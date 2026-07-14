@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Diff;
@@ -43,12 +44,13 @@ internal static class GitChangedFiles
     }
 
     /// <summary>
-    ///     Rebases toplevel-relative paths onto absolute, forward-slash paths, deduped case-insensitively
-    ///     in first-seen order.
+    ///     Rebases toplevel-relative paths onto absolute, forward-slash paths, deduped per-OS
+    ///     (<see cref="PathComparison" />) in first-seen order — so two case-variant changed files stay
+    ///     distinct on a case-sensitive file system rather than one silently swallowing the other.
     /// </summary>
     internal static IReadOnlyList<string> ComposeAbsolute(string toplevel, IEnumerable<string> relative)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(PathComparison.Comparer);
         var result = new List<string>();
         foreach (string rel in relative)
         {

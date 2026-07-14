@@ -16,6 +16,9 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class TripwireSemanticsTests
 {
+    // Match case sensitivity follows the OS file system (the shared PathComparison rule).
+    private static readonly bool CaseInsensitiveFileSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+
     // Alpha and Beta live in the frozen scope; User is outside it and references nothing (so the
     // sibling containment rule stays green and the run's exit signal is tripwire-independent).
     private static readonly CodebaseModel Codebase = CompilationFactory.Extract(
@@ -77,12 +80,33 @@ public sealed class TripwireSemanticsTests
     }
 
     [Fact]
-    public void ChangedFileMatch_IsSeparatorAndCaseInsensitive()
+    public void ChangedFileMatch_IsSeparatorInsensitive()
     {
-        // A different separator and casing in the diff still matches; the warning uses the codebase path.
+        // A backslash separator in the diff still matches the forward-slash codebase path on every OS;
+        // the warning uses the codebase path.
+        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"App.Legacy\Alpha.cs"]));
+
+        tripwire.Warnings.Single().Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+    }
+
+    [Fact]
+    public void ChangedFileMatch_OnCaseInsensitiveFileSystem_IgnoresCase()
+    {
+        // A differently-cased diff path matches only where the OS file system is case-insensitive.
+        Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
         RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"app.legacy\ALPHA.cs"]));
 
         tripwire.Warnings.Single().Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+    }
+
+    [Fact]
+    public void ChangedFileMatch_OnCaseSensitiveFileSystem_DoesNotMatchCaseVariant()
+    {
+        // On Linux a case-variant path is a different file, so the tripwire must not fire on it.
+        Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
+        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"app.legacy\ALPHA.cs"]));
+
+        tripwire.Warnings.ShouldBeEmpty();
     }
 
     [Fact]

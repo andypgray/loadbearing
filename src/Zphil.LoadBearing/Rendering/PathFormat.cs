@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
@@ -20,11 +18,6 @@ namespace Zphil.LoadBearing.Rendering;
 /// </remarks>
 public static class PathFormat
 {
-    private static readonly StringComparison SegmentComparison =
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
     /// <summary>The forward-slashed path from <paramref name="solutionDirectory" /> to <paramref name="filePath" />.</summary>
     public static string Relative(string solutionDirectory, string filePath)
     {
@@ -34,12 +27,12 @@ public static class PathFormat
         // Different roots (a different drive) have no relative path: fall back to the raw target with
         // slashes normalized — the CLI wrapper's former catch behavior.
         if (fromSegments.Length == 0 || toSegments.Length == 0 ||
-            !string.Equals(fromSegments[0], toSegments[0], SegmentComparison))
+            !string.Equals(fromSegments[0], toSegments[0], PathComparison.Comparison))
             return filePath.Replace('\\', '/');
 
         var common = 0;
         int limit = Math.Min(fromSegments.Length, toSegments.Length);
-        while (common < limit && string.Equals(fromSegments[common], toSegments[common], SegmentComparison)) common++;
+        while (common < limit && string.Equals(fromSegments[common], toSegments[common], PathComparison.Comparison)) common++;
 
         var parts = new List<string>();
         for (int i = common; i < fromSegments.Length; i++) parts.Add("..");

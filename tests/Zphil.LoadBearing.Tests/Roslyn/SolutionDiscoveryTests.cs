@@ -1,15 +1,18 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
 ///     Discovery tests. Each runs against a fresh <see cref="Directory.CreateTempSubdirectory(string)" />
 ///     root and drives the walk-up via the <c>workingDirectory</c> parameter — the current directory
-///     is never mutated. The <see cref="LoadBearingEnvVars.SolutionPath" /> env var is cleared per
-///     test (ctor) and restored (Dispose); xUnit runs methods in one class serially, so the one test
-///     that sets it cannot race the others.
+///     is never mutated. The root is canonicalized (like <see cref="PathCanonicalizer" /> does at the
+///     seam) so the <c>Path.GetFullPath</c> expectations hold even on macOS, where the temp dir sits
+///     under a <c>/var</c> → <c>/private/var</c> symlink. The <see cref="LoadBearingEnvVars.SolutionPath" />
+///     env var is cleared per test (ctor) and restored (Dispose); xUnit runs methods in one class
+///     serially, so the one test that sets it cannot race the others.
 /// </summary>
 public sealed class SolutionDiscoveryTests : IDisposable
 {
@@ -18,7 +21,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
 
     public SolutionDiscoveryTests()
     {
-        _tempRoot = Directory.CreateTempSubdirectory("loadbearing-discovery-").FullName;
+        _tempRoot = PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-discovery-").FullName);
         _originalEnvValue = Environment.GetEnvironmentVariable(LoadBearingEnvVars.SolutionPath);
         Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, null);
     }
@@ -132,6 +135,21 @@ public sealed class SolutionDiscoveryTests : IDisposable
 
         ex.Message.ShouldContain("No .sln, .slnf or .slnx file found");
         ex.Message.ShouldContain(LoadBearingEnvVars.SolutionPath);
+    }
+
+    [Fact]
+    public void DiscoverSolution_ThroughSymlinkedDirectory_ReturnsCanonicalPath()
+    {
+        // A real directory with a solution, and a symlink pointing at it. Discovery through the link
+        // must return the canonical (symlink-free) path, so the workspace agrees with git's toplevel.
+        string realDir = CreateDir("real");
+        string slnPath = CreateSln(realDir, "Linked.slnx");
+        string link = Path.Combine(_tempRoot, "link");
+        SymlinkSupport.CreateDirectorySymlink(link, realDir);
+
+        string result = SolutionDiscovery.DiscoverSolution(Path.Combine(link, "Linked.slnx"));
+
+        result.ShouldBe(slnPath);
     }
 
     [Fact]

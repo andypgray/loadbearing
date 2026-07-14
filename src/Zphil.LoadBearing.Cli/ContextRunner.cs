@@ -14,12 +14,6 @@ namespace Zphil.LoadBearing.Cli;
 /// </summary>
 internal sealed class ContextRunner(TextWriter output)
 {
-    // Mirror PathFormat's per-OS segment comparison: case-insensitive on Windows and macOS, ordinal on Linux.
-    private static readonly StringComparison PathComparison =
-        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
@@ -66,11 +60,14 @@ internal sealed class ContextRunner(TextWriter output)
         }
     }
 
+    // Canonicalize the query path to the same standard as the model's declaration-site paths (both
+    // symlink-resolved), so a user/agent path spelled through a symlinked root still matches a scope.
     private static string ResolveQueryPath(string path, string solutionDirectory)
     {
-        return Path.IsPathRooted(path)
+        string full = Path.IsPathRooted(path)
             ? Path.GetFullPath(path)
             : Path.GetFullPath(Path.Combine(solutionDirectory, path));
+        return PathCanonicalizer.Resolve(full);
     }
 
     // True when the scope's resolved directory equals or is an ancestor of the query path — i.e. the
@@ -82,7 +79,7 @@ internal sealed class ContextRunner(TextWriter output)
         if (dirSegments.Length > querySegments.Length) return false;
 
         for (var i = 0; i < dirSegments.Length; i++)
-            if (!string.Equals(dirSegments[i], querySegments[i], PathComparison))
+            if (!string.Equals(dirSegments[i], querySegments[i], PathComparison.Comparison))
                 return false;
 
         return true;

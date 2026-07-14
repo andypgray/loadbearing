@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Roslyn;
+
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
@@ -11,12 +13,17 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 internal sealed class TempFixtureWorkspace : IDisposable
 {
+    // The temp base, resolved through any symlinked ancestor once per run, so every downstream path —
+    // copy root, solution dir, git toplevel — shares one spelling. See RealTempRoot for why the harness
+    // still needs this even though production now canonicalizes at the discovery seam.
+    private static readonly string TempRoot = RealTempRoot();
+
     private readonly string _root;
 
     public TempFixtureWorkspace()
     {
         string source = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp");
-        _root = Path.Combine(Path.GetTempPath(), "loadbearing-mutation", Guid.NewGuid().ToString("N"));
+        _root = Path.Combine(TempRoot, "loadbearing-mutation", Guid.NewGuid().ToString("N"));
         CopyTree(source, _root);
         FixtureRestorer.Restore(SolutionPath);
     }
@@ -61,5 +68,16 @@ internal sealed class TempFixtureWorkspace : IDisposable
     {
         string relative = path.Substring(source.Length).Replace('\\', '/');
         return relative.Contains("/bin/") || relative.Contains("/obj/");
+    }
+
+    // Resolves Path.GetTempPath() through any symlinked ancestor so the returned base is canonical —
+    // the one tested realpath (PathCanonicalizer) shared with production. Still needed here (not just in
+    // the model) because the dotnet restore collision is independent of the model: on macOS
+    // Path.GetTempPath() sits under /var (a symlink to /private/var), and a fixture rooted at the /var
+    // spelling makes dotnet restore visit each project twice and collide on obj/*.nuget.* ("already
+    // exists"). On Windows and Linux no ancestor is a link, so this is Path.GetTempPath() unchanged.
+    private static string RealTempRoot()
+    {
+        return PathCanonicalizer.Resolve(Path.TrimEndingDirectorySeparator(Path.GetTempPath()));
     }
 }

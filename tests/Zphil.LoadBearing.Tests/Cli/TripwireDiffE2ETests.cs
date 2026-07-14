@@ -53,6 +53,40 @@ public sealed class TripwireDiffE2ETests
         result.Out.ShouldContain("Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside frozen scope 'legacy/billing'");
     }
 
+    [Fact]
+    public async Task CheckDiffBase_SolutionOpenedThroughSymlinkedRoot_StillWarns()
+    {
+        using var repo = new TempGitRepo();
+
+        // A symlink whose target is the repo root, living beside the repo (outside its working tree, so
+        // it is never itself a changed file). Opening the solution through it hands the workspace a
+        // symlink-spelled path while `git rev-parse --show-toplevel` returns the canonical one — the exact
+        // divergence that silently defeated the tripwire's prefix match before the discovery-seam
+        // canonicalization. This is the product-side proof of the fix; it would have caught the original bug.
+        string linkRoot = Path.Combine(Path.GetDirectoryName(repo.Root)!, "link-" + Guid.NewGuid().ToString("N"));
+        SymlinkSupport.CreateDirectorySymlink(linkRoot, repo.Root);
+        try
+        {
+            // A brand-new untracked file in dragon territory (the agent-hook case).
+            File.WriteAllText(
+                repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
+                "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+
+            CliResult result = await CliRunner.InvokeAsync(
+                "check", Path.Combine(linkRoot, "MyApp.sln"), "--spec", CliRunner.FrozenSpecDll, "--diff-base", "HEAD");
+
+            result.Exit.ShouldBe(0);
+            result.Out.ShouldContain("warn legacy/billing/tripwire");
+            result.Out.ShouldContain(
+                "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside frozen scope 'legacy/billing'");
+        }
+        finally
+        {
+            // Delete only the symlink (non-recursive), never through it into the real repo.
+            if (Directory.Exists(linkRoot)) Directory.Delete(linkRoot);
+        }
+    }
+
     // Inserts a member line just before a class's final closing brace.
     private static void InsertMember(string filePath, string member)
     {

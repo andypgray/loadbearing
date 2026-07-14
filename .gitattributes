@@ -1,0 +1,15 @@
+# Force LF in the repository and in every checked-out working tree, on every OS.
+#
+# Why this file exists: LoadBearing pins byte-exact strings in tests — raw-string literals compared
+# against `string.Join("\n", …)`, and SHA-256 digests taken over baseline files (GRAMMAR §4). GitHub's
+# Windows runners set `core.autocrlf=true`, so without this the checkout rewrites LF→CRLF and those
+# pins diverge: a CRLF raw-string literal no longer equals an LF join, and a CRLF baseline no longer
+# hashes to its LF digest. Pinning `eol=lf` makes the working tree identical on Windows, Linux, and
+# macOS, independent of each machine's git config.
+* text=auto eol=lf
+
+# Binary types must never be line-ending-normalized, should any be added later.
+*.png binary
+*.ico binary
+*.snk binary
+*.nupkg binary

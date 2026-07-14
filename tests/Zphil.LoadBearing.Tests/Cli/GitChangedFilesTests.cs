@@ -14,6 +14,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class GitChangedFilesTests
 {
+    // ComposeAbsolute runs Path.GetFullPath, which only leaves the toplevel untouched when it is already
+    // rooted for the host OS — a Windows drive letter off Windows would get the CI working directory
+    // prepended. Root the vector natively so the pins hold on every platform (production always gets a
+    // real absolute toplevel from `git rev-parse --show-toplevel`).
+    private static readonly string Toplevel = OperatingSystem.IsWindows() ? "C:/repo" : "/repo";
+
     [Fact]
     public void ParseZTerminated_EmptyOutput_IsEmpty()
     {
@@ -35,15 +41,15 @@ public sealed class GitChangedFilesTests
     [Fact]
     public void ComposeAbsolute_RebasesOntoToplevelWithForwardSlashes()
     {
-        GitChangedFiles.ComposeAbsolute("C:/repo", ["App/Foo.cs", "App/Bar.cs"])
-            .ShouldBe(["C:/repo/App/Foo.cs", "C:/repo/App/Bar.cs"]);
+        GitChangedFiles.ComposeAbsolute(Toplevel, ["App/Foo.cs", "App/Bar.cs"])
+            .ShouldBe([$"{Toplevel}/App/Foo.cs", $"{Toplevel}/App/Bar.cs"]);
     }
 
     [Fact]
     public void ComposeAbsolute_DedupesRepeatedPaths()
     {
-        GitChangedFiles.ComposeAbsolute("C:/repo", ["App/Foo.cs", "App/Foo.cs"])
-            .ShouldBe(["C:/repo/App/Foo.cs"]);
+        GitChangedFiles.ComposeAbsolute(Toplevel, ["App/Foo.cs", "App/Foo.cs"])
+            .ShouldBe([$"{Toplevel}/App/Foo.cs"]);
     }
 
     [Fact]

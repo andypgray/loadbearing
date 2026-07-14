@@ -70,7 +70,10 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
         foreach (ContentUnit unit in units)
         {
             string key = Path.GetFullPath(unit.Directory);
-            FileGroup? group = groups.FirstOrDefault(candidate => string.Equals(candidate.Key, key, StringComparison.Ordinal));
+            // Per-OS so two case-spellings of one directory merge into a single AGENTS.md on
+            // case-insensitive file systems (Windows/macOS) — Ordinal would splice the file twice, the
+            // second clobbering the first — while staying distinct on Linux.
+            FileGroup? group = groups.FirstOrDefault(candidate => string.Equals(candidate.Key, key, PathComparison.Comparison));
             if (group is null)
             {
                 group = new FileGroup(key, unit.Directory);

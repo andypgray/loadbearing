@@ -18,9 +18,12 @@ public static class SolutionDiscovery
     /// <exception cref="InvalidOperationException">No single solution was found, or a directory held several.</exception>
     public static string DiscoverSolution(string? explicitPath = null, string? workingDirectory = null)
     {
+        // Every returned path is canonicalized (symlinks resolved) so the workspace's document paths
+        // agree with git's canonical toplevel — the tripwire prefix match otherwise misses on a
+        // symlinked root (macOS /var → /private/var, a symlinked home, a junction). See PathCanonicalizer.
         if (!string.IsNullOrWhiteSpace(explicitPath))
         {
-            string resolved = Path.GetFullPath(explicitPath);
+            string resolved = PathCanonicalizer.Resolve(explicitPath);
             if (!File.Exists(resolved)) throw new FileNotFoundException($"Solution file not found: {resolved}", resolved);
 
             return resolved;
@@ -29,7 +32,7 @@ public static class SolutionDiscovery
         string? envPath = Environment.GetEnvironmentVariable(LoadBearingEnvVars.SolutionPath);
         if (!string.IsNullOrWhiteSpace(envPath))
         {
-            string resolved = Path.GetFullPath(envPath);
+            string resolved = PathCanonicalizer.Resolve(envPath);
             if (!File.Exists(resolved))
                 throw new FileNotFoundException(
                     $"{LoadBearingEnvVars.SolutionPath} points to a file that does not exist: {resolved}", resolved);
@@ -44,7 +47,7 @@ public static class SolutionDiscovery
         while (current is not null)
         {
             string[] slnFiles = FindSlnFiles(current);
-            if (slnFiles.Length == 1) return slnFiles[0];
+            if (slnFiles.Length == 1) return PathCanonicalizer.Resolve(slnFiles[0]);
 
             if (slnFiles.Length > 1 && firstAmbiguous is null) firstAmbiguous = (current, slnFiles);
 

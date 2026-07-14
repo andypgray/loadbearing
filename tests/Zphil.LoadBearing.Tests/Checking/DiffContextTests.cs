@@ -6,11 +6,15 @@ namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
 ///     <see cref="DiffContext" /> path plumbing (GRAMMAR §7): forward-slash normalization,
-///     separator- and case-insensitive membership, and solution-relative rendering — pure string
-///     logic (no <c>Path.GetRelativePath</c>, netstandard2.0 discipline).
+///     separator-insensitive membership, per-OS case sensitivity, and solution-relative rendering —
+///     pure string logic (no <c>Path.GetRelativePath</c>, netstandard2.0 discipline).
 /// </summary>
 public sealed class DiffContextTests
 {
+    // Membership case sensitivity follows the OS file system: case-insensitive on Windows/macOS,
+    // ordinal on Linux — the PathComparison rule the tripwire now shares.
+    private static readonly bool CaseInsensitiveFileSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+
     private static DiffContext Make(params string[] changed)
     {
         return new DiffContext("HEAD", @"C:\repo\sln", changed);
@@ -23,13 +27,26 @@ public sealed class DiffContextTests
     }
 
     [Fact]
-    public void Contains_MatchesRegardlessOfSeparatorAndCase()
+    public void Contains_MatchesRegardlessOfSeparator()
     {
         DiffContext diff = Make(@"C:\repo\sln\App\Foo.cs");
 
         diff.Contains(@"C:\repo\sln\App\Foo.cs").ShouldBeTrue();
         diff.Contains("C:/repo/sln/App/Foo.cs").ShouldBeTrue();
-        diff.Contains("c:/REPO/sln/app/foo.cs").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Contains_OnCaseInsensitiveFileSystem_MatchesRegardlessOfCase()
+    {
+        Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
+        Make(@"C:\repo\sln\App\Foo.cs").Contains("c:/REPO/sln/app/foo.cs").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Contains_OnCaseSensitiveFileSystem_DoesNotMatchCaseVariant()
+    {
+        Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
+        Make(@"C:\repo\sln\App\Foo.cs").Contains("c:/REPO/sln/app/foo.cs").ShouldBeFalse();
     }
 
     [Fact]

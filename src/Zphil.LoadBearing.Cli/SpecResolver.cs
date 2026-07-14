@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli;
@@ -137,10 +138,14 @@ internal static class SpecResolver
         return outputFilePath!;
     }
 
+    // Compares a user-supplied --spec csproj path against a Roslyn project.FilePath. Both are
+    // canonicalized (symlinks resolved) so a solution opened through a symlinked root still matches, and
+    // compared per-OS (PathComparison) so the match neither misses across symlink spellings nor
+    // over-matches case-variant paths on a case-sensitive file system.
     private static bool PathsEqual(string? a, string? b)
     {
         if (a is null || b is null) return false;
 
-        return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+        return string.Equals(PathCanonicalizer.Resolve(a), PathCanonicalizer.Resolve(b), PathComparison.Comparison);
     }
 }
