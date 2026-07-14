@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The frozen-scope e2e fixture: one Freeze scope over MyApp.Legacy.Billing with NO explicit
+         .Baseline, so its containment resolves to the conventional default
+         arch/baselines/legacy/billing/containment.json (committed alongside the MyApp fixture). Against
+         that grandfather baseline the whole run is exit 0 — the containment passes, the tripwire skips.
+         References only Core; its DLL path is baked into the test assembly's metadata and loaded via the
+         spec flag. The BoundaryOnlyVia facade types are name-carrier stubs (Stubs.cs). -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+</Project>

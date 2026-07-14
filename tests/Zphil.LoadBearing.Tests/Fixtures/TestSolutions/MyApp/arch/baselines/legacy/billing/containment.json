@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "digest": "09321c040efaae40227c89d55ac699b5bd57ed56c4ce9e8c7ecff03e04bb4162",
+  "rules": {
+    "legacy/billing/containment": {
+      "entries": [
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.BillingCalculator" },
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.RoundingMode" }
+      ]
+    }
+  }
+}

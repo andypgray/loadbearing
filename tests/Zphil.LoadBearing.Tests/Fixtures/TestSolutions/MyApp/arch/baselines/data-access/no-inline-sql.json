@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "digest": "5a2d44770632c921c27c338f9178d1e2d4d76b775056f17a54f39e33b8a40eaf",
+  "rules": {
+    "data-access/no-inline-sql": {
+      "entries": [
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable" }
+      ]
+    }
+  }
+}

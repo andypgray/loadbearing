@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The derive-flow golden fixture: the post-curation spec the derive_spec prompt produces against
+         MyApp, all three postures, every baseline path conventional. On a virgin estate (arch/ deleted)
+         check is red with the acknowledged debt, one baseline init captures it, and the re-check is
+         exit 0 — DeriveFlowE2ETests pins the sequence. References only Core; its DLL path is baked into
+         the test assembly's metadata and loaded via the spec flag. typeof() targets are name-carrier
+         stubs (Stubs.cs, IHandler.cs). -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,181 @@
+using Zphil.LoadBearing.Internal;
+using Zphil.LoadBearing.Model;
+
+namespace Zphil.LoadBearing;
+
+/// <summary>
+///     The v1 modal-constraint vocabulary (GRAMMAR §5.3) as extension methods that turn a
+///     <see cref="Selection" /> into a terminal <see cref="Constraint" />. Polarity is lexical —
+///     negation lives in the verb name, never a <c>Not()</c> combinator (GRAMMAR §2). The four
+///     dependency verbs carry both overloads (GRAMMAR §3.3): a <see cref="Selection" /> list and a
+///     <see cref="Type" /> list (sugar that wraps each type as a single-type selection). The
+///     <c>(first, params more)</c> shape makes a zero-target call uncompilable.
+/// </summary>
+public static class SelectionConstraints
+{
+    /// <summary>The subject must not reference any of the targets.</summary>
+    public static Constraint MustNotReference(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotReferenceConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not reference any of the targets (type sugar).</summary>
+    public static Constraint MustNotReference(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotReferenceConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>The subject may reference only the targets (external packages exempt, GRAMMAR §4.1).</summary>
+    public static Constraint MustOnlyReference(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustOnlyReferenceConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject may reference only the targets (type sugar).</summary>
+    public static Constraint MustOnlyReference(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustOnlyReferenceConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>The subject must not be referenced by any of the sources.</summary>
+    public static Constraint MustNotBeReferencedBy(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotBeReferencedByConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not be referenced by any of the sources (type sugar).</summary>
+    public static Constraint MustNotBeReferencedBy(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotBeReferencedByConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>The subject may be referenced only by the sources.</summary>
+    public static Constraint MustOnlyBeReferencedBy(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustOnlyBeReferencedByConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject may be referenced only by the sources (type sugar).</summary>
+    public static Constraint MustOnlyBeReferencedBy(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustOnlyBeReferencedByConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>The subject must reside in a namespace glob.</summary>
+    public static Constraint MustResideInNamespace(this Selection subject, string glob)
+    {
+        return new MustResideInNamespaceConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+    }
+
+    /// <summary>The subject's type names must end with a suffix.</summary>
+    public static Constraint MustHaveSuffix(this Selection subject, string suffix)
+    {
+        return new MustHaveSuffixConstraint(Subject(subject), NotNull(suffix, nameof(suffix)));
+    }
+
+    /// <summary>The subject's type names must start with a prefix.</summary>
+    public static Constraint MustHavePrefix(this Selection subject, string prefix)
+    {
+        return new MustHavePrefixConstraint(Subject(subject), NotNull(prefix, nameof(prefix)));
+    }
+
+    /// <summary>The subject's type names must match a glob.</summary>
+    public static Constraint MustHaveNameMatching(this Selection subject, string glob)
+    {
+        return new MustHaveNameMatchingConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+    }
+
+    /// <summary>The subject must implement an interface.</summary>
+    public static Constraint MustImplement(this Selection subject, Type type)
+    {
+        return new MustImplementConstraint(Subject(subject), NotNull(type, nameof(type)));
+    }
+
+    /// <summary>The subject must derive from a base type.</summary>
+    public static Constraint MustDeriveFrom(this Selection subject, Type type)
+    {
+        return new MustDeriveFromConstraint(Subject(subject), NotNull(type, nameof(type)));
+    }
+
+    /// <summary>The subject must carry an attribute.</summary>
+    public static Constraint MustBeAttributedWith(this Selection subject, Type type)
+    {
+        return new MustBeAttributedWithConstraint(Subject(subject), NotNull(type, nameof(type)));
+    }
+
+    /// <summary>The subject must be sealed.</summary>
+    public static Constraint MustBeSealed(this Selection subject)
+    {
+        return new MustBeSealedConstraint(Subject(subject));
+    }
+
+    /// <summary>The subject must be static.</summary>
+    public static Constraint MustBeStatic(this Selection subject)
+    {
+        return new MustBeStaticConstraint(Subject(subject));
+    }
+
+    /// <summary>The subject must be abstract.</summary>
+    public static Constraint MustBeAbstract(this Selection subject)
+    {
+        return new MustBeAbstractConstraint(Subject(subject));
+    }
+
+    /// <summary>The subject must be public.</summary>
+    public static Constraint MustBePublic(this Selection subject)
+    {
+        return new MustBePublicConstraint(Subject(subject));
+    }
+
+    /// <summary>The subject must be internal.</summary>
+    public static Constraint MustBeInternal(this Selection subject)
+    {
+        return new MustBeInternalConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     The constraint-position escape hatch. The predicate is stored, never evaluated in
+    ///     Phase 1; the required <paramref name="description" /> completes "must …". A blank
+    ///     description fails spec build (validation §8 item 5).
+    /// </summary>
+    public static Constraint Must(this Selection subject, Func<ITypeInfo, bool> predicate, string description)
+    {
+        return new MustConstraint(Subject(subject), NotNull(predicate, nameof(predicate)), description);
+    }
+
+    private static IReadOnlyList<Selection> Selections(Selection subject, Selection first, Selection[] more)
+    {
+        Guard.NotNull(subject, nameof(subject));
+        var list = new List<Selection>(1 + more.Length) { NotNull(first, nameof(first)) };
+        foreach (Selection selection in more) list.Add(NotNull(selection, nameof(more)));
+
+        return list;
+    }
+
+    private static IReadOnlyList<Selection> WrappedTypes(Selection subject, Type first, Type[] more)
+    {
+        Guard.NotNull(subject, nameof(subject));
+        var list = new List<Selection>(1 + more.Length) { Wrap(subject, NotNull(first, nameof(first))) };
+        foreach (Type type in more) list.Add(Wrap(subject, NotNull(type, nameof(more))));
+
+        return list;
+    }
+
+    // A bare type target wraps as a single-type selection stamped with the subject's owner, so the
+    // sugar overload is exactly the selection overload with arch.Type(...) written for the caller.
+    private static Selection Wrap(Selection subject, Type type)
+    {
+        return new RefinedSelection(subject.Owner, new TypeNoun(type), Array.Empty<SelectionAdjective>());
+    }
+
+    private static Selection Subject(Selection subject)
+    {
+        return Guard.NotNull(subject, nameof(subject));
+    }
+
+    private static T NotNull<T>(T value, string paramName)
+        where T : class
+    {
+        return Guard.NotNull(value, paramName);
+    }
+}

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "solution": "MyApp.sln",
+  "projects": [
+    {
+      "name": "MyApp.Domain",
+      "projectReferences": [
+        "MyApp.Web"
+      ],
+      "types": 5,
+      "namespaces": [
+        {
+          "namespace": "MyApp.Domain",
+          "types": 5
+        }
+      ]
+    },
+    {
+      "name": "MyApp.Legacy.Billing",
+      "projectReferences": [],
+      "types": 4,
+      "namespaces": [
+        {
+          "namespace": "MyApp.Legacy.Billing",
+          "types": 4
+        }
+      ]
+    },
+    {
+      "name": "MyApp.Web",
+      "projectReferences": [
+        "MyApp.Legacy.Billing"
+      ],
+      "types": 8,
+      "namespaces": [
+        {
+          "namespace": "MyApp.Web",
+          "types": 8
+        }
+      ]
+    }
+  ],
+  "projectEdges": [
+    {
+      "source": "MyApp.Domain",
+      "target": "MyApp.Web",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "target": "MyApp.Legacy.Billing",
+      "references": 3
+    }
+  ],
+  "externalEdges": [
+    {
+      "source": "MyApp.Legacy.Billing",
+      "targetNamespaceRoot": "System",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System",
+      "references": 1
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Data",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Text",
+      "references": 1
+    }
+  ]
+}

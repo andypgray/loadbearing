@@ -1,0 +1,21 @@
+# Weekly dependency-update PRs: GitHub Actions pins and NuGet packages.
+# SHA-pinned action versions (see .github/workflows/) are kept current by the
+# github-actions ecosystem; the SECURITY.md pinning promise depends on this file.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Only the five projects with committed packages.lock.json are listed. The fixture and
+  # arch projects are deliberately absent — they carry no lock files by design.
+  - package-ecosystem: nuget
+    directories:
+      - /src/Zphil.LoadBearing
+      - /src/Zphil.LoadBearing.Roslyn
+      - /src/Zphil.LoadBearing.Xunit
+      - /src/Zphil.LoadBearing.Cli
+      - /tests/Zphil.LoadBearing.Tests
+    schedule:
+      interval: weekly

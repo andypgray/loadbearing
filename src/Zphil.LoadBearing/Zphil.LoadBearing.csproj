@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 is the only TFM referenceable from both a legacy net48 spec project
+             (typeof() over net48 product types) and the net10 CLI/Roslyn/tests. It forces the
+             desirable Core(model)/Roslyn split. See DESIGN.md §13(a). LangVersion 13.0 is pinned
+             because netstandard2.0 otherwise defaults to C# 7.3, losing primary constructors,
+             file-scoped namespaces, and get-only auto-props set from a primary-ctor param
+             (which need no IsExternalInit — so no records/init, no PolySharp shim). -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- The spec-contract package: what a spec project references. PackageId is explicit for
+             clarity; version + shared metadata come from the repo-root Directory.Build.props. -->
+        <PackageId>Zphil.LoadBearing</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>The LoadBearing spec contract: a fluent C# builder and reified rule model for describing .NET architecture — layers, scopes, and rules, each with a posture (Enforce for the law, Migrate for ratcheted tech debt, Freeze for contained legacy). Architecture spec projects reference this package; checking and rendering come from the loadbearing tool (Zphil.LoadBearing.Cli) or the xUnit adapter (Zphil.LoadBearing.Xunit). netstandard2.0 with zero dependencies, so a spec project can target anything from net48 up.</Description>
+        <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;tech-debt;legacy;csharp;dotnet</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The Roslyn extraction project mints and fills Codebase nodes (internal ctors/setters);
+             it is machinery-only and never enters Core's dependency closure. -->
+        <InternalsVisibleTo Include="Zphil.LoadBearing.Roslyn" />
+        <InternalsVisibleTo Include="Zphil.LoadBearing.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+</Project>

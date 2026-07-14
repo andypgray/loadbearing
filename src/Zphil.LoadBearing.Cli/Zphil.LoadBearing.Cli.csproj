@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- net10.0 host: orchestrates workspace load → spec load → extract → check → render.
+             RollForward=Major so a global tool runs on a newer shared runtime. This project packs as
+             the `loadbearing` global tool and MCP server; PackageId is set explicitly to
+             Zphil.LoadBearing.Cli because AssemblyName is `loadbearing`, which would otherwise become
+             the package id and collide with the tool command name. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RollForward>Major</RollForward>
+        <AssemblyName>loadbearing</AssemblyName>
+
+        <!-- Global tool + MCP server identity. PackAsTool applies the DotnetTool package type;
+             PackageType=McpServer additionally marks it for MCP Registry / NuGet MCP discovery. The
+             two coexist. Version + shared metadata come from the repo-root Directory.Build.props. -->
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>loadbearing</ToolCommandName>
+        <PackageId>Zphil.LoadBearing.Cli</PackageId>
+        <PackageType>McpServer</PackageType>
+        <Description>One architecture spec, two render targets. LoadBearing checks a .NET solution against a fluent C# architecture spec — every rule carries a posture: Enforce for the law, Migrate for ratcheted tech debt with a grandfathered baseline, Freeze for contained legacy — and generates AI-agent context (a managed AGENTS.md block, MCP tools via 'loadbearing mcp') so the rules agents read are provably the rules the build enforces. Built for big, messy, business-critical legacy .NET codebases.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;static-analysis;tech-debt;legacy;agents-md;mcp;model-context-protocol;ai;claude;cursor;copilot;csharp;dotnet-tool;dotnet</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- PackagePath must use forward slashes: on a Linux release runner a backslash is not a path
+             separator, so `.mcp\server.json` mis-packs as the literal `.mcp//server.json` (the donor
+             resharper-cli-mcp shipped exactly that bug in 1.0.0) and nuget.org fails to detect the MCP
+             manifest. The tool ships the root README and the MCP server manifest. -->
+        <None Include="..\..\README.md" Pack="true" PackagePath="/" />
+        <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp/server.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\Zphil.LoadBearing.Roslyn\Zphil.LoadBearing.Roslyn.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.CommandLine" Version="2.0.9" />
+        <!-- The `mcp` subcommand's stdio server chassis (donor: resharper-cli-mcp). Pins match the
+             sibling's current versions; all four are in the local NuGet cache. -->
+        <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- LogicalName pinned so ServerInstructions loads "server-instructions.md" rather than the
+             path-mangled default (the file lives under Mcp\). -->
+        <EmbeddedResource Include="Mcp\server-instructions.md" LogicalName="server-instructions.md" />
+        <!-- Same pinned short LogicalName for the derive_spec prompt body (the file lives under
+             Mcp\Prompts\). House style embeds by short name; the donor (resharper-cli-mcp) uses dotted
+             assembly-qualified ids — the deliberate divergence EmbeddedResourceText.Load consumes. -->
+        <EmbeddedResource Include="Mcp\Prompts\derive-spec.md" LogicalName="derive-spec.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Zphil.LoadBearing.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+</Project>

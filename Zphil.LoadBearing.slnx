@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Zphil.LoadBearing/Zphil.LoadBearing.csproj" />
+    <Project Path="src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj" />
+    <Project Path="src/Zphil.LoadBearing.Roslyn/Zphil.LoadBearing.Roslyn.csproj" />
+    <Project Path="src/Zphil.LoadBearing.Xunit/Zphil.LoadBearing.Xunit.csproj" />
+  </Folder>
+  <Folder Name="/arch/">
+    <Project Path="arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Fixtures/">
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppCleanSpec/Zphil.LoadBearing.MyAppCleanSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppDerivedSpec/Zphil.LoadBearing.MyAppDerivedSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppFrozenSpec/Zphil.LoadBearing.MyAppFrozenSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppRenderSpec/Zphil.LoadBearing.MyAppRenderSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppViolatedSpec/Zphil.LoadBearing.MyAppViolatedSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.SpecFixture/Zphil.LoadBearing.SpecFixture.csproj" />
+  </Folder>
+</Solution>

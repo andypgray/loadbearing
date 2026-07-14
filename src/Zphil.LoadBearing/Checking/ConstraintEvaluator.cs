@@ -1,0 +1,148 @@
+using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Model;
+
+namespace Zphil.LoadBearing.Checking;
+
+/// <summary>
+///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
+///     §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; shape verbs test each subject.
+///     Every verb first requires a non-empty subject set — an empty subject fails the rule by default
+///     (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
+/// </summary>
+internal sealed class ConstraintEvaluator
+{
+    /// <summary>The pinned message on an empty-subject failure (ArchUnit precedent, GRAMMAR §4.1).</summary>
+    internal const string EmptySubjectMessage = "The subject selection matched no solution-declared types.";
+
+    private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
+
+    private readonly IReadOnlyList<ReferenceEdge> _edges;
+    private readonly SelectionEvaluator _selections;
+
+    internal ConstraintEvaluator(CodebaseModel model)
+    {
+        _edges = model.Edges;
+        _selections = new SelectionEvaluator(model);
+    }
+
+    internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) Evaluate(Constraint constraint)
+    {
+        var subjects = _selections.Evaluate(constraint.Subject, SelectionPosition.Subject);
+        if (subjects.Count == 0) return (new[] { Violation.EmptySubject(EmptySubjectMessage) }, NoWarnings);
+
+        switch (constraint)
+        {
+            case MustNotReferenceConstraint c:
+                return ForbiddenReference(subjects, c.Targets, false);
+            case MustNotBeReferencedByConstraint c:
+                return ForbiddenReference(subjects, c.Sources, true);
+            case MustOnlyReferenceConstraint c:
+                return OnlyReference(subjects, c.Targets);
+            case MustOnlyBeReferencedByConstraint c:
+                return OnlyBeReferencedBy(subjects, c.Sources);
+            case MustResideInNamespaceConstraint c:
+                var namespacePattern = new NamespacePattern(c.Glob);
+                return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
+            case MustHaveSuffixConstraint c:
+                return Shape(subjects, t => t.Name.EndsWith(c.Suffix, StringComparison.Ordinal));
+            case MustHavePrefixConstraint c:
+                return Shape(subjects, t => t.Name.StartsWith(c.Prefix, StringComparison.Ordinal));
+            case MustHaveNameMatchingConstraint c:
+                var namePattern = new TypeNamePattern(c.Glob);
+                return Shape(subjects, t => namePattern.Matches(t.Name));
+            case MustImplementConstraint c:
+                return Shape(subjects, SelectionEvaluator.InterfaceMatcher(c.Type));
+            case MustDeriveFromConstraint c:
+                return Shape(subjects, SelectionEvaluator.BaseTypeMatcher(c.Type));
+            case MustBeAttributedWithConstraint c:
+                return Shape(subjects, SelectionEvaluator.AttributeMatcher(c.Type));
+            case MustBeSealedConstraint:
+                return Shape(subjects, t => t.IsSealed);
+            case MustBeStaticConstraint:
+                return Shape(subjects, t => t.IsStatic);
+            case MustBeAbstractConstraint:
+                return Shape(subjects, t => t.IsAbstract);
+            case MustBePublicConstraint:
+                return Shape(subjects, t => t.Accessibility == Accessibility.Public);
+            case MustBeInternalConstraint:
+                return Shape(subjects, t => t.Accessibility == Accessibility.Internal);
+            case MustConstraint c:
+                return Shape(subjects, t => SelectionEvaluator.InvokePredicate(c.Predicate, t, "Must"));
+            default:
+                return (Array.Empty<Violation>(), NoWarnings);
+        }
+    }
+
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        // Outbound (MustNotReference): edge subject→operand. Inbound (MustNotBeReferencedBy):
+        // edge operand→subject, Source = the referencing type where the edit happens (GRAMMAR §4.3).
+        foreach (ReferenceEdge edge in _edges)
+        {
+            bool hit = inbound
+                ? subjects.Contains(edge.Target) && operandSet.Contains(edge.Source)
+                : subjects.Contains(edge.Source) && operandSet.Contains(edge.Target);
+            if (hit) violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+        }
+
+        // Inert only when the forbidden operand set is empty AND at least one operand is a pattern
+        // selection; a bare typeof target absent from the codebase is the win condition (decision 3).
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedTargets)
+    {
+        var allowed = ResolveOperands(allowedTargets);
+        var violations = new List<Violation>();
+
+        // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
+        // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
+        foreach (ReferenceEdge edge in _edges)
+            if (subjects.Contains(edge.Source) && !edge.Target.IsExternal && !allowed.Contains(edge.Target))
+                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+
+        return (violations, NoWarnings);
+    }
+
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedSources)
+    {
+        var allowed = ResolveOperands(allowedSources);
+        var violations = new List<Violation>();
+
+        // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
+        // Edge sources are always solution-declared, so no external caveat is needed.
+        foreach (ReferenceEdge edge in _edges)
+            if (subjects.Contains(edge.Target) && !allowed.Contains(edge.Source))
+                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+
+        return (violations, NoWarnings);
+    }
+
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
+    {
+        var violations = new List<Violation>();
+        foreach (TypeNode subject in subjects)
+            if (!holds(subject))
+                violations.Add(Violation.Shape(subject, subject.DeclarationSites));
+
+        return (violations, NoWarnings);
+    }
+
+    private HashSet<TypeNode> ResolveOperands(IReadOnlyList<Selection> operands)
+    {
+        var set = new HashSet<TypeNode>();
+        foreach (Selection operand in operands) set.UnionWith(_selections.Evaluate(operand, SelectionPosition.Target));
+
+        return set;
+    }
+}

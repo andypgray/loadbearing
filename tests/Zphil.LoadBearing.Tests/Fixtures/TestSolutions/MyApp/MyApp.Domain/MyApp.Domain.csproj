@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- The SDK propagates project references transitively (Domain would resolve Billing via
+             Web), so Roslyn's Project.ProjectReferences would report the transitive closure. This
+             fixture pins the DECLARED chain graph, so transitivity is disabled here. Whether the
+             product surfaces declared vs transitive project refs is a Phase 3+ decision. -->
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\MyApp.Web\MyApp.Web.csproj" />
+    </ItemGroup>
+</Project>
