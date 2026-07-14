@@ -77,6 +77,30 @@ public sealed class SpecResolverTests
         Should.Throw<UserErrorException>(() => SpecResolver.RequireBuiltOutput("MyApp.Arch", null));
     }
 
+    [Fact]
+    public void RequireBuiltOutput_EvaluatedConfigMissingButSiblingBuilt_ResolvesSiblingConfiguration()
+    {
+        // The release-CI regression: MSBuildWorkspace evaluates OutputFilePath in Debug, but a
+        // `dotnet build -c Release` only produced the Release output. Resolution must find the assembly
+        // that is actually on disk rather than fail "no built output" for a Debug DLL nobody built.
+        string root = Path.Combine(Path.GetTempPath(), "loadbearing-specresolver", Guid.NewGuid().ToString("N"));
+        string evaluatedDebugOutput = Path.Combine(root, "bin", "Debug", "net10.0", "MyApp.Arch.dll");
+        string builtReleaseOutput = Path.Combine(root, "bin", "Release", "net10.0", "MyApp.Arch.dll");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(builtReleaseOutput)!);
+            File.WriteAllText(builtReleaseOutput, "");
+
+            string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", evaluatedDebugOutput);
+
+            resolved.ShouldBe(builtReleaseOutput);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     private static SpecProjectCandidate Candidate(string name, string referencePath)
     {
         return new SpecProjectCandidate(name, [referencePath], $"C:/out/{name}.dll");

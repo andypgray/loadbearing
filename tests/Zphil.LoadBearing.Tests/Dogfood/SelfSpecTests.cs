@@ -23,7 +23,9 @@ public sealed class SelfSpecTests
         // Loads the whole solution through MSBuildWorkspace (several seconds — accepted for Phase 4).
         CliResult result = await CliRunner.InvokeAsync("check", RepoRoot.Solution, "--spec", RepoRoot.ArchSpecCsproj);
 
-        result.Exit.ShouldBe(0);
+        // Surface the CLI's own output on failure — otherwise a red self-check (e.g. the Release-only
+        // spec-resolution regression) shows only "2 != 0" with no clue why, as the release run did.
+        result.Exit.ShouldBe(0, $"check exited {result.Exit}.\nstderr:\n{result.Err}\nstdout:\n{result.Out}");
     }
 
     [Fact]

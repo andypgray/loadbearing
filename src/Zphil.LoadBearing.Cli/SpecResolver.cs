@@ -129,13 +129,50 @@ internal static class SpecResolver
 
     internal static string RequireBuiltOutput(string projectName, string? outputFilePath)
     {
-        if (string.IsNullOrEmpty(outputFilePath) || !File.Exists(outputFilePath))
-            throw new UserErrorException(
-                $"The spec project '{projectName}' has no built output" +
-                (string.IsNullOrEmpty(outputFilePath) ? "" : $" at '{outputFilePath}'") +
-                ". Build the solution first (dotnet build).");
+        if (!string.IsNullOrEmpty(outputFilePath))
+        {
+            if (File.Exists(outputFilePath)) return outputFilePath;
 
-        return outputFilePath!;
+            // MSBuildWorkspace evaluates every project in its default configuration (Debug) whatever the
+            // caller actually built, so OutputFilePath can name a Debug DLL a Release-only build never
+            // produced — the release-CI regression: `dotnet build -c Release` then `check` looked for the
+            // never-built Debug output and failed "no built output". Fall back to the same assembly under a
+            // sibling configuration before giving up, so `check` works whatever configuration was built.
+            if (FindBuiltOutputInSiblingConfiguration(outputFilePath) is { } built) return built;
+        }
+
+        throw new UserErrorException(
+            $"The spec project '{projectName}' has no built output" +
+            (string.IsNullOrEmpty(outputFilePath) ? "" : $" at '{outputFilePath}'") +
+            ". Build the solution first (dotnet build).");
+    }
+
+    // Given an evaluated output path bin/<config>/<tfm>/<assembly>.dll that does not exist, look for the
+    // same assembly under a sibling build configuration — bin/<otherConfig>/<tfm>/<assembly>.dll — and
+    // return the most recently written match, or null when no configuration is built. Scoped to the sibling
+    // <config> directories at the same depth (not a recursive walk), so it never picks up a ref-assembly
+    // or an unrelated nested copy. Only engages when the evaluated path is absent, so the common
+    // output-present path keeps its exact former behaviour.
+    private static string? FindBuiltOutputInSiblingConfiguration(string evaluatedOutputPath)
+    {
+        string? targetFrameworkDirectory = Path.GetDirectoryName(evaluatedOutputPath);
+        string? configurationDirectory =
+            targetFrameworkDirectory is null ? null : Path.GetDirectoryName(targetFrameworkDirectory);
+        string? binDirectory =
+            configurationDirectory is null ? null : Path.GetDirectoryName(configurationDirectory);
+        if (string.IsNullOrEmpty(targetFrameworkDirectory)
+            || string.IsNullOrEmpty(binDirectory)
+            || !Directory.Exists(binDirectory))
+            return null;
+
+        string assemblyFileName = Path.GetFileName(evaluatedOutputPath);
+        string targetFramework = Path.GetFileName(targetFrameworkDirectory);
+
+        return Directory.EnumerateDirectories(binDirectory)
+            .Select(configuration => Path.Combine(configuration, targetFramework, assemblyFileName))
+            .Where(File.Exists)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
     }
 
     // Compares a user-supplied --spec csproj path against a Roslyn project.FilePath. Both are
