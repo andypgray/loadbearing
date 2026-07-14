@@ -1,6 +1,6 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 

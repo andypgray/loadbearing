@@ -22,9 +22,17 @@ public sealed class AdapterTests
     [Fact]
     public void RuleRows_UsesRuleIdsAsDisplayNames()
     {
-        ITheoryDataRow row = ArchRuleTests<LoadBearingArchSpec>.RuleRows().Single();
+        // The dogfood spec exercises all three postures, so discovery must surface each post-desugar rule
+        // ID as its own display name — including the Freeze scope's containment + tripwire children.
+        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows().ToList();
 
-        row.TestDisplayName.ShouldBe("layering/core-no-roslyn");
+        rows.Select(row => row.TestDisplayName).ShouldBe(
+        [
+            "layering/core-no-roslyn",
+            "mcp/env-through-seam",
+            "roslyn/msbuild-bootstrap/containment",
+            "roslyn/msbuild-bootstrap/tripwire"
+        ], true);
     }
 
     [Fact]

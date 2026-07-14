@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "digest": "946f2bdb647be11935ec52a6c22dc861083028ee93eab8fb69416ffe9408283c",
+  "rules": {
+    "mcp/env-through-seam": {
+      "entries": [
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog", "target": "T:System.Environment" },
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.ParentProcessWatcher", "target": "T:System.Environment" },
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration", "target": "T:System.Environment" },
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.ServerShutdown", "target": "T:System.Environment" }
+      ]
+    }
+  }
+}

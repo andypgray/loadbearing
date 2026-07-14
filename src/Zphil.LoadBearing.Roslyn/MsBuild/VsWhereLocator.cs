@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 
-namespace Zphil.LoadBearing.Roslyn;
+namespace Zphil.LoadBearing.Roslyn.MsBuild;
 
 /// <summary>
 ///     Discovers installed Visual Studio instances via the standard <c>vswhere.exe</c> tool.

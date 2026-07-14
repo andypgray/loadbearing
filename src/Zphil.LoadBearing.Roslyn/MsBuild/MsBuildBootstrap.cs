@@ -1,6 +1,6 @@
 using Microsoft.Build.Locator;
 
-namespace Zphil.LoadBearing.Roslyn;
+namespace Zphil.LoadBearing.Roslyn.MsBuild;
 
 /// <summary>
 ///     Selects an MSBuild instance and registers it both for the current process and (via inherited

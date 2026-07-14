@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "digest": "6589e450ae7dba74fd78cbfccf5a0e22322881dcddc7af39cf8caa2646361af5",
+  "rules": {
+    "roslyn/msbuild-bootstrap/containment": {
+      "entries": [
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.MsBuildBootstrapTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance" },
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance" },
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsWhereLocator" }
+      ]
+    }
+  }
+}

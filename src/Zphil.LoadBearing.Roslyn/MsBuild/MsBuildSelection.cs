@@ -1,4 +1,4 @@
-namespace Zphil.LoadBearing.Roslyn;
+namespace Zphil.LoadBearing.Roslyn.MsBuild;
 
 /// <summary>
 ///     Result of MSBuild selection, returned by <see cref="MsBuildBootstrap.Initialize" /> (the

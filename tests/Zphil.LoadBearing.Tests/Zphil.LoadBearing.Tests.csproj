@@ -22,6 +22,9 @@
         <PackageReference Include="coverlet.collector" Version="10.0.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.0" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
+        <!-- Differential-testing oracle (Phase 10): the ArchUnitNET core builds a rival architecture
+             model from compiled MyApp IL (Mono.Cecil), cross-checking LoadBearing's Roslyn-source model. -->
+        <PackageReference Include="TngTech.ArchUnitNET" Version="0.13.3" />
         <PackageReference Include="xunit.v3" Version="3.2.2" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     </ItemGroup>
@@ -68,6 +71,27 @@
                           Private="false" />
     </ItemGroup>
 
+    <!-- The MyApp fixture solution's three projects, pulled into the build graph so their IL exists for
+         the ArchUnitNET oracle (Part A, Phase 10). Same discipline as the spec fixtures above:
+         ReferenceOutputAssembly=false keeps MyApp types invisible to compilation (the tests can't see
+         them by CLR identity — the oracle stub stands in), and Private=false keeps their DLLs out of the
+         tests output copy (the oracle loads them by baked path). Each carries a distinct OutputItemType so
+         its resolved DLL path is baked as its own metadata attribute. -->
+    <ItemGroup>
+        <ProjectReference Include="Fixtures\TestSolutions\MyApp\MyApp.Domain\MyApp.Domain.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="MyAppDomainAssembly"
+                          Private="false" />
+        <ProjectReference Include="Fixtures\TestSolutions\MyApp\MyApp.Web\MyApp.Web.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="MyAppWebAssembly"
+                          Private="false" />
+        <ProjectReference Include="Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="MyAppBillingAssembly"
+                          Private="false" />
+    </ItemGroup>
+
     <!-- Bake each built fixture DLL's absolute path into an assembly metadata attribute the tests
          read at runtime. Runs after references resolve and before assembly info is generated, so the
          paths are available and materialized into the compiled metadata. -->
@@ -98,6 +122,19 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>DerivedSpecPath</_Parameter1>
                 <_Parameter2>@(DerivedSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <!-- The three MyApp fixture DLL paths, for the ArchUnitNET oracle to load by path. -->
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>MyAppDomainPath</_Parameter1>
+                <_Parameter2>@(MyAppDomainAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>MyAppWebPath</_Parameter1>
+                <_Parameter2>@(MyAppWebAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>MyAppBillingPath</_Parameter1>
+                <_Parameter2>@(MyAppBillingAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
         </ItemGroup>
     </Target>

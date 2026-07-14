@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Cli;
 

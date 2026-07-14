@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Build.Locator;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 [assembly: AssemblyFixture(typeof(WorkspaceFixture))]
