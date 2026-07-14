@@ -1,0 +1,118 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <OutputType>Exe</OutputType>
+        <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+        <!-- Lock-file policy inline here (rather than a tests/Directory.Build.props) so it applies to
+             this project alone. A directory-level policy would also catch the deliberately-unlocked
+             fixtures below it: the spec-fixture projects under tests/Fixtures/ (slnx members, so a CI
+             solution restore would demand lock files for them) and the MyApp fixture solution under
+             this project's Fixtures/TestSolutions/, whose bin-output copies FixtureRestorer restores
+             mid-test-run with $(CI) still set — a locked-mode restore on an unlocked fixture fails. -->
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" Version="10.0.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.0" />
+        <PackageReference Include="Shouldly" Version="4.3.0" />
+        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing.Cli\Zphil.LoadBearing.Cli.csproj" />
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing.Roslyn\Zphil.LoadBearing.Roslyn.csproj" />
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing.Xunit\Zphil.LoadBearing.Xunit.csproj" />
+        <!-- Normal reference (ReferenceOutputAssembly=true): AgentsMd_IsCurrent consumes the dogfood
+             spec type directly to compose the block in-process. Unlike the fixture specs, using this
+             type is legitimate. -->
+        <ProjectReference Include="..\..\arch\Zphil.LoadBearing.ArchSpec\Zphil.LoadBearing.ArchSpec.csproj" />
+    </ItemGroup>
+
+    <!-- Spec fixtures are referenced for build order only: ReferenceOutputAssembly=false keeps their
+         types invisible to compilation (so tests cannot cheat by referencing them), and Private=false
+         keeps their DLLs out of this project's output (the CLI/ALC loads them by path). Each gets a
+         distinct OutputItemType so its resolved path can be baked as its own metadata attribute. -->
+    <ItemGroup>
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.SpecFixture\Zphil.LoadBearing.SpecFixture.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="SpecFixtureAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppViolatedSpec\Zphil.LoadBearing.MyAppViolatedSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="ViolatedSpecAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppCleanSpec\Zphil.LoadBearing.MyAppCleanSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="CleanSpecAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppRenderSpec\Zphil.LoadBearing.MyAppRenderSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="RenderSpecAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppFrozenSpec\Zphil.LoadBearing.MyAppFrozenSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="FrozenSpecAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppDerivedSpec\Zphil.LoadBearing.MyAppDerivedSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="DerivedSpecAssembly"
+                          Private="false" />
+    </ItemGroup>
+
+    <!-- Bake each built fixture DLL's absolute path into an assembly metadata attribute the tests
+         read at runtime. Runs after references resolve and before assembly info is generated, so the
+         paths are available and materialized into the compiled metadata. -->
+    <Target Name="AddSpecFixturePathAttribute"
+            BeforeTargets="CoreGenerateAssemblyInfo"
+            DependsOnTargets="ResolveProjectReferences">
+        <ItemGroup>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>SpecFixturePath</_Parameter1>
+                <_Parameter2>@(SpecFixtureAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>ViolatedSpecPath</_Parameter1>
+                <_Parameter2>@(ViolatedSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>CleanSpecPath</_Parameter1>
+                <_Parameter2>@(CleanSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>RenderSpecPath</_Parameter1>
+                <_Parameter2>@(RenderSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>FrozenSpecPath</_Parameter1>
+                <_Parameter2>@(FrozenSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>DerivedSpecPath</_Parameter1>
+                <_Parameter2>@(DerivedSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+        </ItemGroup>
+    </Target>
+
+    <!-- Test fixtures (e.g. the Phase 2 fixture solutions) are copied to output, not compiled.
+         An empty Fixtures glob is not an error, so this stays safe while no fixtures exist. -->
+    <ItemGroup>
+        <Compile Remove="Fixtures/**/*.cs" />
+        <Content Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+        <!-- A locally built/restored fixture must not leak build artifacts into the output copy: a
+             stale swept-in project.assets.json would defeat FixtureRestorer's restore-skip check. -->
+        <Content Remove="Fixtures/**/bin/**" />
+        <Content Remove="Fixtures/**/obj/**" />
+        <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="Cli/Golden/*.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+</Project>

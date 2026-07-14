@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 3,
+  "solution": "MyApp.sln",
+  "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must not reference the Web layer.",
+      "because": "Domain is UI-agnostic; transaction boundaries live in services.",
+      "fix": "Define an abstraction in Domain and implement it in Web.",
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.HomeController",
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 13
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.WebTextExtensions",
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/billing-independent",
+      "posture": "enforce",
+      "status": "passed",
+      "sentence": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`.",
+      "because": "Billing must not reach up into the web layer.",
+      "violations": [],
+      "warnings": []
+    },
+    {
+      "id": "data-access/no-inline-sql",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`.",
+      "because": "Repository pattern for testability.",
+      "fix": "Inject the repository.",
+      "baseline": {
+        "path": "arch/baselines/data-access/no-inline-sql.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.HomeController",
+          "target": "System.Data.DataTable",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 24
+            },
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 26
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ghost",
+      "posture": "enforce",
+      "status": "passed",
+      "sentence": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`.",
+      "because": "Nothing should reference the (nonexistent) ghost layer.",
+      "violations": [],
+      "warnings": [
+        {
+          "kind": "inertTarget",
+          "message": "This rule is inert: its target selection matched no types."
+        }
+      ]
+    },
+    {
+      "id": "naming/nonexistent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types in `MyApp.Nowhere.*` must be named `*Service`.",
+      "because": "A subject that matches nothing must fail loudly.",
+      "violations": [
+        {
+          "kind": "emptySubject",
+          "detail": "The subject selection matched no solution-declared types.",
+          "sites": []
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/containment",
+      "posture": "freeze",
+      "status": "failed",
+      "sentence": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.",
+      "because": "Replacement scheduled; not worth stabilizing.",
+      "fix": "use `IBillingFacade`",
+      "baseline": {
+        "path": "arch/violated-freeze-baseline.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.BillingCalculator",
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.RoundingMode",
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/tripwire",
+      "posture": "freeze",
+      "status": "skipped",
+      "sentence": "",
+      "because": "Replacement scheduled; not worth stabilizing.",
+      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.",
+      "violations": [],
+      "warnings": []
+    }
+  ],
+  "workspaceDiagnostics": [],
+  "summary": {
+    "rulesChecked": 7,
+    "rulesPassed": 2,
+    "rulesFailed": 4,
+    "rulesSkipped": 1,
+    "violations": 6,
+    "warnings": 1
+  }
+}

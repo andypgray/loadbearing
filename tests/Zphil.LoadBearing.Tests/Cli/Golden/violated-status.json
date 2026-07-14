@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "solution": "MyApp.sln",
+  "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "layering/billing-independent",
+      "posture": "enforce",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 0
+    },
+    {
+      "id": "data-access/no-inline-sql",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/data-access/no-inline-sql.json",
+        "captured": true,
+        "remaining": 1,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "layering/no-ghost",
+      "posture": "enforce",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 1
+    },
+    {
+      "id": "naming/nonexistent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "legacy/billing/containment",
+      "posture": "freeze",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/violated-freeze-baseline.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 2,
+        "stale": 0
+      }
+    },
+    {
+      "id": "legacy/billing/tripwire",
+      "posture": "freeze",
+      "status": "skipped",
+      "violations": 0,
+      "warnings": 0
+    }
+  ],
+  "summary": {
+    "rulesChecked": 7,
+    "rulesPassed": 2,
+    "rulesFailed": 4,
+    "rulesSkipped": 1,
+    "grandfatheredRemaining": 1,
+    "fixedAwaitingAcceptance": 0
+  }
+}

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # Restore/build/test the whole solution, not just the test project: the self-spec
+      # tests open the real Zphil.LoadBearing.slnx through MSBuildWorkspace, so building the
+      # entire solution is what guarantees the workspace resolves at test time. CI=true (set
+      # by GitHub Actions) also puts NuGet restore in locked mode for the five lock-file
+      # projects, while the throwaway fixture projects restore unlocked by design.
+      - name: Restore
+        run: dotnet restore Zphil.LoadBearing.slnx
+
+      - name: Build
+        run: dotnet build Zphil.LoadBearing.slnx --no-restore
+
+      - name: Test
+        run: dotnet test Zphil.LoadBearing.slnx --no-build --logger "console;verbosity=normal"
+
+  # Packs on Linux and asserts the MCP manifest lands at exactly `.mcp/server.json` — the
+  # path nuget.org scans to generate the VS Code MCP config. A backslash PackagePath
+  # mis-packs only on non-Windows (the `.mcp//server.json` double-slash class of bug), so a
+  # single ubuntu job — not the 3-OS matrix — is the leg that catches it.
+  pack-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts
+
+      # Target the Cli package explicitly: the solution pack emits four nupkgs and only the
+      # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip four
+      # files and break, so glob the single Cli package here.
+      - name: Verify server.json is packed at .mcp/server.json
+        run: |
+          entries="$(unzip -Z1 artifacts/Zphil.LoadBearing.Cli.*.nupkg)"
+          grep -Fxq '.mcp/server.json' <<<"$entries" || {
+            echo "::error::MCP manifest missing or mis-pathed in the packed nupkg (need .mcp/server.json)"
+            printf '%s\n' "$entries" | grep -i 'server\.json' || true
+            exit 1
+          }

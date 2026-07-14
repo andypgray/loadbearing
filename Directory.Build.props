@@ -1,0 +1,40 @@
+<Project>
+
+    <!-- Repo-wide package identity, shared by all four shipping projects. The four packages
+         (Zphil.LoadBearing, .Roslyn, .Xunit, .Cli) version in lockstep: this <Version> is the only
+         MSBuild-side declaration. It must agree with the two copies in .mcp/server.json (.version and
+         .packages[0].version); release.yml refuses a tag unless all three equal the tag.
+         The nuget metadata below (authors, licence, project/repo URLs, SourceLink
+         knobs, symbol packages) is identical across the four, so it lives here rather than being
+         copy-pasted into each csproj. -->
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <Authors>Andrew Gray</Authors>
+        <Copyright>Copyright (c) 2026 Andrew Gray</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/andypgray/loadbearing</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/andypgray/loadbearing</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <!-- ContinuousIntegrationBuild makes release builds deterministic (normalised paths, stable
+         SourceLink). $(CI) is set to 'true' by GitHub Actions, so this only bites in CI. -->
+    <PropertyGroup Condition="'$(CI)' == 'true'">
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <!-- Deliberately NO lock-file policy (RestorePackagesWithLockFile / RestoreLockedMode) here.
+         It lives one level down in src/Directory.Build.props (plus inline in the tests csproj)
+         instead. Reason: FixtureRestorer shells `dotnet restore` on fixture-solution copies staged
+         under a project's bin/ mid-test-run, and does not strip $(CI) from that child process. Those
+         throwaway copies walk up the directory tree and would import this file. A lock policy at the
+         repo root would therefore demand committed lock files for the temp fixture projects and, in
+         CI, fail their locked-mode restore outright — breaking the temp-copy contract. Scoping the
+         policy below the repo root keeps the four shipping projects (and the tests) locked while
+         leaving fixtures unencumbered. -->
+
+</Project>

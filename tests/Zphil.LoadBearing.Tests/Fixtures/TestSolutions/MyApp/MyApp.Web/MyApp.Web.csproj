@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- Pin the declared project-reference chain graph, not the SDK's transitive closure. -->
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+</Project>

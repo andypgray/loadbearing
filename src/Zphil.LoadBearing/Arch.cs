@@ -1,0 +1,81 @@
+using Zphil.LoadBearing.Model;
+
+namespace Zphil.LoadBearing;
+
+/// <summary>
+///     The stage-machine entry point handed to <see cref="IArchitectureSpec.Define" /> (GRAMMAR
+///     §3.2). Noun factories mint <see cref="Selection" />s stamped with this owner; <c>Rule</c> and
+///     <c>Scope</c> register an anchor immediately and return a builder whose trailers mutate the
+///     registered node. One <see cref="Arch" /> is shared across all specs in a single build, so
+///     duplicate IDs across spec classes are caught in one pass (GRAMMAR §8 item 1).
+/// </summary>
+public sealed class Arch
+{
+    private readonly List<LayerNoun> _layers = [];
+    private readonly List<Registration> _registrations = [];
+
+    /// <summary>
+    ///     Constructed by <see cref="ArchModelBuilder" /> (one fresh instance per build). Exposed to
+    ///     tests via <c>InternalsVisibleTo</c> so a second <see cref="Arch" /> can be minted to
+    ///     exercise the foreign-selection validation (§8 item 10).
+    /// </summary>
+    internal Arch()
+    {
+    }
+
+    /// <summary>All types declared in the solution.</summary>
+    public Selection Types => new RefinedSelection(this, TypesNoun.Instance, Array.Empty<SelectionAdjective>());
+
+    /// <summary>The registered rule and scope anchors, in authoring order.</summary>
+    internal IReadOnlyList<Registration> Registrations => _registrations;
+
+    /// <summary>The declared layers, in authoring order.</summary>
+    internal IReadOnlyList<LayerNoun> Layers => _layers;
+
+    /// <summary>
+    ///     Defines a named layer from one or more namespace globs. The <c>(name, glob, more)</c>
+    ///     shape makes a zero-glob layer uncompilable (GRAMMAR §3.3).
+    /// </summary>
+    public Layer Layer(string name, string glob, params string[] more)
+    {
+        var globs = new List<string>(1 + more.Length) { glob };
+        globs.AddRange(more);
+        var noun = new LayerNoun(name, globs);
+        _layers.Add(noun);
+        return new Layer(this, noun);
+    }
+
+    /// <summary>Types in a namespace glob (dot-segment aware, GRAMMAR §4.2).</summary>
+    public Selection Namespace(string glob)
+    {
+        return new RefinedSelection(this, new NamespaceNoun(glob), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>Types in a named project.</summary>
+    public Selection Project(string name)
+    {
+        return new RefinedSelection(this, new ProjectNoun(name), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>A single type.</summary>
+    public Selection Type(Type type)
+    {
+        return new RefinedSelection(this, new TypeNoun(type), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>Registers a rule anchor immediately and returns its posture-stage builder.</summary>
+    public IRuleBuilder Rule(string id)
+    {
+        var registration = new RuleRegistration(id);
+        _registrations.Add(registration);
+        return new RuleBuilder(registration);
+    }
+
+    /// <summary>Registers a scope anchor immediately and returns its freeze-stage builder.</summary>
+    public IScopeBuilder Scope(string id)
+    {
+        var registration = new ScopeRegistration(id);
+        _registrations.Add(registration);
+        return new ScopeBuilder(registration);
+    }
+}

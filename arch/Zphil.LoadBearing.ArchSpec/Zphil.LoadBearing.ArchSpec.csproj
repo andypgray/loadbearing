@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- This repo's own architecture spec — the dogfood render source. It references only Core and is
+         loaded by the CLI via the spec flag (convention resolution is ambiguous here because the test
+         fixtures also reference Core). Its rendered block lives in the committed root AGENTS.md, kept
+         current by the self-spec tests. IsPackable=false: it ships with nothing. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+</Project>

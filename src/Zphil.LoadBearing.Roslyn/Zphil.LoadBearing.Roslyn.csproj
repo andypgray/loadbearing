@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- net10.0: this is the machinery half of the Core(model, netstandard2.0)/Roslyn split.
+             It hosts MSBuildWorkspace + the extractor and never enters Core's dependency closure. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Ships as a dependency of the tool and the xUnit adapter, not for direct reference. Version
+             + shared metadata come from the repo-root Directory.Build.props. -->
+        <PackageId>Zphil.LoadBearing.Roslyn</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>LoadBearing's Roslyn extraction and workspace infrastructure: MSBuildWorkspace loading, type-level dependency-edge extraction, and the baseline-file host layer. Not intended for direct reference — it ships as a dependency of the LoadBearing tool (Zphil.LoadBearing.Cli) and the xUnit adapter (Zphil.LoadBearing.Xunit); architecture spec projects should reference Zphil.LoadBearing instead.</Description>
+        <PackageTags>architecture;roslyn;msbuild;static-analysis;csharp;dotnet</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- 'loadbearing' is the CLI's AssemblyName; the adapter reaches the baseline store + the host
+             UserErrorException. Both consume this project's internal host layer (BaselineStore/Document). -->
+        <InternalsVisibleTo Include="loadbearing" />
+        <InternalsVisibleTo Include="Zphil.LoadBearing.Xunit" />
+        <InternalsVisibleTo Include="Zphil.LoadBearing.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" />
+    </ItemGroup>
+
+    <!-- MSBuild.Locator requires that MSBuild runtime assemblies are NOT shipped with the app; they
+         are loaded at runtime by MSBuildLocator.RegisterDefaults(). ExcludeAssets="runtime" keeps the
+         engine DLLs out of the build output, and PrivateAssets="all" keeps these off the published
+         nuspec — a consumer of this package (or of the tool that bundles it) must resolve MSBuild from
+         the SDK on the host, never from us. Versions are pinned to 18.7.1 (the version the lock file
+         resolves) rather than floating "*", because a lock file cannot capture a wildcard and
+         supply-chain locking demands a determinate version. -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Build" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.NET.StringTools" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+    </ItemGroup>
+
+    <!-- Override vulnerable transitive pulled in by Microsoft.Build.Tasks.Core (NU1903). -->
+    <ItemGroup>
+        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.9" ExcludeAssets="runtime" PrivateAssets="all" />
+    </ItemGroup>
+
+</Project>

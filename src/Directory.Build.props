@@ -1,0 +1,24 @@
+<Project>
+
+    <!-- Pull in the repo-root props (version + shared package metadata) first: GetPathOfFileAbove
+         starts the search in the PARENT of this directory, so it finds the root file rather than
+         re-importing this one. -->
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+    <!-- Supply-chain lock-file policy, scoped to src/ (the four shipping projects) — plus an inline
+         copy in the tests csproj, since tests live outside this directory. It is deliberately NOT at
+         the repo root: FixtureRestorer restores throwaway fixture-solution copies under a project's
+         bin/ mid-test-run without stripping $(CI), and those copies walk up to whatever props file
+         sits above them — a root-level policy would demand lock files for the fixtures and fail their
+         CI restore. RestorePackagesWithLockFile makes restore generate/maintain packages.lock.json;
+         RestoreLockedMode (CI only) fails restore if the resolved graph drifts from the committed
+         lock file. Local restores stay unlocked so adding a package updates the lock naturally. -->
+    <PropertyGroup>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(CI)' == 'true'">
+        <RestoreLockedMode>true</RestoreLockedMode>
+    </PropertyGroup>
+
+</Project>
