@@ -52,10 +52,15 @@ jobs:
       # lockstep-versioned packages) and BOTH version fields in .mcp/server.json (the
       # top-level `version` and the package entry's `version`). Any mismatch fails the
       # release before anything is pushed. jq ships on the ubuntu-latest runner.
+      #
+      # The `(?=</Version>)` lookahead is load-bearing, not redundant: Directory.Build.props's
+      # own comment says the literal "<Version>", and a bare `(?<=<Version>)[^<]+` matches that
+      # prose too, so PROPS becomes two lines and never equals the tag. Anchoring on the closing
+      # tag keeps only the real element. Do not remove it.
       - name: Verify tag matches Directory.Build.props and server.json versions
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          PROPS=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          PROPS=$(grep -oP '(?<=<Version>)[^<]+(?=</Version>)' Directory.Build.props)
           SERVER_TOP=$(jq -r '.version' .mcp/server.json)
           SERVER_PKG=$(jq -r '.packages[0].version' .mcp/server.json)
           echo "tag=$TAG props=$PROPS server.json/.version=$SERVER_TOP server.json/.packages[0].version=$SERVER_PKG"

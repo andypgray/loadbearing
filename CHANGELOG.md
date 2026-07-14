@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - TBD
+## [0.1.0] - 2026-07-14
 
 Initial public release, pre-alpha. One fluent C# architecture spec, two render targets:
 deterministic enforcement and generated AI-agent context.
