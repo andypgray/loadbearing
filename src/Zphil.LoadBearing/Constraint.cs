@@ -26,4 +26,10 @@ public abstract class Constraint
     ///     reachable from a rule (GRAMMAR §8 item 10, foreign selection).
     /// </summary>
     internal virtual IReadOnlyList<Selection> Operands => Array.Empty<Selection>();
+
+    /// <summary>
+    ///     Member operands of the member-access verb (<c>MustNotUse</c>) — the banned member targets
+    ///     (GRAMMAR §4.5). Walked by validation (GRAMMAR §8 items 11–13); empty for every other verb.
+    /// </summary>
+    internal virtual IReadOnlyList<Member> MemberOperands => Array.Empty<Member>();
 }

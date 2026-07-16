@@ -55,6 +55,28 @@ internal static class SentenceRenderer
         return ProseFormat.JoinReferences(parts);
     }
 
+    /// <summary>
+    ///     Renders a member-access verb's target list (GRAMMAR §4.5, §6): each member as the
+    ///     backticked declaring-type dot member — <c>`DateTime.Now`</c>, <c>`Task.Wait()`</c> with
+    ///     <c>()</c> appended iff a method — then joins with no Oxford comma. Colliding declaring-type
+    ///     simple names widen by the same minimal-trailing-segments rule as the reference list (fed
+    ///     through <see cref="ResolveTypeDisplays" />), including when the member names differ.
+    /// </summary>
+    internal static string MemberList(IReadOnlyList<Member> members)
+    {
+        var declaringTypes = members.Select(member => member.DeclaringType).ToList();
+        var display = ResolveTypeDisplays(declaringTypes);
+
+        var parts = new List<string>(members.Count);
+        foreach (Member member in members)
+        {
+            string suffix = member.IsMethod ? "()" : string.Empty;
+            parts.Add(ProseFormat.Backtick(display[member.DeclaringType] + "." + member.Name + suffix));
+        }
+
+        return ProseFormat.JoinReferences(parts);
+    }
+
     /// <summary>The layer definition fragment for the module map: <c>**Domain** — `MyApp.Domain.*`</c>.</summary>
     internal static string LayerDefinition(LayerNoun noun)
     {

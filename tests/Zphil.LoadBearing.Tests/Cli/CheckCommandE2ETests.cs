@@ -40,6 +40,21 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_ReportsMemberUseRuleWithUsesLinesAndInitHint()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
+        // read at its file:line, and — uncaptured member-level Migrate — the same --init hint as any ratcheted rule.
+        result.Out.ShouldContain("FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.");
+        result.Out.ShouldContain("MyApp.Web/HomeController.cs:32 — MyApp.Web.HomeController uses System.DateTime.Now");
+        result.Out.ShouldContain("MyApp.Web/HomeController.cs:37 — MyApp.Web.HomeController uses System.DateTime.UtcNow");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
+    }
+
+    [Fact]
     public async Task Check_ViolatedSpec_FreezeContainmentRedInteriorGreenFacadeTripwireSkips()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);

@@ -25,4 +25,15 @@ public class HomeController
     {
         return new System.Data.DataTable();
     }
+
+    // New code reading the ambient clock directly: both reads are red under time/inject-clock.
+    public System.DateTime ExportStamp()
+    {
+        return System.DateTime.Now;
+    }
+
+    public System.DateTime ExportStampUtc()
+    {
+        return System.DateTime.UtcNow;
+    }
 }

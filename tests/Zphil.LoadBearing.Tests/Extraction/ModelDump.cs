@@ -7,8 +7,9 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     Renders every fact of a <see cref="CodebaseModel" /> to a single deterministic string, for
 ///     string-equality pins. It is deliberately <em>total</em> — projects, every scalar type fact,
 ///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three construction
-///     lists, and every edge with its sites — so that if a fact is not rendered here it is not pinned. The
-///     model is already fully ordered (types by FullName, edges by source/target, projects by name), so a
+///     lists, every edge with its sites, and every member-use edge with its member facts and sites — so that
+///     if a fact is not rendered here it is not pinned. The model is already fully ordered (types by
+///     FullName, edges by source/target, member edges by source/member SymbolId, projects by name), so a
 ///     straight walk is stable. Used by the fragment JSON round-trip test to assert that
 ///     serialize→deserialize→merge equals a direct merge.
 /// </summary>
@@ -30,6 +31,12 @@ internal static class ModelDump
         foreach (ReferenceEdge edge in model.Edges)
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Target.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+
+        builder.AppendLine("== MEMBER EDGES ==");
+        foreach (MemberEdge edge in model.MemberEdges)
+            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Member.SymbolId)
+                .Append(" (").Append(edge.Member.Kind).Append(' ').Append(edge.Member.ContainingType.FullName)
+                .Append('.').Append(edge.Member.Name).Append(") @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
 
         return builder.ToString();
     }

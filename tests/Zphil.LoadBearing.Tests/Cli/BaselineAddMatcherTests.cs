@@ -10,9 +10,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     Pins <see cref="BaselineAddMatcher" />'s resolution semantics — a name matches a type by its
 ///     FullName or its <c>T:</c> symbol ID, and an edge's source and target must match the same
-///     violation — and the shapes of its two loud refusals: a no-match that lists the rule's current
+///     violation; a member <c>--target</c> matches a MemberUse violation by member full name
+///     (<c>N.T.M</c>) or member symbol ID (<c>M:</c>/<c>P:</c>…), one full name covering every overload
+///     (GRAMMAR §4.5) — and the shapes of its two loud refusals: a no-match that lists the rule's current
 ///     grandfatherable violations (or reports it has none), and an ambiguity that lists the matched
-///     identities in symbol-ID form and steers to the <c>T:</c> form. Pure over synthetic nodes.
+///     identities in symbol-ID form and steers to the symbol-ID form. Pure over synthetic nodes.
 /// </summary>
 public sealed class BaselineAddMatcherTests
 {
@@ -84,7 +86,7 @@ public sealed class BaselineAddMatcherTests
         error.Message.ShouldContain("--subject 'N.Dup' matches more than one current violation of 'r'");
         error.Message.ShouldContain("T:N.Dup`1");
         error.Message.ShouldContain("T:N.Dup`2");
-        error.Message.ShouldEndWith("Use the 'T:' symbol ID form.");
+        error.Message.ShouldEndWith("Use the symbol ID form.");
     }
 
     [Fact]
@@ -99,7 +101,7 @@ public sealed class BaselineAddMatcherTests
         error.Message.ShouldContain("--source 'N.A' --target 'N.B' matches more than one current violation of 'r'");
         error.Message.ShouldContain("T:N.A`1 -> T:N.B`1");
         error.Message.ShouldContain("T:N.A`2 -> T:N.B`2");
-        error.Message.ShouldEndWith("Use the 'T:' symbol ID form.");
+        error.Message.ShouldEndWith("Use the symbol ID form.");
     }
 
     [Fact]
@@ -114,10 +116,66 @@ public sealed class BaselineAddMatcherTests
         resolved.ShouldBeSameAs(first);
     }
 
+    [Fact]
+    public void ResolveEdge_MemberByFullNameAndSymbolId_ReturnsMatchingViolation()
+    {
+        Violation use = Violation.MemberUse(
+            Node("App.Home", "T:App.Home"),
+            Member("System.DateTime", "Now", "P:System.DateTime.Now", MemberKind.Property),
+            Array.Empty<SourceLocation>());
+        Violation[] violations = [use];
+
+        Violation byFullName = BaselineAddMatcher.ResolveEdge("r", violations, "App.Home", "System.DateTime.Now");
+        Violation bySymbolId = BaselineAddMatcher.ResolveEdge("r", violations, "App.Home", "P:System.DateTime.Now");
+
+        byFullName.ShouldBeSameAs(use);
+        bySymbolId.ShouldBeSameAs(use);
+    }
+
+    [Fact]
+    public void ResolveEdge_OverloadedMemberFullName_AmbiguousListsBothMemberIds()
+    {
+        // A full-name --target naming an overloaded method matches every overload → the ambiguity lists
+        // the distinct member ids to retry with (GRAMMAR §4.5).
+        Violation intOverload = Violation.MemberUse(
+            Node("App.Cli", "T:App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.Int32)", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+        Violation stringOverload = Violation.MemberUse(
+            Node("App.Cli", "T:App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.String)", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+        Violation[] violations = [intOverload, stringOverload];
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", violations, "App.Cli", "N.Svc.M"));
+
+        error.Message.ShouldContain("--source 'App.Cli' --target 'N.Svc.M' matches more than one current violation of 'r'");
+        error.Message.ShouldContain("M:N.Svc.M(System.Int32)");
+        error.Message.ShouldContain("M:N.Svc.M(System.String)");
+        error.Message.ShouldEndWith("Use the symbol ID form.");
+    }
+
+    [Fact]
+    public void ResolveEdge_MemberNoMatch_ListsSourceArrowMemberFullNameForm()
+    {
+        Violation use = Violation.MemberUse(
+            Node("App.Home", "T:App.Home"),
+            Member("System.DateTime", "Now", "P:System.DateTime.Now", MemberKind.Property),
+            Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [use], "App.Home", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  App.Home -> System.DateTime.Now");
+    }
+
     private static TypeNode Node(string fullName, string symbolId)
     {
         return new TypeNode(
             fullName, symbolId, fullName, "N", TypeKind.Class,
             Accessibility.Public, false, false, false, false, "Proj", false);
+    }
+
+    private static MemberReference Member(string containingFullName, string name, string symbolId, MemberKind kind)
+    {
+        return new MemberReference(Node(containingFullName, $"T:{containingFullName}"), name, symbolId, kind);
     }
 }

@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Tests.Stubs;
 
 namespace Zphil.LoadBearing.Tests;
@@ -164,6 +165,47 @@ public class ModelReificationTests
         containment.BaselinePath.ShouldBe("arch/baselines/legacy/billing/containment.json");
         // The tripwire's baseline stays null — grandfathering is a containment concern.
         model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire").Freeze!.BaselinePath.ShouldBeNull();
+    }
+
+    [Fact]
+    public void MustNotUseRule_ReifiesToWalkableMemberConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new MemberUseSpec()).Rules.Single(r => r.Id == "time/inject-clock");
+
+        rule.Posture.ShouldBe(Posture.Migrate);
+        var constraint = rule.Constraint.ShouldBeOfType<MustNotUseConstraint>();
+
+        // Members in authoring order, each with its authored declaring type + name (GRAMMAR §4.5).
+        constraint.Members.Count.ShouldBe(2);
+        constraint.Members[0].DeclaringType.ShouldBe(typeof(DateTime));
+        constraint.Members[0].Name.ShouldBe("Now");
+        constraint.Members[1].DeclaringType.ShouldBe(typeof(DateTime));
+        constraint.Members[1].Name.ShouldBe("UtcNow");
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DependencyVerbConstraint_HasEmptyMemberOperands()
+    {
+        // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
+        Rule("layering/domain-independent").Constraint!.MemberOperands.ShouldBeEmpty();
+    }
+
+    // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
+    private sealed class MemberUseSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("time/inject-clock")
+                .Migrate(
+                    "Code reads the ambient clock directly.",
+                    arch.Types.MustNotUse(
+                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.");
+        }
     }
 
     // A frozen scope documented via .DragonsDoc(...) rather than inline .Dragons(...).

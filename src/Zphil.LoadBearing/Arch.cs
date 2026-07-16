@@ -63,6 +63,17 @@ public sealed class Arch
         return new RefinedSelection(this, new TypeNoun(type), Array.Empty<SelectionAdjective>());
     }
 
+    /// <summary>
+    ///     A member-access ban target — a declaring type plus a member name (GRAMMAR §4.5). A
+    ///     target-only leaf for <see cref="SelectionConstraints.MustNotUse" />, not a
+    ///     <see cref="Selection" />; matching is by declaring type + member name, so one ban covers
+    ///     every overload. Canonical call: <c>arch.Member(typeof(DateTime), nameof(DateTime.Now))</c>.
+    /// </summary>
+    public Member Member(Type type, string name)
+    {
+        return new Member(this, type, name);
+    }
+
     /// <summary>Registers a rule anchor immediately and returns its posture-stage builder.</summary>
     public IRuleBuilder Rule(string id)
     {

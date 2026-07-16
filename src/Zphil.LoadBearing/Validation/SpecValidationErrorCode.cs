@@ -37,5 +37,18 @@ public enum SpecValidationErrorCode
     DuplicateLayerName,
 
     /// <summary>A selection minted on a different <see cref="Arch" /> instance (§8 item 10).</summary>
-    ForeignSelection
+    ForeignSelection,
+
+    /// <summary>Blank or whitespace member name on an <c>arch.Member</c> used by a rule (§8 item 11).</summary>
+    BlankMemberName,
+
+    /// <summary>
+    ///     A member not declared on its anchored type (reflection <c>DeclaredOnly</c> typo guard); when
+    ///     the member is declared on a base type the error names that base and the <c>typeof</c> to use
+    ///     (§8 item 12).
+    /// </summary>
+    MemberNotDeclared,
+
+    /// <summary>A <see cref="Member" /> minted on a different <see cref="Arch" /> instance (§8 item 13).</summary>
+    ForeignMember
 }

@@ -15,6 +15,13 @@ public enum ViolationKind
     /// </summary>
     Shape,
 
+    /// <summary>
+    ///     A banned member access (GRAMMAR §4.5): <c>Source</c> uses <c>Member</c>, with the member-use
+    ///     edge's <c>Sites</c>. One per (rule, source, member) — per-overload edges yield per-overload
+    ///     violations (GRAMMAR §4.3).
+    /// </summary>
+    MemberUse,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

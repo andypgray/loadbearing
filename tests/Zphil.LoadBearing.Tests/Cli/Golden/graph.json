@@ -61,7 +61,7 @@
     {
       "source": "MyApp.Web",
       "targetNamespaceRoot": "System",
-      "references": 1
+      "references": 2
     },
     {
       "source": "MyApp.Web",

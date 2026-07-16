@@ -158,7 +158,9 @@ internal static class CommandFactory
         };
         Option<string?> target = new("--target")
         {
-            Description = "The referenced type of the edge to grandfather — a full type name or 'T:' symbol ID (with --add)."
+            Description =
+                "The referenced type of the edge to grandfather — a full type name or 'T:' symbol ID, or a banned "
+                + "member's full name (System.DateTime.Now) or member symbol ID (P:System.DateTime.Now) (with --add)."
         };
         Option<string?> subject = new("--subject")
         {

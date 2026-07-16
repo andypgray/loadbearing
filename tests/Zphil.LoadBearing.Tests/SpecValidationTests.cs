@@ -138,6 +138,53 @@ public class SpecValidationTests
         ex.Errors.ShouldContain(e => e.Code == Code.DanglingAnchor);
     }
 
+    [Fact]
+    public void BlankMemberName_OnMustNotUse_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankMemberName && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankMemberName).Message
+            .ShouldBe("Blank member name on a member of 'System.DateTime' (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberNotDeclared_TypoName_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new TypoMemberSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberNotDeclared && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberNotDeclared).Message
+            .ShouldBe("'System.DateTime' does not declare a member named 'Nows' (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberNotDeclared_MemberOnBaseType_NamesBaseAndTypeof()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BaseTypeMemberSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberNotDeclared && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberNotDeclared).Message
+            .ShouldBe("'System.Threading.Tasks.Task<TResult>' does not declare 'Wait'; it is declared on base type " +
+                      "'System.Threading.Tasks.Task' — use typeof(Task) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void ForeignMember_MemberFromAnotherArch_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ForeignMemberSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.ForeignMember && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.ForeignMember).Message
+            .ShouldBe("A member used by 'area/rule' was minted on a different Arch instance; it is not registered with this model.");
+    }
+
+    [Fact]
+    public void ValidMemberUse_MustNotUseSpec_BuildsWithoutError()
+    {
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberUseSpec()));
+    }
+
     private sealed class DuplicateIdSpecA : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -200,7 +247,7 @@ public class SpecValidationTests
     {
         public void Define(Arch arch)
         {
-            arch.Rule("area/rule").Enforce(arch.Types.Must(t => true, "")).Because("Reason.");
+            arch.Rule("area/rule").Enforce(arch.Types.Must(_ => true, "")).Because("Reason.");
         }
     }
 
@@ -253,6 +300,56 @@ public class SpecValidationTests
             var other = new Arch();
             Selection foreign = other.Types.OfKind(TypeKind.Interface);
             arch.Rule("area/rule").Enforce(foreign.MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberNameSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), " "))).Because("Reason.");
+        }
+    }
+
+    private sealed class TypoMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), "Nows"))).Because("Reason.");
+        }
+    }
+
+    private sealed class BaseTypeMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Wait lives on the non-generic base Task, not on Task<TResult> — the base-type guidance case.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(Task<>), "Wait"))).Because("Reason.");
+        }
+    }
+
+    private sealed class ForeignMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            var other = new Arch();
+            Member foreign = other.Member(typeof(DateTime), nameof(DateTime.Now));
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(foreign)).Because("Reason.");
+        }
+    }
+
+    private sealed class ValidMemberUseSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("time/inject-clock")
+                .Migrate(
+                    "Code reads the ambient clock directly.",
+                    arch.Types.MustNotUse(
+                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
+                .Fix("Take IClock in the constructor; see OrderService for the pattern.");
         }
     }
 

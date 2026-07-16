@@ -130,4 +130,55 @@ public class SentenceAssemblyTests
         SentenceRenderer.Subject(Arch.Types.Implementing(typeof(IDictionary<,>)))
             .ShouldBe("Types implementing `IDictionary<TKey, TValue>`");
     }
+
+    [Fact]
+    public void MustNotUse_TwoMembersOfSameType_RendersMemberList()
+    {
+        Constraint constraint = Arch.Types.MustNotUse(
+            Arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+            Arch.Member(typeof(DateTime), nameof(DateTime.UtcNow)));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
+    }
+
+    [Fact]
+    public void MustNotUse_BareLayerSubject_SpeaksCollectively()
+    {
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustNotUse(Arch.Member(typeof(DateTime), nameof(DateTime.Now))))
+            .ShouldBe("The Web layer must not use `DateTime.Now`.");
+    }
+
+    [Fact]
+    public void MustNotUse_MethodMember_AppendsParens()
+    {
+        Constraint constraint = Arch.Types.MustNotUse(Arch.Member(typeof(Task), nameof(Task.Wait)));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `Task.Wait()`.");
+    }
+
+    [Fact]
+    public void MustNotUse_GenericAnchorProperty_RendersDeclaredTypeParameterName()
+    {
+        Constraint constraint = Arch.Types.MustNotUse(Arch.Member(typeof(Task<>), "Result"));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `Task<TResult>.Result`.");
+    }
+
+    [Fact]
+    public void MustNotUse_CollidingDeclaringTypes_SameMemberName_WidenWithTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustNotUse(
+            Arch.Member(typeof(Order), nameof(Order.Total)),
+            Arch.Member(typeof(Stubs.Sales.Order), nameof(Stubs.Sales.Order.Total)));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not use `Billing.Order.Total` or `Sales.Order.Total`.");
+    }
+
+    [Fact]
+    public void MustNotUse_CollidingDeclaringTypes_DifferentMemberNames_StillWiden()
+    {
+        Constraint constraint = Arch.Types.MustNotUse(
+            Arch.Member(typeof(Order), nameof(Order.Total)),
+            Arch.Member(typeof(Stubs.Sales.Order), nameof(Stubs.Sales.Order.Refresh)));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not use `Billing.Order.Total` or `Sales.Order.Refresh()`.");
+    }
 }

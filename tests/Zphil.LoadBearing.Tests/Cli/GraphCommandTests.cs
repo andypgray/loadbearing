@@ -32,7 +32,7 @@ public sealed class GraphCommandTests
 
         External references (by namespace root):
           MyApp.Legacy.Billing -> System: 2
-          MyApp.Web -> System: 1
+          MyApp.Web -> System: 2
           MyApp.Web -> System.Data: 2
           MyApp.Web -> System.Text: 1
         """;

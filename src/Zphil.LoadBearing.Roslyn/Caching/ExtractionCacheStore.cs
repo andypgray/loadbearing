@@ -131,7 +131,9 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    private const int CurrentSchemaVersion = 1;
+    // v2 (Phase 13 WP2): fragments now carry member-use edges (GRAMMAR §4.5), so a v1 cache.json degrades to
+    // a clean Miss and is rebuilt — the cache is disposable derived data, never a loud error.
+    private const int CurrentSchemaVersion = 2;
 
     // Probe files whose presence anywhere from a project directory up to the solution directory changes the
     // build — recorded even when absent, so a newly-appearing one is an existence flip. Mirrors WorkspaceSession.

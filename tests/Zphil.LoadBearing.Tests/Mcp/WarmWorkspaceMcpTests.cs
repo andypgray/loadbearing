@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
@@ -58,6 +59,37 @@ public sealed class WarmWorkspaceMcpTests
 
         // …and the incremental store re-walked exactly the edited project (HomeController is in Web) plus its
         // reverse-dependent Domain — Billing was reused, not re-extracted.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
+    public async Task ArchCheck_MemberBanReadAddedOnDisk_ReflectsNewSiteAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, whose member-level Migrate rule time/inject-clock
+        // (uncaptured) is already red on HomeController's two ambient-clock reads (GRAMMAR §4.5).
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+        // Act — append a THIRD banned read (another DateTime.Now use) on disk, then re-check the still-warm
+        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        EditOnDisk(homeController, InsertAnotherClockRead);
+        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        CliResult coldEdited = await CliRunner.InvokeAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the warm re-check reflects the new member-use site (the Now violation's site set grows from one
+        // to two), the payload changed, and it is byte-identical to the cold run on the edited tree.
+        NowSiteCount(before).ShouldBe(1);
+        NowSiteCount(after).ShouldBe(2);
+        Normalize(after).ShouldNotBe(Normalize(before));
+        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+        // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
     }
 
@@ -204,6 +236,25 @@ public sealed class WarmWorkspaceMcpTests
     {
         int lastBrace = source.LastIndexOf('}');
         return source[..lastBrace] + "    public BillingCalculator NewCalculator() => new BillingCalculator();\n}\n";
+    }
+
+    // Appends one more DateTime.Now read to HomeController — a third banned member-use site (GRAMMAR §4.5),
+    // folding into the existing Now violation's site set rather than minting a new violation identity.
+    private static string InsertAnotherClockRead(string source)
+    {
+        int lastBrace = source.LastIndexOf('}');
+        return source[..lastBrace] + "    public System.DateTime ExportStampAgain() => System.DateTime.Now;\n}\n";
+    }
+
+    // The number of member-use sites reported for the banned DateTime.Now read under time/inject-clock.
+    private static int NowSiteCount(string checkJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == "time/inject-clock");
+        JsonElement now = rule.GetProperty("violations").EnumerateArray()
+            .Single(v => v.GetProperty("targetMember").GetString() == "P:System.DateTime.Now");
+        return now.GetProperty("sites").GetArrayLength();
     }
 
     private static void EditOnDisk(string path, Func<string, string> transform)

@@ -89,6 +89,11 @@ public static class HumanReportRenderer
                         located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
                             $"{violation.Source!.FullName} references {violation.Target!.FullName}"));
                     break;
+                case ViolationKind.MemberUse:
+                    foreach (SourceLocation site in violation.Sites)
+                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
+                            $"{violation.Source!.FullName} uses {MemberDisplay(violation.Member!)}"));
+                    break;
                 case ViolationKind.Shape:
                     SourceLocation? first = violation.Subject!.DeclarationSites.FirstOrDefault();
                     if (first is not null)
@@ -111,6 +116,14 @@ public static class HumanReportRenderer
                      .ThenBy(l => l.Line)
                      .ThenBy(l => l.Text, StringComparer.Ordinal))
             yield return $"{path}:{line} — {text}";
+    }
+
+    // The banned member the source used, as declaring-type-dot-member, with () appended iff a method
+    // (never a signature) — the human analog of the §6 prose form, over the extracted MemberReference.
+    private static string MemberDisplay(MemberReference member)
+    {
+        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
+        return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
     }
 
     private static string Marker(RuleResult result)

@@ -5,9 +5,10 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
-///     §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; shape verbs test each subject.
-///     Every verb first requires a non-empty subject set — an empty subject fails the rule by default
-///     (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
+///     §4.5, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
+///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; shape verbs test each
+///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
+///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
 internal sealed class ConstraintEvaluator
 {
@@ -17,11 +18,13 @@ internal sealed class ConstraintEvaluator
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
     private readonly IReadOnlyList<ReferenceEdge> _edges;
+    private readonly IReadOnlyList<MemberEdge> _memberEdges;
     private readonly SelectionEvaluator _selections;
 
     internal ConstraintEvaluator(CodebaseModel model)
     {
         _edges = model.Edges;
+        _memberEdges = model.MemberEdges;
         _selections = new SelectionEvaluator(model);
     }
 
@@ -40,6 +43,8 @@ internal sealed class ConstraintEvaluator
                 return OnlyReference(subjects, c.Targets);
             case MustOnlyBeReferencedByConstraint c:
                 return OnlyBeReferencedBy(subjects, c.Sources);
+            case MustNotUseConstraint c:
+                return ForbiddenMemberUse(subjects, c.Members);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -96,6 +101,33 @@ internal sealed class ConstraintEvaluator
             : NoWarnings;
 
         return (violations, warnings);
+    }
+
+    // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
+    // its used member matches a banned (declaring type, name) pair — ordinal, one ban covering every
+    // overload. Per-overload edges yield per-overload MemberUse violations (the §4.3 identity substrate).
+    // The banned set is resolved eagerly so a closed-generic member anchor is refused (RuleError) before
+    // any edge is tested — mirroring the type-noun refusal (decision 2).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenMemberUse(
+        HashSet<TypeNode> subjects, IReadOnlyList<Member> members)
+    {
+        var banned = new HashSet<(string DeclaringType, string Name)>();
+        foreach (Member member in members)
+        {
+            string declaringType = SelectionEvaluator.DefinitionFullName(
+                member.DeclaringType,
+                "member-use edges are definition-level. Anchor the member on the open definition instead.");
+            banned.Add((declaringType, member.Name));
+        }
+
+        var violations = new List<Violation>();
+        foreach (MemberEdge edge in _memberEdges)
+            if (subjects.Contains(edge.Source) && banned.Contains((edge.Member.ContainingType.FullName, edge.Member.Name)))
+                violations.Add(Violation.MemberUse(edge.Source, edge.Member, edge.Sites));
+
+        // MustNotUse never warns: member targets are typeof-anchored (no pattern form), so a banned member
+        // absent from the codebase is the win condition, exactly like a bare typeof target (GRAMMAR §4.5).
+        return (violations, NoWarnings);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(

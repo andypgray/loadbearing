@@ -6,10 +6,11 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     A spec for the MyApp fixture whose one run exercises the whole report/JSON schema: a failing
 ///     Enforce rule (the acceptance rule — Domain must not reference Web, which OrderService breaks),
 ///     a passing rule, a ratcheted Migrate rule (its conventional baseline grandfathers InvoiceController's
-///     DataTable but not HomeController's — so it fails red on the new site), an inert-target warning
-///     rule, a failing empty-subject rule, and a frozen billing scope whose containment is uncaptured
-///     (an explicit, deliberately-uncommitted baseline path — hard red) and whose tripwire skips without
-///     a <c>--diff-base</c>.
+///     DataTable but not HomeController's — so it fails red on the new site), a member-use Migrate rule
+///     (uncaptured — both of HomeController's ambient-clock reads, <c>DateTime.Now</c> and
+///     <c>DateTime.UtcNow</c>, are red), an inert-target warning rule, a failing empty-subject rule, and
+///     a frozen billing scope whose containment is uncaptured (an explicit, deliberately-uncommitted
+///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>.
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
@@ -37,6 +38,18 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                 web.WithSuffix("Controller").MustNotReference(arch.Namespace("System.Data.*")))
             .Because("Repository pattern for testability.")
             .Fix("Inject the repository.");
+
+        // Migrate (ratcheted, member-level): the conventional baseline path is uncommitted, so both of
+        // HomeController's ambient-clock reads are red with the --init hint — the member-use half of the
+        // report/JSON schema ('uses' lines, targetMember field).
+        arch.Rule("time/inject-clock")
+            .Migrate(
+                "Code reads the ambient clock directly.",
+                web.MustNotUse(
+                    arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                    arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+            .Because("Wall-clock reads are untestable; inject IClock.")
+            .Fix("Take IClock in the constructor; see OrderService for the pattern.");
 
         // Inert warning: the target pattern matches nothing, so the rule can never fire.
         arch.Rule("layering/no-ghost")

@@ -55,6 +55,65 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     }
 
     [Fact]
+    public void ExtractFromSolutionAsync_DomainProject_PinsCompleteMemberEdgeList()
+    {
+        // The member-use channel (GRAMMAR §4.5) for the Domain project, pinned whole: property accesses fold
+        // to P: (Reference, Amount), the cross-project call is the M: overload (RenderOrder), and the reduced
+        // extension resolves to the declaring static class (WebTextExtensions), never to string. Deliberately
+        // ABSENT: OrderService's `new HomeController()` (constructor) and `typeof(HomeController)` — neither is a use.
+        string rendered = string.Join("\n", fixture.Model.MemberEdges
+            .Where(e => e.Source.ProjectName == "MyApp.Domain")
+            .Select(fixture.RenderMemberEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Domain.Order -> P:MyApp.Domain.Money.Amount @ MyApp.Domain/Order.Validation.cs:5
+            MyApp.Domain.OrderService -> M:MyApp.Web.HomeController.RenderOrder(System.String) @ MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.OrderService -> M:MyApp.Web.WebTextExtensions.ToWebDisplay(System.String) @ MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.OrderService -> P:MyApp.Domain.Order.Reference @ MyApp.Domain/OrderService.cs:10
+            """);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_BillingCalculatorMemberEdges_PinExternalNormalizedForms()
+    {
+        // The real-workspace member DocIds against BCL metadata: the two Math.Round overloads are distinct
+        // M: ids (the §4.3 per-overload identity substrate), the enum members are F:, and the external flag is
+        // set for the BCL targets but not the in-solution RoundingMode.
+        string rendered = string.Join("\n", fixture.Model.MemberEdges
+            .Where(e => e.Source.FullName == "MyApp.Legacy.Billing.BillingCalculator")
+            .Select(fixture.RenderMemberEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Legacy.Billing.BillingCalculator -> F:MyApp.Legacy.Billing.RoundingMode.Bankers @ MyApp.Legacy.Billing/BillingCalculator.cs:9
+            MyApp.Legacy.Billing.BillingCalculator -> F:System.MidpointRounding.ToEven @ MyApp.Legacy.Billing/BillingCalculator.cs:10
+            MyApp.Legacy.Billing.BillingCalculator -> M:System.Math.Round(System.Decimal,System.Int32) @ MyApp.Legacy.Billing/BillingCalculator.cs:11
+            MyApp.Legacy.Billing.BillingCalculator -> M:System.Math.Round(System.Decimal,System.Int32,System.MidpointRounding) @ MyApp.Legacy.Billing/BillingCalculator.cs:10
+            """);
+
+        MemberReference round = fixture.Model.MemberEdge(
+            "MyApp.Legacy.Billing.BillingCalculator", "M:System.Math.Round(System.Decimal,System.Int32)").Member;
+        round.ContainingType.IsExternal.ShouldBeTrue();
+        round.ContainingType.ShouldBeSameAs(fixture.Model.Type("System.Math"));
+
+        fixture.Model.MemberEdge(
+                "MyApp.Legacy.Billing.BillingCalculator", "F:MyApp.Legacy.Billing.RoundingMode.Bankers")
+            .Member.ContainingType.IsExternal.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerStringBuilderUse_UnionsSitesUnderOneExternalMethodEdge()
+    {
+        // Two Append call sites (lines 13, 19) union into one external M: edge; the constructor at line 9 is not here.
+        MemberEdge append = fixture.Model.MemberEdge(
+            "MyApp.Web.HomeController", "M:System.Text.StringBuilder.Append(System.String)");
+
+        append.Member.ContainingType.IsExternal.ShouldBeTrue();
+        append.Lines().ShouldBe([13, 19]);
+    }
+
+    [Fact]
     public void ExtractFromSolutionAsync_WebToBillingFacadeEdge_PinsCleanFacadeSites()
     {
         fixture.Model.Edge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
@@ -86,6 +145,20 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
 
         edge.Target.IsExternal.ShouldBeTrue();
         edge.Lines().ShouldBe([24, 26]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerClockReads_PinNewMemberUseEdgesAndDateTimeTypeEdge()
+    {
+        // The Phase 13 member-use fixture edit (GRAMMAR §4.5): HomeController's two ambient-clock reads fold to
+        // P: member edges on the new external System.DateTime at the appended lines — the rows time/inject-clock
+        // bans. The parallel type edge to System.DateTime (return types + the reads) is the new external node.
+        fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.Now").Lines().ShouldBe([32]);
+        fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.UtcNow").Lines().ShouldBe([37]);
+
+        ReferenceEdge dateTime = fixture.Model.Edge("MyApp.Web.HomeController", "System.DateTime");
+        dateTime.Target.IsExternal.ShouldBeTrue();
+        dateTime.Lines().ShouldBe([30, 32, 35, 37]);
     }
 
     [Fact]

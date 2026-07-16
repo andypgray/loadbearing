@@ -67,15 +67,26 @@ internal sealed class SelectionEvaluator
         }
     }
 
-    // A closed generic construction has no type-level node (v1 edges are definition-level); refuse it
-    // here so the rule fails as a RuleError with actionable guidance (ratified decision 2). An open
-    // definition (arch.Type(typeof(IHandler<>))) resolves to its definition node and is allowed.
     private static string TypeNounFullName(Type type)
+    {
+        return DefinitionFullName(
+            type,
+            "v1 reference edges are type-level. Ban the open definition and/or the argument type separately.");
+    }
+
+    /// <summary>
+    ///     The extraction-format FQN of a definition-level anchor type, refusing a closed generic
+    ///     construction (which has no definition-level node, GRAMMAR §4.1/§4.5) as a
+    ///     <see cref="RuleEvaluationException" /> — a <see cref="ViolationKind.RuleError" /> the checker
+    ///     surfaces rather than crashing. The <paramref name="closedGenericGuidance" /> tail is spliced
+    ///     after "is a closed generic construction; " so each caller (type-noun refusal, member-anchor
+    ///     refusal) states its own actionable next step; an open definition resolves normally.
+    /// </summary>
+    internal static string DefinitionFullName(Type type, string closedGenericGuidance)
     {
         if (type.IsGenericType && !type.IsGenericTypeDefinition)
             throw new RuleEvaluationException(
-                $"`{TypeName.Simple(type)}` is a closed generic construction; v1 reference edges are type-level. " +
-                "Ban the open definition and/or the argument type separately.");
+                $"`{TypeName.Simple(type)}` is a closed generic construction; {closedGenericGuidance}");
 
         return TypeName.FullDisplay(type);
     }

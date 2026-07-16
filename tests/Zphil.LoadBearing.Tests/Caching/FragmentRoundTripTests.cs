@@ -51,6 +51,52 @@ public sealed class FragmentRoundTripTests
         json.ShouldNotContain("\"Kind\":0");
     }
 
+    [Fact]
+    public void SerializeDeserializeMerge_MemberEdges_SurviveRoundTripByteStably()
+    {
+        // Arrange — a cross-project source exercising every member-edge field and all four MemberKinds
+        // (method, property, field, event), so a lost kind or dropped site would move the merged dump.
+        CompilationInput lib = CompilationFactory.Compile("Lib",
+            ("Api.cs", """
+                       namespace N;
+                       public class Api
+                       {
+                           public int Field;
+                           public int Prop { get; set; }
+                           public event System.Action Evt;
+                           public void Do() {}
+                       }
+                       """));
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib",
+            ("Use.cs", """
+                       namespace M;
+                       public class User
+                       {
+                           public void Go(N.Api api)
+                           {
+                               api.Do();
+                               int p = api.Prop;
+                               int f = api.Field;
+                               api.Evt += OnEvt;
+                           }
+                           private void OnEvt() {}
+                       }
+                       """));
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+
+        // Act
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+
+        // Assert — the member kinds serialize as names, the edges are present, and the round-trip is invisible.
+        json.ShouldContain("\"MemberKind\":\"Event\"");
+        direct.MemberEdges.Select(e => e.Member.SymbolId).ShouldBe(
+            ["E:N.Api.Evt", "F:N.Api.Field", "M:N.Api.Do", "P:N.Api.Prop"]);
+        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

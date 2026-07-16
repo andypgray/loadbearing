@@ -22,12 +22,15 @@ public sealed class BaselineAddE2ETests
 {
     private const string MigrateRule = "data-access/no-inline-sql";
     private const string ContainmentRule = "legacy/billing/containment";
+    private const string ClockRule = "time/inject-clock";
     private const string ForeignRule = "some/other-rule";
+
+    private const string NowMemberId = "P:System.DateTime.Now";
+    private const string UtcNowMemberId = "P:System.DateTime.UtcNow";
 
     private const string HomeId = "T:MyApp.Web.HomeController";
     private const string InvoiceId = "T:MyApp.Web.InvoiceController";
     private const string DataTableId = "T:System.Data.DataTable";
-    private const string DataSetId = "T:System.Data.DataSet";
     private const string BillingCalculatorId = "T:MyApp.Legacy.Billing.BillingCalculator";
     private const string RoundingModeId = "T:MyApp.Legacy.Billing.RoundingMode";
     private const string ForeignSubjectId = "T:MyApp.Other.Widget";
@@ -44,6 +47,7 @@ public sealed class BaselineAddE2ETests
 
     private static readonly string[] MigrateBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
     private static readonly string[] FreezeBaselineFile = ["arch", "violated-freeze-baseline.json"];
+    private static readonly string[] ClockBaselineFile = ["arch", "baselines", "time", "inject-clock.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -137,6 +141,82 @@ public sealed class BaselineAddE2ETests
         JsonElement containment = document.RootElement.GetProperty("rules").EnumerateArray()
             .Single(rule => rule.GetProperty("id").GetString() == ContainmentRule);
         containment.GetProperty("status").GetString().ShouldBe("passed");
+    }
+
+    [Fact]
+    public async Task BaselineAdd_MemberRule_GrandfathersOneClockReadAndBystanderUtcNowStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Red first: the member-level Migrate rule is uncaptured, so both of HomeController's ambient-clock
+        // reads (GRAMMAR §4.5) are current memberUse violations.
+        CliResult red = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement redRule = RuleElement(red.Out, ClockRule);
+        redRule.GetProperty("status").GetString().ShouldBe("failed");
+        redRule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("targetMember").GetString())
+            .ShouldBe([NowMemberId, UtcNowMemberId], true);
+
+        // Capture: --init grandfathers both member identities (T: source x P: member DocId entries), and the
+        // re-check sees the rule green with both reads riding the baseline.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("time/inject-clock: captured 2 grandfathered violations.");
+
+        CliResult captured = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement capturedRule = RuleElement(captured.Out, ClockRule);
+        capturedRule.GetProperty("status").GetString().ShouldBe("passed");
+        capturedRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(2);
+
+        // Un-capture the pair (composer as arrangement, the Migrate fact's idiom): a digest-valid EMPTY
+        // section turns both reads red again on a captured rule — the state the valve exists for.
+        string clockPath = workspace.PathOf(ClockBaselineFile);
+        File.WriteAllText(clockPath, ComposeSections((ClockRule, [])));
+        string beforeText = File.ReadAllText(clockPath);
+
+        // The valve, member flavor: a full-name --target (no P: prefix) resolves the member violation.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", ClockRule,
+            "--source", "MyApp.Web.HomeController", "--target", "System.DateTime.Now", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry line keying the P: member DocId, plus the digest change.
+        string afterText = File.ReadAllText(clockPath);
+        Normalize(afterText).ShouldBe(ComposeSections(
+            (ClockRule, [BaselineEntry.ForEdge(HomeId, NowMemberId).WithBecause("INC-1234")])));
+        afterText.ShouldNotBe(beforeText);
+        LineSet(afterText).Count(line => line.Contains("\"source\":")).ShouldBe(1);
+
+        // The bystander pin: the OTHER clock read (UtcNow) is still red; only Now is grandfathered.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement clockRule = RuleElement(check.Out, ClockRule);
+        clockRule.GetProperty("status").GetString().ShouldBe("failed");
+        clockRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        var bystanders = clockRule.GetProperty("violations").EnumerateArray().ToList();
+        JsonElement bystander = bystanders.ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("memberUse");
+        bystander.GetProperty("targetMember").GetString().ShouldBe(UtcNowMemberId);
+
+        // The attribution round-trips: --accept-reductions keeps the still-observed Now entry (refusing the
+        // UtcNow growth) and a second --init leaves the captured section be — byte-identical both ways.
+        byte[] snapshot = File.ReadAllBytes(clockPath);
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.Exit.ShouldBe(0);
+        File.ReadAllBytes(clockPath).ShouldBe(snapshot);
+        CliResult reinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        reinit.Exit.ShouldBe(0);
+        File.ReadAllBytes(clockPath).ShouldBe(snapshot);
     }
 
     [Fact]
@@ -265,6 +345,15 @@ public sealed class BaselineAddE2ETests
         string original = File.ReadAllText(filePath);
         int lastBrace = original.LastIndexOf('}');
         File.WriteAllText(filePath, original[..lastBrace] + member + original[lastBrace..]);
+    }
+
+    // One rule's object from a check --json document, cloned so it outlives the parse.
+    private static JsonElement RuleElement(string checkJson, string ruleId)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        return document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(rule => rule.GetProperty("id").GetString() == ruleId)
+            .Clone();
     }
 
     private static string ComposeSections(params (string RuleId, BaselineEntry[] Entries)[] sections)

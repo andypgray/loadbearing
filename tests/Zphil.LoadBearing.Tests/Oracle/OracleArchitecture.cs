@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchUnitNET.Domain;
+using ArchUnitNET.Domain.Dependencies;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
 using Shouldly;
@@ -91,6 +92,30 @@ public sealed class OracleArchitecture
     public Interface HandlerInterface()
     {
         return Architecture.Interfaces.Single(i => i.Name.StartsWith("IHandler", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     The MyApp-declared types whose IL calls <c>System.DateTime</c>'s clock getters
+    ///     (<c>get_Now()</c> / <c>get_UtcNow()</c>) — the ArchUnitNET (Mono.Cecil) analog of LoadBearing's
+    ///     <c>MustNotUse(DateTime.Now, DateTime.UtcNow)</c> (GRAMMAR §4.5). A C# property read compiles to a
+    ///     getter call, so the member-use ban surfaces as a <see cref="MethodCallDependency" /> in the IL
+    ///     substrate. ArchUnitNET's fluent surface has no member-call predicate, so the architecture's
+    ///     dependency model is queried directly — same substrate, verdict-level, type granularity.
+    /// </summary>
+    public IReadOnlySet<string> TypesReadingAmbientClock()
+    {
+        return MyAppTypes
+            .Where(type => type.Dependencies.OfType<MethodCallDependency>().Any(IsClockGetterCall))
+            .Select(type => type.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    // A call to System.DateTime.get_Now() / get_UtcNow(). ArchUnitNET's MethodMember.Name is parens-inclusive;
+    // pinned to the 0.13.3 form (the package is exact-pinned).
+    private static bool IsClockGetterCall(MethodCallDependency dependency)
+    {
+        return dependency.TargetMember.DeclaringType.FullName == "System.DateTime"
+               && dependency.TargetMember.Name is "get_Now()" or "get_UtcNow()";
     }
 
     /// <summary>

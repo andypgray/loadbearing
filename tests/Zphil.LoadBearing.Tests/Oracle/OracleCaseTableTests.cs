@@ -185,6 +185,26 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.InvoiceController");
     }
 
+    // Row 8 (Phase 13 member-use, best-effort): the ambient-clock ban at caller-type granularity. LoadBearing's
+    // MustNotUse(DateTime.Now, DateTime.UtcNow) flags the using TYPE (GRAMMAR §4.5); ArchUnitNET sees the IL
+    // getter calls (a property read compiles to get_Now()/get_UtcNow()). ArchUnitNET has no fluent member-call
+    // predicate, so its dependency model is queried directly (OracleArchitecture) — same substrate, verdict-level.
+    // Only HomeController reads the clock.
+    [Fact]
+    public void Row8_AmbientClockReadsAtCallerTypeGranularity()
+    {
+        var loadBearing = LoadBearingMemberUseViolators(arch =>
+            arch.Rule("oracle/no-ambient-clock")
+                .Enforce(arch.Types.MustNotUse(
+                    arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                    arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Oracle row 8: no ambient-clock reads."));
+
+        var archUnit = oracle.TypesReadingAmbientClock();
+
+        AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
+    }
+
     /// <summary>
     ///     The oracle assertion: both substrates equal the pinned expected set (so a shared blind spot is
     ///     caught), and equal each other (the agreement claim). Sets are compared order-insensitively.
@@ -212,6 +232,15 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         return result.Violations
             .Where(violation => violation.Kind == ViolationKind.Shape)
             .Select(violation => violation.Subject!.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private IReadOnlySet<string> LoadBearingMemberUseViolators(Action<Arch> define)
+    {
+        RuleResult result = Checker.Run(workspace.Model, define).Single();
+        return result.Violations
+            .Where(violation => violation.Kind == ViolationKind.MemberUse)
+            .Select(violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 }

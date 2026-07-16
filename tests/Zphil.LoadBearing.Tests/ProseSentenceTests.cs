@@ -58,4 +58,31 @@ public class ProseSentenceTests
         SentenceFor("style/type-name-length")
             .ShouldBe("Types in `MyApp.*` must keep type names at or under 40 characters.");
     }
+
+    [Fact]
+    public void Migrate_InjectClock_RendersMemberUseSentence()
+    {
+        // The member-access verb renders each target as a backticked declaring-type dot member,
+        // joined with "or" (GRAMMAR §4.5, §6). Validation runs on build, so the members must be real.
+        ArchModelBuilder.Build(new InjectClockSpec())
+            .Rules.Single(rule => rule.Id == "time/inject-clock").Sentence
+            .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
+    }
+
+    // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
+    // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
+    private sealed class InjectClockSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("time/inject-clock")
+                .Migrate(
+                    "Code reads the ambient clock directly.",
+                    arch.Types.MustNotUse(
+                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
+                .Fix("Take IClock in the constructor; see OrderService for the pattern.");
+        }
+    }
 }

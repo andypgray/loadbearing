@@ -9,10 +9,14 @@ namespace Zphil.LoadBearing.Cli;
 ///     Resolves the <c>--add</c> names against a rule's current violations (from the same
 ///     empty-baseline check the whole <c>baseline</c> command runs on). A name matches a type when it
 ///     ordinally equals the <see cref="TypeNode.FullName" /> or the <see cref="TypeNode.SymbolId" />;
-///     an edge's source and target must match the <em>same</em> violation. Zero matches and ambiguous
-///     matches (two distinct identities) are loud <see cref="UserErrorException" />s listing the
-///     candidates — the baseline records observed reality, so the valve only admits what is actually
-///     red. Pure over the in-memory results, so ambiguity is unit-testable with synthetic nodes.
+///     an edge's source and target must match the <em>same</em> violation. A member <c>--target</c>
+///     matches a <see cref="ViolationKind.MemberUse" /> when it equals the member's full name
+///     (no parens — <c>System.DateTime.Now</c>) or its member symbol ID (<c>P:System.DateTime.Now</c>);
+///     a full-name target naming an overloaded method matches every overload, so the ambiguity error
+///     lists the distinct member IDs to retry with (GRAMMAR §4.5). Zero matches and ambiguous matches
+///     (two distinct identities) are loud <see cref="UserErrorException" />s listing the candidates —
+///     the baseline records observed reality, so the valve only admits what is actually red. Pure over
+///     the in-memory results, so ambiguity is unit-testable with synthetic nodes.
 /// </summary>
 internal static class BaselineAddMatcher
 {
@@ -20,7 +24,7 @@ internal static class BaselineAddMatcher
     {
         var echo = $"--source '{source}' --target '{target}'";
         var candidates = violations
-            .Where(v => v.Kind == ViolationKind.Reference && Matches(v.Source!, source) && Matches(v.Target!, target))
+            .Where(v => MatchesEdge(v, source, target))
             .ToList();
 
         return Resolve(ruleId, violations, candidates, echo);
@@ -42,9 +46,27 @@ internal static class BaselineAddMatcher
         if (identities.Count == 0) throw new UserErrorException(NoMatch(ruleId, violations, echo));
         if (identities.Count > 1)
             throw new UserErrorException(
-                $"{echo} matches more than one current violation of '{ruleId}': {RenderSymbols(identities)}. Use the 'T:' symbol ID form.");
+                $"{echo} matches more than one current violation of '{ruleId}': {RenderSymbols(identities)}. Use the symbol ID form.");
 
         return candidates[0];
+    }
+
+    // A --source/--target pair matches a reference edge on both type endpoints, or a member-use edge on
+    // the source type and the banned member (by full name or member symbol ID, GRAMMAR §4.5).
+    private static bool MatchesEdge(Violation violation, string source, string target)
+    {
+        return violation.Kind switch
+        {
+            ViolationKind.Reference => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            ViolationKind.MemberUse => Matches(violation.Source!, source) && MatchesMember(violation.Member!, target),
+            _ => false
+        };
+    }
+
+    private static bool MatchesMember(MemberReference member, string target)
+    {
+        return string.Equals($"{member.ContainingType.FullName}.{member.Name}", target, StringComparison.Ordinal)
+               || string.Equals(member.SymbolId, target, StringComparison.Ordinal);
     }
 
     private static string NoMatch(string ruleId, IReadOnlyList<Violation> violations, string echo)
@@ -68,11 +90,25 @@ internal static class BaselineAddMatcher
         return string.Join(", ", identities.Select(SymbolForm).OrderBy(symbol => symbol, StringComparer.Ordinal));
     }
 
-    private static string FullNameForm(Violation violation)
+    // A violation's full-name listing form: the subject for a shape, Source -> Target for a reference
+    // edge, Source -> member display for a member use. Shared with BaselineRunner's added-entry echo so
+    // the success message and the no-match candidate list render one way for every kind --add resolves.
+    internal static string FullNameForm(Violation violation)
     {
-        return violation.Kind == ViolationKind.Shape
-            ? violation.Subject!.FullName
-            : $"{violation.Source!.FullName} -> {violation.Target!.FullName}";
+        return violation.Kind switch
+        {
+            ViolationKind.Shape => violation.Subject!.FullName,
+            ViolationKind.MemberUse => $"{violation.Source!.FullName} -> {MemberDisplay(violation.Member!)}",
+            _ => $"{violation.Source!.FullName} -> {violation.Target!.FullName}"
+        };
+    }
+
+    // The banned member as declaring-type-dot-member, () iff a method — the parens-iff-method display of
+    // the human report line, so the no-match candidate list reads exactly as 'loadbearing check' does.
+    private static string MemberDisplay(MemberReference member)
+    {
+        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
+        return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
     }
 
     private static string SymbolForm(BaselineEntry identity)

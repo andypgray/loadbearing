@@ -85,6 +85,44 @@
       "warnings": []
     },
     {
+      "id": "time/inject-clock",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.",
+      "because": "Wall-clock reads are untestable; inject IClock.",
+      "fix": "Take IClock in the constructor; see OrderService for the pattern.",
+      "baseline": {
+        "path": "arch/baselines/time/inject-clock.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "memberUse",
+          "source": "MyApp.Web.HomeController",
+          "targetMember": "P:System.DateTime.Now",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 32
+            }
+          ]
+        },
+        {
+          "kind": "memberUse",
+          "source": "MyApp.Web.HomeController",
+          "targetMember": "P:System.DateTime.UtcNow",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 37
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -168,11 +206,11 @@
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 7,
+    "rulesChecked": 8,
     "rulesPassed": 2,
-    "rulesFailed": 4,
+    "rulesFailed": 5,
     "rulesSkipped": 1,
-    "violations": 6,
+    "violations": 8,
     "warnings": 1
   }
 }

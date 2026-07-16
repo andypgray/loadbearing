@@ -61,6 +61,12 @@ public static class SelectionConstraints
         return new MustOnlyBeReferencedByConstraint(subject, WrappedTypes(subject, first, more));
     }
 
+    /// <summary>The subject must not use any of the member targets (GRAMMAR §4.5).</summary>
+    public static Constraint MustNotUse(this Selection subject, Member first, params Member[] more)
+    {
+        return new MustNotUseConstraint(subject, Members(subject, first, more));
+    }
+
     /// <summary>The subject must reside in a namespace glob.</summary>
     public static Constraint MustResideInNamespace(this Selection subject, string glob)
     {
@@ -157,6 +163,15 @@ public static class SelectionConstraints
         Guard.NotNull(subject, nameof(subject));
         var list = new List<Selection>(1 + more.Length) { Wrap(subject, NotNull(first, nameof(first))) };
         foreach (Type type in more) list.Add(Wrap(subject, NotNull(type, nameof(more))));
+
+        return list;
+    }
+
+    private static IReadOnlyList<Member> Members(Selection subject, Member first, Member[] more)
+    {
+        Guard.NotNull(subject, nameof(subject));
+        var list = new List<Member>(1 + more.Length) { NotNull(first, nameof(first)) };
+        foreach (Member member in more) list.Add(NotNull(member, nameof(more)));
 
         return list;
     }

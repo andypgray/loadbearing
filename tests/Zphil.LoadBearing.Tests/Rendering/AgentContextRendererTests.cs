@@ -168,6 +168,20 @@ public class AgentContextRendererTests
         block.ShouldNotContain("### Frozen scopes"); // a spec with no freeze omits the section entirely
     }
 
+    [Fact]
+    public void RootBlock_WithMemberRule_ExtendsGlossaryWithUseEntry()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new MemberRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The member-axis "use" entry appears beside "reference" only when a member-target rule exists.
+        block.ShouldContain(
+            "reference = a source-level type reference; use = a source-level member access. " +
+            "Expand any rule ID with `loadbearing explain <rule-id>`.");
+        // It is a swap, not an addition — the member-free glossary line is gone (GRAMMAR §4.5).
+        block.ShouldNotContain("reference = a source-level type reference. Expand");
+    }
+
     // A single Migrate-rule spec — no layers, no Enforce rules — for the Migrations-section pins.
     private sealed class PolicySpec(MigrationPolicy policy) : IArchitectureSpec
     {
@@ -204,6 +218,17 @@ public class AgentContextRendererTests
                          "Roslyn extraction is host machinery.")
                 .Fix("Depend on the Codebase model types in Core; keep Microsoft.CodeAnalysis behind " +
                      "Zphil.LoadBearing.Roslyn.");
+        }
+    }
+
+    // A spec carrying a member-target rule (MustNotUse) — triggers the extended glossary line.
+    private sealed class MemberRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("time/inject-clock")
+                .Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
+                .Because("Wall-clock reads are untestable; inject IClock.");
         }
     }
 }

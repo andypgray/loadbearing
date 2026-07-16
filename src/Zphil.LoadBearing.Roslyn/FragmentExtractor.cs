@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
 using CoreTypeKind = Zphil.LoadBearing.TypeKind;
 
@@ -17,7 +18,8 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         </item>
 ///         <item>
 ///             Edges — walk each declaring part's source for source-name-derived reference edges, deduped by (file,
-///             line), self-edges dropped.
+///             line), self-edges dropped. The same walk yields the member-use edges (GRAMMAR §4.5) beside the type
+///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped.
 ///         </item>
 ///     </list>
 ///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
@@ -110,6 +112,7 @@ internal static class FragmentExtractor
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
 
         public CodebaseFragment Run(CompilationInput input)
         {
@@ -198,15 +201,47 @@ internal static class FragmentExtractor
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
-                foreach ((INamedTypeSymbol target, string file, int line) in ReferenceWalker.Walk(root, model))
+                foreach ((INamedTypeSymbol target, ISymbol? member, string file, int line) in ReferenceWalker.Walk(root, model))
                 {
                     string tgtFqn = FullNameOf(target);
-                    if (tgtFqn == srcFqn) continue; // self-edge
+                    if (tgtFqn == srcFqn) continue; // self-edge — drops the type edge and any member use on this node
 
                     ResolveName(target);
                     EdgeSites((srcFqn, tgtFqn)).Add(new FragmentSite(file, line));
+
+                    // The member's containing type is the type-channel target (they agree by construction), so it is
+                    // already resolved above; the member edge just reuses tgtFqn and records the specific member.
+                    if (member is not null)
+                        RecordMemberEdge(srcFqn, tgtFqn, member, new FragmentSite(file, line));
                 }
             }
+        }
+
+        // One member edge per (source, member DocumentationCommentId); sites union like the type-edge pass. The
+        // SymbolId fallback mirrors TypeFacts's (unresolved:{fqn}) for a member with no DocID (error/unnamed).
+        private void RecordMemberEdge(string srcFqn, string containingFqn, ISymbol member, FragmentSite site)
+        {
+            string memberSymbolId = member.GetDocumentationCommentId() ?? "unresolved:" + containingFqn + "." + member.Name;
+
+            if (!_memberEdges.TryGetValue((srcFqn, memberSymbolId), out MemberEdgeBuilder? builder))
+            {
+                builder = new MemberEdgeBuilder(containingFqn, member.Name, MemberKindOf(member));
+                _memberEdges[(srcFqn, memberSymbolId)] = builder;
+            }
+
+            builder.Sites.Add(site);
+        }
+
+        private static MemberKind MemberKindOf(ISymbol member)
+        {
+            return member switch
+            {
+                IMethodSymbol => MemberKind.Method,
+                IPropertySymbol => MemberKind.Property,
+                IFieldSymbol => MemberKind.Field,
+                IEventSymbol => MemberKind.Event,
+                _ => throw new ArgumentOutOfRangeException(nameof(member), member.Kind, "not a member-use symbol")
+            };
         }
 
         /// <summary>
@@ -258,7 +293,15 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentEdge(kv.Key.Src, kv.Key.Tgt, kv.Value.ToList()))
                 .ToList();
 
-            return new CodebaseFragment(input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges);
+            var memberEdges = _memberEdges
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.MemberSymbolId, StringComparer.Ordinal)
+                .Select(kv => new FragmentMemberEdge(
+                    kv.Key.Src, kv.Value.ContainingFullName, kv.Value.MemberName, kv.Key.MemberSymbolId, kv.Value.Kind,
+                    kv.Value.Sites.ToList()))
+                .ToList();
+
+            return new CodebaseFragment(input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges);
         }
 
         private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
@@ -301,5 +344,18 @@ internal static class FragmentExtractor
                 BaseTypeChain,
                 AttributeConstructions);
         }
+    }
+
+    /// <summary>
+    ///     Mutable accumulator for one member-use edge, keyed by (source FQN, member DocumentationCommentId): the
+    ///     member's declaring-type FQN, simple name, and kind (all functions of the member symbol) plus its unioned
+    ///     use sites. The facts are captured once on first mention; every later site of the same member unions in.
+    /// </summary>
+    private sealed class MemberEdgeBuilder(string containingFullName, string memberName, MemberKind kind)
+    {
+        public string ContainingFullName { get; } = containingFullName;
+        public string MemberName { get; } = memberName;
+        public MemberKind Kind { get; } = kind;
+        public SortedSet<FragmentSite> Sites { get; } = [];
     }
 }

@@ -1,4 +1,6 @@
+using System.Reflection;
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Prose;
 using Code = Zphil.LoadBearing.Validation.SpecValidationErrorCode;
 
 namespace Zphil.LoadBearing.Validation;
@@ -90,6 +92,7 @@ internal static class SpecValidator
         foreach ((string label, string? value) in RuleProse(rule)) CheckProse(value, label, rule.Id, errors);
 
         CheckForeign(RuleSelections(rule), rule.Id, arch, errors);
+        CheckMembers(rule, arch, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -149,6 +152,115 @@ internal static class SpecValidator
                     $"A selection used by '{id}' was minted on a different Arch instance; it is not registered with this model."));
                 return;
             }
+    }
+
+    // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
+    // rule (mirroring CheckForeign's report-once-and-return); otherwise each member is checked for a
+    // blank name and then, when named, that its anchor declares it.
+    private static void CheckMembers(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
+    {
+        var members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
+        if (members.Count == 0) return;
+
+        foreach (Member member in members)
+            if (!ReferenceEquals(member.Owner, arch))
+            {
+                errors.Add(new SpecValidationError(Code.ForeignMember, rule.Id,
+                    $"A member used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model."));
+                return;
+            }
+
+        foreach (Member member in members) CheckMember(member, rule.Id, errors);
+    }
+
+    private static void CheckMember(Member member, string id, List<SpecValidationError> errors)
+    {
+        string display = SafeFullDisplay(member.DeclaringType);
+
+        if (string.IsNullOrWhiteSpace(member.Name))
+        {
+            errors.Add(new SpecValidationError(Code.BlankMemberName, id,
+                $"Blank member name on a member of '{display}' (used by '{id}')."));
+            return;
+        }
+
+        Type anchor = GenericDefinition(member.DeclaringType);
+        if (Declares(anchor, member.Name)) return;
+
+        Type? declaringBase = FindDeclaringBase(anchor, member.Name);
+        if (declaringBase != null)
+        {
+            errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
+                $"'{display}' does not declare '{member.Name}'; it is declared on base type '{SafeFullDisplay(declaringBase)}' — " +
+                $"use typeof({TypeofForm(declaringBase)}) (used by '{id}')."));
+            return;
+        }
+
+        errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
+            $"'{display}' does not declare a member named '{member.Name}' (used by '{id}')."));
+    }
+
+    // The first base type / interface (each normalized to its generic definition) that declares the
+    // name, or null when nothing in the hierarchy declares it — GRAMMAR §8 item 12's base-type guidance.
+    private static Type? FindDeclaringBase(Type anchor, string name)
+    {
+        if (anchor.IsInterface)
+        {
+            foreach (Type contract in anchor.GetInterfaces())
+            {
+                Type normalized = GenericDefinition(contract);
+                if (Declares(normalized, name)) return normalized;
+            }
+
+            return null;
+        }
+
+        for (Type? baseType = anchor.BaseType; baseType != null; baseType = baseType.BaseType)
+        {
+            Type normalized = GenericDefinition(baseType);
+            if (Declares(normalized, name)) return normalized;
+        }
+
+        return null;
+    }
+
+    private static bool Declares(Type type, string name)
+    {
+        const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
+                                   BindingFlags.Instance | BindingFlags.Static;
+        return type.GetMember(name, flags).Length > 0;
+    }
+
+    private static Type GenericDefinition(Type type)
+    {
+        return type.IsGenericType && !type.IsGenericTypeDefinition ? type.GetGenericTypeDefinition() : type;
+    }
+
+    // The C#-writable typeof operand for a (normalized) type: non-generic → bare name (`Task`); generic
+    // definition → name without arity plus empty type-argument brackets (`HandlerBase<>`, `Foo<,>`).
+    private static string TypeofForm(Type type)
+    {
+        string name = type.Name;
+        int tick = name.IndexOf('`');
+        string bare = tick < 0 ? name : name.Substring(0, tick);
+        if (!type.IsGenericType) return bare;
+
+        int arity = type.GetGenericArguments().Length;
+        return bare + "<" + new string(',', arity - 1) + ">";
+    }
+
+    // FullDisplay of the authored type; a pointer/by-ref/partially-open anchor has no source form, so
+    // fall back to Type.ToString() rather than crash validation (GRAMMAR §8 item 12).
+    private static string SafeFullDisplay(Type type)
+    {
+        try
+        {
+            return TypeName.FullDisplay(type);
+        }
+        catch (UnrepresentableTypeException)
+        {
+            return type.ToString();
+        }
     }
 
     private static IEnumerable<(string Label, string? Value)> RuleProse(RuleRegistration rule)

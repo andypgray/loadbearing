@@ -22,6 +22,12 @@ public static class AgentContextRenderer
     private const string GlossaryLine =
         "reference = a source-level type reference. Expand any rule ID with `loadbearing explain <rule-id>`.";
 
+    // The member-axis glossary gains a "use" entry only when the spec carries a member-target rule; a
+    // spec without one renders byte-identically to before member bans existed (GRAMMAR §4.5 last bullet).
+    private const string GlossaryLineWithMembers =
+        "reference = a source-level type reference; use = a source-level member access. " +
+        "Expand any rule ID with `loadbearing explain <rule-id>`.";
+
     /// <summary>
     ///     The provenance/warning line — the first line inside every managed block (R1). Names the
     ///     spec deterministically (assembly file name without extension) so the pin is
@@ -50,11 +56,12 @@ public static class AgentContextRenderer
     {
         Guard.NotNull(model, nameof(model));
 
+        bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            GlossaryLine
+            hasMemberRule ? GlossaryLineWithMembers : GlossaryLine
         };
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));

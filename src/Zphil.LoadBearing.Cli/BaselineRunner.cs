@@ -82,8 +82,9 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error)
                 "--add requires exactly one entry form: --source with --target (an edge), or --subject (a shape).");
     }
 
-    // --add: append one attributed entry to a captured rule's section (or update attribution on a present entry).
-    private int AddEntry(BaselineRequest request, CheckReport report, string solutionDirectory)
+    // --add: append one attributed entry to a captured rule's section (or update attribution on a present
+    // entry). Internal so the fast-tier runner tests drive it over an in-memory report (no workspace).
+    internal int AddEntry(BaselineRequest request, CheckReport report, string solutionDirectory)
     {
         string ruleId = request.Rule!;
         RuleResult? result = report.Results.FirstOrDefault(r => string.Equals(r.Rule.Id, ruleId, StringComparison.Ordinal));
@@ -122,9 +123,10 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error)
         else
         {
             sections[ruleId] = existingEntries.Append(attributed).ToList();
-            output.WriteLine(request.Subject is not null
-                ? $"{ruleId}: added 1 grandfathered entry — {violation.Subject!.FullName} (because: {request.Because})."
-                : $"{ruleId}: added 1 grandfathered entry — {violation.Source!.FullName} -> {violation.Target!.FullName} (because: {request.Because}).");
+            // The shared full-name form covers every kind the matcher resolves — subject, reference edge,
+            // and member use (whose Target slot is null; the member display renders instead).
+            output.WriteLine(
+                $"{ruleId}: added 1 grandfathered entry — {BaselineAddMatcher.FullNameForm(violation)} (because: {request.Because}).");
         }
 
         WriteOutcome outcome = BaselineStore.Write(path, new BaselineDocument(sections));

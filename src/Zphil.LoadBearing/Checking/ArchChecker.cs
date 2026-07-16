@@ -172,12 +172,14 @@ public static class ArchChecker
             Array.Empty<Violation>(), 0, false);
     }
 
-    // Deterministic within-rule order: (Source|Subject FullName, Target FullName), ordinal.
+    // Deterministic within-rule order: (Source|Subject FullName, Target FullName, Member SymbolId),
+    // ordinal. A MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId).
     private static IReadOnlyList<Violation> Order(IReadOnlyList<Violation> violations)
     {
         return violations
             .OrderBy(v => (v.Source ?? v.Subject)?.FullName ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(v => v.Target?.FullName ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(v => v.Member?.SymbolId ?? string.Empty, StringComparer.Ordinal)
             .ToList();
     }
 }

@@ -44,4 +44,11 @@ public sealed class WorkspaceFixture : IAsyncLifetime
         string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
         return $"{edge.Source.FullName} -> {edge.Target.FullName} @ {sites}";
     }
+
+    /// <summary>Renders a member-use edge as <c>src -&gt; member SymbolId @ file:line, ...</c> (GRAMMAR §4.5).</summary>
+    public string RenderMemberEdge(MemberEdge edge)
+    {
+        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
+        return $"{edge.Source.FullName} -> {edge.Member.SymbolId} @ {sites}";
+    }
 }
