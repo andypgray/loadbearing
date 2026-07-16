@@ -10,8 +10,10 @@ namespace Zphil.LoadBearing.Cli;
 ///     listing every available (post-desugar) ID, ordinal-sorted → exit 2. A missing ID argument never
 ///     reaches here — System.CommandLine rejects it as a parse error, remapped to exit 2.
 /// </summary>
-internal sealed class ExplainRunner(TextWriter output)
+internal sealed class ExplainRunner(TextWriter output, ISolutionSource? source = null)
 {
+    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
+
     public async Task<int> RunAsync(ExplainRequest request, CancellationToken ct)
     {
         ArchitectureModel model = await LoadModelAsync(request, ct);
@@ -23,7 +25,7 @@ internal sealed class ExplainRunner(TextWriter output)
         return 0;
     }
 
-    private static async Task<ArchitectureModel> LoadModelAsync(ExplainRequest request, CancellationToken ct)
+    private async Task<ArchitectureModel> LoadModelAsync(ExplainRequest request, CancellationToken ct)
     {
         // Fast path: a built-DLL --spec resolves without ever opening the solution (R4).
         SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(request.Spec);
@@ -31,7 +33,7 @@ internal sealed class ExplainRunner(TextWriter output)
 
         // Convention or csproj --spec: load the workspace for resolution only; never extract.
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            request.Solution, request.Spec, request.WorkingDirectory, ct);
+            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
         return workspace.Model;
     }
 

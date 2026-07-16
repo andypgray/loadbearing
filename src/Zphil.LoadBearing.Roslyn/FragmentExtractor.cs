@@ -1,0 +1,305 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Zphil.LoadBearing.Roslyn.Caching;
+using CoreTypeKind = Zphil.LoadBearing.TypeKind;
+
+namespace Zphil.LoadBearing.Roslyn;
+
+/// <summary>
+///     Extracts one <see cref="CompilationInput" /> into a self-contained <see cref="CodebaseFragment" />
+///     by running the model's three passes over a <em>single</em> compilation:
+///     <list type="number">
+///         <item>Declare — record a <see cref="FragmentType" /> per solution-declared type in this input.</item>
+///         <item>
+///             Hierarchy — fill each declared type's base type, interfaces, and attributes <em>by FQN</em>,
+///             recording every referenced-but-not-declared FQN in <see cref="CodebaseFragment.Externals" />
+///             with the facts from this compilation's metadata view.
+///         </item>
+///         <item>
+///             Edges — walk each declaring part's source for source-name-derived reference edges, deduped by (file,
+///             line), self-edges dropped.
+///         </item>
+///     </list>
+///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
+///     fragments by FQN to reproduce the global cross-input semantics. Because a fragment sees only its own
+///     compilation, a type another project declares still lands in <see cref="CodebaseFragment.Externals" />
+///     here; the merge — not this pass — decides unification (declared-beats-external).
+/// </summary>
+internal static class FragmentExtractor
+{
+    private static readonly SymbolDisplayFormat FullNameFormat = new(
+        SymbolDisplayGlobalNamespaceStyle.Omitted,
+        SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        SymbolDisplayGenericsOptions.IncludeTypeParameters);
+
+    public static CodebaseFragment Extract(CompilationInput input)
+    {
+        return new ExtractState().Run(input);
+    }
+
+    private static IEnumerable<INamedTypeSymbol> DeclaredTypes(Compilation compilation)
+    {
+        return TypesInNamespace(compilation.Assembly.GlobalNamespace);
+    }
+
+    private static IEnumerable<INamedTypeSymbol> TypesInNamespace(INamespaceSymbol ns)
+    {
+        foreach (INamespaceSymbol child in ns.GetNamespaceMembers())
+        foreach (INamedTypeSymbol type in TypesInNamespace(child))
+            yield return type;
+
+        foreach (INamedTypeSymbol type in ns.GetTypeMembers())
+        foreach (INamedTypeSymbol nested in TypeAndNested(type))
+            yield return nested;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> TypeAndNested(INamedTypeSymbol type)
+    {
+        yield return type;
+        foreach (INamedTypeSymbol nested in type.GetTypeMembers())
+        foreach (INamedTypeSymbol descendant in TypeAndNested(nested))
+            yield return descendant;
+    }
+
+    private static string FullNameOf(INamedTypeSymbol symbol)
+    {
+        return symbol.OriginalDefinition.ToDisplayString(FullNameFormat);
+    }
+
+    // Scalar shape + identity facts read once from the original definition. Shape facts are normalized to
+    // C# declaration semantics: a static class is encoded abstract+sealed in metadata (and may be so from
+    // source), and the `&& !isStatic` mask converges both paths so a static class reports neither. The
+    // TryMap fallback to Class matches the external-mint path (declared types always map, so it is a no-op
+    // for them). The baseline key (GRAMMAR §4.3) is the definition's DocumentationCommentId (T: form), or
+    // an unresolved:{fqn} fallback when the symbol has no DocID (error/unnamed types).
+    private static TypeFacts ExtractFacts(INamedTypeSymbol definition)
+    {
+        string fqn = FullNameOf(definition);
+        CoreTypeKind kind = TypeKindMapper.TryMap(definition, out CoreTypeKind mapped) ? mapped : CoreTypeKind.Class;
+        bool isStatic = definition.IsStatic;
+        return new TypeFacts(
+            fqn,
+            definition.GetDocumentationCommentId() ?? "unresolved:" + fqn,
+            definition.Name,
+            NamespaceOf(definition),
+            kind,
+            AccessibilityMapper.Map(definition),
+            definition.IsSealed && !isStatic,
+            isStatic,
+            definition.IsAbstract && !isStatic,
+            definition.IsRecord);
+    }
+
+    private static string NamespaceOf(INamedTypeSymbol symbol)
+    {
+        return symbol.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() : "";
+    }
+
+    private static SyntaxToken? IdentifierOf(SyntaxNode node)
+    {
+        return node switch
+        {
+            BaseTypeDeclarationSyntax type => type.Identifier,
+            DelegateDeclarationSyntax del => del.Identifier,
+            _ => null
+        };
+    }
+
+    private sealed class ExtractState
+    {
+        private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
+        private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
+
+        public CodebaseFragment Run(CompilationInput input)
+        {
+            Compilation compilation = input.Compilation;
+
+            // Pass 1 — declare every solution-declared type in this compilation.
+            foreach (INamedTypeSymbol symbol in DeclaredTypes(compilation))
+                Declare(symbol);
+
+            // Pass 2 — hierarchy (once per declared type, in first-declaration order).
+            foreach (DeclaredBuilder builder in _declared.Values)
+                PopulateHierarchy(builder);
+
+            // Pass 3 — edges (every declaring part; sites dedupe).
+            foreach (DeclaredBuilder builder in _declared.Values)
+                WalkEdges(builder.Symbol, compilation);
+
+            return Materialize(input);
+        }
+
+        private void Declare(INamedTypeSymbol symbol)
+        {
+            if (symbol.IsImplicitlyDeclared || !symbol.CanBeReferencedByName) return;
+
+            if (!TypeKindMapper.TryMap(symbol, out _)) return;
+
+            INamedTypeSymbol definition = symbol.OriginalDefinition;
+            string fqn = FullNameOf(definition);
+
+            if (!_declared.TryGetValue(fqn, out DeclaredBuilder? builder))
+            {
+                builder = new DeclaredBuilder(ExtractFacts(definition), definition);
+                _declared[fqn] = builder;
+            }
+
+            AccumulateDeclarationSites(builder.Sites, definition);
+        }
+
+        private void PopulateHierarchy(DeclaredBuilder builder)
+        {
+            INamedTypeSymbol symbol = builder.Symbol;
+
+            builder.BaseTypeFullName = symbol.BaseType is { } baseType ? ResolveName(baseType) : null;
+
+            builder.Interfaces = symbol.Interfaces
+                .Select(ResolveName)
+                .ToList();
+
+            builder.Attributes = symbol.GetAttributes()
+                .Select(a => a.AttributeClass)
+                .Where(c => c is not null)
+                .Select(c => ResolveName(c!))
+                .ToList();
+
+            // Construction-preserving facts: the Definition side resolves to the OriginalDefinition FQN
+            // (via ResolveName), while the constructed name displays the CONSTRUCTED symbol, so a closed
+            // generic keeps its substituted arguments.
+            builder.AllInterfaces = symbol.AllInterfaces
+                .Select(Construction)
+                .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
+                .ToList();
+
+            var baseChain = new List<FragmentConstruction>();
+            for (INamedTypeSymbol? current = symbol.BaseType; current is not null; current = current.BaseType)
+                baseChain.Add(Construction(current)); // nearest-first; derivation order is meaningful, so not sorted
+            builder.BaseTypeChain = baseChain;
+
+            builder.AttributeConstructions = symbol.GetAttributes()
+                .Select(a => a.AttributeClass)
+                .Where(c => c is not null)
+                .Select(c => Construction(c!))
+                .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        /// <summary>A construction: the definition FQN (via <see cref="ResolveName" />) plus the constructed display name.</summary>
+        private FragmentConstruction Construction(INamedTypeSymbol symbol)
+        {
+            return new FragmentConstruction(ResolveName(symbol), symbol.ToDisplayString(FullNameFormat));
+        }
+
+        private void WalkEdges(INamedTypeSymbol symbol, Compilation compilation)
+        {
+            string srcFqn = FullNameOf(symbol);
+            foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
+            {
+                SyntaxNode root = reference.GetSyntax();
+                SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
+                foreach ((INamedTypeSymbol target, string file, int line) in ReferenceWalker.Walk(root, model))
+                {
+                    string tgtFqn = FullNameOf(target);
+                    if (tgtFqn == srcFqn) continue; // self-edge
+
+                    ResolveName(target);
+                    EdgeSites((srcFqn, tgtFqn)).Add(new FragmentSite(file, line));
+                }
+            }
+        }
+
+        /// <summary>
+        ///     The FQN of a referenced type's original definition. When that FQN is not declared by this
+        ///     input, it is a referenced-but-not-declared type, so an external record (first mention wins)
+        ///     is minted from this compilation's metadata view — the per-input analog of the builder's node
+        ///     minting, deferring cross-input unification to the merge.
+        /// </summary>
+        private string ResolveName(INamedTypeSymbol symbol)
+        {
+            INamedTypeSymbol definition = symbol.OriginalDefinition;
+            string fqn = FullNameOf(definition);
+
+            if (!_declared.ContainsKey(fqn) && !_externals.ContainsKey(fqn))
+                _externals[fqn] = new FragmentExternal(ExtractFacts(definition), definition.ContainingAssembly?.Name ?? "");
+
+            return fqn;
+        }
+
+        private static void AccumulateDeclarationSites(SortedSet<FragmentSite> sites, INamedTypeSymbol definition)
+        {
+            foreach (SyntaxReference reference in definition.DeclaringSyntaxReferences)
+            {
+                SyntaxNode node = reference.GetSyntax();
+                if (IdentifierOf(node) is { } identifier)
+                {
+                    int line = identifier.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                    sites.Add(new FragmentSite(node.SyntaxTree.FilePath, line));
+                }
+            }
+        }
+
+        private CodebaseFragment Materialize(CompilationInput input)
+        {
+            // Canonical ordering makes the serialized fragment stable; the merge re-derives global order,
+            // so a fragment's internal order never affects the model.
+            var declaredTypes = _declared.Values
+                .Select(b => b.ToFragmentType())
+                .OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
+                .ToList();
+
+            var externals = _externals.Values
+                .OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
+                .ToList();
+
+            var edges = _edgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Tgt, StringComparer.Ordinal)
+                .Select(kv => new FragmentEdge(kv.Key.Src, kv.Key.Tgt, kv.Value.ToList()))
+                .ToList();
+
+            return new CodebaseFragment(input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges);
+        }
+
+        private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
+        {
+            if (!_edgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _edgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+    }
+
+    /// <summary>
+    ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration sites, and
+    ///     hierarchy filled in pass 2.
+    /// </summary>
+    private sealed class DeclaredBuilder(TypeFacts facts, INamedTypeSymbol symbol)
+    {
+        public TypeFacts Facts { get; } = facts;
+        public INamedTypeSymbol Symbol { get; } = symbol;
+        public SortedSet<FragmentSite> Sites { get; } = [];
+        public string? BaseTypeFullName { get; set; }
+        public IReadOnlyList<string> Interfaces { get; set; } = [];
+        public IReadOnlyList<string> Attributes { get; set; } = [];
+        public IReadOnlyList<FragmentConstruction> AllInterfaces { get; set; } = [];
+        public IReadOnlyList<FragmentConstruction> BaseTypeChain { get; set; } = [];
+        public IReadOnlyList<FragmentConstruction> AttributeConstructions { get; set; } = [];
+
+        public FragmentType ToFragmentType()
+        {
+            return new FragmentType(
+                Facts,
+                Sites.ToList(),
+                BaseTypeFullName,
+                Interfaces,
+                Attributes,
+                AllInterfaces,
+                BaseTypeChain,
+                AttributeConstructions);
+        }
+    }
+}

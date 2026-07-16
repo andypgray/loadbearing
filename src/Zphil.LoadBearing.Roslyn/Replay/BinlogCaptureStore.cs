@@ -1,0 +1,598 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn.Caching;
+
+namespace Zphil.LoadBearing.Roslyn.Replay;
+
+/// <summary>The three states <see cref="BinlogCaptureStore.Validate" /> can report.</summary>
+internal enum CaptureState
+{
+    /// <summary>No capture exists for this solution; the run takes the cold path with no notice.</summary>
+    Absent,
+
+    /// <summary>The capture still reflects the tree's structure; replay the recorded binlog copy.</summary>
+    Usable,
+
+    /// <summary>A capture existed but no longer holds; carry the notice and fall back to a design-time build.</summary>
+    Invalid
+}
+
+/// <summary>
+///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="BinlogCopyPath" /> is set only on
+///     <see cref="CaptureState.Usable" /> (the copy to replay); <see cref="Notice" /> only on
+///     <see cref="CaptureState.Invalid" /> — the complete user-facing line WP4 prints to stderr behind its
+///     <c>warning: </c> prefix.
+/// </summary>
+internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyPath, string? Notice)
+{
+    internal static CaptureValidation Absent()
+    {
+        return new CaptureValidation(CaptureState.Absent, null, null);
+    }
+
+    internal static CaptureValidation Usable(string binlogCopyPath)
+    {
+        return new CaptureValidation(CaptureState.Usable, binlogCopyPath, null);
+    }
+
+    internal static CaptureValidation Invalid(string notice)
+    {
+        return new CaptureValidation(CaptureState.Invalid, null, notice);
+    }
+}
+
+/// <summary>
+///     The ingest/validate boundary over one solution's persisted <b>build capture</b> — a copied binlog plus
+///     a structure-only-keyed manifest that lets a later run replay the build with no design-time build, as
+///     long as the tree's structure has not moved (Phase 12 WP3). It is the sibling of the Phase 11
+///     <see cref="ExtractionCacheStore" /> and mirrors its disciplines exactly: atomic temp-file-then-move
+///     writes, <see cref="FileStamp" /> content-hash tolerance of a bare mtime touch, stamp promotion so the
+///     steady state validates on stat alone, "any failure degrades, never a wrong answer", and an internal
+///     <see cref="ContentHashCount" /> observable for the promotion pin. This type is <em>unwired</em> — the
+///     CLI's <c>--binlog</c> option, source selection, and notice printing are WP4.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>Why a second, structure-only cache layer.</b> The fragment cache keys on structure
+///         <em>and</em> per-document content, so any source edit re-extracts. The capture keys on structure
+///         alone, because replay reads source text from current disk — content edits are invisible to it and
+///         must stay valid. What invalidates a capture is anything that changes the captured csc command
+///         lines' meaning: a csproj/sln/props/targets/global.json/assets edit (the structural stamps), a
+///         source add (the project-cone scan), or a source/obj-generated file that has gone missing (the
+///         document existence sweep — a <c>dotnet clean</c> deletes <c>*.GlobalUsings.g.cs</c> and friends,
+///         which replay cannot regenerate, so the capture must go invalid rather than drift).
+///     </para>
+///     <para>
+///         <b>Ingest is explicit and sanity-checked</b> (WP4 calls it right after a successful
+///         <c>--binlog</c> replay). A binlog older than the tree's structural files, or one that does not
+///         cover exactly the solution's csproj set, is a loud <see cref="UserErrorException" /> refusal — the
+///         capture contract is "from a build of the current tree", and a subset binlog would silently shrink
+///         the model forever. A capture invalidated <em>later</em> is not loud: <see cref="Validate" />
+///         reports an <see cref="CaptureState.Invalid" /> notice and the run falls back to a design-time
+///         build, because a hard error would break CI on any csproj change until re-capture.
+///     </para>
+///     <para>
+///         <b>Persistence is best-effort.</b> WP4's run already holds its replayed solution, so an I/O
+///         failure while persisting must not fail the run — <see cref="Ingest" /> returns whether it
+///         persisted. The binlog copy is written <em>before</em> the manifest, so a torn write leaves a
+///         manifest-less orphan (validated as <see cref="CaptureState.Absent" />), never a manifest pointing
+///         at a missing binlog.
+///     </para>
+/// </remarks>
+internal sealed class BinlogCaptureStore
+{
+    private const int CurrentSchemaVersion = 1;
+
+    /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
+    internal const string UnreadableNotice =
+        "build capture is unreadable; running a design-time build instead. Re-capture: rebuild with -bl and "
+        + "re-run with --binlog.";
+
+    /// <summary>The <see cref="CaptureState.Invalid" /> notice when the capture is from another tool version.</summary>
+    internal const string VersionMismatchNotice =
+        "build capture was written by a different LoadBearing version; running a design-time build instead. "
+        + "Re-capture: rebuild with -bl and re-run with --binlog.";
+
+    // Mirrors ExtractionCacheStore: probe files whose presence anywhere from a project directory up to the
+    // solution directory changes the build, stamped even when absent so a newly-appearing one is a flip.
+    private static readonly string[] StructuralProbeFileNames =
+        ["Directory.Build.props", "Directory.Build.targets", "global.json"];
+
+    // The tool version is the assembly's informational version ("0.1.0+<sha>"): the SDK appends the commit
+    // hash, giving per-commit invalidation during development. Same discipline (and, being the same assembly,
+    // the same value) as ExtractionCacheStore.CurrentToolVersion.
+    private static readonly string CurrentToolVersion =
+        typeof(BinlogCaptureStore).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? "unknown";
+
+    private readonly string cacheDirectory;
+    private readonly string captureBinlogPath;
+    private readonly string captureManifestPath;
+    private readonly string solutionPath;
+
+    /// <summary>
+    ///     Creates a store for <paramref name="solutionPath" />'s capture. The files live under
+    ///     <paramref name="cacheRootOverride" /> when given, else the default cache root — either way in the
+    ///     per-solution subdirectory <see cref="CacheLocations" /> derives. Never reads an environment
+    ///     variable itself: the CLI passes <c>LOADBEARING_CACHE_DIR</c> through its <c>IEnvironment</c> seam
+    ///     in WP4 (self-spec <c>mcp/env-through-seam</c>).
+    /// </summary>
+    public BinlogCaptureStore(string solutionPath, string? cacheRootOverride = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
+        this.solutionPath = solutionPath;
+        captureManifestPath = CacheLocations.CaptureManifestPath(solutionPath, cacheRootOverride);
+        captureBinlogPath = CacheLocations.CaptureBinlogPath(solutionPath, cacheRootOverride);
+        cacheDirectory = Path.GetDirectoryName(captureManifestPath)!;
+    }
+
+    /// <summary>
+    ///     The number of file-content reads (SHA-256 computations) performed by <see cref="Validate" />. Zero
+    ///     in the steady state, where every structural input is trusted on stat alone. Internal test
+    ///     observable — the capture's analog of <see cref="ExtractionCacheStore.ContentHashCount" />; never
+    ///     consulted in production.
+    /// </summary>
+    internal long ContentHashCount { get; private set; }
+
+    // ── message factories (dictated text; exposed so tests pin without duplicating format logic) ──────────
+
+    /// <summary>The <see cref="UserErrorException" /> text when a structural file is newer than the binlog.</summary>
+    internal static string StaleAtIngestMessage(string binlogArgument, string newestStructuralFile)
+    {
+        return $"--binlog '{binlogArgument}' predates '{newestStructuralFile}' (the build no longer reflects "
+               + "the current tree). Rebuild with -bl and pass the fresh binlog.";
+    }
+
+    /// <summary>The refusal text when the binlog is missing one or more of the solution's csproj members.</summary>
+    internal static string MissingCoverageMessage(string binlogArgument, IEnumerable<string> missingCsprojs)
+    {
+        string list = string.Join("\n", missingCsprojs.OrderBy(p => p, StringComparer.Ordinal).Select(p => $"  {p}"));
+        return $"--binlog '{binlogArgument}' does not cover the solution; missing from the binlog:\n{list}\n"
+               + "Build the whole solution with -bl and pass that binlog.";
+    }
+
+    /// <summary>The refusal text when the binlog contains a project the solution does not list.</summary>
+    internal static string ExtraCoverageMessage(
+        string binlogArgument, string solutionFileName, IEnumerable<string> extraCsprojs)
+    {
+        string list = string.Join("\n", extraCsprojs.OrderBy(p => p, StringComparer.Ordinal).Select(p => $"  {p}"));
+        return $"--binlog '{binlogArgument}' contains projects that are not in '{solutionFileName}':\n{list}\n"
+               + "Pass a .binlog produced by building exactly this solution.";
+    }
+
+    /// <summary>The <see cref="CaptureState.Invalid" /> notice when a structural input no longer matches.</summary>
+    internal static string StaleNotice(string offendingFile)
+    {
+        return $"build capture is stale ('{offendingFile}' no longer matches the capture); running a "
+               + "design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.";
+    }
+
+    // ── ingest ───────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Sanity-checks <paramref name="replayedSolution" /> against <paramref name="binlogFullPath" /> and,
+    ///     if it passes, persists the capture. In order: (1) refuse if any structural file is strictly newer
+    ///     than the binlog (a stale build); (2) refuse if the binlog does not cover exactly the solution's
+    ///     csproj set; (3) copy the binlog and write the manifest, both atomically and best-effort.
+    /// </summary>
+    /// <param name="replayedSolution">The solution just produced by replaying <paramref name="binlogFullPath" />.</param>
+    /// <param name="binlogFullPath">The absolute path to the binlog that was replayed.</param>
+    /// <param name="binlogArgument">The user's as-typed <c>--binlog</c> value, used verbatim in refusals.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> if the capture was persisted; <c>false</c> if a best-effort I/O step failed.</returns>
+    /// <exception cref="UserErrorException">The binlog is stale, or does not cover exactly the solution.</exception>
+    public bool Ingest(
+        Solution replayedSolution, string binlogFullPath, string binlogArgument, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(binlogFullPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
+
+        var projects = CollectProjects(replayedSolution);
+        var structuralPaths = DedupedStructuralPaths(projects);
+
+        RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
+        RefuseIfCoverageMismatch(projects, binlogArgument);
+
+        return TryPersist(projects, structuralPaths, binlogFullPath, ct);
+    }
+
+    private void RefuseIfStale(
+        IReadOnlyList<string> structuralPaths, string binlogFullPath, string binlogArgument, CancellationToken ct)
+    {
+        DateTime binlogTime = File.GetLastWriteTimeUtc(binlogFullPath);
+
+        string? newestOffender = null;
+        DateTime newestOffenderTime = default;
+        foreach (string path in structuralPaths)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!File.Exists(path)) continue;
+
+            DateTime writeTime = File.GetLastWriteTimeUtc(path);
+            if (writeTime <= binlogTime) continue; // equal timestamps tolerate coarse filesystem clocks
+
+            bool newer = newestOffender is null
+                         || writeTime > newestOffenderTime
+                         || (writeTime == newestOffenderTime && string.CompareOrdinal(path, newestOffender) < 0);
+            if (newer)
+            {
+                newestOffender = path;
+                newestOffenderTime = writeTime;
+            }
+        }
+
+        if (newestOffender is not null)
+            throw new UserErrorException(StaleAtIngestMessage(binlogArgument, newestOffender));
+    }
+
+    private void RefuseIfCoverageMismatch(IReadOnlyList<CaptureProjectEntry> projects, string binlogArgument)
+    {
+        var solutionCsprojs = SolutionProjectFileParser.ReadCsprojMembers(solutionPath);
+        var replayCsprojs = projects.Select(p => p.CsprojPath).ToList();
+
+        var replayCanonical = new HashSet<string>(replayCsprojs.Select(CanonicalKey), PathComparison.Comparer);
+        var missing = solutionCsprojs.Where(p => !replayCanonical.Contains(CanonicalKey(p))).ToList();
+        if (missing.Count > 0)
+            throw new UserErrorException(MissingCoverageMessage(binlogArgument, missing));
+
+        var solutionCanonical = new HashSet<string>(solutionCsprojs.Select(CanonicalKey), PathComparison.Comparer);
+        var extra = replayCsprojs.Where(p => !solutionCanonical.Contains(CanonicalKey(p))).ToList();
+        if (extra.Count > 0)
+            throw new UserErrorException(
+                ExtraCoverageMessage(binlogArgument, Path.GetFileName(solutionPath), extra));
+    }
+
+    private bool TryPersist(
+        IReadOnlyList<CaptureProjectEntry> projects, IReadOnlyList<string> structuralPaths,
+        string binlogFullPath, CancellationToken ct)
+    {
+        List<FileStamp> structuralStamps;
+        try
+        {
+            Directory.CreateDirectory(cacheDirectory);
+            structuralStamps = structuralPaths.Select(StampOf).ToList();
+
+            // Binlog copy BEFORE the manifest: a torn state is then a manifest-less orphan (validated Absent),
+            // never a manifest pointing at a binlog that was never written.
+            CopyFileAtomic(binlogFullPath, captureBinlogPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return false;
+        }
+
+        ct.ThrowIfCancellationRequested();
+        var manifest = new CaptureManifest(
+            CurrentSchemaVersion, CurrentToolVersion, structuralStamps, projects, StampOf(captureBinlogPath));
+        return TryWriteManifestAtomic(manifest);
+    }
+
+    // ── validate ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Validates the persisted capture against disk with zero MSBuild. Reports <see cref="CaptureState.Absent" />
+    ///     (no capture — silent cold path), <see cref="CaptureState.Usable" /> (replay the binlog copy), or
+    ///     <see cref="CaptureState.Invalid" /> (a notice to print, then fall back). Existence flips and
+    ///     content changes on structural inputs invalidate; a bare mtime touch with unchanged bytes does not
+    ///     (hash-verified on a stat mismatch, then the manifest is rewritten with promoted stamps so the next
+    ///     run is pure-stat). Every recorded document must still exist, and no <c>*.cs</c> may have appeared
+    ///     in a project cone. Never throws (bar cancellation): an unexpected failure is the unreadable variant
+    ///     — a capture must never break a run.
+    /// </summary>
+    public CaptureValidation Validate(CancellationToken ct = default)
+    {
+        try
+        {
+            return ValidateCore(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Any unexpected failure (I/O mid-sweep, a malformed record STJ still bound) degrades to the
+            // unreadable variant: the capture is disposable, so the run falls back rather than surfacing it.
+            return CaptureValidation.Invalid(UnreadableNotice);
+        }
+    }
+
+    private CaptureValidation ValidateCore(CancellationToken ct)
+    {
+        if (!File.Exists(captureManifestPath)) return CaptureValidation.Absent();
+
+        CaptureManifest? manifest = TryReadManifest();
+        if (manifest is null) return CaptureValidation.Invalid(UnreadableNotice);
+        if (manifest.SchemaVersion != CurrentSchemaVersion) return CaptureValidation.Invalid(UnreadableNotice);
+        if (!string.Equals(manifest.ToolVersion, CurrentToolVersion, StringComparison.Ordinal))
+            return CaptureValidation.Invalid(VersionMismatchNotice);
+
+        // The binlog we would replay must still be on disk (a torn write or a hand-deleted copy).
+        if (!File.Exists(captureBinlogPath)) return CaptureValidation.Invalid(UnreadableNotice);
+
+        // Structural sweep — an existence flip or content change is the stale variant, naming the file.
+        var refreshedStructural = new List<FileStamp>(manifest.StructuralStamps.Count);
+        foreach (FileStamp stamp in manifest.StructuralStamps)
+        {
+            ct.ThrowIfCancellationRequested();
+            (bool changed, FileStamp refreshed) = CheckStructural(stamp);
+            if (changed) return CaptureValidation.Invalid(StaleNotice(stamp.Path));
+            refreshedStructural.Add(refreshed);
+        }
+
+        // Every recorded document (source and obj-generated) must still exist — a delete or clean is stale.
+        foreach (CaptureProjectEntry project in manifest.Projects)
+        foreach (string documentPath in project.DocumentPaths)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!File.Exists(documentPath)) return CaptureValidation.Invalid(StaleNotice(documentPath));
+        }
+
+        // Cone scan for a *.cs added outside bin/obj that the capture did not record — a membership change.
+        foreach (CaptureProjectEntry project in manifest.Projects)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (FirstConeAdd(project) is { } added) return CaptureValidation.Invalid(StaleNotice(added));
+        }
+
+        PromoteIfChanged(manifest, refreshedStructural);
+        return CaptureValidation.Usable(captureBinlogPath);
+    }
+
+    // Mirrors ExtractionCacheStore.CheckStructural: existence flip ⇒ changed; a promoted stat match is
+    // trusted; otherwise re-hash — a real content change is changed, a bare touch refreshes a promoted stamp.
+    private (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp)
+    {
+        FileFreshness current = FileFreshness.Capture(stamp.Path);
+        if (stamp.Exists != current.Exists) return (true, stamp);
+        if (!stamp.Exists) return (false, stamp);
+        if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp);
+
+        string? sha = HashDuringValidation(stamp.Path);
+        if (sha is null || !string.Equals(sha, stamp.Sha256, StringComparison.Ordinal)) return (true, stamp);
+
+        // Content unchanged despite the stat delta (a bare touch): refresh so the next sweep is pure-stat.
+        return (false, RefreshStamp(stamp.Path, current, sha));
+    }
+
+    // Enumerates *.cs under the project directory (skipping bin/obj) and returns the first not already
+    // recorded — the SDK-glob add a stat sweep cannot see. Sorted so "first" is deterministic.
+    private static string? FirstConeAdd(CaptureProjectEntry project)
+    {
+        if (!Directory.Exists(project.ProjectDirectory)) return null;
+
+        var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
+        var adds = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(project.ProjectDirectory, "*.cs", SearchOption.AllDirectories))
+        {
+            if (IsBuildArtifact(project.ProjectDirectory, file)) continue;
+
+            string full = Path.GetFullPath(file);
+            if (!known.Contains(full)) adds.Add(full);
+        }
+
+        adds.Sort(StringComparer.Ordinal);
+        return adds.Count > 0 ? adds[0] : null;
+    }
+
+    private void PromoteIfChanged(CaptureManifest manifest, IReadOnlyList<FileStamp> refreshedStructural)
+    {
+        if (StampsEqual(manifest.StructuralStamps, refreshedStructural)) return; // already reflects disk
+
+        CaptureManifest promoted = manifest with { StructuralStamps = refreshedStructural };
+        TryWriteManifestAtomic(promoted); // best-effort; a later change is still caught by the next stat delta
+    }
+
+    // ── project collection ───────────────────────────────────────────────────────────────────────────────
+
+    // One entry per C# project (collapsing a multi-target-framework project's several Projects by name, as
+    // SolutionCacheInputs does), with the FULL document set — obj-generated sources included, deliberately.
+    private static IReadOnlyList<CaptureProjectEntry> CollectProjects(Solution solution)
+    {
+        var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
+
+        foreach (Project project in solution.Projects)
+        {
+            if (project.Language != LanguageNames.CSharp || project.FilePath is null) continue;
+
+            string csprojFull = Path.GetFullPath(project.FilePath);
+            if (!byName.TryGetValue(project.Name, out Accumulator? accumulator))
+            {
+                accumulator = new Accumulator(project.Name, csprojFull, Path.GetDirectoryName(csprojFull)!);
+                byName[project.Name] = accumulator;
+            }
+
+            foreach (Document document in project.Documents)
+                if (document.FilePath is not null)
+                    accumulator.Documents.Add(Path.GetFullPath(document.FilePath));
+        }
+
+        return byName.Values
+            .OrderBy(a => a.ProjectName, StringComparer.Ordinal)
+            .Select(a => a.ToEntry())
+            .ToList();
+    }
+
+    // ── structural enumeration (mirrors ExtractionCacheStore) ────────────────────────────────────────────
+
+    private IReadOnlyList<string> DedupedStructuralPaths(IReadOnlyList<CaptureProjectEntry> projects)
+    {
+        var paths = new List<string>();
+        var seen = new HashSet<string>(PathComparison.Comparer);
+        foreach (string path in EnumerateStructuralPaths(projects))
+            if (seen.Add(path))
+                paths.Add(path);
+        return paths;
+    }
+
+    private IEnumerable<string> EnumerateStructuralPaths(IReadOnlyList<CaptureProjectEntry> projects)
+    {
+        string fullSolution = Path.GetFullPath(solutionPath);
+        yield return fullSolution;
+        string solutionDirectory = Path.GetDirectoryName(fullSolution)!;
+
+        foreach (CaptureProjectEntry project in projects)
+        {
+            yield return project.CsprojPath;
+            yield return AssetsPathOf(project.ProjectDirectory);
+
+            foreach (string ancestor in AncestorsUpTo(project.ProjectDirectory, solutionDirectory))
+            foreach (string probe in StructuralProbeFileNames)
+                yield return Path.Combine(ancestor, probe);
+        }
+    }
+
+    private static string AssetsPathOf(string projectDirectory)
+    {
+        return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
+    }
+
+    private static IEnumerable<string> AncestorsUpTo(string startDirectory, string stopDirectory)
+    {
+        string? directory = startDirectory;
+        while (directory is not null)
+        {
+            yield return directory;
+            if (string.Equals(directory, stopDirectory, StringComparison.OrdinalIgnoreCase)) yield break;
+            directory = Path.GetDirectoryName(directory);
+        }
+    }
+
+    private static bool IsBuildArtifact(string projectDirectory, string file)
+    {
+        string relative = Path.GetRelativePath(projectDirectory, file).Replace('\\', '/');
+        return relative.Split('/').Any(segment => segment is "bin" or "obj");
+    }
+
+    // ── stamping + hashing (mirrors ExtractionCacheStore) ────────────────────────────────────────────────
+
+    private static FileStamp StampOf(string path)
+    {
+        string full = Path.GetFullPath(path);
+        FileFreshness fresh = FileFreshness.Capture(full);
+        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
+
+        return new FileStamp(full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, TryHashFile(full), fresh.IsPromoted);
+    }
+
+    private static FileStamp RefreshStamp(string path, FileFreshness current, string? sha)
+    {
+        return new FileStamp(path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted);
+    }
+
+    private string? HashDuringValidation(string path)
+    {
+        ContentHashCount++;
+        return TryHashFile(path);
+    }
+
+    private static string? TryHashFile(string path)
+    {
+        try
+        {
+            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    // ── read + atomic write (mirrors ExtractionCacheStore) ───────────────────────────────────────────────
+
+    private CaptureManifest? TryReadManifest()
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(captureManifestPath);
+            return JsonSerializer.Deserialize<CaptureManifest>(bytes, ExtractionCacheStore.JsonOptions);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null; // torn / garbled / unreadable ⇒ unreadable notice
+        }
+    }
+
+    private bool TryWriteManifestAtomic(CaptureManifest manifest)
+    {
+        string tempPath = Path.Combine(cacheDirectory, $"{Path.GetFileName(captureManifestPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            Directory.CreateDirectory(cacheDirectory);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ExtractionCacheStore.JsonOptions);
+            File.WriteAllBytes(tempPath, bytes);
+            File.Move(tempPath, captureManifestPath, true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            TryDelete(tempPath);
+            return false;
+        }
+    }
+
+    private void CopyFileAtomic(string source, string destination)
+    {
+        string tempPath = Path.Combine(cacheDirectory, $"{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.Copy(source, tempPath, true);
+            File.Move(tempPath, destination, true);
+        }
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    // ── small helpers ────────────────────────────────────────────────────────────────────────────────────
+
+    private static string CanonicalKey(string path)
+    {
+        return PathCanonicalizer.Resolve(path);
+    }
+
+    private static FileFreshness ToFreshness(FileStamp stamp)
+    {
+        // RecordedAtUtc is irrelevant to MatchesStat; the racy verdict is the persisted Promoted flag.
+        return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
+    }
+
+    private static bool StampsEqual(IReadOnlyList<FileStamp> left, IReadOnlyList<FileStamp> right)
+    {
+        if (left.Count != right.Count) return false;
+        for (var i = 0; i < left.Count; i++)
+            if (left[i] != right[i])
+                return false; // FileStamp is a record ⇒ scalar value equality
+        return true;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // best-effort cleanup
+        }
+    }
+
+    // Accumulates one project's identity and its unioned, ordinal-sorted document set across frameworks.
+    private sealed class Accumulator(string projectName, string csprojPath, string projectDirectory)
+    {
+        public string ProjectName { get; } = projectName;
+        public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
+
+        public CaptureProjectEntry ToEntry()
+        {
+            return new CaptureProjectEntry(ProjectName, csprojPath, projectDirectory, Documents.ToList());
+        }
+    }
+}

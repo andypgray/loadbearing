@@ -20,7 +20,7 @@
         <ToolCommandName>loadbearing</ToolCommandName>
         <PackageId>Zphil.LoadBearing.Cli</PackageId>
         <PackageType>McpServer</PackageType>
-        <Description>One architecture spec, two render targets. LoadBearing checks a .NET solution against a fluent C# architecture spec — every rule carries a posture: Enforce for the law, Migrate for ratcheted tech debt with a grandfathered baseline, Freeze for contained legacy — and generates AI-agent context (a managed AGENTS.md block, MCP tools via 'loadbearing mcp') so the rules agents read are provably the rules the build enforces. Built for big, messy, business-critical legacy .NET codebases.</Description>
+        <Description>One architecture spec, two render targets. LoadBearing checks a .NET solution against a fluent C# architecture spec — every rule carries a posture: Enforce for the law, Migrate for ratcheted tech debt with a grandfathered baseline, Freeze for contained legacy — and generates AI-agent context (a managed AGENTS.md block, MCP tools via 'loadbearing mcp') so the rules agents read are provably the rules the build enforces. Built for big, long-lived, business-critical .NET codebases.</Description>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;static-analysis;tech-debt;legacy;agents-md;mcp;model-context-protocol;ai;claude;cursor;copilot;csharp;dotnet-tool;dotnet</PackageTags>
     </PropertyGroup>

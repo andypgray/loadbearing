@@ -38,13 +38,17 @@ internal static class CommandFactory
             Description =
                 "A git ref; files changed since it are checked against frozen scopes (Freeze tripwire) — warnings only, never failures."
         };
+        var noCache = NoCacheOption();
+        var binlog = BinlogOption();
 
         Command check = new("check", "Evaluate rules against a target solution.")
         {
             solution,
             spec,
             json,
-            diffBase
+            diffBase,
+            noCache,
+            binlog
         };
 
         check.SetAction((parseResult, ct) =>
@@ -54,7 +58,9 @@ internal static class CommandFactory
                 parseResult.GetValue(spec),
                 parseResult.GetValue(json),
                 parseResult.GetValue(diffBase),
-                Directory.GetCurrentDirectory());
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache),
+                parseResult.GetValue(binlog));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -204,12 +210,16 @@ internal static class CommandFactory
         {
             Description = "Emit the machine-readable JSON burndown document instead of human-readable output."
         };
+        var noCache = NoCacheOption();
+        var binlog = BinlogOption();
 
         Command status = new("status", "Report per-rule burndown and promotion suggestions; always exits 0.")
         {
             solution,
             spec,
-            json
+            json,
+            noCache,
+            binlog
         };
 
         status.SetAction((parseResult, ct) =>
@@ -218,7 +228,9 @@ internal static class CommandFactory
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 parseResult.GetValue(json),
-                Directory.GetCurrentDirectory());
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache),
+                parseResult.GetValue(binlog));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -235,6 +247,8 @@ internal static class CommandFactory
         {
             Description = "Emit the machine-readable JSON survey document instead of human-readable output."
         };
+        var noCache = NoCacheOption();
+        var binlog = BinlogOption();
 
         // Deliberately no --spec: the survey is a property of the codebase, and derive runs before any
         // spec exists (a spec project, once present, appears here as an ordinary project).
@@ -243,7 +257,9 @@ internal static class CommandFactory
             "Summarize the codebase: projects, declared vs observed project references, namespace inventory, and grouped external references. Needs no spec.")
         {
             solution,
-            json
+            json,
+            noCache,
+            binlog
         };
 
         graph.SetAction((parseResult, ct) =>
@@ -251,7 +267,9 @@ internal static class CommandFactory
             var request = new GraphRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(json),
-                Directory.GetCurrentDirectory());
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache),
+                parseResult.GetValue(binlog));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -300,6 +318,27 @@ internal static class CommandFactory
         return new Option<string?>("--spec")
         {
             Description = "A built spec DLL, or a csproj that is a member of the target solution. Omit to use the convention."
+        };
+    }
+
+    private static Option<bool> NoCacheOption()
+    {
+        return new Option<bool>("--no-cache")
+        {
+            Description =
+                "Bypass the persisted caches (extraction fragments and the build capture): always load and extract "
+                + "fresh, and write nothing back."
+        };
+    }
+
+    private static Option<string?> BinlogOption()
+    {
+        return new Option<string?>("--binlog")
+        {
+            Description =
+                "A .binlog from a real build of this solution on this machine. Replays the captured structure "
+                + "instead of a design-time build; the capture persists, and later runs replay it automatically "
+                + "while structurally valid."
         };
     }
 }

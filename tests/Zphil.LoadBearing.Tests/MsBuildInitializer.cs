@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Build.Locator;
 using Xunit;
+using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -19,6 +20,16 @@ internal static class MsBuildInitializer
     internal static void Initialize()
     {
         if (!MSBuildLocator.IsRegistered) MsBuildBootstrap.Initialize();
+
+        // Point the persisted extraction cache (Phase 11 D2) at a fresh per-run temp directory so no run
+        // reads a cache another run wrote, and so this process never touches a developer's real
+        // %LOCALAPPDATA% cache. A side effect this earns for free: every existing golden E2E now runs
+        // through the cache path (miss on first touch of a solution, hit on later identical touches), which
+        // makes the whole golden suite a continuous cold-vs-hit equality pin — any leak of the cache into
+        // observable output shows up as golden churn. Read CLI-side through IEnvironment/SystemEnvironment.
+        Environment.SetEnvironmentVariable(
+            CodebaseSource.CacheDirectoryVariable,
+            Path.Combine(Path.GetTempPath(), "loadbearing-cache-tests", Guid.NewGuid().ToString("N")));
 
         // NB: fixture restore is deliberately NOT done here. A [ModuleInitializer] runs during the
         // runner's assembly-info probe too, whose 60s no-response deadline a cold restore blows past

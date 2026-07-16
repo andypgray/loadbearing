@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
@@ -6,23 +7,39 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The <c>check</c> pipeline: load the model through the shared <see cref="ModelPipeline" /> → run
+///     The <c>check</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) → run
 ///     the shared <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render (human
 ///     or JSON) → exit code (0 clean / 1 red violations; grandfathered Migrate violations do not fail
 ///     the run). Expected failures surface as <see cref="UserErrorException" />; the top-level handler
-///     maps them to exit 2. Output/error writers are injected so the in-process e2e tests can capture them.
+///     maps them to exit 2. Output/error writers are injected so the in-process e2e tests can capture them,
+///     and the <see cref="IEnvironment" /> seam supplies the cache-root override.
 /// </summary>
-internal sealed class CheckRunner(TextWriter output, TextWriter error)
+internal sealed class CheckRunner(
+    TextWriter output,
+    TextWriter error,
+    ISolutionSource? source = null,
+    IEnvironment? environment = null)
 {
+    private readonly IEnvironment environment = environment ?? new SystemEnvironment();
+    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
+
+    /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
+    internal CodebaseSourceOutcome? LastOutcome { get; private set; }
+
+    /// <summary>The projects the last run re-extracted from a workspace. Internal test observable; never printed.</summary>
+    internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = new HashSet<string>();
+
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
     {
-        using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            request.Solution, request.Spec, request.WorkingDirectory, ct);
+        using var source = await CodebaseSource.CreateWithSpecAsync(
+            solutionSource, environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
-        CheckReport report = await CheckPipeline.ExecuteAsync(workspace, request.DiffBase, ct);
+        CheckReport report = await CheckPipeline.ExecuteAsync(source, request.DiffBase, ct);
+        LastOutcome = source.Outcome;
+        LastReExtractedProjects = source.ReExtractedProjects;
         Render(
-            request, report, workspace.SolutionDirectory, Path.GetFileName(workspace.SolutionPath),
-            Path.GetFileName(workspace.Resolution.DllPath), workspace.Diagnostics);
+            request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
+            Path.GetFileName(source.Resolution.DllPath), source.Diagnostics);
 
         return report.HasViolations ? 1 : 0;
     }

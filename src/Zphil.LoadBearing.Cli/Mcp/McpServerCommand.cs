@@ -1,10 +1,12 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Mcp.Prompts;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Cli.Mcp;
@@ -18,6 +20,12 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 /// </summary>
 internal static class McpServerCommand
 {
+    // Set LOADBEARING_DISABLE_WARM_WORKSPACE=true to fall back to the cold one-shot source (following the
+    // LOADBEARING_DISABLE_PARENT_WATCH precedent for opting out of an MCP-lifetime behaviour). Read through
+    // the IEnvironment seam, never System.Environment, so the env-through-seam ratchet stays green and the
+    // test harness can drive both paths without touching real process state.
+    internal const string DisableWarmWorkspaceVariable = "LOADBEARING_DISABLE_WARM_WORKSPACE";
+
     public static async Task<int> RunAsync(McpServerBinding binding, TextWriter error, CancellationToken ct)
     {
         if (!Console.IsInputRedirected)
@@ -51,6 +59,7 @@ internal static class McpServerCommand
 
         builder.Services.AddSingleton<IEnvironment, SystemEnvironment>();
         builder.Services.AddSingleton(binding);
+        AddWorkspaceSolutionSource(builder.Services);
 
         builder.Services
             .AddMcpServer(options =>
@@ -70,6 +79,48 @@ internal static class McpServerCommand
 
         await builder.Build().RunAsync(ct);
         return 0;
+    }
+
+    /// <summary>
+    ///     Registers the warm-workspace services shared by the production server and the in-process test
+    ///     harness, so the two compose the same graph: the long-lived <see cref="WorkspaceSession" /> (its
+    ///     reconcile log routed to the host logger), the session-scoped <see cref="SessionFragmentStore" />
+    ///     that reuses clean projects' fragments across tool calls (Phase 12 D2), and the
+    ///     <see cref="ISolutionSource" /> the tools acquire the solution through. The source is warm by
+    ///     default — one session reconciled per call across the server's lifetime, one store paired with it —
+    ///     unless <see cref="DisableWarmWorkspaceVariable" /> is <c>true</c>, which resolves the cold one-shot
+    ///     <see cref="ColdSolutionSource" /> instead. The warm branch registers the session's disposer with
+    ///     <see cref="ServerShutdown" /> lazily, from inside the factory, so a run that never builds a warm
+    ///     source wires no disposer.
+    /// </summary>
+    internal static void AddWorkspaceSolutionSource(IServiceCollection services)
+    {
+        services.AddSingleton(provider =>
+        {
+            ILogger logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger<WorkspaceSession>();
+            return new WorkspaceSession(message => logger.LogInformation("{ReconcileEvent}", message));
+        });
+
+        // One store per server lifetime, paired with the one session. A singleton always, so a test can
+        // resolve it; it is only ever populated when the warm source is built and a tool call runs.
+        services.AddSingleton(_ => new SessionFragmentStore());
+
+        services.AddSingleton<ISolutionSource>(provider =>
+        {
+            var environment = provider.GetRequiredService<IEnvironment>();
+            if (WarmWorkspaceDisabled(environment)) return new ColdSolutionSource();
+
+            var session = provider.GetRequiredService<WorkspaceSession>();
+            var store = provider.GetRequiredService<SessionFragmentStore>();
+            ServerShutdown.RegisterDisposer(session.DisposeAsync);
+            return new WarmSolutionSource(session, store);
+        });
+    }
+
+    private static bool WarmWorkspaceDisabled(IEnvironment environment)
+    {
+        return string.Equals(
+            environment.GetVariable(DisableWarmWorkspaceVariable), "true", StringComparison.OrdinalIgnoreCase);
     }
 
     // Discovers the bound solution (an explicit path, a directory, or a walk-up), throwing a

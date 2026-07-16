@@ -25,8 +25,8 @@ internal static class ModelPipeline
         {
             if (!string.IsNullOrWhiteSpace(solution))
                 return Directory.Exists(solution)
-                    ? SolutionDiscovery.DiscoverSolution(null, solution!)
-                    : SolutionDiscovery.DiscoverSolution(solution!);
+                    ? SolutionDiscovery.DiscoverSolution(null, solution)
+                    : SolutionDiscovery.DiscoverSolution(solution);
 
             return SolutionDiscovery.DiscoverSolution(null, workingDirectory);
         }
@@ -41,27 +41,36 @@ internal static class ModelPipeline
     }
 
     /// <summary>
-    ///     Runs the whole workspace prefix and returns a disposable bundle the caller <c>using</c>s.
-    ///     On any failure after the workspace opens, the workspace is disposed before the exception
-    ///     propagates, so a partial run never leaks a BuildHost.
+    ///     Runs the whole workspace prefix over an <see cref="ISolutionSource" /> and returns a disposable
+    ///     bundle the caller <c>using</c>s. On any failure after the solution is acquired, the handle is
+    ///     disposed before the exception propagates, so a partial run never leaks a BuildHost (a no-op when
+    ///     a warm source owns nothing).
     /// </summary>
     public static async Task<WorkspaceModel> LoadWithWorkspaceAsync(
-        string? solution, string? spec, string workingDirectory, CancellationToken ct)
+        ISolutionSource source, string? solution, string? spec, string workingDirectory, CancellationToken ct)
     {
-        string solutionPath = DiscoverSolution(solution, workingDirectory);
-        var diagnostics = new List<string>();
-        LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
+        SolutionHandle handle = await source.AcquireAsync(solution, workingDirectory, ct);
         try
         {
-            SpecResolution resolution = SpecResolver.Resolve(loaded.Solution, spec);
+            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, spec);
             ArchitectureModel model = LoadModel(resolution.DllPath);
-            return new WorkspaceModel(loaded, model, resolution, diagnostics, solutionPath);
+            return new WorkspaceModel(handle, model, resolution);
         }
         catch
         {
-            loaded.Dispose();
+            handle.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    ///     The cold-source convenience overload: the CLI/adapter lifetime, where each call opens and owns a
+    ///     fresh one-shot workspace. Equivalent to passing a <see cref="ColdSolutionSource" />.
+    /// </summary>
+    public static Task<WorkspaceModel> LoadWithWorkspaceAsync(
+        string? solution, string? spec, string workingDirectory, CancellationToken ct)
+    {
+        return LoadWithWorkspaceAsync(new ColdSolutionSource(), solution, spec, workingDirectory, ct);
     }
 
     /// <summary>

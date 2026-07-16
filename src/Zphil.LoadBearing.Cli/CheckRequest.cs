@@ -6,4 +6,16 @@ namespace Zphil.LoadBearing.Cli;
 /// <param name="Json">Whether to emit the machine-readable JSON document instead of human output.</param>
 /// <param name="DiffBase">The <c>--diff-base</c> git ref for the Freeze tripwire, or null to skip it.</param>
 /// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
-internal sealed record CheckRequest(string? Solution, string? Spec, bool Json, string? DiffBase, string WorkingDirectory);
+/// <param name="NoCache">Whether to bypass the persisted extraction cache entirely (no read, no write).</param>
+/// <param name="Binlog">
+///     The explicit <c>--binlog</c> path to replay instead of a design-time build, or null to auto-select
+///     (a valid build capture if one exists, else a design-time build). Roslyn-free — the gate acts on it.
+/// </param>
+internal sealed record CheckRequest(
+    string? Solution,
+    string? Spec,
+    bool Json,
+    string? DiffBase,
+    string WorkingDirectory,
+    bool NoCache,
+    string? Binlog);

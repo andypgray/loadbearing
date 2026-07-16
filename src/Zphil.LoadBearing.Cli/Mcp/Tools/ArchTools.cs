@@ -11,10 +11,13 @@ namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 ///     methods never <c>try/catch</c>: they throw, and <see cref="Pipeline.GlobalCallToolFilter" /> shapes
 ///     any <see cref="Roslyn.UserErrorException" /> or spec-validation failure into an error result.
 ///     Reaching a Roslyn workspace type only through the runners keeps the MSBuildLocator JIT quarantine
-///     intact — these methods are first JITted at the first tool call, after registration has run.
+///     intact — these methods are first JITted at the first tool call, after registration has run. Every
+///     runner is handed the injected <see cref="ISolutionSource" /> so tool calls acquire the solution the
+///     same way: warm (a session reconciled across calls) by default, or cold when the warm workspace is
+///     disabled — the CLI's own default source.
 /// </summary>
 [McpServerToolType]
-internal sealed class ArchTools(McpServerBinding binding)
+internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source)
 {
     internal const string CheckToolName = "arch_check";
     internal const string StatusToolName = "arch_status";
@@ -56,9 +59,12 @@ internal sealed class ArchTools(McpServerBinding binding)
     {
         var output = new StringWriter();
         // Exit code deliberately ignored — violations ride in the JSON; stderr diagnostics ride in the
-        // document's workspaceDiagnostics, so the error writer is discarded.
-        await new CheckRunner(output, TextWriter.Null).RunAsync(
-            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory), cancellationToken);
+        // document's workspaceDiagnostics, so the error writer is discarded. NoCache: the warm workspace and
+        // the persisted cache keep independent lifetimes — a tool call never reads or writes the cache file.
+        // Binlog null: the warm path never uses the build capture (latency-critical callers ride the session).
+        await new CheckRunner(output, TextWriter.Null, source).RunAsync(
+            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null),
+            cancellationToken);
         return output.ToString();
     }
 
@@ -73,8 +79,10 @@ internal sealed class ArchTools(McpServerBinding binding)
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        await new StatusRunner(output, TextWriter.Null).RunAsync(
-            new StatusRequest(binding.Solution, binding.Spec, true, binding.WorkingDirectory), cancellationToken);
+        // Binlog null: the warm path never uses the build capture.
+        await new StatusRunner(output, TextWriter.Null, source).RunAsync(
+            new StatusRequest(binding.Solution, binding.Spec, true, binding.WorkingDirectory, true, null),
+            cancellationToken);
         return output.ToString();
     }
 
@@ -92,7 +100,7 @@ internal sealed class ArchTools(McpServerBinding binding)
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        await new ExplainRunner(output).RunAsync(
+        await new ExplainRunner(output, source).RunAsync(
             new ExplainRequest(ruleId, binding.Solution, binding.Spec, binding.WorkingDirectory), cancellationToken);
         return output.ToString();
     }
@@ -111,7 +119,7 @@ internal sealed class ArchTools(McpServerBinding binding)
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        await new ContextRunner(output).RunAsync(
+        await new ContextRunner(output, source).RunAsync(
             new ContextRequest(path, binding.Solution, binding.Spec, binding.WorkingDirectory), cancellationToken);
         return output.ToString();
     }
@@ -128,9 +136,10 @@ internal sealed class ArchTools(McpServerBinding binding)
     {
         var output = new StringWriter();
         // binding.Spec is deliberately unused: the survey is a property of the codebase, and derive runs
-        // before any spec exists (a spec project would appear here as an ordinary project).
-        await new GraphRunner(output, TextWriter.Null).RunAsync(
-            new GraphRequest(binding.Solution, true, binding.WorkingDirectory), cancellationToken);
+        // before any spec exists (a spec project would appear here as an ordinary project). Binlog null: the
+        // warm path never uses the build capture.
+        await new GraphRunner(output, TextWriter.Null, source).RunAsync(
+            new GraphRequest(binding.Solution, true, binding.WorkingDirectory, true, null), cancellationToken);
         return output.ToString();
     }
 }

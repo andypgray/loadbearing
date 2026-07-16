@@ -11,9 +11,11 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 ///     <para>
 ///         Both <see cref="IdleTimeoutWatchdog" /> and <see cref="ParentProcessWatcher" /> route through
 ///         <see cref="ExitWith(string)" /> instead of calling <c>Environment.Exit</c> directly, so a
-///         mid-flight tool call drains and the logger flushes first. LoadBearing loads a fresh workspace
-///         per tool call and caches nothing, so no disposer is registered in v1 — but the seam is kept so
-///         a future long-lived resource (a workspace cache, Phase 10) can register its dispose here.
+///         mid-flight tool call drains and the logger flushes first. The warm MCP server (Phase 11 D1)
+///         registers the long-lived <see cref="Roslyn.WorkspaceSession" />'s async disposer here, so a
+///         watchdog-triggered teardown disposes its <c>MSBuildWorkspace</c> and out-of-process BuildHost
+///         before the process exits; the cold fallback (<c>LOADBEARING_DISABLE_WARM_WORKSPACE</c>) owns no
+///         long-lived workspace and registers none.
 ///     </para>
 ///     <para>
 ///         A per-disposer bound keeps shutdown deterministic even if a disposer hangs.
@@ -22,10 +24,9 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 internal static class ServerShutdown
 {
     // 12s bound per disposer: sized to a long-lived MSBuild server's measured worst case, where a
-    // workspace dispose (drain pending updates + acquire the mutation gate, then dispose the
-    // MSBuildWorkspace + BuildHost child) takes ~10s. LoadBearing registers no disposer today, but the
-    // headroom is kept for a future workspace-cache disposer so a 5s bound could not abandon a dispose
-    // partway.
+    // workspace dispose (acquire the session's mutation gate, then dispose the MSBuildWorkspace + BuildHost
+    // child) takes ~10s. The warm WorkspaceSession's own DisposeAsync uses the same 12s gate-acquire bound,
+    // so a 5s bound here could abandon its dispose partway.
     private static readonly TimeSpan DefaultDisposalTimeout = TimeSpan.FromSeconds(12);
 
     // How long ExitWith waits for in-flight tool calls to finish before running disposers. Bounds the

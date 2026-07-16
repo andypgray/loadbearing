@@ -12,12 +12,14 @@ namespace Zphil.LoadBearing.Cli;
 ///     the path ⇒ the same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The
 ///     scope-card body carries no provenance line (that is a <c>render</c> file-splice concern).
 /// </summary>
-internal sealed class ContextRunner(TextWriter output)
+internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null)
 {
+    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
+
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            request.Solution, request.Spec, request.WorkingDirectory, ct);
+            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         // No frozen scopes ⇒ nothing scoped to place; skip the extraction cost and point at the root block.
         if (!workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze))
