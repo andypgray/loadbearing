@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Meridian.Quoting.Domain/Meridian.Quoting.Domain.csproj" />
+    <Project Path="src/Meridian.Quoting.Application/Meridian.Quoting.Application.csproj" />
+    <Project Path="src/Meridian.Quoting.Infrastructure/Meridian.Quoting.Infrastructure.csproj" />
+    <Project Path="src/Meridian.Quoting.Api/Meridian.Quoting.Api.csproj" />
+  </Folder>
+  <Folder Name="/arch/">
+    <Project Path="arch/Meridian.Quoting.ArchSpec/Meridian.Quoting.ArchSpec.csproj" />
+  </Folder>
+</Solution>

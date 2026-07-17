@@ -15,21 +15,15 @@ using Zphil.LoadBearing.Xunit;
 
 public sealed class ArchitectureTests : ArchRuleTests<MyApp.ArchSpec.ArchSpec>
 {
-    protected override string SolutionPath => FindUp("MyApp.sln");
-
-    private static string FindUp(string name)
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, name)))
-            directory = directory.Parent;
-        return Path.Combine(directory!.FullName, name);
-    }
+    protected override string SolutionPath => FindSolutionUp("MyApp.sln");
 }
 ```
 
-`SolutionPath` is the only required override. Resolve the path however suits your repo;
-relative values resolve against the test process's working directory, so the example walks up
-from the test output directory instead. The test explorer lists one case per rule ID; the
+`SolutionPath` is the only required override. `FindSolutionUp` climbs from the test output
+directory to the first ancestor holding the named file and returns its absolute path, throwing
+`FileNotFoundException` naming the start directory on a miss. Resolve the path however suits
+your repo; relative values resolve against the test process's working directory, not the output
+directory `FindSolutionUp` starts from. The test explorer lists one case per rule ID; the
 workspace load, extraction, and check run once per spec type, and every rule case reads its
 verdict from that shared run. A `Freeze` tripwire rule reports as skipped (a test run has no
 diff context); everything else passes or fails like any other test.

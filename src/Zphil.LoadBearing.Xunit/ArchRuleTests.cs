@@ -12,9 +12,11 @@ namespace Zphil.LoadBearing.Xunit;
 
 /// <summary>
 ///     The xUnit adapter (DESIGN.md §10): derive a sealed test class from
-///     <c>ArchRuleTests&lt;YourSpec&gt;</c>, point <see cref="SolutionPath" /> at the solution to check,
-///     and every post-desugar rule in the spec becomes its own named test — the rule ID <em>is</em> the
-///     test's display name, so a failing architecture rule reads as a failing test in the test explorer.
+///     <c>ArchRuleTests&lt;YourSpec&gt;</c>, point <see cref="SolutionPath" /> at the solution to check
+///     (<see cref="FindSolutionUp" /> resolves it by name when the solution is not copied to the test
+///     output), and every post-desugar rule in the spec becomes its own named test — the rule ID
+///     <em>is</em> the test's display name, so a failing architecture rule reads as a failing test in the
+///     test explorer.
 ///     A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
 ///     a Freeze tripwire (no diff context in a test run) is reported as skipped, and everything else passes.
 /// </summary>
@@ -45,6 +47,35 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     override to <see langword="null" /> when the spec lives outside the target solution.
     /// </summary>
     protected virtual string? ExcludeProjectName => typeof(TSpec).Assembly.GetName().Name;
+
+    /// <summary>
+    ///     Resolves a solution file's absolute path by name, for the usual case where the solution is not
+    ///     copied to the test output directory. Climbs from <see cref="AppContext.BaseDirectory" /> through
+    ///     its ancestors (the start directory included) and returns the full path of the first one holding a
+    ///     file named <paramref name="fileName" />, so a consumer writes
+    ///     <c>SolutionPath =&gt; FindSolutionUp("MyApp.slnx")</c> rather than hand-rolling the walk.
+    /// </summary>
+    /// <param name="fileName">The solution file name to locate (for example, <c>MyApp.slnx</c>).</param>
+    /// <returns>The absolute path to the located file.</returns>
+    /// <exception cref="FileNotFoundException">
+    ///     No ancestor of <see cref="AppContext.BaseDirectory" /> holds a file named
+    ///     <paramref name="fileName" />; the message names both the file and the start directory.
+    /// </exception>
+    protected static string FindSolutionUp(string fileName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, fileName);
+            if (File.Exists(candidate)) return candidate;
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Could not locate '{fileName}' walking up from '{AppContext.BaseDirectory}'.", fileName);
+    }
 
     /// <summary>
     ///     The discovery-time row source: one row per post-desugar rule ID, its ID doubling as the test

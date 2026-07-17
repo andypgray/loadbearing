@@ -4,6 +4,7 @@ using Xunit.Sdk;
 using Zphil.LoadBearing.ArchSpec;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Tests.Cli;
+using Zphil.LoadBearing.Tests.TestSupport;
 using Zphil.LoadBearing.Xunit;
 
 namespace Zphil.LoadBearing.Tests.Xunit;
@@ -58,6 +59,19 @@ public sealed class AdapterTests
         skip.Message.ShouldEndWith(ArchChecker.TripwireSkipReason);
     }
 
+    [Fact]
+    public void FindSolutionUp_FromTestOutput_ResolvesRepoSolution()
+    {
+        HelperAccessor.Call("Zphil.LoadBearing.slnx").ShouldBe(RepoRoot.Solution);
+    }
+
+    [Fact]
+    public void FindSolutionUp_MissingFile_ThrowsNamingFileAndOrigin()
+    {
+        var exception = Should.Throw<FileNotFoundException>(() => HelperAccessor.Call("no-such-file-f2.slnx"));
+        exception.Message.ShouldBe($"Could not locate 'no-such-file-f2.slnx' walking up from '{AppContext.BaseDirectory}'.");
+    }
+
     // The "FAIL <ruleId> …" block from the CLI human output: the header line plus its indented lines.
     private static string ExtractBlock(string humanOutput, string ruleId)
     {
@@ -98,6 +112,18 @@ public sealed class AdapterTests
     {
         protected override string SolutionPath => CliRunner.MyAppSolution;
         protected override string? ExcludeProjectName => null;
+    }
+
+    // Reaches the protected FindSolutionUp helper without discovering a real test case: SolutionPath is
+    // never read (the runner never sees this private class), so it throws if the pipeline ever touched it.
+    private sealed class HelperAccessor : ArchRuleTests<MyAppViolatedInlineSpec>
+    {
+        protected override string SolutionPath => throw new NotSupportedException();
+
+        public static string Call(string fileName)
+        {
+            return FindSolutionUp(fileName);
+        }
     }
 
     // A frozen scope over MyApp.Legacy.Billing — its desugared tripwire skips without a --diff-base.

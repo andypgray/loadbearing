@@ -127,4 +127,4 @@ loadbearing check examples/Meridian/Meridian.slnx
 
 ## From here
 
-The clean-architecture on-ramp example takes the same five rules and applies them to a greenfield subsystem where they are all `Enforce` from day one. Meridian is that target state met by a codebase that has not reached it yet: same law, stated honestly against the debt.
+The clean-architecture on-ramp, [`Meridian.Quoting`](../Meridian.Quoting/), is a greenfield subsystem that meets these ratchets' target state: the same rules as `Enforce` law from day one. Meridian is that target state met by a codebase that has not reached it yet: same law, stated honestly against the debt.
