@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Meridian.Operations/Meridian.Operations.csproj" />
+  </Folder>
+  <Folder Name="/arch/">
+    <Project Path="arch/Meridian.Operations.ArchSpec/Meridian.Operations.ArchSpec.csproj" />
+  </Folder>
+</Solution>

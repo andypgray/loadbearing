@@ -71,10 +71,10 @@ jobs:
           }
 
   # Provably-current examples: build each example solution, run `check` (exit 0 on the
-  # committed baselines), then re-run `render` for both and assert a single zero diff across
-  # examples/. If a spec drifts from its example code, this job fails. The Meridian.Quoting
-  # on-ramp also runs its xUnit adapter (one named test per rule). Ubuntu-only initially
-  # (EXAMPLES.md §3 item 4).
+  # committed baselines), then re-run `render` for all of them and assert a single zero diff
+  # across examples/ — root blocks AND the scoped per-directory cards. If a spec drifts from
+  # its example code, this job fails. The Meridian.Quoting on-ramp also runs its xUnit
+  # adapter (one named test per rule). Ubuntu-only initially (EXAMPLES.md §3 item 4).
   examples:
     runs-on: ubuntu-latest
     steps:
@@ -90,18 +90,23 @@ jobs:
         run: dotnet build examples/Meridian/Meridian.slnx
       - name: Build the Meridian.Quoting example solution
         run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
+      - name: Build the Meridian.Operations example solution
+        run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
       - name: Build the LoadBearing CLI
         run: dotnet build src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj
       - name: Check Meridian (expect exit 0 on the committed baselines)
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian/Meridian.slnx
       - name: Check Meridian.Quoting (expect exit 0; Enforce-only, no baselines)
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Quoting/Meridian.Quoting.slnx
+      - name: Check Meridian.Operations (expect exit 0 on the committed containment baseline)
+        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx
       # No --no-build here: the adapter test project is not a member of any slnx, so nothing
       # above builds it. dotnet test restores and builds it (and the Xunit adapter it references).
       - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
         run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --logger "console;verbosity=normal"
-      - name: Render both blocks and assert a single zero diff (the provably-current property)
+      - name: Render all three and assert a single zero diff (the provably-current property)
         run: |
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian/Meridian.slnx
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Quoting/Meridian.Quoting.slnx
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx
           git diff --exit-code -- examples/

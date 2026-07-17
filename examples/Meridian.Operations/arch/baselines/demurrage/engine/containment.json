@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "digest": "cf94dba750394c1b00d47aecebb4a3f6b995275aae00709fcdf597c039fd8064",
+  "rules": {
+    "demurrage/engine/containment": {
+      "entries": [
+        { "source": "T:Meridian.Operations.Invoicing.DemurrageReconciler", "target": "T:Meridian.Operations.Demurrage.FreeTimeCalendar" }
+      ]
+    }
+  }
+}
