@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "digest": "10cb1f2adce439d523cc0c4de7f2d8b69961cb5f3575a5f60f0b28ac40615a5a",
+  "rules": {
+    "time/inject-clock": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "P:System.DateTime.UtcNow" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "P:System.DateTime.Now" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.Now" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.UtcNow" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "P:System.DateTime.UtcNow" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "P:System.DateTime.UtcNow" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "P:System.DateTime.UtcNow" }
+      ]
+    }
+  }
+}

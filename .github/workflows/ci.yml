@@ -69,3 +69,28 @@ jobs:
             printf '%s\n' "$entries" | grep -i 'server\.json' || true
             exit 1
           }
+
+  # Provably-current examples: build each example solution, run `check` (exit 0 on the
+  # committed baselines), then re-run `render` and assert a zero diff. If a spec drifts from
+  # its example code, this job fails. Ubuntu-only initially (EXAMPLES.md §3 item 4).
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+      # The CLI never builds the target; build the example first. Example restores unlocked
+      # (no lock policy under examples/); CLI/src restore locked via committed lock files.
+      - name: Build the example solution
+        run: dotnet build examples/Meridian/Meridian.slnx
+      - name: Build the LoadBearing CLI
+        run: dotnet build src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj
+      - name: Check (expect exit 0 on the committed baselines)
+        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian/Meridian.slnx
+      - name: Render and assert zero diff (the provably-current property)
+        run: |
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian/Meridian.slnx
+          git diff --exit-code -- examples/

@@ -95,7 +95,14 @@ internal static class ModelPipeline
                 throw new UserErrorException(ex.Message, ex);
             }
 
-            return ArchModelBuilder.Build(specs); // SpecValidationException propagates to the top handler
+            try
+            {
+                return ArchModelBuilder.Build(specs); // SpecValidationException propagates to the top handler
+            }
+            catch (FileNotFoundException ex) when (SpecDependencyLoadFailure.IsAssemblyLoadFailure(ex))
+            {
+                throw SpecDependencyLoadFailure.Map(ex, specDllPath);
+            }
         }
         finally
         {

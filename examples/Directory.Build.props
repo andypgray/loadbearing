@@ -1,0 +1,6 @@
+<Project>
+    <!-- Shield: examples do not inherit the root packaging props and never opt into lock files. -->
+    <PropertyGroup>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+</Project>

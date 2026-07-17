@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "digest": "3ba9c0c6885ae3e358b12ee488efce28d61b6882132215ba505341b30a72fc7b",
+  "rules": {
+    "data-access/no-inline-sql": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection" }
+      ]
+    }
+  }
+}

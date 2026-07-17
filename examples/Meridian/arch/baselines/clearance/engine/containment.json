@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "digest": "1ca256682a86450df3c4284be98394a2052b0d5424473c433a766acd2280009e",
+  "rules": {
+    "clearance/engine/containment": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Meridian.Clearance.ContainerNumberValidator" }
+      ]
+    }
+  }
+}

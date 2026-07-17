@@ -79,6 +79,9 @@ solution):
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <!-- Stages package assemblies into the build output so `check` can load typeof() targets
+             that live in NuGet packages; harmless when every target is a project type or pattern. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Zphil.LoadBearing" Version="..." />
@@ -129,6 +132,11 @@ Errors you may see, verbatim, and what they mean:
   references the contract library; name yours.
 - `The spec project '…' has no built output … Build the solution first (dotnet build).` —
   the CLI and this server **never build**; build before every check, or the results are stale.
+- `The spec assembly '…' failed to load its dependency '…' while running Define().` — the spec
+  names a NuGet-packaged type via `typeof()`, and that package assembly is not in the spec's
+  build output. Add `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>` to the
+  spec csproj (the scaffold above carries it) and rebuild, or switch the target to a
+  namespace pattern.
 
 If discovery still cannot find your spec project, do not stall: pass
 `--spec path/to/YourSpec.csproj` to every verb and continue — nothing downstream depends on
