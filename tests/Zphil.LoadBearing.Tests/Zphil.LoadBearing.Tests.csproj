@@ -61,6 +61,10 @@
                           ReferenceOutputAssembly="false"
                           OutputItemType="RenderSpecAssembly"
                           Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppLayerSpec\Zphil.LoadBearing.MyAppLayerSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="LayerSpecAssembly"
+                          Private="false" />
         <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppFrozenSpec\Zphil.LoadBearing.MyAppFrozenSpec.csproj"
                           ReferenceOutputAssembly="false"
                           OutputItemType="FrozenSpecAssembly"
@@ -114,6 +118,10 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>RenderSpecPath</_Parameter1>
                 <_Parameter2>@(RenderSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>LayerSpecPath</_Parameter1>
+                <_Parameter2>@(LayerSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>FrozenSpecPath</_Parameter1>

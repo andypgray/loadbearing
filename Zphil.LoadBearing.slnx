@@ -15,6 +15,7 @@
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppCleanSpec/Zphil.LoadBearing.MyAppCleanSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppDerivedSpec/Zphil.LoadBearing.MyAppDerivedSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppFrozenSpec/Zphil.LoadBearing.MyAppFrozenSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppLayerSpec/Zphil.LoadBearing.MyAppLayerSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppRenderSpec/Zphil.LoadBearing.MyAppRenderSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppViolatedSpec/Zphil.LoadBearing.MyAppViolatedSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.SpecFixture/Zphil.LoadBearing.SpecFixture.csproj" />

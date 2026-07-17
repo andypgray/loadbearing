@@ -6,11 +6,12 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     The <c>arch_context</c> pipeline (the MCP <c>arch_context</c> tool's core): load the model → if no
-///     frozen scope exists, emit the pointer line and stop (no extraction — <see cref="RenderRunner" />'s
-///     cost gate) → otherwise extract, resolve each frozen scope's directory placement, and write the
-///     scope card for every scope whose resolved directory contains the query path. No frozen scope covers
-///     the path ⇒ the same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The
-///     scope-card body carries no provenance line (that is a <c>render</c> file-splice concern).
+///     frozen scope and no anchored layer exist, emit the pointer line and stop (no extraction —
+///     <see cref="RenderRunner" />'s cost gate) → otherwise extract, resolve each layer's and each frozen
+///     scope's directory placement, and write the covering cards (layer card(s) before freeze card(s)) for
+///     every placement whose resolved directory contains the query path. No placement covers the path ⇒ the
+///     same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The card body carries
+///     no provenance line (that is a <c>render</c> file-splice concern).
 /// </summary>
 internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null)
 {
@@ -21,8 +22,10 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
-        // No frozen scopes ⇒ nothing scoped to place; skip the extraction cost and point at the root block.
-        if (!workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze))
+        // Nothing scoped to place — no frozen scope and no anchored layer — ⇒ skip the extraction cost
+        // and point at the root block.
+        bool anyFreeze = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze);
+        if (!anyFreeze && !LayerContextResolver.HasAnchoredLayers(workspace.Model))
         {
             output.WriteLine(PointerLine(request.Path));
             return 0;
@@ -33,31 +36,36 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
 
         string queryFullPath = ResolveQueryPath(request.Path, workspace.SolutionDirectory);
 
-        var matching = ScopedContextResolver.Resolve(workspace.Model, codebase)
+        // Layer local-rules card(s) first, then frozen-scope card(s) — the same order render merges them.
+        var cards = new List<string>();
+        cards.AddRange(LayerContextResolver.Resolve(workspace.Model, codebase)
             .Where(placement => placement.DirectoryPath is not null && Covers(placement.DirectoryPath, queryFullPath))
-            .ToList();
+            .Select(placement => AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules)));
+        cards.AddRange(ScopedContextResolver.Resolve(workspace.Model, codebase)
+            .Where(placement => placement.DirectoryPath is not null && Covers(placement.DirectoryPath, queryFullPath))
+            .Select(placement => AgentContextRenderer.ScopeCard(placement.ContainmentRule)));
 
-        if (matching.Count == 0)
+        if (cards.Count == 0)
         {
             output.WriteLine(PointerLine(request.Path));
             return 0;
         }
 
-        WriteCards(matching);
+        WriteCards(cards);
         return 0;
     }
 
-    // Each frozen scope's card, in model order, blank line between cards. The card body is LF-internal;
-    // write it line by line so it adopts the output writer's newline (parity with the CLI surfaces).
-    private void WriteCards(IReadOnlyList<ScopePlacement> matching)
+    // Each matching card — layer cards before freeze cards — blank line between cards. The card body is
+    // LF-internal; write it line by line so it adopts the output writer's newline (parity with the CLI).
+    private void WriteCards(IReadOnlyList<string> cards)
     {
         var first = true;
-        foreach (ScopePlacement placement in matching)
+        foreach (string card in cards)
         {
             if (!first) output.WriteLine();
             first = false;
 
-            foreach (string line in AgentContextRenderer.ScopeCard(placement.ContainmentRule).Split('\n'))
+            foreach (string line in card.Split('\n'))
                 output.WriteLine(line);
         }
     }
@@ -98,7 +106,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
 
     private static string PointerLine(string path)
     {
-        return $"No frozen scope covers '{path}'. Architecture context for this solution lives in the root " +
+        return $"No architecture scope covers '{path}'. Architecture context for this solution lives in the root " +
                "AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.";
     }
 }

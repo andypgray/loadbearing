@@ -36,8 +36,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Return one rule's because, fix, posture payload, and linked prose as text.";
 
     private const string ContextDescription =
-        "Return the frozen-scope card(s) covering a path (dragons prose + sanctioned surface), or a pointer " +
-        "line when none apply.";
+        "Return the architecture scope card(s) covering a path — a frozen scope's dragons + sanctioned surface, " +
+        "or a layer's local rules — or a pointer line when none apply.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects with namespace inventories, declared vs " +
@@ -114,7 +114,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         OpenWorld = false)]
     [Description(ContextDescription)]
     public async Task<string> ContextAsync(
-        [Description("A file or directory path (absolute or solution-relative) to find frozen-scope cards for.")]
+        [Description("A file or directory path (absolute or solution-relative) to find architecture scope cards for.")]
         string path,
         CancellationToken cancellationToken = default)
     {

@@ -32,6 +32,15 @@ public sealed class CliMcpParityTests
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
         "- Expand: `loadbearing explain legacy/billing/containment`.";
 
+    // The AgentContextRenderer.LayerCard body arch_context returns for the Web layer of MyAppLayerSpec —
+    // no provenance line (that is a render file-splice concern), mirroring the frozen-scope card above.
+    private const string ExpectedWebLayerCard =
+        "## Layer `Web`\n\n" +
+        "This directory holds the `Web` layer. Its architecture rules:\n\n" +
+        "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
+        "The web layer must reach billing only through the sanctioned facade.\n" +
+        "- Expand any rule above with `loadbearing explain <rule-id>`.";
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -101,11 +110,12 @@ public sealed class CliMcpParityTests
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing/BillingCalculator.cs" }, cancellationToken: Ct);
         Normalize(TextOf(inScope)).ShouldBe(ExpectedScopeCard);
 
-        // A path no frozen scope covers → the pinned pointer line (echoing the query path).
+        // A path no scope covers → the pinned pointer line (echoing the query path). The RenderSpec's
+        // Domain/Web layers carry no anchored rules, so no layer card competes here.
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         Normalize(TextOf(outScope)).ShouldBe(
-            "No frozen scope covers 'MyApp.Web/HomeController.cs'. Architecture context for this solution lives in " +
+            "No architecture scope covers 'MyApp.Web/HomeController.cs'. Architecture context for this solution lives in " +
             "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
     }
 
@@ -129,6 +139,25 @@ public sealed class CliMcpParityTests
         string mcpText = Normalize(TextOf(mcpCheck));
         mcpText.ShouldBe(Normalize(cliCheck.Out));
         mcpText.ShouldContain("frozenScopeTouched");
+    }
+
+    [Fact]
+    public async Task HarnessE_LayerSpec_Context_InLayerCardAndOutOfScopePointer()
+    {
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.LayerSpecDll), Ct);
+
+        // A path inside the Web layer directory → that layer's local-rules card.
+        CallToolResult inLayer = await harness.Client.CallToolAsync(
+            "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
+        Normalize(TextOf(inLayer)).ShouldBe(ExpectedWebLayerCard);
+
+        // A path no layer or frozen scope covers → the reworded pointer line (echoing the query path).
+        CallToolResult outScope = await harness.Client.CallToolAsync(
+            "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/Order.cs" }, cancellationToken: Ct);
+        Normalize(TextOf(outScope)).ShouldBe(
+            "No architecture scope covers 'MyApp.Domain/Order.cs'. Architecture context for this solution lives in " +
+            "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
     }
 
     private static McpServerBinding Binding(string? solution, string? spec)

@@ -292,7 +292,8 @@ Re-run `arch_check`: expect exit 0, `rulesFailed: 0`, with the grandfathered cou
 
 Have the human run `loadbearing render MyApp.sln`: it writes the managed block into the root `AGENTS.md`
 (everything outside the markers is preserved byte-for-byte) and drops a second managed
-`AGENTS.md` — the frozen-scope card — into each frozen scope's own directory. Then commit —
+`AGENTS.md` into each frozen scope's directory (the dragons card) and into each layer's
+directory when rules are anchored on that layer (the local-rules card). Then commit —
 spec project, `arch/baselines/**`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
 acknowledged debt, and the generated context in a single change.
@@ -357,7 +358,8 @@ subject fails the rule; an inert target warns; both are authoring signals, not c
 
 - `arch_explain <rule-id>` (CLI: `loadbearing explain`) — any rule's because / fix / posture
   payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
-- `arch_context <path>` — the frozen-scope cards covering a directory.
+- `arch_context <path>` — the architecture scope cards covering a directory (a frozen
+  scope's dragons, a layer's local rules).
 - `loadbearing status` — the burndown after baselining.
 - The generated `AGENTS.md` block is the always-on summary; this recipe's output is what
   keeps it true.

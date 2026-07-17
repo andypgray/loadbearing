@@ -111,6 +111,57 @@ public class AgentContextRendererTests
     }
 
     [Fact]
+    public void LayerCard_TwoEnforceRules_MatchesGolden()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new DispatchLayerSpec());
+        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
+
+        const string expected =
+            "## Layer `Dispatch`\n\n" +
+            "This directory holds the `Dispatch` layer. Its architecture rules:\n\n" +
+            "- `modules/dispatch/internals` — The Dispatch layer must not reference types in `Acme.Web.*`. " +
+            "Dispatch is a leaf module.\n" +
+            "- `modules/dispatch/outbound` — The Dispatch layer must not be referenced by types in `Acme.Legacy.*`. " +
+            "Nothing legacy may depend on dispatch.\n" +
+            "- Expand any rule above with `loadbearing explain <rule-id>`.";
+
+        AgentContextRenderer.LayerCard("Dispatch", rules).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void LayerCard_MigrateRule_RendersSameCounterPriorBulletAsRoot()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new MigrateLayerSpec());
+        var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
+
+        // The exact counter-prior bullet the root ### Migrations section renders for this rule.
+        const string counterPriorBullet =
+            "- `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: " +
+            "Controllers build DataTables inline (legacy Active Record style). " +
+            "That is grandfathered debt, not house style. New code must follow: " +
+            "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`. " +
+            "Repository pattern for testability. " +
+            "If you are already editing a grandfathered site and the migration is small, migrate it; " +
+            "otherwise do not grow the debt.";
+
+        AgentContextRenderer.RootBlock(model, "Spec").ShouldContain(counterPriorBullet);
+        // The shared composer renders the Migrate rule byte-identically in the layer card (no Fix, no count).
+        AgentContextRenderer.LayerCard("Web", migrateRules).ShouldContain(counterPriorBullet);
+    }
+
+    [Fact]
+    public void LayerCard_EnforceRuleWithFix_OmitsFix()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new FixLayerSpec());
+        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
+
+        string card = AgentContextRenderer.LayerCard("Web", rules);
+
+        card.ShouldContain("- `layering/web-not-billing` —"); // the rule renders...
+        card.ShouldNotContain("Inject IBillingFacade"); // ...but its Fix never does (progressive disclosure).
+    }
+
+    [Fact]
     public void RootBlock_WithFrozenScope_EmitsFrozenScopesSectionWithContainmentLawAndSurface()
     {
         string block = AgentContextRenderer.RootBlock(Canonical(), "Spec");
@@ -229,6 +280,48 @@ public class AgentContextRendererTests
             arch.Rule("time/inject-clock")
                 .Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
                 .Because("Wall-clock reads are untestable; inject IClock.");
+        }
+    }
+
+    // A layer with two bare-subject Enforce rules anchored on it — the layer-card golden source.
+    private sealed class DispatchLayerSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer dispatch = arch.Layer("Dispatch", "Acme.Dispatch.*");
+            arch.Rule("modules/dispatch/internals")
+                .Enforce(dispatch.MustNotReference(arch.Namespace("Acme.Web.*")))
+                .Because("Dispatch is a leaf module.");
+            arch.Rule("modules/dispatch/outbound")
+                .Enforce(dispatch.MustNotBeReferencedBy(arch.Namespace("Acme.Legacy.*")))
+                .Because("Nothing legacy may depend on dispatch.");
+        }
+    }
+
+    // A layer carrying one Migrate rule (subject refined onto the layer) — the counter-prior bullet source.
+    private sealed class MigrateLayerSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            arch.Rule("data-access/no-inline-sql")
+                .Migrate(
+                    "Controllers build DataTables inline (legacy Active Record style).",
+                    web.WithSuffix("Controller").MustNotReference(arch.Namespace("System.Data.*")))
+                .Because("Repository pattern for testability.");
+        }
+    }
+
+    // A layer whose one Enforce rule carries a Fix — proving the card omits it.
+    private sealed class FixLayerSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            arch.Rule("layering/web-not-billing")
+                .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
+                .Because("Web reaches billing only through the facade.")
+                .Fix("Inject IBillingFacade instead of newing up billing types.");
         }
     }
 }

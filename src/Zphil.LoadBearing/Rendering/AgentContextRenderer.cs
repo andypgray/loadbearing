@@ -116,6 +116,32 @@ public static class AgentContextRenderer
         return string.Join("\n\n", sections);
     }
 
+    /// <summary>
+    ///     A layer's "local rules" context card (Phase X3), placed in the layer's directory (without
+    ///     the provenance line, which the splice pipeline adds once per file): the layer heading, a
+    ///     one-line lede, then one bullet per anchored rule — the very same Rules/Migrations composer
+    ///     the root block uses, so a rule reads identically in both places — closed by a generic
+    ///     drill-down pointer. No Fix lines (progressive disclosure; <c>explain</c> serves the fix).
+    ///     This is the scoped, per-directory rule digest an agent editing the layer reads.
+    /// </summary>
+    public static string LayerCard(string layerName, IReadOnlyList<ArchRule> rules)
+    {
+        Guard.NotNullOrWhiteSpace(layerName, nameof(layerName));
+        Guard.NotNull(rules, nameof(rules));
+
+        var bullets = rules.Select(rule => RuleBullet(rule)).ToList();
+        bullets.Add($"- Expand any rule above with {ProseFormat.Backtick("loadbearing explain <rule-id>")}.");
+
+        var sections = new List<string>
+        {
+            $"## Layer {ProseFormat.Backtick(layerName)}",
+            $"This directory holds the {ProseFormat.Backtick(layerName)} layer. Its architecture rules:",
+            string.Join("\n", bullets)
+        };
+
+        return string.Join("\n\n", sections);
+    }
+
     private static string LayersSection(IReadOnlyList<LayerDefinition> layers)
     {
         var bullets = layers.Select(layer => "- " + layer.DefinitionFragment);
@@ -124,8 +150,7 @@ public static class AgentContextRenderer
 
     private static string RulesSection(IReadOnlyList<ArchRule> rules)
     {
-        var bullets = rules.Select(rule =>
-            $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence} {rule.Because}");
+        var bullets = rules.Select(rule => RuleBullet(rule));
         return "### Rules\n" + string.Join("\n", bullets);
     }
 
@@ -134,8 +159,20 @@ public static class AgentContextRenderer
     // so an agent reading the majority (old) pattern does not infer it is house style.
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
     {
-        var bullets = rules.Select(rule => MigrationBullet(rule, counts));
+        var bullets = rules.Select(rule => RuleBullet(rule, counts));
         return "### Migrations\n" + string.Join("\n", bullets);
+    }
+
+    // One rule's context bullet — the shared composer for the root Rules and Migrations sections and
+    // the per-layer card, so a rule renders byte-identically wherever it appears. An Enforce rule
+    // states its law sentence + rationale; a Migrate rule renders the full counter-prior paragraph
+    // (OLD-pattern warning, target law, boy-scout policy, and the optional live grandfathered count).
+    // No Fix line ever — progressive disclosure routes fixes to `explain` (R2).
+    private static string RuleBullet(ArchRule rule, Func<ArchRule, int?>? counts = null)
+    {
+        return rule.Posture == Posture.Migrate
+            ? MigrationBullet(rule, counts)
+            : $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence} {rule.Because}";
     }
 
     private static string MigrationBullet(ArchRule rule, Func<ArchRule, int?>? counts)

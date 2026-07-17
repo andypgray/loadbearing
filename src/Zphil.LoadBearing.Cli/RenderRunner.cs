@@ -7,9 +7,10 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     The <c>render</c> pipeline (R3): load the model → compose the root block into
-///     <c>&lt;solution-dir&gt;/AGENTS.md</c> → and, only when the model has frozen scopes, extract the
-///     codebase, place each scope's card in its directory's <c>AGENTS.md</c>. Content units that land
-///     in the same directory merge into that file's one managed block. Every target is spliced through
+///     <c>&lt;solution-dir&gt;/AGENTS.md</c> → and, when the model has frozen scopes or layers carrying
+///     anchored rules, extract the codebase and place each layer's local-rules card and each scope's
+///     card in its directory's <c>AGENTS.md</c>. Content units that land in the same directory merge
+///     into that file's one managed block (layer card before freeze card). Every target is spliced through
 ///     the byte-level <see cref="ManagedBlockFile" /> adapter and reported as <c>wrote</c>/<c>unchanged</c>
 ///     with a solution-relative path. Render is a mutation, not a gate: it always exits 0 on success;
 ///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
@@ -31,20 +32,38 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
             new(solutionDirectory, AgentContextRenderer.RootBlock(workspace.Model, specName), true)
         };
 
-        // Extraction only earns its cost when there are scopes to place.
-        if (workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze))
-            units.AddRange(await ScopeUnitsAsync(workspace, ct));
+        // Extraction only earns its cost when there is something scoped to place — a frozen scope, or a
+        // layer carrying anchored rules. Layer cards precede freeze cards, so a directory holding both
+        // merges the layer card first into its one managed block.
+        bool anyFreeze = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze);
+        if (anyFreeze || LayerContextResolver.HasAnchoredLayers(workspace.Model))
+            units.AddRange(await ScopedUnitsAsync(workspace, ct));
 
         WriteGroups(units, specName, solutionDirectory);
         return 0;
     }
 
-    private async Task<IEnumerable<ContentUnit>> ScopeUnitsAsync(WorkspaceModel workspace, CancellationToken ct)
+    // The non-root content units: extract the codebase once, then the layer cards (declaration order)
+    // ahead of the freeze cards (model order). A directory that hosts a layer and a frozen scope thus
+    // receives its layer unit before its freeze unit, and WriteGroups merges them in that order.
+    private async Task<IEnumerable<ContentUnit>> ScopedUnitsAsync(WorkspaceModel workspace, CancellationToken ct)
     {
         IReadOnlyCollection<string>? exclude = workspace.Resolution.ExcludeProjectName is { } name ? [name] : null;
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, exclude, ct);
 
-        var scopeUnits = new List<ContentUnit>();
+        var units = new List<ContentUnit>();
+        foreach (LayerPlacement placement in LayerContextResolver.Resolve(workspace.Model, codebase))
+        {
+            if (placement.DirectoryPath is null)
+            {
+                error.WriteLine($"warning: {placement.SkipReason}");
+                continue;
+            }
+
+            units.Add(new ContentUnit(
+                placement.DirectoryPath, AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules), false));
+        }
+
         foreach (ScopePlacement placement in ScopedContextResolver.Resolve(workspace.Model, codebase))
         {
             if (placement.DirectoryPath is null)
@@ -53,11 +72,11 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
                 continue;
             }
 
-            scopeUnits.Add(new ContentUnit(
+            units.Add(new ContentUnit(
                 placement.DirectoryPath, AgentContextRenderer.ScopeCard(placement.ContainmentRule), false));
         }
 
-        return scopeUnits;
+        return units;
     }
 
     // Groups content units by target directory (first-seen order, so the root file is reported first),
