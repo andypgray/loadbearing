@@ -40,6 +40,7 @@ public sealed class TypeNode : ITypeInfo
         AllInterfaces = Array.Empty<TypeConstruction>();
         BaseTypeChain = Array.Empty<TypeConstruction>();
         AttributeConstructions = Array.Empty<TypeConstruction>();
+        Members = Array.Empty<MemberNode>();
     }
 
     /// <summary>The fully-qualified name; the model's identity key. See remarks for the exact form.</summary>
@@ -93,6 +94,15 @@ public sealed class TypeNode : ITypeInfo
     ///     uniformly. Empty for external types. Backs <c>AttributedWith</c> / <c>MustBeAttributedWith</c>.
     /// </summary>
     public IReadOnlyList<TypeConstruction> AttributeConstructions { get; internal set; }
+
+    /// <summary>
+    ///     The type's declared members (GRAMMAR §4.6) — its inventoried methods, properties, fields, and
+    ///     events (accessors/constructors/operators/finalizers/indexers and compiler-generated members
+    ///     excluded), ordered ordinal by <see cref="MemberNode.SymbolId" />. Each member's
+    ///     <see cref="MemberNode.DeclaringType" /> is <em>this</em> node. Empty for external types and for
+    ///     enum/delegate types (which contribute no inventory). Backs the member selections' subject set.
+    /// </summary>
+    public IReadOnlyList<MemberNode> Members { get; internal set; }
 
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; internal set; }

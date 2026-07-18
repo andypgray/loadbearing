@@ -50,5 +50,12 @@ public enum SpecValidationErrorCode
     MemberNotDeclared,
 
     /// <summary>A <see cref="Member" /> minted on a different <see cref="Arch" /> instance (§8 item 13).</summary>
-    ForeignMember
+    ForeignMember,
+
+    /// <summary>
+    ///     A closed-generic <c>.Returning</c> anchor on a member selection (§8 item 14); member
+    ///     return-type matching is definition-level, so the error guides to the open definition
+    ///     (<c>typeof(Task&lt;&gt;)</c>).
+    /// </summary>
+    MemberReturningClosedGeneric
 }

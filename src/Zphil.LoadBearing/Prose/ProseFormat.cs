@@ -1,4 +1,5 @@
 using System.Text;
+using Zphil.LoadBearing.Model;
 
 namespace Zphil.LoadBearing.Prose;
 
@@ -34,6 +35,19 @@ internal static class ProseFormat
             TypeKind.Enum => "enums",
             TypeKind.Delegate => "delegates",
             _ => "types"
+        };
+    }
+
+    /// <summary>The plural noun a member <see cref="MemberKindFilter" /> projection heads with (GRAMMAR §5.7).</summary>
+    internal static string MemberKindPlural(MemberKindFilter kind)
+    {
+        return kind switch
+        {
+            MemberKindFilter.Method => "methods",
+            MemberKindFilter.Property => "properties",
+            MemberKindFilter.Field => "fields",
+            MemberKindFilter.Event => "events",
+            _ => "members"
         };
     }
 

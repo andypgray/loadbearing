@@ -101,6 +101,15 @@ public static class HumanReportRenderer
                     else
                         unlocated.Add(violation.Subject.FullName);
                     break;
+                case ViolationKind.MemberShape:
+                    MemberNode member = violation.SubjectMember!;
+                    SourceLocation? at = member.DeclarationSites.FirstOrDefault();
+                    string memberLine = MemberSubjectDisplay(member);
+                    if (at is not null)
+                        located.Add((PathFormat.Relative(solutionDirectory, at.FilePath), at.Line, memberLine));
+                    else
+                        unlocated.Add(memberLine);
+                    break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");
                     break;
@@ -124,6 +133,14 @@ public static class HumanReportRenderer
     {
         string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
         return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
+    }
+
+    // The offending member subject, in the same declaring-type-dot-member, () iff a method convention
+    // (GRAMMAR §4.6, §6) — over an inventoried MemberNode (its DeclaringType is the owning TypeNode).
+    private static string MemberSubjectDisplay(MemberNode member)
+    {
+        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
+        return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
     }
 
     private static string Marker(RuleResult result)

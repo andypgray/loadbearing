@@ -55,6 +55,7 @@ public sealed class ExplainCommandTests
             "  layering/no-ghost\n" +
             "  legacy/billing/containment\n" +
             "  legacy/billing/tripwire\n" +
+            "  naming/async-suffix\n" +
             "  naming/nonexistent");
     }
 

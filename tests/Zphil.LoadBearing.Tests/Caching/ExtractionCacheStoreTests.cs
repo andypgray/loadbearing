@@ -33,17 +33,18 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion1_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion2_ReturnsMiss()
     {
-        // Arrange — a v1 cache predates member-use edges (Phase 13 WP2 bumped the schema to 2).
+        // Arrange — a v2 cache predates the member inventory (Phase 14 WP2 bumped the schema to 3): its
+        // fragments carry member-use edges but no DeclaredMembers.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
-        // Act — downgrade the recorded schema to the pre-member-edge version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 1);
+        // Act — downgrade the recorded schema to the pre-inventory version.
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 2);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

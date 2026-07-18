@@ -48,6 +48,21 @@
       }
     },
     {
+      "id": "naming/async-suffix",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/naming/async-suffix.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -84,9 +99,9 @@
     }
   ],
   "summary": {
-    "rulesChecked": 8,
+    "rulesChecked": 9,
     "rulesPassed": 2,
-    "rulesFailed": 5,
+    "rulesFailed": 6,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

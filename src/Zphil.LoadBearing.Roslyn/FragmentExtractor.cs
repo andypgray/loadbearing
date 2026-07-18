@@ -107,6 +107,126 @@ internal static class FragmentExtractor
         };
     }
 
+    // The declared-member inventory of one type (GRAMMAR §4.6): its Ordinary methods, non-indexer
+    // properties, fields, and events. Enum and delegate types contribute nothing — an enum's fields are its
+    // values (an enum-value read stays a recorded member USE, §4.5) and a delegate's Invoke/BeginInvoke are
+    // runtime plumbing. Ordered ordinal by the member's DocumentationCommentId, so the fragment (and the
+    // merged node built from it) is deterministic.
+    private static IReadOnlyList<FragmentMember> BuildMembers(INamedTypeSymbol type, CoreTypeKind kind)
+    {
+        if (kind is CoreTypeKind.Enum or CoreTypeKind.Delegate) return [];
+
+        var members = new List<FragmentMember>();
+        foreach (ISymbol member in type.GetMembers())
+            if (IsInventoried(member))
+                members.Add(BuildMember(member));
+
+        members.Sort((left, right) => string.CompareOrdinal(left.Facts.SymbolId, right.Facts.SymbolId));
+        return members;
+    }
+
+    // The ratified exclusion filter (GRAMMAR §4.6): drop every compiler-generated/implicitly-declared member
+    // (auto-property and field-like-event backing fields, the record equality/clone/deconstruct surface),
+    // every non-Ordinary method (which is exactly accessors, constructors incl. static, operators,
+    // conversions, and finalizers), indexers, and anything that is not a method/property/field/event.
+    private static bool IsInventoried(ISymbol member)
+    {
+        if (member.IsImplicitlyDeclared) return false;
+
+        return member switch
+        {
+            IMethodSymbol method => method.MethodKind == MethodKind.Ordinary,
+            IPropertySymbol property => !property.IsIndexer,
+            IFieldSymbol => true,
+            IEventSymbol => true,
+            _ => false
+        };
+    }
+
+    private static FragmentMember BuildMember(ISymbol member)
+    {
+        string symbolId = member.GetDocumentationCommentId()
+                          ?? "unresolved:" + FullNameOf(member.ContainingType) + "." + member.Name;
+        (string? returnTypeFullName, string? memberTypeFullName) = MemberTypeNames(member);
+
+        var facts = new MemberFacts(
+            symbolId,
+            member.Name,
+            MemberKindOf(member),
+            AccessibilityMapper.Map(member),
+            member.IsStatic,
+            member.IsAbstract, // C# declaration semantics: an abstract member and every interface member report true
+            member.IsVirtual, // false for an override or abstract member — an override is not itself "virtual"
+            member is IMethodSymbol { IsAsync: true },
+            returnTypeFullName,
+            memberTypeFullName);
+
+        return new FragmentMember(facts, MemberDeclarationSites(member));
+    }
+
+    // Exactly one of the two names is non-null: a method carries its return type (System.Void for void), a
+    // property/field/event its member type. Both are the definition-level FQN in extraction format — the
+    // return type read off OriginalDefinition so `Task<int>` matches a `.Returning(typeof(Task<>))` anchor
+    // (§4.6), the same construction-erasing normalization ResolveName uses for edge targets (§4.1).
+    private static (string? ReturnTypeFullName, string? MemberTypeFullName) MemberTypeNames(ISymbol member)
+    {
+        return member switch
+        {
+            IMethodSymbol method => (DefinitionName(method.ReturnType), null),
+            IPropertySymbol property => (null, DefinitionName(property.Type)),
+            IFieldSymbol field => (null, DefinitionName(field.Type)),
+            IEventSymbol @event => (null, DefinitionName(@event.Type)),
+            _ => (null, null)
+        };
+    }
+
+    private static string DefinitionName(ITypeSymbol type)
+    {
+        return type.OriginalDefinition.ToDisplayString(FullNameFormat);
+    }
+
+    private static MemberKind MemberKindOf(ISymbol member)
+    {
+        return member switch
+        {
+            IMethodSymbol => MemberKind.Method,
+            IPropertySymbol => MemberKind.Property,
+            IFieldSymbol => MemberKind.Field,
+            IEventSymbol => MemberKind.Event,
+            _ => throw new ArgumentOutOfRangeException(nameof(member), member.Kind, "not an inventoried member symbol")
+        };
+    }
+
+    // Declaration sites for a member: the identifier line (+1) of each declaring syntax — a partial method
+    // has two, a field/field-like-event declarator has its own — deduped and ordered by (file, line), the
+    // same discipline the type declaration-site pass uses.
+    private static IReadOnlyList<FragmentSite> MemberDeclarationSites(ISymbol member)
+    {
+        var sites = new SortedSet<FragmentSite>();
+        foreach (SyntaxReference reference in member.DeclaringSyntaxReferences)
+        {
+            SyntaxNode node = reference.GetSyntax();
+            Location location = MemberIdentifierOf(node) is { } identifier ? identifier.GetLocation() : node.GetLocation();
+            int line = location.GetLineSpan().StartLinePosition.Line + 1;
+            sites.Add(new FragmentSite(node.SyntaxTree.FilePath, line));
+        }
+
+        return sites.ToList();
+    }
+
+    private static SyntaxToken? MemberIdentifierOf(SyntaxNode node)
+    {
+        return node switch
+        {
+            MethodDeclarationSyntax method => method.Identifier,
+            PropertyDeclarationSyntax property => property.Identifier,
+            EventDeclarationSyntax @event => @event.Identifier,
+            VariableDeclaratorSyntax declarator => declarator.Identifier, // a field or a field-like event
+            ParameterSyntax parameter => parameter.Identifier, // a positional record property
+            _ => null
+        };
+    }
+
     private sealed class ExtractState
     {
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
@@ -144,7 +264,8 @@ internal static class FragmentExtractor
 
             if (!_declared.TryGetValue(fqn, out DeclaredBuilder? builder))
             {
-                builder = new DeclaredBuilder(ExtractFacts(definition), definition);
+                TypeFacts facts = ExtractFacts(definition);
+                builder = new DeclaredBuilder(facts, definition, BuildMembers(definition, facts.Kind));
                 _declared[fqn] = builder;
             }
 
@@ -232,18 +353,6 @@ internal static class FragmentExtractor
             builder.Sites.Add(site);
         }
 
-        private static MemberKind MemberKindOf(ISymbol member)
-        {
-            return member switch
-            {
-                IMethodSymbol => MemberKind.Method,
-                IPropertySymbol => MemberKind.Property,
-                IFieldSymbol => MemberKind.Field,
-                IEventSymbol => MemberKind.Event,
-                _ => throw new ArgumentOutOfRangeException(nameof(member), member.Kind, "not a member-use symbol")
-            };
-        }
-
         /// <summary>
         ///     The FQN of a referenced type's original definition. When that FQN is not declared by this
         ///     input, it is a referenced-but-not-declared type, so an external record (first mention wins)
@@ -320,10 +429,11 @@ internal static class FragmentExtractor
     ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration sites, and
     ///     hierarchy filled in pass 2.
     /// </summary>
-    private sealed class DeclaredBuilder(TypeFacts facts, INamedTypeSymbol symbol)
+    private sealed class DeclaredBuilder(TypeFacts facts, INamedTypeSymbol symbol, IReadOnlyList<FragmentMember> members)
     {
         public TypeFacts Facts { get; } = facts;
         public INamedTypeSymbol Symbol { get; } = symbol;
+        public IReadOnlyList<FragmentMember> Members { get; } = members;
         public SortedSet<FragmentSite> Sites { get; } = [];
         public string? BaseTypeFullName { get; set; }
         public IReadOnlyList<string> Interfaces { get; set; } = [];
@@ -342,7 +452,8 @@ internal static class FragmentExtractor
                 Attributes,
                 AllInterfaces,
                 BaseTypeChain,
-                AttributeConstructions);
+                AttributeConstructions,
+                Members);
         }
     }
 

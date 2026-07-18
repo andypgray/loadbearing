@@ -167,6 +167,56 @@ public sealed class BaselineAddMatcherTests
         error.Message.ShouldContain("  App.Home -> System.DateTime.Now");
     }
 
+    [Fact]
+    public void ResolveSubject_MemberByFullNameAndSymbolId_ReturnsMatchingViolation()
+    {
+        // A --subject matches a member-shape violation by the member's full name (no parens) or member id.
+        Violation shape = Violation.MemberShape(
+            MemberSubject("MyApp.Web.HomeController", "Save", "M:MyApp.Web.HomeController.Save", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+        Violation[] violations = [shape];
+
+        Violation byFullName = BaselineAddMatcher.ResolveSubject("r", violations, "MyApp.Web.HomeController.Save");
+        Violation bySymbolId = BaselineAddMatcher.ResolveSubject("r", violations, "M:MyApp.Web.HomeController.Save");
+
+        byFullName.ShouldBeSameAs(shape);
+        bySymbolId.ShouldBeSameAs(shape);
+    }
+
+    [Fact]
+    public void ResolveSubject_OverloadedMemberFullName_AmbiguousListsBothMemberIds()
+    {
+        // A full-name --subject naming an overloaded method matches every overload → the ambiguity lists the
+        // distinct member ids to retry with (GRAMMAR §4.6, mirroring the member --target side).
+        Violation intOverload = Violation.MemberShape(
+            MemberSubject("N.Svc", "M", "M:N.Svc.M(System.Int32)", MemberKind.Method), Array.Empty<SourceLocation>());
+        Violation stringOverload = Violation.MemberShape(
+            MemberSubject("N.Svc", "M", "M:N.Svc.M(System.String)", MemberKind.Method), Array.Empty<SourceLocation>());
+        Violation[] violations = [intOverload, stringOverload];
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", violations, "N.Svc.M"));
+
+        error.Message.ShouldContain("--subject 'N.Svc.M' matches more than one current violation of 'r'");
+        error.Message.ShouldContain("M:N.Svc.M(System.Int32)");
+        error.Message.ShouldContain("M:N.Svc.M(System.String)");
+        error.Message.ShouldEndWith("Use the symbol ID form.");
+    }
+
+    [Fact]
+    public void ResolveSubject_MemberNoMatch_ListsMemberFullNameFormWithParens()
+    {
+        // The no-match candidate list echoes the member as 'Save()' (parens iff method), exactly as
+        // 'loadbearing check' renders it, even though matching accepts the no-parens full name.
+        Violation shape = Violation.MemberShape(
+            MemberSubject("MyApp.Web.HomeController", "Save", "M:MyApp.Web.HomeController.Save", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", [shape], "MyApp.Web.HomeController.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  MyApp.Web.HomeController.Save()");
+    }
+
     private static TypeNode Node(string fullName, string symbolId)
     {
         return new TypeNode(
@@ -177,5 +227,13 @@ public sealed class BaselineAddMatcherTests
     private static MemberReference Member(string containingFullName, string name, string symbolId, MemberKind kind)
     {
         return new MemberReference(Node(containingFullName, $"T:{containingFullName}"), name, symbolId, kind);
+    }
+
+    private static MemberNode MemberSubject(string declaringFullName, string name, string symbolId, MemberKind kind)
+    {
+        return new MemberNode(
+            Node(declaringFullName, $"T:{declaringFullName}"), symbolId, name, kind,
+            Accessibility.Public, false, false, false, false, null, null,
+            Array.Empty<SourceLocation>(), Array.Empty<string>());
     }
 }

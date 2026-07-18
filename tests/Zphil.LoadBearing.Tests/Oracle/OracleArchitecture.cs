@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Domain.Dependencies;
+using ArchUnitNET.Domain.Extensions;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
 using Shouldly;
@@ -116,6 +117,44 @@ public sealed class OracleArchitecture
     {
         return dependency.TargetMember.DeclaringType.FullName == "System.DateTime"
                && dependency.TargetMember.Name is "get_Now()" or "get_UtcNow()";
+    }
+
+    /// <summary>
+    ///     The MyApp.Web-declared types that declare at least one <see cref="MethodForm.Normal" /> (non-ctor,
+    ///     non-accessor) method returning a Task-family type (<c>System.Threading.Tasks.Task</c> or a
+    ///     <c>Task&lt;T&gt;</c> construction) whose name does not end in <c>Async</c> — the ArchUnitNET
+    ///     (Mono.Cecil) analog of LoadBearing's member-subject rule
+    ///     <c>web.Methods.Returning(typeof(Task), typeof(Task&lt;&gt;)).MustHaveSuffix("Async")</c> (GRAMMAR
+    ///     §4.6), reduced to DECLARING-TYPE granularity (the bridge, exactly as row 8's caller-type reduction).
+    ///     ArchUnitNET 0.13.3 has method members with a <see cref="MethodMember.ReturnType" /> but no
+    ///     return-type-at-definition fluent predicate, so its dependency model is queried directly.
+    ///     Return-type matching is by definition-name prefix, so a <c>Task&lt;int&gt;</c> construction counts —
+    ///     the bridge for LoadBearing's definition-level open-generic match. <c>MethodMember.Name</c> is
+    ///     parens-inclusive in 0.13.3 ("Save()"), so the suffix test strips the signature first.
+    /// </summary>
+    public IReadOnlySet<string> TypesDeclaringUnsuffixedTaskReturningMethods()
+    {
+        return MyAppTypes
+            .Where(type => type.FullName.StartsWith("MyApp.Web.", StringComparison.Ordinal))
+            .Where(type => type.GetMethodMembers().Any(IsUnsuffixedTaskReturningMethod))
+            .Select(type => type.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    // A Normal method (MethodForm.Normal excludes constructors and property accessors — the ArchUnitNET analog
+    // of the §4.6 inventory exclusions) returning a Task-family type whose bare name lacks the Async suffix.
+    private static bool IsUnsuffixedTaskReturningMethod(MethodMember method)
+    {
+        return method.MethodForm == MethodForm.Normal
+               && method.ReturnType.FullName.StartsWith("System.Threading.Tasks.Task", StringComparison.Ordinal)
+               && !BareName(method).EndsWith("Async", StringComparison.Ordinal);
+    }
+
+    // The bare method name: 0.13.3's MethodMember.Name is parens-inclusive ("Save()"), so drop the signature.
+    private static string BareName(MethodMember method)
+    {
+        int paren = method.Name.IndexOf('(');
+        return paren >= 0 ? method.Name[..paren] : method.Name;
     }
 
     /// <summary>

@@ -102,4 +102,72 @@ public class VocabularyFragmentTests
     {
         SentenceRenderer.Sentence(Arch.Types.MustBeInternal()).ShouldBe("Types must be internal.");
     }
+
+    // ---- Member modal verbs (GRAMMAR §5.7): one pin per verb, all ten ----
+
+    [Fact]
+    public void Member_MustHaveSuffix_ReusesTypeSideNamingFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustHaveSuffix("Async"))
+            .ShouldBe("Methods of types must be named `*Async`.");
+    }
+
+    [Fact]
+    public void Member_MustHavePrefix_ReusesTypeSideNamingFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustHavePrefix("Get"))
+            .ShouldBe("Methods of types must be named `Get*`.");
+    }
+
+    [Fact]
+    public void Member_MustHaveNameMatching_RendersGlob()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustHaveNameMatching("*Async"))
+            .ShouldBe("Methods of types must have a name matching `*Async`.");
+    }
+
+    [Fact]
+    public void Member_MustBePublic_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePublic()).ShouldBe("Methods of types must be public.");
+    }
+
+    [Fact]
+    public void Member_MustBeInternal_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeInternal()).ShouldBe("Methods of types must be internal.");
+    }
+
+    [Fact]
+    public void Member_MustBePrivate_RendersFragment()
+    {
+        // Member-only vocabulary (no type-side twin).
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePrivate()).ShouldBe("Methods of types must be private.");
+    }
+
+    [Fact]
+    public void Member_MustBeStatic_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeStatic()).ShouldBe("Methods of types must be static.");
+    }
+
+    [Fact]
+    public void Member_MustBeAbstract_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeAbstract()).ShouldBe("Methods of types must be abstract.");
+    }
+
+    [Fact]
+    public void Member_MustBeVirtual_RendersFragment()
+    {
+        // Member-only vocabulary (no type-side twin).
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeVirtual()).ShouldBe("Methods of types must be virtual.");
+    }
+
+    [Fact]
+    public void Member_Must_RendersEscapeHatchDescription()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.Must(m => m.IsAsync, "return a Task"))
+            .ShouldBe("Methods of types must return a Task.");
+    }
 }

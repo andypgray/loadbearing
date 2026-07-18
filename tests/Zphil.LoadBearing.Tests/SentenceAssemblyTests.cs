@@ -181,4 +181,70 @@ public class SentenceAssemblyTests
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not use `Billing.Order.Total` or `Sales.Order.Refresh()`.");
     }
+
+    // ---- Member subjects (GRAMMAR §4.6, §5.7, §6) ----
+
+    [Fact]
+    public void MemberProjections_RenderKindPluralHeads()
+    {
+        // The five projection heads: "{kind-plural} of {reference}" (§5.7). Reference is "types".
+        SentenceRenderer.MemberSubject(Arch.Types.Members).ShouldBe("Members of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods).ShouldBe("Methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Properties).ShouldBe("Properties of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Fields).ShouldBe("Fields of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Events).ShouldBe("Events of types");
+    }
+
+    [Fact]
+    public void MemberSubject_ReferenceIsUnderlyingTypeSelection()
+    {
+        // The {reference} is the source type selection in reference position (§6): a namespace locative.
+        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*").Methods)
+            .ShouldBe("Methods of types in `MyApp.Web.*`");
+    }
+
+    [Fact]
+    public void Returning_SingleAnchor_RendersReturningClause()
+    {
+        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task)))
+            .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task`");
+    }
+
+    [Fact]
+    public void Returning_OpenGeneric_RendersDeclaredTypeParameterName()
+    {
+        // An open-generic anchor renders declared type-parameter names, like Implementing (§4.6, §5.2).
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task<>)))
+            .ShouldBe("Methods of types returning `Task<TResult>`");
+    }
+
+    [Fact]
+    public void Returning_MultipleAnchors_JoinWithOr()
+    {
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task), typeof(Task<>)))
+            .ShouldBe("Methods of types returning `Task` or `Task<TResult>`");
+    }
+
+    [Fact]
+    public void MemberWhere_CanonicalizesToSentenceFinal_RegardlessOfChainPosition()
+    {
+        // The member Where renders sentence-final after the inline adjective, whatever the chain order.
+        string whereFirst = SentenceRenderer.MemberSubject(
+            Arch.Types.Methods.Where(m => m.IsAsync, "that are async").WithSuffix("Handler"));
+        string whereLast = SentenceRenderer.MemberSubject(
+            Arch.Types.Methods.WithSuffix("Handler").Where(m => m.IsAsync, "that are async"));
+
+        whereFirst.ShouldBe("Methods of types named `*Handler` that are async");
+        whereLast.ShouldBe(whereFirst);
+    }
+
+    [Fact]
+    public void MemberAdjectives_RenderInAuthoringOrder()
+    {
+        // Two inline adjectives render in the order written — order is preserved, not canonicalized.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task)).WithSuffix("Async"))
+            .ShouldBe("Methods of types returning `Task` named `*Async`");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async").Returning(typeof(Task)))
+            .ShouldBe("Methods of types named `*Async` returning `Task`");
+    }
 }

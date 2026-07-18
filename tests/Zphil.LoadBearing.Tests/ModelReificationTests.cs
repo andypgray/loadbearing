@@ -193,6 +193,27 @@ public class ModelReificationTests
         Rule("layering/domain-independent").Constraint!.MemberOperands.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void MemberSubjectRule_ReifiesToWalkableMemberConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new AsyncSuffixSpec()).Rules.Single(r => r.Id == "naming/async-suffix");
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MemberMustHaveSuffixConstraint>();
+
+        // The member subject: the Methods projection carrying one Returning adjective (GRAMMAR §4.6).
+        constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Method);
+        constraint.MemberSubject.Adjectives.OfType<ReturningAdjective>().ShouldHaveSingleItem();
+
+        // The inherited Subject is the underlying TYPE selection (Subject => MemberSubject.Source), so
+        // foreign walks and Freeze desugaring keep working on the type side.
+        constraint.Subject.ShouldBeSameAs(constraint.MemberSubject.Source);
+        constraint.Subject.Noun.ShouldBeOfType<NamespaceNoun>();
+
+        // Member subjects never populate MemberOperands (that hook is the MustNotUse target list).
+        constraint.MemberOperands.ShouldBeEmpty();
+    }
+
     // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
     private sealed class MemberUseSpec : IArchitectureSpec
     {
@@ -205,6 +226,18 @@ public class ModelReificationTests
                         arch.Member(typeof(DateTime), nameof(DateTime.Now)),
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.");
+        }
+    }
+
+    // The flagship member-subject rule, reused for the walkable-model pins (GRAMMAR §4.6).
+    private sealed class AsyncSuffixSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Selection web = arch.Namespace("MyApp.Web.*");
+            arch.Rule("naming/async-suffix")
+                .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
+                .Because("Async methods are discovered by suffix.");
         }
     }
 

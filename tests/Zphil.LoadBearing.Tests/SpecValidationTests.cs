@@ -185,6 +185,42 @@ public class SpecValidationTests
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberUseSpec()));
     }
 
+    [Fact]
+    public void MemberReturningClosedGeneric_ClosedAnchor_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ClosedGenericReturningSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberReturningClosedGeneric && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberReturningClosedGeneric).Message
+            .ShouldBe("'System.Threading.Tasks.Task<System.Int32>' is a closed generic; .Returning matches definition-level — " +
+                      "use typeof(Task<>) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void BlankProse_BlankMemberWhereDescription_IsReported()
+    {
+        // The extended prose walk reaches a member Where description (GRAMMAR §8 item 5, §4.6).
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberWhereSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankProse && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankProse_BlankMemberMustDescription_IsReported()
+    {
+        // The extended prose walk reaches a member Must description (GRAMMAR §8 item 5, §4.6).
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberMustSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankProse && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ValidMemberSubject_AsyncSuffixSpec_BuildsWithoutError()
+    {
+        // Non-generic + open-generic Returning anchors are both accepted (only closed generics fail).
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberSubjectSpec()));
+    }
+
     private sealed class DuplicateIdSpecA : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -350,6 +386,46 @@ public class SpecValidationTests
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
                 .Fix("Take IClock in the constructor; see OrderService for the pattern.");
+        }
+    }
+
+    private sealed class ClosedGenericReturningSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // typeof(Task<int>) is a closed construction — refused; ban the open definition instead.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.Returning(typeof(Task<int>)).MustHaveSuffix("Async"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberWhereSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.Where(_ => true, "").MustHaveSuffix("Async"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberMustSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.Methods.Must(_ => true, "")).Because("Reason.");
+        }
+    }
+
+    private sealed class ValidMemberSubjectSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Selection web = arch.Namespace("MyApp.Web.*");
+            arch.Rule("naming/async-suffix")
+                .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
+                .Because("Async methods are discovered by suffix.");
         }
     }
 

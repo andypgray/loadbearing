@@ -23,10 +23,14 @@ public sealed class BaselineAddE2ETests
     private const string MigrateRule = "data-access/no-inline-sql";
     private const string ContainmentRule = "legacy/billing/containment";
     private const string ClockRule = "time/inject-clock";
+    private const string AsyncRule = "naming/async-suffix";
     private const string ForeignRule = "some/other-rule";
 
     private const string NowMemberId = "P:System.DateTime.Now";
     private const string UtcNowMemberId = "P:System.DateTime.UtcNow";
+
+    private const string SaveMemberId = "M:MyApp.Web.HomeController.Save";
+    private const string LoadMemberId = "M:MyApp.Web.HomeController.Load";
 
     private const string HomeId = "T:MyApp.Web.HomeController";
     private const string InvoiceId = "T:MyApp.Web.InvoiceController";
@@ -48,6 +52,7 @@ public sealed class BaselineAddE2ETests
     private static readonly string[] MigrateBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
     private static readonly string[] FreezeBaselineFile = ["arch", "violated-freeze-baseline.json"];
     private static readonly string[] ClockBaselineFile = ["arch", "baselines", "time", "inject-clock.json"];
+    private static readonly string[] AsyncBaselineFile = ["arch", "baselines", "naming", "async-suffix.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -217,6 +222,80 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         reinit.Exit.ShouldBe(0);
         File.ReadAllBytes(clockPath).ShouldBe(snapshot);
+    }
+
+    [Fact]
+    public async Task BaselineAdd_MemberSubjectRule_GrandfathersOneTaskMethodAndBystanderLoadStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Red first: the member-subject Migrate rule naming/async-suffix is uncaptured, so both of
+        // HomeController's unsuffixed Task-returning methods (Save, Load — GRAMMAR §4.6) are current
+        // memberShape violations, each keyed by the member's own DocId in the subjectMember field.
+        CliResult red = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement redRule = RuleElement(red.Out, AsyncRule);
+        redRule.GetProperty("status").GetString().ShouldBe("failed");
+        redRule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("subjectMember").GetString())
+            .ShouldBe([SaveMemberId, LoadMemberId], true);
+
+        // Capture: --init grandfathers both member identities (M: member DocId, ForSubject entries), and the
+        // re-check sees the rule green with both methods riding the baseline.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("naming/async-suffix: captured 2 grandfathered violations.");
+
+        CliResult captured = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement capturedRule = RuleElement(captured.Out, AsyncRule);
+        capturedRule.GetProperty("status").GetString().ShouldBe("passed");
+        capturedRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(2);
+
+        // Un-capture the pair (composer as arrangement, the Migrate/clock fact's idiom): a digest-valid EMPTY
+        // section turns both methods red again on a captured rule — the state the valve exists for.
+        string asyncPath = workspace.PathOf(AsyncBaselineFile);
+        File.WriteAllText(asyncPath, ComposeSections((AsyncRule, [])));
+
+        // The valve, member-subject flavor: a full-name --subject (no M: prefix, no parens) resolves the
+        // member-shape violation, and the echo renders Save() WITH parens exactly as 'loadbearing check' does.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", AsyncRule,
+            "--subject", "MyApp.Web.HomeController.Save", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "naming/async-suffix: added 1 grandfathered entry — MyApp.Web.HomeController.Save() (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry keying the M: member DocId via ForSubject, plus the digest.
+        Normalize(File.ReadAllText(asyncPath)).ShouldBe(ComposeSections(
+            (AsyncRule, [BaselineEntry.ForSubject(SaveMemberId).WithBecause("INC-1234")])));
+        LineSet(File.ReadAllText(asyncPath)).Count(line => line.Contains("\"subject\":")).ShouldBe(1);
+
+        // The bystander pin: the OTHER Task method (Load) is still red; only Save is grandfathered.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement asyncRule = RuleElement(check.Out, AsyncRule);
+        asyncRule.GetProperty("status").GetString().ShouldBe("failed");
+        asyncRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        JsonElement bystander = asyncRule.GetProperty("violations").EnumerateArray().ToList().ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("memberShape");
+        bystander.GetProperty("subjectMember").GetString().ShouldBe(LoadMemberId);
+
+        // The attribution round-trips: --accept-reductions keeps the still-observed Save entry (refusing the
+        // Load growth) and a second --init leaves the captured section be — byte-identical both ways.
+        byte[] snapshot = File.ReadAllBytes(asyncPath);
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.Exit.ShouldBe(0);
+        File.ReadAllBytes(asyncPath).ShouldBe(snapshot);
+        CliResult reinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        reinit.Exit.ShouldBe(0);
+        File.ReadAllBytes(asyncPath).ShouldBe(snapshot);
     }
 
     [Fact]

@@ -13,7 +13,10 @@ internal static class SentenceRenderer
     /// <summary>The full law sentence: <c>{Subject} {verb phrase}.</c></summary>
     internal static string Sentence(Constraint constraint)
     {
-        return Subject(constraint.Subject) + " " + constraint.VerbPhrase + ".";
+        // A member constraint speaks over its member subject ("Methods of types in `MyApp.Web.*` …");
+        // every other constraint speaks over its type subject (GRAMMAR §4.6, §6).
+        string subject = constraint is MemberConstraint member ? MemberSubject(member.MemberSubject) : Subject(constraint.Subject);
+        return subject + " " + constraint.VerbPhrase + ".";
     }
 
     /// <summary>The capitalized subject phrase for a selection (GRAMMAR §6).</summary>
@@ -22,10 +25,16 @@ internal static class SentenceRenderer
         return ProseFormat.Capitalize(Phrase(selection));
     }
 
+    /// <summary>The capitalized member-subject phrase for a member selection (GRAMMAR §4.6, §6).</summary>
+    internal static string MemberSubject(MemberSelection selection)
+    {
+        return ProseFormat.Capitalize(MemberPhrase(selection));
+    }
+
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
     internal static string Reference(Selection selection)
     {
-        if (selection is UnionSelection union) return ProseFormat.JoinReferences(union.Members.Select(Reference).ToList());
+        if (selection is UnionSelection union) return ProseFormat.JoinReferences(union.Parts.Select(Reference).ToList());
 
         // A bare noun (no adjectives) uses its own reference fragment: "the Web layer",
         // "types in `MyApp.*`", "`SqlConnection`". A refined selection falls back to the
@@ -111,6 +120,23 @@ internal static class SentenceRenderer
             }
 
         return head + noun.Locative + inline + subjectFinal;
+    }
+
+    // Member-subject assembly (GRAMMAR §4.6, §6): "{kind-plural} of {selection-reference}" + inline
+    // member adjectives in authoring order + the sentence-final member Where. The kind-plural is the
+    // projection head; the reference is the underlying type selection in reference position.
+    private static string MemberPhrase(MemberSelection selection)
+    {
+        string head = ProseFormat.MemberKindPlural(selection.Kind);
+        string reference = Reference(selection.Source);
+
+        var inline = string.Empty;
+        var subjectFinal = string.Empty;
+        foreach (MemberAdjective adjective in selection.Adjectives)
+            if (adjective.Placement == AdjectivePlacement.SubjectFinal) subjectFinal += adjective.Fragment;
+            else inline += adjective.Fragment;
+
+        return head + " of " + reference + inline + subjectFinal;
     }
 
     private static bool TryBareType(Selection selection, out Type type)

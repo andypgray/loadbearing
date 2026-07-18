@@ -93,6 +93,7 @@ internal static class SpecValidator
 
         CheckForeign(RuleSelections(rule), rule.Id, arch, errors);
         CheckMembers(rule, arch, errors);
+        CheckMemberReturning(rule, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -171,6 +172,22 @@ internal static class SpecValidator
             }
 
         foreach (Member member in members) CheckMember(member, rule.Id, errors);
+    }
+
+    // GRAMMAR §8 item 14: a member `.Returning` anchor is definition-level, so a closed-generic anchor
+    // (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)). A non-generic
+    // or open-generic anchor is accepted; only a MemberConstraint carries a ReturningAdjective at all.
+    private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MemberConstraint memberConstraint) return;
+
+        foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
+            if (adjective is ReturningAdjective returning)
+                foreach (Type type in returning.Types)
+                    if (type.IsGenericType && !type.IsGenericTypeDefinition)
+                        errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
+                            $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
+                            $"use typeof({TypeofForm(GenericDefinition(type))}) (used by '{rule.Id}')."));
     }
 
     private static void CheckMember(Member member, string id, List<SpecValidationError> errors)
@@ -293,6 +310,17 @@ internal static class SpecValidator
     {
         if (constraint is MustConstraint must) yield return ("description", must.Description);
 
+        // The member escape hatches (GRAMMAR §4.6, §8 item 5 via the extended walk): the member Must
+        // description and any member Where descriptions on the member subject reach BlankProse/MultiLineProse.
+        if (constraint is MemberMustConstraint memberMust) yield return ("description", memberMust.Description);
+
+        if (constraint is MemberConstraint memberConstraint)
+            foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
+                if (adjective is MemberWhereAdjective memberWhere)
+                    yield return ("description", memberWhere.Description);
+
+        // For a member constraint, Subject is the underlying type selection (Subject => MemberSubject.Source),
+        // so this also walks any type-side Where/Except used before the projection.
         foreach ((string, string?) prose in SelectionProse(constraint.Subject)) yield return prose;
 
         foreach (Selection operand in constraint.Operands)
@@ -304,7 +332,7 @@ internal static class SpecValidator
     {
         if (selection is UnionSelection union)
         {
-            foreach (Selection member in union.Members)
+            foreach (Selection member in union.Parts)
             foreach ((string, string?) prose in SelectionProse(member))
                 yield return prose;
 
@@ -344,7 +372,7 @@ internal static class SpecValidator
 
         if (selection is UnionSelection union)
         {
-            foreach (Selection member in union.Members)
+            foreach (Selection member in union.Parts)
             foreach (Selection nested in ExpandSelection(member))
                 yield return nested;
 

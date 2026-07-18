@@ -131,9 +131,10 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v2 (Phase 13 WP2): fragments now carry member-use edges (GRAMMAR §4.5), so a v1 cache.json degrades to
-    // a clean Miss and is rebuilt — the cache is disposable derived data, never a loud error.
-    private const int CurrentSchemaVersion = 2;
+    // v3 (Phase 14 WP2): declared types now carry their member inventory (GRAMMAR §4.6), so a v2 cache.json
+    // (member-use edges but no inventory) degrades to a clean Miss and is rebuilt — the cache is disposable
+    // derived data, never a loud error. (v2 added member-use edges over v1's type-only fragments.)
+    private const int CurrentSchemaVersion = 3;
 
     // Probe files whose presence anywhere from a project directory up to the solution directory changes the
     // build — recorded even when absent, so a newly-appearing one is an existence flip. Mirrors WorkspaceSession.

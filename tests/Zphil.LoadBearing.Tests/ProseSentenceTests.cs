@@ -69,6 +69,16 @@ public class ProseSentenceTests
             .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
     }
 
+    [Fact]
+    public void Enforce_AsyncSuffix_RendersMemberSubjectFlagship()
+    {
+        // Phase 14 acceptance box 1: the flagship member-subject rule (GRAMMAR §4.6, §6). The member
+        // subject is "{kind-plural} of {selection-reference}" + the Returning adjective; single anchor.
+        ArchModelBuilder.Build(new AsyncSuffixSpec())
+            .Rules.Single(rule => rule.Id == "naming/async-suffix").Sentence
+            .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task` must be named `*Async`.");
+    }
+
     // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
     // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
     private sealed class InjectClockSpec : IArchitectureSpec
@@ -83,6 +93,19 @@ public class ProseSentenceTests
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
                 .Fix("Take IClock in the constructor; see OrderService for the pattern.");
+        }
+    }
+
+    // The flagship member-subject rule (GRAMMAR §4.6): Web-layer methods returning Task must be *Async.
+    // Single-anchor Enforce form, reconciled with PLAN's literal acceptance sentence.
+    private sealed class AsyncSuffixSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Selection web = arch.Namespace("MyApp.Web.*");
+            arch.Rule("naming/async-suffix")
+                .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
+                .Because("Async methods are discovered by suffix; agents grep by *Async.");
         }
     }
 }

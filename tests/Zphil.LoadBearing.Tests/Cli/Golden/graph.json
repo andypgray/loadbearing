@@ -72,6 +72,11 @@
       "source": "MyApp.Web",
       "targetNamespaceRoot": "System.Text",
       "references": 1
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Threading",
+      "references": 2
     }
   ]
 }

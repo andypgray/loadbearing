@@ -123,6 +123,42 @@
       "warnings": []
     },
     {
+      "id": "naming/async-suffix",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`.",
+      "because": "Async methods are discovered by their Async suffix.",
+      "fix": "Rename the method to end in Async and update its callers.",
+      "baseline": {
+        "path": "arch/baselines/naming/async-suffix.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Load",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 48
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Save",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 43
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -206,11 +242,11 @@
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 8,
+    "rulesChecked": 9,
     "rulesPassed": 2,
-    "rulesFailed": 5,
+    "rulesFailed": 6,
     "rulesSkipped": 1,
-    "violations": 8,
+    "violations": 10,
     "warnings": 1
   }
 }

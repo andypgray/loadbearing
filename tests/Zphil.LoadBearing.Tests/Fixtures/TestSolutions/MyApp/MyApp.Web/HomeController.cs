@@ -36,4 +36,22 @@ public class HomeController
     {
         return System.DateTime.UtcNow;
     }
+
+    // New async-style methods (Phase 14 member subjects): Save/Load return a Task form without the
+    // Async suffix — red under naming/async-suffix; Load's Task<int> proves open-generic matching
+    // end-to-end. SaveAsync is correctly named — green.
+    public System.Threading.Tasks.Task Save()
+    {
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    public System.Threading.Tasks.Task<int> Load()
+    {
+        return System.Threading.Tasks.Task.FromResult(0);
+    }
+
+    public System.Threading.Tasks.Task SaveAsync()
+    {
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
 }

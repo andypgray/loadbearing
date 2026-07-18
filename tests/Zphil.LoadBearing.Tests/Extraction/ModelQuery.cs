@@ -54,4 +54,27 @@ internal static class ModelQuery
     {
         return ((TypeNode)type).FullName;
     }
+
+    // ── declared members (GRAMMAR §4.6) ───────────────────────────────────────────────────────────────────
+
+    public static MemberNode Member(this TypeNode type, string symbolId)
+    {
+        return type.Members.Single(m => m.SymbolId == symbolId);
+    }
+
+    public static MemberNode Member(this CodebaseModel model, string typeFullName, string symbolId)
+    {
+        return model.Type(typeFullName).Member(symbolId);
+    }
+
+    /// <summary>The type's declared-member SymbolIds, in the model's ordinal-by-SymbolId order.</summary>
+    public static IReadOnlyList<string> MemberIds(this TypeNode type)
+    {
+        return type.Members.Select(m => m.SymbolId).ToList();
+    }
+
+    public static IReadOnlyList<int> DeclarationLines(this MemberNode member)
+    {
+        return member.DeclarationSites.Select(s => s.Line).ToList();
+    }
 }

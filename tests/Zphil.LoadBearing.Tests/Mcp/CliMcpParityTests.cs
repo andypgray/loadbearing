@@ -49,7 +49,9 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
-        // arch_check ≡ check --json (CLI exits 1 on the violation; the tool never reports IsError).
+        // arch_check ≡ check --json (CLI exits 1 on the violation; the tool never reports IsError). The
+        // ViolatedSpec carries every violation kind including the member-subject rule naming/async-suffix
+        // (memberShape / subjectMember, GRAMMAR §4.6), so this byte-parity covers member subjects too.
         CliResult cliCheck = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
         cliCheck.Exit.ShouldBe(1);

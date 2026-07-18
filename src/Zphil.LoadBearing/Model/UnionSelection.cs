@@ -8,14 +8,14 @@ namespace Zphil.LoadBearing.Model;
 /// </summary>
 internal sealed class UnionSelection : Selection
 {
-    internal UnionSelection(Arch owner, IReadOnlyList<Selection> members)
+    internal UnionSelection(Arch owner, IReadOnlyList<Selection> parts)
         : base(owner)
     {
-        Members = members;
+        Parts = parts;
     }
 
-    /// <summary>The unioned member selections, in order.</summary>
-    internal IReadOnlyList<Selection> Members { get; }
+    /// <summary>The unioned selections, in order (named <c>Parts</c> to stay clear of the <c>.Members</c> projection, §4.6).</summary>
+    internal IReadOnlyList<Selection> Parts { get; }
 
     internal override SelectionNoun Noun
         => throw new InvalidOperationException("A union selection has no single noun; render it in reference position.");

@@ -7,11 +7,13 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     Renders every fact of a <see cref="CodebaseModel" /> to a single deterministic string, for
 ///     string-equality pins. It is deliberately <em>total</em> — projects, every scalar type fact,
 ///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three construction
-///     lists, every edge with its sites, and every member-use edge with its member facts and sites — so that
-///     if a fact is not rendered here it is not pinned. The model is already fully ordered (types by
-///     FullName, edges by source/target, member edges by source/member SymbolId, projects by name), so a
-///     straight walk is stable. Used by the fragment JSON round-trip test to assert that
-///     serialize→deserialize→merge equals a direct merge.
+///     lists, every edge with its sites, every member-use edge with its member facts and sites, and every
+///     declared member's scalar facts and declaration sites (GRAMMAR §4.6) — so that if a fact is not
+///     rendered here it is not pinned. The model is already fully ordered (types by FullName, edges by
+///     source/target, member edges by source/member SymbolId, each type's members by SymbolId, projects by
+///     name), so a straight walk is stable. Used by the fragment JSON round-trip test to assert that
+///     serialize→deserialize→merge equals a direct merge — so the member inventory round-trips (and, via
+///     the replay-fidelity test, replays) guarded by construction.
 /// </summary>
 internal static class ModelDump
 {
@@ -38,7 +40,25 @@ internal static class ModelDump
                 .Append(" (").Append(edge.Member.Kind).Append(' ').Append(edge.Member.ContainingType.FullName)
                 .Append('.').Append(edge.Member.Name).Append(") @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
 
+        builder.AppendLine("== DECLARED MEMBERS ==");
+        foreach (TypeNode type in model.Types)
+        foreach (MemberNode member in type.Members)
+            RenderMember(builder, type, member);
+
         return builder.ToString();
+    }
+
+    private static void RenderMember(StringBuilder builder, TypeNode type, MemberNode member)
+    {
+        builder.Append("MEMBER ").Append(type.FullName).Append(' ').AppendLine(member.SymbolId);
+        builder.Append("  name=").Append(member.Name).Append(" kind=").Append(member.Kind)
+            .Append(" acc=").Append(member.Accessibility).Append(" static=").Append(member.IsStatic)
+            .Append(" abstract=").Append(member.IsAbstract).Append(" virtual=").Append(member.IsVirtual)
+            .Append(" async=").Append(member.IsAsync).AppendLine();
+        builder.Append("  returnType=").Append(member.ReturnTypeFullName ?? "<null>")
+            .Append(" memberType=").Append(member.MemberTypeFullName ?? "<null>").AppendLine();
+        builder.Append("  declSites=[").Append(RenderSites(member.DeclarationSites)).AppendLine("]");
+        builder.Append("  filePaths=[").Append(string.Join(", ", member.FilePaths)).AppendLine("]");
     }
 
     private static void RenderType(StringBuilder builder, TypeNode type)

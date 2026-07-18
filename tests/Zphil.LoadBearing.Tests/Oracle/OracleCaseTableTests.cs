@@ -3,6 +3,7 @@ using MyApp.Web;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -205,6 +206,26 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
     }
 
+    // Row 9 (Phase 14 member-subject, best-effort): "methods returning Task must be named *Async" at
+    // DECLARING-TYPE granularity. LoadBearing's memberShape violation names the offending member (an M: DocId,
+    // GRAMMAR §4.6); ArchUnitNET has method members with a ReturnType but no return-type-at-definition fluent
+    // predicate, so its model is queried directly (OracleArchitecture) — same substrate, verdict-level, reduced
+    // to the declaring type (the bridge, exactly as row 8's caller-type reduction). Only HomeController declares
+    // unsuffixed Task-returning methods (Save returning Task, Load returning Task<int>).
+    [Fact]
+    public void Row9_TaskReturningMethodsMustHaveAsyncSuffixAtDeclaringTypeGranularity()
+    {
+        var loadBearing = LoadBearingMemberShapeViolators(arch =>
+            arch.Rule("oracle/async-suffix")
+                .Enforce(arch.Namespace("MyApp.Web.*").Methods
+                    .Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
+                .Because("Oracle row 9: Task-returning methods carry the Async suffix."));
+
+        var archUnit = oracle.TypesDeclaringUnsuffixedTaskReturningMethods();
+
+        AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
+    }
+
     /// <summary>
     ///     The oracle assertion: both substrates equal the pinned expected set (so a shared blind spot is
     ///     caught), and equal each other (the agreement claim). Sets are compared order-insensitively.
@@ -241,6 +262,18 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         return result.Violations
             .Where(violation => violation.Kind == ViolationKind.MemberUse)
             .Select(violation => violation.Source!.FullName)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    // A member-shape rule's violators reduced to DECLARING-TYPE FullNames — the bridge to the oracle's
+    // type-granularity compare (row 9). LoadBearing keys the specific member (M: DocId); the oracle agrees on
+    // which types own an offending member, exactly as row 8 agrees on which types read the clock.
+    private IReadOnlySet<string> LoadBearingMemberShapeViolators(Action<Arch> define)
+    {
+        RuleResult result = Checker.Run(workspace.Model, define).Single();
+        return result.Violations
+            .Where(violation => violation.Kind == ViolationKind.MemberShape)
+            .Select(violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 }

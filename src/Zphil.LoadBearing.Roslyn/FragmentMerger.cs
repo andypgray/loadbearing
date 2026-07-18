@@ -32,6 +32,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             , same-type uses dropped, with one shared
 ///             <see cref="MemberReference" /> instance per distinct SymbolId and every endpoint a merged node.
 ///         </item>
+///         <item>
+///             <b>M5</b> — declared members (GRAMMAR §4.6): the winning fragment's member inventory becomes
+///             the node's <see cref="TypeNode.Members" /> list (winner-only, like M2), each
+///             <see cref="MemberNode.DeclaringType" /> the same merged node; externals keep an empty list.
+///         </item>
 ///     </list>
 ///     One code path serves cold runs, the fast test path, and (Phase 11 WP6) cache hits, so the cache
 ///     cannot change results by construction.
@@ -58,7 +63,7 @@ internal static class FragmentMerger
         private readonly Dictionary<string, FragmentExternal> _externalFacts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
-        private readonly Dictionary<string, MemberFacts> _memberFacts = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
@@ -87,6 +92,12 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
                 MergeMemberEdge(memberEdge);
+
+            // M5 — declared members (GRAMMAR §4.6): the winning fragment's inventory becomes the node's
+            // MemberNode list, each member's DeclaringType the same merged node; externals keep their empty
+            // default (the member axis is solution-declared-only). Winner-only, exactly like M2 hierarchy.
+            foreach ((string fqn, FragmentType declared) in _hierarchy)
+                PopulateMembers(_nodes[fqn], declared);
 
             return Materialize(fragments);
         }
@@ -132,6 +143,27 @@ internal static class FragmentMerger
             return new TypeConstruction(ResolveNode(construction.DefinitionFullName), construction.ConstructedName);
         }
 
+        private static void PopulateMembers(TypeNode node, FragmentType declared)
+        {
+            node.Members = declared.DeclaredMembers
+                .Select(member => NewMember(node, member))
+                .ToList();
+        }
+
+        // The member's declaration sites are already (file, line) ordinal-ordered from extraction, so — as in
+        // Materialize's type FilePaths — Distinct preserves first-occurrence file order (the §5.6 contract).
+        private static MemberNode NewMember(TypeNode declaringType, FragmentMember member)
+        {
+            MemberFacts facts = member.Facts;
+            return new MemberNode(
+                declaringType,
+                facts.SymbolId, facts.Name, facts.Kind, facts.Accessibility,
+                facts.IsStatic, facts.IsAbstract, facts.IsVirtual, facts.IsAsync,
+                facts.ReturnTypeFullName, facts.MemberTypeFullName,
+                member.DeclarationSites.Select(s => new SourceLocation(s.File, s.Line)).ToList(),
+                member.DeclarationSites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList());
+        }
+
         private void MergeEdge(FragmentEdge edge)
         {
             if (string.Equals(edge.SourceFullName, edge.TargetFullName, StringComparison.Ordinal)) return; // self-edge
@@ -151,7 +183,7 @@ internal static class FragmentMerger
             ResolveNode(edge.TargetContainingTypeFullName);
 
             // Member facts are functions of the SymbolId, so the first mention wins and every later one agrees.
-            _memberFacts.TryAdd(edge.MemberSymbolId, new MemberFacts(edge.TargetContainingTypeFullName, edge.MemberName, edge.MemberKind));
+            _memberFacts.TryAdd(edge.MemberSymbolId, new MemberEdgeFacts(edge.TargetContainingTypeFullName, edge.MemberName, edge.MemberKind));
 
             var sites = MemberEdgeSites((edge.SourceFullName, edge.MemberSymbolId));
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
@@ -218,7 +250,7 @@ internal static class FragmentMerger
             {
                 if (memberReferences.TryGetValue(symbolId, out MemberReference? reference)) return reference;
 
-                MemberFacts facts = _memberFacts[symbolId];
+                MemberEdgeFacts facts = _memberFacts[symbolId];
                 reference = new MemberReference(_nodes[facts.ContainingFullName], facts.Name, symbolId, facts.Kind);
                 memberReferences[symbolId] = reference;
                 return reference;
@@ -293,6 +325,6 @@ internal static class FragmentMerger
         ///     The merge-side facts a <see cref="MemberReference" /> needs beyond its SymbolId: declaring-type FQN, name,
         ///     kind.
         /// </summary>
-        private readonly record struct MemberFacts(string ContainingFullName, string Name, MemberKind Kind);
+        private readonly record struct MemberEdgeFacts(string ContainingFullName, string Name, MemberKind Kind);
     }
 }

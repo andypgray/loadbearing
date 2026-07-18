@@ -162,6 +162,46 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     }
 
     [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerMembers_PinDeclaredInventoryAndFacts()
+    {
+        // The member inventory (GRAMMAR §4.6) on the real workspace: the nine declared members (the implicit
+        // default constructor excluded), ordered ordinal by SymbolId. Return/member types are definition-level
+        // FQNs, accessibility carries through (the private field included), and each member's DeclaringType is
+        // the SAME node instance held by model.Types. The three Task-returning methods (Phase 14) are the
+        // naming/async-suffix subject universe — Load returns Task<int> (a definition-level Task`1).
+        TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
+
+        home.MemberIds().ShouldBe([
+            "F:MyApp.Web.HomeController.log",
+            "M:MyApp.Web.HomeController.ExportOrders",
+            "M:MyApp.Web.HomeController.ExportStamp",
+            "M:MyApp.Web.HomeController.ExportStampUtc",
+            "M:MyApp.Web.HomeController.Load",
+            "M:MyApp.Web.HomeController.RenderOrder(System.String)",
+            "M:MyApp.Web.HomeController.Save",
+            "M:MyApp.Web.HomeController.SaveAsync",
+            "M:MyApp.Web.HomeController.ShowInvoiceTotal(MyApp.Legacy.Billing.IBillingFacade)"
+        ]);
+
+        MemberNode log = home.Member("F:MyApp.Web.HomeController.log");
+        log.Kind.ShouldBe(MemberKind.Field);
+        log.Accessibility.ShouldBe(Accessibility.Private);
+        log.MemberTypeFullName.ShouldBe("System.Text.StringBuilder");
+        log.DeclaringType.ShouldBeSameAs(home);
+
+        MemberNode stamp = home.Member("M:MyApp.Web.HomeController.ExportStamp");
+        stamp.Kind.ShouldBe(MemberKind.Method);
+        stamp.Accessibility.ShouldBe(Accessibility.Public);
+        stamp.ReturnTypeFullName.ShouldBe("System.DateTime");
+        stamp.DeclarationSites.Single().Line.ShouldBe(30);
+
+        home.Member("M:MyApp.Web.HomeController.RenderOrder(System.String)").ReturnTypeFullName.ShouldBe("System.String");
+
+        // Externals carry no inventory (the member axis is solution-declared-only).
+        fixture.Model.Type("System.Text.StringBuilder").Members.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void ExtractFromSolutionAsync_SymbolIds_PinRealWorkspaceDocIdForms()
     {
         // The baseline keys (GRAMMAR §4.3) from the real workspace: plain, open generic (backtick-arity),

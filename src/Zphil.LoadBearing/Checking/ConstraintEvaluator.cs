@@ -15,10 +15,14 @@ internal sealed class ConstraintEvaluator
     /// <summary>The pinned message on an empty-subject failure (ArchUnit precedent, GRAMMAR §4.1).</summary>
     internal const string EmptySubjectMessage = "The subject selection matched no solution-declared types.";
 
+    /// <summary>The pinned message on an empty <em>member</em> subject failure (the member analog, GRAMMAR §4.6).</summary>
+    internal const string EmptyMemberSubjectMessage = "The subject selection matched no solution-declared members.";
+
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
     private readonly IReadOnlyList<ReferenceEdge> _edges;
     private readonly IReadOnlyList<MemberEdge> _memberEdges;
+    private readonly MemberSelectionEvaluator _memberSelections;
     private readonly SelectionEvaluator _selections;
 
     internal ConstraintEvaluator(CodebaseModel model)
@@ -26,10 +30,16 @@ internal sealed class ConstraintEvaluator
         _edges = model.Edges;
         _memberEdges = model.MemberEdges;
         _selections = new SelectionEvaluator(model);
+        _memberSelections = new MemberSelectionEvaluator(_selections);
     }
 
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) Evaluate(Constraint constraint)
     {
+        // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
+        // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
+        // types none of whose members survive the kind filter is the ordinary way to fail empty).
+        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint);
+
         var subjects = _selections.Evaluate(constraint.Subject, SelectionPosition.Subject);
         if (subjects.Count == 0) return (new[] { Violation.EmptySubject(EmptySubjectMessage) }, NoWarnings);
 
@@ -166,6 +176,55 @@ internal sealed class ConstraintEvaluator
         foreach (TypeNode subject in subjects)
             if (!holds(subject))
                 violations.Add(Violation.Shape(subject, subject.DeclarationSites));
+
+        return (violations, NoWarnings);
+    }
+
+    // The member modal verbs (GRAMMAR §5.7): resolve the member subject, then test each surviving member
+    // against the verb's shape/naming/accessibility/flag predicate — a failing member is a MemberShape
+    // violation at its own declaration sites, identity keyed on its DocId (§4.6). An empty member subject
+    // fails with the member-flavored message (the analog of the empty type subject). Resolution can throw
+    // RuleEvaluationException (a closed-generic .Returning anchor); ArchChecker turns that into a RuleError.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EvaluateMember(MemberConstraint constraint)
+    {
+        var members = _memberSelections.Resolve(constraint.MemberSubject);
+        if (members.Count == 0) return (new[] { Violation.EmptySubject(EmptyMemberSubjectMessage) }, NoWarnings);
+
+        switch (constraint)
+        {
+            case MemberMustHaveSuffixConstraint c:
+                return MemberShape(members, m => m.Name.EndsWith(c.Suffix, StringComparison.Ordinal));
+            case MemberMustHavePrefixConstraint c:
+                return MemberShape(members, m => m.Name.StartsWith(c.Prefix, StringComparison.Ordinal));
+            case MemberMustHaveNameMatchingConstraint c:
+                var namePattern = new TypeNamePattern(c.Glob);
+                return MemberShape(members, m => namePattern.Matches(m.Name));
+            case MemberMustBePublicConstraint:
+                return MemberShape(members, m => m.Accessibility == Accessibility.Public);
+            case MemberMustBeInternalConstraint:
+                return MemberShape(members, m => m.Accessibility == Accessibility.Internal);
+            case MemberMustBePrivateConstraint:
+                return MemberShape(members, m => m.Accessibility == Accessibility.Private);
+            case MemberMustBeStaticConstraint:
+                return MemberShape(members, m => m.IsStatic);
+            case MemberMustBeAbstractConstraint:
+                return MemberShape(members, m => m.IsAbstract);
+            case MemberMustBeVirtualConstraint:
+                return MemberShape(members, m => m.IsVirtual);
+            case MemberMustConstraint c:
+                return MemberShape(members, m => SelectionEvaluator.InvokePredicate(c.Predicate, m, "Must"));
+            default:
+                return (Array.Empty<Violation>(), NoWarnings);
+        }
+    }
+
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) MemberShape(
+        IReadOnlyList<MemberNode> members, Func<IMemberInfo, bool> holds)
+    {
+        var violations = new List<Violation>();
+        foreach (MemberNode member in members)
+            if (!holds(member))
+                violations.Add(Violation.MemberShape(member, member.DeclarationSites));
 
         return (violations, NoWarnings);
     }

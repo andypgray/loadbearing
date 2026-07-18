@@ -173,13 +173,21 @@ public static class ArchChecker
     }
 
     // Deterministic within-rule order: (Source|Subject FullName, Target FullName, Member SymbolId),
-    // ordinal. A MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId).
+    // ordinal. A MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
+    // MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId).
     private static IReadOnlyList<Violation> Order(IReadOnlyList<Violation> violations)
     {
         return violations
-            .OrderBy(v => (v.Source ?? v.Subject)?.FullName ?? string.Empty, StringComparer.Ordinal)
+            .OrderBy(v => (v.Source ?? v.Subject)?.FullName ?? MemberDeclaringFullName(v), StringComparer.Ordinal)
             .ThenBy(v => v.Target?.FullName ?? string.Empty, StringComparer.Ordinal)
-            .ThenBy(v => v.Member?.SymbolId ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(v => v.Member?.SymbolId ?? v.SubjectMember?.SymbolId ?? string.Empty, StringComparer.Ordinal)
             .ToList();
+    }
+
+    // A MemberShape violation's declaring-type FullName — its primary sort key (empty for every other kind,
+    // which already sort on Source/Subject). The declaring type is always the owning TypeNode.
+    private static string MemberDeclaringFullName(Violation violation)
+    {
+        return violation.SubjectMember is { } member ? ((TypeNode)member.DeclaringType).FullName : string.Empty;
     }
 }

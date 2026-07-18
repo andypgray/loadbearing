@@ -34,7 +34,7 @@ internal sealed class SelectionEvaluator
         if (selection is UnionSelection union)
         {
             var members = new HashSet<TypeNode>();
-            foreach (Selection member in union.Members) members.UnionWith(Evaluate(member, position));
+            foreach (Selection member in union.Parts) members.UnionWith(Evaluate(member, position));
             return members;
         }
 
@@ -166,5 +166,28 @@ internal sealed class SelectionEvaluator
             throw new RuleEvaluationException(
                 $"the `{hatch}` predicate threw {ex.GetType().Name} on `{type.FullName}`: {ex.Message}");
         }
+    }
+
+    // The member-flavored guarded invoke (GRAMMAR §5.6): the member `.Where`/`.Must` escape hatches run
+    // here so a throwing predicate becomes a RuleError naming the member, not an aborted run — the exact
+    // shape of the type-side invoke above.
+    internal static bool InvokePredicate(Func<IMemberInfo, bool> predicate, IMemberInfo member, string hatch)
+    {
+        try
+        {
+            return predicate(member);
+        }
+        catch (Exception ex)
+        {
+            throw new RuleEvaluationException(
+                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{MemberIdentity(member)}`: {ex.Message}");
+        }
+    }
+
+    // The declaring-type-dot-member identity for a member escape-hatch error; the declaring type is always
+    // a TypeNode (IMemberInfo.DeclaringType), so its FullName is available for a fully-qualified name.
+    private static string MemberIdentity(IMemberInfo member)
+    {
+        return member.DeclaringType is TypeNode type ? $"{type.FullName}.{member.Name}" : member.Name;
     }
 }

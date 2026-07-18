@@ -8,8 +8,11 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     a passing rule, a ratcheted Migrate rule (its conventional baseline grandfathers InvoiceController's
 ///     DataTable but not HomeController's — so it fails red on the new site), a member-use Migrate rule
 ///     (uncaptured — both of HomeController's ambient-clock reads, <c>DateTime.Now</c> and
-///     <c>DateTime.UtcNow</c>, are red), an inert-target warning rule, a failing empty-subject rule, and
-///     a frozen billing scope whose containment is uncaptured (an explicit, deliberately-uncommitted
+///     <c>DateTime.UtcNow</c>, are red), a member-subject Migrate rule (uncaptured — both of
+///     HomeController's unsuffixed Task-returning methods, <c>Save</c> and <c>Load</c>, are red, exercising
+///     the <c>memberShape</c> kind and the <c>subjectMember</c> field), an inert-target warning rule, a
+///     failing empty-subject rule, and a frozen billing scope whose containment is uncaptured (an explicit,
+///     deliberately-uncommitted
 ///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>.
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
@@ -50,6 +53,17 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                     arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
             .Because("Wall-clock reads are untestable; inject IClock.")
             .Fix("Take IClock in the constructor; see OrderService for the pattern.");
+
+        // Migrate (ratcheted, member-subject): the conventional baseline path arch/baselines/naming/
+        // async-suffix.json is uncommitted, so both of HomeController's unsuffixed Task-returning methods
+        // (Save returning Task, Load returning Task<int> — the open-generic match) are red — the
+        // member-subject half of the report/JSON schema (the memberShape kind, the subjectMember field).
+        arch.Rule("naming/async-suffix")
+            .Migrate(
+                "Some Task-returning methods lack the Async suffix.",
+                web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
+            .Because("Async methods are discovered by their Async suffix.")
+            .Fix("Rename the method to end in Async and update its callers.");
 
         // Inert warning: the target pattern matches nothing, so the rule can never fire.
         arch.Rule("layering/no-ghost")

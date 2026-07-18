@@ -4,8 +4,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // Freeze tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
 // Clustered in one file: these records are one cohesive DTO, not product types.
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
-// §4.5) is null on every other kind and so omitted — the schema stays version 3, byte-identical for
-// specs without a member-target rule.
+// §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
+// §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
+// without a member-target or member-subject rule.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
 internal sealed record CheckJson(
@@ -43,6 +44,7 @@ internal sealed record ViolationJson(
     string? Target,
     string? TargetMember,
     string? Subject,
+    string? SubjectMember,
     string? Detail,
     IReadOnlyList<SiteJson> Sites);
 

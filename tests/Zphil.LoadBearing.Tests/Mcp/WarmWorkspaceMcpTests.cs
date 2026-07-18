@@ -28,6 +28,10 @@ public sealed class WarmWorkspaceMcpTests
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
 
+    private const string SaveMemberId = "M:MyApp.Web.HomeController.Save";
+    private const string LoadMemberId = "M:MyApp.Web.HomeController.Load";
+    private const string DeleteMemberId = "M:MyApp.Web.HomeController.Delete";
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -86,6 +90,39 @@ public sealed class WarmWorkspaceMcpTests
         // to two), the payload changed, and it is byte-identical to the cold run on the edited tree.
         NowSiteCount(before).ShouldBe(1);
         NowSiteCount(after).ShouldBe(2);
+        Normalize(after).ShouldNotBe(Normalize(before));
+        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+        // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
+    public async Task ArchCheck_UnsuffixedTaskMethodAddedOnDisk_ReflectsNewMemberShapeRedAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, whose member-subject Migrate rule
+        // naming/async-suffix (uncaptured) is already red on HomeController's two unsuffixed Task-returning
+        // methods Save/Load (GRAMMAR §4.6). This is the member-SUBJECT analog of the member-USE test above.
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+        // Act — append a THIRD unsuffixed Task-returning method (Delete) on disk, then re-check the still-warm
+        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        EditOnDisk(homeController, InsertUnsuffixedTaskMethod);
+        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        CliResult coldEdited = await CliRunner.InvokeAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the warm re-check reflects the new member-shape red (the async-suffix subject set grows from
+        // {Save, Load} to {Save, Load, Delete}, the new one keying its own M: DocId), the payload changed, and
+        // it is byte-identical to the cold run on the edited tree.
+        AsyncSuffixSubjectMembers(before).ShouldBe([SaveMemberId, LoadMemberId], true);
+        AsyncSuffixSubjectMembers(after).ShouldBe([SaveMemberId, LoadMemberId, DeleteMemberId], true);
         Normalize(after).ShouldNotBe(Normalize(before));
         Normalize(after).ShouldBe(Normalize(coldEdited.Out));
 
@@ -244,6 +281,26 @@ public sealed class WarmWorkspaceMcpTests
     {
         int lastBrace = source.LastIndexOf('}');
         return source[..lastBrace] + "    public System.DateTime ExportStampAgain() => System.DateTime.Now;\n}\n";
+    }
+
+    // Appends one more unsuffixed Task-returning method to HomeController — a third member-shape red under
+    // naming/async-suffix (GRAMMAR §4.6), minting its own member-subject violation identity (M:...Delete).
+    private static string InsertUnsuffixedTaskMethod(string source)
+    {
+        int lastBrace = source.LastIndexOf('}');
+        return source[..lastBrace]
+               + "    public System.Threading.Tasks.Task Delete() => System.Threading.Tasks.Task.CompletedTask;\n}\n";
+    }
+
+    // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
+    private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == "naming/async-suffix");
+        return rule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("subjectMember").GetString()!)
+            .ToList();
     }
 
     // The number of member-use sites reported for the banned DateTime.Now read under time/inject-clock.

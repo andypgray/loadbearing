@@ -13,7 +13,10 @@ namespace Zphil.LoadBearing.Cli;
 ///     matches a <see cref="ViolationKind.MemberUse" /> when it equals the member's full name
 ///     (no parens — <c>System.DateTime.Now</c>) or its member symbol ID (<c>P:System.DateTime.Now</c>);
 ///     a full-name target naming an overloaded method matches every overload, so the ambiguity error
-///     lists the distinct member IDs to retry with (GRAMMAR §4.5). Zero matches and ambiguous matches
+///     lists the distinct member IDs to retry with (GRAMMAR §4.5). A <c>--subject</c> likewise matches a
+///     <see cref="ViolationKind.MemberShape" /> by the member's full name (no parens —
+///     <c>MyApp.Web.HomeController.Save</c>) or its member symbol ID (<c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c>),
+///     with the same overload-ambiguity behavior (GRAMMAR §4.6). Zero matches and ambiguous matches
 ///     (two distinct identities) are loud <see cref="UserErrorException" />s listing the candidates —
 ///     the baseline records observed reality, so the valve only admits what is actually red. Pure over
 ///     the in-memory results, so ambiguity is unit-testable with synthetic nodes.
@@ -34,10 +37,29 @@ internal static class BaselineAddMatcher
     {
         var echo = $"--subject '{subject}'";
         var candidates = violations
-            .Where(v => v.Kind == ViolationKind.Shape && Matches(v.Subject!, subject))
+            .Where(v => MatchesSubject(v, subject))
             .ToList();
 
         return Resolve(ruleId, violations, candidates, echo);
+    }
+
+    // A --subject matches a type-shape violation on its subject type (FullName or T: symbol ID), or a
+    // member-shape violation on its subject member (member full name, no parens, or member symbol ID,
+    // GRAMMAR §4.6) — one full name covering every overload, exactly as a member --target does (§4.5).
+    private static bool MatchesSubject(Violation violation, string subject)
+    {
+        return violation.Kind switch
+        {
+            ViolationKind.Shape => Matches(violation.Subject!, subject),
+            ViolationKind.MemberShape => MatchesMemberSubject(violation.SubjectMember!, subject),
+            _ => false
+        };
+    }
+
+    private static bool MatchesMemberSubject(MemberNode member, string subject)
+    {
+        return string.Equals($"{((TypeNode)member.DeclaringType).FullName}.{member.Name}", subject, StringComparison.Ordinal)
+               || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
     }
 
     private static Violation Resolve(string ruleId, IReadOnlyList<Violation> violations, IReadOnlyList<Violation> candidates, string echo)
@@ -90,14 +112,16 @@ internal static class BaselineAddMatcher
         return string.Join(", ", identities.Select(SymbolForm).OrderBy(symbol => symbol, StringComparer.Ordinal));
     }
 
-    // A violation's full-name listing form: the subject for a shape, Source -> Target for a reference
-    // edge, Source -> member display for a member use. Shared with BaselineRunner's added-entry echo so
-    // the success message and the no-match candidate list render one way for every kind --add resolves.
+    // A violation's full-name listing form: the subject for a type shape, the member subject for a member
+    // shape, Source -> Target for a reference edge, Source -> member display for a member use. Shared with
+    // BaselineRunner's added-entry echo so the success message and the no-match candidate list render one
+    // way for every kind --add resolves.
     internal static string FullNameForm(Violation violation)
     {
         return violation.Kind switch
         {
             ViolationKind.Shape => violation.Subject!.FullName,
+            ViolationKind.MemberShape => MemberSubjectDisplay(violation.SubjectMember!),
             ViolationKind.MemberUse => $"{violation.Source!.FullName} -> {MemberDisplay(violation.Member!)}",
             _ => $"{violation.Source!.FullName} -> {violation.Target!.FullName}"
         };
@@ -109,6 +133,14 @@ internal static class BaselineAddMatcher
     {
         string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
         return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
+    }
+
+    // The offending member subject, same declaring-type-dot-member, () iff a method convention — so a
+    // member-shape candidate list echoes 'Save()' exactly as 'loadbearing check' renders it (GRAMMAR §4.6).
+    private static string MemberSubjectDisplay(MemberNode member)
+    {
+        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
+        return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
     }
 
     private static string SymbolForm(BaselineEntry identity)

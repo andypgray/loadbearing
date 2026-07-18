@@ -73,9 +73,10 @@ internal static class JsonReportRenderer
             : null;
     }
 
-    // A memberUse violation carries Source (the using type, as Reference does) and the banned member's
-    // raw symbol ID in targetMember; Target stays null. Every slot is null-omitted, so a report with no
-    // member violation is byte-identical to before (schemaVersion unchanged).
+    // A memberUse violation carries Source (the using type, as Reference does) and the banned member's raw
+    // symbol ID in targetMember; a memberShape violation carries the offending member's raw symbol ID in
+    // subjectMember (Subject/Target stay null). Every slot is null-omitted, so a report with no member
+    // violation is byte-identical to before (schemaVersion unchanged).
     private static ViolationJson ToViolation(Violation violation, string solutionDirectory)
     {
         return new ViolationJson(
@@ -84,6 +85,7 @@ internal static class JsonReportRenderer
             violation.Target?.FullName,
             violation.Member?.SymbolId,
             violation.Subject?.FullName,
+            violation.SubjectMember?.SymbolId,
             violation.Detail,
             violation.Sites.Select(s => new SiteJson(PathFormat.Relative(solutionDirectory, s.FilePath), s.Line)).ToList());
     }
