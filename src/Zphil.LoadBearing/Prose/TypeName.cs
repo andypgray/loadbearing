@@ -19,7 +19,15 @@ internal static class TypeName
         if (!type.IsGenericType) return type.Name;
 
         string baseName = StripArity(type.Name);
-        string arguments = string.Join(", ", type.GetGenericArguments().Select(Simple));
+
+        // A nested type's GetGenericArguments() lists the WHOLE chain's parameters, outermost-first; the leaf
+        // owns only the last IntroducedArity of them (the same distribution FullDisplay performs across the
+        // chain). A leaf that introduces none (a non-generic type nested in a generic one) has no <...> at all.
+        int arity = IntroducedArity(type);
+        if (arity == 0) return baseName;
+
+        var all = type.GetGenericArguments();
+        string arguments = string.Join(", ", all.Skip(all.Length - arity).Select(Simple));
         return baseName + "<" + arguments + ">";
     }
 
@@ -47,7 +55,9 @@ internal static class TypeName
     {
         if (type.IsByRef || type.IsPointer) throw new UnrepresentableTypeException(type);
 
-        if (type.IsArray) return FullDisplay(type.GetElementType()!) + "[]";
+        // Emit the array rank: a rank-1 (SZ) array is `[]`, a rank-2 is `[,]`, a rank-3 `[,,]`, matching the
+        // form Roslyn's SymbolDisplay produces (a dropped rank would silently conflate `Elem[]` and `Elem[,]`).
+        if (type.IsArray) return FullDisplay(type.GetElementType()!) + "[" + new string(',', type.GetArrayRank() - 1) + "]";
 
         if (type.IsGenericParameter) return type.Name;
 

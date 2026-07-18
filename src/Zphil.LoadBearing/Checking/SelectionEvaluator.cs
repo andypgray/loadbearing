@@ -63,7 +63,10 @@ internal sealed class SelectionEvaluator
                 string fullName = TypeNounFullName(typeNoun.Type);
                 return universe.Where(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal));
             default:
-                return Enumerable.Empty<TypeNode>();
+                // Fail closed (M4): the closed noun hierarchy makes this arm unreachable for any v1 noun. An
+                // unknown noun means a new noun without a switch arm; throw rather than select nothing (which
+                // would vacuously pass every shape verb over an empty subject). ArchChecker contains it per-rule.
+                throw new InvalidOperationException($"Unhandled selection noun '{noun.GetType().Name}'.");
         }
     }
 
@@ -122,7 +125,10 @@ internal sealed class SelectionEvaluator
             case WhereAdjective where:
                 return current.Where(t => InvokePredicate(where.Predicate, t, "Where"));
             default:
-                return current;
+                // Fail closed (M4): an unknown adjective would silently widen the selection — and in a
+                // MustOnly* target position a silently-widened allow-set is fail-open enforcement. A missing
+                // arm is a bug; throw (ArchChecker contains it per-rule) rather than pass the widened set through.
+                throw new InvalidOperationException($"Unhandled selection adjective '{adjective.GetType().Name}'.");
         }
     }
 

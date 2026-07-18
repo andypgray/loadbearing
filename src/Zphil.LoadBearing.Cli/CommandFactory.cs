@@ -38,15 +38,25 @@ internal static class CommandFactory
             Description =
                 "A git ref; files changed since it are checked against frozen scopes (Freeze tripwire) — warnings only, never failures."
         };
+        Option<bool> allowWorkspaceDiagnostics = new("--allow-workspace-diagnostics")
+        {
+            Description =
+                "Check against the partial model even when some projects fail to load, instead of failing the run "
+                + "with exit 2."
+        };
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
-        Command check = new("check", "Evaluate rules against a target solution.")
+        Command check = new(
+            "check",
+            "Evaluate rules against a target solution; a project that fails to load fails the run (exit 2) unless "
+            + "--allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
             json,
             diffBase,
+            allowWorkspaceDiagnostics,
             noCache,
             binlog
         };
@@ -60,7 +70,8 @@ internal static class CommandFactory
                 parseResult.GetValue(diffBase),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
-                parseResult.GetValue(binlog));
+                parseResult.GetValue(binlog),
+                parseResult.GetValue(allowWorkspaceDiagnostics));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;

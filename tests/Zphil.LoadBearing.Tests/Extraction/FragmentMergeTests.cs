@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     per-input-fragment refactor must reproduce byte-for-byte: first-declarer-wins node facts and
 ///     ProjectName, declaration-site union across declarers, declare-all-before-reference
 ///     (declared-beats-external globally), the reference-equality contract on constructions and edges,
-///     external-node sharing, and the same-project-name (multi-TFM) project union.
+///     external-node sharing, and the same-project-name (multi-TFM) project union. The final block pins the
+///     M2 same-FQN cross-project conflation notes that ride on top of first-declarer-wins.
 /// </summary>
 public sealed class FragmentMergeTests
 {
@@ -167,5 +168,91 @@ public sealed class FragmentMergeTests
         shared.IsExternal.ShouldBeTrue();
         model.Edge("N.CA", "System.Exception").Target.ShouldBeSameAs(shared);
         model.Edge("N2.CB", "System.Exception").Target.ShouldBeSameAs(shared);
+    }
+
+    // ── M2: same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void ExtractFromCompilations_SameFqnDeclaredByTwoDifferentProjects_RecordsCrossProjectMergeNote()
+    {
+        // Both Aproj and Bproj declare N.Dup. Aproj wins (input order), so Bproj's copy is invisible to
+        // arch.Project("Bproj") — the merge records one advisory note naming winner, loser, and consequence.
+        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", """
+                                                                              namespace N;
+                                                                              public class Dup {}
+                                                                              """));
+        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.MergeNotes.ShouldBe([
+            "Type 'N.Dup' is declared by projects 'Aproj' and 'Bproj'; its facts and project attribution "
+            + "follow 'Aproj' (the first declarer), so arch.Project('Bproj') selections will not include it."
+        ]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameFqnSameProjectNameTwice_RecordsNoMergeNote()
+    {
+        // One project's two target frameworks declare the same FQN under the same name — the legitimate
+        // multi-TFM union, not a conflation. It must stay silent.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            """);
+        var first = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Legacy"]);
+        var second = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Modern"]);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.MergeNotes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_DistinctFqnsAcrossProjects_HasNoMergeNotes()
+    {
+        // The common case: two projects, no shared FQN → nothing to conflate → the notes list stays empty
+        // (so a merge-note-free model — every existing golden — is byte-identical).
+        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", """
+                                                                              namespace N;
+                                                                              public class A {}
+                                                                              """));
+        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", """
+                                                                               namespace N;
+                                                                               public class B {}
+                                                                               """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.MergeNotes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_CrossProjectLoserDeclaredInTwoFrameworks_RecordsExactlyOneNote()
+    {
+        // Winner Aproj declares N.Dup once; loser Bproj declares it in two frameworks. The (FQN, loser)
+        // dedup collapses the loser's two declarations to a single note.
+        CompilationInput winner = CompilationFactory.Compile("Aproj", ("A.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+        var loserFirst = new CompilationInput(
+            CompilationFactory.Compile("Bproj", ("B.cs", """
+                                                         namespace N;
+                                                         public class Dup {}
+                                                         """)).Compilation, "Bproj", ["Legacy"]);
+        var loserSecond = new CompilationInput(
+            CompilationFactory.Compile("Bproj", ("B.cs", """
+                                                         namespace N;
+                                                         public class Dup {}
+                                                         """)).Compilation, "Bproj", ["Modern"]);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, loserFirst, loserSecond]);
+
+        model.MergeNotes.Count.ShouldBe(1);
+        model.MergeNotes[0].ShouldContain("declared by projects 'Aproj' and 'Bproj'");
     }
 }

@@ -117,10 +117,11 @@ public sealed class CheckCacheE2ETests
     //
     // These pin the workspace-free spec resolution a hit performs. The member-spec (convention/csproj)
     // *exclude* on a hit shares the one Retain filter the cold path already exercises under SelfSpecTests
-    // (which extracts all projects and merges minus the arch-spec project), so it is covered there; a
-    // full-repo hit is not asserted end-to-end because this repo's test project embeds non-compiled fixture
-    // sources under its own directory, which the store's cone scan always reports as adds — a solution-shape
-    // quirk that keeps that one project perpetually dirty, unrelated to the spec-replay path under test here.
+    // (which extracts all projects and merges minus the arch-spec project), so it is covered there. A
+    // full-repo hit was once impossible to assert end-to-end because this repo's test project embeds
+    // non-compiled fixture sources under its own directory, and the store's cone scan read them as perpetual
+    // adds; the H1 fix (cone-adds recorded identically at capture and validation) cures that, but these
+    // targeted cases stay the right level to pin the spec-replay path without a whole-repo build.
 
     [Fact]
     public void ResolveSpecOnHit_ExplicitDllPresent_ResolvesWithoutAnyRecord()
@@ -212,7 +213,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null), Ct);
+            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

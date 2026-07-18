@@ -84,7 +84,11 @@ internal sealed class ConstraintEvaluator
             case MustConstraint c:
                 return Shape(subjects, t => SelectionEvaluator.InvokePredicate(c.Predicate, t, "Must"));
             default:
-                return (Array.Empty<Violation>(), NoWarnings);
+                // Fail closed (M4): the closed Constraint hierarchy makes this arm unreachable for any v1
+                // verb, so an unknown subclass means a new verb shipped without a switch arm. Surface it
+                // loudly — ArchChecker.CheckRule contains the throw as a per-rule RuleError — rather than
+                // passing the rule silently (a missing arm must never read green).
+                throw new InvalidOperationException($"Unhandled constraint '{constraint.GetType().Name}'.");
         }
     }
 
@@ -214,7 +218,9 @@ internal sealed class ConstraintEvaluator
             case MemberMustConstraint c:
                 return MemberShape(members, m => SelectionEvaluator.InvokePredicate(c.Predicate, m, "Must"));
             default:
-                return (Array.Empty<Violation>(), NoWarnings);
+                // Fail closed (M4): as with the type-subject switch, an unhandled member verb is a missing
+                // arm, not a pass — throw so it surfaces (contained per-rule by ArchChecker), never green.
+                throw new InvalidOperationException($"Unhandled member constraint '{constraint.GetType().Name}'.");
         }
     }
 

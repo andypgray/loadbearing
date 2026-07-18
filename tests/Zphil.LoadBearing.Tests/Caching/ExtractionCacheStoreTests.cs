@@ -33,21 +33,42 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion2_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion3_ReturnsMiss()
     {
-        // Arrange — a v2 cache predates the member inventory (Phase 14 WP2 bumped the schema to 3): its
-        // fragments carry member-use edges but no DeclaredMembers.
+        // Arrange — a v3 cache predates the H1 fix (schema bumped 3→4): its content/Merkle keys were built by
+        // a CaptureFingerprint that hardcoded cone-adds=[], so they are not comparable to a v4 capture's keys.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
-        // Act — downgrade the recorded schema to the pre-inventory version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 2);
+        // Act — downgrade the recorded schema to the immediately-prior version.
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 3);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void ReadAndValidate_ExcludedStrayInCone_StillHits()
+    {
+        // Arrange — a *.cs on disk in the project cone but not among the project's documents (a <Compile
+        // Remove> file). This is the H1 defect: CaptureFingerprint recorded adds=[] while validation's cone
+        // scan reads the stray as an add, so the project's content key never matched and it validated dirty
+        // forever. Capture now computes adds the same way, so the stray lands in both and cancels.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.AddStrayFile("A", Path.Combine("Snippets", "Excluded.cs"), "class Excluded {}");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+
+        // Act — steady-state revalidation with the stray untouched.
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — a clean hit, not a perpetual Partial.
+        result.Outcome.ShouldBe(CacheOutcome.Hit);
     }
 
     [Fact]
@@ -322,6 +343,15 @@ public sealed class ExtractionCacheStoreTests
 
             var inputs = new ProjectInputs(name, csproj, directory, references, documentPaths);
             projects.Add(inputs);
+        }
+
+        // Writes a *.cs into an existing project's directory WITHOUT recording it as a document — the
+        // on-disk-but-excluded stray (a <Compile Remove> file) the cone scan sees but the compiler does not.
+        public void AddStrayFile(string project, string relativePath, string content)
+        {
+            string path = Path.Combine(Root, project, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, content);
         }
 
         public string PathOf(string project, string file)

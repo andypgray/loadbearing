@@ -11,6 +11,13 @@ namespace Zphil.LoadBearing.Cli;
 ///     The explicit <c>--binlog</c> path to replay instead of a design-time build, or null to auto-select
 ///     (a valid build capture if one exists, else a design-time build). Roslyn-free — the gate acts on it.
 /// </param>
+/// <param name="AllowWorkspaceDiagnostics">
+///     Whether to check against the partial model when a project fails to load. Default (<c>false</c>):
+///     any workspace-load failure diagnostic fails the run with exit 2, overriding the 0/1 verdict, because
+///     a rule that "passes" only because a project did not load is worse than no answer. <c>true</c> opts
+///     back into the prior behavior — the diagnostics print as warnings and the run exits 0/1. Keys strictly
+///     on workspace-load failures, never on the advisory merge notes that share the diagnostics stream.
+/// </param>
 internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
@@ -18,4 +25,5 @@ internal sealed record CheckRequest(
     string? DiffBase,
     string WorkingDirectory,
     bool NoCache,
-    string? Binlog);
+    string? Binlog,
+    bool AllowWorkspaceDiagnostics);

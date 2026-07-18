@@ -7,6 +7,7 @@ internal sealed class ScopeBuilder(ScopeRegistration registration) : IScopeBuild
 {
     public IFrozenScope Freeze(Selection selection)
     {
+        registration.FreezeCount++;
         registration.Frozen = Guard.NotNull(selection, nameof(selection));
         return new FrozenScopeBuilder(registration);
     }

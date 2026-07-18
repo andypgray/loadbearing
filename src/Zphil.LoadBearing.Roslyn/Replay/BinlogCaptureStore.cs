@@ -84,7 +84,10 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 /// </remarks>
 internal sealed class BinlogCaptureStore
 {
-    private const int CurrentSchemaVersion = 1;
+    // v2 (post-review H1): each project entry now records its cone-file membership at ingest so the cone scan
+    // no longer reads an excluded stray *.cs as a perpetual add. A v1 manifest has no ConeFiles, so it degrades
+    // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
+    private const int CurrentSchemaVersion = 2;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
     internal const string UnreadableNotice =
@@ -155,6 +158,13 @@ internal sealed class BinlogCaptureStore
                + "Build the whole solution with -bl and pass that binlog.";
     }
 
+    /// <summary>The refusal text when the capture target is a solution filter (.slnf) rather than a full solution.</summary>
+    internal static string SolutionFilterNotSupportedMessage(string solutionFileName)
+    {
+        return $"'{solutionFileName}' is a solution filter (.slnf); build captures require the full solution. "
+               + "Pass the .sln/.slnx instead.";
+    }
+
     /// <summary>The refusal text when the binlog contains a project the solution does not list.</summary>
     internal static string ExtraCoverageMessage(
         string binlogArgument, string solutionFileName, IEnumerable<string> extraCsprojs)
@@ -190,6 +200,13 @@ internal sealed class BinlogCaptureStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogFullPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
+
+        // A solution filter narrows a build to a subset; a capture keyed on it would silently shrink the
+        // model. Refuse it explicitly and early — the coverage check would otherwise report a misleading
+        // "zero members" mismatch (the .slnf parses to no csproj members). The cold .slnf path via
+        // MSBuildWorkspace is unaffected: this guard is only about persisting a build capture.
+        if (solutionPath.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase))
+            throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
         var projects = CollectProjects(replayedSolution);
         var structuralPaths = DedupedStructuralPaths(projects);
@@ -359,22 +376,16 @@ internal sealed class BinlogCaptureStore
         return (false, RefreshStamp(stamp.Path, current, sha));
     }
 
-    // Enumerates *.cs under the project directory (skipping bin/obj) and returns the first not already
-    // recorded — the SDK-glob add a stat sweep cannot see. Sorted so "first" is deterministic.
+    // Enumerates the project cone's *.cs and returns the first present in neither the recorded ConeFiles nor
+    // the compiled DocumentPaths — the SDK-glob add a stat sweep cannot see. An excluded stray that was in the
+    // cone at ingest is in ConeFiles, so it is not read as an add; only a file new since ingest trips this.
+    // Sorted so "first" is deterministic.
     private static string? FirstConeAdd(CaptureProjectEntry project)
     {
-        if (!Directory.Exists(project.ProjectDirectory)) return null;
-
         var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
-        var adds = new List<string>();
-        foreach (string file in Directory.EnumerateFiles(project.ProjectDirectory, "*.cs", SearchOption.AllDirectories))
-        {
-            if (IsBuildArtifact(project.ProjectDirectory, file)) continue;
+        known.UnionWith(project.ConeFiles);
 
-            string full = Path.GetFullPath(file);
-            if (!known.Contains(full)) adds.Add(full);
-        }
-
+        var adds = ProjectCone.Enumerate(project.ProjectDirectory).Where(full => !known.Contains(full)).ToList();
         adds.Sort(StringComparer.Ordinal);
         return adds.Count > 0 ? adds[0] : null;
     }
@@ -433,14 +444,13 @@ internal sealed class BinlogCaptureStore
     {
         string fullSolution = Path.GetFullPath(solutionPath);
         yield return fullSolution;
-        string solutionDirectory = Path.GetDirectoryName(fullSolution)!;
 
         foreach (CaptureProjectEntry project in projects)
         {
             yield return project.CsprojPath;
             yield return AssetsPathOf(project.ProjectDirectory);
 
-            foreach (string ancestor in AncestorsUpTo(project.ProjectDirectory, solutionDirectory))
+            foreach (string ancestor in ProjectCone.Ancestors(project.ProjectDirectory))
             foreach (string probe in StructuralProbeFileNames)
                 yield return Path.Combine(ancestor, probe);
         }
@@ -449,23 +459,6 @@ internal sealed class BinlogCaptureStore
     private static string AssetsPathOf(string projectDirectory)
     {
         return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
-    }
-
-    private static IEnumerable<string> AncestorsUpTo(string startDirectory, string stopDirectory)
-    {
-        string? directory = startDirectory;
-        while (directory is not null)
-        {
-            yield return directory;
-            if (string.Equals(directory, stopDirectory, StringComparison.OrdinalIgnoreCase)) yield break;
-            directory = Path.GetDirectoryName(directory);
-        }
-    }
-
-    private static bool IsBuildArtifact(string projectDirectory, string file)
-    {
-        string relative = Path.GetRelativePath(projectDirectory, file).Replace('\\', '/');
-        return relative.Split('/').Any(segment => segment is "bin" or "obj");
     }
 
     // ── stamping + hashing (mirrors ExtractionCacheStore) ────────────────────────────────────────────────
@@ -519,19 +512,15 @@ internal sealed class BinlogCaptureStore
 
     private bool TryWriteManifestAtomic(CaptureManifest manifest)
     {
-        string tempPath = Path.Combine(cacheDirectory, $"{Path.GetFileName(captureManifestPath)}.{Guid.NewGuid():N}.tmp");
         try
         {
-            Directory.CreateDirectory(cacheDirectory);
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ExtractionCacheStore.JsonOptions);
-            File.WriteAllBytes(tempPath, bytes);
-            File.Move(tempPath, captureManifestPath, true);
+            AtomicFile.WriteAllBytes(captureManifestPath, bytes);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            TryDelete(tempPath);
-            return false;
+            return false; // the capture is disposable — a failed write is re-captured next run, never an error
         }
     }
 
@@ -592,7 +581,9 @@ internal sealed class BinlogCaptureStore
 
         public CaptureProjectEntry ToEntry()
         {
-            return new CaptureProjectEntry(ProjectName, csprojPath, projectDirectory, Documents.ToList());
+            // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
+            var coneFiles = ProjectCone.Enumerate(projectDirectory).OrderBy(p => p, StringComparer.Ordinal).ToList();
+            return new CaptureProjectEntry(ProjectName, csprojPath, projectDirectory, Documents.ToList(), coneFiles);
         }
     }
 }

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn.Baselines;
 
@@ -100,8 +101,11 @@ internal static class BaselineStore
         if (File.Exists(absolutePath) && NormalizeNewlines(File.ReadAllText(absolutePath)) == composed)
             return WriteOutcome.Unchanged;
 
-        Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
-        File.WriteAllText(absolutePath, composed, new UTF8Encoding(false));
+        // A baseline is a committed, version-controlled file, so the write is atomic: a crash mid-write
+        // must not truncate it. UTF-8 no BOM — byte-identical to the prior File.WriteAllText, since
+        // UTF8Encoding(false) emits no preamble (the round-trip pins are the oracle).
+        byte[] bytes = new UTF8Encoding(false).GetBytes(composed);
+        AtomicFile.WriteAllBytes(absolutePath, bytes);
         return WriteOutcome.Wrote;
     }
 

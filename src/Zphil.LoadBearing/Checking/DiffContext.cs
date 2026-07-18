@@ -25,16 +25,13 @@ public sealed class DiffContext
     /// </summary>
     public DiffContext(string baseRef, string solutionDirectory, IEnumerable<string> changedFiles)
     {
-        BaseRef = Guard.NotNull(baseRef, nameof(baseRef));
+        Guard.NotNull(baseRef, nameof(baseRef));
         SolutionDirectory = Normalize(Guard.NotNull(solutionDirectory, nameof(solutionDirectory))).TrimEnd('/');
         _solutionPrefix = SolutionDirectory + "/";
         _changed = new HashSet<string>(PathComparison.Comparer);
         foreach (string file in Guard.NotNull(changedFiles, nameof(changedFiles))) _changed.Add(Normalize(file));
         ChangedFiles = _changed;
     }
-
-    /// <summary>The git ref the diff was taken against (echoed into <c>check --json</c>).</summary>
-    public string BaseRef { get; }
 
     /// <summary>The solution directory, normalized to forward slashes with no trailing slash.</summary>
     public string SolutionDirectory { get; }

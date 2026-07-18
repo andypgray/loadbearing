@@ -34,6 +34,13 @@ internal static class ResponseTruncator
         int cutPoint = text.LastIndexOf('\n', maxChars - 1);
         if (cutPoint <= 0) cutPoint = maxChars;
 
+        // Never cut between the high and low half of a UTF-16 surrogate pair (that strands a lone surrogate —
+        // a broken astral char, e.g. an emoji). When the character kept just before the cut is a high
+        // surrogate and the one dropped at the cut is its low surrogate, step back one so the pair stays whole.
+        if (cutPoint > 0 && cutPoint < text.Length
+                         && char.IsHighSurrogate(text[cutPoint - 1]) && char.IsLowSurrogate(text[cutPoint]))
+            cutPoint--;
+
         string truncated = text[..cutPoint];
         int droppedChars = text.Length - cutPoint;
 

@@ -11,6 +11,13 @@ internal sealed class ScopeRegistration(string id) : Registration(id)
     /// <summary>The frozen selection, or null when <c>Freeze</c> was not called.</summary>
     internal Selection? Frozen { get; set; }
 
+    /// <summary>
+    ///     How many times <c>Freeze</c> was called. The stage machine (§3.2) forbids a fluent double-call,
+    ///     but a stored <c>IScopeBuilder</c> reference is mutable, so a second <c>Freeze</c> silently
+    ///     overwrites the frozen selection; a count &gt; 1 is the repeated-posture error (§8 item 17).
+    /// </summary>
+    internal int FreezeCount { get; set; }
+
     /// <summary>The accumulated boundary types across every <c>BoundaryOnlyVia</c> call.</summary>
     internal List<Type> Boundary { get; } = [];
 

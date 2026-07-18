@@ -24,4 +24,6 @@ public class UsesNested : IBox<Outer.Inner>;
 
 public class UsesArray : IBox<Simple[]>;
 
+public class UsesRank2Array : IBox<Simple[,]>;
+
 public class UsesGenericInGeneric : IBox<Pair<Simple, int>>;

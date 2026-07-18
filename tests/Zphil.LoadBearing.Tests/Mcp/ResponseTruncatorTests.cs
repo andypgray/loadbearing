@@ -66,6 +66,23 @@ public sealed class ResponseTruncatorTests
     }
 
     [Fact]
+    public void TruncateIfNeeded_CutFallsBetweenSurrogatePair_StepsBackSoNoLoneSurrogateRemains()
+    {
+        const int maxChars = 10;
+        // Nine ASCII chars, then "😀" (U+1F600 = two UTF-16 units): its HIGH surrogate lands at index 9 and
+        // its LOW surrogate at index 10, so a naive cut at the cap keeps a lone high surrogate. Trailing
+        // filler (no newline) forces the no-newline cut-at-cap path.
+        string text = new string('a', maxChars - 1) + "\U0001F600" + new string('b', maxChars);
+
+        string result = ResponseTruncator.TruncateIfNeeded(text, null, maxChars);
+
+        // The kept prefix stops before the split emoji — nine 'a's, no dangling surrogate.
+        string kept = result[..result.IndexOf('\n')];
+        kept.ShouldBe(new string('a', maxChars - 1));
+        char.IsHighSurrogate(kept[^1]).ShouldBeFalse();
+    }
+
+    [Fact]
     public void TruncateIfNeeded_TextExceedsLimit_FooterReportsSizeAndOmittedCountAndNoHint()
     {
         string text = new('x', 50);

@@ -37,4 +37,33 @@ public class NamespacePatternTests
     {
         new NamespacePattern("MyApp.Domain").Matches("myapp.domain").ShouldBeFalse();
     }
+
+    [Theory]
+    // Well-formed globs — every row of the match table above, plus the interior single-segment wildcard.
+    [InlineData("MyApp.Domain.*")]
+    [InlineData("MyApp.Domain")]
+    [InlineData("MyApp.*.Orders")]
+    [InlineData("MyApp.Legacy*")]
+    [InlineData("*")]
+    public void Validate_WellFormedGlob_ReturnsNull(string pattern)
+    {
+        NamespacePattern.Validate(pattern).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_BlankGlob_ReturnsBlankReason(string pattern)
+    {
+        NamespacePattern.Validate(pattern).ShouldBe("is blank");
+    }
+
+    [Fact]
+    public void Validate_WildcardInSubtreePrefix_ReturnsDeadSubtreeReason()
+    {
+        // The trailing `.*` prefix is matched literally, so a `*` there can never match (GRAMMAR §8 item 16).
+        NamespacePattern.Validate("MyApp.*.Controllers.*")
+            .ShouldBe("has a trailing `.*` subtree operator but its literal prefix contains a `*`, " +
+                      "which never matches; anchor the subtree on a literal prefix");
+    }
 }

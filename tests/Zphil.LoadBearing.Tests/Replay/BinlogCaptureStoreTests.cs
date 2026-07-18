@@ -191,6 +191,24 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     }
 
     [Fact]
+    public void Validate_ExcludedStrayInCone_StaysUsableWithNoNotice()
+    {
+        // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
+        // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. Before the
+        // H1 fix the cone scan read it as an add and invalidated the capture on every run; the ConeFiles
+        // snapshot recorded at ingest now covers it. This static-fixture stray needs no revert.
+        BinlogCaptureStore store = IngestFullCapture();
+        File.Exists(Fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs")).ShouldBeTrue();
+
+        // Act
+        CaptureValidation validation = store.Validate();
+
+        // Assert — Usable, and specifically with no stale/unreadable notice.
+        validation.State.ShouldBe(CaptureState.Usable);
+        validation.Notice.ShouldBeNull();
+    }
+
+    [Fact]
     public void Validate_DeletedRecordedDocument_InvalidNamingFile()
     {
         // Arrange
@@ -347,6 +365,19 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     }
 
     [Fact]
+    public void Ingest_SlnfSolution_RefusesEarlyWithSolutionFilterMessage()
+    {
+        // A store over a .slnf: Ingest must refuse before touching the solution (an empty AdhocWorkspace
+        // solution proves it never reaches CollectProjects/coverage, which is where the misleading
+        // zero-members "coverage" message used to come from).
+        var store = new BinlogCaptureStore(Path.Combine(_cacheRoot, "App.slnf"), _cacheRoot);
+        Solution empty = new AdhocWorkspace().CurrentSolution;
+
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(empty, "build.binlog", "build.binlog"));
+        ex.Message.ShouldBe(BinlogCaptureStore.SolutionFilterNotSupportedMessage("App.slnf"));
+    }
+
+    [Fact]
     public void Ingest_BinlogHasProjectNotInSolution_ThrowsExtraCoverageRefusal()
     {
         // Arrange — a reduced solution missing the MyApp.Web member; the full binlog builds it anyway.
@@ -390,6 +421,13 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         BinlogCaptureStore.ExtraCoverageMessage("build.binlog", "App.sln", [@"C:\repo\Extra\Extra.csproj"])
             .ShouldBe("--binlog 'build.binlog' contains projects that are not in 'App.sln':\n  C:\\repo\\Extra\\Extra.csproj\nPass a .binlog produced by building exactly this solution.");
+    }
+
+    [Fact]
+    public void SolutionFilterNotSupportedMessage_RendersDictatedText()
+    {
+        BinlogCaptureStore.SolutionFilterNotSupportedMessage("App.slnf")
+            .ShouldBe("'App.slnf' is a solution filter (.slnf); build captures require the full solution. Pass the .sln/.slnx instead.");
     }
 
     [Fact]

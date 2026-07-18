@@ -35,9 +35,6 @@ namespace Zphil.LoadBearing.Xunit;
 /// <typeparam name="TSpec">The architecture spec to check — must be default-constructible.</typeparam>
 public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new()
 {
-    private static readonly object Gate = new();
-    private static Task<ArchCheckRun>? s_run;
-
     /// <summary>The solution (<c>.sln</c>/<c>.slnx</c>) to check the spec against.</summary>
     protected abstract string SolutionPath { get; }
 
@@ -169,4 +166,12 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     private sealed record ArchCheckRun(IReadOnlyDictionary<string, RuleResult> ResultsById, string SolutionDirectory);
+
+    // Per-closed-generic statics are load-bearing: each ArchRuleTests<TSpec> caches ITS spec's single check
+    // run (per-TSpec caching is the whole point of the design), so these must NOT be shared across TSpec.
+    // ReSharper disable StaticMemberInGenericType
+    private static readonly object Gate = new();
+
+    private static Task<ArchCheckRun>? s_run;
+    // ReSharper restore StaticMemberInGenericType
 }

@@ -75,7 +75,10 @@ internal sealed class MemberSelectionEvaluator
             case MemberWhereAdjective where:
                 return current.Where(member => SelectionEvaluator.InvokePredicate(where.Predicate, member, "Where"));
             default:
-                return current;
+                // Fail closed (M4): an unknown member adjective would silently widen the member set. The kind
+                // filter's Any arm (KindFilter) is a legitimate total match; a missing adjective arm is a bug —
+                // throw (ArchChecker contains it per-rule) rather than pass the un-narrowed set through.
+                throw new InvalidOperationException($"Unhandled member adjective '{adjective.GetType().Name}'.");
         }
     }
 

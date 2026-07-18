@@ -137,6 +137,30 @@ public sealed class WorkspaceSessionTests
     }
 
     [Fact]
+    public async Task GetCurrentAsync_ExcludedStrayInCone_NeverReloadsAndStaysOutOfModel()
+    {
+        // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
+        // disk but is never compiled. Before the H1 fix the cone scan compared the disk against the COMPILED
+        // document set, so this stray read as a perpetual add and forced a full reload on every single call.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        long reloadsBefore = session.FullReloadCount;
+        File.Exists(fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs")).ShouldBeTrue();
+
+        // Act — two more reconcile sweeps with disk untouched.
+        await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(fixture.SolutionPath, ct);
+
+        // Assert — the stray is recorded cone membership, so it never trips the scan (zero reloads) and never
+        // enters the extracted model — the two halves of "a removed file is not a compiled document".
+        (session.FullReloadCount - reloadsBefore).ShouldBe(0);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: ct);
+        model.Types.ShouldNotContain(t => t.FullName == "MyApp.Domain.Snippets.ExcludedScratchTypeMustNeverAppearInTheModel");
+    }
+
+    [Fact]
     public async Task GetCurrentAsync_CsprojTouched_TriggersReload()
     {
         // Arrange

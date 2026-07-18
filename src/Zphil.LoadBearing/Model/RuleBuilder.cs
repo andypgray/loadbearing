@@ -7,6 +7,7 @@ internal sealed class RuleBuilder(RuleRegistration registration) : IRuleBuilder
 {
     public IEnforceRule Enforce(Constraint constraint)
     {
+        registration.PostureCount++;
         registration.Posture = Posture.Enforce;
         registration.Constraint = Guard.NotNull(constraint, nameof(constraint));
         return new EnforceRuleBuilder(registration);
@@ -14,6 +15,7 @@ internal sealed class RuleBuilder(RuleRegistration registration) : IRuleBuilder
 
     public IMigrateRule Migrate(string from, Constraint to)
     {
+        registration.PostureCount++;
         registration.Posture = Posture.Migrate;
         registration.MigrateFrom = from;
         registration.Constraint = Guard.NotNull(to, nameof(to));

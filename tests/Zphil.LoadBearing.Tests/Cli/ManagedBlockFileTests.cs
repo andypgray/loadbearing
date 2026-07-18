@@ -11,7 +11,9 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     The byte-level file adapter (R1): a new file is written UTF-8 with no BOM; an existing file's
 ///     BOM state is preserved exactly (the pin that <c>File.ReadAllText</c> would silently lose); an
 ///     unchanged re-splice reports Unchanged with byte-identical output; a malformed block becomes a
-///     file-naming <see cref="UserErrorException" />.
+///     file-naming <see cref="UserErrorException" />; and a file that is not valid UTF-8 — invalid bytes
+///     or a UTF-16 BOM — is refused with a file-naming <see cref="UserErrorException" /> and left byte-for-byte
+///     untouched (L1), never decoded lossily and rewritten as replacement characters.
 /// </summary>
 public sealed class ManagedBlockFileTests
 {
@@ -93,6 +95,46 @@ public sealed class ManagedBlockFileTests
 
             var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
             error.Message.ShouldContain(path);
+        });
+    }
+
+    [Fact]
+    public void Splice_InvalidUtf8File_RefusesAndLeavesFileUntouched()
+    {
+        WithTempDir(dir =>
+        {
+            string path = Path.Combine(dir, "AGENTS.md");
+            // A lone 0x80 continuation byte with no lead byte — invalid UTF-8 that a lenient decoder would
+            // silently turn into U+FFFD and then write back, destroying the file (the L1 defect).
+            byte[] invalid = [0x41, 0x80, 0x42];
+            File.WriteAllBytes(path, invalid);
+
+            var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
+
+            error.Message.ShouldBe(
+                $"{path}: not valid UTF-8. LoadBearing manages a UTF-8 AGENTS.md block and refuses a file it "
+                + "cannot decode rather than rewriting it with replacement characters; convert it to UTF-8 and re-render.");
+            File.ReadAllBytes(path).ShouldBe(invalid); // refused, not rewritten
+        });
+    }
+
+    [Fact]
+    public void Splice_Utf16LeBomFile_RefusesFlaggingUtf16()
+    {
+        WithTempDir(dir =>
+        {
+            string path = Path.Combine(dir, "AGENTS.md");
+            // A UTF-16 LE file: the FF FE BOM then "# Title" as UTF-16. A generic "invalid UTF-8" message
+            // would be true but unhelpful; the adapter names the encoding so the fix is obvious.
+            byte[] utf16 = [0xFF, 0xFE, .. Encoding.Unicode.GetBytes("# Title")];
+            File.WriteAllBytes(path, utf16);
+
+            var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
+
+            error.Message.ShouldBe(
+                $"{path}: looks like UTF-16 (a leading byte-order mark). LoadBearing manages UTF-8 files only; "
+                + "convert it to UTF-8 and re-render.");
+            File.ReadAllBytes(path).ShouldBe(utf16); // refused, not rewritten
         });
     }
 

@@ -1,6 +1,4 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Zphil.LoadBearing.Checking;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
@@ -8,19 +6,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <summary>
 ///     Renders a <see cref="CheckReport" /> as the <c>status --json</c> document (its own schemaVersion 2)
 ///     — burndown counts per ratcheted rule (Migrate and Freeze containment) plus, for Migrate, the
-///     promotion flag (omitted for freeze). Same serializer options as <see cref="JsonReportRenderer" />;
+///     promotion flag (omitted for freeze). Uses the shared <see cref="LoadBearingJson.Options" />;
 ///     machine-independent (<c>solution</c>/<c>specAssembly</c> are file names).
 /// </summary>
 internal static class StatusJsonRenderer
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-
     public static void Render(TextWriter output, CheckReport report, string solutionName, string specAssembly)
     {
         var document = new StatusJson(
@@ -32,7 +22,7 @@ internal static class StatusJsonRenderer
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.GrandfatheredCount, report.StaleBaselineEntryCount));
 
-        output.WriteLine(JsonSerializer.Serialize(document, Options));
+        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Options));
     }
 
     private static StatusRuleJson ToRule(RuleResult result)

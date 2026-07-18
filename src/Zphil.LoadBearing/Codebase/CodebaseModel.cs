@@ -7,7 +7,8 @@ namespace Zphil.LoadBearing.Codebase;
 ///     <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source FullName, target
 ///     FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
 ///     <see cref="MemberReference.SymbolId" />) (ordinal), and <see cref="Projects" /> by
-///     <see cref="ProjectNode.Name" /> (ordinal).
+///     <see cref="ProjectNode.Name" /> (ordinal). <see cref="MergeNotes" /> carries the advisory
+///     diagnostics the fragment merge raised while assembling this model.
 /// </summary>
 public sealed class CodebaseModel
 {
@@ -15,12 +16,14 @@ public sealed class CodebaseModel
         IReadOnlyList<TypeNode> types,
         IReadOnlyList<ReferenceEdge> edges,
         IReadOnlyList<MemberEdge> memberEdges,
-        IReadOnlyList<ProjectNode> projects)
+        IReadOnlyList<ProjectNode> projects,
+        IReadOnlyList<string> mergeNotes)
     {
         Types = types;
         Edges = edges;
         MemberEdges = memberEdges;
         Projects = projects;
+        MergeNotes = mergeNotes;
     }
 
     /// <summary>All types — solution-declared and shallow external nodes — ordered by FullName.</summary>
@@ -38,4 +41,17 @@ public sealed class CodebaseModel
 
     /// <summary>All projects, ordered by name.</summary>
     public IReadOnlyList<ProjectNode> Projects { get; }
+
+    /// <summary>
+    ///     Advisory notes the fragment merge raised while assembling this model, ordinal-ordered so the
+    ///     list is stable across runs. In v1 the sole source is same-FQN cross-project conflation: two
+    ///     <em>differently named</em> projects declaring one fully-qualified type name, where the first
+    ///     declarer wins the node's facts and <see cref="TypeNode.ProjectName" /> and the loser's copy is
+    ///     therefore invisible to <c>arch.Project</c> selections. Purely informational — the model is
+    ///     complete and correct, just ambiguous in its project attribution — so these never denote a
+    ///     failed load and never gate <c>check</c> (unlike workspace-load diagnostics). Empty for the
+    ///     overwhelming common case, including a project's own several target frameworks (same name,
+    ///     silent).
+    /// </summary>
+    public IReadOnlyList<string> MergeNotes { get; }
 }

@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     the CLI, the MCP tools, and the xUnit adapter all share one path-formatting rule.
 /// </summary>
 /// <remarks>
-///     <see cref="System.IO.Path.GetRelativePath" /> does not exist on netstandard2.0, so the relative
+///     <c>Path.GetRelativePath</c> does not exist on netstandard2.0, so the relative
 ///     walk is hand-rolled to match its semantics: full-path both operands, compare directory segments
 ///     with the platform's file-name comparison (case-insensitive on Windows and macOS, ordinal on
 ///     Linux), and emit <c>../</c> per unmatched base segment followed by the remaining target segments.

@@ -47,6 +47,19 @@ internal static class CompilationFactory
         return CodebaseExtractor.ExtractFromCompilations([Compile("TestProject", source)]);
     }
 
+    /// <summary>
+    ///     Extract a model from a <see cref="OutputKind.ConsoleApplication" /> compilation — the output kind
+    ///     that makes Roslyn synthesize the top-level-statements <c>Program</c> entry point (a library has no
+    ///     entry point, so this is the only way to exercise it on the fast path).
+    /// </summary>
+    public static CodebaseModel ExtractConsoleApp(params (string Path, string Source)[] files)
+    {
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path)).ToArray();
+        var compilation = CSharpCompilation.Create(
+            "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+    }
+
     /// <summary>Multi-file convenience: extract a model from several files in one project.</summary>
     public static CodebaseModel Extract(string projectName, params (string Path, string Source)[] files)
     {

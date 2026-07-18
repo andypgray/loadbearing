@@ -28,6 +28,7 @@ public sealed class TypeNameFullDisplayTests
                                                                                public class UsesInt : IBox<int> {}
                                                                                public class UsesNested : IBox<Outer.Inner> {}
                                                                                public class UsesArray : IBox<Simple[]> {}
+                                                                               public class UsesRank2Array : IBox<Simple[,]> {}
                                                                                public class UsesGenericInGeneric : IBox<Pair<Simple, int>> {}
                                                                                """);
 
@@ -71,6 +72,14 @@ public sealed class TypeNameFullDisplayTests
     public void FullDisplay_ClosedGenericWithArrayArgument_AppendsBrackets()
     {
         AssertExtractedInterface("UsesArray", typeof(IBox<Simple[]>), $"{Ns}.IBox<{Ns}.Simple[]>");
+    }
+
+    [Fact]
+    public void FullDisplay_ClosedGenericWithRank2ArrayArgument_AppendsRankedBrackets()
+    {
+        // A rank-2 array renders `[,]`, not `[]` (the L5 bug dropped the rank) — and it must still match the
+        // form Roslyn extraction produces for the byte-identical source.
+        AssertExtractedInterface("UsesRank2Array", typeof(IBox<Simple[,]>), $"{Ns}.IBox<{Ns}.Simple[,]>");
     }
 
     [Fact]

@@ -12,4 +12,10 @@
     <ItemGroup>
         <ProjectReference Include="..\MyApp.Web\MyApp.Web.csproj" />
     </ItemGroup>
+    <!-- Snippets/ holds scratch *.cs that live in the project cone on disk but are NOT compiled. This is the
+         H1 fixture: a file the zero-MSBuild cone scan sees but that never enters the model. It must stay
+         excluded, so the many MyApp goldens keep passing byte-identical (that unchanged-ness is the H1 test). -->
+    <ItemGroup>
+        <Compile Remove="Snippets/**/*.cs" />
+    </ItemGroup>
 </Project>

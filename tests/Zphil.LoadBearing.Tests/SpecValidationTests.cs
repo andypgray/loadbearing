@@ -102,6 +102,26 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void RepeatedPosture_PostureVerbTwiceViaStoredRuleBuilder_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new DoublePostureRuleSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.RepeatedPosture && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.RepeatedPosture).Message
+            .ShouldBe("Rule 'area/rule' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.");
+    }
+
+    [Fact]
+    public void RepeatedPosture_FreezeTwiceViaStoredScopeBuilder_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new DoubleFreezeScopeSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.RepeatedPosture && e.RuleId == "legacy/billing");
+        ex.Errors.First(e => e.Code == Code.RepeatedPosture).Message
+            .ShouldBe("Scope 'legacy/billing' has more than one posture; call .Freeze(...) exactly once.");
+    }
+
+    [Fact]
     public void EmptyBoundary_BoundaryOnlyViaWithNoTypes_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new EmptyBoundarySpec());
@@ -221,6 +241,74 @@ public class SpecValidationTests
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberSubjectSpec()));
     }
 
+    [Fact]
+    public void BlankPattern_BlankNamespaceGlob_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankNamespaceGlobSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank namespace pattern on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankSuffix_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankSuffixSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank suffix on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankMemberSubjectAffix_IsReported()
+    {
+        // The member-subject adjective walk (parallel to the member prose/Returning walks) reaches a
+        // blank member .WithSuffix (GRAMMAR §8 item 15, §4.6).
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberSuffixSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank member suffix on 'area/rule'.");
+    }
+
+    [Fact]
+    public void UnanchoredSubtreePattern_WildcardInSubtreePrefix_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeGlobSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.UnanchoredSubtreePattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.UnanchoredSubtreePattern).Message
+            .ShouldBe("The namespace pattern 'MyApp.*.Controllers.*' on 'area/rule' has a trailing `.*` subtree " +
+                      "operator but its literal prefix contains a `*`, which never matches; anchor the subtree on a literal prefix.");
+    }
+
+    [Fact]
+    public void UnanchoredSubtreePattern_OnLayerGlob_IsReportedSpecWide()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeLayerSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.UnanchoredSubtreePattern && e.RuleId == null);
+        ex.Errors.First(e => e.Code == Code.UnanchoredSubtreePattern).Message
+            .ShouldBe("The namespace pattern 'MyApp.*.Svc.*' on layer 'Bad' has a trailing `.*` subtree " +
+                      "operator but its literal prefix contains a `*`, which never matches; anchor the subtree on a literal prefix.");
+    }
+
+    [Fact]
+    public void NamespacePattern_InteriorWildcardWithoutSubtree_BuildsWithoutError()
+    {
+        // MyApp.*.Orders is legitimate single-segment matching (GRAMMAR §4.2), not a dead subtree pattern.
+        Should.NotThrow(() => ArchModelBuilder.Build(new InteriorWildcardSpec()));
+    }
+
+    [Fact]
+    public void AllErrors_ThreeBadPatterns_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ThreeBadPatternsSpec());
+
+        // Two dead subtree globs (the subject noun and the verb) plus one blank affix, reported together.
+        ex.Errors.Count(e => e.Code == Code.UnanchoredSubtreePattern).ShouldBe(2);
+        ex.Errors.Count(e => e.Code == Code.BlankPattern).ShouldBe(1);
+    }
+
     private sealed class DuplicateIdSpecA : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -308,6 +396,31 @@ public class SpecValidationTests
         public void Define(Arch arch)
         {
             arch.Rule("Bad_Id").Enforce(arch.Types.MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class DoublePostureRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The stage machine forbids the fluent double-call, but a stored IRuleBuilder is mutable, so a
+            // second posture verb silently overwrites the first (§8 item 17). Only one .Because so the
+            // repeated posture is the sole error.
+            IRuleBuilder rule = arch.Rule("area/rule");
+            rule.Enforce(arch.Types.MustHavePrefix("I"));
+            rule.Migrate("Controllers open SqlConnection directly.", arch.Types.MustHaveSuffix("Handler"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class DoubleFreezeScopeSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // A stored IScopeBuilder re-called with .Freeze silently overwrites the frozen selection (§8 item 17).
+            IScopeBuilder scope = arch.Scope("legacy/billing");
+            scope.Freeze(arch.Namespace("MyApp.Legacy.Billing.*"));
+            scope.Freeze(arch.Namespace("MyApp.Legacy.Other.*")).Dragons("Dragons.").Because("Frozen.");
         }
     }
 
@@ -426,6 +539,64 @@ public class SpecValidationTests
             arch.Rule("naming/async-suffix")
                 .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
                 .Because("Async methods are discovered by suffix.");
+        }
+    }
+
+    private sealed class BlankNamespaceGlobSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Namespace(" ").MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankSuffixSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.MustHaveSuffix(" ")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberSuffixSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.Methods.WithSuffix(" ").MustHaveSuffix("Async")).Because("Reason.");
+        }
+    }
+
+    private sealed class DeadSubtreeGlobSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Namespace("MyApp.*.Controllers.*").MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class DeadSubtreeLayerSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Layer("Bad", "MyApp.*.Svc.*");
+        }
+    }
+
+    private sealed class InteriorWildcardSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Namespace("MyApp.*.Orders").MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class ThreeBadPatternsSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Namespace("MyApp.*.A.*").WithSuffix(" ").MustResideInNamespace("Bad.*.X.*"))
+                .Because("Reason.");
         }
     }
 

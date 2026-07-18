@@ -57,5 +57,29 @@ public enum SpecValidationErrorCode
     ///     return-type matching is definition-level, so the error guides to the open definition
     ///     (<c>typeof(Task&lt;&gt;)</c>).
     /// </summary>
-    MemberReturningClosedGeneric
+    MemberReturningClosedGeneric,
+
+    /// <summary>
+    ///     A blank or whitespace glob or affix (§8 item 15): a namespace/name pattern, or a
+    ///     suffix/prefix, left empty. A blank affix is vacuously true and a blank glob throws at check
+    ///     time — either way it is almost certainly an authoring slip. Covers the type and member sides.
+    /// </summary>
+    BlankPattern,
+
+    /// <summary>
+    ///     A dead namespace subtree pattern (§8 item 16): a trailing <c>.*</c> whose literal prefix
+    ///     carries a <c>*</c> (e.g. <c>MyApp.*.Controllers.*</c>), which the subtree operator compares
+    ///     literally and so never matches. The error steers the author to anchor the subtree on a
+    ///     literal prefix. Type-name globs and affixes carry no subtree operator, so this never applies
+    ///     to them (GRAMMAR §4.2).
+    /// </summary>
+    UnanchoredSubtreePattern,
+
+    /// <summary>
+    ///     A rule given more than one posture verb, or a scope given <c>Freeze</c> more than once (§8
+    ///     item 17). The stage machine (§3.2) makes the fluent double-call uncompilable, but a stored
+    ///     <c>IRuleBuilder</c>/<c>IScopeBuilder</c> reference is mutable, and a second posture call
+    ///     silently overwrites the first — this catches that stored-reference re-call.
+    /// </summary>
+    RepeatedPosture
 }

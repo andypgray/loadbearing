@@ -131,10 +131,13 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v3 (Phase 14 WP2): declared types now carry their member inventory (GRAMMAR §4.6), so a v2 cache.json
-    // (member-use edges but no inventory) degrades to a clean Miss and is rebuilt — the cache is disposable
-    // derived data, never a loud error. (v2 added member-use edges over v1's type-only fragments.)
-    private const int CurrentSchemaVersion = 3;
+    // v4 (post-review H1): CaptureFingerprint now computes cone-adds the same way validation does, so a
+    // project whose cone holds an excluded stray *.cs no longer captures with adds=[] and then validates
+    // dirty forever. A v3 cache.json carries content/Merkle keys built from that old adds=[] capture, so it
+    // degrades to a clean Miss and is rebuilt with agreeing keys — the cache is disposable derived data,
+    // never a loud error. (v3 added the member inventory; v2 added member-use edges over v1's type-only
+    // fragments — every prior version likewise misses.)
+    private const int CurrentSchemaVersion = 4;
 
     // Probe files whose presence anywhere from a project directory up to the solution directory changes the
     // build — recorded even when absent, so a newly-appearing one is an existence flip. Mirrors WorkspaceSession.
@@ -157,7 +160,6 @@ internal sealed class ExtractionCacheStore
     /// </summary>
     internal static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
-    private readonly string cacheDirectory;
     private readonly string cacheFilePath;
     private readonly string solutionPath;
 
@@ -172,7 +174,6 @@ internal sealed class ExtractionCacheStore
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
         this.solutionPath = solutionPath;
         cacheFilePath = CacheLocations.CacheFilePath(solutionPath, cacheRootOverride);
-        cacheDirectory = Path.GetDirectoryName(cacheFilePath)!;
     }
 
     /// <summary>
@@ -211,8 +212,13 @@ internal sealed class ExtractionCacheStore
             string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
             string? assetsSha = structuralShaByPath.GetValueOrDefault(AssetsPathOf(project.ProjectDirectory));
 
-            // Adds are empty at capture: the caller's document set is authoritative here.
-            contentKeys[project.ProjectName] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, []);
+            // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
+            // full paths). Hardcoding adds=[] here was the H1 bug: a *.cs on disk under the project but
+            // excluded from compilation is a validation-time add, so an empty capture never validated and the
+            // project stayed dirty forever. With capture and validation running the one routine, they agree.
+            var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
+            var adds = ConeAdds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
+            contentKeys[project.ProjectName] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
             referencesByName[project.ProjectName] = project.ProjectReferences;
             documentsByName[project.ProjectName] = documents;
         }
@@ -404,21 +410,12 @@ internal sealed class ExtractionCacheStore
         return (contentKey, refreshedDocuments);
     }
 
-    // Enumerates *.cs under the project directory (skipping bin/obj) and returns those not already known —
-    // the SDK-glob adds a bare mtime sweep cannot see. Sorted so the content key is order-stable.
+    // Returns the project cone's *.cs not already known — the SDK-glob adds a bare mtime sweep cannot see.
+    // Sorted so the content key is order-stable. Capture and validation both call this over the same known
+    // set, so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
     private static IReadOnlyList<string> ConeAdds(string projectDirectory, HashSet<string> knownDocuments)
     {
-        if (!Directory.Exists(projectDirectory)) return [];
-
-        var adds = new List<string>();
-        foreach (string file in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
-        {
-            if (IsBuildArtifact(projectDirectory, file)) continue;
-
-            string full = Path.GetFullPath(file);
-            if (!knownDocuments.Contains(full)) adds.Add(full);
-        }
-
+        var adds = ProjectCone.Enumerate(projectDirectory).Where(full => !knownDocuments.Contains(full)).ToList();
         adds.Sort(StringComparer.Ordinal);
         return adds;
     }
@@ -489,19 +486,15 @@ internal sealed class ExtractionCacheStore
 
     private bool TryWriteAtomic(CacheManifest manifest)
     {
-        string tempPath = Path.Combine(cacheDirectory, $"{Path.GetFileName(cacheFilePath)}.{Guid.NewGuid():N}.tmp");
         try
         {
-            Directory.CreateDirectory(cacheDirectory);
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
-            File.WriteAllBytes(tempPath, bytes);
-            File.Move(tempPath, cacheFilePath, true);
+            AtomicFile.WriteAllBytes(cacheFilePath, bytes);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            TryDelete(tempPath);
-            return false;
+            return false; // the cache is disposable — a failed write is simply rebuilt next run, never an error
         }
     }
 
@@ -573,7 +566,6 @@ internal sealed class ExtractionCacheStore
     {
         string fullSolution = Path.GetFullPath(solutionPath);
         yield return fullSolution;
-        string solutionDirectory = Path.GetDirectoryName(fullSolution)!;
 
         foreach (ProjectInputs project in projects)
         {
@@ -582,7 +574,7 @@ internal sealed class ExtractionCacheStore
             string projectDirectory = Path.GetFullPath(project.ProjectDirectory);
             yield return AssetsPathOf(projectDirectory);
 
-            foreach (string ancestor in AncestorsUpTo(projectDirectory, solutionDirectory))
+            foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
             foreach (string probe in StructuralProbeFileNames)
                 yield return Path.Combine(ancestor, probe);
         }
@@ -591,23 +583,6 @@ internal sealed class ExtractionCacheStore
     private static string AssetsPathOf(string projectDirectory)
     {
         return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
-    }
-
-    private static IEnumerable<string> AncestorsUpTo(string startDirectory, string stopDirectory)
-    {
-        string? directory = startDirectory;
-        while (directory is not null)
-        {
-            yield return directory;
-            if (string.Equals(directory, stopDirectory, StringComparison.OrdinalIgnoreCase)) yield break;
-            directory = Path.GetDirectoryName(directory);
-        }
-    }
-
-    private static bool IsBuildArtifact(string projectDirectory, string file)
-    {
-        string relative = Path.GetRelativePath(projectDirectory, file).Replace('\\', '/');
-        return relative.Split('/').Any(segment => segment is "bin" or "obj");
     }
 
     // ── small helpers ───────────────────────────────────────────────────────────────────────────────────
@@ -647,18 +622,6 @@ internal sealed class ExtractionCacheStore
             if (!StampsEqual(left[i].Documents, right[i].Documents))
                 return false;
         return true;
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // best-effort cleanup
-        }
     }
 
     private static JsonSerializerOptions CreateJsonOptions()

@@ -6,8 +6,9 @@ namespace Zphil.LoadBearing.Baselines;
 ///     One grandfathered violation's identity in a baseline (GRAMMAR §4.3). A dependency-verb entry
 ///     carries <see cref="Source" /> and <see cref="Target" /> symbol IDs; a shape/naming/inheritance/
 ///     attribute/escape-hatch entry carries only <see cref="Subject" />. The unused slots are null.
-///     IDs are Roslyn <c>DocumentationCommentId</c> strings (<c>T:</c> forms in v1), so an entry is
-///     stable across file moves and formatting. Value equality is ordinal over all three slots.
+///     IDs are Roslyn <c>DocumentationCommentId</c> strings — <c>T:</c> forms for type subjects and
+///     edges, and <c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c> forms for member subjects (§4.6) — so an entry
+///     is stable across file moves and formatting. Value equality is ordinal over all three slots.
 ///     An optional <see cref="Because" /> attribution rides along but is excluded from equality —
 ///     identity is the ID slots only, so ratchet set operations never fork on annotation.
 /// </summary>
@@ -27,7 +28,7 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
     /// <summary>The referenced type's symbol ID (edge entry), or null for a subject entry.</summary>
     public string? Target { get; }
 
-    /// <summary>The offending type's symbol ID (subject entry), or null for an edge entry.</summary>
+    /// <summary>The offending type's or member's symbol ID (subject entry), or null for an edge entry.</summary>
     public string? Subject { get; }
 
     /// <summary>Why this entry is grandfathered (single line, non-blank), or null when unattributed. Excluded from equality.</summary>

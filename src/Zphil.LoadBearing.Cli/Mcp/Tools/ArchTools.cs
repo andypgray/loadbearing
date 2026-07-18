@@ -62,8 +62,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // document's workspaceDiagnostics, so the error writer is discarded. NoCache: the warm workspace and
         // the persisted cache keep independent lifetimes — a tool call never reads or writes the cache file.
         // Binlog null: the warm path never uses the build capture (latency-critical callers ride the session).
+        // AllowWorkspaceDiagnostics false: the M1 gate would fire on a load failure, but it writes only to the
+        // discarded error writer and returns an ignored exit code — it cannot touch the JSON this tool returns.
         await new CheckRunner(output, TextWriter.Null, source).RunAsync(
-            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null),
+            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, false),
             cancellationToken);
         return output.ToString();
     }

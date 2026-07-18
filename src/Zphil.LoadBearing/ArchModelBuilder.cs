@@ -25,7 +25,7 @@ public static class ArchModelBuilder
     public static ArchitectureModel Build(IEnumerable<IArchitectureSpec> specs)
     {
         var arch = new Arch();
-        foreach (IArchitectureSpec spec in Guard.NotNull(specs, nameof(specs))) Guard.NotNull(spec, nameof(specs)).Define(arch);
+        foreach (IArchitectureSpec spec in Guard.NotNull(specs, nameof(specs))) Guard.NotNull(spec, nameof(spec)).Define(arch);
 
         var errors = SpecValidator.Validate(arch);
         if (errors.Count > 0) throw new SpecValidationException(errors);

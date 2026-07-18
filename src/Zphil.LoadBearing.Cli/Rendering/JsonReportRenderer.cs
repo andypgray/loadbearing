@@ -1,6 +1,4 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Rendering;
 
@@ -12,20 +10,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     content on stdout in JSON mode, so hooks can parse it. The optional <c>diffBase</c> echoes the
 ///     <c>--diff-base</c> ref (omitted when absent). Machine-independent: <c>solution</c> and
 ///     <c>specAssembly</c> are file names, and every site path is solution-relative with forward slashes.
-///     Serialization lives here so Core stays dependency-free.
+///     Serialization lives here so Core stays dependency-free; the options are the shared
+///     <see cref="LoadBearingJson.Options" />.
 /// </summary>
 internal static class JsonReportRenderer
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        // Backticks and em-dashes ride in rule sentences; this is CLI output for hooks, not HTML, so
-        // emit them literally rather than as ` escapes.
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-
     public static void Render(
         TextWriter output,
         CheckReport report,
@@ -46,7 +35,7 @@ internal static class JsonReportRenderer
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.ViolationCount, report.WarningCount));
 
-        output.WriteLine(JsonSerializer.Serialize(document, Options));
+        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Options));
     }
 
     private static RuleJson ToRule(RuleResult result, string solutionDirectory)

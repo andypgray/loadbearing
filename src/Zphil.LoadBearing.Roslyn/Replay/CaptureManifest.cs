@@ -62,6 +62,14 @@ internal sealed record CaptureManifest(
 ///     command line fixes, and replay cannot regenerate them, so a <c>dotnet clean</c> that deletes them must
 ///     invalidate the capture rather than let replay silently produce a model drifted from the real build.
 /// </param>
+/// <param name="ConeFiles">
+///     The project cone's <c>*.cs</c> (bin/obj excluded) as it stood at ingest — the membership the cone scan
+///     compares against. Recorded because the cone is a superset of <see cref="DocumentPaths" />: a
+///     <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed <c>*.cs</c> is in the cone but not compiled, so
+///     without this snapshot the scan would read it as a perpetual add and invalidate the capture on every
+///     run. A file the scan finds that is in neither <see cref="ConeFiles" /> nor <see cref="DocumentPaths" />
+///     is a genuine post-ingest add.
+/// </param>
 // ProjectName is persisted schema: the self-describing manifest records each project's identity for a
 // readable manifest diff, though validation re-collects projects from the solution and keys on the
 // directory, csproj, and document set rather than reading the stored name back.
@@ -70,6 +78,7 @@ internal sealed record CaptureProjectEntry(
     string ProjectName,
     string CsprojPath,
     string ProjectDirectory,
-    IReadOnlyList<string> DocumentPaths);
+    IReadOnlyList<string> DocumentPaths,
+    IReadOnlyList<string> ConeFiles);
 
 // ReSharper restore NotAccessedPositionalProperty.Global

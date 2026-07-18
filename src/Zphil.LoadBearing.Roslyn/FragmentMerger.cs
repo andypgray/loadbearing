@@ -11,7 +11,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <item>
 ///             <b>M1</b> — fragments in input (ordinal-project) order; the first declarer wins a node's
 ///             facts and <c>ProjectName</c>; declaration sites union across declarers (partials across
-///             projects, or a project's several target frameworks).
+///             projects, or a project's several target frameworks). A later declarer under a
+///             <em>different</em> project name is same-FQN cross-project conflation: the facts still follow
+///             the first declarer, and an advisory <see cref="CodebaseModel.MergeNotes">merge note</see>
+///             records it (deduped per (FQN, loser); a project's own several target frameworks share its
+///             name and so stay silent).
 ///         </item>
 ///         <item>
 ///             <b>M2</b> — hierarchy comes from the winning fragment only; <c>ResolveNode(fqn)</c> is the
@@ -64,7 +68,9 @@ internal static class FragmentMerger
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
+        private readonly List<string> _mergeNotes = [];
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
+        private readonly HashSet<(string Fqn, string Loser)> _notedConflations = [];
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
         {
@@ -110,9 +116,30 @@ internal static class FragmentMerger
                 _nodes[fqn] = NewNode(declared.Facts, projectName, false);
                 _hierarchy[fqn] = declared; // the winning (first) declarer supplies the hierarchy
             }
+            else
+            {
+                NoteConflationIfCrossProject(fqn, projectName);
+            }
 
             var sites = DeclarationSites(fqn);
             foreach (FragmentSite site in declared.DeclarationSites) sites.Add(site);
+        }
+
+        // A second (or later) declarer of an already-declared FQN. When its project name differs from the
+        // winner's, this is same-FQN cross-project conflation: the facts and ProjectName keep following the
+        // first declarer, so the loser's copy is invisible to arch.Project selections — record one advisory
+        // note. A matching project name is a project's own several target frameworks (M1's legitimate union),
+        // which stays silent; the (FQN, loser) dedup collapses a multi-TFM loser to a single note.
+        private void NoteConflationIfCrossProject(string fqn, string laterProjectName)
+        {
+            string winner = _nodes[fqn].ProjectName;
+            if (string.Equals(winner, laterProjectName, StringComparison.Ordinal)) return;
+            if (!_notedConflations.Add((fqn, laterProjectName))) return;
+
+            _mergeNotes.Add(
+                $"Type '{fqn}' is declared by projects '{winner}' and '{laterProjectName}'; its facts and "
+                + $"project attribution follow '{winner}' (the first declarer), so arch.Project('{laterProjectName}') "
+                + "selections will not include it.");
         }
 
         private void RecordExternal(FragmentExternal external)
@@ -236,7 +263,11 @@ internal static class FragmentMerger
 
             var memberEdges = BuildMemberEdges();
 
-            return new CodebaseModel(types, edges, memberEdges, BuildProjects(fragments));
+            // Sort the advisory notes ordinal (they key first on the FQN) so the list is stable across runs
+            // regardless of the order distinct conflations were first seen.
+            var mergeNotes = _mergeNotes.OrderBy(note => note, StringComparer.Ordinal).ToList();
+
+            return new CodebaseModel(types, edges, memberEdges, BuildProjects(fragments), mergeNotes);
         }
 
         // Member edges ordered by (source FullName, member SymbolId). A single MemberReference is minted per

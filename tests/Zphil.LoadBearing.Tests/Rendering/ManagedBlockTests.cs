@@ -142,15 +142,33 @@ public class ManagedBlockTests
     }
 
     [Theory]
-    [InlineData("<!-- loadbearing:begin -->\nx\n", "without a matching")]                                  // begin, no end
-    [InlineData("x\n<!-- loadbearing:end -->\n", "without a matching")]                                    // end, no begin
-    [InlineData("<!-- loadbearing:end -->\nx\n<!-- loadbearing:begin -->\n", "precedes")]                  // end before begin
-    [InlineData("<!-- loadbearing:begin -->\na\n<!-- loadbearing:begin -->\nb\n<!-- loadbearing:end -->\n", "expected exactly one")] // duplicate begin
-    [InlineData("<!-- loadbearing:begin -->\na\n<!-- loadbearing:end -->\nb\n<!-- loadbearing:end -->\n", "expected exactly one")]   // duplicate end
+    [InlineData("<!-- loadbearing:begin -->\nx\n", "without a matching")] // begin, no end
+    [InlineData("x\n<!-- loadbearing:end -->\n", "without a matching")] // end, no begin
+    [InlineData("<!-- loadbearing:end -->\nx\n<!-- loadbearing:begin -->\n", "precedes")] // end before begin
     public void Splice_MalformedMarkers_ThrowWithoutWriting(string existing, string messageFragment)
     {
         var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice(existing, Body));
         exception.Message.ShouldContain(messageFragment);
+    }
+
+    // The duplicate-marker pin, moved out of the fragment theory above to assert the whole message including
+    // the stray-marker guidance sentence (L8) — the marker text must not appear anywhere else in the file.
+    [Fact]
+    public void Splice_DuplicateBeginMarker_ThrowsWithStrayMarkerGuidance()
+    {
+        var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice("<!-- loadbearing:begin -->\na\n<!-- loadbearing:begin -->\nb\n<!-- loadbearing:end -->\n", Body));
+        exception.Message.ShouldBe(
+            "Malformed managed block: 2 '<!-- loadbearing:begin -->' markers (expected exactly one). "
+            + "The marker text must not appear anywhere else in the file, including in examples.");
+    }
+
+    [Fact]
+    public void Splice_DuplicateEndMarker_ThrowsWithStrayMarkerGuidance()
+    {
+        var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice("<!-- loadbearing:begin -->\na\n<!-- loadbearing:end -->\nb\n<!-- loadbearing:end -->\n", Body));
+        exception.Message.ShouldBe(
+            "Malformed managed block: 2 '<!-- loadbearing:end -->' markers (expected exactly one). "
+            + "The marker text must not appear anywhere else in the file, including in examples.");
     }
 
     [Fact]
@@ -176,7 +194,6 @@ public class ManagedBlockTests
     [Fact]
     public void ExtractBody_MalformedMarkers_Throws()
     {
-        Should.Throw<MalformedManagedBlockException>(
-            () => ManagedBlock.ExtractBody("<!-- loadbearing:begin -->\nx\n"));
+        Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.ExtractBody("<!-- loadbearing:begin -->\nx\n"));
     }
 }

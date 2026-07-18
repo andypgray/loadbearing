@@ -124,6 +124,14 @@ internal sealed class CodebaseSource : IDisposable
     /// </summary>
     internal IReadOnlySet<string> ReExtractedProjects => reExtractedProjects;
 
+    /// <summary>
+    ///     The advisory merge notes the last <see cref="ExtractAsync" /> produced (same-FQN cross-project
+    ///     conflation, M2), regenerated from the fragments on every path — a cache hit re-merges, so these
+    ///     need no persistence. Empty until <see cref="ExtractAsync" /> runs. Distinct from
+    ///     <see cref="Diagnostics" />: merge notes ride the same rendered diagnostics stream but never gate.
+    /// </summary>
+    internal IReadOnlyList<string> MergeNotes { get; private set; } = [];
+
     /// <summary>Disposes the owned cold workspace; a no-op on a cache hit (which owns none).</summary>
     public void Dispose()
     {
@@ -207,6 +215,16 @@ internal sealed class CodebaseSource : IDisposable
     ///     the subset is merged for the model, and the whole fragment set is written back best-effort.
     /// </summary>
     public async Task<CodebaseModel> ExtractAsync(string? excludeProjectName, CancellationToken ct)
+    {
+        CodebaseModel codebase = await ExtractCoreAsync(excludeProjectName, ct);
+        // The advisory merge notes are a function of the merged fragments, so every path (hit, warm, cold)
+        // regenerates them through FragmentMerger — the cache stores fragments, never notes. Captured here,
+        // off the one exit, so the runners can surface them beside the workspace-load diagnostics.
+        MergeNotes = codebase.MergeNotes;
+        return codebase;
+    }
+
+    private async Task<CodebaseModel> ExtractCoreAsync(string? excludeProjectName, CancellationToken ct)
     {
         if (Outcome == CodebaseSourceOutcome.Hit)
             return FragmentMerger.Merge(Retain(cacheRead.ReusableFragments, excludeProjectName));

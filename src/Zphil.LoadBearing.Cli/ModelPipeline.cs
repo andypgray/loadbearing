@@ -94,6 +94,12 @@ internal static class ModelPipeline
             {
                 throw new UserErrorException(ex.Message, ex);
             }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // GetTypes() couldn't load every type — a missing or version-mismatched dependency of the
+                // spec assembly. Surface the distinct loader messages as one user error, not a reflection crash.
+                throw new UserErrorException(LoaderFailureMessage(ex, specDllPath), ex);
+            }
 
             try
             {
@@ -108,5 +114,29 @@ internal static class ModelPipeline
         {
             context.Unload();
         }
+    }
+
+    /// <summary>
+    ///     The <see cref="UserErrorException" /> text for a <see cref="ReflectionTypeLoadException" /> out of
+    ///     spec discovery: the <em>distinct</em> loader messages (deduped, ordinal-sorted so the output is
+    ///     deterministic) under a naming/fix frame. Internal so a fabricated exception can pin the shape.
+    /// </summary>
+    internal static string LoaderFailureMessage(ReflectionTypeLoadException ex, string specDllPath)
+    {
+        var messages = ex.LoaderExceptions
+            .Select(inner => inner?.Message)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .Select(message => message!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(message => message, StringComparer.Ordinal)
+            .ToList();
+
+        string detail = messages.Count > 0
+            ? string.Join("\n", messages.Select(message => "  " + message))
+            : "  (the runtime reported no loader detail)";
+
+        return $"Could not load spec assembly '{Path.GetFileName(specDllPath)}'; one or more types failed to load:\n"
+               + detail
+               + "\nBuild the spec project and restore its dependencies, then retry.";
     }
 }

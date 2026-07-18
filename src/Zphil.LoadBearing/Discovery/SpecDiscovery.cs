@@ -4,8 +4,10 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Discovery;
 
 /// <summary>
-///     Reflection-only spec discovery (netstandard2.0-safe, so it runs in the Core). Finds public,
-///     non-abstract <see cref="IArchitectureSpec" /> classes, ordered deterministically by
+///     Reflection-only spec discovery (netstandard2.0-safe, so it runs in the Core). Finds
+///     publicly-visible (top-level public, or public nested through a public chain — <see cref="Type.IsVisible" />,
+///     not <see cref="Type.IsPublic" /> which is false for any nested type), non-abstract
+///     <see cref="IArchitectureSpec" /> classes, ordered deterministically by
 ///     <see cref="Type.FullName" /> ordinal (GRAMMAR §9 — law must load predictably), and
 ///     instantiates each. A zero result is loud (<see cref="SpecDiscoveryException" />). The
 ///     <c>AssemblyLoadContext</c> that isolates a prebuilt spec DLL is a host concern (the test
@@ -21,7 +23,7 @@ public static class SpecDiscovery
         var specTypes = assembly.GetTypes()
             .Where(type => type.IsClass
                            && !type.IsAbstract
-                           && type.IsPublic
+                           && type.IsVisible
                            && typeof(IArchitectureSpec).IsAssignableFrom(type))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToList();

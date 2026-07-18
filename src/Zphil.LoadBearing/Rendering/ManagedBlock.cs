@@ -130,10 +130,12 @@ public static class ManagedBlock
 
         if (beginIndices.Count > 1)
             throw new MalformedManagedBlockException(
-                $"Malformed managed block: {beginIndices.Count} '{BeginMarker}' markers (expected exactly one).");
+                $"Malformed managed block: {beginIndices.Count} '{BeginMarker}' markers (expected exactly one). "
+                + "The marker text must not appear anywhere else in the file, including in examples.");
         if (endIndices.Count > 1)
             throw new MalformedManagedBlockException(
-                $"Malformed managed block: {endIndices.Count} '{EndMarker}' markers (expected exactly one).");
+                $"Malformed managed block: {endIndices.Count} '{EndMarker}' markers (expected exactly one). "
+                + "The marker text must not appear anywhere else in the file, including in examples.");
         if (beginIndices.Count == 0)
             throw new MalformedManagedBlockException(
                 $"Malformed managed block: '{EndMarker}' without a matching '{BeginMarker}'.");

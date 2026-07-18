@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn;
@@ -53,21 +54,27 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     private readonly Action<string>? diagnosticSink;
 
-    // Known-document fingerprints, keyed by canonical full path. Doubles as the cone-scan membership set:
-    // any *.cs found under a project directory whose path is absent here is a newly-added file.
-    private readonly Dictionary<string, FileFreshness> documentFingerprints = new(StringComparer.OrdinalIgnoreCase);
+    // Known-document fingerprints, keyed by canonical full path. Covers only the project's COMPILED documents,
+    // so it must not double as the cone-scan membership set — a *.cs on disk but excluded from compilation
+    // (<Compile Remove>, a None item) is absent here yet is not a new file. That role is knownConeFiles.
+    private readonly Dictionary<string, FileFreshness> documentFingerprints = new(PathComparison.Comparer);
 
     // Canonical full path ⇒ the document(s) at that path, captured at load and keyed identically to
     // documentFingerprints. Resolving an edited file to its DocumentId(s) through this map avoids
     // round-tripping through Roslyn's own path matching, whose spelling need not equal our normalized key.
     // DocumentIds survive WithDocumentText, so the map stays valid across in-place edits within one load.
-    private readonly Dictionary<string, List<DocumentId>> documentIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<DocumentId>> documentIds = new(PathComparison.Comparer);
 
     // The one gate that serializes every sweep, reload, and edit against concurrent callers.
     private readonly SemaphoreSlim gate = new(1, 1);
 
+    // Every *.cs the cone scan would find under the loaded project directories (bin/obj excluded), snapshotted
+    // at load — the true cone-scan membership set. Only a file the scan finds that is absent here counts as a
+    // newly-added source file; a compiled document and an excluded stray both live here, so neither trips it.
+    private readonly HashSet<string> knownConeFiles = new(PathComparison.Comparer);
+
     // Project directories (from the loaded solution) scanned for newly-added source files.
-    private readonly HashSet<string> projectDirectories = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> projectDirectories = new(PathComparison.Comparer);
 
     // Per-project (by name) edit counters within the current generation: reset (seeded to 0 for every C#
     // project) on each full load, bumped when the reconcile sweep rewrites one of a project's documents.
@@ -77,7 +84,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     // Structural-file fingerprints, keyed by canonical full path. Absent probe-chain entries are recorded
     // with Exists = false so a file that later appears trips the sweep.
-    private readonly Dictionary<string, FileFreshness> structuralFingerprints = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileFreshness> structuralFingerprints = new(PathComparison.Comparer);
 
     // The private snapshot chain: the current (possibly edited) forked solution.
     private Solution? current;
@@ -212,6 +219,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         documentFingerprints.Clear();
         documentIds.Clear();
         structuralFingerprints.Clear();
+        knownConeFiles.Clear();
         projectDirectories.Clear();
         projectEditVersions.Clear();
 
@@ -282,26 +290,21 @@ public sealed class WorkspaceSession : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Enumerates <c>*.cs</c> under each project directory (skipping <c>bin</c>/<c>obj</c>) and reports
-    ///     whether any file is not already a known document — the add case an mtime sweep cannot see, since
-    ///     an SDK-glob add touches no MSBuild file.
+    ///     Rescans each project directory's <see cref="Caching.ProjectCone">cone</see> and reports whether any
+    ///     <c>*.cs</c> is not in the load-time <see cref="knownConeFiles" /> snapshot — the add case an mtime
+    ///     sweep cannot see, since an SDK-glob add touches no MSBuild file. Comparing against the recorded cone
+    ///     (not <see cref="documentFingerprints" />, the compiled set) means an excluded stray already on disk
+    ///     at load is not mistaken for a perpetual add; only a file that appeared since load reloads.
     /// </summary>
     private bool ConeScanDetectsNewFile()
     {
         foreach (string projectDirectory in projectDirectories)
+        foreach (string file in ProjectCone.Enumerate(projectDirectory))
         {
-            if (!Directory.Exists(projectDirectory)) continue;
+            if (knownConeFiles.Contains(file)) continue;
 
-            foreach (string file in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
-            {
-                if (IsBuildArtifact(projectDirectory, file)) continue;
-
-                string full = Path.GetFullPath(file);
-                if (documentFingerprints.ContainsKey(full)) continue;
-
-                diagnosticSink?.Invoke($"New source file detected, reloading: {full}");
-                return true;
-            }
+            diagnosticSink?.Invoke($"New source file detected, reloading: {file}");
+            return true;
         }
 
         return false;
@@ -415,14 +418,13 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     /// <summary>
     ///     Records the load-time fingerprints: every document (unverified, so the first sweep content-checks
-    ///     it once and promotes it) plus the structural set (solution, csprojs, per-project assets, and the
-    ///     props/targets/global.json probe chain from each project directory up to the solution directory,
-    ///     absence included).
+    ///     it once and promotes it), the whole-cone <c>*.cs</c> membership snapshot each project directory
+    ///     globs (so the cone scan tells a real add from an always-present excluded stray), plus the structural
+    ///     set (solution, csprojs, per-project assets, and the props/targets/global.json probe chain from each
+    ///     project directory up to the filesystem root, absence included).
     /// </summary>
     private void RecordAllFingerprints(string solutionPath, Solution solution)
     {
-        string solutionDirectory = Path.GetDirectoryName(solutionPath)!;
-
         foreach (Document document in solution.Projects.SelectMany(p => p.Documents))
         {
             if (document.FilePath is null) continue;
@@ -453,36 +455,19 @@ public sealed class WorkspaceSession : IAsyncDisposable
         }
 
         foreach (string projectDirectory in projectDirectories)
-        foreach (string ancestor in AncestorsUpTo(projectDirectory, solutionDirectory))
-        foreach (string probe in StructuralProbeFileNames)
-            RecordStructural(Path.Combine(ancestor, probe));
+        {
+            foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))
+                knownConeFiles.Add(coneFile);
+
+            foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
+            foreach (string probe in StructuralProbeFileNames)
+                RecordStructural(Path.Combine(ancestor, probe));
+        }
     }
 
     private void RecordStructural(string path)
     {
         structuralFingerprints[Path.GetFullPath(path)] = FileFreshness.Capture(path);
-    }
-
-    /// <summary>
-    ///     Yields <paramref name="startDirectory" /> and each ancestor up to and including
-    ///     <paramref name="stopDirectory" />. If the start is not under the stop (an out-of-tree project),
-    ///     the walk terminates at the filesystem root instead — harmless extra absent probes.
-    /// </summary>
-    private static IEnumerable<string> AncestorsUpTo(string startDirectory, string stopDirectory)
-    {
-        string? directory = startDirectory;
-        while (directory is not null)
-        {
-            yield return directory;
-            if (PathEquals(directory, stopDirectory)) yield break;
-            directory = Path.GetDirectoryName(directory);
-        }
-    }
-
-    private static bool IsBuildArtifact(string projectDirectory, string file)
-    {
-        string relative = Path.GetRelativePath(projectDirectory, file).Replace('\\', '/');
-        return relative.Split('/').Any(segment => segment is "bin" or "obj");
     }
 
     /// <summary>
@@ -523,6 +508,6 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     private static bool PathEquals(string? left, string? right)
     {
-        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(left, right, PathComparison.Comparison);
     }
 }

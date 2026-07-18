@@ -66,7 +66,7 @@ internal static class FreezeDesugarer
             .Select(type => (Selection)new RefinedSelection(owner, new TypeNoun(type), Array.Empty<SelectionAdjective>()))
             .ToList();
 
-        // sel.Except(sel ∪ F) . MustOnlyBeReferencedBy(sel, F...) — the formula holds whether the
+        // sel.Except(F) . MustOnlyBeReferencedBy(sel, F...) — the formula holds whether the
         // facade types live inside or outside the frozen selection (GRAMMAR §7).
         var union = new UnionSelection(owner, facades);
         Selection subject = frozen.Except(union);
