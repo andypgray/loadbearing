@@ -27,6 +27,8 @@ dotnet tool install -g Zphil.LoadBearing.Cli
 loadbearing check MyApp.sln
 ```
 
+Starting on an existing codebase? [The Meridian adoption walkthrough](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md) derives a spec from real code, one command at a time.
+
 The command is `loadbearing`. Four lockstep-versioned packages make up a release:
 
 | Package | What it is |
@@ -54,6 +56,7 @@ Worked examples live in [`examples/`](https://github.com/andypgray/loadbearing/t
 - [`Meridian`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a freight-forwarding monolith mid-migration, carrying all three postures on one codebase. The law, a ratcheted migration with its burndown, and a frozen scope with dragons.
 - [`Meridian.Quoting`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): a greenfield clean-architecture quoting subsystem, Enforce-only. The generated `AGENTS.md` block beside the spec that produced it, and every rule as an individually named xUnit test.
 - [`Meridian.Operations`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): a modular monolith with module isolation as enforceable law. Each module directory carries its own generated `AGENTS.md` card, and one module is frozen behind its facade.
+- [`Meridian/ADOPTING.md`](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md): the day-one adoption walkthrough. The full derive flow against an existing codebase, every step a real command with real output.
 
 ## License
 

@@ -173,7 +173,9 @@ arch.Rule("data-access/no-inline-sql")
   warning — the misspelling check comes free.
 - Naming/shape candidates come straight from the inventory: interfaces `MustHavePrefix("I")`,
   handler types `MustHaveSuffix("Handler")`, `MustBeSealed()` where the convention looks
-  intended.
+  intended. Member-level conventions are candidates too:
+  `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")` where the
+  codebase names its async methods `*Async`.
 - Dragon-zone candidates are the one exception to "all as Enforce": a boundary has no Enforce
   form, so draft them as `arch.Scope(id).Freeze(...)` directly (step 5 shows the full shape).
   The scope's containment violations arrive in step 4 alongside every other rule's evidence.
@@ -309,7 +311,9 @@ A spec is one class implementing `IArchitectureSpec` with one method `Define(Arc
 three statement forms: definitions, rules, scopes.
 
 **Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` ·
-`arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))`.
+`arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` ·
+`arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the `MustNotUse` target form;
+matching is by declaring type + member name, so one ban covers every overload).
 
 **Adjectives** (chain onto any selection) — `.InNamespace(glob)` · `.OfKind(TypeKind.Class |
 Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
@@ -318,10 +322,24 @@ Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
 
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes
-selections or `typeof()`s, one-or-more) · `MustResideInNamespace(glob)` · `MustHaveSuffix` /
-`MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` / `MustDeriveFrom` /
-`MustBeAttributedWith` · `MustBeSealed` / `MustBeStatic` / `MustBeAbstract` / `MustBePublic` /
-`MustBeInternal` · `.Must(pred, description:)`.
+selections or `typeof()`s, one-or-more) · `MustNotUse(arch.Member(...), ...)` (bans member
+accesses — `DateTime.Now`, `.Result`, `ConfigurationManager.AppSettings`; *use* = a
+source-level member access, and `nameof` operands are not uses) · `MustResideInNamespace(glob)`
+· `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
+`MustDeriveFrom` / `MustBeAttributedWith` · `MustBeSealed` / `MustBeStatic` / `MustBeAbstract`
+/ `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
+
+**Member subjects** — a projection turns any selection into a selection of its declared
+members, constrained directly: projections `.Members` / `.Methods` / `.Properties` / `.Fields`
+/ `.Events` · member adjectives `.WithSuffix` / `.WithPrefix` / `.WithNameMatching` ·
+`.Returning(typeof(Task))` (methods-only, so it chains only off `.Methods`; matches the
+declared return type at the definition level — `typeof(Task<>)` matches every construction,
+and a closed generic like `typeof(Task<int>)` is refused) · `.Where(pred, description:)` ·
+member verbs `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustBePublic` /
+`MustBeInternal` / `MustBePrivate` · `MustBeStatic` / `MustBeAbstract` / `MustBeVirtual` ·
+`.Must(pred, description:)` (member predicates see `IMemberInfo`). The flagship:
+`web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in
+`MyApp.Web.*` returning `Task` must be named `*Async`."*
 
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |
@@ -343,9 +361,14 @@ written), `FilePaths`, attributes, base type, interfaces.
 within one segment, never crossing a dot; lone `*` = everything. So `MyApp.Domain.*` matches
 `MyApp.Domain` and `MyApp.Domain.Orders` but not `MyApp.DomainX`.
 
-**Semantics worth knowing** — "reference" means a source-level type reference; edges are
-type-level. Subjects range over solution-declared types; targets also reach external
-(BCL/NuGet) types. `MustOnlyReference` constrains solution-declared targets only (external
+**Semantics worth knowing** — "reference" means a source-level type reference; "use" means a
+source-level member access: the checker records both edge kinds. Member bans are
+source-visibility bans, not runtime-dispatch bans — a ban on a concrete member does not catch
+calls through an interface-typed receiver, nor the reverse. Member subjects range over the
+declared members of solution-declared types (accessors, constructors, operators, indexers,
+and compiler-generated members are excluded; external types carry no member inventory), and
+an empty member subject fails the rule exactly like an empty type subject. Type subjects
+range over solution-declared types; targets also reach external (BCL/NuGet) types. `MustOnlyReference` constrains solution-declared targets only (external
 packages are exempt, and the rendered sentence says so) and is strict — list a layer's own
 selection among its allowed targets if self-references are fine. `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)

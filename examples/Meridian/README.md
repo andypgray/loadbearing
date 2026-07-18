@@ -128,3 +128,5 @@ loadbearing check examples/Meridian/Meridian.slnx
 ## From here
 
 The clean-architecture on-ramp, [`Meridian.Quoting`](../Meridian.Quoting/), is a greenfield subsystem that meets these ratchets' target state: the same rules as `Enforce` law from day one. Meridian is that target state met by a codebase that has not reached it yet: same law, stated honestly against the debt.
+
+[ADOPTING.md](ADOPTING.md) walks the other direction: how this spec was derived from Meridian's code, one real command at a time, the day-one flow for a codebase that already exists.
