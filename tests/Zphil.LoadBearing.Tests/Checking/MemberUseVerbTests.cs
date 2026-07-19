@@ -315,6 +315,68 @@ public sealed class MemberUseVerbTests
         violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
     }
 
+    [Fact]
+    public void MustNotUse_ExpressionMintedAnchor_MatchesSameAsTypeofAnchor()
+    {
+        // An expression-minted anchor arch.Member<Clock>(c => c.Ticks) reifies to the same (declaring type,
+        // name), so it yields the identical member SymbolId — and the identical violation — as the typeof form.
+        RuleResult result = Checker.Run(SceneModel, arch =>
+                arch.Rule("member/no-ticks")
+                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member<Clock>(c => c.Ticks)))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.MemberUse);
+        violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
+    }
+
+    [Fact]
+    public void MustNotUse_ExpressionInterfaceCastAnchor_RespectsDispatchBoundary()
+    {
+        // arch.Member<Gauge>(g => ((IGauge)g).Read()) anchors the interface member: the receiver-side Convert
+        // is peeled to recognise the parameter, but the resolved method is IGauge.Read, so the ban catches
+        // only the interface-typed call — the same dispatch boundary as the typeof(IGauge) ban (GRAMMAR §4.5).
+        RuleResult iface = Checker.Run(SceneModel, arch =>
+        {
+            // The (IGauge) cast is load-bearing: it moves the statically-resolved method the expression tree
+            // records from the concrete Gauge.Read to IGauge.Read, so it must survive cleanup's cast strip.
+            // ReSharper disable once RedundantCast
+            Member ifaceRead = arch.Member<Gauge>(g => ((IGauge)g).Read());
+            arch.Rule("member/no-iface")
+                .Enforce(arch.Namespace("App.*").MustNotUse(ifaceRead))
+                .Because("b");
+        }).Single();
+
+        MemberIds(iface).ShouldBe([$"M:{T}IGauge.Read"]);
+    }
+
+    [Fact]
+    public void MustNotUse_VerbMintedStaticAnchor_MatchesSameAsTypeofAnchor()
+    {
+        // A verb-minted static anchor `() => DateTime.Now` desugars through arch.Member(() => …) to the same
+        // (declaring type, name) leaf as the typeof form, so it yields the identical member SymbolId — and the
+        // identical violation. The shared Scene uses no static member, so a local model that reads DateTime.Now
+        // stands in (the local-model pattern of the JsonReportRenderer / UsingStatic siblings above).
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         using System;
+                                                         namespace App;
+                                                         public class Home { public DateTime Go() => DateTime.Now; }
+                                                         """);
+
+        RuleResult result = Checker.Run(model, arch =>
+                arch.Rule("member/no-now")
+                    .Enforce(arch.Namespace("App.*").MustNotUse(() => DateTime.Now))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.MemberUse);
+        violation.Member!.SymbolId.ShouldBe("P:System.DateTime.Now");
+    }
+
     private static string Block(Action<Arch> define)
     {
         RuleResult result = Checker.Run(SceneModel, define).Single();

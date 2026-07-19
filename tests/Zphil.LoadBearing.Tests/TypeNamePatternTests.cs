@@ -3,7 +3,10 @@ using Xunit;
 
 namespace Zphil.LoadBearing.Tests;
 
-/// <summary>The GRAMMAR §5.2 type-name glob, pinned verbatim: <c>*</c> matches any run including empty; case-sensitive.</summary>
+/// <summary>
+///     The GRAMMAR §4.2 name-glob semantics, pinned verbatim: <c>*</c> matches any run including empty;
+///     case-sensitive.
+/// </summary>
 public class TypeNamePatternTests
 {
     [Theory]

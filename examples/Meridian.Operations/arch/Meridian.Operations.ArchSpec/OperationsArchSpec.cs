@@ -69,8 +69,8 @@ public sealed class OperationsArchSpec : IArchitectureSpec
                 arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
                 arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"),
-                arch.Type(typeof(IDemurrageCalculator)),
-                arch.Type(typeof(DemurrageCalculator))))
+                arch.Type<IDemurrageCalculator>(),
+                arch.Type<DemurrageCalculator>()))
             .Because("The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.");
 
         arch.Scope("demurrage/engine")

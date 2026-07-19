@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Prose;
 
@@ -87,7 +88,7 @@ internal sealed class SelectionEvaluator
     /// </summary>
     internal static string DefinitionFullName(Type type, string closedGenericGuidance)
     {
-        if (type.IsGenericType && !type.IsGenericTypeDefinition)
+        if (Generics.IsConstructed(type))
             throw new RuleEvaluationException(
                 $"`{TypeName.Simple(type)}` is a closed generic construction; {closedGenericGuidance}");
 

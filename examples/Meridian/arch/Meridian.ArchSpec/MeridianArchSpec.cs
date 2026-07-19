@@ -39,8 +39,8 @@ public sealed class MeridianArchSpec : IArchitectureSpec
                 "Code reads the ambient clock directly.",
                 web.Except(arch.Types.WithNameMatching("SystemClock"))
                     .MustNotUse(
-                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                        () => DateTime.Now,
+                        () => DateTime.UtcNow))
             .Because("Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input.")
             .Fix("Take IClock in the constructor; see BookingsController.");
 

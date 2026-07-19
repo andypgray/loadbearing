@@ -248,4 +248,44 @@ public sealed class CodebaseExtractorMemberEdgeTests
         model.HasEdge("N.Bar", "N.Foo").ShouldBeTrue();
         model.MemberEdges("N.Bar").ShouldBeEmpty();
     }
+
+    [Fact]
+    public void ExtractFromCompilations_CompilerPatternConsumption_ProducesNoMemberEdges()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         using System.Linq;
+                                                         namespace N;
+                                                         public class Boundary
+                                                         {
+                                                             public async System.Threading.Tasks.Task Go(System.Threading.Tasks.Task pending, int[] xs, System.IDisposable gate)
+                                                             {
+                                                                 await pending;
+                                                                 using (gate) {}
+                                                                 foreach (int x in xs) {}
+                                                             }
+
+                                                             public System.Collections.Generic.IEnumerable<int> Q(int[] xs) => from x in xs select x;
+                                                         }
+                                                         """);
+
+        // The documented syntax-walk boundary (GRAMMAR §4.5): await's GetAwaiter, using's Dispose, the
+        // foreach enumerator pattern, and query-syntax translation are compiler-pattern consumption the
+        // walk never sees as a member access — the member channel stays empty.
+        model.MemberEdges("N.Boundary").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_IndexerElementAccess_ProducesNoMemberEdge()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class Box { public int this[int i] => i; }
+                                                         public class User { public int Go(Box b) => b[0]; }
+                                                         """);
+
+        // The edge-side indexer exclusion (GRAMMAR §4.5, §11 growth): an element access binds no
+        // SimpleNameSyntax, so the indexer never surfaces in the member channel; the type edge stands.
+        model.HasEdge("N.User", "N.Box").ShouldBeTrue();
+        model.MemberEdges("N.User").ShouldBeEmpty();
+    }
 }

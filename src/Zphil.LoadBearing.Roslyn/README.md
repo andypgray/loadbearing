@@ -1,8 +1,8 @@
 # Zphil.LoadBearing.Roslyn
 
 `Zphil.LoadBearing.Roslyn` is [LoadBearing](https://github.com/andypgray/loadbearing)'s Roslyn
-extraction and workspace infrastructure: MSBuildWorkspace loading, type-level dependency-edge
-extraction, and the baseline-file host layer.
+extraction and workspace infrastructure: MSBuildWorkspace loading, type- and member-level
+dependency-edge extraction, and the baseline-file host layer.
 
 **Not intended for direct reference.** This package exists because it is a dependency of the
 packages you actually use:

@@ -271,6 +271,17 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void BlankPattern_BlankLayerGlob_IsReportedSpecWide()
+    {
+        // The layer flavor of §8 item 15: like the dead-subtree layer case below, layer globs are
+        // validated at their declaration (spec-wide, null rule ID, named by layer), used or not.
+        SpecValidationException ex = BuildExpectingFailure(new BlankLayerGlobSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == null);
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank namespace pattern on layer 'Bad'.");
+    }
+
+    [Fact]
     public void UnanchoredSubtreePattern_WildcardInSubtreePrefix_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeGlobSpec());
@@ -307,6 +318,228 @@ public class SpecValidationTests
         // Two dead subtree globs (the subject noun and the verb) plus one blank affix, reported together.
         ex.Errors.Count(e => e.Code == Code.UnanchoredSubtreePattern).ShouldBe(2);
         ex.Errors.Count(e => e.Code == Code.BlankPattern).ShouldBe(1);
+    }
+
+    [Fact]
+    public void MemberExpression_NonMemberBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new NonMemberBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda must be a single property, field, or method access " +
+                      "(x => x.Member or () => Type.Member); this lambda body is neither (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_MethodGroupBody_IsReportedWithInvocationGuidance()
+    {
+        // A method-group anchor `w => w.Reset` compiles on C# 14 (converting the method group to object,
+        // warning CS8974 — suppressed in the spec) and lowers to a CreateDelegate tree the resolver detects;
+        // on C# <= 13 it does not compile at all. Steers to the invocation form.
+        SpecValidationException ex = BuildExpectingFailure(new MethodGroupBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+                      "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
+                      "is anchored (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_ChainedReceiver_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ChainedReceiverSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
+                      "cast or as-cast is allowed; a chained access like x => x.A.B, a captured local or field, or a " +
+                      "user-defined conversion is not); anchor the declaring type you mean directly (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_StaticMemberInInstanceForm_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new StaticInInstanceFormSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A typed member anchor arch.Member<T>(x => ...) accesses a static member; anchor statics " +
+                      "with the parameterless overload arch.Member(() => Type.Member) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_InstanceMemberInStaticForm_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new InstanceInStaticFormSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A parameterless member anchor arch.Member(() => ...) must access a static member " +
+                      "directly; anchor an instance member with the typed overload arch.Member<T>(x => x.Member) " +
+                      "(used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_IndexerBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new IndexerBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
+                      "member-anchor surface (GRAMMAR §4.5); anchor a named property, field, or method " +
+                      "(used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_StaticMethodGroupBody_IsReported()
+    {
+        // A static method-group anchor `() => AnchorStatics.Beep` compiles on C# 14 (method group to object,
+        // CS8974 — suppressed in the spec) and lowers to a CreateDelegate tree carrying the MethodInfo as a
+        // compiler-emitted constant. Doubles as the T1 static-lowering regression oracle; steers to the
+        // invocation form like the instance case.
+        SpecValidationException ex = BuildExpectingFailure(new StaticMethodGroupBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+                      "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
+                      "is anchored (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_UserDefinedConversionReceiver_IsReported()
+    {
+        // ((AnchorFahrenheit)c).Value reaches its member through a user-defined conversion — following it
+        // would silently anchor the post-conversion type, so it is reported (identity casts are the only
+        // receiver peel).
+        SpecValidationException ex = BuildExpectingFailure(new UserOpConversionReceiverSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
+                      "cast or as-cast is allowed; a chained access like x => x.A.B, a captured local or field, or a " +
+                      "user-defined conversion is not); anchor the declaring type you mean directly (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_CompileTimeConstantBody_IsReported()
+    {
+        // () => DayOfWeek.Monday inlines the enum member to its value (Convert(Constant(...), object)), so
+        // Unwrap peels to a ConstantExpression with no member left to anchor.
+        SpecValidationException ex = BuildExpectingFailure(new CompileTimeConstantBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
+                      "literal) that the compiler inlines to its value, so no member remains to anchor; name a const " +
+                      "or enum member with the typeof form arch.Member(typeof(T), nameof(T.M)) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpressions_MultiplePoisoned_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MultiplePoisonedMembersSpec());
+
+        // Two poisoned member anchors on one rule → two errors in one pass (the §8 all-at-once contract).
+        ex.Errors.Count(e => e.Code == Code.MemberExpressionUnresolvable).ShouldBe(2);
+    }
+
+    [Fact]
+    public void ForeignMember_ExpressionMintedFromAnotherArch_IsReported()
+    {
+        // An expression-minted member is Owner-stamped like the typeof form, so the foreign-Arch check
+        // (which precedes the poison short-circuit) catches it (GRAMMAR §8 item 13).
+        SpecValidationException ex = BuildExpectingFailure(new ForeignExpressionMemberSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.ForeignMember && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ValidExpressionMemberUse_BuildsWithoutError()
+    {
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidExpressionMemberSpec()));
+    }
+
+    // Verb-position poison parity (Phase 16): the same unresolvable-anchor diagnostics the anchor-position
+    // twins pin (above) fire when the poisoned lambda is passed bare to MustNotUse's static forms, because
+    // the verb desugars each target through the identical MemberExpressionResolver. Five of the seven poison
+    // classes are reachable from the static forms; the two instance-form steers have no static-verb spelling.
+    // Message strings are copied verbatim from the anchor-position twins — the pinned strings are the spec.
+    [Fact]
+    public void MemberExpression_VerbNonMemberBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbNonMemberBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda must be a single property, field, or method access " +
+                      "(x => x.Member or () => Type.Member); this lambda body is neither (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_VerbStaticMethodGroupBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbStaticMethodGroupBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+                      "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
+                      "is anchored (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_VerbInstanceMemberInStaticForm_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbInstanceInStaticFormSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A parameterless member anchor arch.Member(() => ...) must access a static member " +
+                      "directly; anchor an instance member with the typed overload arch.Member<T>(x => x.Member) " +
+                      "(used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_VerbIndexerBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbIndexerBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
+                      "member-anchor surface (GRAMMAR §4.5); anchor a named property, field, or method " +
+                      "(used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpression_VerbCompileTimeConstantBody_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbCompileTimeConstantBodySpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
+            .ShouldBe("A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
+                      "literal) that the compiler inlines to its value, so no member remains to anchor; name a const " +
+                      "or enum member with the typeof form arch.Member(typeof(T), nameof(T.M)) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberExpressions_VerbMultiplePoisoned_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new VerbMultiplePoisonedMembersSpec());
+
+        // Two poisoned verb-position anchors on one rule → two errors in one pass (the §8 all-at-once contract).
+        ex.Errors.Count(e => e.Code == Code.MemberExpressionUnresolvable).ShouldBe(2);
+    }
+
+    [Fact]
+    public void ValidVerbMemberUse_BuildsWithoutError()
+    {
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidVerbMemberSpec()));
     }
 
     private sealed class DuplicateIdSpecA : IArchitectureSpec
@@ -566,6 +799,14 @@ public class SpecValidationTests
         }
     }
 
+    private sealed class BlankLayerGlobSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Layer("Bad", " ");
+        }
+    }
+
     private sealed class DeadSubtreeGlobSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -596,6 +837,196 @@ public class SpecValidationTests
         {
             arch.Rule("area/rule")
                 .Enforce(arch.Namespace("MyApp.*.A.*").WithSuffix(" ").MustResideInNamespace("Bad.*.X.*"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class NonMemberBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // w.Count + 1 is an arithmetic expression, not a member access.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<AnchorWidget>(w => w.Count + 1))).Because("Reason.");
+        }
+    }
+
+    private sealed class MethodGroupBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+#pragma warning disable CS8974 // deliberately anchoring a method group (the mistake under test)
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<AnchorWidget>(w => w.Reset))).Because("Reason.");
+#pragma warning restore CS8974
+        }
+    }
+
+    private sealed class ChainedReceiverSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // w.Inner.Count reaches through a chained access — anchor Count's declaring type directly instead.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<AnchorWidget>(w => w.Inner!.Count))).Because("Reason.");
+        }
+    }
+
+    private sealed class StaticInInstanceFormSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Instance form (arch.Member<T>) but the body reads a static member.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<DateTime>(_ => DateTime.Now))).Because("Reason.");
+        }
+    }
+
+    private sealed class InstanceInStaticFormSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Parameterless form (arch.Member(() => ...)) but the body reads an instance member off a static field.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.MinValue.Ticks))).Because("Reason.");
+        }
+    }
+
+    private sealed class IndexerBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // l[0] resolves to the get_Item accessor (IsSpecialName) — an indexer, outside the member-anchor surface.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<List<int>>(l => l[0]))).Because("Reason.");
+        }
+    }
+
+    private sealed class StaticMethodGroupBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+#pragma warning disable CS8974 // deliberately anchoring a static method group (the mistake under test)
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(() => AnchorStatics.Beep))).Because("Reason.");
+#pragma warning restore CS8974
+        }
+    }
+
+    private sealed class UserOpConversionReceiverSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // ((AnchorFahrenheit)c).Value peels through the explicit user-defined conversion — not an identity cast.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member<AnchorCelsius>(c => ((AnchorFahrenheit)c).Value))).Because("Reason.");
+        }
+    }
+
+    private sealed class CompileTimeConstantBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // DayOfWeek.Monday is a compile-time enum constant — inlined to its value, no member remains.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(() => DayOfWeek.Monday))).Because("Reason.");
+        }
+    }
+
+    private sealed class MultiplePoisonedMembersSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotUse(
+                    arch.Member<AnchorWidget>(w => w.Count + 1),
+                    arch.Member<AnchorWidget>(w => w.Inner!.Count)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class ForeignExpressionMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            var other = new Arch();
+            Member foreign = other.Member<Task>(t => t.Wait());
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(foreign)).Because("Reason.");
+        }
+    }
+
+    private sealed class ValidExpressionMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotUse(
+                    arch.Member(() => DateTime.Now),
+                    arch.Member(() => DateTime.UtcNow)))
+                .Because("Reason.");
+        }
+    }
+
+    // Verb-position twins of the poison specs above: the poisoned lambda is passed bare to MustNotUse's
+    // static forms rather than wrapped in arch.Member(...). Each reifies through the identical resolver, so
+    // it reproduces the identical diagnostic.
+    private sealed class VerbNonMemberBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // new object() is an object-creation expression, not a member access.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(() => new object())).Because("Reason.");
+        }
+    }
+
+    private sealed class VerbStaticMethodGroupBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+#pragma warning disable CS8974 // deliberately anchoring a static method group (the mistake under test)
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(() => AnchorStatics.Beep)).Because("Reason.");
+#pragma warning restore CS8974
+        }
+    }
+
+    private sealed class VerbInstanceInStaticFormSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Static form (() => ...) but the body reads an instance member (.Ticks) off a static field.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(() => DateTime.MinValue.Ticks)).Because("Reason.");
+        }
+    }
+
+    private sealed class VerbIndexerBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // new List<int>()[0] resolves to the get_Item accessor (IsSpecialName) — checked before receiver classification.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(() => new List<int>()[0])).Because("Reason.");
+        }
+    }
+
+    private sealed class VerbCompileTimeConstantBodySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // DayOfWeek.Monday is a compile-time enum constant — inlined to its value, no member remains.
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(() => DayOfWeek.Monday)).Because("Reason.");
+        }
+    }
+
+    private sealed class VerbMultiplePoisonedMembersSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Both bind the Func<object?> overload (an enum read is not a statement, so only that overload spans both).
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotUse(() => new object(), () => DayOfWeek.Monday))
+                .Because("Reason.");
+        }
+    }
+
+    // No verb-position foreign-Arch twin: the resolver's owner comes from subject.Owner by construction, so
+    // there is no seam to pass a foreign Arch. The ForeignMember check that ForeignExpressionMemberSpec
+    // exercises (via a Member minted on another Arch) has no static-verb spelling — hence no test here.
+    private sealed class ValidVerbMemberSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow))
                 .Because("Reason.");
         }
     }

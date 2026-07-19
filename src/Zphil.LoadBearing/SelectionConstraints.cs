@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 
@@ -67,6 +68,26 @@ public static class SelectionConstraints
         return new MustNotUseConstraint(subject, Members(subject, first, more));
     }
 
+    /// <summary>
+    ///     The subject must not use any of the static value-member targets — <c>() =&gt; Type.M</c>, pure
+    ///     authoring sugar for <c>arch.Member(() =&gt; Type.M)</c> (GRAMMAR §3.3/§4.5). Each lambda desugars
+    ///     at mint through <see cref="MemberExpressionResolver" /> to the identical <see cref="Member" /> leaf.
+    /// </summary>
+    public static Constraint MustNotUse(this Selection subject, Expression<Func<object?>> first, params Expression<Func<object?>>[] more)
+    {
+        return new MustNotUseConstraint(subject, ResolvedMembers(subject, first, more));
+    }
+
+    /// <summary>
+    ///     The subject must not use any of the static void-method targets — <c>() =&gt; Type.M()</c>, pure
+    ///     authoring sugar for <c>arch.Member(() =&gt; Type.M())</c> (GRAMMAR §3.3/§4.5). Each lambda desugars
+    ///     at mint through <see cref="MemberExpressionResolver" /> to the identical <see cref="Member" /> leaf.
+    /// </summary>
+    public static Constraint MustNotUse(this Selection subject, Expression<Action> first, params Expression<Action>[] more)
+    {
+        return new MustNotUseConstraint(subject, ResolvedMembers(subject, first, more));
+    }
+
     /// <summary>The subject must reside in a namespace glob.</summary>
     public static Constraint MustResideInNamespace(this Selection subject, string glob)
     {
@@ -107,6 +128,31 @@ public static class SelectionConstraints
     public static Constraint MustBeAttributedWith(this Selection subject, Type type)
     {
         return new MustBeAttributedWithConstraint(Subject(subject), NotNull(type, nameof(type)));
+    }
+
+    /// <summary>
+    ///     The subject must implement <typeparamref name="T" /> — <c>≡ MustImplement(typeof(T))</c>; an open generic
+    ///     stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustImplement<T>(this Selection subject)
+    {
+        return subject.MustImplement(typeof(T));
+    }
+
+    /// <summary>
+    ///     The subject must derive from <typeparamref name="T" /> — <c>≡ MustDeriveFrom(typeof(T))</c>; an open generic
+    ///     stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustDeriveFrom<T>(this Selection subject)
+    {
+        return subject.MustDeriveFrom(typeof(T));
+    }
+
+    /// <summary>The subject must carry attribute <typeparamref name="T" /> — <c>≡ MustBeAttributedWith(typeof(T))</c>.</summary>
+    public static Constraint MustBeAttributedWith<T>(this Selection subject)
+        where T : Attribute
+    {
+        return subject.MustBeAttributedWith(typeof(T));
     }
 
     /// <summary>The subject must be sealed.</summary>
@@ -172,6 +218,22 @@ public static class SelectionConstraints
         Guard.NotNull(subject, nameof(subject));
         var list = new List<Member>(1 + more.Length) { NotNull(first, nameof(first)) };
         foreach (Member member in more) list.Add(NotNull(member, nameof(more)));
+
+        return list;
+    }
+
+    // The static-form MustNotUse sugar: each lambda resolves through MemberExpressionResolver stamped with
+    // the subject's owner (the Wrap precedent), minting the identical Member leaf as arch.Member(() => ...).
+    // Generic over the concrete lambda type so the two delegate-shape overloads (Func<object?> / Action)
+    // share one body with no array-covariance conversion. Null/empty params edges mirror the
+    // Members/WrappedTypes helpers exactly.
+    private static IReadOnlyList<Member> ResolvedMembers<TLambda>(Selection subject, TLambda first, TLambda[] more)
+        where TLambda : LambdaExpression
+    {
+        Guard.NotNull(subject, nameof(subject));
+        Arch owner = subject.Owner;
+        var list = new List<Member>(1 + more.Length) { MemberExpressionResolver.Resolve(owner, NotNull(first, nameof(first))) };
+        foreach (TLambda lambda in more) list.Add(MemberExpressionResolver.Resolve(owner, NotNull(lambda, nameof(more))));
 
         return list;
     }

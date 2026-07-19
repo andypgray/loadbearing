@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 
 namespace Zphil.LoadBearing;
@@ -63,6 +65,12 @@ public sealed class Arch
         return new RefinedSelection(this, new TypeNoun(type), Array.Empty<SelectionAdjective>());
     }
 
+    /// <summary>A single type — <c>arch.Type&lt;SqlConnection&gt;()</c> ≡ <c>arch.Type(typeof(T))</c>.</summary>
+    public Selection Type<T>()
+    {
+        return Type(typeof(T));
+    }
+
     /// <summary>
     ///     A member-access ban target — a declaring type plus a member name (GRAMMAR §4.5). A
     ///     target-only leaf for <see cref="SelectionConstraints.MustNotUse" />, not a
@@ -72,6 +80,49 @@ public sealed class Arch
     public Member Member(Type type, string name)
     {
         return new Member(this, type, name);
+    }
+
+    /// <summary>
+    ///     A member-access ban target from a typed instance-member lambda whose member returns a value
+    ///     (GRAMMAR §4.5): <c>arch.Member&lt;Task&lt;int&gt;&gt;(t =&gt; t.Result)</c> anchors
+    ///     <c>Task&lt;T&gt;.Result</c>. Pure authoring sugar — desugars at mint to the same leaf as
+    ///     <see cref="Member(System.Type,System.String)" />, with the type↔member pairing additionally
+    ///     compiler-checked; the anchor is the lambda's resolved member (a constructed generic normalized
+    ///     to its definition), and an unresolvable lambda is reported at spec build (GRAMMAR §8).
+    /// </summary>
+    public Member Member<T>(Expression<Func<T, object?>> member)
+    {
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+    }
+
+    /// <summary>
+    ///     A member-access ban target from a typed instance-member lambda whose member returns void
+    ///     (GRAMMAR §4.5): <c>arch.Member&lt;Task&gt;(t =&gt; t.Wait())</c> anchors <c>Task.Wait</c>. The
+    ///     void twin of the value-returning typed overload; same desugaring.
+    /// </summary>
+    public Member Member<T>(Expression<Action<T>> member)
+    {
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+    }
+
+    /// <summary>
+    ///     A member-access ban target from a parameterless static-member lambda whose member returns a
+    ///     value (GRAMMAR §4.5): <c>arch.Member(() =&gt; DateTime.Now)</c> anchors <c>DateTime.Now</c>.
+    ///     The static form of the typed instance overloads; same desugaring.
+    /// </summary>
+    public Member Member(Expression<Func<object?>> member)
+    {
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+    }
+
+    /// <summary>
+    ///     A member-access ban target from a parameterless static-member lambda whose member returns void
+    ///     (GRAMMAR §4.5): <c>arch.Member(() =&gt; GC.Collect())</c> anchors <c>GC.Collect</c>. The static
+    ///     void twin; same desugaring.
+    /// </summary>
+    public Member Member(Expression<Action> member)
+    {
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
     }
 
     /// <summary>Registers a rule anchor immediately and returns its posture-stage builder.</summary>

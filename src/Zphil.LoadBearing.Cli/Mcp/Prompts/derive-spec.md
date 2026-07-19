@@ -23,7 +23,8 @@ Work the steps in order. Do not skip the curation gate.
   `arch_status`) or their identical CLI verbs (`loadbearing graph|check|explain|status`,
   add `--json` for the same documents). The CLI verbs take the solution path as their first
   argument — `loadbearing graph MyApp.sln --json` — or walk up from the working directory
-  when omitted; the MCP tools are already bound to the solution. The two ratchet mutations
+  when omitted (`explain` differs: its rule ID comes first, the solution second —
+  `loadbearing explain area/rule MyApp.sln`); the MCP tools are already bound to the solution. The two ratchet mutations
   that end the flow — `loadbearing baseline --init` and the commit — belong to the human.
 
 ## 0. Discover stated intent first
@@ -96,6 +97,12 @@ it will `typeof()`.** On a `net48` estate, the spec targets `net48` — the Load
 library is `netstandard2.0` precisely so that works. Where referencing a product project is
 awkward, you do not need it: namespace-pattern targets (`arch.Namespace("System.Data.*")`)
 need no compile-time reference at all, and matching is by full name.
+
+`typeof()` targets must also be **accessible** to the spec assembly: anchoring an `internal`
+type fails the spec build with CS0122. For dependency-verb targets, switch to a namespace
+pattern; where the type itself is the point — a `BoundaryOnlyVia` facade, an `Implementing`
+anchor — have the product project grant `[InternalsVisibleTo("MyApp.ArchSpec")]` (or the
+csproj `<InternalsVisibleTo Include="MyApp.ArchSpec" />`) and rebuild.
 
 ```csharp
 using Zphil.LoadBearing;
@@ -176,6 +183,11 @@ arch.Rule("data-access/no-inline-sql")
   intended. Member-level conventions are candidates too:
   `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")` where the
   codebase names its async methods `*Async`.
+- Anchor a rule on the `Layer` handle wherever one exists (`tools.MustHaveSuffix("Tools")`,
+  not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`). The two check
+  identically, but render's per-directory local-rules card is keyed on the layer-anchored
+  subject — the glob-spelled twin emits no card in that layer's directory, so agents editing
+  there never see the rule locally.
 - Dragon-zone candidates are the one exception to "all as Enforce": a boundary has no Enforce
   form, so draft them as `arch.Scope(id).Freeze(...)` directly (step 5 shows the full shape).
   The scope's containment violations arrive in step 4 alongside every other rule's evidence.
@@ -203,8 +215,11 @@ are the data). For each rule, read `rules[]`:
   unresolvable or unbuilt spec, or spec validation errors. Fix, rebuild, rerun.
 
 Iterate globs until the failures that remain are *genuine* — real edges, real nonconforming
-names. If the MCP response is truncated on a big solution, check rule-by-rule at the CLI or
-split the draft spec temporarily.
+names. Iterating is cheap over MCP: the server holds the workspace warm and reconciles your
+edits per call, so a re-check after the first load answers in milliseconds; one-shot CLI runs
+pay a workspace load each time (a clean tree with a valid extraction cache skips it). If the
+MCP response is truncated on a big solution, check rule-by-rule at the CLI or split the draft
+spec temporarily.
 
 ## 5. Assign postures from the evidence
 
@@ -311,23 +326,43 @@ A spec is one class implementing `IArchitectureSpec` with one method `Define(Arc
 three statement forms: definitions, rules, scopes.
 
 **Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` ·
-`arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` ·
-`arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the `MustNotUse` target form;
-matching is by declaring type + member name, so one ban covers every overload).
+`arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
+`arch.Type<X>()`) · `arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the
+`MustNotUse` target form; matching is by declaring type + member name, so one ban covers every
+overload) — or the compiler-checked expression forms `arch.Member<X>(x => x.M)` (instance) and
+`arch.Member(() => X.M)` (static), which anchor the same member with the type↔member pairing
+verified at compile time — and `MustNotUse` accepts these static lambdas bare (see the verb
+below). (These expression forms cannot anchor a compiler-inlined member: a
+`const` field, `enum` member, or literal is baked to its value with no member left in the tree, so
+anchor those with the `typeof`/`nameof` form.)
 
 **Adjectives** (chain onto any selection) — `.InNamespace(glob)` · `.OfKind(TypeKind.Class |
 Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
-`.WithNameMatching(glob)` · `.Implementing(type)` · `.DerivedFrom(type)` ·
-`.AttributedWith(attributeType)` · `.Except(selection)` · `.Where(pred, description:)`.
+`.WithNameMatching(glob)` · `.Implementing(type)` / `.Implementing<T>()` · `.DerivedFrom(type)` /
+`.DerivedFrom<T>()` · `.AttributedWith(attributeType)` / `.AttributedWith<T>()` ·
+`.Except(selection)` · `.Where(pred, description:)`.
 
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes
-selections or `typeof()`s, one-or-more) · `MustNotUse(arch.Member(...), ...)` (bans member
-accesses — `DateTime.Now`, `.Result`, `ConfigurationManager.AppSettings`; *use* = a
+selections or `typeof()`s, one-or-more) · `MustNotUse(arch.Member(...), ...)` — or, when every
+target is a **static** member, the lambdas bare: `MustNotUse(() => DateTime.Now,
+() => DateTime.UtcNow)` — (bans member accesses — `DateTime.Now`, `.Result`,
+`ConfigurationManager.AppSettings`; *use* = a
 source-level member access, and `nameof` operands are not uses) · `MustResideInNamespace(glob)`
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
-`MustDeriveFrom` / `MustBeAttributedWith` · `MustBeSealed` / `MustBeStatic` / `MustBeAbstract`
-/ `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
+`MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
+`MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustBeSealed` / `MustBeStatic` /
+`MustBeAbstract` / `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
+
+The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>()` /
+`.AttributedWith<T>()`, the three `Must*<T>` verbs, the `arch.Member<X>(x => x.M)` /
+`arch.Member(() => X.M)` anchors, and the static `MustNotUse(() => X.M)` verb forms — are pure
+sugar for the `typeof`/`nameof` form and reify identically. An **open** generic has no
+type-argument form, so it stays `typeof` (`Implementing(typeof(IHandler<>))`,
+`.Returning(typeof(Task<>))`). The dependency verbs take
+`typeof` or a wrapping `arch.Type<X>()` (never a generic verb); `.Returning` takes `typeof` only:
+its sole overload is `Returning(Type, params Type[])`, and a `Selection` such as `arch.Type<X>()`
+is not a `Type`.
 
 **Member subjects** — a projection turns any selection into a selection of its declared
 members, constrained directly: projections `.Members` / `.Methods` / `.Properties` / `.Fields`

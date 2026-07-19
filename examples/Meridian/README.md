@@ -14,7 +14,7 @@ Twenty current violations are grandfathered: twelve inline-SQL references, seven
 
 ## The spec
 
-The architecture is six statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Each one carries a posture, a reason, and a fix.
+The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Each one carries a posture, a reason, and a fix. (The frozen scope desugars into two checked rules, so `check` reports six.)
 
 | Rule | Posture | What it says |
 |---|---|---|

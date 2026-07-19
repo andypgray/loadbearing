@@ -59,6 +59,31 @@ public static class SelectionAdjectives
         return Append(selection, new AttributedWithAdjective(NotNull(type, nameof(type))));
     }
 
+    /// <summary>
+    ///     Narrows to types implementing <typeparamref name="T" /> — <c>≡ Implementing(typeof(T))</c>; an open generic
+    ///     stays <c>typeof</c>.
+    /// </summary>
+    public static Selection Implementing<T>(this Selection selection)
+    {
+        return selection.Implementing(typeof(T));
+    }
+
+    /// <summary>
+    ///     Narrows to types derived from <typeparamref name="T" /> — <c>≡ DerivedFrom(typeof(T))</c>; an open generic
+    ///     stays <c>typeof</c>.
+    /// </summary>
+    public static Selection DerivedFrom<T>(this Selection selection)
+    {
+        return selection.DerivedFrom(typeof(T));
+    }
+
+    /// <summary>Narrows to types carrying attribute <typeparamref name="T" /> — <c>≡ AttributedWith(typeof(T))</c>.</summary>
+    public static Selection AttributedWith<T>(this Selection selection)
+        where T : Attribute
+    {
+        return selection.AttributedWith(typeof(T));
+    }
+
     /// <summary>Excludes another selection; canonicalized to sentence-final (GRAMMAR §6).</summary>
     public static Selection Except(this Selection selection, Selection exclusion)
     {

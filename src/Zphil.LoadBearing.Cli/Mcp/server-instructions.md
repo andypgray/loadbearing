@@ -12,6 +12,6 @@ Cross-cutting:
 
 - **Violations are data, not errors.** `arch_check` returns its report even when rules fail — read the `summary` counts and the `rules[]` array; a red rule is a finding, never a tool failure.
 - The server is bound to **one solution + one spec** (set when it was started); the tools take no solution argument.
-- Every call **loads the workspace fresh** — expect several seconds on a large solution. There is no caching in v1.
+- The workspace loads on the **first call** — expect several seconds on a large solution — then is held **warm** and reconciled against disk on every later call, so a post-edit re-check answers in milliseconds. Set `LOADBEARING_DISABLE_WARM_WORKSPACE=true` to load fresh per call instead.
 - The server **never builds.** Build the solution yourself before checking; a stale build yields stale results.
 - Drill down with `arch_explain <rule-id>`; the always-on architecture summary lives in the repository's root `AGENTS.md` managed block.

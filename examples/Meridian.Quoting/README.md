@@ -21,7 +21,7 @@ Three rules from [arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs](arch/Meridi
             .Fix("Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.");
 
         arch.Rule("handlers/transactional")
-            .Enforce(arch.Types.Implementing(typeof(ICommandHandler<>)).MustBeAttributedWith(typeof(TransactionalAttribute)))
+            .Enforce(arch.Types.Implementing(typeof(ICommandHandler<>)).MustBeAttributedWith<TransactionalAttribute>())
             .Because("Every command here mutates the store, and the command bus opens a unit of work only around a handler marked `[Transactional]`; an unmarked command handler would commit each write on its own and leave a half-written quote if it failed midway.")
             .Fix("Add `[Transactional]` to the command handler (see RequestQuoteHandler); if the work is read-only, make it a query handler instead.");
 
@@ -29,8 +29,8 @@ Three rules from [arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs](arch/Meridi
             .Enforce(arch.Types.InNamespace("Meridian.Quoting.*")
                          .Except(arch.Types.WithNameMatching("SystemClock"))
                          .MustNotUse(
-                             arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                             arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                             () => DateTime.Now,
+                             () => DateTime.UtcNow))
             .Because("A quote's validity window is computed from the current instant; read straight from the wall clock it cannot be tested at a fixed moment, so time enters through IClock and SystemClock is the one adapter that reads the machine clock.")
             .Fix("Take IClock in the constructor and read clock.UtcNow; see SystemClock for the single sanctioned wall-clock read.");
 ```

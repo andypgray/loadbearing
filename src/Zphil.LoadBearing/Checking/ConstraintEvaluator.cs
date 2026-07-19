@@ -139,7 +139,7 @@ internal sealed class ConstraintEvaluator
             if (subjects.Contains(edge.Source) && banned.Contains((edge.Member.ContainingType.FullName, edge.Member.Name)))
                 violations.Add(Violation.MemberUse(edge.Source, edge.Member, edge.Sites));
 
-        // MustNotUse never warns: member targets are typeof-anchored (no pattern form), so a banned member
+        // MustNotUse never warns: member targets are concrete (type, name) anchors (no pattern form), so a banned member
         // absent from the codebase is the win condition, exactly like a bare typeof target (GRAMMAR §4.5).
         return (violations, NoWarnings);
     }

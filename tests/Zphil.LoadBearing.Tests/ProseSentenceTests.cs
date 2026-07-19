@@ -79,6 +79,44 @@ public class ProseSentenceTests
             .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task` must be named `*Async`.");
     }
 
+    [Fact]
+    public void MustNotUse_ExpressionMintedMethod_RendersParens()
+    {
+        // The no-churn proof (Phase 15): an expression-minted method anchor renders byte-identically to the
+        // typeof form — parens for a method (GRAMMAR §6). The member reifies to the same leaf, so the prose is unchanged.
+        ArchModelBuilder.Build(new ExpressionMintedMethodSpec())
+            .Rules.Single(rule => rule.Id == "member/no-wait").Sentence
+            .ShouldBe("Types must not use `Task.Wait()`.");
+    }
+
+    [Fact]
+    public void MustNotUse_ExpressionMintedProperty_RendersNoParens()
+    {
+        // An expression-minted property anchor renders with no parens — identical to the typeof form.
+        ArchModelBuilder.Build(new ExpressionMintedPropertySpec())
+            .Rules.Single(rule => rule.Id == "member/no-now").Sentence
+            .ShouldBe("Types must not use `DateTime.Now`.");
+    }
+
+    [Fact]
+    public void MustNotUse_VerbStaticVoidMethod_RendersParens()
+    {
+        // The static-form verb sugar (Phase 16): a bare () => GC.Collect() lambda desugars through
+        // arch.Member(() => …) to the same method leaf, so the sentence is byte-identical — parens for a method.
+        ArchModelBuilder.Build(new VerbStaticMethodSpec())
+            .Rules.Single(rule => rule.Id == "member/verb-collect").Sentence
+            .ShouldBe("Types must not use `GC.Collect()`.");
+    }
+
+    [Fact]
+    public void MustNotUse_VerbStaticProperty_RendersNoParens()
+    {
+        // The static-form verb sugar over a property renders with no parens — identical to the typeof form.
+        ArchModelBuilder.Build(new VerbStaticPropertySpec())
+            .Rules.Single(rule => rule.Id == "member/verb-now").Sentence
+            .ShouldBe("Types must not use `DateTime.Now`.");
+    }
+
     // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
     // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
     private sealed class InjectClockSpec : IArchitectureSpec
@@ -106,6 +144,51 @@ public class ProseSentenceTests
             arch.Rule("naming/async-suffix")
                 .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                 .Because("Async methods are discovered by suffix; agents grep by *Async.");
+        }
+    }
+
+    // Expression-minted member anchors (Phase 15): the void method form (parens in prose) and the static
+    // property form (no parens) — each reifies to the same leaf as the typeof form, so the prose is unchanged.
+    private sealed class ExpressionMintedMethodSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/no-wait")
+                .Enforce(arch.Types.MustNotUse(arch.Member<Task>(t => t.Wait())))
+                .Because("Blocking waits deadlock the request thread.");
+        }
+    }
+
+    private sealed class ExpressionMintedPropertySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/no-now")
+                .Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
+                .Because("Wall-clock reads are untestable.");
+        }
+    }
+
+    // Static-form verb sugar (Phase 16): the bare () => Type.M lambdas on MustNotUse desugar to the same leaf
+    // as arch.Member(() => …), so the rendered sentence is unchanged — parens for the void method, none for
+    // the property.
+    private sealed class VerbStaticMethodSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/verb-collect")
+                .Enforce(arch.Types.MustNotUse(() => GC.Collect()))
+                .Because("Forced GCs stall the process.");
+        }
+    }
+
+    private sealed class VerbStaticPropertySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/verb-now")
+                .Enforce(arch.Types.MustNotUse(() => DateTime.Now))
+                .Because("Wall-clock reads are untestable.");
         }
     }
 }

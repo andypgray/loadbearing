@@ -49,8 +49,8 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Migrate(
                 "Code reads the ambient clock directly.",
                 web.MustNotUse(
-                    arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                    arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                    () => DateTime.Now,
+                    () => DateTime.UtcNow))
             .Because("Wall-clock reads are untestable; inject IClock.")
             .Fix("Take IClock in the constructor; see OrderService for the pattern.");
 

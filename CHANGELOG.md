@@ -9,7 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Warm MCP server: the workspace loads on the first tool call, then is held warm and
+  reconciled against disk per call, so a post-edit `arch_check` answers in milliseconds
+  (opt out with `LOADBEARING_DISABLE_WARM_WORKSPACE=true`). The one-shot CLI gains a
+  persisted per-solution extraction cache: a clean tree checks without a design-time
+  build; `--no-cache` bypasses it.
 - `check`/`status`/`graph` `--binlog <path>`: replay a real build's binlog instead of running a design-time build (via Basic.CompilerLog). The capture persists per solution, and later runs replay it automatically while it stays structurally valid; `--no-cache` now bypasses both the fragment cache and the build capture. Known v1 limit: replayed models can omit source-generator output (measured: ASP.NET Razor generated types), so on generator-heavy solutions the design-time path remains the fidelity reference.
+- Member-access bans: `arch.Member(...)` targets and the `MustNotUse` verb. "The Web layer
+  must not use `DateTime.Now`" is now a one-line rule, checked at source-level member use
+  with `file:line` and ratcheted like any other rule (`baseline --add --target` accepts
+  member names and symbol IDs).
+- Member subjects: `.Methods`/`.Properties`/`.Fields`/`.Events`/`.Members` projections
+  with member adjectives (`.Returning(...)`, name affixes, `.Where(...)`) and member
+  verbs (`MustHaveSuffix`, `MustBePrivate`, `MustBeVirtual`, …): "methods returning
+  `Task` must be named `*Async`" in closed vocabulary.
+- Compile-checked anchors and generic sugar: `arch.Member<T>(x => x.M)` /
+  `arch.Member(() => X.M)` expression member anchors, `arch.Type<X>()`, generic
+  adjective/constraint twins (`.Implementing<T>()`, `MustImplement<T>()`, …), and the
+  static forms directly on the verb, `MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)`.
+  All pure authoring sugar reifying to the identical model.
 
 ## [0.1.0] - 2026-07-14
 

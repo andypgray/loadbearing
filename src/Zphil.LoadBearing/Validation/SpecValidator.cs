@@ -1,4 +1,5 @@
 using System.Reflection;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Prose;
 using Code = Zphil.LoadBearing.Validation.SpecValidationErrorCode;
@@ -231,14 +232,23 @@ internal static class SpecValidator
         foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
             if (adjective is ReturningAdjective returning)
                 foreach (Type type in returning.Types)
-                    if (type.IsGenericType && !type.IsGenericTypeDefinition)
+                    if (Generics.IsConstructed(type))
                         errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
                             $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
-                            $"use typeof({TypeofForm(GenericDefinition(type))}) (used by '{rule.Id}')."));
+                            $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}')."));
     }
 
     private static void CheckMember(Member member, string id, List<SpecValidationError> errors)
     {
+        // A member minted from an unresolvable anchor expression (GRAMMAR §8, item 12's expression sibling):
+        // the resolver stored the diagnostic core; report it before touching the anchor. A poisoned Member's
+        // anchor accessors throw if read (fail closed), so this short-circuit is the only sanctioned path.
+        if (member.PoisonError is not null)
+        {
+            errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, id, $"{member.PoisonError} (used by '{id}')."));
+            return;
+        }
+
         string display = SafeFullDisplay(member.DeclaringType);
 
         if (string.IsNullOrWhiteSpace(member.Name))
@@ -248,7 +258,7 @@ internal static class SpecValidator
             return;
         }
 
-        Type anchor = GenericDefinition(member.DeclaringType);
+        Type anchor = Generics.Definition(member.DeclaringType);
         if (Declares(anchor, member.Name)) return;
 
         Type? declaringBase = FindDeclaringBase(anchor, member.Name);
@@ -272,7 +282,7 @@ internal static class SpecValidator
         {
             foreach (Type contract in anchor.GetInterfaces())
             {
-                Type normalized = GenericDefinition(contract);
+                Type normalized = Generics.Definition(contract);
                 if (Declares(normalized, name)) return normalized;
             }
 
@@ -281,7 +291,7 @@ internal static class SpecValidator
 
         for (Type? baseType = anchor.BaseType; baseType != null; baseType = baseType.BaseType)
         {
-            Type normalized = GenericDefinition(baseType);
+            Type normalized = Generics.Definition(baseType);
             if (Declares(normalized, name)) return normalized;
         }
 
@@ -293,11 +303,6 @@ internal static class SpecValidator
         const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
                                    BindingFlags.Instance | BindingFlags.Static;
         return type.GetMember(name, flags).Length > 0;
-    }
-
-    private static Type GenericDefinition(Type type)
-    {
-        return type.IsGenericType && !type.IsGenericTypeDefinition ? type.GetGenericTypeDefinition() : type;
     }
 
     // The C#-writable typeof operand for a (normalized) type: non-generic → bare name (`Task`); generic
