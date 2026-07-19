@@ -125,6 +125,24 @@ loadbearing check examples/Meridian/Meridian.slnx
 
 `check` exits 0 here, because every current violation is on the baseline. `loadbearing status` prints the burndown above, and `loadbearing render` regenerates the `AGENTS.md` block from the spec. Introduce one of the violations from this page and `check` exits 1 with the message shown.
 
+## In the agent's loop
+
+The rendered block steers an agent's first attempt. A hook makes the same rules block a wrong one before it lands. Wired as a Claude Code `PostToolUse` hook, `loadbearing check` runs after each edit, and a new violation returns on stderr at the moment of creation, so the agent reads the rule and corrects the code in the same turn. Add the inline-SQL method from [the statistical prior](#the-statistical-prior) to `BookingsController` and the hook blocks the edit with exit 2, feeding back the failing rule (its passing siblings in the report omitted here):
+
+```text
+FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
+  because: Data access behind a repository can be tested and swapped; SQL in the request path cannot.
+  fix: Move the SQL into a repository; see BookingRepository.
+  src/Meridian.Web/Controllers/BookingsController.cs:72 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
+  src/Meridian.Web/Controllers/BookingsController.cs:73 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  src/Meridian.Web/Controllers/BookingsController.cs:74 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  src/Meridian.Web/Controllers/BookingsController.cs:75 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
+  src/Meridian.Web/Controllers/BookingsController.cs:77 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
+```
+
+The fix line names the exemplar, and `IBookingRepository` already has the query, so the correction is a two-line call through the injected repository, captured green in the same loop. The wrapper scripts, the paste-in `.claude/settings.json` snippet (the repository keeps `.claude/` local, so the hook config ships as a snippet you paste), and the full task-to-self-correction walk are in [`hooks/`](hooks/), scripted with real captured output in the [storyboard](hooks/storyboard.md).
+
 ## From here
 
 The clean-architecture on-ramp, [`Meridian.Quoting`](../Meridian.Quoting/), is a greenfield subsystem that meets these ratchets' target state: the same rules as `Enforce` law from day one. Meridian is that target state met by a codebase that has not reached it yet: same law, stated honestly against the debt.

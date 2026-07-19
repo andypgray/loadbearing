@@ -57,6 +57,7 @@ Worked examples live in [`examples/`](https://github.com/andypgray/loadbearing/t
 - [`Meridian.Quoting`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): a greenfield clean-architecture quoting subsystem, Enforce-only. The generated `AGENTS.md` block beside the spec that produced it, and every rule as an individually named xUnit test.
 - [`Meridian.Operations`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): a modular monolith with module isolation as enforceable law. Each module directory carries its own generated `AGENTS.md` card, and one module is frozen behind its facade.
 - [`Meridian/ADOPTING.md`](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md): the day-one adoption walkthrough. The full derive flow against an existing codebase, every step a real command with real output.
+- [`Meridian/hooks`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian/hooks): the agent-loop showcase. A Claude Code hook runs `check` after each edit, so new code in a retired pattern goes red at the moment of creation; the storyboard walks one task from the old pattern to self-correction, every block real captured output.
 
 ## License
 

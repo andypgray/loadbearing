@@ -128,7 +128,15 @@ closure regardless of membership, so the contract library's types appear in the 
 in the checked universe**. Ignore them in the survey, and scope broad subjects to your product
 namespaces (`arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*")`, not bare
 `arch.Types.OfKind(...)`) so convention rules never bite the tooling. A `PackageReference`
-setup has none of this — the package is a metadata reference, not a project.
+setup has none of this — the package is a metadata reference, not a project. (Outside the
+LoadBearing repo, expect `dotnet sln add` to record the contract library by a long relative
+path — harmless, but it will show in the solution diff; the published package is the cure.)
+
+Test projects need the same subject-scoping care in ANY setup: a test project sharing the
+product root namespace (`MyApp.Tests.*` inside `MyApp.*`) is solution-declared, so
+`.InNamespace("MyApp.*")` subjects include its types — fakes and test helpers then pollute
+naming, member, and hierarchy rules. Anchor product-wide subjects on `arch.Project("MyApp")`
+instead; a project noun never crosses project boundaries.
 
 Errors you may see, verbatim, and what they mean:
 
@@ -299,8 +307,11 @@ uncaptured ratcheted rule's *current* violations in one pass, writing one entry 
 `arch/baselines/` (paths resolve against the solution root) — everything red right now,
 including code written five minutes ago; day
 zero is the one moment "current" and "accepted" coincide, which is why curation comes first.
-From then on the ratchet holds: baselined sites pass, anything new goes red, and the file only
-shrinks (`baseline --accept-reductions`).
+From then on the ratchet holds: baselined violations pass, new ones go red, and the file only
+shrinks (`baseline --accept-reductions`). One precision worth knowing: entries key
+subject×target pairs, not sites — every reference site between one pair rides in a single
+entry, `status` counts pairs, and a new site inside an already-grandfathered pair does not go
+red (a new pair does).
 
 Re-run `arch_check`: expect exit 0, `rulesFailed: 0`, with the grandfathered counts visible.
 `arch_status` now shows the per-rule burndown — the numbers the team watches shrink.
