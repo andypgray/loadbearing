@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -139,20 +138,6 @@ internal sealed class ExtractionCacheStore
     // fragments — every prior version likewise misses.)
     private const int CurrentSchemaVersion = 4;
 
-    // Probe files whose presence anywhere from a project directory up to the solution directory changes the
-    // build — recorded even when absent, so a newly-appearing one is an existence flip. Mirrors WorkspaceSession.
-    private static readonly string[] StructuralProbeFileNames =
-        ["Directory.Build.props", "Directory.Build.targets", "global.json"];
-
-    // The tool version is the assembly's informational version (e.g. "0.1.0+<sha>"): the .NET SDK appends the
-    // commit hash, giving per-commit invalidation during development, which is deliberate. Read from this
-    // (Roslyn) assembly because the CLI's ServerVersion is not reachable from here; all packages ship lockstep,
-    // so the value equals the tool's.
-    private static readonly string CurrentToolVersion =
-        typeof(ExtractionCacheStore).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? "unknown";
-
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
     ///     their names (readability over the few bytes, and rename-safe: an unrecognized name degrades to a
@@ -195,7 +180,7 @@ internal sealed class ExtractionCacheStore
         var seenStructural = new HashSet<string>(PathComparison.Comparer);
         foreach (string path in EnumerateStructuralPaths(projects))
             if (seenStructural.Add(path))
-                structuralStamps.Add(StampOf(path));
+                structuralStamps.Add(FileStamping.StampOf(path));
 
         var structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
 
@@ -207,10 +192,10 @@ internal sealed class ExtractionCacheStore
         {
             ct.ThrowIfCancellationRequested();
 
-            var documents = project.DocumentPaths.Select(StampOf).ToList();
+            var documents = project.DocumentPaths.Select(FileStamping.StampOf).ToList();
             var documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
             string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
-            string? assetsSha = structuralShaByPath.GetValueOrDefault(AssetsPathOf(project.ProjectDirectory));
+            string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
 
             // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
             // full paths). Hardcoding adds=[] here was the H1 bug: a *.cs on disk under the project but
@@ -265,7 +250,7 @@ internal sealed class ExtractionCacheStore
 
         var manifest = new CacheManifest(
             CurrentSchemaVersion,
-            CurrentToolVersion,
+            FileStamping.CurrentToolVersion,
             fingerprint.StructuralStamps,
             fingerprint.Projects,
             extraction.SpecResolutions,
@@ -304,14 +289,14 @@ internal sealed class ExtractionCacheStore
         CacheManifest? manifest = TryRead();
         if (manifest is null) return CacheReadResult.Miss();
         if (manifest.SchemaVersion != CurrentSchemaVersion) return CacheReadResult.Miss();
-        if (!string.Equals(manifest.ToolVersion, CurrentToolVersion, StringComparison.Ordinal)) return CacheReadResult.Miss();
+        if (!string.Equals(manifest.ToolVersion, FileStamping.CurrentToolVersion, StringComparison.Ordinal)) return CacheReadResult.Miss();
 
         // Structural sweep — any existence flip or content change is a full miss.
         var refreshedStructural = new List<FileStamp>(manifest.StructuralStamps.Count);
         foreach (FileStamp stamp in manifest.StructuralStamps)
         {
             ct.ThrowIfCancellationRequested();
-            (bool missed, FileStamp refreshed) = CheckStructural(stamp);
+            (bool missed, FileStamp refreshed) = FileStamping.CheckStructural(stamp, () => ContentHashCount++);
             if (missed) return CacheReadResult.Miss();
             refreshedStructural.Add(refreshed);
         }
@@ -355,21 +340,6 @@ internal sealed class ExtractionCacheStore
 
     // ── structural + document checks ────────────────────────────────────────────────────────────────────
 
-    private (bool Missed, FileStamp Refreshed) CheckStructural(FileStamp stamp)
-    {
-        FileFreshness current = FileFreshness.Capture(stamp.Path);
-        if (stamp.Exists != current.Exists) return (true, stamp); // an absent probe that appeared, or a vanished file
-        if (!stamp.Exists) return (false, stamp); // both absent: unchanged
-
-        if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp); // trusted on stat alone
-
-        string? sha = HashDuringValidation(stamp.Path);
-        if (sha is null || !string.Equals(sha, stamp.Sha256, StringComparison.Ordinal)) return (true, stamp); // real change
-
-        // Content unchanged despite the stat delta (a bare touch): refresh so the next sweep is pure-stat.
-        return (false, RefreshStamp(stamp.Path, current, sha));
-    }
-
     private (string ContentKey, IReadOnlyList<FileStamp> RefreshedDocuments) CheckProject(
         ProjectCacheEntry project, IReadOnlyDictionary<string, string?> structuralShaByPath, CancellationToken ct)
     {
@@ -391,7 +361,7 @@ internal sealed class ExtractionCacheStore
                 continue;
             }
 
-            if (ToFreshness(document).MatchesStat(current) && document.Promoted)
+            if (FileStamping.ToFreshness(document).MatchesStat(current) && document.Promoted)
             {
                 documentShas.Add((document.Path, document.Sha256)); // provably unchanged: trust the recorded hash
                 refreshedDocuments.Add(document);
@@ -400,12 +370,12 @@ internal sealed class ExtractionCacheStore
 
             string? sha = HashDuringValidation(document.Path);
             documentShas.Add((document.Path, sha));
-            refreshedDocuments.Add(RefreshStamp(document.Path, current, sha));
+            refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, sha));
         }
 
         var adds = ConeAdds(project.ProjectDirectory, knownDocuments);
         string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
-        string? assetsSha = structuralShaByPath.GetValueOrDefault(AssetsPathOf(project.ProjectDirectory));
+        string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
         string contentKey = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
         return (contentKey, refreshedDocuments);
     }
@@ -476,7 +446,7 @@ internal sealed class ExtractionCacheStore
     private void PromoteIfChanged(
         CacheManifest manifest, IReadOnlyList<FileStamp> refreshedStructural, IReadOnlyList<ProjectCacheEntry> refreshedProjects)
     {
-        bool changed = !StampsEqual(manifest.StructuralStamps, refreshedStructural)
+        bool changed = !FileStamping.StampsEqual(manifest.StructuralStamps, refreshedStructural)
                        || !DocumentStampsEqual(manifest.Projects, refreshedProjects);
         if (!changed) return; // already reflects disk — steady state writes nothing
 
@@ -515,44 +485,18 @@ internal sealed class ExtractionCacheStore
 
     // ── stamping + hashing ──────────────────────────────────────────────────────────────────────────────
 
-    private static FileStamp StampOf(string path)
-    {
-        string full = Path.GetFullPath(path);
-        FileFreshness fresh = FileFreshness.Capture(full);
-        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
-
-        return new FileStamp(full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, TryHashFile(full), fresh.IsPromoted);
-    }
-
-    private static FileStamp RefreshStamp(string path, FileFreshness current, string? sha)
-    {
-        return new FileStamp(path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted);
-    }
-
     private static bool StatChangedSinceCapture(FileStamp stamp)
     {
         FileFreshness current = FileFreshness.Capture(stamp.Path);
         if (stamp.Exists != current.Exists) return true;
         if (!stamp.Exists) return false;
-        return !ToFreshness(stamp).MatchesStat(current);
+        return !FileStamping.ToFreshness(stamp).MatchesStat(current);
     }
 
     private string? HashDuringValidation(string path)
     {
         ContentHashCount++;
-        return TryHashFile(path);
-    }
-
-    private static string? TryHashFile(string path)
-    {
-        try
-        {
-            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
+        return FileStamping.TryHashFile(path);
     }
 
     private static string HashString(string value)
@@ -572,17 +516,12 @@ internal sealed class ExtractionCacheStore
             yield return Path.GetFullPath(project.CsprojPath);
 
             string projectDirectory = Path.GetFullPath(project.ProjectDirectory);
-            yield return AssetsPathOf(projectDirectory);
+            yield return FileStamping.AssetsPathOf(projectDirectory);
 
             foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
-            foreach (string probe in StructuralProbeFileNames)
+            foreach (string probe in FileStamping.StructuralProbeFileNames)
                 yield return Path.Combine(ancestor, probe);
         }
-    }
-
-    private static string AssetsPathOf(string projectDirectory)
-    {
-        return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
     }
 
     // ── small helpers ───────────────────────────────────────────────────────────────────────────────────
@@ -594,32 +533,16 @@ internal sealed class ExtractionCacheStore
         return map;
     }
 
-    private static FileFreshness ToFreshness(FileStamp stamp)
-    {
-        // RecordedAtUtc is irrelevant to MatchesStat, the only comparison we use it for; the racy verdict is
-        // carried by the persisted Promoted flag, not re-derived from a runtime instant.
-        return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
-    }
-
     private static string KeyPath(string path)
     {
         return PathComparison.Comparison == StringComparison.OrdinalIgnoreCase ? path.ToLowerInvariant() : path;
-    }
-
-    private static bool StampsEqual(IReadOnlyList<FileStamp> left, IReadOnlyList<FileStamp> right)
-    {
-        if (left.Count != right.Count) return false;
-        for (var i = 0; i < left.Count; i++)
-            if (left[i] != right[i])
-                return false; // FileStamp is a record ⇒ scalar value equality
-        return true;
     }
 
     private static bool DocumentStampsEqual(IReadOnlyList<ProjectCacheEntry> left, IReadOnlyList<ProjectCacheEntry> right)
     {
         if (left.Count != right.Count) return false;
         for (var i = 0; i < left.Count; i++)
-            if (!StampsEqual(left[i].Documents, right[i].Documents))
+            if (!FileStamping.StampsEqual(left[i].Documents, right[i].Documents))
                 return false;
         return true;
     }

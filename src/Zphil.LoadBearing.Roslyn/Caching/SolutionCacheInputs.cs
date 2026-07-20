@@ -50,7 +50,7 @@ internal static class SolutionCacheInputs
                 if (document.FilePath is null) continue;
 
                 string full = Path.GetFullPath(document.FilePath);
-                if (!IsBuildArtifact(projectDirectory, full)) accumulator.Documents.Add(full);
+                if (!BuildOutputDirectories.IsUnderBuildOutput(projectDirectory, full)) accumulator.Documents.Add(full);
             }
 
             foreach (ProjectReference reference in project.ProjectReferences)
@@ -62,15 +62,6 @@ internal static class SolutionCacheInputs
             .OrderBy(a => a.ProjectName, StringComparer.Ordinal)
             .Select(a => a.ToInputs())
             .ToList();
-    }
-
-    // A document is a build artifact when its path, relative to the project directory, crosses a bin or obj
-    // segment. A linked source file above the project directory stays tracked (its relative path has no such
-    // segment). Mirrors the store's own cone-scan skip so tracked and scanned sets stay consistent.
-    private static bool IsBuildArtifact(string projectDirectory, string documentPath)
-    {
-        string relative = Path.GetRelativePath(projectDirectory, documentPath).Replace('\\', '/');
-        return relative.Split('/').Any(segment => segment is "bin" or "obj");
     }
 
     private sealed class Accumulator(string projectName, string csprojPath)

@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adjective/constraint twins (`.Implementing<T>()`, `MustImplement<T>()`, …), and the
   static forms directly on the verb, `MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)`.
   All pure authoring sugar reifying to the identical model.
+- Spec-source locations in validation errors: every spec-build error that names a rule, scope, or
+  member now renders with the `file:line` of the offending statement — captured via
+  `[CallerFilePath]`/`[CallerLineNumber]` on the anchor factories (`arch.Rule`, `arch.Scope`, the five
+  `arch.Member` forms) — so all-errors-at-once lands each one at a jump target. Rendered file-name-only
+  (never the machine-specific full path), keeping goldens deterministic; an unlocated error degrades to
+  the un-prefixed message. The optional caller-info parameters are invisible at call sites but are
+  binary-breaking for a spec DLL compiled against the previous Core (acceptable pre-publish at lockstep
+  0.1.0).
 
 ## [0.1.0] - 2026-07-14
 

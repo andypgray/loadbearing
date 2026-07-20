@@ -1,6 +1,8 @@
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Validation;
 
 namespace Zphil.LoadBearing;
 
@@ -77,9 +79,10 @@ public sealed class Arch
     ///     <see cref="Selection" />; matching is by declaring type + member name, so one ban covers
     ///     every overload. Canonical call: <c>arch.Member(typeof(DateTime), nameof(DateTime.Now))</c>.
     /// </summary>
-    public Member Member(Type type, string name)
+    public Member Member(Type type, string name,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        return new Member(this, type, name);
+        return new Member(this, type, name, SpecSourceLocation.Capture(filePath, lineNumber));
     }
 
     /// <summary>
@@ -90,9 +93,10 @@ public sealed class Arch
     ///     compiler-checked; the anchor is the lambda's resolved member (a constructed generic normalized
     ///     to its definition), and an unresolvable lambda is reported at spec build (GRAMMAR §8).
     /// </summary>
-    public Member Member<T>(Expression<Func<T, object?>> member)
+    public Member Member<T>(Expression<Func<T, object?>> member,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)), SpecSourceLocation.Capture(filePath, lineNumber));
     }
 
     /// <summary>
@@ -100,9 +104,10 @@ public sealed class Arch
     ///     (GRAMMAR §4.5): <c>arch.Member&lt;Task&gt;(t =&gt; t.Wait())</c> anchors <c>Task.Wait</c>. The
     ///     void twin of the value-returning typed overload; same desugaring.
     /// </summary>
-    public Member Member<T>(Expression<Action<T>> member)
+    public Member Member<T>(Expression<Action<T>> member,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)), SpecSourceLocation.Capture(filePath, lineNumber));
     }
 
     /// <summary>
@@ -110,9 +115,10 @@ public sealed class Arch
     ///     value (GRAMMAR §4.5): <c>arch.Member(() =&gt; DateTime.Now)</c> anchors <c>DateTime.Now</c>.
     ///     The static form of the typed instance overloads; same desugaring.
     /// </summary>
-    public Member Member(Expression<Func<object?>> member)
+    public Member Member(Expression<Func<object?>> member,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)), SpecSourceLocation.Capture(filePath, lineNumber));
     }
 
     /// <summary>
@@ -120,23 +126,26 @@ public sealed class Arch
     ///     (GRAMMAR §4.5): <c>arch.Member(() =&gt; GC.Collect())</c> anchors <c>GC.Collect</c>. The static
     ///     void twin; same desugaring.
     /// </summary>
-    public Member Member(Expression<Action> member)
+    public Member Member(Expression<Action> member,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)));
+        return MemberExpressionResolver.Resolve(this, Guard.NotNull(member, nameof(member)), SpecSourceLocation.Capture(filePath, lineNumber));
     }
 
     /// <summary>Registers a rule anchor immediately and returns its posture-stage builder.</summary>
-    public IRuleBuilder Rule(string id)
+    public IRuleBuilder Rule(string id,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        var registration = new RuleRegistration(id);
+        var registration = new RuleRegistration(id) { Location = SpecSourceLocation.Capture(filePath, lineNumber) };
         _registrations.Add(registration);
         return new RuleBuilder(registration);
     }
 
     /// <summary>Registers a scope anchor immediately and returns its freeze-stage builder.</summary>
-    public IScopeBuilder Scope(string id)
+    public IScopeBuilder Scope(string id,
+        [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {
-        var registration = new ScopeRegistration(id);
+        var registration = new ScopeRegistration(id) { Location = SpecSourceLocation.Capture(filePath, lineNumber) };
         _registrations.Add(registration);
         return new ScopeBuilder(registration);
     }

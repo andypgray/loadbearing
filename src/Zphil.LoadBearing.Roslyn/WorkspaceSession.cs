@@ -49,9 +49,6 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 public sealed class WorkspaceSession : IAsyncDisposable
 {
-    private static readonly string[] StructuralProbeFileNames =
-        ["Directory.Build.props", "Directory.Build.targets", "global.json"];
-
     private readonly Action<string>? diagnosticSink;
 
     // Known-document fingerprints, keyed by canonical full path. Covers only the project's COMPILED documents,
@@ -460,7 +457,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
                 knownConeFiles.Add(coneFile);
 
             foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
-            foreach (string probe in StructuralProbeFileNames)
+            foreach (string probe in FileStamping.StructuralProbeFileNames)
                 RecordStructural(Path.Combine(ancestor, probe));
         }
     }

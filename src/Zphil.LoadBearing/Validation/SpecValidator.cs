@@ -10,7 +10,10 @@ namespace Zphil.LoadBearing.Validation;
 ///     Runs the whole GRAMMAR §8 catalog and collects <em>every</em> error in one pass (a
 ///     deliberate divergence from EF Core's fail-fast validator). ID checks run over the
 ///     post-desugar ID set; authored-field checks run over the original registrations, keyed to
-///     the rule or scope the author wrote.
+///     the rule or scope the author wrote. Every rule/scope/member-attributed error carries the
+///     offending anchor's spec-source location (GRAMMAR §8) so all-errors-at-once lands each one at a
+///     <c>file:line</c> jump target; spec-wide errors (duplicate layer name, layer globs) stay
+///     location-free by design.
 /// </summary>
 internal static class SpecValidator
 {
@@ -44,44 +47,56 @@ internal static class SpecValidator
 
             // A layer's globs are validated here — their authoritative, use-independent home — so a bad
             // glob is caught whether or not the layer is ever used as a subject (§8 items 15–16). Like the
-            // duplicate-name error above, these are spec-wide (null ID, named by layer in the message).
+            // duplicate-name error above, these are spec-wide (null ID, named by layer in the message) and
+            // location-free: a layer name is a unique, trivially greppable string (the plan's Layer exclusion).
             foreach (string glob in layer.Globs)
-                CheckPattern(glob, true, "namespace pattern", null, $"layer '{layer.Name}'", errors);
+                CheckPattern(glob, true, "namespace pattern", null, $"layer '{layer.Name}'", null, errors);
         }
     }
 
     private static void ValidateIds(Arch arch, List<SpecValidationError> errors)
     {
-        var ruleIds = arch.Registrations.OfType<RuleRegistration>().Select(r => r.Id).ToList();
-        var scopeIds = arch.Registrations.OfType<ScopeRegistration>().Select(s => s.Id).ToList();
+        var rules = arch.Registrations.OfType<RuleRegistration>().ToList();
+        var scopes = arch.Registrations.OfType<ScopeRegistration>().ToList();
 
-        foreach (string id in ruleIds.Concat(scopeIds))
-            if (!RuleIdSyntax.IsValid(id))
-                errors.Add(new SpecValidationError(Code.MalformedId, id,
-                    $"Malformed ID '{id}'; expected `area/rule-name` matching {RuleIdSyntax.Pattern}."));
+        // Malformed ID — walked per registration (not over the flattened ID list) so the offending anchor's
+        // location rides along.
+        foreach (Registration registration in arch.Registrations)
+            if (!RuleIdSyntax.IsValid(registration.Id))
+                errors.Add(new SpecValidationError(Code.MalformedId, registration.Id,
+                    $"Malformed ID '{registration.Id}'; expected `area/rule-name` matching {RuleIdSyntax.Pattern}.",
+                    registration.Location));
 
         var extendsScope = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string ruleId in ruleIds)
-        foreach (string scopeId in scopeIds)
-            if (RuleIdSyntax.ExtendsScope(ruleId, scopeId))
+        foreach (RuleRegistration rule in rules)
+        foreach (ScopeRegistration scope in scopes)
+            if (RuleIdSyntax.ExtendsScope(rule.Id, scope.Id))
             {
-                errors.Add(new SpecValidationError(Code.IdExtendsScope, ruleId,
-                    $"Rule ID '{ruleId}' extends scope '{scopeId}'; the '{scopeId}/…' namespace is reserved for its generated children."));
-                extendsScope.Add(ruleId);
+                errors.Add(new SpecValidationError(Code.IdExtendsScope, rule.Id,
+                    $"Rule ID '{rule.Id}' extends scope '{scope.Id}'; the '{scope.Id}/…' namespace is reserved for its generated children.",
+                    rule.Location));
+                extendsScope.Add(rule.Id);
             }
 
         // Duplicate detection over the post-desugar ID set (§8 item 1). IDs already flagged as
-        // extends-scope are excluded so they are reported once, by the more specific code.
-        var postDesugar = new List<string>(ruleIds.Where(id => !extendsScope.Contains(id)));
-        foreach (string scopeId in scopeIds)
+        // extends-scope are excluded so they are reported once, by the more specific code. Each post-desugar
+        // ID carries the location of the anchor that contributes it, so the collision renders at the first
+        // authored occurrence of the ID (GroupBy preserves source order).
+        var postDesugar = new List<(string Id, SpecSourceLocation? Location)>();
+        foreach (RuleRegistration rule in rules)
+            if (!extendsScope.Contains(rule.Id))
+                postDesugar.Add((rule.Id, rule.Location));
+
+        foreach (ScopeRegistration scope in scopes)
         {
-            postDesugar.Add(scopeId + "/containment");
-            postDesugar.Add(scopeId + "/tripwire");
+            postDesugar.Add((scope.Id + "/containment", scope.Location));
+            postDesugar.Add((scope.Id + "/tripwire", scope.Location));
         }
 
-        foreach (var group in postDesugar.GroupBy(id => id, StringComparer.Ordinal))
+        foreach (var group in postDesugar.GroupBy(entry => entry.Id, StringComparer.Ordinal))
             if (group.Count() > 1)
-                errors.Add(new SpecValidationError(Code.DuplicateId, group.Key, $"Duplicate rule ID '{group.Key}'."));
+                errors.Add(new SpecValidationError(Code.DuplicateId, group.Key,
+                    $"Duplicate rule ID '{group.Key}'.", group.First().Location));
     }
 
     private static void ValidateRule(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
@@ -89,25 +104,25 @@ internal static class SpecValidator
         if (rule.Posture == null)
         {
             errors.Add(new SpecValidationError(Code.DanglingAnchor, rule.Id,
-                $"Rule '{rule.Id}' has no posture; call .Enforce(...) or .Migrate(...)."));
+                $"Rule '{rule.Id}' has no posture; call .Enforce(...) or .Migrate(...).", rule.Location));
             return;
         }
 
         if (rule.PostureCount > 1)
             errors.Add(new SpecValidationError(Code.RepeatedPosture, rule.Id,
-                $"Rule '{rule.Id}' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once."));
+                $"Rule '{rule.Id}' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.", rule.Location));
 
-        CheckBecause(rule.Becauses, rule.Id, errors);
-        CheckRepeated(rule.Fixes.Count, "Fix", rule.Id, errors);
-        CheckRepeated(rule.Baselines.Count, "Baseline", rule.Id, errors);
-        CheckRepeated(rule.Policies.Count, "WhileYoureThere", rule.Id, errors);
+        CheckBecause(rule.Becauses, rule.Id, rule.Location, errors);
+        CheckRepeated(rule.Fixes.Count, "Fix", rule.Id, rule.Location, errors);
+        CheckRepeated(rule.Baselines.Count, "Baseline", rule.Id, rule.Location, errors);
+        CheckRepeated(rule.Policies.Count, "WhileYoureThere", rule.Id, rule.Location, errors);
 
-        foreach ((string label, string? value) in RuleProse(rule)) CheckProse(value, label, rule.Id, errors);
+        foreach ((string label, string? value) in RuleProse(rule)) CheckProse(value, label, rule.Id, rule.Location, errors);
 
-        CheckForeign(RuleSelections(rule), rule.Id, arch, errors);
+        CheckForeign(RuleSelections(rule), rule.Id, arch, rule.Location, errors);
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
-        CheckPatterns(RulePatterns(rule), rule.Id, errors);
+        CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -115,58 +130,58 @@ internal static class SpecValidator
         if (scope.Frozen == null)
         {
             errors.Add(new SpecValidationError(Code.DanglingAnchor, scope.Id,
-                $"Scope '{scope.Id}' has no posture; call .Freeze(...)."));
+                $"Scope '{scope.Id}' has no posture; call .Freeze(...).", scope.Location));
             return;
         }
 
         if (scope.FreezeCount > 1)
             errors.Add(new SpecValidationError(Code.RepeatedPosture, scope.Id,
-                $"Scope '{scope.Id}' has more than one posture; call .Freeze(...) exactly once."));
+                $"Scope '{scope.Id}' has more than one posture; call .Freeze(...) exactly once.", scope.Location));
 
-        CheckBecause(scope.Becauses, scope.Id, errors);
-        CheckRepeated(scope.Dragons.Count, "Dragons", scope.Id, errors);
-        CheckRepeated(scope.DragonsDocs.Count, "DragonsDoc", scope.Id, errors);
-        CheckRepeated(scope.Baselines.Count, "Baseline", scope.Id, errors);
+        CheckBecause(scope.Becauses, scope.Id, scope.Location, errors);
+        CheckRepeated(scope.Dragons.Count, "Dragons", scope.Id, scope.Location, errors);
+        CheckRepeated(scope.DragonsDocs.Count, "DragonsDoc", scope.Id, scope.Location, errors);
+        CheckRepeated(scope.Baselines.Count, "Baseline", scope.Id, scope.Location, errors);
 
         if (scope.BoundaryOnlyViaCount > 1)
-            errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'."));
+            errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'.", scope.Location));
         else if (scope.BoundaryOnlyViaCount == 1 && scope.Boundary.Count == 0)
             errors.Add(new SpecValidationError(Code.EmptyBoundary, scope.Id,
-                $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic freeze."));
+                $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic freeze.", scope.Location));
 
         if (scope.Dragons.Count == 0 && scope.DragonsDocs.Count == 0)
             errors.Add(new SpecValidationError(Code.MissingDragons, scope.Id,
-                $"Frozen scope '{scope.Id}' is missing .Dragons(...) or .DragonsDoc(...)."));
+                $"Frozen scope '{scope.Id}' is missing .Dragons(...) or .DragonsDoc(...).", scope.Location));
 
-        foreach ((string label, string? value) in ScopeProse(scope)) CheckProse(value, label, scope.Id, errors);
+        foreach ((string label, string? value) in ScopeProse(scope)) CheckProse(value, label, scope.Id, scope.Location, errors);
 
-        CheckForeign(ScopeSelections(scope), scope.Id, arch, errors);
-        CheckPatterns(ScopePatterns(scope), scope.Id, errors);
+        CheckForeign(ScopeSelections(scope), scope.Id, arch, scope.Location, errors);
+        CheckPatterns(ScopePatterns(scope), scope.Id, scope.Location, errors);
     }
 
-    private static void CheckBecause(List<string> becauses, string id, List<SpecValidationError> errors)
+    private static void CheckBecause(List<string> becauses, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
-        if (becauses.Count == 0) errors.Add(new SpecValidationError(Code.MissingBecause, id, $"'{id}' is missing a required .Because(...)."));
+        if (becauses.Count == 0) errors.Add(new SpecValidationError(Code.MissingBecause, id, $"'{id}' is missing a required .Because(...).", location));
 
-        CheckRepeated(becauses.Count, "Because", id, errors);
+        CheckRepeated(becauses.Count, "Because", id, location, errors);
     }
 
-    private static void CheckRepeated(int count, string trailer, string id, List<SpecValidationError> errors)
+    private static void CheckRepeated(int count, string trailer, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
-        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedTrailer, id, $"Repeated trailer '{trailer}' on '{id}'."));
+        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedTrailer, id, $"Repeated trailer '{trailer}' on '{id}'.", location));
     }
 
-    private static void CheckProse(string? value, string label, string id, List<SpecValidationError> errors)
+    private static void CheckProse(string? value, string label, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
-            errors.Add(new SpecValidationError(Code.BlankProse, id, $"Blank {label} on '{id}'."));
-        else if (value!.IndexOf('\n') >= 0 || value.IndexOf('\r') >= 0) errors.Add(new SpecValidationError(Code.MultiLineProse, id, $"Multi-line {label} on '{id}'; prose fields are single-line."));
+            errors.Add(new SpecValidationError(Code.BlankProse, id, $"Blank {label} on '{id}'.", location));
+        else if (value!.IndexOf('\n') >= 0 || value.IndexOf('\r') >= 0) errors.Add(new SpecValidationError(Code.MultiLineProse, id, $"Multi-line {label} on '{id}'; prose fields are single-line.", location));
     }
 
     private static void CheckPatterns(
-        IEnumerable<(string Value, bool Namespace, string Label)> patterns, string id, List<SpecValidationError> errors)
+        IEnumerable<(string Value, bool Namespace, string Label)> patterns, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
-        foreach ((string value, bool ns, string label) in patterns) CheckPattern(value, ns, label, id, $"'{id}'", errors);
+        foreach ((string value, bool ns, string label) in patterns) CheckPattern(value, ns, label, id, $"'{id}'", location, errors);
     }
 
     // GRAMMAR §8 items 15–16. A blank glob or affix is BlankPattern (the shared catalog-wide code, one
@@ -175,13 +190,15 @@ internal static class SpecValidator
     // dot-segment structure, so only the blank check applies — the matcher has no subtree operator to
     // strand a wildcard behind. Blank is handled here first so every kind shares one code; the
     // namespace well-formedness verdict itself stays in NamespacePattern.Validate (its self-contained
-    // blank branch backstops any direct caller).
+    // blank branch backstops any direct caller). The subject argument is the "on {subject}" text (a
+    // rule/scope ID or a layer name); the location is that anchor's spec-source position (null for a layer
+    // glob, which is spec-wide).
     private static void CheckPattern(
-        string value, bool isNamespace, string label, string? id, string location, List<SpecValidationError> errors)
+        string value, bool isNamespace, string label, string? id, string subject, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new SpecValidationError(Code.BlankPattern, id, $"Blank {label} on {location}."));
+            errors.Add(new SpecValidationError(Code.BlankPattern, id, $"Blank {label} on {subject}.", location));
             return;
         }
 
@@ -189,23 +206,26 @@ internal static class SpecValidator
 
         string? reason = NamespacePattern.Validate(value);
         if (reason is not null)
-            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {label} '{value}' on {location} {reason}."));
+            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {label} '{value}' on {subject} {reason}.", location));
     }
 
-    private static void CheckForeign(IEnumerable<Selection> selections, string id, Arch arch, List<SpecValidationError> errors)
+    private static void CheckForeign(
+        IEnumerable<Selection> selections, string id, Arch arch, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
         foreach (Selection selection in selections)
             if (!ReferenceEquals(selection.Owner, arch))
             {
                 errors.Add(new SpecValidationError(Code.ForeignSelection, id,
-                    $"A selection used by '{id}' was minted on a different Arch instance; it is not registered with this model."));
+                    $"A selection used by '{id}' was minted on a different Arch instance; it is not registered with this model.", location));
                 return;
             }
     }
 
     // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
     // rule (mirroring CheckForeign's report-once-and-return); otherwise each member is checked for a
-    // blank name and then, when named, that its anchor declares it.
+    // blank name and then, when named, that its anchor declares it. A member error renders at the member's
+    // own arch.Member(...) call site when it has one, falling back to the consuming rule's anchor for a
+    // verb-minted member (which carries no location — GRAMMAR §8, items 11–13/18).
     private static void CheckMembers(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
         var members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
@@ -215,16 +235,18 @@ internal static class SpecValidator
             if (!ReferenceEquals(member.Owner, arch))
             {
                 errors.Add(new SpecValidationError(Code.ForeignMember, rule.Id,
-                    $"A member used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model."));
+                    $"A member used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model.",
+                    member.Location ?? rule.Location));
                 return;
             }
 
-        foreach (Member member in members) CheckMember(member, rule.Id, errors);
+        foreach (Member member in members) CheckMember(member, rule.Id, rule.Location, errors);
     }
 
     // GRAMMAR §8 item 14: a member `.Returning` anchor is definition-level, so a closed-generic anchor
     // (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)). A non-generic
-    // or open-generic anchor is accepted; only a MemberConstraint carries a ReturningAdjective at all.
+    // or open-generic anchor is accepted; only a MemberConstraint carries a ReturningAdjective at all. The
+    // anchor is the consuming rule's statement, so it renders at the rule's location.
     private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is not MemberConstraint memberConstraint) return;
@@ -235,17 +257,21 @@ internal static class SpecValidator
                     if (Generics.IsConstructed(type))
                         errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
                             $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
-                            $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}')."));
+                            $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
     }
 
-    private static void CheckMember(Member member, string id, List<SpecValidationError> errors)
+    private static void CheckMember(Member member, string id, SpecSourceLocation? ruleLocation, List<SpecValidationError> errors)
     {
+        // The member's own arch.Member(...) call site steers the diagnostic when present; a verb-minted
+        // member has none, so it attributes to the consuming rule's anchor.
+        SpecSourceLocation? location = member.Location ?? ruleLocation;
+
         // A member minted from an unresolvable anchor expression (GRAMMAR §8, item 12's expression sibling):
         // the resolver stored the diagnostic core; report it before touching the anchor. A poisoned Member's
         // anchor accessors throw if read (fail closed), so this short-circuit is the only sanctioned path.
         if (member.PoisonError is not null)
         {
-            errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, id, $"{member.PoisonError} (used by '{id}')."));
+            errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, id, $"{member.PoisonError} (used by '{id}').", location));
             return;
         }
 
@@ -254,7 +280,7 @@ internal static class SpecValidator
         if (string.IsNullOrWhiteSpace(member.Name))
         {
             errors.Add(new SpecValidationError(Code.BlankMemberName, id,
-                $"Blank member name on a member of '{display}' (used by '{id}')."));
+                $"Blank member name on a member of '{display}' (used by '{id}').", location));
             return;
         }
 
@@ -266,12 +292,12 @@ internal static class SpecValidator
         {
             errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
                 $"'{display}' does not declare '{member.Name}'; it is declared on base type '{SafeFullDisplay(declaringBase)}' — " +
-                $"use typeof({TypeofForm(declaringBase)}) (used by '{id}')."));
+                $"use typeof({TypeofForm(declaringBase)}) (used by '{id}').", location));
             return;
         }
 
         errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
-            $"'{display}' does not declare a member named '{member.Name}' (used by '{id}')."));
+            $"'{display}' does not declare a member named '{member.Name}' (used by '{id}').", location));
     }
 
     // The first base type / interface (each normalized to its generic definition) that declares the

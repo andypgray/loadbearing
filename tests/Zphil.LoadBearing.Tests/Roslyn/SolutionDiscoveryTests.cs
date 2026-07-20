@@ -80,6 +80,19 @@ public sealed class SolutionDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void DiscoverSolution_EnvVarPointsToMissingFile_Throws()
+    {
+        // The env var is set but names a file that does not exist: discovery throws with the env-var-specific
+        // message rather than falling through to the walk-up.
+        string missing = Path.Combine(_tempRoot, "EnvVarGhost.slnx");
+        Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, missing);
+
+        var ex = Should.Throw<FileNotFoundException>(() => SolutionDiscovery.DiscoverSolution());
+
+        ex.Message.ShouldContain("points to a file that does not exist");
+    }
+
+    [Fact]
     public void DiscoverSolution_SingleSolutionInAncestor_FoundByWalkUp()
     {
         string ancestorDir = CreateDir("ancestor");

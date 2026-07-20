@@ -277,4 +277,23 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single().Status.ShouldBe(RuleStatus.Passed);
     }
+
+    [Fact]
+    public void Where_ThrowingSubjectPredicate_SurfacesRuleErrorNamingTheHatch()
+    {
+        // A subject-selection Where predicate that throws becomes a contained RuleError, not an aborted run;
+        // the detail names the `Where` hatch and echoes the thrown exception (SelectionEvaluator.InvokePredicate).
+        RuleResult result = Checker.Run(Sources.Layered, arch =>
+                arch.Rule("throwing/x")
+                    .Enforce(arch.Types.Where(_ => throw new Exception("boom"), "d").MustHavePrefix("I"))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.RuleError);
+        violation.Detail.ShouldNotBeNull();
+        violation.Detail!.ShouldContain("the `Where` predicate threw Exception");
+        violation.Detail!.ShouldContain("boom");
+    }
 }

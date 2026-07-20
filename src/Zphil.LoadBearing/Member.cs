@@ -1,5 +1,6 @@
 using System.Reflection;
 using Zphil.LoadBearing.Internal;
+using Zphil.LoadBearing.Validation;
 
 namespace Zphil.LoadBearing;
 
@@ -24,9 +25,10 @@ public sealed class Member
     private readonly bool _isMethod;
     private readonly string? _name;
 
-    internal Member(Arch owner, Type declaringType, string name)
+    internal Member(Arch owner, Type declaringType, string name, SpecSourceLocation? location = null)
     {
         Owner = owner;
+        Location = location;
         _declaringType = Guard.NotNull(declaringType, nameof(declaringType));
         _name = Guard.NotNull(name, nameof(name));
         _isMethod = ResolveIsMethod(_declaringType, _name);
@@ -40,10 +42,11 @@ public sealed class Member
     // short-circuits on PoisonError, and ArchModelBuilder.Build validates the whole spec before it projects
     // or renders any node, so a poisoned Member is caught before anything reaches for its anchor. Owner is
     // stamped so the foreign-Arch check (§8 item 13) still precedes the poison report.
-    internal Member(Arch owner, string poisonError)
+    internal Member(Arch owner, string poisonError, SpecSourceLocation? location = null)
     {
         Owner = owner;
         PoisonError = poisonError;
+        Location = location;
     }
 
     /// <summary>
@@ -51,6 +54,14 @@ public sealed class Member
     ///     member flavor).
     /// </summary>
     internal Arch Owner { get; }
+
+    /// <summary>
+    ///     The spec-source position of the <c>arch.Member(...)</c> call that minted this leaf (GRAMMAR §8),
+    ///     or null for a verb-minted member (the <c>MustNotUse(() =&gt; ...)</c> expression forms cannot carry
+    ///     caller info past <c>params</c>) — whose errors then attribute to the consuming rule's anchor.
+    ///     Always safe to read, including on a poisoned member (unlike the fail-closed anchor accessors).
+    /// </summary>
+    internal SpecSourceLocation? Location { get; }
 
     /// <summary>
     ///     Non-null when this member was minted from an unresolvable anchor expression: the diagnostic

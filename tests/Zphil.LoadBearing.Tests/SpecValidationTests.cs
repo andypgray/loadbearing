@@ -23,7 +23,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new DuplicateIdSpecA(), new DuplicateIdSpecB());
 
         ex.Errors.ShouldContain(e => e.Code == Code.DuplicateId && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.DuplicateId).Message.ShouldBe("Duplicate rule ID 'area/rule'.");
+        ex.Errors.First(e => e.Code == Code.DuplicateId).Message.ShouldBe("SpecValidationTests.cs:549: Duplicate rule ID 'area/rule'.");
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.MissingBecause && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.MissingBecause).Message.ShouldBe("'area/rule' is missing a required .Because(...).");
+        ex.Errors.First(e => e.Code == Code.MissingBecause).Message.ShouldBe("SpecValidationTests.cs:583: 'area/rule' is missing a required .Because(...).");
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new RepeatedBecauseSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.RepeatedTrailer && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.RepeatedTrailer).Message.ShouldBe("Repeated trailer 'Because' on 'area/rule'.");
+        ex.Errors.First(e => e.Code == Code.RepeatedTrailer).Message.ShouldBe("SpecValidationTests.cs:623: Repeated trailer 'Because' on 'area/rule'.");
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.RepeatedPosture && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.RepeatedPosture).Message
-            .ShouldBe("Rule 'area/rule' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.");
+            .ShouldBe("SpecValidationTests.cs:642: Rule 'area/rule' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.");
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.RepeatedPosture && e.RuleId == "legacy/billing");
         ex.Errors.First(e => e.Code == Code.RepeatedPosture).Message
-            .ShouldBe("Scope 'legacy/billing' has more than one posture; call .Freeze(...) exactly once.");
+            .ShouldBe("SpecValidationTests.cs:654: Scope 'legacy/billing' has more than one posture; call .Freeze(...) exactly once.");
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.BlankMemberName && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.BlankMemberName).Message
-            .ShouldBe("Blank member name on a member of 'System.DateTime' (used by 'area/rule').");
+            .ShouldBe("SpecValidationTests.cs:692: Blank member name on a member of 'System.DateTime' (used by 'area/rule').");
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberNotDeclared && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberNotDeclared).Message
-            .ShouldBe("'System.DateTime' does not declare a member named 'Nows' (used by 'area/rule').");
+            .ShouldBe("SpecValidationTests.cs:700: 'System.DateTime' does not declare a member named 'Nows' (used by 'area/rule').");
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberNotDeclared && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberNotDeclared).Message
-            .ShouldBe("'System.Threading.Tasks.Task<TResult>' does not declare 'Wait'; it is declared on base type " +
+            .ShouldBe("SpecValidationTests.cs:709: 'System.Threading.Tasks.Task<TResult>' does not declare 'Wait'; it is declared on base type " +
                       "'System.Threading.Tasks.Task' — use typeof(Task) (used by 'area/rule').");
     }
 
@@ -196,7 +196,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.ForeignMember && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.ForeignMember).Message
-            .ShouldBe("A member used by 'area/rule' was minted on a different Arch instance; it is not registered with this model.");
+            .ShouldBe("SpecValidationTests.cs:718: A member used by 'area/rule' was minted on a different Arch instance; it is not registered with this model.");
     }
 
     [Fact]
@@ -212,7 +212,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberReturningClosedGeneric && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberReturningClosedGeneric).Message
-            .ShouldBe("'System.Threading.Tasks.Task<System.Int32>' is a closed generic; .Returning matches definition-level — " +
+            .ShouldBe("SpecValidationTests.cs:743: 'System.Threading.Tasks.Task<System.Int32>' is a closed generic; .Returning matches definition-level — " +
                       "use typeof(Task<>) (used by 'area/rule').");
     }
 
@@ -247,7 +247,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new BlankNamespaceGlobSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank namespace pattern on 'area/rule'.");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("SpecValidationTests.cs:782: Blank namespace pattern on 'area/rule'.");
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new BlankSuffixSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank suffix on 'area/rule'.");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("SpecValidationTests.cs:790: Blank suffix on 'area/rule'.");
     }
 
     [Fact]
@@ -267,7 +267,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new BlankMemberSuffixSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
-        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("Blank member suffix on 'area/rule'.");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message.ShouldBe("SpecValidationTests.cs:798: Blank member suffix on 'area/rule'.");
     }
 
     [Fact]
@@ -288,7 +288,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.UnanchoredSubtreePattern && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.UnanchoredSubtreePattern).Message
-            .ShouldBe("The namespace pattern 'MyApp.*.Controllers.*' on 'area/rule' has a trailing `.*` subtree " +
+            .ShouldBe("SpecValidationTests.cs:814: The namespace pattern 'MyApp.*.Controllers.*' on 'area/rule' has a trailing `.*` subtree " +
                       "operator but its literal prefix contains a `*`, which never matches; anchor the subtree on a literal prefix.");
     }
 
@@ -327,7 +327,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda must be a single property, field, or method access " +
+            .ShouldBe("SpecValidationTests.cs:849: A member anchor lambda must be a single property, field, or method access " +
                       "(x => x.Member or () => Type.Member); this lambda body is neither (used by 'area/rule').");
     }
 
@@ -341,7 +341,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+            .ShouldBe("SpecValidationTests.cs:858: A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
                       "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
                       "is anchored (used by 'area/rule').");
     }
@@ -353,7 +353,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
+            .ShouldBe("SpecValidationTests.cs:868: A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
                       "cast or as-cast is allowed; a chained access like x => x.A.B, a captured local or field, or a " +
                       "user-defined conversion is not); anchor the declaring type you mean directly (used by 'area/rule').");
     }
@@ -365,7 +365,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A typed member anchor arch.Member<T>(x => ...) accesses a static member; anchor statics " +
+            .ShouldBe("SpecValidationTests.cs:877: A typed member anchor arch.Member<T>(x => ...) accesses a static member; anchor statics " +
                       "with the parameterless overload arch.Member(() => Type.Member) (used by 'area/rule').");
     }
 
@@ -376,7 +376,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A parameterless member anchor arch.Member(() => ...) must access a static member " +
+            .ShouldBe("SpecValidationTests.cs:886: A parameterless member anchor arch.Member(() => ...) must access a static member " +
                       "directly; anchor an instance member with the typed overload arch.Member<T>(x => x.Member) " +
                       "(used by 'area/rule').");
     }
@@ -388,7 +388,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
+            .ShouldBe("SpecValidationTests.cs:895: A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
                       "member-anchor surface (GRAMMAR §4.5); anchor a named property, field, or method " +
                       "(used by 'area/rule').");
     }
@@ -404,7 +404,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+            .ShouldBe("SpecValidationTests.cs:904: A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
                       "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
                       "is anchored (used by 'area/rule').");
     }
@@ -419,7 +419,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
+            .ShouldBe("SpecValidationTests.cs:914: A member anchor lambda must reach its member directly on the lambda parameter (an interface " +
                       "cast or as-cast is allowed; a chained access like x => x.A.B, a captured local or field, or a " +
                       "user-defined conversion is not); anchor the declaring type you mean directly (used by 'area/rule').");
     }
@@ -433,7 +433,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
+            .ShouldBe("SpecValidationTests.cs:923: A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
                       "literal) that the compiler inlines to its value, so no member remains to anchor; name a const " +
                       "or enum member with the typeof form arch.Member(typeof(T), nameof(T.M)) (used by 'area/rule').");
     }
@@ -475,7 +475,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda must be a single property, field, or method access " +
+            .ShouldBe("SpecValidationTests.cs:969: A member anchor lambda must be a single property, field, or method access " +
                       "(x => x.Member or () => Type.Member); this lambda body is neither (used by 'area/rule').");
     }
 
@@ -486,7 +486,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
+            .ShouldBe("SpecValidationTests.cs:978: A member anchor lambda may not be a method group (x => x.Method or () => Type.Method); " +
                       "write the invocation form (x => x.Method() or () => Type.Method(...)) so the method itself " +
                       "is anchored (used by 'area/rule').");
     }
@@ -498,7 +498,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A parameterless member anchor arch.Member(() => ...) must access a static member " +
+            .ShouldBe("SpecValidationTests.cs:988: A parameterless member anchor arch.Member(() => ...) must access a static member " +
                       "directly; anchor an instance member with the typed overload arch.Member<T>(x => x.Member) " +
                       "(used by 'area/rule').");
     }
@@ -510,7 +510,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
+            .ShouldBe("SpecValidationTests.cs:997: A member anchor lambda resolves to an indexer accessor (get_Item), which is outside the " +
                       "member-anchor surface (GRAMMAR §4.5); anchor a named property, field, or method " +
                       "(used by 'area/rule').");
     }
@@ -522,7 +522,7 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
+            .ShouldBe("SpecValidationTests.cs:1006: A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
                       "literal) that the compiler inlines to its value, so no member remains to anchor; name a const " +
                       "or enum member with the typeof form arch.Member(typeof(T), nameof(T.M)) (used by 'area/rule').");
     }
@@ -1038,6 +1038,200 @@ public class SpecValidationTests
             // Bad_Id → MalformedId; no .Because → MissingBecause; dangling scope → DanglingAnchor.
             arch.Rule("Bad_Id").Enforce(arch.Types.MustHavePrefix("I"));
             arch.Scope("other/scope");
+        }
+    }
+
+    // Phase 17 — spec-source locations (caller-info diagnostics). These are appended at the end of the class
+    // so the existing failing-spec fixtures above keep their authored line numbers, which the re-pinned
+    // messages encode (the file:line maintenance contract, same as violation goldens).
+    [Fact]
+    public void SpecValidationError_NoCapturedLocation_RendersMessageWithNoPrefix()
+    {
+        // The pre-caller-info degradation seam: an error minted without a source location — as a spec DLL
+        // compiled against the previous Core yields — renders today's message verbatim, no location prefix
+        // and no leading blank. Simulated via the internal ctor since we cannot compile against an older Core.
+        var error = new SpecValidationError(Code.DanglingAnchor, "area/x",
+            "Rule 'area/x' has no posture; call .Enforce(...) or .Migrate(...).");
+
+        error.Location.ShouldBeNull();
+        error.Message.ShouldBe("Rule 'area/x' has no posture; call .Enforce(...) or .Migrate(...).");
+    }
+
+    [Fact]
+    public void SpecValidationError_Location_IsFileNameOnlyAndLineCaptured()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
+        SpecValidationError error = ex.Errors.First(e => e.Code == Code.MissingBecause);
+
+        error.Location.ShouldNotBeNull();
+        // File name only — never the machine-specific directory — so goldens stay byte-identical across build
+        // machines; the line is the captured 1-based anchor line.
+        error.Location!.File.ShouldBe("SpecValidationTests.cs");
+        error.Location.Line.ShouldBeGreaterThan(0);
+        error.Message.ShouldStartWith("SpecValidationTests.cs:");
+    }
+
+    [Fact]
+    public void AllErrors_MultiErrorSpec_EachRendersItsAnchorLocation()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
+
+        // Every error in the one-pass batch lands at its own anchor's file:line — the rule's malformed ID and
+        // missing Because on one line, the dangling scope on the next (two distinct anchor lines).
+        ex.Errors.ShouldAllBe(e => e.Location != null && e.Location.File == "SpecValidationTests.cs");
+        ex.Errors.Select(e => e.Location!.Line).Distinct().Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public void MemberPoison_AnchorsToMemberCallSite_RuleErrorAnchorsToRuleAnchor()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MemberPoisonBelowRuleSpec());
+        SpecValidationError ruleError = ex.Errors.First(e => e.Code == Code.MissingBecause);
+        SpecValidationError memberError = ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable);
+
+        ruleError.Location.ShouldNotBeNull();
+        memberError.Location.ShouldNotBeNull();
+        // The member poison steers to its own arch.Member(...) lambda line — below the arch.Rule(...) anchor
+        // the rule-level MissingBecause renders at — proving item-18 steers point at the offending construct,
+        // not the consuming rule (GRAMMAR §8).
+        memberError.Location!.Line.ShouldBeGreaterThan(ruleError.Location!.Line);
+    }
+
+    private sealed class MemberPoisonBelowRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The arch.Member(...) poison sits two lines below the arch.Rule(...) anchor; the rule also omits
+            // .Because, so the one-pass batch carries a rule-anchored error at the rule line and a member
+            // -anchored one at the lambda line.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotUse(
+                    arch.Member<AnchorWidget>(w => w.Count + 1)));
+        }
+    }
+
+    // WP-2 — SpecValidator blank-pattern arms (GRAMMAR §8 item 15). Appended at the very end of the class so
+    // every file:line golden above keeps its authored line number (the caller-info maintenance contract) — and
+    // for the same reason this file must NOT be run through a member-reordering cleanup profile. Each arm — the
+    // shape/naming verb's own glob, a subject-side adjective, and their member analogs — routes through
+    // CheckPattern and emits the one shared Code.BlankPattern; a distinct spec per arm walks each
+    // ConstraintPatterns / SelectionPatterns / MemberAdjectivePatterns code path.
+    [Fact]
+    public void BlankPattern_BlankTypeNameMatchingVerb_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNameMatchingVerbSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankTypeNameMatchingAdjective_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNameMatchingAdjectiveSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankTypePrefixAdjective_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankTypePrefixAdjectiveSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankMemberNameMatchingAdjective_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameMatchingAdjectiveSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankMemberPrefixAdjective_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberPrefixAdjectiveSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankMemberNameMatchingVerb_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameMatchingVerbSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankMemberPrefixVerb_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberPrefixVerbSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    private sealed class BlankTypeNameMatchingVerbSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The verb's own name glob (ConstraintPatterns MustHaveNameMatchingConstraint arm).
+            arch.Rule("area/rule").Enforce(arch.Types.MustHaveNameMatching(" ")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankTypeNameMatchingAdjectiveSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The subject-side WithNameMatching adjective glob (SelectionPatterns WithNameMatchingAdjective arm).
+            arch.Rule("area/rule").Enforce(arch.Types.WithNameMatching(" ").MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankTypePrefixAdjectiveSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The subject-side WithPrefix adjective affix (SelectionPatterns WithPrefixAdjective arm).
+            arch.Rule("area/rule").Enforce(arch.Types.WithPrefix(" ").MustHavePrefix("I")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberNameMatchingAdjectiveSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The member-subject WithNameMatching adjective glob (MemberAdjectivePatterns arm).
+            arch.Rule("area/rule").Enforce(arch.Types.Methods.WithNameMatching(" ").MustBePublic()).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberPrefixAdjectiveSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The member-subject WithPrefix adjective affix (MemberAdjectivePatterns arm).
+            arch.Rule("area/rule").Enforce(arch.Types.Methods.WithPrefix(" ").MustBePublic()).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberNameMatchingVerbSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The member verb's own name glob (ConstraintPatterns MemberMustHaveNameMatchingConstraint arm).
+            arch.Rule("area/rule").Enforce(arch.Types.Members.MustHaveNameMatching(" ")).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberPrefixVerbSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The member verb's own affix (ConstraintPatterns MemberMustHavePrefixConstraint arm).
+            arch.Rule("area/rule").Enforce(arch.Types.Members.MustHavePrefix(" ")).Because("Reason.");
         }
     }
 }

@@ -73,6 +73,19 @@ public sealed class EvaluatorFailClosedTests
         violation.Detail.ShouldContain("Unhandled selection adjective 'UnknownAdjective'.");
     }
 
+    [Fact]
+    public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
+    {
+        // A UnionSelection is the internal, Freeze-only union (GRAMMAR §7): rendered only in reference
+        // position, never as a sentence subject, so it exposes no single noun — reading .Noun throws
+        // rather than inventing one.
+        var arch = new Arch();
+        var union = new UnionSelection(arch, new[] { arch.Types });
+
+        var ex = Should.Throw<InvalidOperationException>(() => _ = union.Noun);
+        ex.Message.ShouldBe("A union selection has no single noun; render it in reference position.");
+    }
+
     private sealed class UnknownNoun : SelectionNoun
     {
         internal override string Locative => string.Empty;

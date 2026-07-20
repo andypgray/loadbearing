@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Rendering;
@@ -98,19 +96,6 @@ internal sealed class BinlogCaptureStore
     internal const string VersionMismatchNotice =
         "build capture was written by a different LoadBearing version; running a design-time build instead. "
         + "Re-capture: rebuild with -bl and re-run with --binlog.";
-
-    // Mirrors ExtractionCacheStore: probe files whose presence anywhere from a project directory up to the
-    // solution directory changes the build, stamped even when absent so a newly-appearing one is a flip.
-    private static readonly string[] StructuralProbeFileNames =
-        ["Directory.Build.props", "Directory.Build.targets", "global.json"];
-
-    // The tool version is the assembly's informational version ("0.1.0+<sha>"): the SDK appends the commit
-    // hash, giving per-commit invalidation during development. Same discipline (and, being the same assembly,
-    // the same value) as ExtractionCacheStore.CurrentToolVersion.
-    private static readonly string CurrentToolVersion =
-        typeof(BinlogCaptureStore).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? "unknown";
 
     private readonly string cacheDirectory;
     private readonly string captureBinlogPath;
@@ -271,11 +256,11 @@ internal sealed class BinlogCaptureStore
         try
         {
             Directory.CreateDirectory(cacheDirectory);
-            structuralStamps = structuralPaths.Select(StampOf).ToList();
+            structuralStamps = structuralPaths.Select(FileStamping.StampOf).ToList();
 
             // Binlog copy BEFORE the manifest: a torn state is then a manifest-less orphan (validated Absent),
             // never a manifest pointing at a binlog that was never written.
-            CopyFileAtomic(binlogFullPath, captureBinlogPath);
+            AtomicFile.Copy(binlogFullPath, captureBinlogPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -284,7 +269,7 @@ internal sealed class BinlogCaptureStore
 
         ct.ThrowIfCancellationRequested();
         var manifest = new CaptureManifest(
-            CurrentSchemaVersion, CurrentToolVersion, structuralStamps, projects, StampOf(captureBinlogPath));
+            CurrentSchemaVersion, FileStamping.CurrentToolVersion, structuralStamps, projects, FileStamping.StampOf(captureBinlogPath));
         return TryWriteManifestAtomic(manifest);
     }
 
@@ -325,7 +310,7 @@ internal sealed class BinlogCaptureStore
         CaptureManifest? manifest = TryReadManifest();
         if (manifest is null) return CaptureValidation.Invalid(UnreadableNotice);
         if (manifest.SchemaVersion != CurrentSchemaVersion) return CaptureValidation.Invalid(UnreadableNotice);
-        if (!string.Equals(manifest.ToolVersion, CurrentToolVersion, StringComparison.Ordinal))
+        if (!string.Equals(manifest.ToolVersion, FileStamping.CurrentToolVersion, StringComparison.Ordinal))
             return CaptureValidation.Invalid(VersionMismatchNotice);
 
         // The binlog we would replay must still be on disk (a torn write or a hand-deleted copy).
@@ -336,7 +321,7 @@ internal sealed class BinlogCaptureStore
         foreach (FileStamp stamp in manifest.StructuralStamps)
         {
             ct.ThrowIfCancellationRequested();
-            (bool changed, FileStamp refreshed) = CheckStructural(stamp);
+            (bool changed, FileStamp refreshed) = FileStamping.CheckStructural(stamp, () => ContentHashCount++);
             if (changed) return CaptureValidation.Invalid(StaleNotice(stamp.Path));
             refreshedStructural.Add(refreshed);
         }
@@ -360,22 +345,6 @@ internal sealed class BinlogCaptureStore
         return CaptureValidation.Usable(captureBinlogPath);
     }
 
-    // Mirrors ExtractionCacheStore.CheckStructural: existence flip ⇒ changed; a promoted stat match is
-    // trusted; otherwise re-hash — a real content change is changed, a bare touch refreshes a promoted stamp.
-    private (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp)
-    {
-        FileFreshness current = FileFreshness.Capture(stamp.Path);
-        if (stamp.Exists != current.Exists) return (true, stamp);
-        if (!stamp.Exists) return (false, stamp);
-        if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp);
-
-        string? sha = HashDuringValidation(stamp.Path);
-        if (sha is null || !string.Equals(sha, stamp.Sha256, StringComparison.Ordinal)) return (true, stamp);
-
-        // Content unchanged despite the stat delta (a bare touch): refresh so the next sweep is pure-stat.
-        return (false, RefreshStamp(stamp.Path, current, sha));
-    }
-
     // Enumerates the project cone's *.cs and returns the first present in neither the recorded ConeFiles nor
     // the compiled DocumentPaths — the SDK-glob add a stat sweep cannot see. An excluded stray that was in the
     // cone at ingest is in ConeFiles, so it is not read as an add; only a file new since ingest trips this.
@@ -392,7 +361,7 @@ internal sealed class BinlogCaptureStore
 
     private void PromoteIfChanged(CaptureManifest manifest, IReadOnlyList<FileStamp> refreshedStructural)
     {
-        if (StampsEqual(manifest.StructuralStamps, refreshedStructural)) return; // already reflects disk
+        if (FileStamping.StampsEqual(manifest.StructuralStamps, refreshedStructural)) return; // already reflects disk
 
         CaptureManifest promoted = manifest with { StructuralStamps = refreshedStructural };
         TryWriteManifestAtomic(promoted); // best-effort; a later change is still caught by the next stat delta
@@ -448,50 +417,11 @@ internal sealed class BinlogCaptureStore
         foreach (CaptureProjectEntry project in projects)
         {
             yield return project.CsprojPath;
-            yield return AssetsPathOf(project.ProjectDirectory);
+            yield return FileStamping.AssetsPathOf(project.ProjectDirectory);
 
             foreach (string ancestor in ProjectCone.Ancestors(project.ProjectDirectory))
-            foreach (string probe in StructuralProbeFileNames)
+            foreach (string probe in FileStamping.StructuralProbeFileNames)
                 yield return Path.Combine(ancestor, probe);
-        }
-    }
-
-    private static string AssetsPathOf(string projectDirectory)
-    {
-        return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
-    }
-
-    // ── stamping + hashing (mirrors ExtractionCacheStore) ────────────────────────────────────────────────
-
-    private static FileStamp StampOf(string path)
-    {
-        string full = Path.GetFullPath(path);
-        FileFreshness fresh = FileFreshness.Capture(full);
-        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
-
-        return new FileStamp(full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, TryHashFile(full), fresh.IsPromoted);
-    }
-
-    private static FileStamp RefreshStamp(string path, FileFreshness current, string? sha)
-    {
-        return new FileStamp(path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted);
-    }
-
-    private string? HashDuringValidation(string path)
-    {
-        ContentHashCount++;
-        return TryHashFile(path);
-    }
-
-    private static string? TryHashFile(string path)
-    {
-        try
-        {
-            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return null;
         }
     }
 
@@ -524,53 +454,11 @@ internal sealed class BinlogCaptureStore
         }
     }
 
-    private void CopyFileAtomic(string source, string destination)
-    {
-        string tempPath = Path.Combine(cacheDirectory, $"{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            File.Copy(source, tempPath, true);
-            File.Move(tempPath, destination, true);
-        }
-        catch
-        {
-            TryDelete(tempPath);
-            throw;
-        }
-    }
-
     // ── small helpers ────────────────────────────────────────────────────────────────────────────────────
 
     private static string CanonicalKey(string path)
     {
         return PathCanonicalizer.Resolve(path);
-    }
-
-    private static FileFreshness ToFreshness(FileStamp stamp)
-    {
-        // RecordedAtUtc is irrelevant to MatchesStat; the racy verdict is the persisted Promoted flag.
-        return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
-    }
-
-    private static bool StampsEqual(IReadOnlyList<FileStamp> left, IReadOnlyList<FileStamp> right)
-    {
-        if (left.Count != right.Count) return false;
-        for (var i = 0; i < left.Count; i++)
-            if (left[i] != right[i])
-                return false; // FileStamp is a record ⇒ scalar value equality
-        return true;
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // best-effort cleanup
-        }
     }
 
     // Accumulates one project's identity and its unioned, ordinal-sorted document set across frameworks.

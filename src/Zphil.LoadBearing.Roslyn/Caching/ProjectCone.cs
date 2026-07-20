@@ -1,3 +1,4 @@
+using Microsoft.Extensions.FileSystemGlobbing;
 using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -27,11 +28,12 @@ internal static class ProjectCone
     /// </summary>
     public static IEnumerable<string> Enumerate(string projectDirectory)
     {
-        if (!Directory.Exists(projectDirectory)) yield break;
+        if (!Directory.Exists(projectDirectory)) return [];
 
-        foreach (string file in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
-            if (!IsBuildArtifact(projectDirectory, file))
-                yield return Path.GetFullPath(file);
+        var matcher = new Matcher(StringComparison.Ordinal);
+        matcher.AddInclude("**/*.cs");
+        foreach (string glob in BuildOutputDirectories.ExcludeGlobs) matcher.AddExclude(glob);
+        return matcher.GetResultsInFullPath(projectDirectory);
     }
 
     /// <summary>
@@ -49,11 +51,5 @@ internal static class ProjectCone
             yield return directory;
             directory = Path.GetDirectoryName(directory);
         }
-    }
-
-    private static bool IsBuildArtifact(string projectDirectory, string file)
-    {
-        string relative = Path.GetRelativePath(projectDirectory, file).Replace('\\', '/');
-        return relative.Split('/').Any(segment => segment is "bin" or "obj");
     }
 }

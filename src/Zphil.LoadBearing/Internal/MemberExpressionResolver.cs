@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Zphil.LoadBearing.Validation;
 
 namespace Zphil.LoadBearing.Internal;
 
@@ -53,9 +54,10 @@ internal static class MemberExpressionResolver
     /// <summary>
     ///     Resolves <paramref name="lambda" /> (already null-checked by the calling <see cref="Arch" />
     ///     <c>Member</c> overload) to a resolved or poisoned <see cref="Member" /> stamped with
-    ///     <paramref name="owner" />.
+    ///     <paramref name="owner" /> and the anchor's spec-source <paramref name="location" /> (null for a
+    ///     verb-minted lambda, which cannot carry caller info — GRAMMAR §8).
     /// </summary>
-    internal static Member Resolve(Arch owner, LambdaExpression lambda)
+    internal static Member Resolve(Arch owner, LambdaExpression lambda, SpecSourceLocation? location = null)
     {
         bool instanceForm = lambda.Parameters.Count == 1;
         Expression body = Unwrap(lambda.Body);
@@ -65,28 +67,28 @@ internal static class MemberExpressionResolver
             case MethodCallExpression call:
                 // Order matters (ratified): the method-group trap is detected before receiver
                 // classification (a lowered method group has a synthetic receiver), then indexers.
-                if (IsMethodGroupLowering(call)) return Poison(owner, MethodGroup);
-                if (call.Method.IsSpecialName) return Poison(owner, SpecialName);
+                if (IsMethodGroupLowering(call)) return Poison(owner, MethodGroup, location);
+                if (call.Method.IsSpecialName) return Poison(owner, SpecialName, location);
 
                 // In the instance form a reduced extension call `x.Ext()` lowers to `Ext(x)` — a static call
                 // whose real receiver is Arguments[0], redirected so the parameter check sees it (the §4.5
                 // ReducedFrom parity). In the static form an extension is anchored like any other static call
                 // (its declaring static class), so no redirect.
                 Expression? methodReceiver = instanceForm && IsExtensionCall(call) ? call.Arguments[0] : call.Object;
-                return ClassifyReceiver(owner, methodReceiver, instanceForm, lambda)
-                       ?? Anchor(owner, call.Method.DeclaringType!, call.Method.Name);
+                return ClassifyReceiver(owner, methodReceiver, instanceForm, lambda, location)
+                       ?? Anchor(owner, call.Method.DeclaringType!, call.Method.Name, location);
 
             case MemberExpression { Member: PropertyInfo or FieldInfo } member:
-                return ClassifyReceiver(owner, member.Expression, instanceForm, lambda)
-                       ?? Anchor(owner, member.Member.DeclaringType!, member.Member.Name);
+                return ClassifyReceiver(owner, member.Expression, instanceForm, lambda, location)
+                       ?? Anchor(owner, member.Member.DeclaringType!, member.Member.Name, location);
 
             case ConstantExpression:
                 // The lambda body inlined to a compile-time value (a const field, enum member, or literal),
                 // peeled by Unwrap to its ConstantExpression — no member remains in the tree to anchor.
-                return Poison(owner, CompileTimeConstant);
+                return Poison(owner, CompileTimeConstant, location);
 
             default:
-                return Poison(owner, NotMemberAccess);
+                return Poison(owner, NotMemberAccess, location);
         }
     }
 
@@ -95,27 +97,28 @@ internal static class MemberExpressionResolver
     // as-cast (both peeled by PeelIdentityCast); a user-defined conversion stops the peel and is reported,
     // since following it would silently anchor the post-conversion type. The static form wants no receiver.
     // Returns a poison Member on a mismatch, or null to mean "receiver is fine".
-    private static Member? ClassifyReceiver(Arch owner, Expression? receiver, bool instanceForm, LambdaExpression lambda)
+    private static Member? ClassifyReceiver(
+        Arch owner, Expression? receiver, bool instanceForm, LambdaExpression lambda, SpecSourceLocation? location)
     {
         Expression? peeled = PeelIdentityCast(receiver);
 
         if (instanceForm)
         {
-            if (peeled is null) return Poison(owner, StaticInInstanceForm);
-            if (!ReferenceEquals(peeled, lambda.Parameters[0])) return Poison(owner, ReceiverNotParameter);
+            if (peeled is null) return Poison(owner, StaticInInstanceForm, location);
+            if (!ReferenceEquals(peeled, lambda.Parameters[0])) return Poison(owner, ReceiverNotParameter, location);
             return null;
         }
 
-        return peeled is null ? null : Poison(owner, InstanceInStaticForm);
+        return peeled is null ? null : Poison(owner, InstanceInStaticForm, location);
     }
 
     // The anchor is the resolved member's declaring type (never ReflectedType), normalized through
     // Generics.Definition so a constructed generic collapses to its definition (Task<int> → Task<>). That
     // keeps it identical to the typeof form and the checker's closed-generic refusal (GRAMMAR §4.5)
     // unreachable from an expression-minted member.
-    private static Member Anchor(Arch owner, Type declaringType, string name)
+    private static Member Anchor(Arch owner, Type declaringType, string name, SpecSourceLocation? location)
     {
-        return new Member(owner, Generics.Definition(declaringType), name);
+        return new Member(owner, Generics.Definition(declaringType), name, location);
     }
 
     // The body's boxing Convert (a value member widened to object? by the Func<...,object?> overloads) is
@@ -169,8 +172,8 @@ internal static class MemberExpressionResolver
                && call.Method.IsDefined(typeof(ExtensionAttribute), false);
     }
 
-    private static Member Poison(Arch owner, string message)
+    private static Member Poison(Arch owner, string message, SpecSourceLocation? location)
     {
-        return new Member(owner, message);
+        return new Member(owner, message, location);
     }
 }

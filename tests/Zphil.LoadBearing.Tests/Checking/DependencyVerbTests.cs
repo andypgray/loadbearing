@@ -111,4 +111,22 @@ public sealed class DependencyVerbTests
         // Web may be referenced only by Web; the inbound Domain→Web edge is a violation.
         result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Web.Controller");
     }
+
+    [Fact]
+    public void MustNotReference_InertPatternTarget_WarnsAndStillPasses()
+    {
+        // The forbidden target (a namespace glob) matches no types, so the rule can never fire — it is inert.
+        // A pattern operand (not a bare typeof) is the warning gate (ConstraintEvaluator.ForbiddenReference).
+        RuleResult result = Checker.Run(Sources.Layered, arch =>
+                arch.Rule("inert/x")
+                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("Nonexistent.*")))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Passed);
+        result.Violations.ShouldBeEmpty();
+        CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
+        warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
+        warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
+    }
 }

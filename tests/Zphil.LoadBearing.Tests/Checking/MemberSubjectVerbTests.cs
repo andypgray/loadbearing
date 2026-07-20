@@ -101,6 +101,20 @@ public sealed class MemberSubjectVerbTests
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
 
+    [Fact]
+    public void WithNameMatchingAdjective_NarrowsMemberSetByGlob_ThenVerbRuns()
+    {
+        // The .WithNameMatching *adjective* (not the MustHaveNameMatching verb above) narrows the projected
+        // methods by an ordinal *-glob before the verb runs — MemberSelectionEvaluator.ApplyAdjective's
+        // name-matching arm. "*Async" keeps only RunAsync, so MustHaveSuffix("Async") holds; without the
+        // narrowing the other seven methods would fail, so the pass proves the glob actually filtered.
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async").MustHaveSuffix("Async"));
+
+        // "*Walk*" selects only Walk, which fails the suffix — the glob arm flags exactly that member.
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Walk*").MustHaveSuffix("Async"))
+            .ShouldBe(["M:App.Members.Widget.Walk"]);
+    }
+
     // ── accessibility verbs ───────────────────────────────────────────────────────────────────────────
 
     [Fact]

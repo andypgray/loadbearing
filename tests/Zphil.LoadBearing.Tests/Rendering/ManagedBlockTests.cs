@@ -196,4 +196,12 @@ public class ManagedBlockTests
     {
         Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.ExtractBody("<!-- loadbearing:begin -->\nx\n"));
     }
+
+    [Fact]
+    public void ExtractBody_EmptyBodyBetweenAdjacentMarkers_ReturnsEmptyString()
+    {
+        // Adjacent markers (a hand-authored empty managed block) leave a zero-length region, which
+        // StripOneTrailingNewline returns unchanged (ManagedBlock.cs:111) — there is no trailing newline to strip.
+        ManagedBlock.ExtractBody(Begin + "\n" + End + "\n").ShouldBe(string.Empty);
+    }
 }

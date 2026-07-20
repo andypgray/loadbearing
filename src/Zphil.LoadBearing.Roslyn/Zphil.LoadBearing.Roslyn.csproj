@@ -38,6 +38,13 @@
         <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" />
     </ItemGroup>
 
+    <!-- Powers ProjectCone's *.cs cone glob (bin/obj-excluding disk walk). Dependency-free. Pinned to
+         10.0.9 — the version the Cli already resolves transitively — so the Microsoft.Extensions.* graph
+         stays uniform with no NU1605 downgrade. -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.9" />
+    </ItemGroup>
+
     <!-- Basic.CompilerLog.Util (jaredpar/complog, MIT) powers binlog replay (Phase 12 D1): a real
          build's binlog is read into a workspace-shaped Solution without a design-time build (no
          MSBuildWorkspace, no build host). Exact-pinned. Its net10.0 group floors

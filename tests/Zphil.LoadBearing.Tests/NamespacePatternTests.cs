@@ -38,6 +38,14 @@ public class NamespacePatternTests
         new NamespacePattern("MyApp.Domain").Matches("myapp.domain").ShouldBeFalse();
     }
 
+    [Fact]
+    public void Matches_PartialSegmentWildcard_MismatchWithinSegment_ReturnsFalse()
+    {
+        // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
+        // (NamespacePattern.cs:108-110): `Legacy*` diverges from `Ledger` at the third character.
+        new NamespacePattern("MyApp.Legacy*").Matches("MyApp.Ledger").ShouldBeFalse();
+    }
+
     [Theory]
     // Well-formed globs — every row of the match table above, plus the interior single-segment wildcard.
     [InlineData("MyApp.Domain.*")]

@@ -99,22 +99,43 @@ internal static class VsWhereLocator
         using Process proc = Process.Start(psi)
                              ?? throw new InvalidOperationException($"Failed to start {VsWherePath}");
 
-        // Drain stderr concurrently so a chatty child can't fill its pipe buffer and block while
-        // we're synchronously consuming stdout.
-        var stderrTask = proc.StandardError.ReadToEndAsync();
-        string output = proc.StandardOutput.ReadToEnd();
-        if (!proc.WaitForExit(10_000))
+        using var timeout = new CancellationTokenSource(10_000);
+        // Drain both streams concurrently AND cancellably. The old code read stdout with a synchronous,
+        // unbounded ReadToEnd() *before* the WaitForExit timeout — so a vswhere child whose stdout write
+        // handle was inherited by a concurrently-spawned long-lived process never reached EOF and wedged
+        // here forever, with the timeout below unreachable. The token now bounds every wait.
+        var outputTask = proc.StandardOutput.ReadToEndAsync(timeout.Token);
+        var stderrTask = proc.StandardError.ReadToEndAsync(timeout.Token);
+        try
         {
-            proc.Kill();
+            proc.WaitForExitAsync(timeout.Token).GetAwaiter().GetResult();
+            string output = outputTask.GetAwaiter().GetResult();
+
+            if (proc.ExitCode != 0)
+            {
+                string err = stderrTask.GetAwaiter().GetResult();
+                throw new InvalidOperationException($"vswhere exited with code {proc.ExitCode}: {err}");
+            }
+
+            return output;
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            TryKill(proc);
             throw new TimeoutException("vswhere did not complete within 10 seconds");
         }
+    }
 
-        if (proc.ExitCode != 0)
+    // Best-effort kill of a wedged vswhere process (and any children) before we throw the timeout.
+    private static void TryKill(Process process)
+    {
+        try
         {
-            string err = stderrTask.GetAwaiter().GetResult();
-            throw new InvalidOperationException($"vswhere exited with code {proc.ExitCode}: {err}");
+            if (!process.HasExited) process.Kill(true);
         }
-
-        return output;
+        catch
+        {
+            // Already exited or inaccessible — nothing to clean up.
+        }
     }
 }

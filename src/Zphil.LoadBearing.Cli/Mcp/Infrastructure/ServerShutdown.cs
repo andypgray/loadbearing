@@ -32,7 +32,6 @@ internal static class ServerShutdown
     // How long ExitWith waits for in-flight tool calls to finish before running disposers. Bounds the
     // window that lets a mid-flight call commit; 5s keeps shutdown from being held hostage by a stuck call.
     private static readonly TimeSpan DefaultInFlightDrainTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan InFlightPollInterval = TimeSpan.FromMilliseconds(50);
     private static readonly Lock DisposersLock = new();
     private static readonly List<Func<ValueTask>> Disposers = [];
     private static int s_hasExited;
@@ -103,15 +102,18 @@ internal static class ServerShutdown
     }
 
     /// <summary>
-    ///     Spins (50 ms poll) until no tool call is in flight or <paramref name="timeout" /> elapses.
-    ///     Synchronous by design — this is the terminal shutdown path, so blocking the caller is fine.
+    ///     Blocks until no tool call is in flight or <paramref name="timeout" /> elapses, whichever
+    ///     comes first, then returns so shutdown can proceed. Waits on the completion source
+    ///     <see cref="IdleTimeoutWatchdog" /> signals when the in-flight count drops to zero — no
+    ///     busy-wait, and an already-idle server returns immediately. Synchronous by design: this is
+    ///     the terminal shutdown path, so blocking the caller is fine.
     /// </summary>
     private static void WaitForInFlightCalls(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero) return;
 
-        long deadlineTicks = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
-        while (IdleTimeoutWatchdog.InFlightCount > 0 && Environment.TickCount64 < deadlineTicks) Thread.Sleep(InFlightPollInterval);
+        Task drained = IdleTimeoutWatchdog.WhenAllCallsComplete();
+        drained.Wait(timeout);
     }
 
     private static void RunDisposerBounded(Func<ValueTask> disposer, TimeSpan timeout)

@@ -111,6 +111,17 @@ public class AgentContextRendererTests
     }
 
     [Fact]
+    public void ScopeCard_NonContainmentRule_Throws()
+    {
+        // ScopeCard requires a Freeze containment rule; any other rule (here an Enforce rule with no Freeze
+        // payload) is rejected before rendering (AgentContextRenderer.cs:92-93).
+        var enforceRule = new ArchRule("naming/x", Posture.Enforce, "b", null, "s", null, null, null);
+
+        Should.Throw<ArgumentException>(() => AgentContextRenderer.ScopeCard(enforceRule))
+            .Message.ShouldContain("ScopeCard requires a Freeze containment rule.");
+    }
+
+    [Fact]
     public void LayerCard_TwoEnforceRules_MatchesGolden()
     {
         ArchitectureModel model = ArchModelBuilder.Build(new DispatchLayerSpec());

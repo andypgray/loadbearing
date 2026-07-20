@@ -37,6 +37,18 @@ public sealed class AdapterTests
     }
 
     [Fact]
+    public void RuleRows_SpecBuildFailure_CollapsesToSingleSentinelRow()
+    {
+        // A spec that fails validation at build time (a rule with no .Because) cannot enumerate its rules, so
+        // discovery collapses to one sentinel row that lands red at run time — where the pipeline rebuild
+        // rethrows the real SpecValidationException — rather than vanishing as a silent discovery diagnostic.
+        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<SpecBuildFailsSpec>.RuleRows().ToList();
+
+        ITheoryDataRow row = rows.ShouldHaveSingleItem();
+        row.TestDisplayName.ShouldBe($"{nameof(SpecBuildFailsSpec)}: spec build failed");
+    }
+
+    [Fact]
     public async Task FailureText_MatchesCliHumanBlock()
     {
         // The CLI human block for the same rule + same solution is the oracle.
@@ -142,5 +154,15 @@ public sealed class AdapterTests
     {
         protected override string SolutionPath => CliRunner.MyAppSolution;
         protected override string? ExcludeProjectName => null;
+    }
+
+    // A spec that fails build-time validation: the rule carries a posture but no required .Because(...), so
+    // ArchModelBuilder.Build throws SpecValidationException and RuleRows() takes its spec-build-failure branch.
+    private sealed class SpecBuildFailsSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule").Enforce(arch.Types.MustHavePrefix("I"));
+        }
     }
 }

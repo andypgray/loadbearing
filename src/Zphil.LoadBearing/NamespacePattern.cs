@@ -77,41 +77,6 @@ public sealed class NamespacePattern
 
         return pattern.IndexOf('*') < 0
             ? string.Equals(pattern, segment, StringComparison.Ordinal)
-            : WildcardMatch(pattern, segment);
-    }
-
-    // Iterative within-segment wildcard match: '*' matches any run (including empty), case-sensitive,
-    // never crossing a dot (segments are split before this is called).
-    private static bool WildcardMatch(string pattern, string text)
-    {
-        var p = 0;
-        var t = 0;
-        int star = -1;
-        var mark = 0;
-
-        while (t < text.Length)
-            if (p < pattern.Length && pattern[p] == '*')
-            {
-                star = p++;
-                mark = t;
-            }
-            else if (p < pattern.Length && pattern[p] == text[t])
-            {
-                p++;
-                t++;
-            }
-            else if (star >= 0)
-            {
-                p = star + 1;
-                t = ++mark;
-            }
-            else
-            {
-                return false;
-            }
-
-        while (p < pattern.Length && pattern[p] == '*') p++;
-
-        return p == pattern.Length;
+            : Wildcard.Match(pattern, segment);
     }
 }

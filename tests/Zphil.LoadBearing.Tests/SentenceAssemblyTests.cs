@@ -247,4 +247,14 @@ public class SentenceAssemblyTests
         SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async").Returning(typeof(Task)))
             .ShouldBe("Methods of types named `*Async` returning `Task`");
     }
+
+    [Fact]
+    public void MemberWithNameMatching_RendersMatchesClauseAfterKindHead()
+    {
+        // The member .WithNameMatching adjective renders " whose name matches `glob`" inline after the
+        // projection head (GRAMMAR §5.7): MemberWithNameMatchingAdjective.Fragment at an Inline placement,
+        // cloned onto the selection through KindMemberSelection.Rebuild.
+        SentenceRenderer.MemberSubject(Arch.Types.Members.WithNameMatching("*Handler*"))
+            .ShouldBe("Members of types whose name matches `*Handler*`");
+    }
 }

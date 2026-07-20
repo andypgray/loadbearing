@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
@@ -89,6 +90,24 @@ public sealed class BaselineFormatTests
         string composed = BaselineFormat.ComposeFile(Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
 
         composed.ShouldContain("{ \"subject\": \"a\\\"b\\\\c\\td\\u0001e\" }");
+    }
+
+    [Fact]
+    public void ComposeFile_SubjectWithNamedControlChars_EscapesBackspaceFormfeedNewlineReturnTabAndUnicode()
+    {
+        // The subject field reaches Quote unfiltered (ForSubject validates nothing; WithBecause would reject the
+        // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.cs:181-191); U+001F (<0x20) falls
+        // through to \uXXXX. Built from explicit code points to keep the source free of invisible control chars.
+        string subject = "a" + (char)0x08 + (char)0x0C + (char)0x0A + (char)0x0D + (char)0x09 + (char)0x1F + "z";
+        string composed = BaselineFormat.ComposeFile(Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
+
+        composed.ShouldContain("\"a\\b\\f\\n\\r\\t\\u001fz\"");
+
+        // The escapes are valid JSON that round-trips back to the original subject through a standard parser.
+        using JsonDocument document = JsonDocument.Parse(composed);
+        string roundTripped = document.RootElement
+            .GetProperty("rules").GetProperty("r/x").GetProperty("entries")[0].GetProperty("subject").GetString()!;
+        roundTripped.ShouldBe(subject);
     }
 
     [Fact]

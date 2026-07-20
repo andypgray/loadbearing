@@ -98,6 +98,26 @@ public sealed class TypeNameFullDisplayTests
         model.Types.ShouldContain(t => t.FullName == "TopLevel");
     }
 
+    // The three type shapes with no source-level extraction analog throw (Prose/TypeName.cs:56,66): a by-ref
+    // (int&) and a pointer (int*) at line 56, and a partially-open construction (Dictionary<int, TValue> — some
+    // arguments bound, some free) at line 66. A discriminant selects the case so the computed types never
+    // round-trip through xUnit's theory-data serializer (a by-ref/pointer/partial-open Type does not).
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void FullDisplay_UnrepresentableType_ThrowsUnrepresentableTypeException(int which)
+    {
+        Type type = which switch
+        {
+            0 => typeof(int).MakeByRefType(),
+            1 => typeof(int).MakePointerType(),
+            _ => typeof(Dictionary<,>).MakeGenericType(typeof(int), typeof(Dictionary<,>).GetGenericArguments()[1])
+        };
+
+        Should.Throw<UnrepresentableTypeException>(() => TypeName.FullDisplay(type));
+    }
+
     // FullDisplay must equal the pinned literal AND be a name extraction actually produced for the
     // definition — the pair proves the two renderers agree without either side asserting itself.
     private static void AssertExtractedDefinition(Type type, string expected)
