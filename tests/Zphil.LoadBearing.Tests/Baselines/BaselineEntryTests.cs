@@ -1,6 +1,8 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
+using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
 
 namespace Zphil.LoadBearing.Tests.Baselines;
 
@@ -28,6 +30,23 @@ public sealed class BaselineEntryTests
     {
         BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
             .ShouldNotBe(BaselineEntry.ForEdge("T:N.Src", "T:N.Other"));
+    }
+
+    [Fact]
+    public void ForEdge_ConstructionViolationIdentity_IsAnOrdinaryEdgeEntry()
+    {
+        // A construction violation's identity is a plain (source, constructed) ForEdge entry (GRAMMAR §4.3) —
+        // the very shape a reference uses — so grandfathering construction needs zero new baseline format: the
+        // identity is value-equal to, hash-equal to, and set-dedupes with a hand-built ForEdge and its twin.
+        BaselineEntry identity = Violation
+            .Construction(Node("N.Factory"), Node("N.Widget"), Array.Empty<SourceLocation>())
+            .BaselineIdentity()!;
+
+        identity.ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget"));
+        identity.GetHashCode().ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget").GetHashCode());
+        identity.Subject.ShouldBeNull();
+        new HashSet<BaselineEntry> { identity }
+            .Contains(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget").WithBecause("INC-1")).ShouldBeTrue();
     }
 
     [Fact]
@@ -107,5 +126,13 @@ public sealed class BaselineEntryTests
         Should.Throw<ArgumentException>(() => entry.WithBecause("")).Message.ShouldContain("non-blank single line");
         Should.Throw<ArgumentException>(() => entry.WithBecause("a\rb")).Message.ShouldContain("non-blank single line");
         Should.Throw<ArgumentException>(() => entry.WithBecause("a\nb")).Message.ShouldContain("non-blank single line");
+    }
+
+    // A shallow TypeNode whose SymbolId is `T:` + FullName — the construction identity reads only those.
+    private static TypeNode Node(string fullName)
+    {
+        return new TypeNode(
+            fullName, $"T:{fullName}", fullName, "N", TypeKind.Class, Accessibility.Public,
+            false, false, false, false, "Proj", false);
     }
 }

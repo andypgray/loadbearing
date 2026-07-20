@@ -50,6 +50,7 @@ public sealed class ExplainCommandTests
         Normalize(result.Err).ShouldContain(
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
             "  data-access/no-inline-sql\n" +
+            "  di/handlers-via-registry\n" +
             "  layering/billing-independent\n" +
             "  layering/domain-independent\n" +
             "  layering/no-ghost\n" +

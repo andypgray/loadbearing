@@ -19,7 +19,9 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <item>
 ///             Edges — walk each declaring part's source for source-name-derived reference edges, deduped by (file,
 ///             line), self-edges dropped. The same walk yields the member-use edges (GRAMMAR §4.5) beside the type
-///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped.
+///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped — and
+///             the construction edges (§4.5) — one per (source, constructed FQN) at every object-creation
+///             expression, sites deduped, self-construction dropped, riding independently of the type channel.
 ///         </item>
 ///     </list>
 ///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
@@ -229,6 +231,7 @@ internal static class FragmentExtractor
 
     private sealed class ExtractState
     {
+        private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
@@ -322,18 +325,39 @@ internal static class FragmentExtractor
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
-                foreach ((INamedTypeSymbol target, ISymbol? member, string file, int line) in ReferenceWalker.Walk(root, model))
+                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, string file, int line)
+                         in ReferenceWalker.Walk(root, model))
                 {
-                    string tgtFqn = FullNameOf(target);
-                    if (tgtFqn == srcFqn) continue; // self-edge — drops the type edge and any member use on this node
+                    var site = new FragmentSite(file, line);
 
-                    ResolveName(target);
-                    EdgeSites((srcFqn, tgtFqn)).Add(new FragmentSite(file, line));
+                    // The type channel: mint the reference edge (and any member use riding it), self-edges dropped.
+                    if (target is not null)
+                    {
+                        string tgtFqn = FullNameOf(target);
+                        if (tgtFqn != srcFqn) // self-edge — drops the type edge and any member use on this node
+                        {
+                            ResolveName(target);
+                            EdgeSites((srcFqn, tgtFqn)).Add(site);
 
-                    // The member's containing type is the type-channel target (they agree by construction), so it is
-                    // already resolved above; the member edge just reuses tgtFqn and records the specific member.
-                    if (member is not null)
-                        RecordMemberEdge(srcFqn, tgtFqn, member, new FragmentSite(file, line));
+                            // The member's containing type is the type-channel target (they agree by construction),
+                            // so it is already resolved above; the member edge reuses tgtFqn and records the member.
+                            if (member is not null)
+                                RecordMemberEdge(srcFqn, tgtFqn, member, site);
+                        }
+                    }
+
+                    // The construct channel: mint the construction edge, self-construction dropped to mirror the
+                    // type-edge self-drop (§4.1). Rides independently of the type channel — an explicit `new Foo()`
+                    // arrives here with target=null, so a shared self-edge `continue` would silently drop it.
+                    if (constructed is not null)
+                    {
+                        string ctorFqn = FullNameOf(constructed);
+                        if (ctorFqn != srcFqn)
+                        {
+                            ResolveName(constructed);
+                            ConstructorEdgeSites((srcFqn, ctorFqn)).Add(site);
+                        }
+                    }
                 }
             }
         }
@@ -410,7 +434,14 @@ internal static class FragmentExtractor
                     kv.Value.Sites.ToList()))
                 .ToList();
 
-            return new CodebaseFragment(input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges);
+            var constructorEdges = _constructorEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Ctor, StringComparer.Ordinal)
+                .Select(kv => new FragmentConstructorEdge(kv.Key.Src, kv.Key.Ctor, kv.Value.ToList()))
+                .ToList();
+
+            return new CodebaseFragment(
+                input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges);
         }
 
         private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
@@ -419,6 +450,17 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _edgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ConstructorEdgeSites((string Src, string Ctor) key)
+        {
+            if (!_constructorEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _constructorEdgeSites[key] = sites;
             }
 
             return sites;

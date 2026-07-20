@@ -19,7 +19,7 @@ namespace Zphil.LoadBearing.Internal;
 /// </summary>
 internal static class MemberExpressionResolver
 {
-    // Seven poison messages, one code (the BlankPattern precedent). The resolver stores the core; the
+    // Eight poison messages, one code (the BlankPattern precedent). The resolver stores the core; the
     // validator appends " (used by '{id}')." Each names the shape that failed and steers to the cure.
     private const string NotMemberAccess =
         "A member anchor lambda must be a single property, field, or method access " +
@@ -50,6 +50,10 @@ internal static class MemberExpressionResolver
         "A member anchor lambda body is a compile-time constant (a const field, an enum member, or a " +
         "literal) that the compiler inlines to its value, so no member remains to anchor; name a const " +
         "or enum member with the typeof form arch.Member(typeof(T), nameof(T.M))";
+
+    private const string ObjectCreation =
+        "A member anchor lambda body is an object creation (a new expression, including target-typed new()); " +
+        "construction is not a member use, so ban the constructed type with the MustNotConstruct verb instead";
 
     /// <summary>
     ///     Resolves <paramref name="lambda" /> (already null-checked by the calling <see cref="Arch" />
@@ -86,6 +90,12 @@ internal static class MemberExpressionResolver
                 // The lambda body inlined to a compile-time value (a const field, enum member, or literal),
                 // peeled by Unwrap to its ConstantExpression — no member remains in the tree to anchor.
                 return Poison(owner, CompileTimeConstant, location);
+
+            case NewExpression:
+                // An object-creation body (`() => new Foo()`, including target-typed `new()`) names a constructor,
+                // which is outside the member-anchor surface (§4.5); the cure is the MustNotConstruct verb (§5.3),
+                // not a member ban. Placed before default: so it steers instead of falling to NotMemberAccess.
+                return Poison(owner, ObjectCreation, location);
 
             default:
                 return Poison(owner, NotMemberAccess, location);

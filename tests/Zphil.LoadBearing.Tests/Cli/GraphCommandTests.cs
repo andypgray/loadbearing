@@ -20,7 +20,7 @@ public sealed class GraphCommandTests
         Projects (3):
           MyApp.Domain — 5 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 8 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 10 types; references: MyApp.Legacy.Billing
 
         Observed project references (distinct type pairs):
           MyApp.Domain -> MyApp.Web: 2
@@ -29,7 +29,7 @@ public sealed class GraphCommandTests
         Namespaces:
           MyApp.Domain: MyApp.Domain (5)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
-          MyApp.Web: MyApp.Web (8)
+          MyApp.Web: MyApp.Web (10)
 
         External references (by namespace root):
           MyApp.Legacy.Billing -> System: 2

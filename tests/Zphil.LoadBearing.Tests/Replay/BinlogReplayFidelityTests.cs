@@ -46,6 +46,19 @@ public sealed class BinlogReplayFidelityTests
     }
 
     [Fact]
+    public async Task Replay_ConstructorEdges_MatchTheMsBuildWorkspace()
+    {
+        // The construction channel (GRAMMAR §4.5) survives the binlog-replay path — an explicit assertion
+        // beside the whole-model dump equality above, so a dropped ctor channel is a named failure not a diff.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+        model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController").ShouldBeTrue();
+        model.ConstructorEdge("MyApp.Web.InvoiceController", "System.Data.DataTable")
+            .Constructed.IsExternal.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Replay_AfterAppendingTypePostBuild_ReflectsCurrentDiskNotCapturedText()
     {
         // Arrange — append a new type to a source file already covered by the binlog's csc file list, AFTER

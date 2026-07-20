@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Internal;
+using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Rendering;
@@ -19,14 +20,18 @@ public static class AgentContextRenderer
 {
     private const string Heading = "## Architecture (LoadBearing)";
 
-    private const string GlossaryLine =
-        "reference = a source-level type reference. Expand any rule ID with `loadbearing explain <rule-id>`.";
+    // The glossary composes from per-axis clauses, not 2^N whole-string constants: the "reference" clause is
+    // always present, "use" iff a member-target rule exists, "construct" iff a ctor rule exists — each axis
+    // gates independently, so a spec without a given axis renders byte-identically to before that axis existed
+    // (GRAMMAR §4.1/§4.5/§10). The clauses join with "; " and the tail follows a ". " separator.
+    private const string GlossaryReferenceClause = "reference = a source-level type reference";
 
-    // The member-axis glossary gains a "use" entry only when the spec carries a member-target rule; a
-    // spec without one renders byte-identically to before member bans existed (GRAMMAR §4.5 last bullet).
-    private const string GlossaryLineWithMembers =
-        "reference = a source-level type reference; use = a source-level member access. " +
-        "Expand any rule ID with `loadbearing explain <rule-id>`.";
+    private const string GlossaryUseClause = "use = a source-level member access";
+
+    private const string GlossaryConstructClause =
+        "construct = a source-level object creation (`new`, including target-typed `new()`)";
+
+    private const string GlossaryTail = "Expand any rule ID with `loadbearing explain <rule-id>`.";
 
     /// <summary>
     ///     The provenance/warning line — the first line inside every managed block (R1). Names the
@@ -57,11 +62,12 @@ public static class AgentContextRenderer
         Guard.NotNull(model, nameof(model));
 
         bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
+        bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            hasMemberRule ? GlossaryLineWithMembers : GlossaryLine
+            GlossaryLine(hasMemberRule, hasCtorRule)
         };
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));
@@ -76,6 +82,18 @@ public static class AgentContextRenderer
         if (containmentRules.Count > 0) sections.Add(FrozenScopesSection(containmentRules));
 
         return string.Join("\n\n", sections);
+    }
+
+    // The glossary/drill-down line, composed from the always-on "reference" clause plus the axis clauses the
+    // spec actually exercises, then the shared tail. Reproduces the pre-ctor "reference." and "reference; use."
+    // lines byte-for-byte when their axis flags are the only ones set (GRAMMAR §4.1/§4.5/§10).
+    private static string GlossaryLine(bool hasMemberRule, bool hasCtorRule)
+    {
+        var clauses = new List<string> { GlossaryReferenceClause };
+        if (hasMemberRule) clauses.Add(GlossaryUseClause);
+        if (hasCtorRule) clauses.Add(GlossaryConstructClause);
+
+        return string.Join("; ", clauses) + ". " + GlossaryTail;
     }
 
     /// <summary>

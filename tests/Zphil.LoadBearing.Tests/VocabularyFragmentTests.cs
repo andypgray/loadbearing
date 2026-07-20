@@ -39,6 +39,14 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustNotConstruct_RendersFragment()
+    {
+        // The constructor-ban verb (GRAMMAR §5.3): "must not construct {list}".
+        SentenceRenderer.Sentence(Arch.Types.MustNotConstruct(typeof(SqlConnection)))
+            .ShouldBe("Types must not construct `SqlConnection`.");
+    }
+
+    [Fact]
     public void MustResideInNamespace_BackticksGlob()
     {
         SentenceRenderer.Sentence(Arch.Types.MustResideInNamespace("MyApp.Web.*"))

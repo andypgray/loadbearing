@@ -170,6 +170,49 @@ public sealed class FragmentMergeTests
         model.Edge("N2.CB", "System.Exception").Target.ShouldBeSameAs(shared);
     }
 
+    [Fact]
+    public void ExtractFromCompilations_CrossInputConstruction_ConstructedIsSameInstanceAsTypesNode()
+    {
+        // A construction whose constructed type is declared by another input resolves to the declared node
+        // (reference equality), never a shallow external — the ctor analog of the cross-input edge contract.
+        CompilationInput lib = CompilationFactory.Compile("Aproj", ("Lib.cs", """
+                                                                              namespace N;
+                                                                              public class Widget {}
+                                                                              """));
+        CompilationInput app = CompilationFactory.CompileReferencing(
+            "Bproj", lib.Compilation, "Aproj", ("App.cs", """
+                                                          namespace N2;
+                                                          public class Maker { public object M() => new N.Widget(); }
+                                                          """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+
+        TypeNode widget = model.Type("N.Widget");
+        ConstructorEdge edge = model.ConstructorEdge("N2.Maker", "N.Widget");
+        edge.Constructed.ShouldBeSameAs(widget);
+        edge.Constructed.IsExternal.ShouldBeFalse();
+        edge.Source.ShouldBeSameAs(model.Type("N2.Maker"));
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameProjectNameTwice_UnionsDuplicateConstructorEdgesToOneSite()
+    {
+        // Two compilations sharing a project name and source path model one project's two TFMs; the merge
+        // unions the identical ctor edge (and its single site) rather than duplicating it.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            public class B { public object M() => new A(); }
+                            """);
+        CompilationInput first = CompilationFactory.Compile("P", file);
+        CompilationInput second = CompilationFactory.Compile("P", file);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.ConstructorEdges.Count(e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A").ShouldBe(1);
+        model.ConstructorEdge("P.B", "P.A").Sites.Count.ShouldBe(1);
+    }
+
     // ── M2: same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
 
     [Fact]

@@ -63,6 +63,21 @@
       }
     },
     {
+      "id": "di/handlers-via-registry",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/di/handlers-via-registry.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -99,9 +114,9 @@
     }
   ],
   "summary": {
-    "rulesChecked": 9,
+    "rulesChecked": 10,
     "rulesPassed": 2,
-    "rulesFailed": 6,
+    "rulesFailed": 7,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

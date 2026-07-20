@@ -79,6 +79,23 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_ConstructionViolation_RendersConstructsLineAtNewSite()
+    {
+        // ViolationLines has no default arm, so a missing Construction case would render nothing and a red
+        // report would read green. Pin the located line text: `Source constructs Target` at the `new` site.
+        var construction = Violation.Construction(
+            Node("App.Factory"), Node("Widgets.Widget"), [new SourceLocation("Factory.cs", 12)]);
+        var result = new RuleResult(
+            EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, [], 0, false);
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Construction);
+        block.ShouldContain("App.Factory constructs Widgets.Widget");
+        block.ShouldContain(":12 — App.Factory constructs Widgets.Widget");
+    }
+
+    [Fact]
     public void RuleBlock_MixedUnlocatedAndLocated_EmitsUnlocatedBeforeLocated()
     {
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered

@@ -12,6 +12,18 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class DependencyVerbTests
 {
+    // One `new` (Maker) and one bare reference (Holder) onto the same forbidden data-layer type — the fixture
+    // that separates the construction verb from the reference verb.
+    private const string ConstructsAndReferences = """
+                                                   namespace App.Data { public class Db {} }
+                                                   namespace App.Web
+                                                   {
+                                                       using App.Data;
+                                                       public class Maker { public Db Open() => new Db(); }
+                                                       public class Holder { public Db Handle; }
+                                                   }
+                                                   """;
+
     [Fact]
     public void MustNotReference_DomainReferencesWeb_FailsWithSourceTargetSites()
     {
@@ -128,5 +140,35 @@ public sealed class DependencyVerbTests
         CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
         warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
         warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
+    }
+
+    [Fact]
+    public void MustNotConstruct_SubjectNewsTarget_FailsWithConstructionPair()
+    {
+        // The construction verb sits beside the reference verbs but walks object-creation edges: only Maker's
+        // `new Db()` trips — Holder's Db field is a reference, invisible to MustNotConstruct.
+        RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
+                arch.Rule("di/x")
+                    .Enforce(arch.Namespace("App.Web.*").MustNotConstruct(arch.Namespace("App.Data.*")))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ConstructionPairs().ShouldBe(["App.Web.Maker -> App.Data.Db"]);
+    }
+
+    [Fact]
+    public void MustNotConstruct_ReferenceWithoutConstruction_Passes()
+    {
+        // The reference/construction split, pinned: Holder holds a Db field (a reference edge) but never `new`s
+        // it, so MustNotConstruct is silent exactly where MustNotReference would fire.
+        RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
+                arch.Rule("di/x")
+                    .Enforce(arch.Namespace("App.Web.*").WithSuffix("Holder").MustNotConstruct(arch.Namespace("App.Data.*")))
+                    .Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Passed);
+        result.Violations.ShouldBeEmpty();
     }
 }

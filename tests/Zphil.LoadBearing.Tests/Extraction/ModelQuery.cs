@@ -50,6 +50,28 @@ internal static class ModelQuery
         return edge.Sites.Select(s => s.Line).ToList();
     }
 
+    // ── construction edges (GRAMMAR §4.5) ─────────────────────────────────────────────────────────────────
+
+    public static ConstructorEdge ConstructorEdge(this CodebaseModel model, string sourceFullName, string constructedFullName)
+    {
+        return model.ConstructorEdges.Single(e => e.Source.FullName == sourceFullName && e.Constructed.FullName == constructedFullName);
+    }
+
+    public static IReadOnlyList<ConstructorEdge> ConstructorEdges(this CodebaseModel model, string sourceFullName)
+    {
+        return model.ConstructorEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+    }
+
+    public static bool HasConstructorEdge(this CodebaseModel model, string sourceFullName, string constructedFullName)
+    {
+        return model.ConstructorEdges.Any(e => e.Source.FullName == sourceFullName && e.Constructed.FullName == constructedFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this ConstructorEdge edge)
+    {
+        return edge.Sites.Select(s => s.Line).ToList();
+    }
+
     public static string FullName(this ITypeInfo type)
     {
         return ((TypeNode)type).FullName;

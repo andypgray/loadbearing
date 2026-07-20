@@ -28,7 +28,7 @@ public class ModelReificationTests
     }
 
     [Fact]
-    public void Build_CanonicalSample_ReifiesSevenRulesInPinnedOrder()
+    public void Build_CanonicalSample_ReifiesEightRulesInPinnedOrder()
     {
         BuildCanonical().Rules.Select(rule => rule.Id).ShouldBe(
         [
@@ -38,6 +38,7 @@ public class ModelReificationTests
             "legacy/billing/containment",
             "legacy/billing/tripwire",
             "naming/handlers",
+            "di/handlers-via-registry",
             "style/type-name-length"
         ]);
     }
@@ -49,6 +50,7 @@ public class ModelReificationTests
     [InlineData("legacy/billing/containment", Posture.Freeze)]
     [InlineData("legacy/billing/tripwire", Posture.Freeze)]
     [InlineData("naming/handlers", Posture.Enforce)]
+    [InlineData("di/handlers-via-registry", Posture.Enforce)]
     [InlineData("style/type-name-length", Posture.Enforce)]
     public void Build_CanonicalSample_AssignsPostures(string id, Posture posture)
     {
@@ -187,10 +189,28 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void MustNotConstructRule_ReifiesToWalkableConstructConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new CtorRuleSpec()).Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustNotConstructConstraint>();
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        constraint.Targets.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void DependencyVerbConstraint_HasEmptyMemberOperands()
     {
         // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
         Rule("layering/domain-independent").Constraint!.MemberOperands.ShouldBeEmpty();
+        // MustNotConstruct is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty too.
+        ArchModelBuilder.Build(new CtorRuleSpec()).Rules.Single().Constraint!.MemberOperands.ShouldBeEmpty();
     }
 
     [Fact]
@@ -226,6 +246,17 @@ public class ModelReificationTests
                         arch.Member(typeof(DateTime), nameof(DateTime.Now)),
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.");
+        }
+    }
+
+    // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private sealed class CtorRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-new-services")
+                .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
+                .Because("Services are DI-resolved; direct construction bypasses the container.");
         }
     }
 

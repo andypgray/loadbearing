@@ -31,11 +31,11 @@
       "projectReferences": [
         "MyApp.Legacy.Billing"
       ],
-      "types": 8,
+      "types": 10,
       "namespaces": [
         {
           "namespace": "MyApp.Web",
-          "types": 8
+          "types": 10
         }
       ]
     }

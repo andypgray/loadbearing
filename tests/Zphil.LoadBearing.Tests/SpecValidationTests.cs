@@ -465,7 +465,7 @@ public class SpecValidationTests
 
     // Verb-position poison parity (Phase 16): the same unresolvable-anchor diagnostics the anchor-position
     // twins pin (above) fire when the poisoned lambda is passed bare to MustNotUse's static forms, because
-    // the verb desugars each target through the identical MemberExpressionResolver. Five of the seven poison
+    // the verb desugars each target through the identical MemberExpressionResolver. Six of the eight poison
     // classes are reachable from the static forms; the two instance-form steers have no static-verb spelling.
     // Message strings are copied verbatim from the anchor-position twins — the pinned strings are the spec.
     [Fact]
@@ -475,8 +475,8 @@ public class SpecValidationTests
 
         ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable && e.RuleId == "area/rule");
         ex.Errors.First(e => e.Code == Code.MemberExpressionUnresolvable).Message
-            .ShouldBe("SpecValidationTests.cs:969: A member anchor lambda must be a single property, field, or method access " +
-                      "(x => x.Member or () => Type.Member); this lambda body is neither (used by 'area/rule').");
+            .ShouldBe("SpecValidationTests.cs:969: A member anchor lambda body is an object creation (a new expression, including target-typed new()); " +
+                      "construction is not a member use, so ban the constructed type with the MustNotConstruct verb instead (used by 'area/rule').");
     }
 
     [Fact]
@@ -1232,6 +1232,30 @@ public class SpecValidationTests
         {
             // The member verb's own affix (ConstraintPatterns MemberMustHavePrefixConstraint arm).
             arch.Rule("area/rule").Enforce(arch.Types.Members.MustHavePrefix(" ")).Because("Reason.");
+        }
+    }
+
+    // Phase 18 WP1 — MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb
+    // walk hook, like the reference verbs), so the existing §8 item 10 foreign-selection walk
+    // (ConstraintSelections → CheckForeign) reaches a construct target minted on another Arch with no new
+    // validator arm. Appended at the very end so every caller-info golden above keeps its authored line number
+    // (and, like the WP-2 append above, this file must NOT be run through a member-reordering cleanup profile).
+    [Fact]
+    public void ForeignSelection_ConstructTargetFromAnotherArch_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ForeignConstructTargetSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.ForeignSelection && e.RuleId == "area/rule");
+    }
+
+    private sealed class ForeignConstructTargetSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // The construct target is minted on a different Arch — caught by the shared Operands foreign walk.
+            var other = new Arch();
+            Selection foreignTarget = other.Namespace("MyApp.Services.*");
+            arch.Rule("area/rule").Enforce(arch.Types.MustNotConstruct(foreignTarget)).Because("Reason.");
         }
     }
 }

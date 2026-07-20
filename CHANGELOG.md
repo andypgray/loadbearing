@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the un-prefixed message. The optional caller-info parameters are invisible at call sites but are
   binary-breaking for a spec DLL compiled against the previous Core (acceptable pre-publish at lockstep
   0.1.0).
+- Constructor bans: the `MustNotConstruct` verb. "Types must not construct types implementing
+  `IHandler<T>`" forbids direct `new` of types meant to arrive via DI — a service you may reference
+  but may not construct — recorded at source-level object-creation sites (`new`, including
+  target-typed `new()`) with `file:line`, reported human (`{source} constructs {target}`) and JSON
+  (kind `"construction"`), and ratcheted on the (source, constructed) type pair like any other rule.
+  Carries the same `(first, params more)` selection and type-sugar overloads as the reference verbs.
+  The canonical §12 sample adopts it as `di/handlers-via-registry` — every type except the
+  sanctioned `HandlerRegistry` must not construct an `IHandler<T>` implementor — the first rule added
+  to the founding sample.
 
 ## [0.1.0] - 2026-07-14
 

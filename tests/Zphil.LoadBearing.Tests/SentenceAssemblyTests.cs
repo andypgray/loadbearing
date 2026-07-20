@@ -182,6 +182,39 @@ public class SentenceAssemblyTests
             .ShouldBe("Types must not use `Billing.Order.Total` or `Sales.Order.Refresh()`.");
     }
 
+    // ---- MustNotConstruct (GRAMMAR §5.3, §3.3): dependency-shape verb over selection/type targets ----
+
+    [Fact]
+    public void MustNotConstruct_SelectionTarget_RendersConstructList()
+    {
+        // The Selection overload: a pattern-selection target renders in reference position.
+        Constraint constraint = Arch.Types.MustNotConstruct(Arch.Namespace("MyApp.Services.*"));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct types in `MyApp.Services.*`.");
+    }
+
+    [Fact]
+    public void MustNotConstruct_TypeSugar_BackticksSimpleName()
+    {
+        // The Type sugar overload wraps the bare type as a single-type selection (arch.Type written for you).
+        Constraint constraint = Arch.Types.MustNotConstruct(typeof(SqlConnection));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `SqlConnection`.");
+    }
+
+    [Fact]
+    public void MustNotConstruct_MultipleTargets_JoinWithOr()
+    {
+        Constraint constraint = Arch.Types.MustNotConstruct(typeof(SqlConnection), typeof(ControllerBase));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `SqlConnection` or `ControllerBase`.");
+    }
+
+    [Fact]
+    public void MustNotConstruct_CollidingSimpleNames_QualifyWithMinimalTrailingSegments()
+    {
+        // Shares TargetList with the reference verbs, so colliding simple names widen identically.
+        Constraint constraint = Arch.Types.MustNotConstruct(typeof(Order), typeof(Stubs.Sales.Order));
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
+    }
+
     // ---- Member subjects (GRAMMAR §4.6, §5.7, §6) ----
 
     [Fact]

@@ -87,7 +87,7 @@ public enum SpecValidationErrorCode
     ///     A member-anchor expression lambda — <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> or
     ///     <c>arch.Member(() =&gt; Type.M)</c> — that <see cref="Internal.MemberExpressionResolver" /> could
     ///     not reduce to a declared <c>(type, name)</c> (GRAMMAR §8, the member-anchor expression class:
-    ///     one code, seven poison messages — the <see cref="BlankPattern" /> precedent). Reported by
+    ///     one code, eight poison messages — the <see cref="BlankPattern" /> precedent). Reported by
     ///     <see cref="SpecValidator" /> before item 12 (member-not-declared), which an expression anchor —
     ///     resolved from a real member and generic-normalized at mint — can never reach.
     /// </summary>

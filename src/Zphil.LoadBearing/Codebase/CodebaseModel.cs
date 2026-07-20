@@ -2,11 +2,12 @@ namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
 ///     The extracted codebase: its types, the reference edges between them, the member-use edges
-///     (GRAMMAR §4.5), and its projects — the deterministic substrate the Phase 3 checker evaluates
-///     rules against. Every list is ordered for reproducibility: <see cref="Types" /> by
-///     <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source FullName, target
-///     FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
-///     <see cref="MemberReference.SymbolId" />) (ordinal), and <see cref="Projects" /> by
+///     (GRAMMAR §4.5), the construction edges (§4.5), and its projects — the deterministic substrate the
+///     Phase 3 checker evaluates rules against. Every list is ordered for reproducibility:
+///     <see cref="Types" /> by <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source
+///     FullName, target FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
+///     <see cref="MemberReference.SymbolId" />) (ordinal), <see cref="ConstructorEdges" /> by (source
+///     FullName, constructed FullName) (ordinal), and <see cref="Projects" /> by
 ///     <see cref="ProjectNode.Name" /> (ordinal). <see cref="MergeNotes" /> carries the advisory
 ///     diagnostics the fragment merge raised while assembling this model.
 /// </summary>
@@ -16,12 +17,14 @@ public sealed class CodebaseModel
         IReadOnlyList<TypeNode> types,
         IReadOnlyList<ReferenceEdge> edges,
         IReadOnlyList<MemberEdge> memberEdges,
+        IReadOnlyList<ConstructorEdge> constructorEdges,
         IReadOnlyList<ProjectNode> projects,
         IReadOnlyList<string> mergeNotes)
     {
         Types = types;
         Edges = edges;
         MemberEdges = memberEdges;
+        ConstructorEdges = constructorEdges;
         Projects = projects;
         MergeNotes = mergeNotes;
     }
@@ -38,6 +41,13 @@ public sealed class CodebaseModel
     ///     of it: every member use also mints a type-level edge to the member's containing type.
     /// </summary>
     public IReadOnlyList<MemberEdge> MemberEdges { get; }
+
+    /// <summary>
+    ///     All construction edges (GRAMMAR §4.5), ordered by (source FullName, constructed FullName).
+    ///     Recorded beside <see cref="Edges" />, never instead of it: every <c>new Foo()</c> also mints a
+    ///     type-level edge to the constructed type.
+    /// </summary>
+    public IReadOnlyList<ConstructorEdge> ConstructorEdges { get; }
 
     /// <summary>All projects, ordered by name.</summary>
     public IReadOnlyList<ProjectNode> Projects { get; }

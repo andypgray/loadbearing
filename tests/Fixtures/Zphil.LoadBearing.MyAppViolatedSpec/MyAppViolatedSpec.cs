@@ -1,4 +1,5 @@
 using MyApp.Legacy.Billing;
+using MyApp.Web;
 
 namespace Zphil.LoadBearing.MyAppViolatedSpec;
 
@@ -10,7 +11,9 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     (uncaptured — both of HomeController's ambient-clock reads, <c>DateTime.Now</c> and
 ///     <c>DateTime.UtcNow</c>, are red), a member-subject Migrate rule (uncaptured — both of
 ///     HomeController's unsuffixed Task-returning methods, <c>Save</c> and <c>Load</c>, are red, exercising
-///     the <c>memberShape</c> kind and the <c>subjectMember</c> field), an inert-target warning rule, a
+///     the <c>memberShape</c> kind and the <c>subjectMember</c> field), a ratcheted Migrate construction rule
+///     (uncaptured — the DI flagship, InvoiceService news up a handler instead of resolving it through
+///     HandlerRegistry, exercising the <c>construction</c> kind), an inert-target warning rule, a
 ///     failing empty-subject rule, and a frozen billing scope whose containment is uncaptured (an explicit,
 ///     deliberately-uncommitted
 ///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>.
@@ -64,6 +67,19 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                 web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
             .Because("Async methods are discovered by their Async suffix.")
             .Fix("Rename the method to end in Async and update its callers.");
+
+        // Migrate (ratcheted, construction): the conventional baseline path arch/baselines/di/
+        // handlers-via-registry.json is uncommitted, so InvoiceService's direct `new` of a handler is a
+        // hard-red construction violation with the --init hint — the construction half of the report/JSON
+        // schema (the 'construction' kind, GRAMMAR §5.3). The registry is carved out of the subject by
+        // .Except, so its own construction of a handler is exempt.
+        arch.Rule("di/handlers-via-registry")
+            .Migrate(
+                "Some services construct handlers directly instead of resolving them through HandlerRegistry.",
+                arch.Types.Except(arch.Type<HandlerRegistry>())
+                    .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>))))
+            .Because("Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.")
+            .Fix("Resolve the handler through HandlerRegistry instead of constructing it.");
 
         // Inert warning: the target pattern matches nothing, so the rule can never fire.
         arch.Rule("layering/no-ghost")

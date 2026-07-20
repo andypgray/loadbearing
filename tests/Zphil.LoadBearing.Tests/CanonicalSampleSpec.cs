@@ -44,6 +44,11 @@ public sealed class ArchSpec : IArchitectureSpec
             .Enforce(arch.Types.Implementing(typeof(IHandler<>)).MustHaveSuffix("Handler"))
             .Because("Handler discovery is convention-based (see HandlerRegistry).");
 
+        arch.Rule("di/handlers-via-registry")
+            .Enforce(arch.Types.Except(arch.Type<HandlerRegistry>())
+                         .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>))))
+            .Because("Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.");
+
         arch.Rule("style/type-name-length")
             .Enforce(arch.Types.InNamespace("MyApp.*")
                          .Must(t => t.Name.Length <= 40,

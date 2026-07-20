@@ -52,6 +52,16 @@ public class ProseSentenceTests
     }
 
     [Fact]
+    public void Enforce_DiHandlersViaRegistry_RendersExceptSubjectAndConstructVerb()
+    {
+        // The DI construction ban (GRAMMAR §5.3): .Except carves the sanctioned root out of the subject
+        // (sentence-final "except `HandlerRegistry`"), and the open-generic target renders as
+        // "types implementing `IHandler<T>`".
+        SentenceFor("di/handlers-via-registry")
+            .ShouldBe("Types, except `HandlerRegistry` must not construct types implementing `IHandler<T>`.");
+    }
+
+    [Fact]
     public void Enforce_TypeNameLength_RendersMustEscapeHatchDescription()
     {
         // The `.Must(...)` escape-hatch description completes "must …" verbatim.

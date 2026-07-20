@@ -6,7 +6,8 @@ namespace Zphil.LoadBearing.Checking;
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
 ///     §4.5, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
-///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; shape verbs test each
+///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
+///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; shape verbs test each
 ///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
 ///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
@@ -20,6 +21,7 @@ internal sealed class ConstraintEvaluator
 
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
+    private readonly IReadOnlyList<ConstructorEdge> _constructorEdges;
     private readonly IReadOnlyList<ReferenceEdge> _edges;
     private readonly IReadOnlyList<MemberEdge> _memberEdges;
     private readonly MemberSelectionEvaluator _memberSelections;
@@ -29,6 +31,7 @@ internal sealed class ConstraintEvaluator
     {
         _edges = model.Edges;
         _memberEdges = model.MemberEdges;
+        _constructorEdges = model.ConstructorEdges;
         _selections = new SelectionEvaluator(model);
         _memberSelections = new MemberSelectionEvaluator(_selections);
     }
@@ -55,6 +58,8 @@ internal sealed class ConstraintEvaluator
                 return OnlyBeReferencedBy(subjects, c.Sources);
             case MustNotUseConstraint c:
                 return ForbiddenMemberUse(subjects, c.Members);
+            case MustNotConstructConstraint c:
+                return ForbiddenConstruction(subjects, c.Targets);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -142,6 +147,30 @@ internal sealed class ConstraintEvaluator
         // MustNotUse never warns: member targets are concrete (type, name) anchors (no pattern form), so a banned member
         // absent from the codebase is the win condition, exactly like a bare typeof target (GRAMMAR §4.5).
         return (violations, NoWarnings);
+    }
+
+    // The construction verb (GRAMMAR §4.5, §5.3): a construction edge is a hit when its source is a subject
+    // AND the constructed type is a forbidden operand — the "you may use it; you may not create it" ban.
+    // Extraction already collapses every `new` of one type into one (source, constructed) edge with its sites
+    // aggregated, so one edge yields one Construction violation keyed on the type pair (overload-indifferent,
+    // §4.3). Inert-target warning semantics mirror ForbiddenReference exactly: a forbidden set that resolves
+    // empty from a pattern operand can never fire, so it is loudly flagged inert (a bare typeof absent from
+    // the codebase is the win condition, not a warning).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenConstruction(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (ConstructorEdge edge in _constructorEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Constructed))
+                violations.Add(Violation.Construction(edge.Source, edge.Constructed, edge.Sites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(

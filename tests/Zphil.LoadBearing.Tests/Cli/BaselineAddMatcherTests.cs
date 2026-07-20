@@ -34,6 +34,32 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveEdge_ConstructionByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    {
+        // A construction violation resolves on both type endpoints exactly like a reference edge (the
+        // constructed type rides the Target slot, GRAMMAR §4.5) — full name, symbol ID, and mixed all match.
+        var edge = Violation.Construction(Node("N.Factory", "T:N.Factory"), Node("N.Widget", "T:N.Widget"), Array.Empty<SourceLocation>());
+        Violation[] violations = [edge];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Factory", "N.Widget").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Factory", "T:N.Widget").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Factory", "T:N.Widget").ShouldBeSameAs(edge);
+    }
+
+    [Fact]
+    public void ResolveEdge_ConstructionNoMatch_ListsSourceArrowConstructedFullNameForm()
+    {
+        // FullNameForm's default arm already renders a construction candidate as `Source -> Constructed`, no
+        // code change from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
+        var edge = Violation.Construction(Node("N.Factory", "T:N.Factory"), Node("N.Widget", "T:N.Widget"), Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Factory", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  N.Factory -> N.Widget");
+    }
+
+    [Fact]
     public void ResolveEdge_SourceAndTargetMatchDifferentViolations_NoMatchListsBothCandidates()
     {
         Violation ab = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());

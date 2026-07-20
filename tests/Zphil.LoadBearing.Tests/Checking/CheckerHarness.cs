@@ -63,6 +63,15 @@ internal static class Checker
             .ToList();
     }
 
+    /// <summary>Construction violations rendered as <c>Source -&gt; Constructed</c>, in report order (§4.5).</summary>
+    public static IReadOnlyList<string> ConstructionPairs(this RuleResult result)
+    {
+        return result.Violations
+            .Where(v => v.Kind == ViolationKind.Construction)
+            .Select(v => $"{v.Source!.FullName} -> {v.Target!.FullName}")
+            .ToList();
+    }
+
     /// <summary>Shape-violation subject FullNames, in report order.</summary>
     public static IReadOnlyList<string> ShapeSubjects(this RuleResult result)
     {

@@ -75,6 +75,28 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     }
 
     [Fact]
+    public void ExtractFromSolutionAsync_DomainProject_PinsCompleteConstructorEdgeList()
+    {
+        // The construction channel (GRAMMAR §4.5) for the Domain project, pinned whole: Order builds its nested
+        // Line, and OrderService `new`s the cross-project HomeController. Deliberately ABSENT: OrderService's
+        // typeof(HomeController) at line 13 (a type reference, not a construction — no ctor edge).
+        string rendered = string.Join("\n", fixture.Model.ConstructorEdges
+            .Where(e => e.Source.ProjectName == "MyApp.Domain")
+            .Select(fixture.RenderConstructorEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Domain.Order -> MyApp.Domain.Order.Line @ MyApp.Domain/Order.cs:9
+            MyApp.Domain.OrderService -> MyApp.Web.HomeController @ MyApp.Domain/OrderService.cs:9
+            """);
+
+        // Cross-project construction resolves to the declared Web node, and the type edge co-exists.
+        fixture.Model.ConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
+            .Constructed.IsExternal.ShouldBeFalse();
+        fixture.Model.HasEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController").ShouldBeTrue();
+    }
+
+    [Fact]
     public void ExtractFromSolutionAsync_BillingCalculatorMemberEdges_PinExternalNormalizedForms()
     {
         // The real-workspace member DocIds against BCL metadata: the two Math.Round overloads are distinct

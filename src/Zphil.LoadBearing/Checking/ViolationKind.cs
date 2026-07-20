@@ -29,6 +29,14 @@ public enum ViolationKind
     /// </summary>
     MemberShape,
 
+    /// <summary>
+    ///     A forbidden construction edge (GRAMMAR §4.5): <c>Source</c> constructs <c>Target</c> (the constructed
+    ///     type) with an object-creation expression, carrying every <c>new</c> <c>Sites</c>. One per (rule,
+    ///     source, constructed) — overload-indifferent, since all constructor overloads of the constructed type
+    ///     collapse to one identity and the sites are evidence, not identity (GRAMMAR §4.3).
+    /// </summary>
+    Construction,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

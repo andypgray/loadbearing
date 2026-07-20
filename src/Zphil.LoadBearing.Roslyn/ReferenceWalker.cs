@@ -4,25 +4,35 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     Walks a single type-declaration part and yields, per bound name, two channels at once:
+///     Walks a single type-declaration part and yields, per node, three channels at once:
 ///     <list type="bullet">
 ///         <item>
 ///             the <b>type</b> it binds a name to (base lists, signatures, generic args, <c>typeof</c>,
 ///             casts, creations, static receivers, attribute names, <c>nameof</c> operands, and the
-///             containing type of any member access) — GRAMMAR §4.1's "a source-level type reference"; and
+///             containing type of any member access) — GRAMMAR §4.1's "a source-level type reference";
 ///         </item>
 ///         <item>
 ///             the <b>member</b> it uses, when the name resolved through one — a method invocation or
 ///             method-group reference, a property/field/event access (including <c>?.</c>, compound
 ///             assignment, and <c>+=</c>/<c>-=</c> subscription), a reduced extension call, or a
-///             <c>using static</c> bare name — GRAMMAR §4.5's "a source-level member access".
+///             <c>using static</c> bare name — GRAMMAR §4.5's "a source-level member access"; and
+///         </item>
+///         <item>
+///             the <b>constructed</b> type an object-creation expression creates — explicit <c>new Foo()</c>
+///             and target-typed <c>new()</c> — GRAMMAR §4.5's "a source-level object creation". Delegate
+///             creation (<c>new Action(M)</c> and its target-typed form) is excluded, keyed on the created
+///             symbol's <see cref="Microsoft.CodeAnalysis.TypeKind.Delegate" /> so both spellings skip.
 ///         </item>
 ///     </list>
 ///     The member channel is <see langword="null" /> whenever the name is not a §4.5 use: type-only
 ///     references, constructors, operators/conversions, local functions and accessors reached as methods,
 ///     and — the pinned asymmetry — <c>nameof</c> operands (which still mint their type edge; a
-///     <c>nameof</c> never <em>uses</em> the member it names). The type channel is exactly the tuple this
-///     walker yielded before member edges existed, unchanged for every input.
+///     <c>nameof</c> never <em>uses</em> the member it names). The construct channel is non-<see langword="null" />
+///     only on the two object-creation arms; every other node leaves it null (attribute applications,
+///     <c>base(…)</c>/<c>this(…)</c> initializers, <c>with</c> expressions, and array creation carry no
+///     object-creation expression, so their exclusion falls out of the syntax). The type channel is exactly
+///     the tuple this walker yielded before member edges existed, unchanged for every input — an explicit
+///     <c>new Foo()</c> still mints its type edge from the inner <c>Foo</c> name, never re-minted here.
 /// </summary>
 /// <remarks>
 ///     Nested type declarations are a hard boundary: <c>descendIntoChildren</c> refuses to descend
@@ -37,33 +47,55 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 internal static class ReferenceWalker
 {
-    public static IEnumerable<(INamedTypeSymbol Target, ISymbol? Member, string File, int Line)> Walk(
+    public static IEnumerable<(INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, string File, int Line)> Walk(
         SyntaxNode root, SemanticModel model)
     {
         foreach (SyntaxNode node in root.DescendantNodes(n => ReferenceEquals(n, root)
                                                               || n is not (BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)))
         {
-            (INamedTypeSymbol? target, ISymbol? member) = Resolve(node, model);
-            if (target is null) continue;
+            (INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed) = Resolve(node, model);
 
-            var definition = (INamedTypeSymbol)target.OriginalDefinition;
-            if (definition.IsImplicitlyDeclared || !definition.CanBeReferencedByName) continue;
+            // Each channel is normalized to its OriginalDefinition and gated independently, so an explicit
+            // `new Foo()` (which rides on Target: null, Constructed: Foo) is never dropped by a type-channel
+            // guard — the co-existence matrix rows are what catch a regression here.
+            INamedTypeSymbol? targetDefinition = ReferencedDefinition(target);
+            INamedTypeSymbol? constructedDefinition = ReferencedDefinition(constructed);
+            if (targetDefinition is null && constructedDefinition is null) continue;
 
-            if (!TypeKindMapper.TryMap(definition, out _)) continue;
+            // A member use rides the type channel; if that channel is gated out, its member goes with it.
+            ISymbol? memberUse = targetDefinition is not null ? member : null;
 
             int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            yield return (definition, member, node.SyntaxTree.FilePath, line);
+            yield return (targetDefinition, memberUse, constructedDefinition, node.SyntaxTree.FilePath, line);
         }
     }
 
     /// <summary>
-    ///     Resolves a syntax node to (the type it binds a name to, the §4.5 member it uses). The type
-    ///     is <see langword="null" /> when the node is not a reference at all (namespaces, type
-    ///     parameters, locals/params, discards, dynamic, arrays/pointers, predefined-type keywords, and
-    ///     unresolved names all fall through). The member is <see langword="null" /> whenever the node
-    ///     is type-only — including the target-typed <c>new()</c> arm, which is a constructor (never a use).
+    ///     A referenced type's original definition, or <see langword="null" /> when the symbol is absent or
+    ///     gated out — implicitly declared, un-nameable, or a <see cref="TypeKindMapper" /> non-match. Applied
+    ///     independently to the type and construct channels so each stands or falls on its own.
     /// </summary>
-    private static (INamedTypeSymbol? Target, ISymbol? Member) Resolve(SyntaxNode node, SemanticModel model)
+    private static INamedTypeSymbol? ReferencedDefinition(INamedTypeSymbol? symbol)
+    {
+        if (symbol is null) return null;
+
+        var definition = (INamedTypeSymbol)symbol.OriginalDefinition;
+        if (definition.IsImplicitlyDeclared || !definition.CanBeReferencedByName) return null;
+        if (!TypeKindMapper.TryMap(definition, out _)) return null;
+
+        return definition;
+    }
+
+    /// <summary>
+    ///     Resolves a syntax node to (the type it binds a name to, the §4.5 member it uses, the type it
+    ///     constructs). The type is <see langword="null" /> when the node is not a reference at all
+    ///     (namespaces, type parameters, locals/params, discards, dynamic, arrays/pointers, predefined-type
+    ///     keywords, and unresolved names all fall through). The member is <see langword="null" /> whenever
+    ///     the node is not a member use (a constructor is never a use). The constructed channel is non-null
+    ///     only on the two object-creation arms, and null there too for a delegate creation.
+    /// </summary>
+    private static (INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed) Resolve(
+        SyntaxNode node, SemanticModel model)
     {
         switch (node)
         {
@@ -73,21 +105,46 @@ internal static class ReferenceWalker
             case SimpleNameSyntax name when name is not IdentifierNameSyntax { IsVar: true }:
                 SymbolInfo info = model.GetSymbolInfo(name);
                 ISymbol? symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
-                return (ContainingTypeOf(symbol), MemberUseOf(symbol, name));
+                return (ContainingTypeOf(symbol), MemberUseOf(symbol, name), null);
 
-            // Target-typed `new()`: no type-name syntax to catch above, so resolve the constructor's
-            // containing type (fallback: the target type of the expression). Type-only — a constructor
-            // is not a member use (GRAMMAR §4.5).
+            // Explicit `new Foo()`: the inner `Foo` name syntax already mints the type edge on its own visit,
+            // so this node contributes the construct channel ONLY — re-minting the type edge here would
+            // double-count the §4.1 reference.
+            case ObjectCreationExpressionSyntax creation:
+                return (null, null, ConstructedChannelOf(CreatedTypeOf(creation, model)));
+
+            // Target-typed `new()`: no inner type-name syntax exists, so this node is the sole source of BOTH
+            // the type edge to the created type AND the construct edge (the type edge rides even for a
+            // delegate `new()`, only the construct channel is delegate-gated).
             case ImplicitObjectCreationExpressionSyntax creation:
-                SymbolInfo ctorInfo = model.GetSymbolInfo(creation);
-                ISymbol? ctor = ctorInfo.Symbol ?? ctorInfo.CandidateSymbols.FirstOrDefault();
-                INamedTypeSymbol? created = (ctor as IMethodSymbol)?.ContainingType
-                                            ?? model.GetTypeInfo(creation).Type as INamedTypeSymbol;
-                return (created, null);
+                INamedTypeSymbol? created = CreatedTypeOf(creation, model);
+                return (created, null, ConstructedChannelOf(created));
 
             default:
-                return (null, null);
+                return (null, null, null);
         }
+    }
+
+    /// <summary>
+    ///     The named type an object-creation expression creates: the resolved constructor's containing type,
+    ///     or (fallback) the expression's target type. Shared by the explicit and target-typed arms.
+    /// </summary>
+    private static INamedTypeSymbol? CreatedTypeOf(BaseObjectCreationExpressionSyntax creation, SemanticModel model)
+    {
+        SymbolInfo ctorInfo = model.GetSymbolInfo(creation);
+        ISymbol? ctor = ctorInfo.Symbol ?? ctorInfo.CandidateSymbols.FirstOrDefault();
+        return (ctor as IMethodSymbol)?.ContainingType ?? model.GetTypeInfo(creation).Type as INamedTypeSymbol;
+    }
+
+    /// <summary>
+    ///     The construct channel for a created type: the type itself, unless it is a delegate. Delegate
+    ///     creation (<c>new Action(M)</c> and its target-typed form) is not a construction edge (GRAMMAR
+    ///     §4.5), keyed on the created symbol's <see cref="Microsoft.CodeAnalysis.TypeKind.Delegate" /> so
+    ///     both spellings skip regardless of syntax.
+    /// </summary>
+    private static INamedTypeSymbol? ConstructedChannelOf(INamedTypeSymbol? created)
+    {
+        return created is { TypeKind: Microsoft.CodeAnalysis.TypeKind.Delegate } ? null : created;
     }
 
     private static INamedTypeSymbol? ContainingTypeOf(ISymbol? symbol)

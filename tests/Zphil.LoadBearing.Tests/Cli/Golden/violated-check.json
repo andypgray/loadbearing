@@ -159,6 +159,33 @@
       "warnings": []
     },
     {
+      "id": "di/handlers-via-registry",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types, except `HandlerRegistry` must not construct types implementing `IHandler<T>`.",
+      "because": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.",
+      "fix": "Resolve the handler through HandlerRegistry instead of constructing it.",
+      "baseline": {
+        "path": "arch/baselines/di/handlers-via-registry.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "construction",
+          "source": "MyApp.Web.InvoiceService",
+          "target": "MyApp.Web.InvoiceCreatedHandler",
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceService.cs",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -242,11 +269,11 @@
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 9,
+    "rulesChecked": 10,
     "rulesPassed": 2,
-    "rulesFailed": 6,
+    "rulesFailed": 7,
     "rulesSkipped": 1,
-    "violations": 10,
+    "violations": 11,
     "warnings": 1
   }
 }

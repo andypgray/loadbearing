@@ -90,6 +90,28 @@ public sealed class MigrateRatchetTests
     }
 
     [Fact]
+    public void Check_MigrateConstructionViolation_GrandfathersByEdgePair()
+    {
+        // A construction violation ratchets exactly like a reference: its identity is the (source, constructed)
+        // type pair (GRAMMAR §4.3), so the same ForEdge entry grandfathers OldController `new`ing Db with zero
+        // baseline-format change. (OneController's Load() does `new App.Data.Db()`.)
+        BaselineIndex index = Index("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+
+        RuleResult result = Checker.Run(OneController, index, arch =>
+                arch.Rule("data/x")
+                    .Migrate(
+                        "Controllers `new` the data layer directly (legacy Active Record style).",
+                        arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotConstruct(arch.Namespace("App.Data.*")))
+                    .Because("Resolve via DI for testability."))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Passed);
+        result.Violations.ShouldBeEmpty();
+        result.Grandfathered.Count.ShouldBe(1);
+        result.BaselineCaptured.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Check_MigrateShapeViolation_GrandfathersBySubjectId()
     {
         const string source = "namespace App { public class GoodHandler {} public class BadThing {} }";

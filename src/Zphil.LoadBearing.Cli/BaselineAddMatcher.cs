@@ -73,13 +73,15 @@ internal static class BaselineAddMatcher
         return candidates[0];
     }
 
-    // A --source/--target pair matches a reference edge on both type endpoints, or a member-use edge on
-    // the source type and the banned member (by full name or member symbol ID, GRAMMAR §4.5).
+    // A --source/--target pair matches a reference edge on both type endpoints, a construction edge on both
+    // type endpoints likewise (the constructed type rides the Target slot, GRAMMAR §4.5), or a member-use edge
+    // on the source type and the banned member (by full name or member symbol ID, §4.5).
     private static bool MatchesEdge(Violation violation, string source, string target)
     {
         return violation.Kind switch
         {
             ViolationKind.Reference => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            ViolationKind.Construction => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.MemberUse => Matches(violation.Source!, source) && MatchesMember(violation.Member!, target),
             _ => false
         };

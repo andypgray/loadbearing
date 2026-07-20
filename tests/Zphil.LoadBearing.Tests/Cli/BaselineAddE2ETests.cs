@@ -24,6 +24,7 @@ public sealed class BaselineAddE2ETests
     private const string ContainmentRule = "legacy/billing/containment";
     private const string ClockRule = "time/inject-clock";
     private const string AsyncRule = "naming/async-suffix";
+    private const string ConstructionRule = "di/handlers-via-registry";
     private const string ForeignRule = "some/other-rule";
 
     private const string NowMemberId = "P:System.DateTime.Now";
@@ -39,6 +40,9 @@ public sealed class BaselineAddE2ETests
     private const string RoundingModeId = "T:MyApp.Legacy.Billing.RoundingMode";
     private const string ForeignSubjectId = "T:MyApp.Other.Widget";
 
+    private const string InvoiceServiceId = "T:MyApp.Web.InvoiceService";
+    private const string InvoiceCreatedHandlerId = "T:MyApp.Web.InvoiceCreatedHandler";
+
     // A SECOND forbidden System.Data edge on HomeController (DataSet), inserted alongside the stock DataTable
     // one — so the Migrate rule has two current reds and --add grandfathers exactly one of them.
     private const string DataSetMethod =
@@ -49,10 +53,16 @@ public sealed class BaselineAddE2ETests
     private const string DescribeBillingMethod =
         "\n    public string DescribeBilling()\n    {\n        BillingCalculator calculator = new BillingCalculator();\n        return calculator.ToString();\n    }\n";
 
+    // A SECOND construction of the handler on a NON-registry type (HomeController) — a distinct (source,
+    // constructed) identity from InvoiceService's stock red, so --add grandfathers one and this stays red.
+    private const string ConstructHandlerMethod =
+        "\n    public IHandler<InvoiceCreated> BuildHandler()\n    {\n        return new InvoiceCreatedHandler();\n    }\n";
+
     private static readonly string[] MigrateBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
     private static readonly string[] FreezeBaselineFile = ["arch", "violated-freeze-baseline.json"];
     private static readonly string[] ClockBaselineFile = ["arch", "baselines", "time", "inject-clock.json"];
     private static readonly string[] AsyncBaselineFile = ["arch", "baselines", "naming", "async-suffix.json"];
+    private static readonly string[] ConstructionBaselineFile = ["arch", "baselines", "di", "handlers-via-registry.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -296,6 +306,54 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         reinit.Exit.ShouldBe(0);
         File.ReadAllBytes(asyncPath).ShouldBe(snapshot);
+    }
+
+    [Fact]
+    public async Task BaselineAdd_ConstructionRule_GrandfathersFlagshipEdgeAndBystanderStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+        // A SECOND construction red (HomeController news up the handler too), inserted BEFORE --init so both
+        // construction reds are captured — a distinct (source, constructed) identity from InvoiceService's stock red.
+        InsertMember(workspace.PathOf(HomeControllerFile), ConstructHandlerMethod);
+
+        // Capture both construction reds (this also mints the arch/baselines/di/ directory), then un-capture the
+        // pair (composer as arrangement, the member facts' idiom): a digest-valid EMPTY section turns both reds
+        // live again on a captured rule — the state the valve exists for.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("di/handlers-via-registry: captured 2 grandfathered violations.");
+        string diPath = workspace.PathOf(ConstructionBaselineFile);
+        File.WriteAllText(diPath, ComposeSections((ConstructionRule, [])));
+
+        // The valve, construction flavor: full-name --source/--target (no T: prefix) resolve the (source,
+        // constructed) type-pair violation, echoed exactly as 'loadbearing check' renders it.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", ConstructionRule,
+            "--source", "MyApp.Web.InvoiceService", "--target", "MyApp.Web.InvoiceCreatedHandler", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "di/handlers-via-registry: added 1 grandfathered entry — MyApp.Web.InvoiceService -> MyApp.Web.InvoiceCreatedHandler (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry keying the (source, constructed) type pair via ForEdge.
+        Normalize(File.ReadAllText(diPath)).ShouldBe(ComposeSections(
+            (ConstructionRule, [BaselineEntry.ForEdge(InvoiceServiceId, InvoiceCreatedHandlerId).WithBecause("INC-1234")])));
+        LineSet(File.ReadAllText(diPath)).Count(line => line.Contains("\"source\":")).ShouldBe(1);
+
+        // The bystander pin: the OTHER construction (HomeController) is still red; only InvoiceService is grandfathered.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        check.Exit.ShouldBe(1);
+        JsonElement diRule = RuleElement(check.Out, ConstructionRule);
+        diRule.GetProperty("status").GetString().ShouldBe("failed");
+        diRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        JsonElement bystander = diRule.GetProperty("violations").EnumerateArray().ToList().ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("construction");
+        bystander.GetProperty("source").GetString().ShouldBe("MyApp.Web.HomeController");
+        bystander.GetProperty("target").GetString().ShouldBe("MyApp.Web.InvoiceCreatedHandler");
     }
 
     [Fact]

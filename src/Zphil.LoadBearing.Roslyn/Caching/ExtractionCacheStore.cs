@@ -130,13 +130,12 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v4 (post-review H1): CaptureFingerprint now computes cone-adds the same way validation does, so a
-    // project whose cone holds an excluded stray *.cs no longer captures with adds=[] and then validates
-    // dirty forever. A v3 cache.json carries content/Merkle keys built from that old adds=[] capture, so it
-    // degrades to a clean Miss and is rebuilt with agreeing keys — the cache is disposable derived data,
-    // never a loud error. (v3 added the member inventory; v2 added member-use edges over v1's type-only
-    // fragments — every prior version likewise misses.)
-    private const int CurrentSchemaVersion = 4;
+    // v5 adds constructor-use edges (a FragmentConstructorEdge list) to each fragment; a v4 cache.json has no
+    // such channel, so it degrades to a clean Miss and is rebuilt — the cache is disposable derived data,
+    // never a loud error. (v4 aligned CaptureFingerprint's cone-adds with validation's, so a cone-stray no
+    // longer validates dirty forever; v3 added the member inventory; v2 added member-use edges over v1's
+    // type-only fragments — every prior version likewise misses.)
+    private const int CurrentSchemaVersion = 5;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as

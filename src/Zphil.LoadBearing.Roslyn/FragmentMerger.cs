@@ -41,6 +41,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             the node's <see cref="TypeNode.Members" /> list (winner-only, like M2), each
 ///             <see cref="MemberNode.DeclaringType" /> the same merged node; externals keep an empty list.
 ///         </item>
+///         <item>
+///             <b>M6</b> — construction edges (GRAMMAR §4.5): site-sets union per
+///             <c>(source, constructed)</c>, self-construction dropped, endpoints the same
+///             <see cref="TypeNode" /> instances held by <see cref="CodebaseModel.Types" />.
+///         </item>
 ///     </list>
 ///     One code path serves cold runs, the fast test path, and (Phase 11 WP6) cache hits, so the cache
 ///     cannot change results by construction.
@@ -62,6 +67,7 @@ internal static class FragmentMerger
 
     private sealed class MergeState
     {
+        private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externalFacts = new(StringComparer.Ordinal);
@@ -104,6 +110,12 @@ internal static class FragmentMerger
             // default (the member axis is solution-declared-only). Winner-only, exactly like M2 hierarchy.
             foreach ((string fqn, FragmentType declared) in _hierarchy)
                 PopulateMembers(_nodes[fqn], declared);
+
+            // M6 — construction edges (GRAMMAR §4.5): site-sets union per (src, constructed); self-construction
+            // guard mirrors M3; endpoints are the same merged nodes.
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
+                MergeConstructorEdge(constructorEdge);
 
             return Materialize(fragments);
         }
@@ -216,6 +228,17 @@ internal static class FragmentMerger
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
+        private void MergeConstructorEdge(FragmentConstructorEdge edge)
+        {
+            // Self-construction guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(edge.SourceFullName, edge.ConstructedFullName, StringComparison.Ordinal)) return;
+
+            ResolveNode(edge.SourceFullName);
+            ResolveNode(edge.ConstructedFullName);
+            var sites = ConstructorEdgeSites((edge.SourceFullName, edge.ConstructedFullName));
+            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+        }
+
         /// <summary>
         ///     The declared-anywhere node for <paramref name="fqn" />, else a shallow external node minted
         ///     once from the first-fragment-wins facts table. Every FQN reachable here was recorded as an
@@ -263,11 +286,17 @@ internal static class FragmentMerger
 
             var memberEdges = BuildMemberEdges();
 
+            var constructorEdges = _constructorEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Ctor, StringComparer.Ordinal)
+                .Select(kv => new ConstructorEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Ctor], ToLocations(kv.Value)))
+                .ToList();
+
             // Sort the advisory notes ordinal (they key first on the FQN) so the list is stable across runs
             // regardless of the order distinct conflations were first seen.
             var mergeNotes = _mergeNotes.OrderBy(note => note, StringComparer.Ordinal).ToList();
 
-            return new CodebaseModel(types, edges, memberEdges, BuildProjects(fragments), mergeNotes);
+            return new CodebaseModel(types, edges, memberEdges, constructorEdges, BuildProjects(fragments), mergeNotes);
         }
 
         // Member edges ordered by (source FullName, member SymbolId). A single MemberReference is minted per
@@ -347,6 +376,17 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _memberEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ConstructorEdgeSites((string Src, string Ctor) key)
+        {
+            if (!_constructorEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _constructorEdgeSites[key] = sites;
             }
 
             return sites;

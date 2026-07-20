@@ -97,6 +97,45 @@ public sealed class FragmentRoundTripTests
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void SerializeDeserializeMerge_ConstructorEdges_SurviveRoundTripByteStably()
+    {
+        // Arrange — a cross-project source with explicit, target-typed, and constructed-generic creations, plus
+        // a delegate creation as a must-not-mint control, so a lost edge or dropped site would move the dump.
+        CompilationInput lib = CompilationFactory.Compile("Lib",
+            ("Api.cs", """
+                       namespace N;
+                       public class Widget {}
+                       public class Box<T> {}
+                       public delegate void Notify();
+                       """));
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib",
+            ("Use.cs", """
+                       namespace M;
+                       public class User
+                       {
+                           public object Explicit() => new N.Widget();
+                           public N.Widget Implicit() { N.Widget w = new(); return w; }
+                           public object Generic() => new N.Box<int>();
+                           public N.Notify Del() => new N.Notify(H);
+                           private static void H() {}
+                       }
+                       """));
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+
+        // Act
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+
+        // Assert — the ctor edges are present (explicit+target-typed union to Widget, generic normalized to the
+        // open definition, the delegate creation excluded), and the round-trip is invisible to the merged model.
+        direct.ConstructorEdges.Select(e => (e.Source.FullName, e.Constructed.FullName)).ShouldBe(
+            [("M.User", "N.Box<T>"), ("M.User", "N.Widget")]);
+        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",
