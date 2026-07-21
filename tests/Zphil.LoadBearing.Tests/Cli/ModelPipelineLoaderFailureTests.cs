@@ -25,7 +25,12 @@ public sealed class ModelPipelineLoaderFailureTests
                 new FileNotFoundException("Could not load file or assembly 'Acme'.") // duplicate — deduped
             });
 
-        string message = ModelPipeline.LoaderFailureMessage(exception, @"C:\out\Meridian.ArchSpec.dll");
+        // Build the spec path with the native separator so Path.GetFileName strips the directory on
+        // every OS. A literal "C:\out\..." only strips on Windows — on Linux/macOS '\' is not a
+        // separator, so the whole string survives and the pinned bare-filename message fails.
+        string specDllPath = Path.Combine("out", "Meridian.ArchSpec.dll");
+
+        string message = ModelPipeline.LoaderFailureMessage(exception, specDllPath);
 
         message.ShouldBe(
             "Could not load spec assembly 'Meridian.ArchSpec.dll'; one or more types failed to load:\n"
