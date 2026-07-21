@@ -455,6 +455,62 @@ desugaring (§7) — keeps working unchanged on the type side.
   `use`-glossary gate (§4.5) — a spec that adds only member-subject rules renders its managed
   block byte-identically to before this section existed.
 
+### 4.7 Registration facts and injection edges (the DI axis)
+
+The captive-dependency rule — a singleton must not depend on a scoped or transient service —
+needs two facts no other section provides: who is *registered* with what lifetime, and who
+*injects* whom. Extraction records both; the `arch.Registered` noun (§3.2, §5.1) and the
+`MustNotInject` verb (§3.3, §5.3) consume them.
+
+- **An injection edge** is `(source type, injected parameter type, parameter file:line
+  sites)`, read from the **declared instance constructors** of every solution-declared type —
+  a declaration-side pass, not a body walk: the edge exists because the parameter is declared,
+  whether or not any body dereferences it. **Primary constructors are included** (their
+  parameters are the modern injection surface); implicitly-declared constructors mint nothing
+  (the compiler's parameterless default, a record's copy constructor, static constructors).
+  Parameter types decompose **definition-level like type edges** (§4.1): `IEnumerable<IFoo>`
+  contributes `IEnumerable<>` and `IFoo`; arrays contribute their element type; constructed
+  generics contribute the definition and every argument. Self-injection is dropped (the
+  type-edge self-drop); enum and delegate types declare no walkable constructors and
+  contribute none. External parameter types get nodes like any other external endpoint, so
+  targets can match them (§4.1).
+- **A registration fact** is `(lifetime, service type, implementation type?, file:line
+  sites)`, read from a **whole-compilation pass** over every syntax tree — not a per-declared-
+  type walk, because the most common composition root is a top-level-statements `Program`.
+  Recognition is **symbol-first** (never name-only): the invoked method must resolve
+  (`ReducedFrom`-normalized) to a method whose containing namespace is
+  `Microsoft.Extensions.DependencyInjection` (or its `.Extensions` sub-namespace, the
+  `TryAdd*` family's home), whose name is in the recognized-call table, and whose first
+  parameter is `IServiceCollection`. A look-alike extension in a user namespace is not
+  recognized — but an **in-solution wrapper whose body calls the real thing IS seen** (the
+  pass walks the wrapper's body like any other tree).
+
+  | Recognized call | Lifetime | service / implementation |
+  |---|---|---|
+  | `AddSingleton` / `AddScoped` / `AddTransient` and their `TryAdd*` twins | by name | two type-args → (service, impl); one type-arg → (T, T) iff the call has receiver-only arguments, else (T, —) — a factory or instance registration names no implementation type; the `typeof` overloads mirror the same split by `Type`-parameter count |
+  | `AddHostedService<T>` | Singleton | service = `Microsoft.Extensions.Hosting.IHostedService`, synthesized — no syntactic mention exists (implementation-only if unresolvable); impl = `T` |
+  | `AddDbContext<T>` / `AddDbContextPool<T>` | Scoped; an explicit **literal** `ServiceLifetime.X` argument is honored; a non-literal lifetime argument → no fact recorded (never guess) | (T, T) |
+  | `AddHttpClient<TClient>` / `AddHttpClient<TClient, TImpl>` | Transient | (TClient, TClient) / (TClient, TImpl); the named-only string form registers no user type → no fact |
+
+  Open-generic `typeof` registrations (`AddSingleton(typeof(IRepo<>), typeof(Repo<>))`)
+  record definition-level, like every other fact (§4.1).
+- **The honesty boundary** (rendered into the glossary whenever a `Registered` noun is in
+  play, §10): registrations the source does not spell with a recognized call are invisible —
+  `Configure`/`AddOptions` (the options interfaces are framework-registered), keyed-service
+  overloads, raw `ServiceDescriptor`/`TryAddEnumerable`, assembly-scanning registrars,
+  reflection, framework defaults, and wrapper extensions compiled into packages (no syntax
+  tree to walk). The recognized-call table is the fence; growth beyond it is named in §11.
+- **`arch.Registered(lifetime)` membership** is the union of **service and implementation
+  type FQNs** of the recognized registrations at that lifetime (`arch.Registered()` — any
+  lifetime). Registration is many-to-many, so membership is resolved at evaluation against
+  these facts, never denormalized onto the type model. In **subject** position the selection
+  intersects solution-declared types (§4.1, as always); in **target** position it also
+  matches externals (`AddSingleton<IClock, SystemClock>()` makes an external `IClock` a
+  matchable operand). An empty `Registered` **subject** fails the rule (the shared §4.1
+  default) — the loud failure is how an author discovers the visibility boundary above. An
+  empty `Registered` **operand** on `MustNotInject` means no such registrations exist — the
+  win condition — so `MustNotInject` **never warns** (§5.3, the bare-`typeof` precedent).
+
 ## 5. Vocabulary v1 (closed; every member ships with pinned fragments)
 
 ### 5.1 Nouns

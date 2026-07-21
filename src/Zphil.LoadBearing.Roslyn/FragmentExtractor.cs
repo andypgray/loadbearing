@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     Extracts one <see cref="CompilationInput" /> into a self-contained <see cref="CodebaseFragment" />
-///     by running the model's three passes over a <em>single</em> compilation:
+///     by running the model's passes over a <em>single</em> compilation:
 ///     <list type="number">
 ///         <item>Declare — record a <see cref="FragmentType" /> per solution-declared type in this input.</item>
 ///         <item>
@@ -22,6 +22,20 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped — and
 ///             the construction edges (§4.5) — one per (source, constructed FQN) at every object-creation
 ///             expression, sites deduped, self-construction dropped, riding independently of the type channel.
+///         </item>
+///         <item>
+///             Injection edges (GRAMMAR §4.7) — a declaration-side pass over each declared type's
+///             <see cref="INamedTypeSymbol.InstanceConstructors" /> (primary constructors included; implicitly
+///             declared ones — the record copy constructor, the parameterless default — filtered out), minting
+///             one <see cref="FragmentInjectionEdge" /> per (source, injected FQN) at every constructor
+///             parameter, with the parameter type decomposed definition-level like a type edge, self-injection
+///             dropped, sites deduped.
+///         </item>
+///         <item>
+///             Registration facts (GRAMMAR §4.7) — a whole-compilation walk over every syntax tree (a
+///             top-level-statements <c>Program</c> is not a declared type, so this is not a per-type walk),
+///             minting one <see cref="FragmentServiceRegistration" /> per (lifetime, service FQN,
+///             implementation FQN) recognized call, sites deduped. See <see cref="RegistrationRecognizer" />.
 ///         </item>
 ///     </list>
 ///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
@@ -229,13 +243,72 @@ internal static class FragmentExtractor
         };
     }
 
+    // The definition-level endpoints one constructor-parameter type contributes as injection edges (GRAMMAR
+    // §4.7), decomposed exactly like a type edge (§4.1): a constructed generic yields its definition and every
+    // type argument (recursively), an array yields its element type (recursively), a plain named type yields
+    // itself. Type parameters, pointers, and dynamic contribute nothing. Endpoints are gated the same way a
+    // type-edge target is (implicitly declared / un-nameable / TypeKindMapper non-match are skipped).
+    private static IEnumerable<INamedTypeSymbol> DecomposeType(ITypeSymbol type)
+    {
+        switch (type)
+        {
+            case IArrayTypeSymbol array:
+                foreach (INamedTypeSymbol endpoint in DecomposeType(array.ElementType))
+                    yield return endpoint;
+                break;
+
+            case INamedTypeSymbol named:
+                INamedTypeSymbol definition = named.OriginalDefinition;
+                if (IsInjectableEndpoint(definition)) yield return definition;
+                foreach (ITypeSymbol argument in named.TypeArguments)
+                foreach (INamedTypeSymbol endpoint in DecomposeType(argument))
+                    yield return endpoint;
+                break;
+        }
+    }
+
+    private static bool IsInjectableEndpoint(INamedTypeSymbol definition)
+    {
+        if (definition.IsImplicitlyDeclared || !definition.CanBeReferencedByName) return false;
+        return TypeKindMapper.TryMap(definition, out _);
+    }
+
+    // The declaration site of a constructor parameter: its in-source identifier location (a primary-constructor
+    // parameter, an ordinary-constructor parameter — both point at the parameter name), file path raw from the
+    // syntax tree and 1-based line, the same discipline every other site pass uses. Null for a parameter with
+    // no source location (should not arise for a source-declared constructor).
+    private static FragmentSite? ParameterSite(IParameterSymbol parameter)
+    {
+        foreach (Location location in parameter.Locations)
+            if (location.SourceTree is { } tree)
+            {
+                int line = location.GetLineSpan().StartLinePosition.Line + 1;
+                return new FragmentSite(tree.FilePath, line);
+            }
+
+        return null;
+    }
+
+    // The site of a registration call: the invoked method-name identifier (so a fluent chain records each
+    // .AddX() on its own line, not the shared receiver line), file path raw from the syntax tree, 1-based line.
+    private static FragmentSite RegistrationSite(InvocationExpressionSyntax invocation)
+    {
+        SyntaxNode anchor = invocation.Expression is MemberAccessExpressionSyntax memberAccess
+            ? memberAccess.Name
+            : invocation.Expression;
+        int line = anchor.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+        return new FragmentSite(anchor.SyntaxTree.FilePath, line);
+    }
+
     private sealed class ExtractState
     {
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
+        private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
         public CodebaseFragment Run(CompilationInput input)
         {
@@ -252,6 +325,14 @@ internal static class FragmentExtractor
             // Pass 3 — edges (every declaring part; sites dedupe).
             foreach (DeclaredBuilder builder in _declared.Values)
                 WalkEdges(builder.Symbol, compilation);
+
+            // Pass 3b — injection edges (declared instance constructors; primary ctors included).
+            foreach (DeclaredBuilder builder in _declared.Values)
+                WalkInjectionEdges(builder.Symbol);
+
+            // Pass R — registration facts (whole-compilation walk; a top-level-statements Program is not a
+            // declared type, so a per-declared-type walk would miss the most common composition root).
+            WalkRegistrations(compilation);
 
             return Materialize(input);
         }
@@ -377,6 +458,57 @@ internal static class FragmentExtractor
             builder.Sites.Add(site);
         }
 
+        // Injection edges (GRAMMAR §4.7): the declared instance constructors of one type. Primary constructors
+        // are included; the !IsImplicitlyDeclared filter drops the record copy constructor and the parameterless
+        // default, and InstanceConstructors already excludes the static constructor. Each parameter's type
+        // decomposes definition-level like a type edge (§4.1); self-injection is dropped like the type-edge
+        // self-drop; ResolveName runs on every decomposed endpoint so external injected types get nodes.
+        private void WalkInjectionEdges(INamedTypeSymbol symbol)
+        {
+            string srcFqn = FullNameOf(symbol);
+            foreach (IMethodSymbol ctor in symbol.InstanceConstructors)
+            {
+                if (ctor.IsImplicitlyDeclared) continue;
+
+                foreach (IParameterSymbol parameter in ctor.Parameters)
+                {
+                    if (ParameterSite(parameter) is not { } site) continue;
+
+                    foreach (INamedTypeSymbol endpoint in DecomposeType(parameter.Type))
+                    {
+                        string injectedFqn = ResolveName(endpoint);
+                        if (injectedFqn == srcFqn) continue; // self-injection dropped
+                        InjectionEdgeSites((srcFqn, injectedFqn)).Add(site);
+                    }
+                }
+            }
+        }
+
+        // Registration facts (GRAMMAR §4.7): a whole-compilation walk over every syntax tree — a
+        // top-level-statements Program is not in _declared, so a per-declared-type walk would miss it. Each
+        // recognized call (RegistrationRecognizer) yields a (lifetime, service, implementation?) fact recorded
+        // string-side (definition-level FQNs, never resolved to nodes — registration is many-to-many).
+        private void WalkRegistrations(Compilation compilation)
+        {
+            var recognizer = new RegistrationRecognizer(compilation);
+            if (!recognizer.IsActive) return; // MEDI not referenced — nothing can be recognized
+
+            foreach (SyntaxTree tree in compilation.SyntaxTrees)
+            {
+                SemanticModel model = compilation.GetSemanticModel(tree);
+                foreach (InvocationExpressionSyntax invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
+                foreach (RecognizedRegistration registration in recognizer.Recognize(invocation, model))
+                    RecordRegistration(registration, RegistrationSite(invocation));
+            }
+        }
+
+        private void RecordRegistration(RecognizedRegistration registration, FragmentSite site)
+        {
+            string serviceFqn = FullNameOf(registration.Service);
+            string? implFqn = registration.Implementation is { } impl ? FullNameOf(impl) : null;
+            RegistrationSites((registration.Lifetime, serviceFqn, implFqn)).Add(site);
+        }
+
         /// <summary>
         ///     The FQN of a referenced type's original definition. When that FQN is not declared by this
         ///     input, it is a referenced-but-not-declared type, so an external record (first mention wins)
@@ -440,8 +572,22 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentConstructorEdge(kv.Key.Src, kv.Key.Ctor, kv.Value.ToList()))
                 .ToList();
 
+            var injectionEdges = _injectionEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Injected, StringComparer.Ordinal)
+                .Select(kv => new FragmentInjectionEdge(kv.Key.Src, kv.Key.Injected, kv.Value.ToList()))
+                .ToList();
+
+            var serviceRegistrations = _registrationSites
+                .OrderBy(kv => kv.Key.Lifetime)
+                .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Impl ?? "", StringComparer.Ordinal)
+                .Select(kv => new FragmentServiceRegistration(kv.Key.Lifetime, kv.Key.Service, kv.Key.Impl, kv.Value.ToList()))
+                .ToList();
+
             return new CodebaseFragment(
-                input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges);
+                input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges,
+                injectionEdges, serviceRegistrations);
         }
 
         private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
@@ -461,6 +607,28 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _constructorEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> InjectionEdgeSites((string Src, string Injected) key)
+        {
+            if (!_injectionEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _injectionEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> RegistrationSites((Lifetime Lifetime, string Service, string? Impl) key)
+        {
+            if (!_registrationSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _registrationSites[key] = sites;
             }
 
             return sites;

@@ -136,6 +136,45 @@ public sealed class FragmentRoundTripTests
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void SerializeDeserializeMerge_InjectionEdgesAndRegistrations_SurviveRoundTripByteStably()
+    {
+        // Arrange — a source exercising both new fact families (GRAMMAR §4.7): a constructor-injection edge
+        // and two registrations (a two-arg service/impl and a one-arg self), so a lost edge, dropped
+        // registration, or mis-serialized lifetime would move the merged dump.
+        CompilationInput app = CompilationFactory.CompileWithDi("App", ("Wire.cs", """
+                                                                                   using Microsoft.Extensions.DependencyInjection;
+                                                                                   namespace N;
+                                                                                   public interface IFoo {}
+                                                                                   public class Foo : IFoo {}
+                                                                                   public class Svc { public Svc(IFoo foo) {} }
+                                                                                   public static class Reg
+                                                                                   {
+                                                                                       public static void Configure(IServiceCollection services)
+                                                                                       {
+                                                                                           services.AddSingleton<IFoo, Foo>();
+                                                                                           services.AddScoped<Svc>();
+                                                                                       }
+                                                                                   }
+                                                                                   """));
+        var fragments = new[] { app }.Select(FragmentExtractor.Extract).ToList();
+
+        // Act
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+
+        // Assert — the lifetime enum serializes as a name, both fact families are present, and the round-trip
+        // is invisible to the merged model.
+        json.ShouldContain("\"Lifetime\":\"Singleton\"");
+        direct.InjectionEdges.Select(e => (e.Source.FullName, e.Injected.FullName)).ShouldContain(("N.Svc", "N.IFoo"));
+        direct.ServiceRegistrations
+            .Any(r => r.Lifetime == Lifetime.Singleton && r.ServiceFullName == "N.IFoo" && r.ImplementationFullName == "N.Foo")
+            .ShouldBeTrue();
+        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

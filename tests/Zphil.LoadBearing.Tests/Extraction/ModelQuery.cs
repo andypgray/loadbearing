@@ -77,6 +77,47 @@ internal static class ModelQuery
         return ((TypeNode)type).FullName;
     }
 
+    // ── injection edges (GRAMMAR §4.7) ────────────────────────────────────────────────────────────────────
+
+    public static InjectionEdge InjectionEdge(this CodebaseModel model, string sourceFullName, string injectedFullName)
+    {
+        return model.InjectionEdges.Single(e => e.Source.FullName == sourceFullName && e.Injected.FullName == injectedFullName);
+    }
+
+    public static IReadOnlyList<InjectionEdge> InjectionEdges(this CodebaseModel model, string sourceFullName)
+    {
+        return model.InjectionEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+    }
+
+    public static bool HasInjectionEdge(this CodebaseModel model, string sourceFullName, string injectedFullName)
+    {
+        return model.InjectionEdges.Any(e => e.Source.FullName == sourceFullName && e.Injected.FullName == injectedFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this InjectionEdge edge)
+    {
+        return edge.Sites.Select(s => s.Line).ToList();
+    }
+
+    // ── registration facts (GRAMMAR §4.7) ─────────────────────────────────────────────────────────────────
+
+    public static ServiceRegistration Registration(
+        this CodebaseModel model, Lifetime lifetime, string serviceFullName, string? implementationFullName)
+    {
+        return model.ServiceRegistrations.Single(r => r.Lifetime == lifetime && r.ServiceFullName == serviceFullName && r.ImplementationFullName == implementationFullName);
+    }
+
+    public static bool HasRegistration(
+        this CodebaseModel model, Lifetime lifetime, string serviceFullName, string? implementationFullName)
+    {
+        return model.ServiceRegistrations.Any(r => r.Lifetime == lifetime && r.ServiceFullName == serviceFullName && r.ImplementationFullName == implementationFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this ServiceRegistration registration)
+    {
+        return registration.Sites.Select(s => s.Line).ToList();
+    }
+
     // ── declared members (GRAMMAR §4.6) ───────────────────────────────────────────────────────────────────
 
     public static MemberNode Member(this TypeNode type, string symbolId)

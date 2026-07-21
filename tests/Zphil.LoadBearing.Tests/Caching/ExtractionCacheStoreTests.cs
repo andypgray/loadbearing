@@ -33,10 +33,11 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion4_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion5_ReturnsMiss()
     {
-        // Arrange — a v4 cache predates the construction-use edges (schema bumped 4→5): its fragments carry no
-        // FragmentConstructorEdge channel, so a v4 cache.json is not usable under v5 and must degrade cleanly.
+        // Arrange — a v5 cache predates the injection edges + registration facts (schema bumped 5→6): its
+        // fragments carry neither the FragmentInjectionEdge nor the FragmentServiceRegistration channel, so a v5
+        // cache.json is not usable under v6 and must degrade cleanly.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -44,7 +45,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 4);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 5);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
@@ -251,7 +252,7 @@ public sealed class ExtractionCacheStoreTests
         ExtractionCacheStore store = solution.NewStore();
         SpecResolutionRecord[] specs = [new("", "A", "/out/A.dll")];
         var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [])).ToList(),
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [])).ToList(),
             specs,
             ["load-diag-1", "load-diag-2"]);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction).ShouldBeTrue();
@@ -272,7 +273,7 @@ public sealed class ExtractionCacheStoreTests
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
         var fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], []))
+            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], ["diag"]);
     }
@@ -280,7 +281,7 @@ public sealed class ExtractionCacheStoreTests
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
     {
         var fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], []))
+            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], [diagnostic]);
     }

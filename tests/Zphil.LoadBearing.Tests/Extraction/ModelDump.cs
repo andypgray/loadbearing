@@ -8,10 +8,12 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     string-equality pins. It is deliberately <em>total</em> — projects, every scalar type fact,
 ///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three generic
 ///     construction lists, every reference edge with its sites, every member-use edge with its member facts
-///     and sites, every construction edge with its sites (§4.5), and every declared member's scalar facts and
+///     and sites, every construction edge with its sites (§4.5), every injection edge with its sites (§4.7),
+///     every registration fact (§4.7), and every declared member's scalar facts and
 ///     declaration sites (GRAMMAR §4.6) — so that if a fact is not rendered here it is not pinned. The model
 ///     is already fully ordered (types by FullName, edges by source/target, member edges by source/member
-///     SymbolId, construction edges by source/constructed, each type's members by SymbolId, projects by
+///     SymbolId, construction edges by source/constructed, injection edges by source/injected, registrations
+///     by lifetime/service/implementation, each type's members by SymbolId, projects by
 ///     name), so a straight walk is stable. Used by the fragment JSON round-trip test to assert that
 ///     serialize→deserialize→merge equals a direct merge — so the member inventory round-trips (and, via
 ///     the replay-fidelity test, replays) guarded by construction.
@@ -45,6 +47,17 @@ internal static class ModelDump
         foreach (ConstructorEdge edge in model.ConstructorEdges)
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Constructed.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+
+        builder.AppendLine("== INJECTION EDGES ==");
+        foreach (InjectionEdge edge in model.InjectionEdges)
+            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Injected.FullName)
+                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+
+        builder.AppendLine("== REGISTRATIONS ==");
+        foreach (ServiceRegistration registration in model.ServiceRegistrations)
+            builder.Append(registration.Lifetime).Append(' ').Append(registration.ServiceFullName)
+                .Append(" -> ").Append(registration.ImplementationFullName ?? "<none>")
+                .Append(" @ [").Append(RenderSites(registration.Sites)).AppendLine("]");
 
         builder.AppendLine("== DECLARED MEMBERS ==");
         foreach (TypeNode type in model.Types)

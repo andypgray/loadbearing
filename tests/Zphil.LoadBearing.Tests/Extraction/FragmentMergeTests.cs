@@ -213,6 +213,75 @@ public sealed class FragmentMergeTests
         model.ConstructorEdge("P.B", "P.A").Sites.Count.ShouldBe(1);
     }
 
+    // ── M7 injection edges / M8 registration facts (GRAMMAR §4.7) ─────────────────────────────────────
+
+    [Fact]
+    public void ExtractFromCompilations_CrossInputInjection_InjectedIsSameInstanceAsTypesNode()
+    {
+        // An injected parameter type declared by another input resolves to the declared node (reference
+        // equality), never a shallow external — the injection analog of the cross-input edge contract.
+        CompilationInput lib = CompilationFactory.Compile("Aproj", ("Lib.cs", """
+                                                                              namespace N;
+                                                                              public interface IDep {}
+                                                                              """));
+        CompilationInput app = CompilationFactory.CompileReferencing(
+            "Bproj", lib.Compilation, "Aproj", ("App.cs", """
+                                                          namespace N2;
+                                                          public class Svc { public Svc(N.IDep d) {} }
+                                                          """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+
+        TypeNode dep = model.Type("N.IDep");
+        InjectionEdge edge = model.InjectionEdge("N2.Svc", "N.IDep");
+        edge.Injected.ShouldBeSameAs(dep);
+        edge.Injected.IsExternal.ShouldBeFalse();
+        edge.Source.ShouldBeSameAs(model.Type("N2.Svc"));
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameProjectNameTwice_UnionsDuplicateInjectionEdgesToOneSite()
+    {
+        // Two compilations sharing a project name and source path model one project's two TFMs; the merge
+        // unions the identical injection edge (and its single site) rather than duplicating it.
+        var file = ("P.cs", """
+                            namespace P;
+                            public interface IDep {}
+                            public class Svc { public Svc(IDep d) {} }
+                            """);
+        CompilationInput first = CompilationFactory.Compile("P", file);
+        CompilationInput second = CompilationFactory.Compile("P", file);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.InjectionEdges.Count(e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep").ShouldBe(1);
+        model.InjectionEdge("P.Svc", "P.IDep").Sites.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameRegistrationInTwoFrameworks_UnionsToOneFactPerKey()
+    {
+        // One project's two target frameworks make the identical registration; M8 unions per
+        // (lifetime, service, implementation) key to a single fact (its one shared site deduped).
+        var file = ("Reg.cs", """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace P;
+                              public interface IFoo {}
+                              public class Foo : IFoo {}
+                              public static class Reg
+                              {
+                                  public static void Configure(IServiceCollection services) => services.AddSingleton<IFoo, Foo>();
+                              }
+                              """);
+        var first = new CompilationInput(CompilationFactory.CompileWithDi("P", file).Compilation, "P", ["Legacy"]);
+        var second = new CompilationInput(CompilationFactory.CompileWithDi("P", file).Compilation, "P", ["Modern"]);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+
+        model.ServiceRegistrations.Count(r => r.ServiceFullName == "P.IFoo").ShouldBe(1);
+        model.Registration(Lifetime.Singleton, "P.IFoo", "P.Foo").Sites.Count.ShouldBe(1);
+    }
+
     // ── Same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
 
     [Fact]

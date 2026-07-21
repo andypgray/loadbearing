@@ -46,6 +46,16 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             <c>(source, constructed)</c>, self-construction dropped, endpoints the same
 ///             <see cref="TypeNode" /> instances held by <see cref="CodebaseModel.Types" />.
 ///         </item>
+///         <item>
+///             <b>M7</b> — injection edges (GRAMMAR §4.7): site-sets union per <c>(source, injected)</c>,
+///             self-injection dropped, endpoints the same <see cref="TypeNode" /> instances held by
+///             <see cref="CodebaseModel.Types" /> (an external injected type resolves to a shared external node).
+///         </item>
+///         <item>
+///             <b>M8</b> — registration facts (GRAMMAR §4.7): site-sets union per
+///             <c>(lifetime, service FQN, implementation FQN)</c>, string-side (no node resolution), so a
+///             registration reported by several fragments (or several sites) collapses to one fact.
+///         </item>
 ///     </list>
 ///     One code path serves cold runs, the fast test path, and cache hits, so the cache
 ///     cannot change results by construction.
@@ -72,11 +82,13 @@ internal static class FragmentMerger
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externalFacts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
         private readonly List<string> _mergeNotes = [];
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
         private readonly HashSet<(string Fqn, string Loser)> _notedConflations = [];
+        private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
         {
@@ -116,6 +128,18 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
                 MergeConstructorEdge(constructorEdge);
+
+            // M7 — injection edges (GRAMMAR §4.7): site-sets union per (src, injected); self-injection guard
+            // mirrors M3; endpoints are the same merged nodes (an external injected type shares one node).
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
+                MergeInjectionEdge(injectionEdge);
+
+            // M8 — registration facts (GRAMMAR §4.7): site-sets union per (lifetime, service, impl?), string-side
+            // (no node resolution — registration is many-to-many, resolved model-side at evaluation).
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentServiceRegistration registration in fragment.ServiceRegistrations)
+                MergeRegistration(registration);
 
             return Materialize(fragments);
         }
@@ -239,6 +263,26 @@ internal static class FragmentMerger
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
+        private void MergeInjectionEdge(FragmentInjectionEdge edge)
+        {
+            // Self-injection guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(edge.SourceFullName, edge.InjectedFullName, StringComparison.Ordinal)) return;
+
+            ResolveNode(edge.SourceFullName);
+            ResolveNode(edge.InjectedFullName);
+            var sites = InjectionEdgeSites((edge.SourceFullName, edge.InjectedFullName));
+            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+        }
+
+        // Registrations are string-side (never resolved to nodes): the union key is the whole
+        // (lifetime, service FQN, implementation FQN) triple, so two fragments (or two call sites) that name
+        // the identical registration collapse to one fact with unioned sites.
+        private void MergeRegistration(FragmentServiceRegistration registration)
+        {
+            var sites = RegistrationSites((registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
+            foreach (FragmentSite site in registration.Sites) sites.Add(site);
+        }
+
         /// <summary>
         ///     The declared-anywhere node for <paramref name="fqn" />, else a shallow external node minted
         ///     once from the first-fragment-wins facts table. Every FQN reachable here was recorded as an
@@ -292,11 +336,26 @@ internal static class FragmentMerger
                 .Select(kv => new ConstructorEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Ctor], ToLocations(kv.Value)))
                 .ToList();
 
+            var injectionEdges = _injectionEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Injected, StringComparer.Ordinal)
+                .Select(kv => new InjectionEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Injected], ToLocations(kv.Value)))
+                .ToList();
+
+            var serviceRegistrations = _registrationSites
+                .OrderBy(kv => kv.Key.Lifetime)
+                .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Impl ?? "", StringComparer.Ordinal)
+                .Select(kv => new ServiceRegistration(kv.Key.Lifetime, kv.Key.Service, kv.Key.Impl, ToLocations(kv.Value)))
+                .ToList();
+
             // Sort the advisory notes ordinal (they key first on the FQN) so the list is stable across runs
             // regardless of the order distinct conflations were first seen.
             var mergeNotes = _mergeNotes.OrderBy(note => note, StringComparer.Ordinal).ToList();
 
-            return new CodebaseModel(types, edges, memberEdges, constructorEdges, BuildProjects(fragments), mergeNotes);
+            return new CodebaseModel(
+                types, edges, memberEdges, constructorEdges, injectionEdges, serviceRegistrations,
+                BuildProjects(fragments), mergeNotes);
         }
 
         // Member edges ordered by (source FullName, member SymbolId). A single MemberReference is minted per
@@ -387,6 +446,28 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _constructorEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> InjectionEdgeSites((string Src, string Injected) key)
+        {
+            if (!_injectionEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _injectionEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> RegistrationSites((Lifetime Lifetime, string Service, string? Impl) key)
+        {
+            if (!_registrationSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _registrationSites[key] = sites;
             }
 
             return sites;
