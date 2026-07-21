@@ -42,7 +42,7 @@
          10.0.9 — the version the Cli already resolves transitively — so the Microsoft.Extensions.* graph
          stays uniform with no NU1605 downgrade. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.10" />
     </ItemGroup>
 
     <!-- Basic.CompilerLog.Util (jaredpar/complog, MIT) powers binlog replay: a real
