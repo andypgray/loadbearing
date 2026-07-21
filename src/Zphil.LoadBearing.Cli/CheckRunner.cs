@@ -55,14 +55,20 @@ internal sealed class CheckRunner(
         // lines + the JSON workspaceDiagnostics array), load failures first. Only the load failures gate,
         // so the two are combined for display but kept separate for the exit decision below.
         IReadOnlyList<string> renderedDiagnostics = [.. source.Diagnostics, .. source.MergeNotes];
+
+        // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
+        // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Keyed strictly
+        // on the workspace-load diagnostics — never on the advisory merge notes, which must not trip this
+        // gate. Hoisted above Render so the SARIF renderer stamps the same verdict the gate below returns.
+        bool executionSuccessful = !(source.Diagnostics.Count > 0 && !request.AllowWorkspaceDiagnostics);
+
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
-            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics);
+            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, executionSuccessful);
 
-        // Fail closed on an incomplete model (a project failed to load): exit 2 takes precedence over 0/1,
-        // unless the operator opted into the partial model. Keyed strictly on the workspace-load diagnostics
-        // — never on the advisory merge notes, which must not trip this gate.
-        if (source.Diagnostics.Count > 0 && !request.AllowWorkspaceDiagnostics)
+        // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
+        // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
+        if (!executionSuccessful)
         {
             error.WriteLine(IncompleteModelGateMessage);
             return 2;
@@ -73,7 +79,7 @@ internal sealed class CheckRunner(
 
     private void Render(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
-        IReadOnlyList<string> diagnostics)
+        IReadOnlyList<string> diagnostics, bool executionSuccessful)
     {
         if (request.Json)
         {
@@ -86,6 +92,14 @@ internal sealed class CheckRunner(
         {
             foreach (string diagnostic in diagnostics) error.WriteLine($"warning: {diagnostic}");
             HumanReportRenderer.Render(output, report, solutionDirectory);
+        }
+
+        // The optional third render target: a SARIF file alongside stdout. The wrote line is human-mode only
+        // (it would break --json stdout purity); the SARIF itself carries the same result model either way.
+        if (request.Sarif is { } sarifPath)
+        {
+            SarifReportRenderer.Render(sarifPath, report, solutionDirectory, executionSuccessful, diagnostics);
+            if (!request.Json) output.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
         }
     }
 }

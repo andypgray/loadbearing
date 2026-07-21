@@ -18,6 +18,12 @@ namespace Zphil.LoadBearing.Cli;
 ///     back into the prior behavior — the diagnostics print as warnings and the run exits 0/1. Keys strictly
 ///     on workspace-load failures, never on the advisory merge notes that share the diagnostics stream.
 /// </param>
+/// <param name="Sarif">
+///     The <c>--sarif</c> path to write a SARIF 2.1.0 report to — a third renderer over the same result
+///     model (for GitHub/ADO code scanning et al.) — or null to write none. Human and <c>--json</c> output
+///     are byte-for-byte unchanged either way; the only added observable is a <c>wrote &lt;path&gt;</c>
+///     line in human mode. Roslyn-free, so the record still crosses the MSBuild gate.
+/// </param>
 internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
@@ -26,4 +32,5 @@ internal sealed record CheckRequest(
     string WorkingDirectory,
     bool NoCache,
     string? Binlog,
-    bool AllowWorkspaceDiagnostics);
+    bool AllowWorkspaceDiagnostics,
+    string? Sarif);

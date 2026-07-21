@@ -213,7 +213,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false), Ct);
+            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

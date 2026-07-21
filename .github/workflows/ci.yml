@@ -70,6 +70,37 @@ jobs:
             exit 1
           }
 
+  # Self-scan: LoadBearing checks its own solution and publishes the result to GitHub code
+  # scanning as SARIF. The self-spec exits 0 today, so the job is green; a future violation
+  # reddens the check step and the alerts still upload (if: always()). Forked-PR and
+  # Dependabot runs lack the security-events token, so the upload is guarded off for them.
+  self-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read           # checkout
+      security-events: write   # upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+      # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
+      # the real MSBuildWorkspace, exactly as build-and-test does. --spec is explicit: the
+      # self-solution has many Core-referencing members, so the one-spec convention cannot
+      # pick (the self-spec test passes the same path).
+      - name: Build
+        run: dotnet build Zphil.LoadBearing.slnx
+      - name: Check self and emit SARIF
+        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --sarif loadbearing.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && (github.event_name != 'pull_request' || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          sarif_file: loadbearing.sarif
+          category: loadbearing
+
   # Provably-current examples: build each example solution, run `check` (exit 0 on the
   # committed baselines), then re-run `render` for all of them and assert a single zero diff
   # across examples/ — root blocks AND the scoped per-directory cards. If a spec drifts from

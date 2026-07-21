@@ -7,7 +7,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     End-to-end <c>check</c> runs against the real MyApp fixture solution (each loads a fresh
 ///     workspace). The violated spec is the acceptance box — one failing rule showing ID, because,
 ///     fix, and <c>file:line</c> together — plus the freeze containment (uncaptured hard red + facade
-///     green + tripwire skip) and the JSON golden pin; the clean spec exits 0.
+///     green + tripwire skip), the JSON golden pin, and the SARIF golden pin (with its <c>--json</c>
+///     stdout-purity guard); the clean spec exits 0.
 /// </summary>
 [Collection("Serial")]
 public sealed class CheckCommandE2ETests
@@ -93,6 +94,50 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpecSarif_MatchesGolden()
+    {
+        // The SARIF render target over the same result model: one result per violation site, red errors and
+        // grandfathered notes, solution-relative paths. The golden is temp-path-independent because every URI
+        // is resolved against SRCROOT, so the temp file the run writes to never leaks into the document.
+        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
+        try
+        {
+            CliResult result = await CliRunner.InvokeAsync(
+                "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
+
+            result.Exit.ShouldBe(1);
+            Normalize(File.ReadAllText(sarifPath)).ShouldBe(Normalize(GoldenSarif()));
+        }
+        finally
+        {
+            File.Delete(sarifPath);
+        }
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJsonWithSarif_StdoutStaysPureJson()
+    {
+        // --json owns stdout. --sarif writes its report to the file, and the human-mode `wrote <path>` line is
+        // suppressed under --json, so a hook still parses a single JSON document off stdout.
+        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
+        try
+        {
+            CliResult result = await CliRunner.InvokeAsync(
+                "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--sarif", sarifPath);
+
+            result.Exit.ShouldBe(1);
+            result.Out.Trim().ShouldStartWith("{");
+            result.Out.ShouldNotContain("wrote");
+            File.Exists(sarifPath).ShouldBeTrue();
+            File.ReadAllText(sarifPath).ShouldContain("\"$schema\"");
+        }
+        finally
+        {
+            File.Delete(sarifPath);
+        }
+    }
+
+    [Fact]
     public async Task Check_MissingSpecFile_ExitsTwoWithMessage()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", "does-not-exist.dll");
@@ -104,6 +149,11 @@ public sealed class CheckCommandE2ETests
     private static string Golden()
     {
         return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "violated-check.json"));
+    }
+
+    private static string GoldenSarif()
+    {
+        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "violated-check.sarif"));
     }
 
     private static string Normalize(string value)

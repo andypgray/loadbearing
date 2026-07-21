@@ -16,7 +16,9 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             green on a partial model; <c>--allow-workspace-diagnostics</c> restores the prior 0/1 exit
 ///             with the load failures printed as warnings. Driven through <see cref="CheckRunner" /> with an
 ///             injected source that wraps the real cold load and adds synthetic load diagnostics — the one
-///             way to exercise the gate without a genuinely broken project. <c>--json</c> stdout stays pure.
+///             way to exercise the gate without a genuinely broken project. <c>--json</c> stdout stays pure,
+///             and a <c>--sarif</c> report written before the gate returns records the unsuccessful
+///             invocation with the load diagnostics as notifications.
 ///         </item>
 ///         <item>
 ///             <b>Merge notes never gate.</b> A real same-FQN cross-project conflation (Shared.Widget
@@ -87,6 +89,29 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Err.ShouldContain(GateLine);
     }
 
+    [Fact]
+    public async Task Check_WorkspaceLoadDiagnosticSarif_RecordsExecutionUnsuccessful()
+    {
+        // SARIF is written before the fail-closed gate returns, so the incomplete-model verdict reaches code
+        // scanning: the invocation records executionSuccessful: false and the load diagnostic rides as a
+        // tool-execution notification, even though the run exits 2.
+        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
+        try
+        {
+            CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
+
+            result.Exit.ShouldBe(2);
+            string sarif = File.ReadAllText(sarifPath);
+            sarif.ShouldContain("\"executionSuccessful\": false");
+            sarif.ShouldContain("\"toolExecutionNotifications\"");
+            sarif.ShouldContain(LoadDiagnostic);
+        }
+        finally
+        {
+            File.Delete(sarifPath);
+        }
+    }
+
     // ── Same-FQN merge notes render but never gate ────────────────────────────────────────────────────
 
     [Fact]
@@ -123,7 +148,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<CliResult> RunWithInjectedDiagnosticAsync(string spec, bool allowWorkspaceDiagnostics, bool json)
+    private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
+        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
@@ -133,7 +159,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         int exit = await runner.RunAsync(
             new CheckRequest(
                 solution, spec, json, null, Path.GetDirectoryName(Path.GetFullPath(solution))!, true, null,
-                allowWorkspaceDiagnostics),
+                allowWorkspaceDiagnostics, sarif),
             Ct);
 
         return new CliResult(exit, output.ToString(), error.ToString());

@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Baselines;
+
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
@@ -19,7 +21,8 @@ public sealed class RuleResult
         string? skipReason,
         IReadOnlyList<Violation> grandfathered,
         int staleBaselineEntries,
-        bool baselineCaptured)
+        bool baselineCaptured,
+        IReadOnlyList<BaselineEntry>? grandfatheredEntries = null)
     {
         Rule = rule;
         Status = status;
@@ -29,6 +32,7 @@ public sealed class RuleResult
         Grandfathered = grandfathered;
         StaleBaselineEntries = staleBaselineEntries;
         BaselineCaptured = baselineCaptured;
+        GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
     }
 
     /// <summary>The rule that was evaluated.</summary>
@@ -60,4 +64,13 @@ public sealed class RuleResult
 
     /// <summary>Whether a baseline section exists for this (Migrate) rule; false when uncaptured or non-Migrate.</summary>
     public bool BaselineCaptured { get; }
+
+    /// <summary>
+    ///     The stored baseline entries that grandfathered <see cref="Grandfathered" />, <b>index-aligned</b>
+    ///     with it: <c>GrandfatheredEntries[i]</c> is the baseline entry — carrying its
+    ///     <see cref="BaselineEntry.Because" /> attribution, if any — that blessed
+    ///     <c>Grandfathered[i]</c>. The two lists always share length and order. Empty for every
+    ///     non-ratcheted rule and whenever <see cref="Grandfathered" /> is empty.
+    /// </summary>
+    public IReadOnlyList<BaselineEntry> GrandfatheredEntries { get; }
 }

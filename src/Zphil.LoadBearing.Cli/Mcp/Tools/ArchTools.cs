@@ -65,7 +65,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // AllowWorkspaceDiagnostics false: the fail-closed gate would fire on a load failure, but it writes only to the
         // discarded error writer and returns an ignored exit code — it cannot touch the JSON this tool returns.
         await new CheckRunner(output, TextWriter.Null, source).RunAsync(
-            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, false),
+            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, false, null),
             cancellationToken);
         return output.ToString();
     }

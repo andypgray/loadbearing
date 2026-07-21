@@ -104,15 +104,18 @@ public static class ArchChecker
     {
         bool captured = baselines.TryGet(rule.Id, out RuleBaseline? section);
         var red = new List<Violation>();
-        var grandfathered = new List<Violation>();
+        var grandfatheredPairs = new List<(Violation Violation, BaselineEntry Entry)>();
         var matched = new HashSet<BaselineEntry>();
 
         foreach (Violation violation in violations)
         {
             BaselineEntry? key = violation.BaselineIdentity();
-            if (key is not null && section is not null && section.Contains(key))
+            // Pair the grandfathered violation with the STORED entry (not the synthesized key) so the
+            // entry's attribution reaches the report; matched still keys on the identity, so the stale
+            // count is unchanged whether or not the entry carried a because.
+            if (key is not null && section is not null && section.TryMatch(key, out BaselineEntry? stored))
             {
-                grandfathered.Add(violation);
+                grandfatheredPairs.Add((violation, stored!));
                 matched.Add(key);
             }
             else
@@ -122,9 +125,13 @@ public static class ArchChecker
         }
 
         var orderedRed = Order(red);
+        var orderedGrandfathered = OrderPairs(grandfatheredPairs);
         int stale = section is null ? 0 : section.Count - matched.Count;
         RuleStatus status = orderedRed.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
-        return new RuleResult(rule, status, orderedRed, warnings, null, Order(grandfathered), stale, captured);
+        return new RuleResult(
+            rule, status, orderedRed, warnings, null,
+            orderedGrandfathered.Select(p => p.Violation).ToList(), stale, captured,
+            orderedGrandfathered.Select(p => p.Entry).ToList());
     }
 
     // The Freeze tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
@@ -178,10 +185,39 @@ public static class ArchChecker
     private static IReadOnlyList<Violation> Order(IReadOnlyList<Violation> violations)
     {
         return violations
-            .OrderBy(v => (v.Source ?? v.Subject)?.FullName ?? MemberDeclaringFullName(v), StringComparer.Ordinal)
-            .ThenBy(v => v.Target?.FullName ?? string.Empty, StringComparer.Ordinal)
-            .ThenBy(v => v.Member?.SymbolId ?? v.SubjectMember?.SymbolId ?? string.Empty, StringComparer.Ordinal)
+            .OrderBy(OrderPrimary, StringComparer.Ordinal)
+            .ThenBy(OrderSecondary, StringComparer.Ordinal)
+            .ThenBy(OrderTertiary, StringComparer.Ordinal)
             .ToList();
+    }
+
+    // The ratchet's grandfathered (violation, entry) pairs, ordered by the SAME keys as Order so the two
+    // split lists — Grandfathered and its index-aligned GrandfatheredEntries — share order (OrderBy is a
+    // stable sort, so this yields exactly the violation order Order would).
+    private static List<(Violation Violation, BaselineEntry Entry)> OrderPairs(
+        List<(Violation Violation, BaselineEntry Entry)> pairs)
+    {
+        return pairs
+            .OrderBy(p => OrderPrimary(p.Violation), StringComparer.Ordinal)
+            .ThenBy(p => OrderSecondary(p.Violation), StringComparer.Ordinal)
+            .ThenBy(p => OrderTertiary(p.Violation), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    // The three ordinal sort keys, single-sourced so Order and OrderPairs cannot drift.
+    private static string OrderPrimary(Violation violation)
+    {
+        return (violation.Source ?? violation.Subject)?.FullName ?? MemberDeclaringFullName(violation);
+    }
+
+    private static string OrderSecondary(Violation violation)
+    {
+        return violation.Target?.FullName ?? string.Empty;
+    }
+
+    private static string OrderTertiary(Violation violation)
+    {
+        return violation.Member?.SymbolId ?? violation.SubjectMember?.SymbolId ?? string.Empty;
     }
 
     // A MemberShape violation's declaring-type FullName — its primary sort key (empty for every other kind,

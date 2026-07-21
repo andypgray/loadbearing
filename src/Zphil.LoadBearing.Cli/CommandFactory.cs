@@ -44,6 +44,11 @@ internal static class CommandFactory
                 "Check against the partial model even when some projects fail to load, instead of failing the run "
                 + "with exit 2."
         };
+        Option<string?> sarif = new("--sarif")
+        {
+            Description =
+                "Write a SARIF 2.1.0 report to <path> (GitHub code scanning et al.); human/--json output is unchanged."
+        };
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
@@ -57,6 +62,7 @@ internal static class CommandFactory
             json,
             diffBase,
             allowWorkspaceDiagnostics,
+            sarif,
             noCache,
             binlog
         };
@@ -71,7 +77,8 @@ internal static class CommandFactory
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
-                parseResult.GetValue(allowWorkspaceDiagnostics));
+                parseResult.GetValue(allowWorkspaceDiagnostics),
+                parseResult.GetValue(sarif));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;

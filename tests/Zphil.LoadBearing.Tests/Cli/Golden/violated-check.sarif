@@ -1,0 +1,654 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "LoadBearing",
+          "version": "0.1.0",
+          "informationUri": "https://github.com/andypgray/loadbearing",
+          "rules": [
+            {
+              "id": "layering/domain-independent",
+              "shortDescription": {
+                "text": "The Domain layer must not reference the Web layer."
+              },
+              "fullDescription": {
+                "text": "Domain is UI-agnostic; transaction boundaries live in services."
+              },
+              "help": {
+                "text": "Define an abstraction in Domain and implement it in Web."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/billing-independent",
+              "shortDescription": {
+                "text": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`."
+              },
+              "fullDescription": {
+                "text": "Billing must not reach up into the web layer."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "data-access/no-inline-sql",
+              "shortDescription": {
+                "text": "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`."
+              },
+              "fullDescription": {
+                "text": "Repository pattern for testability."
+              },
+              "help": {
+                "text": "Inject the repository."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "time/inject-clock",
+              "shortDescription": {
+                "text": "The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`."
+              },
+              "fullDescription": {
+                "text": "Wall-clock reads are untestable; inject IClock."
+              },
+              "help": {
+                "text": "Take IClock in the constructor; see OrderService for the pattern."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "naming/async-suffix",
+              "shortDescription": {
+                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`."
+              },
+              "fullDescription": {
+                "text": "Async methods are discovered by their Async suffix."
+              },
+              "help": {
+                "text": "Rename the method to end in Async and update its callers."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "di/handlers-via-registry",
+              "shortDescription": {
+                "text": "Types, except `HandlerRegistry` must not construct types implementing `IHandler<T>`."
+              },
+              "fullDescription": {
+                "text": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery."
+              },
+              "help": {
+                "text": "Resolve the handler through HandlerRegistry instead of constructing it."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "di/no-captive-dependencies",
+              "shortDescription": {
+                "text": "Singleton-registered types must not inject scoped-registered types or transient-registered types."
+              },
+              "fullDescription": {
+                "text": "A singleton that captures a scoped or transient service pins it to the whole process lifetime."
+              },
+              "help": {
+                "text": "Inject IServiceScopeFactory and resolve the dependency inside a scope."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "layering/no-ghost",
+              "shortDescription": {
+                "text": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`."
+              },
+              "fullDescription": {
+                "text": "Nothing should reference the (nonexistent) ghost layer."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "naming/nonexistent",
+              "shortDescription": {
+                "text": "Types in `MyApp.Nowhere.*` must be named `*Service`."
+              },
+              "fullDescription": {
+                "text": "A subject that matches nothing must fail loudly."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "legacy/billing/containment",
+              "shortDescription": {
+                "text": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`."
+              },
+              "fullDescription": {
+                "text": "Replacement scheduled; not worth stabilizing."
+              },
+              "help": {
+                "text": "use `IBillingFacade`"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "freeze"
+              }
+            },
+            {
+              "id": "legacy/billing/tripwire",
+              "fullDescription": {
+                "text": "Replacement scheduled; not worth stabilizing."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "freeze"
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "originalUriBaseIds": {
+        "SRCROOT": {}
+      },
+      "results": [
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 26
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/data-access/no-inline-sql.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/data-access/no-inline-sql.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "time/inject-clock",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController uses System.DateTime.Now"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 32
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|P:System.DateTime.Now||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "time/inject-clock",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController uses System.DateTime.UtcNow"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 37
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|P:System.DateTime.UtcNow||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "naming/async-suffix",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Load()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Load|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "naming/async-suffix",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Save()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 43
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Save|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-via-registry",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceService constructs MyApp.Web.InvoiceCreatedHandler"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceService|T:MyApp.Web.InvoiceCreatedHandler||MyApp.Web/InvoiceService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/no-captive-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFeed"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFeed||MyApp.Web/ReportScheduler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/no-captive-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFormatter"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFormatter||MyApp.Web/ReportScheduler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        }
+      ]
+    }
+  ]
+}
