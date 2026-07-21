@@ -39,10 +39,10 @@
     </ItemGroup>
 
     <!-- Powers ProjectCone's *.cs cone glob (bin/obj-excluding disk walk). Dependency-free. Pinned to
-         10.0.9 — the version the Cli already resolves transitively — so the Microsoft.Extensions.* graph
+         10.0.10 — the version the Cli already resolves transitively — so the Microsoft.Extensions.* graph
          stays uniform with no NU1605 downgrade. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.10" />
     </ItemGroup>
 
     <!-- Basic.CompilerLog.Util (jaredpar/complog, MIT) powers binlog replay: a real
@@ -70,15 +70,17 @@
          are loaded at runtime by MSBuildLocator.RegisterDefaults(). ExcludeAssets="runtime" keeps the
          engine DLLs out of the build output, and PrivateAssets="all" keeps these off the published
          nuspec — a consumer of this package (or of the tool that bundles it) must resolve MSBuild from
-         the SDK on the host, never from us. Versions are pinned to 18.7.1 (the version the lock file
-         resolves) rather than floating "*", because a lock file cannot capture a wildcard and
+         the SDK on the host, never from us. The four Microsoft.Build engine packages are exact-pinned
+         to 18.7.1; Microsoft.NET.StringTools — a leaf string-interning utility they depend on — rides
+         ahead at 18.8.2 (Dependabot keeps it current, and the engine packages' >= floor accepts it).
+         Exact versions rather than floating "*", because a lock file cannot capture a wildcard and
          supply-chain locking demands a determinate version. -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Build" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.NET.StringTools" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.NET.StringTools" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
     </ItemGroup>
 
     <!-- Override vulnerable transitive pulled in by Microsoft.Build.Tasks.Core (NU1903). -->

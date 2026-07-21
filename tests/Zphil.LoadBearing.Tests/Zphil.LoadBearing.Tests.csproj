@@ -23,9 +23,9 @@
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)
              bind against — promoted from transitive (via the MCP/Hosting stack) to explicit, so the versions
              the recognizer resolves are pinned here rather than floating on another package's closure. -->
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
         <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture
              model from compiled MyApp IL (Mono.Cecil), cross-checking LoadBearing's Roslyn-source model. -->

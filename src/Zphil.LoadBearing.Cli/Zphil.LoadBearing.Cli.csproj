@@ -40,11 +40,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="System.CommandLine" Version="2.0.9" />
+        <PackageReference Include="System.CommandLine" Version="2.0.10" />
         <!-- The `mcp` subcommand's stdio server chassis. The four packages are exact-pinned to
              current versions, all present in the local NuGet cache. -->
         <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
         <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
         <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     </ItemGroup>
