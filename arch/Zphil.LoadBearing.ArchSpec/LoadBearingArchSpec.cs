@@ -7,8 +7,14 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///     this repo's real code so the product governs itself honestly.
 ///     <list type="bullet">
 ///         <item>
-///             <b>Enforce</b> (<c>layering/core-no-roslyn</c>): Core — the netstandard2.0 reified model both
-///             render targets consume — must not reference the Roslyn extraction project (host machinery).
+///             <b>Enforce</b> — three boundaries. <c>layering/core-no-roslyn</c>: Core, the netstandard2.0
+///             reified model both render targets consume, must reference neither the Roslyn extraction
+///             project nor the <c>Microsoft.CodeAnalysis</c>/<c>Microsoft.Build</c> packages behind it (a
+///             package reference is the route the build cannot block). <c>cli/no-stdout</c>: the CLI owns
+///             stdout as a protocol channel — JSON-RPC for the MCP server, System.CommandLine for the
+///             commands — so nothing writes to <see cref="System.Console" /> directly.
+///             <c>di/no-captive-dependencies</c>: the all-singleton MCP host must not inject a scoped or
+///             transient service into a singleton (a forward ratchet — no such registration exists yet).
 ///         </item>
 ///         <item>
 ///             <b>Migrate</b> (<c>mcp/env-through-seam</c>): the MCP infrastructure still reaches for
@@ -31,11 +37,37 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
     {
         arch.Rule("layering/core-no-roslyn")
             .Enforce(arch.Project("Zphil.LoadBearing")
-                .MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn")))
+                .MustNotReference(
+                    arch.Project("Zphil.LoadBearing.Roslyn"),
+                    arch.Namespace("Microsoft.CodeAnalysis.*"),
+                    arch.Namespace("Microsoft.Build.*")))
             .Because("Core is the netstandard2.0 reified model both render targets consume; " +
-                     "Roslyn extraction is host machinery.")
+                     "Roslyn extraction is host machinery, and a Microsoft.CodeAnalysis or Microsoft.Build " +
+                     "package reference would leak compiler types into Core just as the project reference would.")
             .Fix("Depend on the Codebase model types in Core; keep Microsoft.CodeAnalysis behind " +
                  "Zphil.LoadBearing.Roslyn.");
+
+        arch.Rule("cli/no-stdout")
+            .Enforce(arch.Project("Zphil.LoadBearing.Cli")
+                .MustNotUse(
+                    arch.Member(() => Console.Out),
+                    arch.Member(typeof(Console), nameof(Console.Write)),
+                    arch.Member(() => Console.WriteLine())))
+            .Because("Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI " +
+                     "output flows through System.CommandLine's console — so a direct Console write corrupts " +
+                     "the wire and is invisible to the in-process tests.")
+            .Fix("Write CLI output through the command's InvocationConfiguration console; route server " +
+                 "diagnostics to the logger or Console.Error.");
+
+        arch.Rule("di/no-captive-dependencies")
+            .Enforce(arch.Registered(Lifetime.Singleton).InNamespace("Zphil.LoadBearing.*")
+                .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
+            .Because("The MCP server is one long-lived process wired all-singleton by design (IEnvironment, " +
+                     "WorkspaceSession, SessionFragmentStore, ISolutionSource); a scoped or transient service " +
+                     "injected into a singleton is captured for the whole process and silently shared across " +
+                     "every tool call.")
+            .Fix("Keep singletons depending only on singletons; resolve any scoped or transient work per call " +
+                 "inside an IServiceScopeFactory scope instead of injecting it into the singleton.");
 
         arch.Rule("mcp/env-through-seam")
             .Migrate(

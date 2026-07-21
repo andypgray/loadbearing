@@ -1024,5 +1024,5 @@ Refinements vs the founding-session sketch: `Layer` is itself a selection (no `.
 closed vocabulary; escape hatches are `Where`/`Must`; Freeze shows facade-implementation
 listing and the grandfathering baseline. The founding dogfood rule was one line —
 `arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn"))` —
-since grown into the three-posture self-spec (`LoadBearingArchSpec`: that Enforce rule plus a
+since grown into the three-posture self-spec (`LoadBearingArchSpec`: three Enforce rules plus a
 Migrate and a Freeze).

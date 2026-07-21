@@ -30,6 +30,8 @@ public sealed class AdapterTests
         rows.Select(row => row.TestDisplayName).ShouldBe(
         [
             "layering/core-no-roslyn",
+            "cli/no-stdout",
+            "di/no-captive-dependencies",
             "mcp/env-through-seam",
             "roslyn/msbuild-bootstrap/containment",
             "roslyn/msbuild-bootstrap/tripwire"
