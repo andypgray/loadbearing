@@ -78,6 +78,21 @@
       }
     },
     {
+      "id": "di/no-captive-dependencies",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/di/no-captive-dependencies.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -114,9 +129,9 @@
     }
   ],
   "summary": {
-    "rulesChecked": 10,
+    "rulesChecked": 11,
     "rulesPassed": 2,
-    "rulesFailed": 7,
+    "rulesFailed": 8,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

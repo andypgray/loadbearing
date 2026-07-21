@@ -356,6 +356,45 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         fastEdges.ShouldNotBeEmpty();
     }
 
+    [Fact]
+    public void ExtractFromSolutionAsync_ReportSchedulerInjection_PinsCaptiveConstructorEdges()
+    {
+        // The injection channel (GRAMMAR §4.7) for the captive-dependency flagship: the singleton
+        // ReportScheduler's primary constructor takes a scoped IOrderFeed and a transient IOrderFormatter,
+        // each at its own parameter file:line — the two edges di/no-captive-dependencies reds on.
+        string rendered = string.Join("\n", fixture.Model.InjectionEdges
+            .Where(e => e.Source.FullName == "MyApp.Web.ReportScheduler")
+            .Select(fixture.RenderInjectionEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed @ MyApp.Web/ReportScheduler.cs:7
+            MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFormatter @ MyApp.Web/ReportScheduler.cs:8
+            """);
+
+        // Both injected endpoints are in-solution nodes (reference equality, not just name), so the
+        // Registered(Scoped)/Registered(Transient) operands match them as members.
+        fixture.Model.InjectionEdge("MyApp.Web.ReportScheduler", "MyApp.Web.IOrderFeed")
+            .Injected.IsExternal.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ServiceWiring_PinsThreeRegistrationFacts()
+    {
+        // The registration channel (GRAMMAR §4.7): ServiceWiring.Configure's three recognized calls, each
+        // keyed (lifetime, service, implementation) at the invoked-method file:line. AddSingleton<ReportScheduler>()
+        // is the one-type-arg self form (service == implementation); the other two name a distinct
+        // implementation. The whole list is pinned — these are the only registrations the fixture spells.
+        string rendered = string.Join("\n", fixture.Model.ServiceRegistrations.Select(fixture.RenderRegistration));
+
+        rendered.ShouldBe(
+            """
+            Singleton MyApp.Web.ReportScheduler -> MyApp.Web.ReportScheduler @ MyApp.Web/ServiceWiring.cs:13
+            Scoped MyApp.Web.IOrderFeed -> MyApp.Web.OrderFeed @ MyApp.Web/ServiceWiring.cs:14
+            Transient MyApp.Web.IOrderFormatter -> MyApp.Web.OrderFormatter @ MyApp.Web/ServiceWiring.cs:15
+            """);
+    }
+
     private static List<string> RenderBillingEdges(IEnumerable<ReferenceEdge> edges, Func<SourceLocation, string> path)
     {
         return edges

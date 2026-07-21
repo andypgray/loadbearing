@@ -10,7 +10,9 @@ namespace Zphil.LoadBearing.Checking;
 ///     <see cref="ViolationKind.MemberUse" /> carries <see cref="Source" /> and <see cref="Member" />
 ///     with the member-use edge's <see cref="Sites" />; a <see cref="ViolationKind.Construction" /> carries
 ///     <see cref="Source" /> and <see cref="Target" /> (the constructed type) with the construction edge's
-///     <see cref="Sites" />; a <see cref="ViolationKind.Shape" /> carries
+///     <see cref="Sites" />; a <see cref="ViolationKind.Injection" /> carries <see cref="Source" /> and
+///     <see cref="Target" /> (the injected parameter type) with the injection edge's <see cref="Sites" />;
+///     a <see cref="ViolationKind.Shape" /> carries
 ///     <see cref="Subject" /> with its declaration sites; a <see cref="ViolationKind.MemberShape" />
 ///     carries <see cref="SubjectMember" /> with its declaration sites;
 ///     <see cref="ViolationKind.EmptySubject" /> and <see cref="ViolationKind.RuleError" /> carry only
@@ -42,12 +44,15 @@ public sealed class Violation
     public ViolationKind Kind { get; }
 
     /// <summary>
-    ///     The referencing type (Reference kind — for the inbound verbs this is where the edit happens) or the
-    ///     constructing type (Construction kind).
+    ///     The referencing type (Reference kind — for the inbound verbs this is where the edit happens), the
+    ///     constructing type (Construction kind), or the injecting type (Injection kind).
     /// </summary>
     public TypeNode? Source { get; }
 
-    /// <summary>The referenced type (Reference kind) or the constructed type (Construction kind).</summary>
+    /// <summary>
+    ///     The referenced type (Reference kind), the constructed type (Construction kind), or the injected
+    ///     parameter type (Injection kind).
+    /// </summary>
     public TypeNode? Target { get; }
 
     /// <summary>The offending subject type (Shape kind).</summary>
@@ -67,10 +72,11 @@ public sealed class Violation
 
     /// <summary>
     ///     This violation's stable baseline identity (GRAMMAR §4.3): an edge key
-    ///     (<see cref="Source" />, <see cref="Target" /> symbol IDs) for a Reference or a Construction
+    ///     (<see cref="Source" />, <see cref="Target" /> symbol IDs) for a Reference, a Construction
     ///     (the constructed type in <see cref="Target" />; all ctor overloads share the one type-pair
-    ///     identity), an edge key (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId)
-    ///     for a MemberUse, a
+    ///     identity), or an Injection (the injected parameter type in <see cref="Target" />; every parameter
+    ///     typed on it shares the one type-pair identity), an edge key (<see cref="Source" /> symbol ID,
+    ///     <see cref="Member" />'s member DocId) for a MemberUse, a
     ///     subject key for a Shape, and a member-subject key (<see cref="SubjectMember" />'s member DocId)
     ///     for a MemberShape (GRAMMAR §4.6). <see cref="ViolationKind.EmptySubject" /> and
     ///     <see cref="ViolationKind.RuleError" /> have no stable identity and return null — they can
@@ -82,6 +88,7 @@ public sealed class Violation
         {
             ViolationKind.Reference => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.Construction => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            ViolationKind.Injection => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
@@ -97,6 +104,11 @@ public sealed class Violation
     internal static Violation Construction(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
         return new Violation(ViolationKind.Construction, source, target, null, null, null, sites, null);
+    }
+
+    internal static Violation Injection(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.Injection, source, target, null, null, null, sites, null);
     }
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)

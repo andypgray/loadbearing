@@ -51,6 +51,7 @@ public sealed class ExplainCommandTests
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
             "  data-access/no-inline-sql\n" +
             "  di/handlers-via-registry\n" +
+            "  di/no-captive-dependencies\n" +
             "  layering/billing-independent\n" +
             "  layering/domain-independent\n" +
             "  layering/no-ghost\n" +

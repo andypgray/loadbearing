@@ -25,6 +25,7 @@ public sealed class BaselineAddE2ETests
     private const string ClockRule = "time/inject-clock";
     private const string AsyncRule = "naming/async-suffix";
     private const string ConstructionRule = "di/handlers-via-registry";
+    private const string CaptiveRule = "di/no-captive-dependencies";
     private const string ForeignRule = "some/other-rule";
 
     private const string NowMemberId = "P:System.DateTime.Now";
@@ -42,6 +43,9 @@ public sealed class BaselineAddE2ETests
 
     private const string InvoiceServiceId = "T:MyApp.Web.InvoiceService";
     private const string InvoiceCreatedHandlerId = "T:MyApp.Web.InvoiceCreatedHandler";
+
+    private const string ReportSchedulerId = "T:MyApp.Web.ReportScheduler";
+    private const string OrderFeedInterfaceId = "T:MyApp.Web.IOrderFeed";
 
     // A SECOND forbidden System.Data edge on HomeController (DataSet), inserted alongside the stock DataTable
     // one — so the Migrate rule has two current reds and --add grandfathers exactly one of them.
@@ -63,6 +67,7 @@ public sealed class BaselineAddE2ETests
     private static readonly string[] ClockBaselineFile = ["arch", "baselines", "time", "inject-clock.json"];
     private static readonly string[] AsyncBaselineFile = ["arch", "baselines", "naming", "async-suffix.json"];
     private static readonly string[] ConstructionBaselineFile = ["arch", "baselines", "di", "handlers-via-registry.json"];
+    private static readonly string[] CaptiveBaselineFile = ["arch", "baselines", "di", "no-captive-dependencies.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -354,6 +359,82 @@ public sealed class BaselineAddE2ETests
         bystander.GetProperty("kind").GetString().ShouldBe("construction");
         bystander.GetProperty("source").GetString().ShouldBe("MyApp.Web.HomeController");
         bystander.GetProperty("target").GetString().ShouldBe("MyApp.Web.InvoiceCreatedHandler");
+    }
+
+    [Fact]
+    public async Task BaselineAdd_InjectionRule_GrandfathersOneCaptiveEdgeAndBystanderFormatterStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Red first: the injection Migrate rule di/no-captive-dependencies is uncaptured, so both of the
+        // singleton ReportScheduler's captive edges (GRAMMAR §4.7) are current injection violations — a scoped
+        // IOrderFeed and a transient IOrderFormatter, each keyed by the (source, injected) type pair.
+        CliResult red = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement redRule = RuleElement(red.Out, CaptiveRule);
+        redRule.GetProperty("status").GetString().ShouldBe("failed");
+        redRule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("target").GetString())
+            .ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
+
+        // Capture: --init grandfathers both injection identities (T: source × T: injected ForEdge entries), and
+        // the re-check sees the rule green with both captive edges riding the baseline.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("di/no-captive-dependencies: captured 2 grandfathered violations.");
+
+        CliResult captured = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement capturedRule = RuleElement(captured.Out, CaptiveRule);
+        capturedRule.GetProperty("status").GetString().ShouldBe("passed");
+        capturedRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(2);
+
+        // Un-capture the pair (composer as arrangement, the member/construction facts' idiom): a digest-valid
+        // EMPTY section turns both captive edges red again on a captured rule — the state the valve exists for.
+        string captivePath = workspace.PathOf(CaptiveBaselineFile);
+        File.WriteAllText(captivePath, ComposeSections((CaptiveRule, [])));
+
+        // The valve, injection flavor: full-name --source/--target (no T: prefix) resolve the (source, injected)
+        // type-pair violation, echoed exactly as 'loadbearing check' renders it.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", CaptiveRule,
+            "--source", "MyApp.Web.ReportScheduler", "--target", "MyApp.Web.IOrderFeed", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "di/no-captive-dependencies: added 1 grandfathered entry — MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry keying the (source, injected) type pair via ForEdge.
+        Normalize(File.ReadAllText(captivePath)).ShouldBe(ComposeSections(
+            (CaptiveRule, [BaselineEntry.ForEdge(ReportSchedulerId, OrderFeedInterfaceId).WithBecause("INC-1234")])));
+        LineSet(File.ReadAllText(captivePath)).Count(line => line.Contains("\"source\":")).ShouldBe(1);
+
+        // The bystander pin: the OTHER captive edge (IOrderFormatter) is still red; only IOrderFeed is grandfathered.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        check.Exit.ShouldBe(1);
+        JsonElement captiveRule = RuleElement(check.Out, CaptiveRule);
+        captiveRule.GetProperty("status").GetString().ShouldBe("failed");
+        captiveRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        JsonElement bystander = captiveRule.GetProperty("violations").EnumerateArray().ToList().ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("injection");
+        bystander.GetProperty("source").GetString().ShouldBe("MyApp.Web.ReportScheduler");
+        bystander.GetProperty("target").GetString().ShouldBe("MyApp.Web.IOrderFormatter");
+
+        // The attribution round-trips: --accept-reductions keeps the still-observed IOrderFeed entry (refusing
+        // the IOrderFormatter growth) and a second --init leaves the captured section be — byte-identical both ways.
+        byte[] snapshot = File.ReadAllBytes(captivePath);
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.Exit.ShouldBe(0);
+        File.ReadAllBytes(captivePath).ShouldBe(snapshot);
+        CliResult reinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        reinit.Exit.ShouldBe(0);
+        File.ReadAllBytes(captivePath).ShouldBe(snapshot);
     }
 
     [Fact]

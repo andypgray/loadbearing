@@ -37,6 +37,15 @@ public enum ViolationKind
     /// </summary>
     Construction,
 
+    /// <summary>
+    ///     A forbidden constructor-injection edge (GRAMMAR §4.7): <c>Source</c> injects <c>Target</c> (the
+    ///     injected parameter type) through a declared constructor parameter, carrying every parameter
+    ///     <c>Sites</c>. One per (rule, source, injected) — constructor-overload- and parameter-name-indifferent,
+    ///     since every constructor parameter typed on the injected type collapses to one identity and the
+    ///     parameter sites are evidence, not identity (GRAMMAR §4.3).
+    /// </summary>
+    Injection,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

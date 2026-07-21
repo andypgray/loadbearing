@@ -72,6 +72,15 @@ internal static class Checker
             .ToList();
     }
 
+    /// <summary>Injection violations rendered as <c>Source -&gt; Injected</c>, in report order (§4.7).</summary>
+    public static IReadOnlyList<string> InjectionPairs(this RuleResult result)
+    {
+        return result.Violations
+            .Where(v => v.Kind == ViolationKind.Injection)
+            .Select(v => $"{v.Source!.FullName} -> {v.Target!.FullName}")
+            .ToList();
+    }
+
     /// <summary>Shape-violation subject FullNames, in report order.</summary>
     public static IReadOnlyList<string> ShapeSubjects(this RuleResult result)
     {

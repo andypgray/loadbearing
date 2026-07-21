@@ -50,6 +50,24 @@ public sealed class BaselineEntryTests
     }
 
     [Fact]
+    public void ForEdge_InjectionViolationIdentity_IsAnOrdinaryEdgeEntry()
+    {
+        // An injection violation's identity is a plain (source, injected) ForEdge entry (GRAMMAR §4.3) — the
+        // same shape a reference or construction uses — so grandfathering a captive injection needs zero new
+        // baseline format: the identity is value-equal to, hash-equal to, and set-dedupes with a hand-built
+        // ForEdge and its attributed twin.
+        BaselineEntry identity = Violation
+            .Injection(Node("N.Svc"), Node("N.Dep"), Array.Empty<SourceLocation>())
+            .BaselineIdentity()!;
+
+        identity.ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep"));
+        identity.GetHashCode().ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep").GetHashCode());
+        identity.Subject.ShouldBeNull();
+        new HashSet<BaselineEntry> { identity }
+            .Contains(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep").WithBecause("INC-1")).ShouldBeTrue();
+    }
+
+    [Fact]
     public void ForEdge_SwappedSourceAndTarget_AreNotEqual()
     {
         BaselineEntry.ForEdge("T:N.A", "T:N.B")

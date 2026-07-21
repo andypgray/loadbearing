@@ -8,7 +8,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     Spec-free (no <c>--spec</c>), read-only (no temp copy), always exits 0. The human survey and the
 ///     <c>--json</c> document (schemaVersion 1) are both pinned by goldens. The fixture truth behind the
 ///     numbers: 3 projects; Domain→Web = 2 observed type-pairs; Web→Legacy.Billing = 3; Web→System.Data = 2;
-///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms).
+///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms); Web→Microsoft.Extensions = 2
+///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions).
 /// </summary>
 [Collection("Serial")]
 public sealed class GraphCommandTests
@@ -20,7 +21,7 @@ public sealed class GraphCommandTests
         Projects (3):
           MyApp.Domain — 5 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 10 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 16 types; references: MyApp.Legacy.Billing
 
         Observed project references (distinct type pairs):
           MyApp.Domain -> MyApp.Web: 2
@@ -29,10 +30,11 @@ public sealed class GraphCommandTests
         Namespaces:
           MyApp.Domain: MyApp.Domain (5)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
-          MyApp.Web: MyApp.Web (10)
+          MyApp.Web: MyApp.Web (16)
 
         External references (by namespace root):
           MyApp.Legacy.Billing -> System: 2
+          MyApp.Web -> Microsoft.Extensions: 2
           MyApp.Web -> System: 2
           MyApp.Web -> System.Data: 2
           MyApp.Web -> System.Text: 1

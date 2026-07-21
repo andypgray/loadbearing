@@ -58,4 +58,22 @@ public sealed class WorkspaceFixture : IAsyncLifetime
         string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
         return $"{edge.Source.FullName} -> {edge.Constructed.FullName} @ {sites}";
     }
+
+    /// <summary>Renders an injection edge as <c>src -&gt; injected @ file:line, ...</c> (GRAMMAR §4.7).</summary>
+    public string RenderInjectionEdge(InjectionEdge edge)
+    {
+        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
+        return $"{edge.Source.FullName} -> {edge.Injected.FullName} @ {sites}";
+    }
+
+    /// <summary>
+    ///     Renders a registration fact as <c>lifetime service -&gt; impl @ file:line, ...</c> (GRAMMAR §4.7);
+    ///     the implementation renders as <c>(none)</c> when the registration names no distinct implementation.
+    /// </summary>
+    public string RenderRegistration(ServiceRegistration registration)
+    {
+        string sites = string.Join(", ", registration.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
+        string implementation = registration.ImplementationFullName ?? "(none)";
+        return $"{registration.Lifetime} {registration.ServiceFullName} -> {implementation} @ {sites}";
+    }
 }

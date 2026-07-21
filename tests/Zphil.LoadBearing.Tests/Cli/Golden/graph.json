@@ -31,11 +31,11 @@
       "projectReferences": [
         "MyApp.Legacy.Billing"
       ],
-      "types": 10,
+      "types": 16,
       "namespaces": [
         {
           "namespace": "MyApp.Web",
-          "types": 10
+          "types": 16
         }
       ]
     }
@@ -56,6 +56,11 @@
     {
       "source": "MyApp.Legacy.Billing",
       "targetNamespaceRoot": "System",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "Microsoft.Extensions",
       "references": 2
     },
     {

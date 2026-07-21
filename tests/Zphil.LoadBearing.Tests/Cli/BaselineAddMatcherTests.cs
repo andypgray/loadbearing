@@ -60,6 +60,32 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveEdge_InjectionByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    {
+        // An injection violation resolves on both type endpoints exactly like a reference or construction edge
+        // (the injected parameter type rides the Target slot, GRAMMAR §4.7) — full name, symbol ID, and mixed all match.
+        Violation edge = Violation.Injection(Node("N.Svc", "T:N.Svc"), Node("N.Dep", "T:N.Dep"), Array.Empty<SourceLocation>());
+        Violation[] violations = [edge];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Svc", "N.Dep").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Svc", "T:N.Dep").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Svc", "T:N.Dep").ShouldBeSameAs(edge);
+    }
+
+    [Fact]
+    public void ResolveEdge_InjectionNoMatch_ListsSourceArrowInjectedFullNameForm()
+    {
+        // FullNameForm's default arm already renders an injection candidate as `Source -> Injected`, no code
+        // change from the reference/construction form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
+        Violation edge = Violation.Injection(Node("N.Svc", "T:N.Svc"), Node("N.Dep", "T:N.Dep"), Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Svc", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  N.Svc -> N.Dep");
+    }
+
+    [Fact]
     public void ResolveEdge_SourceAndTargetMatchDifferentViolations_NoMatchListsBothCandidates()
     {
         Violation ab = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());

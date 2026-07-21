@@ -46,7 +46,10 @@ internal sealed class SelectionEvaluator
         return new HashSet<TypeNode>(current);
     }
 
-    private static IEnumerable<TypeNode> ByNoun(SelectionNoun noun, IEnumerable<TypeNode> universe)
+    // Instance (not static) because the RegisteredNoun arm reads model-side registration facts
+    // (CodebaseModel.ServiceRegistrations) — membership is many-to-many and never denormalized onto a
+    // TypeNode (GRAMMAR §4.7). The other nouns select purely off the position-correct universe.
+    private IEnumerable<TypeNode> ByNoun(SelectionNoun noun, IEnumerable<TypeNode> universe)
     {
         switch (noun)
         {
@@ -63,12 +66,36 @@ internal sealed class SelectionEvaluator
             case TypeNoun typeNoun:
                 string fullName = TypeNounFullName(typeNoun.Type);
                 return universe.Where(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal));
+            case RegisteredNoun registered:
+                // Membership = service ∪ implementation FQNs of the recognized registrations at this lifetime
+                // (null = any lifetime, §4.7). Filtering the position-correct universe (subject = solution-
+                // declared, target = all types incl. externals) means an external registered type matches in
+                // target position but never enters a subject — exactly the §4.1 universe discipline.
+                var registeredNames = RegisteredFullNames(registered.Lifetime);
+                return universe.Where(t => registeredNames.Contains(t.FullName));
             default:
                 // Fail closed (M4): the closed noun hierarchy makes this arm unreachable for any v1 noun. An
                 // unknown noun means a new noun without a switch arm; throw rather than select nothing (which
                 // would vacuously pass every shape verb over an empty subject). ArchChecker contains it per-rule.
                 throw new InvalidOperationException($"Unhandled selection noun '{noun.GetType().Name}'.");
         }
+    }
+
+    // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7): the union of the service and
+    // implementation full names of every recognized registration at the requested lifetime (null = all
+    // lifetimes), skipping the null implementation of a factory/instance registration. The FQNs are already in
+    // TypeNode.FullName form (definition-level, declared type-parameter names), so a node compares directly.
+    private HashSet<string> RegisteredFullNames(Lifetime? lifetime)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ServiceRegistration registration in _model.ServiceRegistrations)
+        {
+            if (lifetime is { } wanted && registration.Lifetime != wanted) continue;
+            names.Add(registration.ServiceFullName);
+            if (registration.ImplementationFullName is { } implementation) names.Add(implementation);
+        }
+
+        return names;
     }
 
     private static string TypeNounFullName(Type type)

@@ -8,6 +8,11 @@
              fixture pins the DECLARED chain graph, so transitivity is disabled here. Whether the
              product surfaces declared vs transitive project refs is an open product decision. -->
         <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+        <!-- Domain references Web, which now carries a PackageReference; that turns on .NET's NuGet
+             vulnerability audit solution-wide, and an unreachable private feed emits NU1900 warnings that
+             MSBuildWorkspace surfaces as workspace diagnostics (tripping check's fail-closed gate). A
+             throwaway test fixture needs no audit; disabling it keeps the workspace load clean offline. -->
+        <NuGetAudit>false</NuGetAudit>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\MyApp.Web\MyApp.Web.csproj" />

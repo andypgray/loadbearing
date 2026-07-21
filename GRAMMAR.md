@@ -297,6 +297,14 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   A grandfathered `new Foo()` plus a *different* forbidden constructed target from the same
   source is NEW and red, exactly like the reference ratchet; multiple `new` sites within one
   (source, constructed) pair ride together.
+- **Injection verb** (`MustNotInject`, §4.7/§5.3): `(ruleId, source symbol ID, injected
+  symbol ID)` — the same edge-key shape again (the injected parameter type keys the target
+  slot), so an injection entry rides `BaselineEntry.ForEdge` with **zero baseline-format
+  change**. Constructor-overload- and parameter-name-indifferent: every constructor parameter
+  typed on the injected type collapses to the one type-pair identity, and the parameter sites
+  are evidence, not identity. A grandfathered captive injection plus a *different* forbidden
+  injected target from the same source is NEW and red; multiple injecting parameters within
+  one (source, injected) pair ride together.
 - **Shape/naming/inheritance/attribute verbs and escape hatches**:
   `(ruleId, subject symbol ID)`.
 - Symbol IDs are Roslyn `DocumentationCommentId` strings — stable across file moves and

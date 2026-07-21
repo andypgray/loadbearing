@@ -186,6 +186,44 @@
       "warnings": []
     },
     {
+      "id": "di/no-captive-dependencies",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Singleton-registered types must not inject scoped-registered types or transient-registered types.",
+      "because": "A singleton that captures a scoped or transient service pins it to the whole process lifetime.",
+      "fix": "Inject IServiceScopeFactory and resolve the dependency inside a scope.",
+      "baseline": {
+        "path": "arch/baselines/di/no-captive-dependencies.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "injection",
+          "source": "MyApp.Web.ReportScheduler",
+          "target": "MyApp.Web.IOrderFeed",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportScheduler.cs",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "kind": "injection",
+          "source": "MyApp.Web.ReportScheduler",
+          "target": "MyApp.Web.IOrderFormatter",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportScheduler.cs",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
       "id": "layering/no-ghost",
       "posture": "enforce",
       "status": "passed",
@@ -269,11 +307,11 @@
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 10,
+    "rulesChecked": 11,
     "rulesPassed": 2,
-    "rulesFailed": 7,
+    "rulesFailed": 8,
     "rulesSkipped": 1,
-    "violations": 11,
+    "violations": 13,
     "warnings": 1
   }
 }

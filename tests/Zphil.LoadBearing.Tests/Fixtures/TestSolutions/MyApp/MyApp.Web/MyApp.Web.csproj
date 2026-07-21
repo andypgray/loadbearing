@@ -5,8 +5,20 @@
         <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
         <!-- Pin the declared project-reference chain graph, not the SDK's transitive closure. -->
         <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+        <!-- This is the fixture's first PackageReference, which would otherwise turn on .NET's NuGet
+             vulnerability audit. The audit fetches advisory data from every configured feed, and an
+             unreachable private feed emits NU1900 warnings that MSBuildWorkspace surfaces as workspace
+             diagnostics — tripping check's fail-closed gate. A throwaway test fixture needs no audit, and
+             disabling it keeps the fixture's workspace load clean and offline-deterministic. -->
+        <NuGetAudit>false</NuGetAudit>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+    <!-- The DI axis (GRAMMAR 4.7): ServiceWiring registers with AddSingleton/AddScoped/AddTransient, which
+         live in the Abstractions assembly. Restored UNLOCKED (no packages.lock.json under Fixtures/) — the
+         lock-file policy lives only in the tests project, never here. -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     </ItemGroup>
 </Project>

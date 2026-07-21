@@ -131,6 +131,42 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task ArchCheck_RegistrationLifetimeFlippedOnDisk_ReflectsChangedCaptiveSetAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, whose injection Migrate rule
+        // di/no-captive-dependencies (uncaptured) is already red on the singleton ReportScheduler's two captive
+        // edges: a scoped IOrderFeed and a transient IOrderFormatter (GRAMMAR §4.7). This is the DI-axis analog
+        // of the member edit tests above — an on-disk REGISTRATION change (not a reference/member edit).
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+        // Act — flip IOrderFeed's registration from scoped to singleton on disk, then re-check the still-warm
+        // server. A singleton injecting a now-singleton dependency is not captive, so the IOrderFeed edge drops
+        // out of the violation set. A fresh cold CLI run over the same edited tree is the parity oracle.
+        string serviceWiring = fixture.PathOf(Web, "ServiceWiring.cs");
+        EditOnDisk(serviceWiring, FlipOrderFeedToSingleton);
+        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        CliResult coldEdited = await CliRunner.InvokeAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the warm re-check reflects the flipped lifetime (the captive set shrinks from
+        // {IOrderFeed, IOrderFormatter} to just {IOrderFormatter}), the payload changed, and it is
+        // byte-identical to the cold run on the edited tree — the registration pass re-ran for Web.
+        CaptiveInjectedTargets(before).ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
+        CaptiveInjectedTargets(after).ShouldBe(["MyApp.Web.IOrderFormatter"], true);
+        Normalize(after).ShouldNotBe(Normalize(before));
+        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+        // …and the incremental store re-walked exactly the edited project (ServiceWiring is in Web) plus its
+        // reverse-dependent Domain.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
     public async Task ArchCheck_SteadyStateNoDiskChange_ReadsAndReloadsNothing()
     {
         // Arrange — load, then promote every document past the racy window (backdate + one reconcile) so the
@@ -292,6 +328,14 @@ public sealed class WarmWorkspaceMcpTests
                + "    public System.Threading.Tasks.Task Delete() => System.Threading.Tasks.Task.CompletedTask;\n}\n";
     }
 
+    // Flips IOrderFeed's registration from scoped to singleton in ServiceWiring — a singleton dependency injected
+    // by a singleton is not captive, so the IOrderFeed edge drops out of di/no-captive-dependencies (GRAMMAR §4.7),
+    // leaving only the transient IOrderFormatter red.
+    private static string FlipOrderFeedToSingleton(string source)
+    {
+        return source.Replace("AddScoped<IOrderFeed, OrderFeed>", "AddSingleton<IOrderFeed, OrderFeed>");
+    }
+
     // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
     private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
     {
@@ -300,6 +344,17 @@ public sealed class WarmWorkspaceMcpTests
             .Single(r => r.GetProperty("id").GetString() == "naming/async-suffix");
         return rule.GetProperty("violations").EnumerateArray()
             .Select(v => v.GetProperty("subjectMember").GetString()!)
+            .ToList();
+    }
+
+    // The injected-type targets reported red under the injection rule di/no-captive-dependencies (GRAMMAR §4.7).
+    private static IReadOnlyList<string> CaptiveInjectedTargets(string checkJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == "di/no-captive-dependencies");
+        return rule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("target").GetString()!)
             .ToList();
     }
 

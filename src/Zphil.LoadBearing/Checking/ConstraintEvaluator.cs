@@ -5,9 +5,10 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
-///     §4.5, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
+///     §4.5, §4.7, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
 ///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
-///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; shape verbs test each
+///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
+///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; shape verbs test each
 ///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
 ///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
@@ -23,6 +24,7 @@ internal sealed class ConstraintEvaluator
 
     private readonly IReadOnlyList<ConstructorEdge> _constructorEdges;
     private readonly IReadOnlyList<ReferenceEdge> _edges;
+    private readonly IReadOnlyList<InjectionEdge> _injectionEdges;
     private readonly IReadOnlyList<MemberEdge> _memberEdges;
     private readonly MemberSelectionEvaluator _memberSelections;
     private readonly SelectionEvaluator _selections;
@@ -32,6 +34,7 @@ internal sealed class ConstraintEvaluator
         _edges = model.Edges;
         _memberEdges = model.MemberEdges;
         _constructorEdges = model.ConstructorEdges;
+        _injectionEdges = model.InjectionEdges;
         _selections = new SelectionEvaluator(model);
         _memberSelections = new MemberSelectionEvaluator(_selections);
     }
@@ -60,6 +63,8 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenMemberUse(subjects, c.Members);
             case MustNotConstructConstraint c:
                 return ForbiddenConstruction(subjects, c.Targets);
+            case MustNotInjectConstraint c:
+                return ForbiddenInjection(subjects, c.Targets);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -171,6 +176,27 @@ internal sealed class ConstraintEvaluator
             : NoWarnings;
 
         return (violations, warnings);
+    }
+
+    // The injection verb (GRAMMAR §4.7, §5.3): an injection edge is a hit when its source is a subject AND the
+    // injected parameter type is a forbidden operand — the captive-dependency ban. Extraction already collapses
+    // every constructor parameter typed on one injected type into one (source, injected) edge with its sites
+    // aggregated, so one edge yields one Injection violation keyed on the type pair (constructor-overload- and
+    // parameter-name-indifferent, §4.3). Unlike ForbiddenConstruction, MustNotInject NEVER warns: its natural
+    // operand is a Registered selection (§4.7), and an empty Registered operand means no such registrations
+    // exist — the win condition, exactly like a bare typeof target (GRAMMAR §4.1). So there is no inert-target
+    // arm here; an empty operand set is silence, not a warning.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenInjection(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (InjectionEdge edge in _injectionEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Injected))
+                violations.Add(Violation.Injection(edge.Source, edge.Injected, edge.Sites));
+
+        return (violations, NoWarnings);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(

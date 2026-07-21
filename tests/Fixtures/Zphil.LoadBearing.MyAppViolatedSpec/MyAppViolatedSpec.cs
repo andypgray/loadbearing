@@ -13,7 +13,10 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     HomeController's unsuffixed Task-returning methods, <c>Save</c> and <c>Load</c>, are red, exercising
 ///     the <c>memberShape</c> kind and the <c>subjectMember</c> field), a ratcheted Migrate construction rule
 ///     (uncaptured — the DI flagship, InvoiceService news up a handler instead of resolving it through
-///     HandlerRegistry, exercising the <c>construction</c> kind), an inert-target warning rule, a
+///     HandlerRegistry, exercising the <c>construction</c> kind), a ratcheted Migrate injection rule
+///     (uncaptured — the captive-dependency flagship, the singleton ReportScheduler injects a scoped
+///     <c>IOrderFeed</c> and a transient <c>IOrderFormatter</c>, exercising the <c>injection</c> kind), an
+///     inert-target warning rule, a
 ///     failing empty-subject rule, and a frozen billing scope whose containment is uncaptured (an explicit,
 ///     deliberately-uncommitted
 ///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>.
@@ -80,6 +83,18 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                     .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>))))
             .Because("Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.")
             .Fix("Resolve the handler through HandlerRegistry instead of constructing it.");
+
+        // Migrate (ratcheted, injection): the conventional baseline path arch/baselines/di/
+        // no-captive-dependencies.json is uncommitted, so both of ReportScheduler's captive edges are hard red
+        // with the --init hint — the injection half of the report/JSON schema (the injection kind, GRAMMAR §4.7).
+        // ReportScheduler is the only singleton; it injects a scoped IOrderFeed and a transient IOrderFormatter.
+        arch.Rule("di/no-captive-dependencies")
+            .Migrate(
+                "Some singletons capture shorter-lived services through constructor injection.",
+                arch.Registered(Lifetime.Singleton)
+                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
+            .Because("A singleton that captures a scoped or transient service pins it to the whole process lifetime.")
+            .Fix("Inject IServiceScopeFactory and resolve the dependency inside a scope.");
 
         // Inert warning: the target pattern matches nothing, so the rule can never fire.
         arch.Rule("layering/no-ghost")
