@@ -54,7 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ratcheted rule with `file:line` sites — the general captive-dependency check that no
   whole-solution static tool ships. Reported human (`{source} injects {target}`) and JSON (kind
   `"injection"`); registrations made by assembly scanning, factory internals, or framework
-  defaults are the documented honesty boundary.
+  defaults are the documented honesty boundary. The `Meridian.Interchange` guidance pack now
+  enforces it as `di/no-captive-dependencies` with the Microsoft DI-guidelines citation.
 
 ## [0.1.0] - 2026-07-14
 

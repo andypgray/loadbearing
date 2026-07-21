@@ -234,10 +234,11 @@ lands only where the whole list is static and one form:
 - Checker behavior: an empty *subject* selection **fails** the rule by default
   (ArchUnit and ArchUnitNET precedent, with a pinned message). An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
-  `MustNotBeReferencedBy`) whose operand is a **pattern selection** (Layer / Namespace / Project
+  `MustNotBeReferencedBy` / `MustNotConstruct`) whose operand is a **pattern selection**
+  (Layer / Namespace / Project
   or a refined `Types`); a bare `typeof(...)` target absent from the codebase is the *win
-  condition* and stays silent, and the `MustOnly*` verbs never warn (an empty allow-set is loud
-  on its own).
+  condition* and stays silent, the `MustOnly*` verbs never warn (an empty allow-set is loud
+  on its own), and `MustNotUse` / `MustNotInject` never warn at all (§4.5, §4.7).
 - **Edges are definition-level (v1).** A source-level reference to `IHandler<Order>` is a
   reference to *both* the open definition `IHandler<T>` and the argument `Order`; the checker
   mints no edge to the closed construction. A closed generic in an `arch.Type(...)` /

@@ -196,6 +196,13 @@ arch.Rule("data-access/no-inline-sql")
   .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>)))` where a family of types
   (handlers, commands, services) is meant to arrive via one sanctioned root, so a stray `new`
   bypasses discovery. `.Except` the composition root that legitimately `new`s them.
+- DI-lifetime candidates: where the composition root registers services with
+  `AddSingleton`/`AddScoped`/`AddTransient` (or `TryAdd*`, `AddHostedService`, `AddDbContext`,
+  `AddHttpClient<TClient>`), the captive-dependency rule is one line —
+  `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
+  arch.Registered(Lifetime.Transient))`. Registrations made by assembly scanning, factory
+  internals, or framework defaults are not seen, so an empty-subject failure here means the
+  registrations live outside the recognized calls — drop the rule rather than guessing.
 - Anchor a rule on the `Layer` handle wherever one exists (`tools.MustHaveSuffix("Tools")`,
   not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`). The two check
   identically, but render's per-directory local-rules card is keyed on the layer-anchored
@@ -343,7 +350,9 @@ three statement forms: definitions, rules, scopes.
 
 **Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` ·
 `arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
-`arch.Type<X>()`) · `arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the
+`arch.Type<X>()`) · `arch.Registered(Lifetime.Singleton)` (types named in a source-visible
+container registration at that lifetime — service and implementation alike; `arch.Registered()`
+= any lifetime) · `arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the
 `MustNotUse` target form; matching is by declaring type + member name, so one ban covers every
 overload) — or the compiler-checked expression forms `arch.Member<X>(x => x.M)` (instance) and
 `arch.Member(() => X.M)` (static), which anchor the same member with the type↔member pairing
@@ -367,6 +376,10 @@ target is a **static** member, the lambdas bare: `MustNotUse(() => DateTime.Now,
 source-level member access, and `nameof` operands are not uses) ·
 `MustNotConstruct(target, …)` (bans object creation — `new`, including target-typed `new()`; the
 constructed type may be *referenced* but not *created*, keying the (source, constructed) type pair) ·
+`MustNotInject(target, …)` (bans constructor-parameter dependencies, primary constructors
+included, keying the (source, injected) type pair; the natural operands are `Registered`
+selections — `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
+arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
 `MustResideInNamespace(glob)`
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
@@ -417,11 +430,17 @@ within one segment, never crossing a dot; lone `*` = everything. So `MyApp.Domai
 
 **Semantics worth knowing** — "reference" means a source-level type reference; "use" means a
 source-level member access; "construct" means a source-level object creation (`new`, including
-target-typed `new()`): the checker records all three edge kinds. A construction ban keys the
+target-typed `new()`); "inject" means a source-level constructor-parameter dependency (primary
+constructors included): the checker records all four edge kinds. A construction ban keys the
 (source, constructed) type pair (overload-indifferent) and is honest about reflection — a DI
 *registration* mints only a type reference, never a construct edge, so a container-resolved type is
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned
-composition root or baseline the edge. Member bans are
+composition root or baseline the edge. `Registered` membership comes only from source-visible
+registration calls (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/
+`AddDbContext`/`AddHttpClient<TClient>`) — assembly scanning, factory-lambda internals, and
+framework defaults are invisible; an empty `Registered` subject fails loud (check the visibility
+boundary before blaming the code), while an empty `MustNotInject` operand is the win condition
+and never warns. Member bans are
 source-visibility bans, not runtime-dispatch bans — a ban on a concrete member does not catch
 calls through an interface-typed receiver, nor the reverse. Member subjects range over the
 declared members of solution-declared types (accessors, constructors, operators, indexers,

@@ -3,7 +3,9 @@
 
 ## Architecture (LoadBearing)
 
-reference = a source-level type reference; use = a source-level member access; construct = a source-level object creation (`new`, including target-typed `new()`). Expand any rule ID with `loadbearing explain <rule-id>`.
+reference = a source-level type reference; use = a source-level member access; construct = a source-level object creation (`new`, including target-typed `new()`); inject = a source-level constructor-parameter dependency (primary constructors included). Expand any rule ID with `loadbearing explain <rule-id>`.
+
+registered = named in a source-level container registration (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or framework defaults are not seen.
 
 ### Rules
 - `di/construct-via-container` — Types, except types in `Meridian.Interchange.Host.*` must not construct types implementing `IPartnerClient`. Partner clients are wired with their pooled HttpClient and options in the composition root; constructing one elsewhere bypasses that wiring and the registered lifetime — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
@@ -11,6 +13,7 @@ reference = a source-level type reference; use = a source-level member access; c
 - `di/no-service-locator` — Types, except types in `Meridian.Interchange.Host.*` must not use `IServiceProvider.GetService()`, `ServiceProviderServiceExtensions.GetService()` or `ServiceProviderServiceExtensions.GetRequiredService()`. Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
 - `di/no-buildserviceprovider` — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`. Calling BuildServiceProvider while configuring services builds a second container with its own singletons — a duplicate-instance trap — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
 - `di/hosted-services-scope-their-work` — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`. A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope — resolve per work item from an IServiceScopeFactory scope — https://learn.microsoft.com/dotnet/core/extensions/scoped-service
+- `di/no-captive-dependencies` — Singleton-registered types must not inject scoped-registered types or transient-registered types. A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
 - `naming/async-suffix` — Methods of types in `Meridian.Interchange.*` returning `Task` or `Task<TResult>` must be named `*Async`. Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
 
 ### Migrations

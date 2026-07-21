@@ -71,7 +71,15 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
             .Because("A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope — resolve per work item from an IServiceScopeFactory scope — https://learn.microsoft.com/dotnet/core/extensions/scoped-service")
             .Fix("Inject IServiceScopeFactory, create a scope per iteration, resolve scoped services inside it; see OutboxDispatcher and ScopedDispatchRunner.");
 
-        // 7 — TAP (normative): Task-returning methods carry the Async suffix.
+        // 7 — DI guidelines antipattern: a singleton must not capture a scoped or transient service (the general captive-dependency form).
+        arch.Rule("di/no-captive-dependencies")
+            .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(
+                arch.Registered(Lifetime.Scoped),
+                arch.Registered(Lifetime.Transient)))
+            .Because("A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
+            .Fix("Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
+
+        // 8 — TAP (normative): Task-returning methods carry the Async suffix.
         arch.Rule("naming/async-suffix")
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
             .Because("Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
