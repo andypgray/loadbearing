@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "digest": "b06dc266725fe0fe06764c1ebc37485f256677d4f7327d32acd3133d3ad435f9",
+  "rules": {
+    "async/no-sync-over-async": {
+      "entries": [
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult" },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)" },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task`1.GetAwaiter" },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result" }
+      ]
+    }
+  }
+}

@@ -92,6 +92,8 @@ jobs:
         run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
       - name: Build the Meridian.Operations example solution
         run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
+      - name: Build the Meridian.Interchange example solution
+        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
       - name: Build the LoadBearing CLI
         run: dotnet build src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj
       - name: Check Meridian (expect exit 0 on the committed baselines)
@@ -100,13 +102,16 @@ jobs:
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Quoting/Meridian.Quoting.slnx
       - name: Check Meridian.Operations (expect exit 0 on the committed containment baseline)
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx
+      - name: Check Meridian.Interchange (expect exit 0 on the committed baseline)
+        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx
       # No --no-build here: the adapter test project is not a member of any slnx, so nothing
       # above builds it. dotnet test restores and builds it (and the Xunit adapter it references).
       - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
         run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --logger "console;verbosity=normal"
-      - name: Render all three and assert a single zero diff (the provably-current property)
+      - name: Render all four and assert a single zero diff (the provably-current property)
         run: |
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian/Meridian.slnx
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Quoting/Meridian.Quoting.slnx
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx
           git diff --exit-code -- examples/
