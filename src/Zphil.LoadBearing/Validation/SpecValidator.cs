@@ -123,6 +123,7 @@ internal static class SpecValidator
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
         CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
+        CheckLifetimes(rule, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -258,6 +259,22 @@ internal static class SpecValidator
                         errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
                             $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
                             $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
+    }
+
+    // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.
+    // (Lifetime)7 via a cast) names no lifetime. Walked over every selection a rule reaches — subject,
+    // operands, Except payloads, union parts — via the shared RuleSelections walk; the union guard mirrors
+    // SelectionPatterns (a UnionSelection has no single noun). Reported all-at-once, and the build throws
+    // before membership resolution ever sees the bad value.
+    private static void CheckLifetimes(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        foreach (Selection selection in RuleSelections(rule))
+            if (selection is not UnionSelection && selection.Noun is RegisteredNoun { Lifetime: { } lifetime }
+                                                && !Enum.IsDefined(typeof(Lifetime), lifetime))
+                errors.Add(new SpecValidationError(Code.UndefinedLifetime, rule.Id,
+                    $"'(Lifetime){(int)lifetime}' is not a defined Lifetime — " +
+                    $"use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by '{rule.Id}').",
+                    rule.Location));
     }
 
     private static void CheckMember(Member member, string id, SpecSourceLocation? ruleLocation, List<SpecValidationError> errors)

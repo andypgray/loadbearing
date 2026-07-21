@@ -290,4 +290,43 @@ public class SentenceAssemblyTests
         SentenceRenderer.MemberSubject(Arch.Types.Members.WithNameMatching("*Handler*"))
             .ShouldBe("Members of types whose name matches `*Handler*`");
     }
+
+    // ---- Registered noun + MustNotInject (GRAMMAR §4.7, §5.1, §5.3): head truth under adjectives ----
+
+    [Fact]
+    public void Registered_NoArg_RendersRegisteredTypesSubjectHead()
+    {
+        // The any-lifetime noun's subject head — the head IS the noun fragment (GRAMMAR §5.1), capitalized.
+        SentenceRenderer.Subject(Arch.Registered()).ShouldBe("Registered types");
+    }
+
+    [Fact]
+    public void Registered_WithLifetime_RendersLifetimePrefixedSubjectHead()
+    {
+        SentenceRenderer.Subject(Arch.Registered(Lifetime.Singleton)).ShouldBe("Singleton-registered types");
+    }
+
+    [Fact]
+    public void MustNotInject_Flagship_RendersRegisteredSubjectAndTargets()
+    {
+        // The captive-dependency flagship (GRAMMAR §4.7): the Registered subject head survives, and the two
+        // Registered operands render in reference position joined with "or".
+        Constraint constraint = Arch.Registered(Lifetime.Singleton)
+            .MustNotInject(Arch.Registered(Lifetime.Scoped), Arch.Registered(Lifetime.Transient));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Singleton-registered types must not inject scoped-registered types or transient-registered types.");
+    }
+
+    [Fact]
+    public void MustNotInject_AdjectiveBearingRegisteredSubject_KeepsQualifierHead()
+    {
+        // Head truth under adjectives (GRAMMAR §5.1): an Except-bearing Registered subject keeps its qualifier
+        // ("Singleton-registered types, except …") — never a false bare "Types, …". Except canonicalizes
+        // sentence-final as usual.
+        Selection exclusion = Arch.Type(typeof(SqlConnection));
+        Constraint constraint = Arch.Registered(Lifetime.Singleton).Except(exclusion)
+            .MustNotInject(Arch.Registered(Lifetime.Scoped));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Singleton-registered types, except `SqlConnection` must not inject scoped-registered types.");
+    }
 }

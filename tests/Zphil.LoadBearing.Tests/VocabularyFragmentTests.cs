@@ -178,4 +178,31 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.Methods.Must(m => m.IsAsync, "return a Task"))
             .ShouldBe("Methods of types must return a Task.");
     }
+
+    // ---- Registered noun fragments + the injection-ban verb (GRAMMAR §4.7, §5.1, §5.3) ----
+
+    [Theory]
+    [InlineData(Lifetime.Singleton, "singleton-registered types")]
+    [InlineData(Lifetime.Scoped, "scoped-registered types")]
+    [InlineData(Lifetime.Transient, "transient-registered types")]
+    public void Registered_WithLifetime_RendersLifetimePrefixedFragment(Lifetime lifetime, string expected)
+    {
+        // The per-lifetime noun fragment in reference position (GRAMMAR §5.1).
+        SentenceRenderer.Reference(Arch.Registered(lifetime)).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Registered_NoArg_RendersBareRegisteredFragment()
+    {
+        // The any-lifetime noun fragment (GRAMMAR §5.1).
+        SentenceRenderer.Reference(Arch.Registered()).ShouldBe("registered types");
+    }
+
+    [Fact]
+    public void MustNotInject_RendersFragment()
+    {
+        // The injection-ban verb (GRAMMAR §5.3): "must not inject {list}".
+        SentenceRenderer.Sentence(Arch.Types.MustNotInject(typeof(SqlConnection)))
+            .ShouldBe("Types must not inject `SqlConnection`.");
+    }
 }

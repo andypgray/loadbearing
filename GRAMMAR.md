@@ -57,6 +57,7 @@ Inside it there are exactly three statement forms:
 ```
 definition :=  var x = arch.Layer(name, glob, globs...) | arch.Namespace(glob)
              | arch.Project(name) | arch.Type(typeof(X)) | arch.Type<X>()
+             | arch.Registered(lifetime) | arch.Registered()
              | arch.Member(typeof(X), nameof(X.M))
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
 rule       :=  arch.Rule(id) . posture-verb . trailer*
@@ -93,6 +94,10 @@ Arch
  │                                      the arch.Types property (CS0102); multi-type nouns
  │                                      arrive with the future AnyOf union, §11)
  ├─ .Type<T>()        → Selection      (generic sugar: ≡ .Type(typeof(T)); §5.2 note)
+ ├─ .Registered(Lifetime) → Selection  (types named in a source-visible container
+ │                                      registration with that lifetime — service and
+ │                                      implementation alike; §4.7)
+ ├─ .Registered()     → Selection      (same, any lifetime; §4.7)
  ├─ .Member(Type, string) → Member     (member-access leaf, target-only — NOT a Selection:
  │                                      adjectives and modal verbs must not apply; §4.5)
  ├─ .Member<T>(Expression<Func<T, object?>>)  → Member  (typed instance value-member anchor; §4.5)
@@ -154,12 +159,15 @@ Constraint MustNotReference(Selection first, params Selection[] more)
 Constraint MustNotReference(Type first, params Type[] more)      // sugar for arch.Type(...)
 ```
 
-Same shape for `MustOnlyReference`, `MustNotBeReferencedBy`, `MustOnlyBeReferencedBy`, and the
-constructor-ban verb `MustNotConstruct`: it carries the identical pair — a `Selection`
+Same shape for `MustOnlyReference`, `MustNotBeReferencedBy`, `MustOnlyBeReferencedBy`, the
+constructor-ban verb `MustNotConstruct`, and the injection-ban verb `MustNotInject`: each
+carries the identical pair — a `Selection`
 list and the `Type` sugar — and deliberately **no expression overload**. Constructor-ness lives in
 the verb, not the anchor, so ordinary selections name what may not be `new`ed
 (`arch.Types.Implementing(typeof(IHandler<>))`), which scales to "all registered services" where a
-per-constructor anchor would be dummy-argument noise. The
+per-constructor anchor would be dummy-argument noise. Injection-ness lives in the verb the same
+way, and its natural operands are the registration-fact selections
+(`arch.Registered(Lifetime.Scoped)`, §4.7), though any selection or bare type works. The
 `(first, more)` shape makes zero-argument calls **uncompilable** and keeps single-argument
 overload resolution unambiguous. Mixing selections and types in one call = wrap the type:
 `MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
@@ -458,6 +466,7 @@ desugaring (§7) — keeps working unchanged on the type side.
 | `arch.Namespace("MyApp.Legacy.Billing.*")` | "types in `MyApp.Legacy.Billing.*`" |
 | `arch.Project("MyApp.Web")` | "types in project `MyApp.Web`" |
 | `arch.Type(typeof(SqlConnection))` / `arch.Type<SqlConnection>()` | "`SqlConnection`" — simple name; FQN retained in the model |
+| `arch.Registered(Lifetime.Singleton)` / `arch.Registered()` | "singleton-registered types" (per lifetime: "scoped-registered types", "transient-registered types") / "registered types" — types named in a source-visible container registration (§4.7). The fragment is the noun's **head** and survives adjectives ("Singleton-registered types must not inject scoped-registered types, except `X`." — never a false bare "Types, …"); the §5.2 `OfKind` head-substitution mechanic, pinned by an adjective-bearing-subject test. |
 | `arch.Member(typeof(DateTime), nameof(DateTime.Now))` / `arch.Member(() => DateTime.Now)` | "`DateTime.Now`" — member leaf, target-only (§4.5); parens iff method: "`Task.Wait()`" (`arch.Member<Task>(t => t.Wait())`) |
 
 ### 5.2 Adjectives (reduced relative clauses)
@@ -509,6 +518,7 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 | `.MustOnlyBeReferencedBy(source, ...)` | "must be referenced only by {list}" |
 | `.MustNotUse(member, ...)` | "must not use {list}" — member targets (§4.5) |
 | `.MustNotConstruct(target, ...)` | "must not construct {list}" — selection/type targets; the DI-construction verb (§3.3) |
+| `.MustNotInject(target, ...)` | "must not inject {list}" — selection/type targets; the captive-dependency verb (§3.3, §4.7). Never warns: an empty `Registered` operand means no such registrations exist — the win condition, the §4.1 bare-`typeof` precedent |
 | `.MustResideInNamespace(glob)` | "must reside in `{glob}`" |
 | `.MustHaveSuffix("Handler")` | "must be named `*Handler`" |
 | `.MustHavePrefix("I")` | "must be named `I*`" |
@@ -767,6 +777,11 @@ together.
     stored while the `DeclaringType`/`Name`/`IsMethod` backing fields stay default and now throw if
     read (fail closed — enforced, not merely documented), so it is collected in the same all-at-once
     pass as every other error.
+19. Undefined `Lifetime` value on an `arch.Registered` noun used by a rule — a cast like
+    `(Lifetime)7` names no defined lifetime; the error names the undefined value and the
+    defined ones ("`(Lifetime)7` is not a defined `Lifetime` — use `Lifetime.Singleton`,
+    `Lifetime.Scoped`, or `Lifetime.Transient`") and reports in the same all-at-once pass
+    (`SpecValidationErrorCode.UndefinedLifetime`).
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -811,7 +826,9 @@ agent fixing a spec sees every problem in one pass.
 
 ## 10. Naming morphology (style guide for vocabulary growth)
 
-- **Nouns**: bare plurals or PascalCase names (`Types`, `Layer`, `Project`).
+- **Nouns**: bare plurals or PascalCase names (`Types`, `Layer`, `Project`); the registration
+  noun is a bare participle (`Registered`) — it names the set by the fact that admits
+  membership.
 - **Projections**: bare plurals naming the member kind (`Members`, `Methods`, `Properties`,
   `Fields`, `Events`) — they read as "{plural} of {selection}" (§4.6, §5.7).
 - **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`) or prepositional
@@ -823,10 +840,18 @@ agent fixing a spec sees every problem in one pass.
   invocations, reads, writes, and subscriptions in one word. The constructor-ban verb is
   *construct* (`MustNotConstruct`), glossary-pinned as *"construct = a source-level object
   creation (`new`, including target-typed `new()`)"* — the third axis beside reference and use.
-  The glossary line composes from these per-axis clauses (reference always; use iff a member-target
-  rule; construct iff a ctor rule) joined with "; " and closed by the drill-down tail, so each axis
+  The injection-ban verb is *inject* (`MustNotInject`), glossary-pinned as *"inject = a
+  source-level constructor-parameter dependency (primary constructors included)"* — the fourth
+  axis (§4.7). The glossary line composes from these per-axis clauses (reference always; use iff a
+  member-target rule; construct iff a ctor rule; inject iff an injection rule) joined with "; "
+  and closed by the drill-down tail, so each axis
   gates independently and a spec without a given axis renders byte-identically to before that axis
-  existed (§4.1/§4.5's byte-identical-without-it discipline, generalized).
+  existed (§4.1/§4.5's byte-identical-without-it discipline, generalized). A `Registered` noun
+  anywhere in a rule — subject or operand — additionally gates its own glossary line on the same
+  byte-identical-without-it terms: *"registered = named in a source-level container registration
+  (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
+  `AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or
+  framework defaults are not seen."*
 - **Posture verbs**: imperative (`Enforce`, `Migrate`, `Freeze`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule).
   **Trailers**: conjunctions (`Because`) / nouns (`Fix`).
@@ -856,6 +881,13 @@ project cannot reference); indexer/operator bans (the syntax-walk boundary moves
 deliberately, §4.5); and subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`, …)
 — the member constraint-side verbs and the `IMemberInfo` flags shipped (§5.7, §5.6), only the
 adjective position remains, exactly mirroring the type-side gap below.
+
+On the injection axis (§4.7): the `MustOnlyInject` / `MustNotBeInjectedBy` twins; property- and
+method-injection edges (constructor parameters are the recorded form); recognition growth beyond
+the pinned call table — keyed services, `ServiceDescriptor`/`TryAddEnumerable`, assembly-scanning
+registrars — the table is the fence, everything outside it the documented honesty boundary;
+lifetime facts on `ITypeInfo` (registration membership stays model-side, resolved at evaluation);
+and `graph` registration data.
 
 Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); surface union
 `arch.AnyOf(...)` (also the future multi-type noun); a layered-architecture macro (deferred:

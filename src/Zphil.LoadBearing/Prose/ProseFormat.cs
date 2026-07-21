@@ -38,6 +38,24 @@ internal static class ProseFormat
         };
     }
 
+    /// <summary>
+    ///     The registration noun's reference fragment (GRAMMAR §5.1): the lifetime-prefixed head, or the
+    ///     bare "registered types" for any lifetime (<c>null</c>). This fragment is also the noun's subject
+    ///     head — it survives adjectives, so a qualified <c>Registered</c> subject keeps the qualifier
+    ///     instead of collapsing to a false bare "types". An undefined lifetime (refused at spec build,
+    ///     GRAMMAR §8 item 19) never reaches a render, so it falls back to the bare fragment.
+    /// </summary>
+    internal static string RegisteredFragment(Lifetime? lifetime)
+    {
+        return lifetime switch
+        {
+            Lifetime.Singleton => "singleton-registered types",
+            Lifetime.Scoped => "scoped-registered types",
+            Lifetime.Transient => "transient-registered types",
+            _ => "registered types"
+        };
+    }
+
     /// <summary>The plural noun a member <see cref="MemberKindFilter" /> projection heads with (GRAMMAR §5.7).</summary>
     internal static string MemberKindPlural(MemberKindFilter kind)
     {

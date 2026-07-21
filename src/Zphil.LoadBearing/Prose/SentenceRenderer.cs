@@ -102,7 +102,10 @@ internal static class SentenceRenderer
         // switches to types voice — the switch is structural, hence deterministic (GRAMMAR §6).
         if (noun is LayerNoun && adjectives.Count == 0) return noun.ReferenceFragment;
 
-        var head = "types";
+        // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
+        // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
+        // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
+        string head = noun.SubjectHead;
         var inline = string.Empty;
         var subjectFinal = string.Empty;
         foreach (SelectionAdjective adjective in adjectives)

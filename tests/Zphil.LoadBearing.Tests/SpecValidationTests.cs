@@ -1258,4 +1258,30 @@ public class SpecValidationTests
             arch.Rule("area/rule").Enforce(arch.Types.MustNotConstruct(foreignTarget)).Because("Reason.");
         }
     }
+
+    // GRAMMAR §8 item 19: an undefined Lifetime value on an arch.Registered noun used by a rule. Appended at the
+    // very end so every caller-info golden above keeps its authored line number (and, like the appends above,
+    // this file must NOT be run through a member-reordering cleanup profile). The check rides the shared
+    // RuleSelections walk, reaching the Registered subject with no new selection plumbing.
+    [Fact]
+    public void UndefinedLifetime_CastToUndefinedValue_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.UndefinedLifetime && e.RuleId == "di/lifetimes");
+        ex.Errors.First(e => e.Code == Code.UndefinedLifetime).Message
+            .ShouldBe("SpecValidationTests.cs:1282: '(Lifetime)7' is not a defined Lifetime — " +
+                      "use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by 'di/lifetimes').");
+    }
+
+    private sealed class UndefinedLifetimeSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // (Lifetime)7 names no defined lifetime — item 19 refuses it at spec build (all-at-once).
+            arch.Rule("di/lifetimes")
+                .Enforce(arch.Registered((Lifetime)7).MustNotReference(typeof(DateTime)))
+                .Because("Reason.");
+        }
+    }
 }

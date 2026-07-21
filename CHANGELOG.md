@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The canonical §12 sample adopts it as `di/handlers-via-registry` — every type except the
   sanctioned `HandlerRegistry` must not construct an `IHandler<T>` implementor — the first rule added
   to the founding sample.
+- DI registration facts and the captive-dependency ban: the `arch.Registered(Lifetime.Singleton)` /
+  `arch.Registered()` noun selects types named in source-visible container registrations
+  (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
+  `AddHttpClient<TClient>` — service and implementation types alike), and the `MustNotInject`
+  verb bans constructor-parameter dependencies (primary constructors included): "Singleton-registered
+  types must not inject scoped-registered types or transient-registered types" is now a one-line,
+  ratcheted rule with `file:line` sites — the general captive-dependency check that no
+  whole-solution static tool ships. Reported human (`{source} injects {target}`) and JSON (kind
+  `"injection"`); registrations made by assembly scanning, factory internals, or framework
+  defaults are the documented honesty boundary.
 
 ## [0.1.0] - 2026-07-14
 

@@ -234,6 +234,49 @@ public class ModelReificationTests
         constraint.MemberOperands.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void RegisteredNoun_WithLifetime_ReifiesToInjectConstraintCarryingLifetimes()
+    {
+        // arch.Registered(Lifetime.X) reifies to a RegisteredNoun carrying that lifetime; MustNotInject
+        // reifies to a MustNotInjectConstraint whose Operands mirror its Targets (GRAMMAR §4.7).
+        var constraint = ArchModelBuilder.Build(new CaptiveDependencySpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotInjectConstraint>();
+
+        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBe(Lifetime.Singleton);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        constraint.Targets.Select(target => ((RegisteredNoun)target.Noun).Lifetime)
+            .ShouldBe([Lifetime.Scoped, Lifetime.Transient]);
+        // MustNotInject is a dependency-shape verb (overrides Operands, not MemberOperands).
+        constraint.MemberOperands.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RegisteredNoun_NoArg_ReifiesWithNullLifetime()
+    {
+        // arch.Registered() reifies to a RegisteredNoun with a null lifetime (any lifetime).
+        var constraint = ArchModelBuilder.Build(new AnyLifetimeInjectSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotInjectConstraint>();
+        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBeNull();
+    }
+
+    [Fact]
+    public void MustNotInject_TypeSugar_ReifiesIdenticallyToWrappedSelection()
+    {
+        // The Type-sugar overload wraps each bare type as a single-type selection — the model is identical to
+        // writing arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for SqlConnection either way.
+        var sugar = ArchModelBuilder.Build(new InjectTypeSugarSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotInjectConstraint>();
+        var wrapped = ArchModelBuilder.Build(new InjectWrappedSelectionSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotInjectConstraint>();
+
+        sugar.Targets.Count.ShouldBe(1);
+        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        sugarType.ShouldBe(typeof(SqlConnection));
+        wrappedType.ShouldBe(sugarType);
+        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+    }
+
     // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
     private sealed class MemberUseSpec : IArchitectureSpec
     {
@@ -296,6 +339,50 @@ public class ModelReificationTests
                     "Controllers open SqlConnection directly.",
                     web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
                 .Because("Repository pattern for testability.");
+        }
+    }
+
+    // The captive-dependency flagship: singleton-registered types must not inject scoped/transient ones.
+    private sealed class CaptiveDependencySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-captive-dependencies")
+                .Enforce(arch.Registered(Lifetime.Singleton)
+                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
+                .Because("Singletons capturing scoped/transient services leak state across scopes.");
+        }
+    }
+
+    // The any-lifetime Registered subject — exercises the null-lifetime reification.
+    private sealed class AnyLifetimeInjectSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/registered-inject")
+                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Because("Any registration must not inject a scoped service.");
+        }
+    }
+
+    // The MustNotInject Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
+    private sealed class InjectTypeSugarSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-inject-sql")
+                .Enforce(arch.Types.MustNotInject(typeof(SqlConnection)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class InjectWrappedSelectionSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-inject-sql")
+                .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
+                .Because("Reason.");
         }
     }
 }

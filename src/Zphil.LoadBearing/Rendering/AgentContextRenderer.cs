@@ -31,6 +31,17 @@ public static class AgentContextRenderer
     private const string GlossaryConstructClause =
         "construct = a source-level object creation (`new`, including target-typed `new()`)";
 
+    private const string GlossaryInjectClause =
+        "inject = a source-level constructor-parameter dependency (primary constructors included)";
+
+    // A separate, independently-gated glossary line (not an axis clause): rendered as ONE line whenever any
+    // rule's subject or operands carry a Registered noun, on the same byte-identical-without-it terms as the
+    // axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
+    private const string GlossaryRegisteredLine =
+        "registered = named in a source-level container registration " +
+        "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
+        "registrations made by assembly scanning, factory internals, or framework defaults are not seen.";
+
     private const string GlossaryTail = "Expand any rule ID with `loadbearing explain <rule-id>`.";
 
     /// <summary>
@@ -63,12 +74,18 @@ public static class AgentContextRenderer
 
         bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
         bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
+        bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
+        bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            GlossaryLine(hasMemberRule, hasCtorRule)
+            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule)
         };
+
+        // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
+        // non-inject verb, and MustNotInject can ban a plain type), so it is its own paragraph (GRAMMAR §10).
+        if (hasRegisteredNoun) sections.Add(GlossaryRegisteredLine);
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));
 
@@ -87,13 +104,30 @@ public static class AgentContextRenderer
     // The glossary/drill-down line, composed from the always-on "reference" clause plus the axis clauses the
     // spec actually exercises, then the shared tail. Reproduces the pre-ctor "reference." and "reference; use."
     // lines byte-for-byte when their axis flags are the only ones set (GRAMMAR §4.1/§4.5/§10).
-    private static string GlossaryLine(bool hasMemberRule, bool hasCtorRule)
+    private static string GlossaryLine(bool hasMemberRule, bool hasCtorRule, bool hasInjectRule)
     {
         var clauses = new List<string> { GlossaryReferenceClause };
         if (hasMemberRule) clauses.Add(GlossaryUseClause);
         if (hasCtorRule) clauses.Add(GlossaryConstructClause);
+        if (hasInjectRule) clauses.Add(GlossaryInjectClause);
 
         return string.Join("; ", clauses) + ". " + GlossaryTail;
+    }
+
+    // True when a rule's subject or any operand carries a Registered noun (GRAMMAR §10) — descending through
+    // Except payloads and the internal Freeze union, since a Registered noun in any of those still renders the
+    // word "registered" in the block's prose and so must gate the glossary line.
+    private static bool CarriesRegisteredNoun(Constraint constraint)
+    {
+        return SelectionCarriesRegisteredNoun(constraint.Subject) || constraint.Operands.Any(SelectionCarriesRegisteredNoun);
+    }
+
+    private static bool SelectionCarriesRegisteredNoun(Selection selection)
+    {
+        if (selection is UnionSelection union) return union.Parts.Any(SelectionCarriesRegisteredNoun);
+        if (selection.Noun is RegisteredNoun) return true;
+
+        return selection.Adjectives.OfType<ExceptAdjective>().Any(except => SelectionCarriesRegisteredNoun(except.Payload));
     }
 
     /// <summary>

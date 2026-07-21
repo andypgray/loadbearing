@@ -74,6 +74,21 @@ public sealed class Arch
     }
 
     /// <summary>
+    ///     Types named in a source-visible container registration with the given lifetime — service and
+    ///     implementation types alike (GRAMMAR §4.7). The natural operand of the <c>MustNotInject</c> verb.
+    /// </summary>
+    public Selection Registered(Lifetime lifetime)
+    {
+        return new RefinedSelection(this, new RegisteredNoun(lifetime), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>Types named in a source-visible container registration with any lifetime (GRAMMAR §4.7).</summary>
+    public Selection Registered()
+    {
+        return new RefinedSelection(this, new RegisteredNoun(null), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>
     ///     A member-access ban target — a declaring type plus a member name (GRAMMAR §4.5). A
     ///     target-only leaf for <see cref="SelectionConstraints.MustNotUse" />, not a
     ///     <see cref="Selection" />; matching is by declaring type + member name, so one ban covers

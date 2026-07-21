@@ -274,6 +274,67 @@ public class AgentContextRendererTests
             "Expand any rule ID with `loadbearing explain <rule-id>`.");
     }
 
+    [Fact]
+    public void RootBlock_WithInjectRule_ExtendsGlossaryWithInjectClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new InjectRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The inject clause appears beside "reference" when a MustNotInject rule exists (no Registered noun here).
+        block.ShouldContain(
+            "reference = a source-level type reference; inject = a source-level constructor-parameter dependency " +
+            "(primary constructors included). Expand any rule ID with `loadbearing explain <rule-id>`.");
+        // No Registered noun in this spec → no separate registered glossary line.
+        block.ShouldNotContain("registered = named in a source-level container registration");
+    }
+
+    [Fact]
+    public void RootBlock_WithRegisteredNounRule_EmitsSeparateRegisteredGlossaryLine()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new RegisteredNounRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // A Registered noun (here on a MustNotReference subject, not MustNotInject) gates its own line.
+        block.ShouldContain(
+            "registered = named in a source-level container registration " +
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
+            "registrations made by assembly scanning, factory internals, or framework defaults are not seen.");
+        // The verb is MustNotReference, not MustNotInject → no inject clause.
+        block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
+    }
+
+    [Fact]
+    public void RootBlock_WithoutInjectOrRegistered_OmitsBothGlossaryAdditions()
+    {
+        // A reference-only spec carries neither a MustNotInject verb nor a Registered noun, so the block renders
+        // byte-identically to before this section existed (GRAMMAR §4.7/§10 gate discipline).
+        ArchitectureModel model = ArchModelBuilder.Build(new DogfoodShapeSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Zphil.LoadBearing.ArchSpec");
+        block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
+        block.ShouldNotContain("registered = named in a source-level container registration");
+    }
+
+    [Fact]
+    public void RootBlock_WithCaptiveDependencyRule_ComposesInjectClauseRegisteredLineAndTrueSubject()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new CaptiveDependencySpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The inject clause composes into the axis-glossary line...
+        block.ShouldContain(
+            "reference = a source-level type reference; inject = a source-level constructor-parameter dependency " +
+            "(primary constructors included). Expand any rule ID with `loadbearing explain <rule-id>`.");
+        // ...and the Registered noun gates the separate registered line.
+        block.ShouldContain(
+            "registered = named in a source-level container registration " +
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
+            "registrations made by assembly scanning, factory internals, or framework defaults are not seen.");
+        // The rendered law keeps its qualified subject head — never a false bare "Types, …".
+        block.ShouldContain(
+            "Singleton-registered types must not inject scoped-registered types or transient-registered types.");
+    }
+
     // A single Migrate-rule spec — no layers, no Enforce rules — for the Migrations-section pins.
     private sealed class PolicySpec(MigrationPolicy policy) : IArchitectureSpec
     {
@@ -388,6 +449,40 @@ public class AgentContextRendererTests
                 .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
                 .Because("Web reaches billing only through the facade.")
                 .Fix("Inject IBillingFacade instead of newing up billing types.");
+        }
+    }
+
+    // A MustNotInject verb over a plain type — triggers the inject clause but no Registered line.
+    private sealed class InjectRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-inject-clock")
+                .Enforce(arch.Types.MustNotInject(typeof(DateTime)))
+                .Because("Services are DI-injected; direct dependencies bypass the container.");
+        }
+    }
+
+    // A Registered noun on a non-inject verb — triggers the registered line but no inject clause.
+    private sealed class RegisteredNounRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/registered-no-clock")
+                .Enforce(arch.Registered(Lifetime.Singleton).MustNotReference(typeof(DateTime)))
+                .Because("Singletons must not read the wall clock.");
+        }
+    }
+
+    // The captive-dependency flagship — both gates fire, and the qualified subject head survives.
+    private sealed class CaptiveDependencySpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("di/no-captive-dependencies")
+                .Enforce(arch.Registered(Lifetime.Singleton)
+                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
+                .Because("Singletons capturing scoped/transient services leak state across scopes.");
         }
     }
 }

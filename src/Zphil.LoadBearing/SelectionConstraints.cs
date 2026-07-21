@@ -104,6 +104,24 @@ public static class SelectionConstraints
         return new MustNotConstructConstraint(subject, WrappedTypes(subject, first, more));
     }
 
+    /// <summary>
+    ///     The subject must not inject any of the targets — a source-level constructor-parameter dependency,
+    ///     primary constructors included (GRAMMAR §5.3, §4.7). Injection-ness lives in the verb, so ordinary
+    ///     selections name what may not be injected; the natural operands are the registration-fact selections
+    ///     (<c>arch.Registered(Lifetime.Scoped)</c>), though any selection works. There is no expression
+    ///     overload (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotInject(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotInjectConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not inject any of the targets (type sugar).</summary>
+    public static Constraint MustNotInject(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotInjectConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
     /// <summary>The subject must reside in a namespace glob.</summary>
     public static Constraint MustResideInNamespace(this Selection subject, string glob)
     {
