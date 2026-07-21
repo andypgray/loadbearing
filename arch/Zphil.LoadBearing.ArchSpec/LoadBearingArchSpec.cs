@@ -44,7 +44,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                     .Except(arch.Types.WithNameMatching("SystemEnvironment"))
                     .MustNotReference(typeof(Environment)))
             .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +
-                     "process state (tracked in EVALUATION.md).")
+                     "process state.")
             .Fix("Inject IEnvironment (see SystemEnvironment); read via GetVariable.");
 
         arch.Scope("roslyn/msbuild-bootstrap")
