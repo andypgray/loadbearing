@@ -30,5 +30,5 @@ Thumbs.db
 .mcp.json
 CLAUDE.md
 
-## Internal design docs — kept locally, not published (GRAMMAR.md may be added later)
+## Internal design docs — kept locally, not published (GRAMMAR.md is tracked at the repo root)
 docs/
