@@ -1,10 +1,9 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A type in the extracted codebase model — the enforcement substrate's node (Phase 2). It
-///     implements <see cref="ITypeInfo" /> so the Phase 1 escape-hatch predicate contract and this
-///     Roslyn-derived data are the same surface; the checker (Phase 3) can therefore be pure Core
-///     logic over these nodes.
+///     A type in the extracted codebase model — the enforcement substrate's node. It implements
+///     <see cref="ITypeInfo" /> so the escape-hatch predicate contract and this Roslyn-derived data
+///     are the same surface; the checker can therefore be pure Core logic over these nodes.
 /// </summary>
 /// <remarks>
 ///     Nodes are minted shallow (identity only) and filled via internal setters during model

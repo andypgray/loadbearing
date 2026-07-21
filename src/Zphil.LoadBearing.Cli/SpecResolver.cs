@@ -9,7 +9,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     workspace. <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em>
 ///     the output paths of its direct project references: a spec project references the contract library as a
 ///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
-///     convention must see both (the Phase 8 derive walk caught the P2P blind spot).
+///     convention must see both (the derive walk caught the P2P blind spot).
 /// </summary>
 internal sealed record SpecProjectCandidate(string Name, IReadOnlyList<string> ReferencePaths, string? OutputFilePath);
 
@@ -20,7 +20,7 @@ internal sealed record SpecProjectCandidate(string Name, IReadOnlyList<string> R
 internal sealed record SpecResolution(string DllPath, string? ExcludeProjectName);
 
 /// <summary>
-///     Resolves which spec DLL to load (ratified decision 1, DESIGN.md §13(b) CLI half). The CLI
+///     Resolves which spec DLL to load. The CLI
 ///     never builds: <c>--spec</c> takes a prebuilt DLL or a solution-member csproj (resolved to its
 ///     output DLL); with no <c>--spec</c>, the convention picks the unique solution project that
 ///     references <c>Zphil.LoadBearing.dll</c>. Every failure is a loud <see cref="UserErrorException" />;
@@ -38,7 +38,7 @@ internal static class SpecResolver
     }
 
     /// <summary>
-    ///     The workspace-free half of resolution (R4): a built-DLL <c>--spec</c> resolves directly,
+    ///     The workspace-free half of resolution: a built-DLL <c>--spec</c> resolves directly,
     ///     because that branch never touches the <see cref="Solution" />. Returns null when resolution
     ///     needs the workspace — the convention default (no <c>--spec</c>) and a solution-member csproj.
     ///     A DLL path that does not exist is still a loud error. This is what lets <c>explain</c> run

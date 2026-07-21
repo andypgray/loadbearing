@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Where a layer's "local rules" context card lands (Phase X3): the layer name, the anchored
+///     Where a layer's "local rules" context card lands: the layer name, the anchored
 ///     Enforce/Migrate rules whose subject noun head is that layer (in model order — the
 ///     <see cref="AgentContextRenderer.LayerCard" /> source), and either the resolved
 ///     <see cref="DirectoryPath" /> — the deepest common ancestor of the layer's types' declaration

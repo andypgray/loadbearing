@@ -5,8 +5,8 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 
 /// <summary>
 ///     A collectible <see cref="AssemblyLoadContext" /> that isolates a prebuilt spec DLL — the
-///     host-side half of DESIGN.md open question (b), now living in the CLI (Phase 3; it started in
-///     the test project). The type-identity fix is the shared-contract short-circuit:
+///     host-side half of loading a spec in isolation, now living in the CLI (it started in the
+///     test project). The type-identity fix is the shared-contract short-circuit:
 ///     <c>Zphil.LoadBearing</c> resolves from the Default context so <c>spec is IArchitectureSpec</c>
 ///     holds across the boundary; everything else resolves through the dependency resolver.
 /// </summary>

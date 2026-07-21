@@ -9,7 +9,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     Freeze containment semantics (DESIGN.md §5, GRAMMAR §7): the desugared <c>{id}/containment</c>
+///     Freeze containment semantics (GRAMMAR §7): the desugared <c>{id}/containment</c>
 ///     rule evaluated as an ordinary ratcheted rule. Over <c>Sources.Containment</c> —
 ///     <c>App.Client.User</c> references the interior (<c>Internal</c>, red) and the facade
 ///     (<c>IFacade</c>, sanctioned green). Uncaptured is a wall of red; a grandfathered inbound edge

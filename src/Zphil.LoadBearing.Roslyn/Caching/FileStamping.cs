@@ -4,8 +4,8 @@ using System.Security.Cryptography;
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
-///     The pure file-stamping primitives shared by the twin structure-keyed cache stores — the Phase 11
-///     <see cref="ExtractionCacheStore" /> and the Phase 12
+///     The pure file-stamping primitives shared by the twin structure-keyed cache stores — the
+///     <see cref="ExtractionCacheStore" /> and the
 ///     <see cref="Zphil.LoadBearing.Roslyn.Replay.BinlogCaptureStore" />. Both persist a
 ///     <see cref="FileStamp" /> per structural input and validate it against disk the same way: stat first,
 ///     and re-hash only when the stat moved (a bare mtime touch on unchanged bytes must not invalidate).

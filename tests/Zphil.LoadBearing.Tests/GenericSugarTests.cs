@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Tests.Checking;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     Generic-type sugar (GRAMMAR §5.2/§5.3, Phase 15): <c>arch.Type&lt;T&gt;()</c>, the
+///     Generic-type sugar (GRAMMAR §5.2/§5.3): <c>arch.Type&lt;T&gt;()</c>, the
 ///     <c>Implementing</c>/<c>DerivedFrom</c>/<c>AttributedWith</c> adjective twins, and the
 ///     <c>MustImplement</c>/<c>MustDeriveFrom</c>/<c>MustBeAttributedWith</c> constraint twins each reify
 ///     identically to their <c>typeof</c> counterpart — the model is the sole source of prose, so identical

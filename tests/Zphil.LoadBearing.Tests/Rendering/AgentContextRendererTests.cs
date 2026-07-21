@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     Golden pins for the agent-context composition (R2): the full root block for the canonical
+///     Golden pins for the agent-context composition: the full root block for the canonical
 ///     sample (module map + the four Enforce laws + Migrations + the Frozen scopes section, and the
 ///     §4.1 glossary line once), the no-layer single-rule root block (the dogfood shape), and the
 ///     canonical <c>legacy/billing</c> scope card (containment law + rationale + dragons prose +
@@ -299,7 +299,7 @@ public class AgentContextRendererTests
     }
 
     // A no-layer, single Enforce-rule spec — the dogfood shape. Fix is present but never renders
-    // into the always-on block (progressive disclosure, R2).
+    // into the always-on block (progressive disclosure).
     private sealed class DogfoodShapeSpec : IArchitectureSpec
     {
         public void Define(Arch arch)

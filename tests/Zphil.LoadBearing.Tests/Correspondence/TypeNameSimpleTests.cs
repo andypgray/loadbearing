@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Tests.Correspondence;
 
 /// <summary>
 ///     <see cref="TypeName.Simple" /> — the unqualified, generic-aware display name used in prose (GRAMMAR
-///     §5–6). L5: the leaf of a nested generic chain owns only the type parameters it introduces, so
+///     §5–6). The leaf of a nested generic chain owns only the type parameters it introduces, so
 ///     <c>Simple</c> must distribute arity the way <c>FullDisplay</c> does (via <c>IntroducedArity</c>)
 ///     rather than emit the whole <c>GetGenericArguments()</c> list against the leaf name.
 /// </summary>

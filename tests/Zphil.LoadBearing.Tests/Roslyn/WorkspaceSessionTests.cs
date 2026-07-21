@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// <summary>
 ///     Workspace-tier tests for <see cref="WorkspaceSession" /> — the warm, per-call-reconciling solution
 ///     host. Each test runs against its own restored temp copy of the MyApp fixture (mutating disk between
-///     calls), mirroring roz's <c>ExternalEditReconcileTests</c>/lifecycle suites. Serialized with the rest
+///     calls), exercising external-edit reconciliation and lifecycle. Serialized with the rest
 ///     of the workspace-loading suites: every case opens a real <c>MSBuildWorkspace</c>.
 /// </summary>
 [Collection("Serial")]
@@ -52,7 +52,7 @@ public sealed class WorkspaceSessionTests
     public async Task GetCurrentAsync_NoChange_ReturnsSameSnapshotAndReadsNothing()
     {
         // Arrange — load, then promote every document past the racy window with one warmup sweep, so the
-        // measured sweep is a pure O(stat) no-op (roz's steady-state pattern).
+        // measured sweep is a pure O(stat) no-op (the steady-state case).
         CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
@@ -140,7 +140,7 @@ public sealed class WorkspaceSessionTests
     public async Task GetCurrentAsync_ExcludedStrayInCone_NeverReloadsAndStaysOutOfModel()
     {
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
-        // disk but is never compiled. Before the H1 fix the cone scan compared the disk against the COMPILED
+        // disk but is never compiled. Before the fix the cone scan compared the disk against the COMPILED
         // document set, so this stray read as a perpetual add and forced a full reload on every single call.
         CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();

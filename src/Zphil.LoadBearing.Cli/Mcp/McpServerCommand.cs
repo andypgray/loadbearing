@@ -13,7 +13,7 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 
 /// <summary>
 ///     The <c>loadbearing mcp</c> entry point: a stdio MCP server bound to one solution + spec, exposing
-///     the <c>arch_*</c> tools (DESIGN.md §8 — thin shells over the same runners the CLI commands use).
+///     the <c>arch_*</c> tools (thin shells over the same runners the CLI commands use).
 ///     A human who runs it at a terminal gets a hint and exit 2 rather than a hung silent server; a real
 ///     MCP client over piped stdio gets the file logger, the orphan-server watchdogs, MSBuild
 ///     registration (JIT-quarantined behind <see cref="EnsureMsBuildRegistered" />), and the host.
@@ -85,7 +85,7 @@ internal static class McpServerCommand
     ///     Registers the warm-workspace services shared by the production server and the in-process test
     ///     harness, so the two compose the same graph: the long-lived <see cref="WorkspaceSession" /> (its
     ///     reconcile log routed to the host logger), the session-scoped <see cref="SessionFragmentStore" />
-    ///     that reuses clean projects' fragments across tool calls (Phase 12 D2), and the
+    ///     that reuses clean projects' fragments across tool calls, and the
     ///     <see cref="ISolutionSource" /> the tools acquire the solution through. The source is warm by
     ///     default — one session reconciled per call across the server's lifetime, one store paired with it —
     ///     unless <see cref="DisableWarmWorkspaceVariable" /> is <c>true</c>, which resolves the cold one-shot

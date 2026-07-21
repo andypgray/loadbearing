@@ -152,7 +152,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     [Fact]
     public void ExtractFromSolutionAsync_InvoiceControllerToDataTable_PinsGrandfatheredMigrateEdge()
     {
-        // The site the Migrate baseline grandfathers: InvoiceController's inline DataTable (Phase 5).
+        // The site the Migrate baseline grandfathers: InvoiceController's inline DataTable.
         ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.InvoiceController", "System.Data.DataTable");
 
         edge.Target.IsExternal.ShouldBeTrue();
@@ -172,7 +172,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     [Fact]
     public void ExtractFromSolutionAsync_HomeControllerClockReads_PinNewMemberUseEdgesAndDateTimeTypeEdge()
     {
-        // The Phase 13 member-use fixture edit (GRAMMAR §4.5): HomeController's two ambient-clock reads fold to
+        // The member-use fixture edit (GRAMMAR §4.5): HomeController's two ambient-clock reads fold to
         // P: member edges on the new external System.DateTime at the appended lines — the rows time/inject-clock
         // bans. The parallel type edge to System.DateTime (return types + the reads) is the new external node.
         fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.Now").Lines().ShouldBe([32]);
@@ -189,7 +189,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         // The member inventory (GRAMMAR §4.6) on the real workspace: the nine declared members (the implicit
         // default constructor excluded), ordered ordinal by SymbolId. Return/member types are definition-level
         // FQNs, accessibility carries through (the private field included), and each member's DeclaringType is
-        // the SAME node instance held by model.Types. The three Task-returning methods (Phase 14) are the
+        // the SAME node instance held by model.Types. The three Task-returning methods are the
         // naming/async-suffix subject universe — Load returns Task<int> (a definition-level Task`1).
         TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
 

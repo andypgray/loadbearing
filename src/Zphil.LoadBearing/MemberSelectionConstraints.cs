@@ -69,8 +69,8 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     The member constraint-position escape hatch. The predicate is stored, never evaluated in
-    ///     this phase; the required <paramref name="description" /> completes "must …". A blank
+    ///     The member constraint-position escape hatch. The predicate is stored, never evaluated at
+    ///     spec build; the required <paramref name="description" /> completes "must …". A blank
     ///     description fails spec build (validation §8 item 5).
     /// </summary>
     public static Constraint Must(this MemberSelection subject, Func<IMemberInfo, bool> predicate, string description)

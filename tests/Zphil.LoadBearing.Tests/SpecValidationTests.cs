@@ -463,7 +463,7 @@ public class SpecValidationTests
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidExpressionMemberSpec()));
     }
 
-    // Verb-position poison parity (Phase 16): the same unresolvable-anchor diagnostics the anchor-position
+    // Verb-position poison parity: the same unresolvable-anchor diagnostics the anchor-position
     // twins pin (above) fire when the poisoned lambda is passed bare to MustNotUse's static forms, because
     // the verb desugars each target through the identical MemberExpressionResolver. Six of the eight poison
     // classes are reachable from the static forms; the two instance-form steers have no static-verb spelling.
@@ -1041,7 +1041,7 @@ public class SpecValidationTests
         }
     }
 
-    // Phase 17 — spec-source locations (caller-info diagnostics). These are appended at the end of the class
+    // Spec-source locations (caller-info diagnostics). These are appended at the end of the class
     // so the existing failing-spec fixtures above keep their authored line numbers, which the re-pinned
     // messages encode (the file:line maintenance contract, same as violation goldens).
     [Fact]
@@ -1235,7 +1235,7 @@ public class SpecValidationTests
         }
     }
 
-    // Phase 18 WP1 — MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb
+    // MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb
     // walk hook, like the reference verbs), so the existing §8 item 10 foreign-selection walk
     // (ConstraintSelections → CheckForeign) reaches a construct target minted on another Arch with no new
     // validator arm. Appended at the very end so every caller-info golden above keeps its authored line number

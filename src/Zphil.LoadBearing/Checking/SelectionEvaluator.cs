@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Checking;
 /// <summary>
 ///     Resolves a <see cref="Selection" /> to the set of <see cref="TypeNode" />s it names, given its
 ///     <see cref="SelectionPosition" /> (GRAMMAR §4.1, §5.1–§5.2). Nouns pick the candidate set;
-///     adjectives narrow it; <c>Except</c> subtracts; the hierarchy adjectives read the Phase 3
+///     adjectives narrow it; <c>Except</c> subtracts; the hierarchy adjectives read the
 ///     construction lists (open definition matches <see cref="TypeConstruction.Definition" />, a
 ///     closed construction matches <see cref="TypeConstruction.FullName" />). External nodes carry
 ///     empty construction lists, so hierarchy adjectives never match them (documented boundary).

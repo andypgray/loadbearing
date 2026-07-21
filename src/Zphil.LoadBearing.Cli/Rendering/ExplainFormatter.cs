@@ -1,12 +1,12 @@
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     Formats one rule as the <c>explain</c> field dump (R4): a <c>&lt;id&gt; (&lt;posture&gt;)</c>
+///     Formats one rule as the <c>explain</c> field dump: a <c>&lt;id&gt; (&lt;posture&gt;)</c>
 ///     header — the posture carries the Freeze role, e.g. <c>(freeze/containment)</c> — then each
 ///     present field once under check's lowercase-label style (<c>sentence:</c> / <c>because:</c> /
-///     <c>fix:</c>) plus the posture payload. This is a data dump, not the Phase 5/6 voice templates:
+///     <c>fix:</c>) plus the posture payload. This is a data dump, not the voice templates:
 ///     <c>dragons:</c> and <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path
-///     only (the spec stays the index — DESIGN.md §6). Emitted line by line to match the check renderer.
+///     only (the spec stays the index). Emitted line by line to match the check renderer.
 /// </summary>
 internal static class ExplainFormatter
 {

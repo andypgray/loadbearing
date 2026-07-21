@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
-///     The Phase 3 construction-preserving hierarchy facts over the fast path:
+///     The construction-preserving hierarchy facts over the fast path:
 ///     <see cref="TypeNode.AllInterfaces" /> (transitive, substituted closure),
 ///     <see cref="TypeNode.BaseTypeChain" /> (nearest-first, object terminus), and
 ///     <see cref="TypeNode.AttributeConstructions" /> (declared only). Definition-vs-constructed

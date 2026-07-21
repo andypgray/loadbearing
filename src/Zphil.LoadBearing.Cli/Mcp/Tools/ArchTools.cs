@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 
 /// <summary>
-///     The MCP tool surface (DESIGN.md §10): the five <c>arch_*</c> tools, each a thin shell that runs the
+///     The MCP tool surface: the five <c>arch_*</c> tools, each a thin shell that runs the
 ///     same internal runner its CLI verb uses against the bound solution + spec, captures stdout into a
 ///     <see cref="StringWriter" />, and returns the text — so CLI and MCP output are identical by
 ///     construction (pinned by <c>CliMcpParityTests</c>). Violations are data, never tool errors. Tool
@@ -62,7 +62,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // document's workspaceDiagnostics, so the error writer is discarded. NoCache: the warm workspace and
         // the persisted cache keep independent lifetimes — a tool call never reads or writes the cache file.
         // Binlog null: the warm path never uses the build capture (latency-critical callers ride the session).
-        // AllowWorkspaceDiagnostics false: the M1 gate would fire on a load failure, but it writes only to the
+        // AllowWorkspaceDiagnostics false: the fail-closed gate would fire on a load failure, but it writes only to the
         // discarded error writer and returns an ignored exit code — it cannot touch the JSON this tool returns.
         await new CheckRunner(output, TextWriter.Null, source).RunAsync(
             new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, false),

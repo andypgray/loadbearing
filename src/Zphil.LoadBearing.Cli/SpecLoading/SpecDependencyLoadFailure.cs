@@ -3,7 +3,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.SpecLoading;
 
 /// <summary>
-///     Maps finding F1's shape — a spec that <c>typeof()</c>s a NuGet-packaged type whose assembly a
+///     Maps a common spec-load failure — a spec that <c>typeof()</c>s a NuGet-packaged type whose assembly a
 ///     plain framework-dependent class-library build never stages into <c>bin</c>, so JIT-compiling
 ///     <c>Define()</c> throws <see cref="FileNotFoundException" /> for the missing package — into an
 ///     actionable <see cref="UserErrorException" /> naming the spec, the unresolved dependency, the

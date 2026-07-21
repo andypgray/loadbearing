@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
-///     Top-level statements (a synthesized <c>Program</c> entry point) on the extraction fast path
-///     (post-review L6). The investigation hypothesis — that the synthesized <c>Program</c> never enters
+///     Top-level statements (a synthesized <c>Program</c> entry point) on the extraction fast path.
+///     The investigation hypothesis — that the synthesized <c>Program</c> never enters
 ///     extraction because <c>FragmentExtractor.Declare</c> drops implicitly-declared types — is
 ///     <em>disconfirmed</em> on this Roslyn: the simple-program <c>Program</c> is NOT implicitly declared,
 ///     so it is admitted like any solution type, its top-level-statement references bind to it, and the
@@ -71,7 +71,7 @@ public sealed class TopLevelProgramExtractionTests
     [Fact]
     public void TopLevelStatements_SynthesizedProgram_HasEmptyDeclarationSites()
     {
-        // Current (L6-flagged) behavior, pinned so a future change is deliberate: Program's declaring syntax
+        // Current behavior, pinned so a future change is deliberate: Program's declaring syntax
         // is the CompilationUnitSyntax, which carries no type identifier, so no declaration site is recorded
         // (unlike the synthesized <Main>$ member, which falls back to the compilation-unit location). The
         // hypothesized fix was not applied — Program already extracts, and re-siting it would perturb the

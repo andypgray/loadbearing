@@ -9,7 +9,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     End-to-end tests for the persisted extraction cache (Phase 11 D2) — the CLI wiring that makes a
+///     End-to-end tests for the persisted extraction cache — the CLI wiring that makes a
 ///     clean-tree <c>check</c> skip MSBuild entirely. Each test drives the real runners over an injected
 ///     counting <see cref="ISolutionSource" /> and a <see cref="FakeEnvironment" /> pointing the cache root
 ///     at a private temp directory, so a run's <see cref="CodebaseSource" /> outcome, the set of projects it
@@ -120,7 +120,7 @@ public sealed class CheckCacheE2ETests
     // (which extracts all projects and merges minus the arch-spec project), so it is covered there. A
     // full-repo hit was once impossible to assert end-to-end because this repo's test project embeds
     // non-compiled fixture sources under its own directory, and the store's cone scan read them as perpetual
-    // adds; the H1 fix (cone-adds recorded identically at capture and validation) cures that, but these
+    // adds; the fix (cone-adds recorded identically at capture and validation) cures that, but these
     // targeted cases stay the right level to pin the spec-replay path without a whole-repo build.
 
     [Fact]

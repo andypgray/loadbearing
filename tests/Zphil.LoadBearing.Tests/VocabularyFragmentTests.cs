@@ -6,8 +6,8 @@ using Zphil.LoadBearing.Tests.Stubs;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     One authored sentence per modal verb the canonical sample does not exercise (plan
-///     Deliverable 2 coverage pins). Constraints are rendered directly through the internal
+///     One authored sentence per modal verb the canonical sample does not exercise (the
+///     vocabulary coverage pins). Constraints are rendered directly through the internal
 ///     renderer. The <see cref="Arch" /> is a fresh throwaway — these pins render fragments, they
 ///     do not build a full model.
 /// </summary>

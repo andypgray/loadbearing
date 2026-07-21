@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Tests.Checking.Targets;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     The Migrate ratchet (DESIGN.md §5, Phase 5): a Migrate rule evaluates like Enforce, then its
+///     The Migrate ratchet: a Migrate rule evaluates like Enforce, then its
 ///     violations are partitioned against a baseline keyed by stable symbol IDs (GRAMMAR §4.3). In the
 ///     baseline = grandfathered (pass); not in it — including new code in the old pattern and a new
 ///     forbidden target from a grandfathered source — = red. <c>EmptySubject</c>/<c>RuleError</c> are

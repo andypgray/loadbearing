@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     An assembly-shared, lazily-built binlog of a private restored copy of the MyApp fixture — the
-///     substrate for the Phase 12 binlog-replay tests. Producing a binlog needs a real
+///     substrate for the binlog-replay tests. Producing a binlog needs a real
 ///     <c>dotnet build -bl</c>, which costs seconds, so the copy → restore → build runs at most once per
 ///     test run behind a static <see cref="Lazy{T}" /> and every test reads the same
 ///     <see cref="SolutionPath" /> / <see cref="BinlogPath" />.

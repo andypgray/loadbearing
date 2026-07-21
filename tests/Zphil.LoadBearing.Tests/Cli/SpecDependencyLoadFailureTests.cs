@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     Finding F1's papercut mapping, unit-tested without a workspace: an assembly-load
+///     The spec-dependency load-failure mapping, unit-tested without a workspace: an assembly-load
 ///     <see cref="FileNotFoundException" /> (its FileName carries a full assembly identity) becomes the
 ///     pinned three-line actionable <see cref="UserErrorException" /> with the original attached, while a
 ///     FileName that is a plain path or absent is not treated as an assembly-load failure.

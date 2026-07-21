@@ -168,7 +168,7 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_ClosedGenericMemberAnchor_FailsWithRuleErrorRefusal()
     {
-        // WP1's spec-build typo guard normalizes typeof(Task<int>) to the definition and passes, so the
+        // The spec-build typo guard normalizes typeof(Task<int>) to the definition and passes, so the
         // closed construction legitimately reaches the checker, which refuses it (member edges are
         // definition-level, GRAMMAR §4.5).
         RuleResult result = Checker.Run(SceneModel, arch =>

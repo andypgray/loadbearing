@@ -24,8 +24,8 @@ internal static class ResponseTruncator
     /// <summary>
     ///     Returns <paramref name="text" /> unchanged when it fits within <paramref name="maxChars" />;
     ///     otherwise returns a truncated copy with a "RESPONSE TRUNCATED" footer. The
-    ///     <paramref name="toolName" /> parameter is retained for signature parity with the donor and a
-    ///     future per-tool narrowing hint; the <c>arch_*</c> tools have no such hint today.
+    ///     <paramref name="toolName" /> parameter is retained so the signature can carry a future
+    ///     per-tool narrowing hint; the <c>arch_*</c> tools have no such hint today.
     /// </summary>
     public static string TruncateIfNeeded(string text, string? toolName, int maxChars)
     {

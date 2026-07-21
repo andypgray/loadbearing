@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// <summary>
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
-///     unexpected-error, truncated success, unknown-parameter guard — end to end (Phase 7 acceptance box
+///     unexpected-error, truncated success, unknown-parameter guard — end to end (acceptance box
 ///     2). Every row rides the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
 ///     workspace), so the whole stack is proven in milliseconds. Serialized with the watchdog suites: the
 ///     filter brackets each call with the shared <see cref="Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />

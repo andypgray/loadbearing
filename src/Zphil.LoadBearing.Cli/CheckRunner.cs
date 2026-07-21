@@ -14,7 +14,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     fails closed with exit 2 unless <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed —
 ///     a rule that "passes" only because a project did not load is worse than no answer. The gate keys
 ///     strictly on the workspace-load diagnostics (<see cref="CodebaseSource.Diagnostics" />); the advisory
-///     merge notes (<see cref="CodebaseSource.MergeNotes" />, M2) render into the same diagnostics stream
+///     merge notes (<see cref="CodebaseSource.MergeNotes" />) render into the same diagnostics stream
 ///     but never gate. Expected failures surface as <see cref="UserErrorException" />; the top-level handler
 ///     maps them to exit 2. Output/error writers are injected so the in-process e2e tests can capture them,
 ///     and the <see cref="IEnvironment" /> seam supplies the cache-root override.

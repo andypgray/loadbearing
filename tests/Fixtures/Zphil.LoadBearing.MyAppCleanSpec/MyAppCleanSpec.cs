@@ -5,7 +5,7 @@ namespace Zphil.LoadBearing.MyAppCleanSpec;
 ///     reference Web (it doesn't), interfaces under <c>MyApp.*</c> are I-prefixed (they are —
 ///     <c>IHandler</c>, <c>IBillingFacade</c>), and the Migrate rule's two <c>DataTable</c> sites
 ///     (Home + Invoice) are <em>fully grandfathered</em> by <c>arch/clean-baseline.json</c> — so a
-///     ratcheted rule with all debt captured still passes (Phase 5 acceptance).
+///     ratcheted rule with all debt captured still passes.
 /// </summary>
 public sealed class MyAppCleanSpec : IArchitectureSpec
 {

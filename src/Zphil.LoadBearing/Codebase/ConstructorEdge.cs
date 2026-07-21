@@ -3,10 +3,10 @@ namespace Zphil.LoadBearing.Codebase;
 /// <summary>
 ///     A directed construction edge <c>Source → Constructed</c>: <see cref="Source" />'s declaration source
 ///     directly creates <see cref="Constructed" /> with an object-creation expression — explicit
-///     <c>new Foo()</c> or target-typed <c>new()</c> (GRAMMAR §4.5; the construction-edge semantics ratified
-///     for Phase 18). Constructed generics normalize to their open definition (§4.1), so <c>new Box&lt;int&gt;()</c>
-///     records an edge to <c>Box&lt;&gt;</c>. <see cref="Sites" /> lists the distinct <c>file:line</c> positions
-///     where the construction occurs, deduped by (file, line).
+///     <c>new Foo()</c> or target-typed <c>new()</c> (GRAMMAR §4.5). Constructed generics normalize to
+///     their open definition (§4.1), so <c>new Box&lt;int&gt;()</c> records an edge to <c>Box&lt;&gt;</c>.
+///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions where the construction occurs,
+///     deduped by (file, line).
 /// </summary>
 /// <remarks>
 ///     <see cref="Source" /> and <see cref="Constructed" /> are the same <see cref="TypeNode" /> instances

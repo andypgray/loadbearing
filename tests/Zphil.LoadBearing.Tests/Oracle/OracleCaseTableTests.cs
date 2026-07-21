@@ -10,7 +10,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Oracle;
 
 /// <summary>
-///     The differential-testing oracle (Phase 10 Deliverable 1). LoadBearing's checker builds its
+///     The differential-testing oracle. LoadBearing's checker builds its
 ///     dependency model from <em>Roslyn source</em>; ArchUnitNET builds its model from <em>compiled IL</em>
 ///     (Mono.Cecil). Each row below expresses the same architecture rule on both substrates over the same
 ///     <c>MyApp</c> fixture and asserts they reach the <em>same verdict</em> — the set of type FullNames
@@ -22,7 +22,7 @@ namespace Zphil.LoadBearing.Tests.Oracle;
 ///     <para>
 ///         The comparison is deliberately <b>raw-constraint, verdict-level, type granularity</b>. The
 ///         following LoadBearing behaviour is <b>out of oracle scope</b> — a documented boundary, not a
-///         silent omission (PLAN.md "compare raw constraints only"):
+///         silent omission ("compare raw constraints only"):
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
@@ -186,7 +186,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.InvoiceController");
     }
 
-    // Row 8 (Phase 13 member-use, best-effort): the ambient-clock ban at caller-type granularity. LoadBearing's
+    // Row 8 (member-use, best-effort): the ambient-clock ban at caller-type granularity. LoadBearing's
     // MustNotUse(DateTime.Now, DateTime.UtcNow) flags the using TYPE (GRAMMAR §4.5); ArchUnitNET sees the IL
     // getter calls (a property read compiles to get_Now()/get_UtcNow()). ArchUnitNET has no fluent member-call
     // predicate, so its dependency model is queried directly (OracleArchitecture) — same substrate, verdict-level.
@@ -206,7 +206,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
     }
 
-    // Row 9 (Phase 14 member-subject, best-effort): "methods returning Task must be named *Async" at
+    // Row 9 (member-subject, best-effort): "methods returning Task must be named *Async" at
     // DECLARING-TYPE granularity. LoadBearing's memberShape violation names the offending member (an M: DocId,
     // GRAMMAR §4.6); ArchUnitNET has method members with a ReturnType but no return-type-at-definition fluent
     // predicate, so its model is queried directly (OracleArchitecture) — same substrate, verdict-level, reduced

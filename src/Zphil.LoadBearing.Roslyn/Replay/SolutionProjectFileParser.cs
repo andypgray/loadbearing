@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 /// <summary>
 ///     Reads a solution file's declared <c>.csproj</c> membership <em>textually</em>, with no MSBuild — the
 ///     ground truth <see cref="BinlogCaptureStore" />'s coverage check compares a replayed binlog against, so
-///     it can refuse a binlog that does not build exactly the solution's project set (Phase 12 WP3). Handles
+///     it can refuse a binlog that does not build exactly the solution's project set. Handles
 ///     both the classic <c>.sln</c> and the XML <c>.slnx</c> format; non-<c>.csproj</c> entries (solution
 ///     folders, shared projects, database projects) are ignored, and both slash spellings resolve.
 /// </summary>

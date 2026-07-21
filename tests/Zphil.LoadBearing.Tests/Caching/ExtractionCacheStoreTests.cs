@@ -54,7 +54,7 @@ public sealed class ExtractionCacheStoreTests
     public void ReadAndValidate_ExcludedStrayInCone_StillHits()
     {
         // Arrange — a *.cs on disk in the project cone but not among the project's documents (a <Compile
-        // Remove> file). This is the H1 defect: CaptureFingerprint recorded adds=[] while validation's cone
+        // Remove> file). This is the cone-stray defect: CaptureFingerprint recorded adds=[] while validation's cone
         // scan reads the stray as an add, so the project's content key never matched and it validated dirty
         // forever. Capture now computes adds the same way, so the stray lands in both and cancels.
         using var solution = new SyntheticSolution();

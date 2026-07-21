@@ -22,7 +22,7 @@
         <PackageReference Include="coverlet.collector" Version="10.0.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.0" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
-        <!-- Differential-testing oracle (Phase 10): the ArchUnitNET core builds a rival architecture
+        <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture
              model from compiled MyApp IL (Mono.Cecil), cross-checking LoadBearing's Roslyn-source model. -->
         <PackageReference Include="TngTech.ArchUnitNET" Version="0.13.3" />
         <PackageReference Include="xunit.v3" Version="3.2.2" />
@@ -76,7 +76,7 @@
     </ItemGroup>
 
     <!-- The MyApp fixture solution's three projects, pulled into the build graph so their IL exists for
-         the ArchUnitNET oracle (Part A, Phase 10). Same discipline as the spec fixtures above:
+         the ArchUnitNET oracle. Same discipline as the spec fixtures above:
          ReferenceOutputAssembly=false keeps MyApp types invisible to compilation (the tests can't see
          them by CLR identity — the oracle stub stands in), and Private=false keeps their DLLs out of the
          tests output copy (the oracle loads them by baked path). Each carries a distinct OutputItemType so
@@ -147,7 +147,7 @@
         </ItemGroup>
     </Target>
 
-    <!-- Test fixtures (e.g. the Phase 2 fixture solutions) are copied to output, not compiled.
+    <!-- Test fixtures (e.g. the fixture solutions) are copied to output, not compiled.
          An empty Fixtures glob is not an error, so this stays safe while no fixtures exist. -->
     <ItemGroup>
         <Compile Remove="Fixtures/**/*.cs" />

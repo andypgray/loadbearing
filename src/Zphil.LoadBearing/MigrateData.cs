@@ -1,9 +1,9 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The Migrate-specific payload of an <see cref="ArchRule" /> (DESIGN.md §5): the descriptive
+///     The Migrate-specific payload of an <see cref="ArchRule" />: the descriptive
 ///     current state, the prescriptive target sentence, the grandfather baseline, and the
-///     boy-scout policy. Reified in Phase 1; evaluated in Phase 5.
+///     boy-scout policy.
 /// </summary>
 public sealed class MigrateData
 {

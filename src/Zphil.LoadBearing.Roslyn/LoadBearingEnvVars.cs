@@ -1,8 +1,8 @@
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     The environment variables the Roslyn layer reads. Names only in Phase 2; the richer
-///     inventory and env seam arrive with the CLI/MCP phases.
+///     The environment variables the Roslyn layer reads. Names only; the richer
+///     inventory and env seam arrive with the CLI/MCP layers.
 /// </summary>
 internal static class LoadBearingEnvVars
 {

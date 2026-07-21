@@ -7,10 +7,10 @@ using Zphil.LoadBearing.Discovery;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     The end-to-end spec-loading proof (plan Deliverable 3): load the fixture DLL — built by a
+///     The end-to-end spec-loading proof: load the fixture DLL — built by a
 ///     separate csproj with no compile-time visibility here — in an isolated ALC, discover its spec
 ///     by reflection, assert type identity across the boundary, build the model, and enumerate a
-///     known rule. The ALC now lives in the CLI (Phase 3); this test re-targets it. The fixture's
+///     known rule. The ALC now lives in the CLI; this test re-targets it. The fixture's
 ///     path is baked into this assembly's metadata by the build.
 /// </summary>
 public class SpecLoadingTests

@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     The shared directory-collapse arithmetic for scoped context placement (R3): given the
+///     The shared directory-collapse arithmetic for scoped context placement: given the
 ///     declaration-site file paths of a selection's types, pick their
 ///     <em>
 ///         deepest common ancestor
@@ -16,7 +16,7 @@ internal static class DirectoryPlacement
 {
     // The deepest directory that contains every declaration site: the longest common prefix of the
     // sites' directory segments, compared Ordinal (all paths come from one extraction pass, so casing
-    // is consistent — no OS-conditional comparer, per the R3 gotcha). The prefix is reconstructed from
+    // is consistent — no OS-conditional comparer needed). The prefix is reconstructed from
     // the first path so its original root and separators survive verbatim.
     internal static string DeepestCommonDirectory(IReadOnlyList<string> filePaths)
     {

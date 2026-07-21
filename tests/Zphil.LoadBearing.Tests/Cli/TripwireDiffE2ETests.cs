@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     End-to-end Freeze tripwire against a real git repo (<see cref="TempGitRepo" />, Phase 6
-///     acceptance). <c>check --diff-base HEAD</c> warns for changed files inside the frozen scope and
+///     End-to-end Freeze tripwire against a real git repo (<see cref="TempGitRepo" />).
+///     <c>check --diff-base HEAD</c> warns for changed files inside the frozen scope and
 ///     never gates on those warnings: an untracked new file in dragon territory (the agent-hook case,
 ///     found via <c>git ls-files --others</c>) warns and exits 0, while a tracked change combined with a
 ///     new interior reference exits 1 — the exit code is containment-driven, the tripwire only warns.

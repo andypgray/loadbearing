@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     The dependabot-style managed block: a marker-delimited region LoadBearing owns inside an
-///     <c>AGENTS.md</c> file, everything outside preserved byte-for-byte (DESIGN.md §9, R1). A pure
+///     <c>AGENTS.md</c> file, everything outside preserved byte-for-byte. A pure
 ///     string function — <c>existing text × LF-internal body → new text</c> — so it is
 ///     netstandard2.0-safe and deterministic; the CLI file adapter layers on BOM/bytes handling and
 ///     wrote/unchanged reporting.
@@ -73,7 +73,7 @@ public static class ManagedBlock
         return StripOneTrailingNewline(region).Replace(Crlf, Lf);
     }
 
-    // The dominant existing ending: CRLF iff a strict majority of newlines are CRLF (R1).
+    // The dominant existing ending: CRLF iff a strict majority of newlines are CRLF.
     private static string DominantNewline(string text)
     {
         var total = 0;

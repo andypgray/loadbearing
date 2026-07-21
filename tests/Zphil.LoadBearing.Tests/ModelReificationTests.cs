@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Tests.Stubs;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     The reified read model (plan Deliverable 1 / acceptance): rule order over the post-desugar
+///     The reified read model (acceptance): rule order over the post-desugar
 ///     set, per-rule posture, Migrate reification and defaults (GRAMMAR §4.4), and Freeze
 ///     desugaring into containment + tripwire with boundary, baseline, dragons, and auto-Fix
 ///     (GRAMMAR §7).
@@ -114,7 +114,7 @@ public class ModelReificationTests
         containment.Constraint.ShouldNotBeNull();
         // Auto-derived fix from the first BoundaryOnlyVia type (GRAMMAR §5.5).
         containment.Fix.ShouldBe("use `IBillingFacade`");
-        // The raw frozen selection rides on the containment child so the renderer can place it (R3).
+        // The raw frozen selection rides on the containment child so the renderer can place it.
         containment.Freeze.Frozen.ShouldNotBeNull();
     }
 

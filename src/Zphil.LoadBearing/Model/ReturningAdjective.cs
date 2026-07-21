@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Model;
 ///     (GRAMMAR §4.6, §5.7). Holds the anchor types in authoring order; the fragment backticks each
 ///     anchor's simple name (generics via declared type-parameter names, so <c>typeof(Task&lt;&gt;)</c>
 ///     renders <c>Task&lt;TResult&gt;</c>) and joins with the no-Oxford-comma reference join. Matching
-///     is definition-level and lands in the checker phase; a closed-generic anchor is refused at spec
+///     is definition-level and happens at check time; a closed-generic anchor is refused at spec
 ///     build (GRAMMAR §8 item 14).
 /// </summary>
 internal sealed class ReturningAdjective(IReadOnlyList<Type> types) : MemberAdjective

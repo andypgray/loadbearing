@@ -3,7 +3,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.Mcp;
 
 /// <summary>
-///     The warm solution source (Phase 11 D1): the host-managed counterpart to
+///     The warm solution source: the host-managed counterpart to
 ///     <see cref="ColdSolutionSource" />. Each <see cref="AcquireAsync" /> discovers the target solution
 ///     exactly as the cold path does — <see cref="ModelPipeline.DiscoverSolution" /> first, so a discovery
 ///     failure surfaces the byte-for-byte same <see cref="Roslyn.UserErrorException" /> a cold run raises —
@@ -14,7 +14,7 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///     workspace's disposal).
 /// </summary>
 /// <remarks>
-///     The handle also carries the session-scoped incremental fragment extractor (Phase 12 D2): a closure
+///     The handle also carries the session-scoped incremental fragment extractor: a closure
 ///     over this call's <paramref name="session" /> snapshot and the shared <see cref="SessionFragmentStore" />
 ///     that reuses clean projects' fragments and re-walks only the dirty ∪ dependent set. The extraction seam
 ///     consults it instead of re-extracting the whole solution on every tool call.

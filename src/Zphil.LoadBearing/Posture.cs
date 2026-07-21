@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A rule's lifecycle posture (DESIGN.md §5). A scope's <c>Freeze</c> is authored on the
+///     A rule's lifecycle posture. A scope's <c>Freeze</c> is authored on the
 ///     surface but desugars into ordinary posture-bearing rule nodes carrying
 ///     <see cref="Freeze" /> (GRAMMAR §7), so checker, renderer, and baseline all walk one model.
 /// </summary>

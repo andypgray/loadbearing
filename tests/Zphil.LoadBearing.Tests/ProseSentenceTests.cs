@@ -4,7 +4,7 @@ using Xunit;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     The five headline sentence pins from the canonical sample (GRAMMAR §12, plan Deliverable 2).
+///     The five headline sentence pins from the canonical sample (GRAMMAR §12).
 ///     These strings are the spec: each is the deterministic law rendered from a reified rule.
 /// </summary>
 public class ProseSentenceTests
@@ -82,7 +82,7 @@ public class ProseSentenceTests
     [Fact]
     public void Enforce_AsyncSuffix_RendersMemberSubjectFlagship()
     {
-        // Phase 14 acceptance box 1: the flagship member-subject rule (GRAMMAR §4.6, §6). The member
+        // Acceptance box 1: the flagship member-subject rule (GRAMMAR §4.6, §6). The member
         // subject is "{kind-plural} of {selection-reference}" + the Returning adjective; single anchor.
         ArchModelBuilder.Build(new AsyncSuffixSpec())
             .Rules.Single(rule => rule.Id == "naming/async-suffix").Sentence
@@ -92,7 +92,7 @@ public class ProseSentenceTests
     [Fact]
     public void MustNotUse_ExpressionMintedMethod_RendersParens()
     {
-        // The no-churn proof (Phase 15): an expression-minted method anchor renders byte-identically to the
+        // The no-churn proof: an expression-minted method anchor renders byte-identically to the
         // typeof form — parens for a method (GRAMMAR §6). The member reifies to the same leaf, so the prose is unchanged.
         ArchModelBuilder.Build(new ExpressionMintedMethodSpec())
             .Rules.Single(rule => rule.Id == "member/no-wait").Sentence
@@ -111,7 +111,7 @@ public class ProseSentenceTests
     [Fact]
     public void MustNotUse_VerbStaticVoidMethod_RendersParens()
     {
-        // The static-form verb sugar (Phase 16): a bare () => GC.Collect() lambda desugars through
+        // The static-form verb sugar: a bare () => GC.Collect() lambda desugars through
         // arch.Member(() => …) to the same method leaf, so the sentence is byte-identical — parens for a method.
         ArchModelBuilder.Build(new VerbStaticMethodSpec())
             .Rules.Single(rule => rule.Id == "member/verb-collect").Sentence
@@ -145,7 +145,7 @@ public class ProseSentenceTests
     }
 
     // The flagship member-subject rule (GRAMMAR §4.6): Web-layer methods returning Task must be *Async.
-    // Single-anchor Enforce form, reconciled with PLAN's literal acceptance sentence.
+    // Single-anchor Enforce form, matching the acceptance sentence verbatim.
     private sealed class AsyncSuffixSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -157,7 +157,7 @@ public class ProseSentenceTests
         }
     }
 
-    // Expression-minted member anchors (Phase 15): the void method form (parens in prose) and the static
+    // Expression-minted member anchors: the void method form (parens in prose) and the static
     // property form (no parens) — each reifies to the same leaf as the typeof form, so the prose is unchanged.
     private sealed class ExpressionMintedMethodSpec : IArchitectureSpec
     {
@@ -179,7 +179,7 @@ public class ProseSentenceTests
         }
     }
 
-    // Static-form verb sugar (Phase 16): the bare () => Type.M lambdas on MustNotUse desugar to the same leaf
+    // Static-form verb sugar: the bare () => Type.M lambdas on MustNotUse desugar to the same leaf
     // as arch.Member(() => …), so the rendered sentence is unchanged — parens for the void method, none for
     // the property.
     private sealed class VerbStaticMethodSpec : IArchitectureSpec

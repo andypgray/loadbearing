@@ -47,7 +47,7 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             <see cref="TypeNode" /> instances held by <see cref="CodebaseModel.Types" />.
 ///         </item>
 ///     </list>
-///     One code path serves cold runs, the fast test path, and (Phase 11 WP6) cache hits, so the cache
+///     One code path serves cold runs, the fast test path, and cache hits, so the cache
 ///     cannot change results by construction.
 /// </summary>
 /// <remarks>

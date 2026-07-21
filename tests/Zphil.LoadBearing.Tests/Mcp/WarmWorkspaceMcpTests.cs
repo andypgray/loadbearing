@@ -12,7 +12,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
-///     The Phase 11 D1 acceptance: with the warm <see cref="WorkspaceSession" /> wired behind the MCP
+///     With the warm <see cref="WorkspaceSession" /> wired behind the MCP
 ///     tools, a server answers many tool calls against one loaded solution, reconciled against disk at each
 ///     call. These tests drive the real <see cref="McpPipelineHarness" /> (the production DI graph, warm by
 ///     default) and assert on the deterministic observables — the session's <c>SweepContentReads</c> /
@@ -134,7 +134,7 @@ public sealed class WarmWorkspaceMcpTests
     public async Task ArchCheck_SteadyStateNoDiskChange_ReadsAndReloadsNothing()
     {
         // Arrange — load, then promote every document past the racy window (backdate + one reconcile) so the
-        // measured steady state is a pure O(stat) no-op (roz's steady-state pattern, driven through the tool).
+        // measured steady state is a pure O(stat) no-op (the steady-state case, driven through the tool).
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);

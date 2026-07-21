@@ -11,7 +11,7 @@ using Zphil.LoadBearing.Roslyn.MsBuild;
 namespace Zphil.LoadBearing.Xunit;
 
 /// <summary>
-///     The xUnit adapter (DESIGN.md §10): derive a sealed test class from
+///     The xUnit adapter: derive a sealed test class from
 ///     <c>ArchRuleTests&lt;YourSpec&gt;</c>, point <see cref="SolutionPath" /> at the solution to check
 ///     (<see cref="FindSolutionUp" /> resolves it by name when the solution is not copied to the test
 ///     output), and every post-desugar rule in the spec becomes its own named test — the rule ID

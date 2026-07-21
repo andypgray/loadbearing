@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Codebase;
 ///     A single source position: an absolute or solution-relative file path and a 1-based line
 ///     number. The agent-facing rendered form is <c>{FilePath}:{Line}</c> (pinned by tests) — the
 ///     <c>file:line</c> a violation message cites so an agent can jump straight to the offending
-///     source (DESIGN.md §8).
+///     source.
 /// </summary>
 public sealed class SourceLocation
 {

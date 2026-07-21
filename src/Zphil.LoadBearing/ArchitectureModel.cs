@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The finalized, walkable architecture model — the single reified spec both render targets
-///     consume (DESIGN.md §4). Returned by <see cref="ArchModelBuilder.Build(IArchitectureSpec[])" />
+///     consume. Returned by <see cref="ArchModelBuilder.Build(IArchitectureSpec[])" />
 ///     once the spec passes the whole validation catalog.
 /// </summary>
 public sealed class ArchitectureModel

@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     The scalar shape facts of one type, extracted from a Roslyn symbol but holding no Roslyn types —
 ///     the pure-data payload shared by a fragment's declared types and its externals, and the first ten
 ///     constructor arguments of a <see cref="Zphil.LoadBearing.Codebase.TypeNode" />. These are read once
-///     per input from the symbol's <c>OriginalDefinition</c> so a persisted fragment (Phase 11 WP6) can
+///     per input from the symbol's <c>OriginalDefinition</c> so a persisted fragment can
 ///     rebuild the node without re-binding.
 /// </summary>
 /// <remarks>

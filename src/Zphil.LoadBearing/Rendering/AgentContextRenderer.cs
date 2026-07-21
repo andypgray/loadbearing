@@ -5,15 +5,15 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Composes the agent-context block bodies from the reified model — the second render target
-///     (DESIGN.md §9, R2). Pure and codebase-independent: the root block is a function of
+///     Composes the agent-context block bodies from the reified model — the second render target.
+///     Pure and codebase-independent: the root block is a function of
 ///     <c>(model, specName)</c> (plus an optional grandfathered-count provider), a scope card a function
 ///     of one containment rule. Output is LF-internal always (never <c>Environment.NewLine</c>); the
 ///     splicer applies the target file's line ending. The always-on root block carries the module map,
 ///     the Enforce "must" laws, the Migrate counter-prior paragraphs, and the Freeze containment laws
 ///     (the frozen-scopes section — the containment law binds code <em>outside</em> the frozen directory,
 ///     which the per-directory scope card never reaches); dragons prose stays scoped-only (progressive
-///     disclosure). The Migrate voice (DESIGN.md §5) explicitly counters the statistical prior — "most
+///     disclosure). The Migrate voice explicitly counters the statistical prior — "most
 ///     code here follows the OLD pattern".
 /// </summary>
 public static class AgentContextRenderer
@@ -34,7 +34,7 @@ public static class AgentContextRenderer
     private const string GlossaryTail = "Expand any rule ID with `loadbearing explain <rule-id>`.";
 
     /// <summary>
-    ///     The provenance/warning line — the first line inside every managed block (R1). Names the
+    ///     The provenance/warning line — the first line inside every managed block. Names the
     ///     spec deterministically (assembly file name without extension) so the pin is
     ///     machine-independent; carries no timestamp or tool version (idempotence).
     /// </summary>
@@ -53,7 +53,7 @@ public static class AgentContextRenderer
     ///     laws (Frozen scopes — the containment law + sanctioned surface; dragons prose stays scoped).
     ///     <paramref name="grandfatheredCounts" /> is an optional live-count provider: when it returns a
     ///     value for a Migrate rule, the "Grandfathered sites remaining: {n}." sentence is appended. The
-    ///     default (null) renders no counts — the maintainer decision for Phase 5, where the burndown
+    ///     default (null) renders no counts — the maintainer decision, where the burndown
     ///     lives in <c>status</c>/<c>explain</c>, not the block.
     /// </summary>
     public static string RootBlock(
@@ -100,7 +100,7 @@ public static class AgentContextRenderer
     ///     A frozen scope's context card (without the provenance line, which the splice pipeline adds
     ///     once per file): the scope heading, the containment law and rationale, the load-bearing-
     ///     weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a linked <c>Dragons doc</c>
-    ///     bullet — DESIGN.md §5, one of the two is spec-guaranteed), the sanctioned surface (omitted for
+    ///     bullet — one of the two is spec-guaranteed), the sanctioned surface (omitted for
     ///     a hermetic freeze), and the <c>explain</c> pointer. This is the scoped, per-directory story the
     ///     agents editing dragon territory read.
     /// </summary>
@@ -117,8 +117,8 @@ public static class AgentContextRenderer
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
         if (freeze.Boundary.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(freeze.Boundary)}.");
-        // The linked long-form doc is a backticked solution-relative path (the spec stays the index —
-        // DESIGN.md §6), not a rebased markdown link.
+        // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
+        // not a rebased markdown link.
         if (freeze.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
         bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {containmentRule.Id}")}.");
 
@@ -135,7 +135,7 @@ public static class AgentContextRenderer
     }
 
     /// <summary>
-    ///     A layer's "local rules" context card (Phase X3), placed in the layer's directory (without
+    ///     A layer's "local rules" context card, placed in the layer's directory (without
     ///     the provenance line, which the splice pipeline adds once per file): the layer heading, a
     ///     one-line lede, then one bullet per anchored rule — the very same Rules/Migrations composer
     ///     the root block uses, so a rule reads identically in both places — closed by a generic
@@ -172,7 +172,7 @@ public static class AgentContextRenderer
         return "### Rules\n" + string.Join("\n", bullets);
     }
 
-    // The Migrate counter-prior section (DESIGN.md §5, Spec 2): one bullet per Migrate rule that names
+    // The Migrate counter-prior section: one bullet per Migrate rule that names
     // the OLD pattern as grandfathered debt, states the target law, and renders the boy-scout policy —
     // so an agent reading the majority (old) pattern does not infer it is house style.
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
@@ -185,7 +185,7 @@ public static class AgentContextRenderer
     // the per-layer card, so a rule renders byte-identically wherever it appears. An Enforce rule
     // states its law sentence + rationale; a Migrate rule renders the full counter-prior paragraph
     // (OLD-pattern warning, target law, boy-scout policy, and the optional live grandfathered count).
-    // No Fix line ever — progressive disclosure routes fixes to `explain` (R2).
+    // No Fix line ever — progressive disclosure routes fixes to `explain`.
     private static string RuleBullet(ArchRule rule, Func<ArchRule, int?>? counts = null)
     {
         return rule.Posture == Posture.Migrate
@@ -205,7 +205,7 @@ public static class AgentContextRenderer
         return bullet;
     }
 
-    // The Freeze containment section (DESIGN.md §5, GRAMMAR §7): one bullet per frozen scope stating the
+    // The Freeze containment section (GRAMMAR §7): one bullet per frozen scope stating the
     // containment law + rationale + sanctioned surface, in the always-on root block because containment
     // binds code OUTSIDE the frozen directory — those agents never see the per-directory scope card.
     // Dragons prose stays scoped-only (progressive disclosure) and prints in the scope card + explain.

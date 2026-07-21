@@ -6,15 +6,15 @@
         <!-- The SDK propagates project references transitively (Domain would resolve Billing via
              Web), so Roslyn's Project.ProjectReferences would report the transitive closure. This
              fixture pins the DECLARED chain graph, so transitivity is disabled here. Whether the
-             product surfaces declared vs transitive project refs is a Phase 3+ decision. -->
+             product surfaces declared vs transitive project refs is an open product decision. -->
         <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\MyApp.Web\MyApp.Web.csproj" />
     </ItemGroup>
     <!-- Snippets/ holds scratch *.cs that live in the project cone on disk but are NOT compiled. This is the
-         H1 fixture: a file the zero-MSBuild cone scan sees but that never enters the model. It must stay
-         excluded, so the many MyApp goldens keep passing byte-identical (that unchanged-ness is the H1 test). -->
+         exclusion fixture: a file the zero-MSBuild cone scan sees but never enters the model. It must stay
+         excluded, so the many MyApp goldens keep passing byte-identical (that unchanged-ness is the test). -->
     <ItemGroup>
         <Compile Remove="Snippets/**/*.cs" />
     </ItemGroup>

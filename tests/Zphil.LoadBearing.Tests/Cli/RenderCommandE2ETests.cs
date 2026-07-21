@@ -53,7 +53,7 @@ public sealed class RenderCommandE2ETests
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
         "- Expand: `loadbearing explain legacy/billing/containment`.";
 
-    // The MyAppLayerSpec render targets (Phase X3): the root block (module map + two anchored Enforce
+    // The MyAppLayerSpec render targets: the root block (module map + two anchored Enforce
     // laws + the frozen-scope law), the Web layer's local-rules card, and the Billing directory's merged
     // block — its Billing layer card BEFORE the frozen-scope card. Each body carries its own provenance
     // line (the non-root files get it prepended, exactly like a scope-only file). The frozen scope here

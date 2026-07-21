@@ -9,7 +9,7 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
 ///     Workspace-tier tests for <see cref="SessionFragmentStore" /> — the warm server's session-scoped
-///     incremental fragment store (Phase 12 D2). Each test drives a real <see cref="WorkspaceSession" /> over
+///     incremental fragment store. Each test drives a real <see cref="WorkspaceSession" /> over
 ///     its own restored MyApp copy to obtain genuine <see cref="WorkspaceSnapshot" />s (generation + edit
 ///     versions), then feeds them to the store and asserts on which projects it re-walked and on model
 ///     equivalence — never on wall time. The MyApp reference graph is Domain → Web → Billing (Domain

@@ -27,7 +27,7 @@ internal sealed class ExplainRunner(TextWriter output, ISolutionSource? source =
 
     private async Task<ArchitectureModel> LoadModelAsync(ExplainRequest request, CancellationToken ct)
     {
-        // Fast path: a built-DLL --spec resolves without ever opening the solution (R4).
+        // Fast path: a built-DLL --spec resolves without ever opening the solution.
         SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(request.Spec);
         if (withoutSolution is not null) return ModelPipeline.LoadModel(withoutSolution.DllPath);
 

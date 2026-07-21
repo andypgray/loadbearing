@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing.Cli.Replay;
 
 /// <summary>
 ///     Which source-selection branch <see cref="MsBuildGate" /> took for the last <c>check</c>/<c>status</c>/
-///     <c>graph</c> run (Phase 12 D1). Internal test observable — the enforcement path's output is
+///     <c>graph</c> run. Internal test observable — the enforcement path's output is
 ///     byte-identical whichever branch runs, so this only ever tells a test which path was chosen, paired
 ///     with <see cref="Roslyn.WorkspaceLoader.LoadCount" /> for the "no design-time build" pin. Never printed.
 /// </summary>

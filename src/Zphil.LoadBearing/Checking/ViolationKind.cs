@@ -25,7 +25,7 @@ public enum ViolationKind
     /// <summary>
     ///     A declared member failing a member shape/naming/escape verb (GRAMMAR §4.6): <c>SubjectMember</c>
     ///     with its declaration <c>Sites</c>. One per (rule, member) — keyed by the member's own DocId, so a
-    ///     renamed or newly-added member is a NEW red (DESIGN.md §5).
+    ///     renamed or newly-added member is a NEW red.
     /// </summary>
     MemberShape,
 

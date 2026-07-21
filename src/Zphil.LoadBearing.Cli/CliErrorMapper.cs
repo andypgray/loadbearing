@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     in one pass); anything else is a bug and gets a full stack trace. Pure and Roslyn-free, so it
 ///     unit-tests without a workspace. The user-facing text is factored into
 ///     <see cref="UserFacingMessage" /> so the MCP <c>GlobalCallToolFilter</c> renders the identical
-///     multi-line body on its surface (Phase 7 parity).
+///     multi-line body on its surface.
 /// </summary>
 internal static class CliErrorMapper
 {

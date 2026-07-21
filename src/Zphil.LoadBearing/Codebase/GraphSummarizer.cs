@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
 ///     Summarizes a <see cref="CodebaseModel" /> into a <see cref="GraphSummary" /> — the pre-spec survey
-///     the Phase 8 derive flow orients on. Pure over an already-deterministic model (no I/O, no Roslyn):
+///     the derive flow orients on. Pure over an already-deterministic model (no I/O, no Roslyn):
 ///     projects with namespace inventories, observed cross-project reference edges grouped by project
 ///     pair, and external references grouped by namespace root. Every result list is ordinal-ordered, so
 ///     both render targets (the human survey and <c>graph --json</c>) are byte-stable.

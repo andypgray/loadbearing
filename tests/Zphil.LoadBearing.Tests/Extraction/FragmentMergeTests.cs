@@ -7,12 +7,12 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
 ///     The cross-input unification semantics of the model build, over the MSBuild-free fast path with
-///     several synthetic <see cref="CompilationInput" />s. These pin the behaviour the Phase 11 (WP5)
+///     several synthetic <see cref="CompilationInput" />s. These pin the behaviour the
 ///     per-input-fragment refactor must reproduce byte-for-byte: first-declarer-wins node facts and
 ///     ProjectName, declaration-site union across declarers, declare-all-before-reference
 ///     (declared-beats-external globally), the reference-equality contract on constructions and edges,
 ///     external-node sharing, and the same-project-name (multi-TFM) project union. The final block pins the
-///     M2 same-FQN cross-project conflation notes that ride on top of first-declarer-wins.
+///     same-FQN cross-project conflation notes that ride on top of first-declarer-wins.
 /// </summary>
 public sealed class FragmentMergeTests
 {
@@ -213,7 +213,7 @@ public sealed class FragmentMergeTests
         model.ConstructorEdge("P.B", "P.A").Sites.Count.ShouldBe(1);
     }
 
-    // ── M2: same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
+    // ── Same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
 
     [Fact]
     public void ExtractFromCompilations_SameFqnDeclaredByTwoDifferentProjects_RecordsCrossProjectMergeNote()

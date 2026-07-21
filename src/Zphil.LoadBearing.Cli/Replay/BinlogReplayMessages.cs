@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Cli.Replay;
 
 /// <summary>
-///     The CLI-side user-facing text for the <c>--binlog</c> replay path (Phase 12 D1): the loud refusals for
+///     The CLI-side user-facing text for the <c>--binlog</c> replay path: the loud refusals for
 ///     a user-supplied binlog that cannot be replayed, and the soft notice for a persisted capture whose copy
 ///     fails to replay at runtime. The sibling of <see cref="Roslyn.Replay.BinlogCaptureStore" />'s own
 ///     factories (which own the ingest refusals and the structural-invalidation notices); these three own the

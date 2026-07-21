@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     How a <see cref="CodebaseSource" /> produced its model — the internal test observable for the
-///     persisted extraction cache (Phase 11 D2). Never printed: stdout/stderr stay byte-identical to a cold
+///     persisted extraction cache. Never printed: stdout/stderr stay byte-identical to a cold
 ///     run in every mode, so this only ever tells a test which path a run took.
 /// </summary>
 internal enum CodebaseSourceOutcome
@@ -30,7 +30,7 @@ internal enum CodebaseSourceOutcome
 }
 
 /// <summary>
-///     The check/status/graph extraction seam over the persisted extraction cache (Phase 11 D2). It carries
+///     The check/status/graph extraction seam over the persisted extraction cache. It carries
 ///     everything a run needs before the codebase itself — the loaded <see cref="Model" /> and spec
 ///     <see cref="Resolution" /> (both absent for the spec-less <c>graph</c> survey), the discovered
 ///     <see cref="SolutionPath" />, and the workspace <see cref="Diagnostics" /> — and defers the codebase to
@@ -57,7 +57,7 @@ internal enum CodebaseSourceOutcome
 ///         (a <see cref="CodebaseSourceOutcome.Disabled" /> run), so <c>cache.json</c> and the warm
 ///         <see cref="WorkspaceSession" /> keep independent lifetimes and never race on the file. That
 ///         Disabled branch is not always a full cold walk, though: when the handle carries a warm fragment
-///         extractor (<see cref="SolutionHandle.WarmFragments" />, Phase 12 D2) it merges the session store's
+///         extractor (<see cref="SolutionHandle.WarmFragments" />) it merges the session store's
 ///         reused-plus-re-extracted fragments instead, so a warm re-check re-walks only the projects whose
 ///         bytes changed — while the model stays byte-identical to a cold run through the one merge path.
 ///     </para>
@@ -126,7 +126,7 @@ internal sealed class CodebaseSource : IDisposable
 
     /// <summary>
     ///     The advisory merge notes the last <see cref="ExtractAsync" /> produced (same-FQN cross-project
-    ///     conflation, M2), regenerated from the fragments on every path — a cache hit re-merges, so these
+    ///     conflation), regenerated from the fragments on every path — a cache hit re-merges, so these
     ///     need no persistence. Empty until <see cref="ExtractAsync" /> runs. Distinct from
     ///     <see cref="Diagnostics" />: merge notes ride the same rendered diagnostics stream but never gate.
     /// </summary>

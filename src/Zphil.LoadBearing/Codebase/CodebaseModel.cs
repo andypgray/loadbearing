@@ -3,7 +3,7 @@ namespace Zphil.LoadBearing.Codebase;
 /// <summary>
 ///     The extracted codebase: its types, the reference edges between them, the member-use edges
 ///     (GRAMMAR §4.5), the construction edges (§4.5), and its projects — the deterministic substrate the
-///     Phase 3 checker evaluates rules against. Every list is ordered for reproducibility:
+///     checker evaluates rules against. Every list is ordered for reproducibility:
 ///     <see cref="Types" /> by <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source
 ///     FullName, target FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
 ///     <see cref="MemberReference.SymbolId" />) (ordinal), <see cref="ConstructorEdges" /> by (source

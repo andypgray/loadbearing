@@ -1,6 +1,6 @@
 namespace Zphil.LoadBearing.Codebase;
 
-// The pre-spec codebase survey (Phase 8) and its parts, clustered in one file: they are one cohesive
+// The pre-spec codebase survey and its parts, clustered in one file: they are one cohesive
 // summary shape produced together by GraphSummarizer, not independent product types. Sealed classes with
 // internal constructors and get-only auto-props — the Codebase style (records are unavailable on Core's
 // netstandard2.0 TFM; see Zphil.LoadBearing.csproj). Every list is ordinal-ordered for reproducibility.
@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Codebase;
 /// <summary>
 ///     The extracted codebase, summarized for onboarding: its projects with their namespace inventories,
 ///     the observed cross-project reference edges, and the external references grouped by namespace root
-///     — the deterministic pre-spec survey the Phase 8 derive flow orients on. Produced by
+///     — the deterministic pre-spec survey the derive flow orients on. Produced by
 ///     <see cref="GraphSummarizer" /> over a <see cref="CodebaseModel" />. Grouped counts only, never
 ///     per-site dumps (the minimal-token posture; sites arrive later from <c>check</c> on drafted rules).
 /// </summary>

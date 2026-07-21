@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A specific construction of a type as it appears in a hierarchy fact (Phase 3): the open or
+///     A specific construction of a type as it appears in a hierarchy fact: the open or
 ///     non-generic <see cref="Definition" /> node plus the <em>constructed</em> display
 ///     <see cref="FullName" />. For a non-generic type the two names coincide; for a closed generic
 ///     they diverge — <c>MyApp.Web.IHandler&lt;MyApp.Web.InvoiceCreated&gt;</c> constructs

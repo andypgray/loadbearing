@@ -196,9 +196,8 @@ internal static class ReferenceWalker
 
     /// <summary>
     ///     True when <paramref name="node" /> sits inside a <c>nameof(...)</c> operand — a compile-time
-    ///     symbol reference, not a runtime use. Adapted from Zphil.Roz's <c>ReferenceKindClassifier</c>:
-    ///     the walk up the parent chain is bounded by the enclosing statement/member (a <c>nameof</c>, if
-    ///     present, is reached first), so it stays local and cheap.
+    ///     symbol reference, not a runtime use. The walk up the parent chain is bounded by the enclosing
+    ///     statement/member (a <c>nameof</c>, if present, is reached first), so it stays local and cheap.
     /// </summary>
     private static bool IsNameofOperand(SyntaxNode node)
     {

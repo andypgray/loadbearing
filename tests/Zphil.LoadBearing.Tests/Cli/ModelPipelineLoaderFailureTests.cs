@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Cli;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     L3: when spec discovery's <c>GetTypes()</c> raises a <see cref="ReflectionTypeLoadException" />
+///     When spec discovery's <c>GetTypes()</c> raises a <see cref="ReflectionTypeLoadException" />
 ///     (a missing or version-mismatched dependency of the spec assembly), the pipeline surfaces the
 ///     <em>distinct</em> loader messages — deduped and ordinal-sorted so the output is deterministic —
 ///     under a naming/fix frame, not a raw reflection failure. Pinned with a fabricated exception.

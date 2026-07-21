@@ -27,9 +27,9 @@
 
     <ItemGroup>
         <!-- PackagePath must use forward slashes: on a Linux release runner a backslash is not a path
-             separator, so `.mcp\server.json` mis-packs as the literal `.mcp//server.json` (the donor
-             resharper-cli-mcp shipped exactly that bug in 1.0.0) and nuget.org fails to detect the MCP
-             manifest. The tool ships the root README and the MCP server manifest. -->
+             separator, so `.mcp\server.json` mis-packs as the literal `.mcp//server.json` and
+             nuget.org fails to detect the MCP manifest. The tool ships the root README and the
+             MCP server manifest. -->
         <None Include="..\..\README.md" Pack="true" PackagePath="/" />
         <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp/server.json" />
     </ItemGroup>
@@ -41,8 +41,8 @@
 
     <ItemGroup>
         <PackageReference Include="System.CommandLine" Version="2.0.9" />
-        <!-- The `mcp` subcommand's stdio server chassis (donor: resharper-cli-mcp). Pins match the
-             sibling's current versions; all four are in the local NuGet cache. -->
+        <!-- The `mcp` subcommand's stdio server chassis. The four packages are exact-pinned to
+             current versions, all present in the local NuGet cache. -->
         <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
         <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
@@ -54,7 +54,7 @@
              path-mangled default (the file lives under Mcp\). -->
         <EmbeddedResource Include="Mcp\server-instructions.md" LogicalName="server-instructions.md" />
         <!-- Same pinned short LogicalName for the derive_spec prompt body (the file lives under
-             Mcp\Prompts\). House style embeds by short name; the donor (resharper-cli-mcp) uses dotted
+             Mcp\Prompts\). House style embeds by short name; the .NET default is dotted
              assembly-qualified ids — the deliberate divergence EmbeddedResourceText.Load consumes. -->
         <EmbeddedResource Include="Mcp\Prompts\derive-spec.md" LogicalName="derive-spec.md" />
     </ItemGroup>

@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     The scalar facts of one declared member (GRAMMAR §4.6), extracted from a Roslyn symbol but holding
 ///     no Roslyn types — the member analog of <see cref="TypeFacts" /> and the pure-data payload the merge
 ///     turns into a <see cref="Zphil.LoadBearing.Codebase.MemberNode" />. Read once per member from the
-///     declaring type's <c>OriginalDefinition</c> so a persisted fragment (Phase 11 WP6) rebuilds the
+///     declaring type's <c>OriginalDefinition</c> so a persisted fragment rebuilds the
 ///     inventory without re-binding.
 /// </summary>
 /// <remarks>

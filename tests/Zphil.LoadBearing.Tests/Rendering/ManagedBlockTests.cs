@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     The managed-block splice contract (R1): create-absent, append-without-markers with dominant
+///     The managed-block splice contract: create-absent, append-without-markers with dominant
 ///     line-ending selection, replace-strictly-between-markers preserving hand content above and
 ///     below byte-for-byte (CRLF and LF — the acceptance pin), idempotence, and the malformed marker
 ///     states. BOM preservation is proven at the CLI file-adapter level (the Core splicer is string-pure).
@@ -125,7 +125,7 @@ public class ManagedBlockTests
     [Fact]
     public void Splice_DominantEndingTie_ChoosesLf()
     {
-        // One CRLF, one LF — a tie, which resolves to LF for the written block (R1).
+        // One CRLF, one LF — a tie, which resolves to LF for the written block.
         ManagedBlock.Splice("a\r\nb\n", Body).ShouldBe(
             "a\r\nb\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
     }
@@ -152,7 +152,7 @@ public class ManagedBlockTests
     }
 
     // The duplicate-marker pin, moved out of the fragment theory above to assert the whole message including
-    // the stray-marker guidance sentence (L8) — the marker text must not appear anywhere else in the file.
+    // the stray-marker guidance sentence — the marker text must not appear anywhere else in the file.
     [Fact]
     public void Splice_DuplicateBeginMarker_ThrowsWithStrayMarkerGuidance()
     {

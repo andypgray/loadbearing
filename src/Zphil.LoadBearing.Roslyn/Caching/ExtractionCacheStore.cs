@@ -6,11 +6,11 @@ using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
-/// <summary>The outcome of validating a persisted extraction cache against disk (Phase 11 WP6).</summary>
+/// <summary>The outcome of validating a persisted extraction cache against disk.</summary>
 /// <remarks>
 ///     There is deliberately no <c>Disabled</c> member: whether the cache is consulted at all is a CLI-level
 ///     decision (the <c>--no-cache</c> flag / <c>LOADBEARING_CACHE_DIR</c> seam), so it lives on the CLI's
-///     own outcome enum in a later work package — this Roslyn-layer store only knows Hit, Partial, and Miss.
+///     own outcome enum — this Roslyn-layer store only knows Hit, Partial, and Miss.
 /// </remarks>
 internal enum CacheOutcome
 {
@@ -99,10 +99,10 @@ internal sealed record ExtractionResult(
 
 /// <summary>
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
-///     <c>cache.json</c> holding the manifest and every fragment (Phase 11 WP6). Validation runs with zero
+///     <c>cache.json</c> holding the manifest and every fragment. Validation runs with zero
 ///     MSBuild: it stats (and selectively re-hashes) the recorded inputs, scans each project cone for added
 ///     source, and recomputes the content/Merkle keys to produce a dirty set. This type is <em>unwired</em>
-///     — no runner, pipeline, or CLI flag consults it yet; that is a later work package.
+///     — no runner, pipeline, or CLI flag consults it yet.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -197,7 +197,7 @@ internal sealed class ExtractionCacheStore
             string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
 
             // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
-            // full paths). Hardcoding adds=[] here was the H1 bug: a *.cs on disk under the project but
+            // full paths). Hardcoding adds=[] here was a real bug: a *.cs on disk under the project but
             // excluded from compilation is a validation-time add, so an empty capture never validated and the
             // project stayed dirty forever. With capture and validation running the one routine, they agree.
             var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);

@@ -2,7 +2,7 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Baselines;
 
-/// <summary>Helpers for the Roslyn <c>DocumentationCommentId</c> strings baselines key on (DESIGN.md §8).</summary>
+/// <summary>Helpers for the Roslyn <c>DocumentationCommentId</c> strings baselines key on.</summary>
 public static class SymbolIds
 {
     /// <summary>

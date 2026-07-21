@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing;
 ///     The read-only view of a type handed to escape-hatch predicates (<c>.Where(pred, ...)</c>
 ///     and <c>.Must(pred, ...)</c>). This is the v1 predicate input contract (GRAMMAR §5.6); it
 ///     grows additively as extraction learns new facts. Predicates are stored on the model but never
-///     evaluated in Phase 1 — the mandatory description is what renders, not the lambda.
+///     evaluated — the mandatory description is what renders, not the lambda.
 /// </summary>
 public interface ITypeInfo
 {

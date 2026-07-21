@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     End-to-end <c>baseline --add</c> against a private, restored copy of the MyApp fixture
-///     (<see cref="TempFixtureWorkspace" />, one per fact) — the ratchet's escape valve (DESIGN.md §13(d)).
+///     (<see cref="TempFixtureWorkspace" />, one per fact) — the ratchet's escape valve.
 ///     Pins the whole valve: a Migrate <c>--add</c> appends exactly one attributed entry as a one-line
 ///     diff while same-rule and other-rule bystanders stay red; a Freeze-containment <c>--add</c>
 ///     grandfathers a new inbound edge and turns the rule green; a present entry only has its attribution

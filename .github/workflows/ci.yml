@@ -74,7 +74,7 @@ jobs:
   # committed baselines), then re-run `render` for all of them and assert a single zero diff
   # across examples/ — root blocks AND the scoped per-directory cards. If a spec drifts from
   # its example code, this job fails. The Meridian.Quoting on-ramp also runs its xUnit
-  # adapter (one named test per rule). Ubuntu-only initially (EXAMPLES.md §3 item 4).
+  # adapter (one named test per rule). Ubuntu-only initially.
   examples:
     runs-on: ubuntu-latest
     steps:

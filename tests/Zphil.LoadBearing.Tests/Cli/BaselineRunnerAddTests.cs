@@ -17,7 +17,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     <c>P:</c> symbol ID. Also the construction reach (GRAMMAR §4.5, §4.3): a
 ///     <see cref="ViolationKind.Construction" /> resolves by the (source, constructed) type pair and keys a
 ///     plain <c>T:</c>-&gt;<c>T:</c> <see cref="BaselineEntry.ForEdge" /> entry — zero baseline-format change
-///     from a reference edge — since the fixture flagship carries no construction rule until Phase 18 WP4.
+///     from a reference edge — pinned here on the in-memory fast tier, no fixture spec required.
 /// </summary>
 public sealed class BaselineRunnerAddTests : IDisposable
 {

@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     A file's recorded freshness fingerprint: its existence, last-write time, and byte length at the
 ///     moment we captured it, plus the wall-clock instant of the capture. This is the shared primitive
 ///     behind two staleness checks — the warm <see cref="WorkspaceSession" />'s per-call reconcile sweep
-///     and (from Phase 11 WP6) the persisted extraction cache's validation pass — so it carries no
+///     and the persisted extraction cache's validation pass — so it carries no
 ///     session or cache coupling; it only knows how to stat a path and how to reason about the racy
 ///     window.
 /// </summary>

@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     externals it references, its reference edges, its member-use edges (GRAMMAR §4.5), and its
 ///     construction edges (§4.5). It holds no Roslyn types (no <c>ISymbol</c>, <c>Compilation</c>, or
 ///     <c>Location</c>) so it is System.Text.Json-serializable by design — the persisted extraction cache
-///     (Phase 11 WP6) stores exactly this — and
+///     stores exactly this — and
 ///     <see cref="FragmentMerger.Merge" /> reconstructs a <see cref="Zphil.LoadBearing.Codebase.CodebaseModel" />
 ///     from a set of fragments, reproducing the global three-pass cross-input semantics.
 /// </summary>

@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     (<see cref="SolutionHandle.Solution" />) plus the discovered path and the workspace-load
 ///     diagnostics. Two implementations share this contract: <see cref="ColdSolutionSource" /> opens a
 ///     fresh one-shot workspace per call (the CLI/adapter lifetime), while the warm MCP source
-///     (Phase 11 D1) serves a reconciled snapshot cached across tool calls and owns nothing the caller
+///     serves a reconciled snapshot cached across tool calls and owns nothing the caller
 ///     must dispose. Callers <c>using</c> the handle either way; disposal releases the cold workspace and
 ///     no-ops on the warm snapshot.
 /// </summary>

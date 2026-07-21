@@ -12,7 +12,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Replay;
 
 /// <summary>
-///     End-to-end tests for the Phase 12 WP4 CLI wiring of binlog replay: <c>check</c>/<c>status</c>/
+///     End-to-end tests for the CLI wiring of binlog replay: <c>check</c>/<c>status</c>/
 ///     <c>graph</c> <c>--binlog</c>, the auto-replay of a persisted capture, the stale-capture notice, the
 ///     ingest refusals, and the <c>--no-cache</c> composition. Each scenario drives the <em>real</em> command
 ///     tree in-process through <see cref="CliRunner" /> against the shared <see cref="BinlogFixtureWorkspace" />

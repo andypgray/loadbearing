@@ -30,7 +30,7 @@ internal sealed class SolutionHandle(
 
     /// <summary>
     ///     The warm path's incremental fragment extractor, or null on the cold/one-shot path. When present
-    ///     (the warm MCP source, Phase 12 D2), the extraction seam calls it instead of re-walking the whole
+    ///     (the warm MCP source), the extraction seam calls it instead of re-walking the whole
     ///     solution: it captures this call's snapshot plus the session's <see cref="SessionFragmentStore" />,
     ///     so it reuses clean projects' fragments and re-extracts only the dirty ∪ dependent set. Null falls
     ///     straight through to today's full <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.

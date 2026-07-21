@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Places each frozen scope's directory context file (R3). For every containment rule it
+///     Places each frozen scope's directory context file. For every containment rule it
 ///     evaluates the raw frozen selection in <see cref="SelectionPosition.Subject" /> position (so it
 ///     ranges over solution-declared types), collects those types' declaration-site file paths, and
 ///     picks their <em>deepest common ancestor directory</em> — the directory whose <c>AGENTS.md</c>

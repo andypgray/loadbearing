@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Prose;
 ///     Thrown by <see cref="TypeName.FullDisplay" /> when a reflection <see cref="Type" /> has no
 ///     extraction-format analog: pointers, by-refs, and partially-open constructions (some type
 ///     arguments bound, some free). The checker catches this and reports a rule-level RuleError
-///     rather than crashing the run (Phase 3 all-errors philosophy).
+///     rather than crashing the run (all-errors philosophy).
 /// </summary>
 internal sealed class UnrepresentableTypeException(Type type)
     : Exception($"Type '{type}' has no source-level display form the checker can match against.")

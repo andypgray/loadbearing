@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.MyAppLayerSpec;
 ///     Enforce rule, plus the canonical billing freeze over the Billing layer. Rendered against the
 ///     MyApp solution it produces the root block, a Web local-rules card in <c>MyApp.Web/</c>, and —
 ///     in <c>MyApp.Legacy.Billing/</c> — a merged block whose Billing layer card precedes the
-///     frozen-scope card (layer key before freeze key). That Billing directory is the WP0
+///     frozen-scope card (layer key before freeze key). That Billing directory is the
 ///     both-cards-in-one-directory acceptance surface; the frozen layer's desugared containment is
 ///     layer-anchored yet Freeze-posture, so it renders only as the freeze card and is never
 ///     double-emitted as a layer bullet.

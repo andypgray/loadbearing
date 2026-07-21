@@ -195,7 +195,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
         // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. Before the
-        // H1 fix the cone scan read it as an add and invalidated the capture on every run; the ConeFiles
+        // fix the cone scan read it as an add and invalidated the capture on every run; the ConeFiles
         // snapshot recorded at ingest now covers it. This static-fixture stray needs no revert.
         BinlogCaptureStore store = IngestFullCapture();
         File.Exists(Fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs")).ShouldBeTrue();
@@ -305,7 +305,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange — a store over a solution with nothing ingested.
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
 
-        // Act + Assert — silent absence; WP4 runs the cold path with no notice.
+        // Act + Assert — silent absence; the cold path runs with no notice.
         store.Validate().State.ShouldBe(CaptureState.Absent);
     }
 

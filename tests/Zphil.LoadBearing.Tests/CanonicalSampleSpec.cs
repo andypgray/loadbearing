@@ -2,7 +2,7 @@ using Zphil.LoadBearing.Tests.Stubs;
 
 namespace Zphil.LoadBearing.Tests;
 
-// The canonical sample spec, byte-identical to GRAMMAR §12 (= DESIGN.md §7), compiling as pinned
+// The canonical sample spec, byte-identical to GRAMMAR §12, compiling as pinned
 // test code. Its rendered sentences and reified model are the spec. The layout is load-bearing:
 // the named-argument documentation style (GRAMMAR §10) and the alignment below must survive
 // verbatim, so this file is deliberately kept out of automated formatting — do not reformat it.

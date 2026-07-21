@@ -8,7 +8,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
-///     The Phase 7 acceptance table: every <c>arch_*</c> tool returns output identical (after newline
+///     The acceptance table: every <c>arch_*</c> tool returns output identical (after newline
 ///     normalization) to the CLI verb it shells over — parity by construction (each tool runs the same
 ///     runner into a captured writer). One method per solution+spec combo; the explain rows ride the DLL
 ///     fast path (no workspace), <c>arch_context</c> is pinned against the render card text, and the

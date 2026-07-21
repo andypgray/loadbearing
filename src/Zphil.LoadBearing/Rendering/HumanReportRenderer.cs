@@ -65,7 +65,7 @@ public static class HumanReportRenderer
 
     // The ratchet's human lines (Migrate and Freeze containment): a grandfathered count (baselined
     // violations pass, so they are not listed as red sites) and, when a failed rule has no captured
-    // baseline, the bootstrap hint (DESIGN.md §5).
+    // baseline, the bootstrap hint.
     private static void RenderRatchetLines(TextWriter output, RuleResult result)
     {
         if (result.Grandfathered.Count > 0)

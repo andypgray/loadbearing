@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     A private, restored copy of the MyApp fixture solution in a unique temp directory — the substrate
-///     for the Phase 5 mutation tests (<c>baseline --init</c>/<c>--accept-reductions</c>, tamper, file
+///     for the mutation tests (<c>baseline --init</c>/<c>--accept-reductions</c>, tamper, file
 ///     move). The shared <see cref="WorkspaceFixture" /> output tree is read-only and shared across the
 ///     assembly, so a test that edits fixture files or baselines must run against its own copy. Build
 ///     artifacts (<c>bin</c>/<c>obj</c>) are skipped and the copy is re-restored, because a copied

@@ -8,12 +8,12 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The byte-level file adapter (R1): a new file is written UTF-8 with no BOM; an existing file's
+///     The byte-level file adapter: a new file is written UTF-8 with no BOM; an existing file's
 ///     BOM state is preserved exactly (the pin that <c>File.ReadAllText</c> would silently lose); an
 ///     unchanged re-splice reports Unchanged with byte-identical output; a malformed block becomes a
 ///     file-naming <see cref="UserErrorException" />; and a file that is not valid UTF-8 — invalid bytes
 ///     or a UTF-16 BOM — is refused with a file-naming <see cref="UserErrorException" /> and left byte-for-byte
-///     untouched (L1), never decoded lossily and rewritten as replacement characters.
+///     untouched, never decoded lossily and rewritten as replacement characters.
 /// </summary>
 public sealed class ManagedBlockFileTests
 {
@@ -105,7 +105,7 @@ public sealed class ManagedBlockFileTests
         {
             string path = Path.Combine(dir, "AGENTS.md");
             // A lone 0x80 continuation byte with no lead byte — invalid UTF-8 that a lenient decoder would
-            // silently turn into U+FFFD and then write back, destroying the file (the L1 defect).
+            // silently turn into U+FFFD and then write back, destroying the file.
             byte[] invalid = [0x41, 0x80, 0x42];
             File.WriteAllBytes(path, invalid);
 

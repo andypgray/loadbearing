@@ -89,7 +89,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
     private int disposed;
 
     // The load generation, bumped on every full (re)load and stamped onto each snapshot. A session-scoped
-    // consumer (the incremental fragment store, Phase 12 D2) flushes when it changes; within a generation it
+    // consumer (the incremental fragment store) flushes when it changes; within a generation it
     // reuses its work. Starts at 0; the first load makes it 1, so a never-loaded generation never aliases one.
     private long generation;
 

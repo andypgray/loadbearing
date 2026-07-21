@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The Freeze-specific payload of an <see cref="ArchRule" /> (DESIGN.md §5, GRAMMAR §7). A
+///     The Freeze-specific payload of an <see cref="ArchRule" /> (GRAMMAR §7). A
 ///     frozen scope desugars into two rules that share a <see cref="ScopeId" />: the containment
 ///     rule carries the boundary and baseline; both carry the dragons prose.
 /// </summary>
@@ -31,7 +31,7 @@ public sealed class FreezeData
     /// <summary>
     ///     The raw frozen selection (the scope's <c>Freeze(sel)</c> operand, before the containment
     ///     desugaring subtracts the boundary). Carried on both children: the renderer evaluates it in
-    ///     Subject position to place the scope's directory context file (R3), and the tripwire maps
+    ///     Subject position to place the scope's directory context file, and the tripwire maps
     ///     changed files to the frozen types through it. Not public — placement and diff-matching are
     ///     Core concerns.
     /// </summary>

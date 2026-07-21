@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     Spec-free (no <c>--spec</c>), read-only (no temp copy), always exits 0. The human survey and the
 ///     <c>--json</c> document (schemaVersion 1) are both pinned by goldens. The fixture truth behind the
 ///     numbers: 3 projects; Domain→Web = 2 observed type-pairs; Web→Legacy.Billing = 3; Web→System.Data = 2;
-///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms, Phase 14).
+///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms).
 /// </summary>
 [Collection("Serial")]
 public sealed class GraphCommandTests

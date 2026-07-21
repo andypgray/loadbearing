@@ -24,7 +24,7 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     /// <summary>
     ///     The session load generation that produced this snapshot — bumped on every full (re)load, stable
     ///     across the in-place content edits folded into the same load. A session-scoped consumer (the
-    ///     incremental fragment store, Phase 12 D2) treats a generation change as "flush and re-extract
+    ///     incremental fragment store) treats a generation change as "flush and re-extract
     ///     everything" and reuses its work only within a generation. Internal, non-positional, so the record
     ///     stays publicly <c>(Solution, Diagnostics)</c>; visible to the CLI and tests via InternalsVisibleTo.
     /// </summary>

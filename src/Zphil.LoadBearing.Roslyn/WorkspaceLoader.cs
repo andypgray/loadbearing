@@ -24,7 +24,7 @@ public static class WorkspaceLoader
 
     /// <summary>
     ///     The number of times <see cref="LoadAsync" /> has opened an <see cref="MSBuildWorkspace" /> in
-    ///     this process — the "a design-time build ran" pin. The Phase 12 binlog-replay path deliberately
+    ///     this process — the "a design-time build ran" pin. The binlog-replay path deliberately
     ///     bypasses this method, so a run that replays a capture leaves this counter unchanged. Internal
     ///     test observable, incremented with <see cref="Interlocked" />; never consulted in production.
     /// </summary>
@@ -43,7 +43,7 @@ public static class WorkspaceLoader
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
     ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving MSBuild/Roslyn
-    ///     assemblies before <c>MSBuildLocator</c> registration in non-test hosts (the Phase 3 CLI);
+    ///     assemblies before <c>MSBuildLocator</c> registration in non-test hosts (the CLI);
     ///     in tests registration happens in a <c>[ModuleInitializer]</c>, so ordering is already safe.
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]

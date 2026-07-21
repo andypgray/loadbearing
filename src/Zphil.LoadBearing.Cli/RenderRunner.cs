@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The <c>render</c> pipeline (R3): load the model → compose the root block into
+///     The <c>render</c> pipeline: load the model → compose the root block into
 ///     <c>&lt;solution-dir&gt;/AGENTS.md</c> → and, when the model has frozen scopes or layers carrying
 ///     anchored rules, extract the codebase and place each layer's local-rules card and each scope's
 ///     card in its directory's <c>AGENTS.md</c>. Content units that land in the same directory merge

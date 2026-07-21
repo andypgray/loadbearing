@@ -30,7 +30,7 @@ public sealed class SpecResolverTests
     {
         // The source-checkout shape: the contract library arrives as a ProjectReference, so the
         // candidate's reference paths carry the referenced project's OUTPUT path rather than a package
-        // DLL path (candidate construction concatenates both shapes — the Phase 8 derive walk caught
+        // DLL path (candidate construction concatenates both shapes — the derive walk caught
         // the P2P blind spot).
         SpecProjectCandidate chosen = SpecResolver.ResolveConventionProject([
             Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll"),

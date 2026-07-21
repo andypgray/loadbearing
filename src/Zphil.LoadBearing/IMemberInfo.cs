@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing;
 ///     (<c>.Where(pred, ...)</c> and <c>.Must(pred, ...)</c> on a member selection, GRAMMAR §4.6,
 ///     §5.6). The member analog of <see cref="ITypeInfo" />: the v1 member-predicate input contract,
 ///     grown additively as extraction learns new facts. Predicates are stored on the model but never
-///     evaluated in this phase — the mandatory description is what renders, not the lambda.
+///     evaluated at spec build — the mandatory description is what renders, not the lambda.
 /// </summary>
 public interface IMemberInfo
 {

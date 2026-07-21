@@ -91,7 +91,7 @@ public static class SelectionAdjectives
     }
 
     /// <summary>
-    ///     The selector-position escape hatch. The predicate is stored, never evaluated in Phase 1;
+    ///     The selector-position escape hatch. The predicate is stored, never evaluated;
     ///     the required <paramref name="description" /> is what renders as a sentence-final relative
     ///     clause (GRAMMAR §5.6). A blank description fails spec build (validation §8 item 5).
     /// </summary>

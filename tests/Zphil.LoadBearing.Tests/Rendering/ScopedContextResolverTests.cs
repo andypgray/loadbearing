@@ -8,7 +8,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     Scoped placement (R3, step 3): the frozen selection is evaluated in Subject position and its
+///     Scoped placement: the frozen selection is evaluated in Subject position and its
 ///     types' declaration sites collapse to a deepest-common-ancestor directory — the right dir for a
 ///     co-located scope, the containing dir for a single file, the common root for a cross-project
 ///     scope. A scope matching no types resolves to a null directory with a skip reason. No MSBuild —

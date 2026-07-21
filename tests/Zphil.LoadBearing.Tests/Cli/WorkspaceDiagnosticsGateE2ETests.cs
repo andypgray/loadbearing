@@ -7,11 +7,11 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The workspace-diagnostics contract on <c>check</c> (WP4). Two halves, both against the real MyApp
+///     The workspace-diagnostics contract on <c>check</c>. Two halves, both against the real MyApp
 ///     fixture (each opens a workspace, hence <c>Serial</c>):
 ///     <list type="bullet">
 ///         <item>
-///             <b>M1 — fail closed.</b> A workspace-load failure means the model is incomplete, so
+///             <b>Fail closed.</b> A workspace-load failure means the model is incomplete, so
 ///             <c>check</c> exits 2 by default (overriding the clean 0 and the violated 1) rather than read
 ///             green on a partial model; <c>--allow-workspace-diagnostics</c> restores the prior 0/1 exit
 ///             with the load failures printed as warnings. Driven through <see cref="CheckRunner" /> with an
@@ -19,10 +19,10 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             way to exercise the gate without a genuinely broken project. <c>--json</c> stdout stays pure.
 ///         </item>
 ///         <item>
-///             <b>M2 — merge notes never gate.</b> A real same-FQN cross-project conflation (Shared.Widget
+///             <b>Merge notes never gate.</b> A real same-FQN cross-project conflation (Shared.Widget
 ///             declared by two projects that do not reference each other) renders on the same diagnostics
 ///             stream — <c>warning:</c> on stderr, the <c>workspaceDiagnostics</c> array in JSON — while the
-///             exit stays 0: the advisory notes are kept out of the M1 gate by construction.
+///             exit stays 0: the advisory notes are kept out of the fail-closed gate by construction.
 ///         </item>
 ///     </list>
 /// </summary>
@@ -37,7 +37,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    // ── M1: workspace-load diagnostics fail check closed ──────────────────────────────────────────────────
+    // ── Workspace-load diagnostics fail check closed ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Check_WorkspaceLoadDiagnostic_NoFlag_FailsClosedWithExitTwoAndGateLine()
@@ -87,7 +87,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Err.ShouldContain(GateLine);
     }
 
-    // ── M2: same-FQN merge notes render but never gate ────────────────────────────────────────────────────
+    // ── Same-FQN merge notes render but never gate ────────────────────────────────────────────────────
 
     [Fact]
     public async Task Check_SameFqnAcrossTwoProjects_RendersMergeNoteWarningWithoutTrippingGate()
@@ -102,7 +102,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Err.ShouldContain(
             "warning: Type 'Shared.Widget' is declared by projects 'MyApp.Domain' and 'MyApp.Legacy.Billing'");
         result.Err.ShouldContain("arch.Project('MyApp.Legacy.Billing') selections will not include it.");
-        result.Err.ShouldNotContain("error: the model is incomplete"); // the M1 gate did NOT fire
+        result.Err.ShouldNotContain("error: the model is incomplete"); // the fail-closed gate did NOT fire
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     // Wraps a real cold load, then re-wraps the handle with synthetic workspace-load diagnostics — the real
-    // MyApp fixture loads cleanly, so this is the only way to drive the M1 gate without a broken project.
+    // MyApp fixture loads cleanly, so this is the only way to drive the fail-closed gate without a broken project.
     // The real handle rides as the owned disposable, so disposing this wrapper's handle disposes the workspace.
     private sealed class DiagnosticInjectingSolutionSource(IReadOnlyList<string> diagnostics) : ISolutionSource
     {

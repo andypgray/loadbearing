@@ -360,7 +360,7 @@ public sealed class MemberSubjectVerbTests
         grandfathered.Grandfathered.Count.ShouldBe(1);
 
         // Add a NEW unsuffixed Task method: identity is the member's own DocId, so the grandfathered
-        // blessing does not cover it — a NEW red (DESIGN.md §5).
+        // blessing does not cover it — a NEW red.
         const string after = """
                              namespace App.Async
                              {

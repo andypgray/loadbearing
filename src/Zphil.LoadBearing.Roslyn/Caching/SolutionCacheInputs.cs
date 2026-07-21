@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
 ///     Reduces a loaded <see cref="Solution" /> to the <see cref="ProjectInputs" /> the extraction cache
-///     fingerprints (Phase 11 D2): one entry per C# project, keyed by name, with its project file, its
+///     fingerprints: one entry per C# project, keyed by name, with its project file, its
 ///     directory (whose cone the store scans for added <c>*.cs</c>), its forward project-reference names
 ///     (the Merkle dependency edges), and its source-document paths.
 /// </summary>

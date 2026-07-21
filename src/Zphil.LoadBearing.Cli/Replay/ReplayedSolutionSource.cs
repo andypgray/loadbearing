@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 namespace Zphil.LoadBearing.Cli.Replay;
 
 /// <summary>
-///     The eager replay source (Phase 12 D1): serves a <see cref="Solution" /> the gate has <em>already</em>
+///     The eager replay source: serves a <see cref="Solution" /> the gate has <em>already</em>
 ///     replayed from an explicit <c>--binlog</c>, so the ingest sanity-check and capture persistence fire
 ///     deterministically before the run — even when the fragment cache would hit and never acquire a
 ///     workspace. Like <see cref="Mcp.WarmSolutionSource" /> it discovers first

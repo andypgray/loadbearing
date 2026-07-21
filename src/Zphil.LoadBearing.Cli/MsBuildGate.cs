@@ -16,7 +16,7 @@ namespace Zphil.LoadBearing.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Phase 12 D1 — the replay branch.</b> <c>check</c>/<c>status</c>/<c>graph</c> route through
+///         <b>The replay branch.</b> <c>check</c>/<c>status</c>/<c>graph</c> route through
 ///         <see cref="SelectSourceAndRunAsync" />, which registers MSBuildLocator once up front and then
 ///         decides the source over only <c>Replay</c>-namespace + BCL types (capture validation, option
 ///         inspection), never resolving an <c>MSBuildWorkspace</c> in the decision itself. Every branch needs
@@ -87,7 +87,7 @@ internal static class MsBuildGate
         return await InvokeBaselineAsync(request, output, error, ct);
     }
 
-    // ── the source-selection gate (Phase 12 D1) ──────────────────────────────────────────────────────────
+    // ── the source-selection gate ────────────────────────────────────────────────────────────────────────
 
     // The pre-decision: an explicit --binlog wins (replay-first, eagerly); otherwise, unless --no-cache, a
     // structurally-valid capture replays lazily, a stale/unreadable one prints its notice and falls back to a

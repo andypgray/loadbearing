@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Tests.Checking;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     The static-form <c>MustNotUse</c> verb sugar (GRAMMAR §3.3/§4.5, Phase 16):
+///     The static-form <c>MustNotUse</c> verb sugar (GRAMMAR §3.3/§4.5):
 ///     <c>subject.MustNotUse(() =&gt; Type.M)</c> desugars target-by-target through
 ///     <c>arch.Member(() =&gt; …)</c> to the identical <see cref="Member" /> leaf — so it reifies
 ///     identically to both the explicit <c>arch.Member</c> expression spelling and the

@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Baselines;
 
 /// <summary>
-///     The canonical on-disk baseline format and its integrity digest (DESIGN.md §13(d), Phase 5). A
+///     The canonical on-disk baseline format and its integrity digest. A
 ///     baseline file is line-oriented JSON — UTF-8 no BOM, LF endings, a trailing newline, 2-space
 ///     indent, one entry object per line — so a burndown diff removes exactly one line. An entry may
 ///     carry an optional <c>because</c> attribution as its last property, folded into the digest.
@@ -60,7 +60,7 @@ public static class BaselineFormat
     }
 
     /// <summary>
-    ///     The line-oriented digest input for the given rules (Spec 1): a fixed preamble line, then a
+    ///     The line-oriented digest input for the given rules: a fixed preamble line, then a
     ///     <c>rule &lt;id&gt;</c> line per rule (ordinal) and an <c>edge &lt;src&gt; -&gt; &lt;tgt&gt;</c>
     ///     or <c>subject &lt;id&gt;</c> line per entry (tuple-sorted). An attributed entry adds a
     ///     <c>because &lt;text&gt;</c> line immediately after its own line; the encoding stays injective

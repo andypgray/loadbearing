@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     The persisted extraction cache as a single serializable document: a self-describing manifest plus
 ///     every <see cref="CodebaseFragment" /> the last workspace-loaded run extracted. One
 ///     <see cref="ExtractionCacheStore" /> reads, validates, and (re)writes exactly one of these to one
-///     atomic file (Phase 11 WP6). The manifest is deliberately self-contained — it records every input
+///     atomic file. The manifest is deliberately self-contained — it records every input
 ///     path and its stamp so validation needs no MSBuild and no <see cref="CodebaseFragment" /> inspection.
 /// </summary>
 /// <remarks>
@@ -95,7 +95,7 @@ internal sealed record ProjectCacheEntry(
 /// <summary>
 ///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the
 ///     project to exclude and the Debug-evaluated output path. Stored faithfully so a cache hit can replay
-///     spec resolution without a workspace (Phase 11 WP7 consumes these — it re-runs the built-output check
+///     spec resolution without a workspace (the hit path consumes these — it re-runs the built-output check
 ///     over <see cref="OutputFilePath" /> for a convention/csproj spec, so the hit path resolves identically
 ///     to a cold run, including the sibling-configuration fallback and its error text).
 /// </summary>

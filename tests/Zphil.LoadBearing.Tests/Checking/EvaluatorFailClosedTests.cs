@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     M4 fail-closed dispatch: an unknown vocabulary member — a noun, a selection adjective, or a member
+///     Fail-closed dispatch: an unknown vocabulary member — a noun, a selection adjective, or a member
 ///     adjective the evaluator switches do not handle — must throw loudly naming the runtime type, and
 ///     <see cref="ArchChecker" /> must contain that throw as a per-rule <see cref="ViolationKind.RuleError" />
 ///     (the run continues, the rule reports Failed) rather than crash or read green. The

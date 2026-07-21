@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     One reified rule (DESIGN.md §6): a stable ID, a posture, rationale, an optional fix, the
+///     One reified rule: a stable ID, a posture, rationale, an optional fix, the
 ///     deterministic law <see cref="Sentence" />, and the posture-specific payload. Freeze scopes
 ///     desugar into <see cref="Posture.Freeze" /> rules carrying <see cref="Freeze" /> (GRAMMAR §7).
 /// </summary>
@@ -60,7 +60,7 @@ public sealed class ArchRule
     /// <summary>
     ///     The effective ratchet baseline path for this rule, or null when the rule is not ratcheted.
     ///     Both Migrate rules and Freeze containment rules grandfather their violations against a
-    ///     baseline (DESIGN.md §5, GRAMMAR §7); a Freeze tripwire and an Enforce rule have none. The
+    ///     baseline (GRAMMAR §7); a Freeze tripwire and an Enforce rule have none. The
     ///     one accessor every renderer/store consults to ask "is this a ratcheted rule".
     /// </summary>
     public string? BaselinePath => Migrate?.BaselinePath

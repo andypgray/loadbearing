@@ -77,7 +77,7 @@ public sealed class TypeNameFullDisplayTests
     [Fact]
     public void FullDisplay_ClosedGenericWithRank2ArrayArgument_AppendsRankedBrackets()
     {
-        // A rank-2 array renders `[,]`, not `[]` (the L5 bug dropped the rank) — and it must still match the
+        // A rank-2 array renders `[,]`, not `[]` (the rank must not be dropped) — and it must still match the
         // form Roslyn extraction produces for the byte-identical source.
         AssertExtractedInterface("UsesRank2Array", typeof(IBox<Simple[,]>), $"{Ns}.IBox<{Ns}.Simple[,]>");
     }

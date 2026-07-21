@@ -16,7 +16,7 @@ internal readonly record struct SessionFragmentSet(
     IReadOnlySet<string> ReExtractedProjects);
 
 /// <summary>
-///     A session-lifetime, incremental fragment store for the warm MCP server (Phase 12 D2). It holds the
+///     A session-lifetime, incremental fragment store for the warm MCP server. It holds the
 ///     last-extracted <see cref="CodebaseFragment" />s keyed by project name and, on each
 ///     <see cref="GetFragmentsAsync" />, reuses the clean projects' fragments and re-extracts only the ones
 ///     whose bytes changed — expanded to their reference-graph dependents — before returning the whole set,
@@ -73,7 +73,7 @@ internal sealed class SessionFragmentStore
     /// <summary>
     ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked: every C# project on a full
     ///     walk, the dirty ∪ dependents set on an incremental one, empty on a pure steady-state call.
-    ///     Internal test observable (the D2 acceptance — "a warm re-extract walks only projects whose
+    ///     Internal test observable ("a warm re-extract walks only projects whose
     ///     compilation identity changed"); never printed.
     /// </summary>
     internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = NoProjects;

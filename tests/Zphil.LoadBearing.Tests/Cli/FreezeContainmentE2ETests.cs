@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     End-to-end freeze containment against the real MyApp fixture (GRAMMAR §7, Phase 6 acceptance).
+///     End-to-end freeze containment against the real MyApp fixture (GRAMMAR §7).
 ///     The MyAppFrozenSpec resolves its containment to the committed conventional baseline that
 ///     grandfathers InvoiceController's pre-existing interior references — so a clean run is exit 0 —
 ///     while a new inbound reference (HomeController → BillingCalculator, added to a private copy) is

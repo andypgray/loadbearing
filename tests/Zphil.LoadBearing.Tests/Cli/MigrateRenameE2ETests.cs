@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The Phase 5 rename acceptance (DESIGN.md §5): baselines key on stable symbol IDs, not
+///     The rename acceptance: baselines key on stable symbol IDs, not
 ///     <c>file:line</c>, so they survive a file move. Against a private copy of the fixture whose
 ///     controllers' <c>DataTable</c> sites are fully grandfathered (the clean spec's
 ///     <c>arch/clean-baseline.json</c>), moving <c>InvoiceController.cs</c> into a <c>Controllers/</c>

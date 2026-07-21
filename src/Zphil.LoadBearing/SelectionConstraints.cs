@@ -202,8 +202,8 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     The constraint-position escape hatch. The predicate is stored, never evaluated in
-    ///     Phase 1; the required <paramref name="description" /> completes "must …". A blank
+    ///     The constraint-position escape hatch. The predicate is stored, never evaluated;
+    ///     the required <paramref name="description" /> completes "must …". A blank
     ///     description fails spec build (validation §8 item 5).
     /// </summary>
     public static Constraint Must(this Selection subject, Func<ITypeInfo, bool> predicate, string description)

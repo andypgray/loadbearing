@@ -10,11 +10,11 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 ///     The baseline I/O boundary of the host layer (Core owns the format and digest; this owns the disk).
 ///     Reads a baseline file with a strict JSON walk (exact properties, <c>schemaVersion == 1</c>,
 ///     well-formed entries, each optionally attributed with a <c>because</c>), then <em>recanonicalizes</em>
-///     the parsed entries and re-derives the digest — a mismatch is loud tamper (Spec 1). A missing file
+///     the parsed entries and re-derives the digest — a mismatch is loud tamper. A missing file
 ///     or missing rule section is uncaptured, not an error. Writes are canonical (fresh digest, unknown
 ///     sections preserved), UTF-8 no BOM, LF, and report wrote/unchanged on a CRLF-normalized compare so
 ///     an autocrlf checkout is a true zero-diff.
-///     Lives in the Roslyn host project (since Phase 7) so both the CLI and the xUnit adapter share it.
+///     Lives in the Roslyn host project so both the CLI and the xUnit adapter share it.
 /// </summary>
 internal static class BaselineStore
 {
@@ -49,7 +49,7 @@ internal static class BaselineStore
     /// <summary>
     ///     Reads and verifies a baseline file. Returns null when the file does not exist (uncaptured).
     ///     Malformed JSON, a schema violation, or a digest mismatch throw a <see cref="UserErrorException" />
-    ///     naming the path (a mismatch carries the Spec 1 restore hint).
+    ///     naming the path (a mismatch carries the restore hint).
     /// </summary>
     public static BaselineDocument? TryReadDocument(string absolutePath)
     {

@@ -6,7 +6,7 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Places each declared layer's "local rules" context card (Phase X3) — the second, additive
+///     Places each declared layer's "local rules" context card — the second, additive
 ///     emission key beside frozen scopes. A layer earns a card iff at least one Enforce or Migrate
 ///     rule is <em>anchored</em> on it: the rule's subject <see cref="Selection" /> has that layer's
 ///     <see cref="Model.LayerNoun" /> as its noun head (adjectives and <c>Except</c> refinements keep

@@ -71,7 +71,7 @@ jobs:
           exit $rc
 
       # Build the whole solution — the slnx is the entire tree here, so this compiles every
-      # shipping project directly (the donor built its test csproj as a transitive proxy).
+      # shipping project directly.
       - name: Build
         run: dotnet build Zphil.LoadBearing.slnx -c Release
 

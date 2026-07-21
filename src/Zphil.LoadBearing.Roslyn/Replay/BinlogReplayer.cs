@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 namespace Zphil.LoadBearing.Roslyn.Replay;
 
 /// <summary>
-///     One-shot binlog replay for the enforcement path (Phase 12 D1): read a real build's binlog into a
+///     One-shot binlog replay for the enforcement path: read a real build's binlog into a
 ///     workspace-shaped <see cref="Solution" /> without a design-time build, strip unresolved references, and
 ///     return. The replayed solution is the design-time-build bypass — it carries the structure the
 ///     build recorded (project files, output paths, references, the csc source-file list) while the
@@ -51,7 +51,7 @@ internal static class BinlogReplayer
     /// <returns>The replayed, stripped solution with its owning workspace and reader.</returns>
     /// <remarks>
     ///     Synchronous, because the underlying <see cref="SolutionReader" /> API is synchronous.
-    ///     Exception surface (the CLI wraps these in a later work package; this method does not reference
+    ///     Exception surface (the CLI wraps these; this method does not reference
     ///     that mapping):
     ///     <list type="bullet">
     ///         <item><see cref="ArgumentException" /> — <paramref name="binlogPath" /> is null or blank.</item>

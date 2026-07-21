@@ -5,7 +5,7 @@ using Zphil.LoadBearing.Cli.Rendering;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The <c>explain</c> field dump (R4), pinned over the canonical sample's rule shapes in-process:
+///     The <c>explain</c> field dump, pinned over the canonical sample's rule shapes in-process:
 ///     the <c>&lt;id&gt; (&lt;posture&gt;)</c> header (with the Freeze role), each present field once,
 ///     the posture payloads (Migrate <c>from</c>/<c>policy</c>/<c>baseline</c>; Freeze scope/boundary/
 ///     baseline/dragons), and the tripwire's sentence-less, boundary-less form. <c>Fix</c> renders here

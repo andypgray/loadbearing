@@ -11,8 +11,8 @@ namespace Zphil.LoadBearing.Checking;
 ///     <c>status</c>. One <see cref="RuleResult" /> per rule, in model order: Enforce rules are
 ///     evaluated; ratcheted rules — Migrate and Freeze containment — are evaluated the same way and
 ///     then <em>partitioned</em> against a <see cref="BaselineIndex" /> (in-baseline =
-///     grandfathered/pass, not-in-baseline = red, including new code in the old pattern — DESIGN.md
-///     §5); a Freeze tripwire runs the diff-aware touch check (GRAMMAR §7), warning per changed file
+///     grandfathered/pass, not-in-baseline = red, including new code in the old pattern); a Freeze
+///     tripwire runs the diff-aware touch check (GRAMMAR §7), warning per changed file
 ///     inside the scope and passing, or skipping when no <see cref="DiffContext" /> was supplied. Any
 ///     evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather than aborting
 ///     the run (all-errors philosophy).
@@ -68,7 +68,7 @@ public static class ArchChecker
             var (violations, warnings) = evaluator.Evaluate(rule.Constraint!);
             // A ratcheted rule — Migrate, or Freeze containment (which reifies a real
             // MustOnlyBeReferencedBy constraint and so evaluates exactly like Enforce) — partitions
-            // against its baseline; everything else is plain Enforce law (DESIGN.md §5, GRAMMAR §7).
+            // against its baseline; everything else is plain Enforce law (GRAMMAR §7).
             return rule.BaselinePath is not null
                 ? Ratchet(rule, violations, warnings, baselines)
                 : Enforce(rule, violations, warnings);
@@ -95,7 +95,7 @@ public static class ArchChecker
         return new RuleResult(rule, status, ordered, warnings, null, Array.Empty<Violation>(), 0, false);
     }
 
-    // The ratchet (DESIGN.md §5), shared by Migrate and Freeze containment: a violation whose identity
+    // The ratchet, shared by Migrate and Freeze containment: a violation whose identity
     // is grandfathered by the rule's captured baseline section passes; everything else — including a new
     // forbidden target from a grandfathered source (pair identity, GRAMMAR §4.3) and every
     // EmptySubject/RuleError (never baselinable) — is red.

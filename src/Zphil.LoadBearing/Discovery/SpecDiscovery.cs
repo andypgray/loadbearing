@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Discovery;
 ///     <see cref="Type.FullName" /> ordinal (GRAMMAR §9 — law must load predictably), and
 ///     instantiates each. A zero result is loud (<see cref="SpecDiscoveryException" />). The
 ///     <c>AssemblyLoadContext</c> that isolates a prebuilt spec DLL is a host concern (the test
-///     project today, the CLI in Phase 3), not the Core's.
+///     project or the CLI), not the Core's.
 /// </summary>
 public static class SpecDiscovery
 {

@@ -5,13 +5,13 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 /// <summary>
 ///     The persisted build capture as a single serializable document: a self-describing manifest recording
 ///     exactly what makes the copied binlog (<c>capture.binlog</c>) a faithful stand-in for a design-time
-///     build of the current tree (Phase 12 WP3). <see cref="BinlogCaptureStore" /> writes one of these
+///     build of the current tree. <see cref="BinlogCaptureStore" /> writes one of these
 ///     atomically beside the binlog copy and later validates it with zero MSBuild — stat plus a selective
 ///     re-hash of the recorded structural inputs, and an existence sweep over the recorded documents.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Structure-only, deliberately.</b> Unlike the Phase 11 fragment cache (<see cref="CacheManifest" />),
+///         <b>Structure-only, deliberately.</b> Unlike the fragment cache (<see cref="CacheManifest" />),
 ///         which keys on structure <em>and</em> per-document content so any source edit re-extracts, the
 ///         capture keys on structure alone: replay reads source text from current disk, so a content edit is
 ///         invisible to it and must not invalidate the capture. What <em>does</em> invalidate it is anything

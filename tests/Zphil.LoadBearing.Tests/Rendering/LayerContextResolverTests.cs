@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     Layer placement (Phase X3): a layer earns a "local rules" card iff at least one Enforce or
+///     Layer placement: a layer earns a "local rules" card iff at least one Enforce or
 ///     Migrate rule is anchored on it (subject noun head is that layer), and the card lands in the
 ///     deepest common ancestor directory of the whole layer's types. A refined subject (adjective /
 ///     <c>Except</c>) keeps its noun head, so it still anchors; a namespace-subject rule over the same

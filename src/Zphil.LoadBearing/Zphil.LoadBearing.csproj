@@ -3,7 +3,7 @@
     <PropertyGroup>
         <!-- netstandard2.0 is the only TFM referenceable from both a legacy net48 spec project
              (typeof() over net48 product types) and the net10 CLI/Roslyn/tests. It forces the
-             desirable Core(model)/Roslyn split. See DESIGN.md §13(a). LangVersion 13.0 is pinned
+             desirable Core(model)/Roslyn split. LangVersion 13.0 is pinned
              because netstandard2.0 otherwise defaults to C# 7.3, losing primary constructors,
              file-scoped namespaces, and get-only auto-props set from a primary-ctor param
              (which need no IsExternalInit — so no records/init, no PolySharp shim). -->

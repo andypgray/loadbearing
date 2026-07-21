@@ -5,7 +5,7 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 
 /// <summary>
 ///     A binlog-replayed solution paired with the in-memory workspace it was loaded into — the replay
-///     analog of <see cref="LoadedSolution" /> (Phase 12 D1). Unlike that type there is no MSBuild
+///     analog of <see cref="LoadedSolution" />. Unlike that type there is no MSBuild
 ///     <c>BuildHost</c> to release, because no design-time build ran: the structure came from a real
 ///     build's binlog and the source text is read from current disk. <see cref="Solution" /> is the
 ///     unresolved-reference-stripped snapshot the extractor reads, identical in kind to the MSBuild

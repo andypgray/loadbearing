@@ -8,8 +8,8 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     Derives the on-disk location of a solution's persisted extraction cache. The default root is
 ///     <c>%LOCALAPPDATA%/Zphil.LoadBearing/cache</c> (the same <c>%LOCALAPPDATA%/Zphil.LoadBearing</c> base
 ///     the Serilog file log uses), and each solution gets its own subdirectory named
-///     <c>&lt;sln-name&gt;-&lt;sha256-prefix-of-canonical-path&gt;</c>. That directory holds the Phase 11
-///     fragment cache (<c>cache.json</c>) and, from Phase 12, the binlog build-capture pair alongside it: a
+///     <c>&lt;sln-name&gt;-&lt;sha256-prefix-of-canonical-path&gt;</c>. That directory holds the
+///     fragment cache (<c>cache.json</c>) and the binlog build-capture pair alongside it: a
 ///     <c>capture.json</c> manifest and the <c>capture.binlog</c> copy the replay path reuses (see
 ///     <see cref="CaptureManifestPath" />/<see cref="CaptureBinlogPath" />). All three are independent,
 ///     disposable local derived data keyed to the one solution.
@@ -17,7 +17,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// <remarks>
 ///     <para>
 ///         The root is overridable via a parameter (the CLI passes the <c>LOADBEARING_CACHE_DIR</c> value
-///         through <see cref="System.Environment" />'s seam in a later work package, and tests point it at a
+///         through <see cref="System.Environment" />'s seam, and tests point it at a
 ///         throwaway temp directory) — this type never reads an environment variable itself, keeping the
 ///         Roslyn project off the <c>mcp/env-through-seam</c> ratchet.
 ///     </para>
@@ -73,7 +73,7 @@ internal static class CacheLocations
     }
 
     /// <summary>
-    ///     The absolute path to the Phase 12 build-capture manifest (<c>capture.json</c>) for
+    ///     The absolute path to the build-capture manifest (<c>capture.json</c>) for
     ///     <paramref name="solutionPath" /> — the structure-only-keyed sidecar beside
     ///     <see cref="CacheFilePath" /> in the same per-solution directory.
     /// </summary>

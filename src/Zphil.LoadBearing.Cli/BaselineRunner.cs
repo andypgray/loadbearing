@@ -8,12 +8,12 @@ using Zphil.LoadBearing.Roslyn.Baselines;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The <c>baseline</c> pipeline (DESIGN.md §5): grandfather, shrink, or deliberately grow the
+///     The <c>baseline</c> pipeline: grandfather, shrink, or deliberately grow the
 ///     ratcheted baselines — both Migrate rules and Freeze containment (GRAMMAR §7). Mode validation
 ///     runs first (before the workspace cost). <c>--init</c> captures each <em>uncaptured</em>
 ///     ratcheted rule's current violations (an empty section for a clean rule — "captured, zero
 ///     debt"). <c>--accept-reductions</c> removes captured entries whose violation no longer occurs
-///     and <em>refuses</em> new ones. <c>--add</c> is the ratchet's escape valve (DESIGN.md §13(d)):
+///     and <em>refuses</em> new ones. <c>--add</c> is the ratchet's escape valve:
 ///     it grandfathers exactly one currently observed violation of a captured rule, with mandatory
 ///     attribution — growth is never silent, never bulk. The command never gates — it always exits 0
 ///     on success. Tamper (a hand-edited digest) refuses loudly with the restore hint, the same as

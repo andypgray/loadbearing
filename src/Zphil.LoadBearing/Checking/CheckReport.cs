@@ -3,7 +3,7 @@ namespace Zphil.LoadBearing.Checking;
 /// <summary>
 ///     The full result of a check run: one <see cref="RuleResult" /> per rule in model (authoring)
 ///     order, plus roll-up counts. This is the single object both render targets consume — the human
-///     and JSON CLI renderers, and (Phase 7) the MCP <c>arch_check</c> tool.
+///     and JSON CLI renderers, and the MCP <c>arch_check</c> tool.
 /// </summary>
 public sealed class CheckReport
 {

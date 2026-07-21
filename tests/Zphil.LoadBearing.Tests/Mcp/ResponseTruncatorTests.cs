@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
 ///     The response cap (<see cref="ResponseTruncator" />): the token-budget → char-cap conversion and the
-///     truncate-at-last-newline behavior. The donor's tool-specific narrowing-hint rows are dropped — the
+///     truncate-at-last-newline behavior. Tool-specific narrowing-hint rows are deliberately absent — the
 ///     <c>arch_*</c> tools have no per-tool hint, so the footer always ends the same way.
 /// </summary>
 public sealed class ResponseTruncatorTests

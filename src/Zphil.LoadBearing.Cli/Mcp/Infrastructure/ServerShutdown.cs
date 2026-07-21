@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 ///     <para>
 ///         Both <see cref="IdleTimeoutWatchdog" /> and <see cref="ParentProcessWatcher" /> route through
 ///         <see cref="ExitWith(string)" /> instead of calling <c>Environment.Exit</c> directly, so a
-///         mid-flight tool call drains and the logger flushes first. The warm MCP server (Phase 11 D1)
+///         mid-flight tool call drains and the logger flushes first. The warm MCP server
 ///         registers the long-lived <see cref="Roslyn.WorkspaceSession" />'s async disposer here, so a
 ///         watchdog-triggered teardown disposes its <c>MSBuildWorkspace</c> and out-of-process BuildHost
 ///         before the process exits; the cold fallback (<c>LOADBEARING_DISABLE_WARM_WORKSPACE</c>) owns no

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <!-- The test-adapter surface (DESIGN.md §10, §12): each post-desugar rule becomes an
+        <!-- The test-adapter surface: each post-desugar rule becomes an
              individually named xUnit test whose failure text matches the CLI human block. net10.0 host
              over Core (model) + Roslyn (workspace/extraction). -->
         <TargetFramework>net10.0</TargetFramework>

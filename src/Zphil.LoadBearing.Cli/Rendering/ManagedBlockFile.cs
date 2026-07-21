@@ -6,14 +6,14 @@ using Zphil.LoadBearing.Roslyn.Caching;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The byte-level file adapter around the pure Core <see cref="ManagedBlock" /> splicer (R1). It
+///     The byte-level file adapter around the pure Core <see cref="ManagedBlock" /> splicer. It
 ///     reads raw bytes (not <c>File.ReadAllText</c>, which silently strips a BOM), decodes them as
 ///     <em>strict</em> UTF-8 (a file that is not valid UTF-8 is refused, never rewritten with U+FFFD
-///     replacement characters — L1), preserves the file's BOM state exactly, writes new files as UTF-8
+///     replacement characters), preserves the file's BOM state exactly, writes new files as UTF-8
 ///     without a BOM, and reports wrote/unchanged by comparing final bytes to existing bytes (so an
 ///     unchanged spec re-render is a true zero-diff). The write itself goes through
 ///     <see cref="AtomicFile" />, so a crash mid-render leaves the old committed <c>AGENTS.md</c> intact,
-///     never a truncated one (M6). A malformed managed block or a non-UTF-8 file becomes a
+///     never a truncated one. A malformed managed block or a non-UTF-8 file becomes a
 ///     <see cref="UserErrorException" /> that names the file — LoadBearing never repairs a broken file,
 ///     and never destroys one it cannot cleanly round-trip.
 /// </summary>
@@ -22,7 +22,7 @@ internal static class ManagedBlockFile
     private static readonly byte[] Utf8Bom = [0xEF, 0xBB, 0xBF];
 
     // Strict UTF-8: invalid bytes throw DecoderFallbackException on read (refused, not silently replaced
-    // with U+FFFD — L1), and no preamble is emitted on write (the BOM is prepended by hand below). GetBytes
+    // with U+FFFD), and no preamble is emitted on write (the BOM is prepended by hand below). GetBytes
     // over a valid string is byte-identical to the prior new UTF8Encoding(false), so output does not move.
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 

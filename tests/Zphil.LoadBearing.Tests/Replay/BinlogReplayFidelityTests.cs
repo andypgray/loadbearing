@@ -10,7 +10,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Replay;
 
 /// <summary>
-///     The Phase 12 D1 fidelity gate: a binlog replayed into an <c>AdhocWorkspace</c> must produce the
+///     The fidelity gate: a binlog replayed into an <c>AdhocWorkspace</c> must produce the
 ///     same <see cref="CodebaseModel" /> the MSBuildWorkspace path produces from the same tree — edge for
 ///     edge, external for external, site for site. All tests share one lazily-built binlog fixture and
 ///     run sequentially in this one class, so the freshness test may mutate the shared copy in place and

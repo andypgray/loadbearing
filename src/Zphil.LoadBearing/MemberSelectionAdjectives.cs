@@ -36,8 +36,8 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     The member selector-position escape hatch. The predicate is stored, never evaluated in this
-    ///     phase; the required <paramref name="description" /> renders as a sentence-final relative
+    ///     The member selector-position escape hatch. The predicate is stored, never evaluated at
+    ///     spec build; the required <paramref name="description" /> renders as a sentence-final relative
     ///     clause (GRAMMAR §5.6, §5.7). A blank description fails spec build (validation §8 item 5).
     /// </summary>
     public static TSelf Where<TSelf>(this TSelf selection, Func<IMemberInfo, bool> predicate, string description)

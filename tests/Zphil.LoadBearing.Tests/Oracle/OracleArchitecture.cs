@@ -13,8 +13,7 @@ namespace Zphil.LoadBearing.Tests.Oracle;
 ///     The ArchUnitNET half of the differential-testing oracle: loads the three compiled MyApp
 ///     fixture DLLs once (their absolute paths baked into this assembly's metadata by the build) and
 ///     builds a single <see cref="ArchUnitNET.Domain.Architecture" /> from their IL (Mono.Cecil). This
-///     is the independent substrate LoadBearing's Roslyn-source checker is cross-checked against
-///     (Phase 10 Deliverable 1).
+///     is the independent substrate LoadBearing's Roslyn-source checker is cross-checked against.
 /// </summary>
 /// <remarks>
 ///     Reused across the case-table rows as an <c>IClassFixture</c>, so the (non-trivial) assembly

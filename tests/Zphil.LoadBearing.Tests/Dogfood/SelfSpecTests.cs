@@ -8,7 +8,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Dogfood;
 
 /// <summary>
-///     The dogfood gates (Phase 4 acceptance). One class so the two workspace-heavy runs serialize.
+///     The dogfood gates. One class so the two workspace-heavy runs serialize.
 ///     <see cref="SelfSpec_Check_ExitsZero" /> is the CI-equivalent self-spec gate: LoadBearing checks
 ///     itself and passes. <see cref="AgentsMd_IsCurrent" /> is the provably-current gate, no workspace
 ///     needed: it composes the root block in-process and asserts the committed <c>AGENTS.md</c>'s single
@@ -20,7 +20,7 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task SelfSpec_Check_ExitsZero()
     {
-        // Loads the whole solution through MSBuildWorkspace (several seconds — accepted for Phase 4).
+        // Loads the whole solution through MSBuildWorkspace (several seconds — an accepted cost).
         CliResult result = await CliRunner.InvokeAsync("check", RepoRoot.Solution, "--spec", RepoRoot.ArchSpecCsproj);
 
         // Surface the CLI's own output on failure — otherwise a red self-check (e.g. the Release-only

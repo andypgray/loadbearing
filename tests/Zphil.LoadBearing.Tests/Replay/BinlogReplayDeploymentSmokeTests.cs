@@ -9,7 +9,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Replay;
 
 /// <summary>
-///     The deployment-shaped regression net for the binlog-replay MSBuildLocator crash (Phase 12 WP6): it runs
+///     The deployment-shaped regression net for the binlog-replay MSBuildLocator crash: it runs
 ///     the shipped <c>loadbearing.dll</c> as a <em>child process</em> so it exercises the exact condition that
 ///     masked the bug from the rest of the suite. Every other replay E2E drives the command tree in-process,
 ///     where a <c>[ModuleInitializer]</c> (<see cref="MsBuildInitializer" />) has already registered MSBuild
