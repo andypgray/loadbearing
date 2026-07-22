@@ -1,5 +1,3 @@
-using Meridian.Interchange.Outbox;
-
 namespace Meridian.Interchange.Partners;
 
 /// <summary>
@@ -11,6 +9,6 @@ public interface IPartnerClient
     /// <summary>The interchange channel this client transmits to (carrier, customs, terminal, legacy).</summary>
     string Channel { get; }
 
-    /// <summary>Transmits one outbound message to the partner.</summary>
-    Task SendAsync(OutboxMessage message, CancellationToken cancellationToken);
+    /// <summary>Transmits one outbound envelope to the partner.</summary>
+    Task SendAsync(PartnerEnvelope envelope, CancellationToken cancellationToken);
 }

@@ -393,15 +393,53 @@
         }
       ],
       "warnings": []
+    },
+    {
+      "id": "api/return-dtos",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not expose `DataTable`.",
+      "because": "An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model.",
+      "fix": "Return a DTO instead of exposing System.Data.DataTable.",
+      "baseline": {
+        "path": "arch/baselines/api/return-dtos.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "expose",
+          "source": "MyApp.Web.HomeController",
+          "target": "System.Data.DataTable",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 24
+            }
+          ]
+        },
+        {
+          "kind": "expose",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "System.Data.DataTable",
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 14
+            }
+          ]
+        }
+      ],
+      "warnings": []
     }
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 14,
+    "rulesChecked": 15,
     "rulesPassed": 2,
-    "rulesFailed": 11,
+    "rulesFailed": 12,
     "rulesSkipped": 1,
-    "violations": 18,
+    "violations": 20,
     "warnings": 1
   }
 }

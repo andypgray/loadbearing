@@ -15,7 +15,9 @@ namespace Zphil.LoadBearing.Checking;
 ///     a <see cref="ViolationKind.Catch" /> carries <see cref="Source" /> and <see cref="Target" /> (the
 ///     caught exception type) with the catch edge's <see cref="Sites" />; a
 ///     <see cref="ViolationKind.Throw" /> carries <see cref="Source" /> and <see cref="Target" /> (the
-///     thrown exception type) with the throw edge's <see cref="Sites" />;
+///     thrown exception type) with the throw edge's <see cref="Sites" />; a
+///     <see cref="ViolationKind.Expose" /> carries <see cref="Source" /> and <see cref="Target" /> (the
+///     exposed type) with the exposure edge's <see cref="Sites" />;
 ///     a <see cref="ViolationKind.Shape" /> carries
 ///     <see cref="Subject" /> with its declaration sites; a <see cref="ViolationKind.MemberShape" />
 ///     carries <see cref="SubjectMember" /> with its declaration sites;
@@ -50,14 +52,14 @@ public sealed class Violation
     /// <summary>
     ///     The referencing type (Reference kind — for the inbound verbs this is where the edit happens), the
     ///     constructing type (Construction kind), the injecting type (Injection kind), the catching type
-    ///     (Catch kind), or the throwing type (Throw kind).
+    ///     (Catch kind), the throwing type (Throw kind), or the exposing type (Expose kind).
     /// </summary>
     public TypeNode? Source { get; }
 
     /// <summary>
     ///     The referenced type (Reference kind), the constructed type (Construction kind), the injected
-    ///     parameter type (Injection kind), the caught exception type (Catch kind), or the thrown exception
-    ///     type (Throw kind).
+    ///     parameter type (Injection kind), the caught exception type (Catch kind), the thrown exception
+    ///     type (Throw kind), or the exposed type (Expose kind).
     /// </summary>
     public TypeNode? Target { get; }
 
@@ -82,8 +84,10 @@ public sealed class Violation
     ///     (the constructed type in <see cref="Target" />; all ctor overloads share the one type-pair
     ///     identity), an Injection (the injected parameter type in <see cref="Target" />; every parameter
     ///     typed on it shares the one type-pair identity), a Catch (the caught type in <see cref="Target" />;
-    ///     every catch clause of it shares the one type-pair identity), or a Throw (the thrown type in
-    ///     <see cref="Target" />; every throw of it shares the one type-pair identity), an edge key
+    ///     every catch clause of it shares the one type-pair identity), a Throw (the thrown type in
+    ///     <see cref="Target" />; every throw of it shares the one type-pair identity), or an Expose (the
+    ///     exposed type in <see cref="Target" />; every signature position of it shares the one type-pair
+    ///     identity), an edge key
     ///     (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId) for a MemberUse, a
     ///     subject key for a Shape, and a member-subject key (<see cref="SubjectMember" />'s member DocId)
     ///     for a MemberShape (GRAMMAR §4.6). <see cref="ViolationKind.EmptySubject" /> and
@@ -99,6 +103,7 @@ public sealed class Violation
             ViolationKind.Injection => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.Catch => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.Throw => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            ViolationKind.Expose => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
@@ -129,6 +134,11 @@ public sealed class Violation
     internal static Violation Throw(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
         return new Violation(ViolationKind.Throw, source, target, null, null, null, sites, null);
+    }
+
+    internal static Violation Expose(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.Expose, source, target, null, null, null, sites, null);
     }
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)

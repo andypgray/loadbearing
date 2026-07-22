@@ -9,11 +9,13 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three generic
 ///     construction lists, every reference edge with its sites, every member-use edge with its member facts
 ///     and sites, every construction edge with its sites (§4.5), every injection edge with its sites (§4.7),
-///     every catch edge and throw edge with its sites (§4.8), every registration fact (§4.7), and every
+///     every catch edge and throw edge with its sites (§4.8), every exposure edge with its sites (§4.9), every
+///     registration fact (§4.7), and every
 ///     declared member's scalar facts and declaration sites (GRAMMAR §4.6) — so that if a fact is not rendered
 ///     here it is not pinned. The model is already fully ordered (types by FullName, edges by source/target,
 ///     member edges by source/member SymbolId, construction edges by source/constructed, injection edges by
-///     source/injected, catch edges by source/caught, throw edges by source/thrown, registrations by
+///     source/injected, catch edges by source/caught, throw edges by source/thrown, exposure edges by
+///     source/exposed, registrations by
 ///     lifetime/service/implementation, each type's members by SymbolId, projects by
 ///     name), so a straight walk is stable. Used by the fragment JSON round-trip test to assert that
 ///     serialize→deserialize→merge equals a direct merge — so the member inventory round-trips (and, via
@@ -62,6 +64,11 @@ internal static class ModelDump
         builder.AppendLine("== THROW EDGES ==");
         foreach (ThrowEdge edge in model.ThrowEdges)
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Thrown.FullName)
+                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+
+        builder.AppendLine("== EXPOSURE EDGES ==");
+        foreach (ExposureEdge edge in model.ExposureEdges)
+            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Exposed.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
 
         builder.AppendLine("== REGISTRATIONS ==");

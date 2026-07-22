@@ -386,6 +386,9 @@ constructed type may be *referenced* but not *created*, keying the (source, cons
 included, keying the (source, injected) type pair; the natural operands are `Registered`
 selections — `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
 arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
+`MustNotExpose(target, …)` (bans a type appearing in a public signature position — a return,
+parameter, or property/field/event type — of an effectively-public member, keying the (source,
+exposed) type pair; the type may be *referenced* internally but not *surfaced* on the public API) ·
 `MustResideInNamespace(glob)`
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
@@ -446,7 +449,7 @@ source-level member access; "construct" means a source-level object creation (`n
 target-typed `new()`); "inject" means a source-level constructor-parameter dependency (primary
 constructors included); "catch" means a source-level `catch` clause (a bare `catch` counts as
 `System.Exception`); "throw" means a source-level `throw` of the thrown expression's static
-type (bare rethrows `throw;` are not recorded): the checker records all six edge kinds. A construction ban keys the
+type (bare rethrows `throw;` are not recorded); "expose" means a type named in a public signature position (a public member's return, parameter, or property/field/event type) of an externally visible type: the checker records all seven edge kinds. A construction ban keys the
 (source, constructed) type pair (overload-indifferent) and is honest about reflection — a DI
 *registration* mints only a type reference, never a construct edge, so a container-resolved type is
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned

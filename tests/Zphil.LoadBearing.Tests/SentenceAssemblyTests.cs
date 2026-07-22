@@ -264,6 +264,26 @@ public class SentenceAssemblyTests
             .ShouldBe("Types must throw only `InvalidOperationException`, `ArgumentException` or `TimeoutException`.");
     }
 
+    // ---- Signature exposure (GRAMMAR §5.3, §3.3): the dependency-shape exposure-ban verb ----
+
+    [Fact]
+    public void MustNotExpose_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6): a bare layer subject speaks collectively — "The Web layer must not expose …".
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustNotExpose(typeof(SqlConnection)))
+            .ShouldBe("The Web layer must not expose `SqlConnection`.");
+    }
+
+    [Fact]
+    public void MustNotExpose_MultipleTargets_JoinWithOr()
+    {
+        // Shares TargetList with the other dependency verbs, so multiple targets join "`A` or `B`".
+        Constraint constraint = Arch.Types.MustNotExpose(typeof(SqlConnection), typeof(ControllerBase));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not expose `SqlConnection` or `ControllerBase`.");
+    }
+
     // ---- Member subjects (GRAMMAR §4.6, §5.7, §6) ----
 
     [Fact]

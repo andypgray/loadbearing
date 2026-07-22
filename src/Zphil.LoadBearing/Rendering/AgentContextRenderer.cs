@@ -40,6 +40,9 @@ public static class AgentContextRenderer
     private const string GlossaryThrowClause =
         "throw = a source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not recorded)";
 
+    private const string GlossaryExposeClause =
+        "expose = a public signature position (return, parameter, or property/field/event type) on a public member of an externally visible type";
+
     // A separate, independently-gated glossary line (not an axis clause): rendered as ONE line whenever any
     // rule's subject or operands carry a Registered noun, on the same byte-identical-without-it terms as the
     // axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
@@ -83,12 +86,13 @@ public static class AgentContextRenderer
         bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
         bool hasCatchRule = model.Rules.Any(rule => rule.Constraint is MustNotCatchConstraint);
         bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint);
+        bool hasExposeRule = model.Rules.Any(rule => rule.Constraint is MustNotExposeConstraint);
         bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule, hasCatchRule, hasThrowRule)
+            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule, hasCatchRule, hasThrowRule, hasExposeRule)
         };
 
         // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
@@ -113,7 +117,7 @@ public static class AgentContextRenderer
     // spec actually exercises, then the shared tail. Reproduces the pre-ctor "reference." and "reference; use."
     // lines byte-for-byte when their axis flags are the only ones set (GRAMMAR §4.1/§4.5/§10).
     private static string GlossaryLine(
-        bool hasMemberRule, bool hasCtorRule, bool hasInjectRule, bool hasCatchRule, bool hasThrowRule)
+        bool hasMemberRule, bool hasCtorRule, bool hasInjectRule, bool hasCatchRule, bool hasThrowRule, bool hasExposeRule)
     {
         var clauses = new List<string> { GlossaryReferenceClause };
         if (hasMemberRule) clauses.Add(GlossaryUseClause);
@@ -121,6 +125,7 @@ public static class AgentContextRenderer
         if (hasInjectRule) clauses.Add(GlossaryInjectClause);
         if (hasCatchRule) clauses.Add(GlossaryCatchClause);
         if (hasThrowRule) clauses.Add(GlossaryThrowClause);
+        if (hasExposeRule) clauses.Add(GlossaryExposeClause);
 
         return string.Join("; ", clauses) + ". " + GlossaryTail;
     }

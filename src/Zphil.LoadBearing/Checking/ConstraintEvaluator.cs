@@ -5,12 +5,13 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
-///     §4.5, §4.7, §4.8, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
+///     §4.5, §4.7, §4.8, §4.9, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
 ///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
 ///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
 ///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verb
 ///     (<c>MustNotCatch</c>) walks <see cref="CodebaseModel.CatchEdges" />; the throw verb
-///     (<c>MustOnlyThrow</c>) walks <see cref="CodebaseModel.ThrowEdges" />; shape verbs test each
+///     (<c>MustOnlyThrow</c>) walks <see cref="CodebaseModel.ThrowEdges" />; the exposure verb
+///     (<c>MustNotExpose</c>) walks <see cref="CodebaseModel.ExposureEdges" />; shape verbs test each
 ///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
 ///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
@@ -27,6 +28,7 @@ internal sealed class ConstraintEvaluator
     private readonly IReadOnlyList<CatchEdge> _catchEdges;
     private readonly IReadOnlyList<ConstructorEdge> _constructorEdges;
     private readonly IReadOnlyList<ReferenceEdge> _edges;
+    private readonly IReadOnlyList<ExposureEdge> _exposureEdges;
     private readonly IReadOnlyList<InjectionEdge> _injectionEdges;
     private readonly IReadOnlyList<MemberEdge> _memberEdges;
     private readonly MemberSelectionEvaluator _memberSelections;
@@ -41,6 +43,7 @@ internal sealed class ConstraintEvaluator
         _injectionEdges = model.InjectionEdges;
         _catchEdges = model.CatchEdges;
         _throwEdges = model.ThrowEdges;
+        _exposureEdges = model.ExposureEdges;
         _selections = new SelectionEvaluator(model);
         _memberSelections = new MemberSelectionEvaluator(_selections);
     }
@@ -73,6 +76,8 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenInjection(subjects, c.Targets);
             case MustNotCatchConstraint c:
                 return ForbiddenCatch(subjects, c.Targets);
+            case MustNotExposeConstraint c:
+                return ForbiddenExposure(subjects, c.Targets);
             case MustOnlyThrowConstraint c:
                 return OnlyThrow(subjects, c.Targets);
             case MustResideInNamespaceConstraint c:
@@ -232,6 +237,30 @@ internal sealed class ConstraintEvaluator
         foreach (CatchEdge edge in _catchEdges)
             if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught))
                 violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.Sites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
+    // The exposure verb (GRAMMAR §4.9, §5.3): an exposure edge is a hit when its source is a subject AND the
+    // exposed type is a forbidden operand — the "you may use it; you may not surface it on your public API" ban.
+    // Matching is exact definition-level FQN on the operand set (the shared HashSet<TypeNode> membership):
+    // MustNotExpose(typeof(DataTable)) flags only a `DataTable` signature position, never a narrower `DataView`
+    // one (no hierarchy-aware matching). Inert-target warning semantics mirror ForbiddenCatch exactly: a forbidden
+    // set that resolves empty from a pattern operand can never fire, so it is loudly flagged inert (a bare typeof
+    // absent from the codebase is the win condition, not a warning).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (ExposureEdge edge in _exposureEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Exposed))
+                violations.Add(Violation.Expose(edge.Source, edge.Exposed, edge.Sites));
 
         var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
             ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }

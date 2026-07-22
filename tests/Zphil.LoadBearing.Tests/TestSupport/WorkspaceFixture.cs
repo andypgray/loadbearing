@@ -66,6 +66,13 @@ public sealed class WorkspaceFixture : IAsyncLifetime
         return $"{edge.Source.FullName} -> {edge.Injected.FullName} @ {sites}";
     }
 
+    /// <summary>Renders an exposure edge as <c>src -&gt; exposed @ file:line, ...</c> (GRAMMAR §4.9).</summary>
+    public string RenderExposureEdge(ExposureEdge edge)
+    {
+        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
+        return $"{edge.Source.FullName} -> {edge.Exposed.FullName} @ {sites}";
+    }
+
     /// <summary>
     ///     Renders a registration fact as <c>lifetime service -&gt; impl @ file:line, ...</c> (GRAMMAR §4.7);
     ///     the implementation renders as <c>(none)</c> when the registration names no distinct implementation.

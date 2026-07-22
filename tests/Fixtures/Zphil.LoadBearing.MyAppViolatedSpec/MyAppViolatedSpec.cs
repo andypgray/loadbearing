@@ -1,3 +1,4 @@
+using System.Data;
 using MyApp.Domain;
 using MyApp.Legacy.Billing;
 using MyApp.Web;
@@ -27,7 +28,12 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     an Enforce member-subject parameter rule (the Web layer's Task-returning methods must accept a
 ///     <c>CancellationToken</c>, so all three of HomeController's tokenless ones — <c>Save</c>, <c>Load</c>,
 ///     and <c>SaveAsync</c> — are red, reusing the <c>memberShape</c> kind and <c>subjectMember</c> field;
-///     <c>SaveAsync</c> is green under <c>naming/async-suffix</c> but red here).
+///     <c>SaveAsync</c> is green under <c>naming/async-suffix</c> but red here), and a ratcheted Migrate
+///     exposure rule (uncaptured — both HomeController's and InvoiceController's public methods that return a
+///     <c>System.Data.DataTable</c> surface it on their public signature, exercising the <c>expose</c> kind
+///     (GRAMMAR §4.9); InvoiceController is grandfathered for its DataTable reference edge under
+///     <c>data-access/no-inline-sql</c> but red here, because the exposure edge is a different baseline
+///     identity — per-family identity, not per-type).
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
@@ -157,5 +163,18 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
             .Because("A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.")
             .Fix("Add a CancellationToken parameter and flow it to the calls you await.");
+
+        // Migrate (ratcheted, exposure): omits .Baseline, so the conventional path arch/baselines/api/
+        // return-dtos.json is uncommitted, leaving the rule uncaptured — both HomeController's ExportOrders and
+        // InvoiceController's ExportInvoices return a System.Data.DataTable straight from their public signature,
+        // so both are hard red with the --init hint, exercising the expose kind (GRAMMAR §4.9). The whole point:
+        // InvoiceController's DataTable *reference* edge is grandfathered under data-access/no-inline-sql, but the
+        // *exposure* edge is a different baseline identity, so it reds here — per-family identity, not per-type.
+        arch.Rule("api/return-dtos")
+            .Migrate(
+                "Some controllers return a System.Data.DataTable straight from their public methods.",
+                web.MustNotExpose(typeof(DataTable)))
+            .Because("An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model.")
+            .Fix("Return a DTO instead of exposing System.Data.DataTable.");
     }
 }

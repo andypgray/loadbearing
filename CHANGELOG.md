@@ -104,6 +104,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   right verb where the old behavior was a silent always-red or always-pass. The
   `Meridian.Interchange` pack now enforces persistence ignorance as
   `persistence/no-mapping-attributes` with the architectural-principles citation.
+- Signature-exposure bans: the `MustNotExpose` verb over new exposure edges, a
+  position-aware fact family recorded where a type appears in a public signature position
+  (a method return or parameter type, or a property/field/event type) of an
+  effectively-public member. Distinct from plain references: a body reference that never
+  reaches a public signature is not an exposure, and a member of an `internal` type
+  exposes nothing. "The Web layer must not expose `DataTable`" (the return-DTOs guidance
+  as closed vocabulary) is now a one-line, ratcheted rule with declaration `file:line`
+  sites, reported human (`{source} exposes {target}`), JSON (kind `"expose"`), and SARIF. The
+  `Meridian.Interchange` pack now enforces it as `contracts/no-entity-exposure` with the
+  DDD/CQRS citation.
 
 ## [0.1.0] - 2026-07-14
 

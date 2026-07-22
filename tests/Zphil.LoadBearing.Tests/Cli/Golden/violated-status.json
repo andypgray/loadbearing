@@ -155,12 +155,27 @@
       "status": "failed",
       "violations": 3,
       "warnings": 0
+    },
+    {
+      "id": "api/return-dtos",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/api/return-dtos.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
     }
   ],
   "summary": {
-    "rulesChecked": 14,
+    "rulesChecked": 15,
     "rulesPassed": 2,
-    "rulesFailed": 11,
+    "rulesFailed": 12,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

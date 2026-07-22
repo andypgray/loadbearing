@@ -285,4 +285,14 @@ public class VocabularyFragmentTests
         string sentence = SentenceRenderer.Sentence(Arch.Types.MustOnlyThrow(typeof(InvalidOperationException)));
         sentence.ShouldNotContain("(");
     }
+
+    // ---- Signature-exposure verb (GRAMMAR §5.3): "must not expose {list}" ----
+
+    [Fact]
+    public void MustNotExpose_RendersFragment()
+    {
+        // The signature-exposure verb (GRAMMAR §5.3): "must not expose {list}".
+        SentenceRenderer.Sentence(Arch.Types.MustNotExpose(typeof(SqlConnection)))
+            .ShouldBe("Types must not expose `SqlConnection`.");
+    }
 }

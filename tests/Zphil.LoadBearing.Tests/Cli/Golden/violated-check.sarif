@@ -245,6 +245,24 @@
               "properties": {
                 "posture": "enforce"
               }
+            },
+            {
+              "id": "api/return-dtos",
+              "shortDescription": {
+                "text": "The Web layer must not expose `DataTable`."
+              },
+              "fullDescription": {
+                "text": "An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model."
+              },
+              "help": {
+                "text": "Return a DTO instead of exposing System.Data.DataTable."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
             }
           ]
         }
@@ -819,6 +837,54 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.SaveAsync|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "api/return-dtos",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController exposes System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "api/return-dtos",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController exposes System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|0"
           },
           "baselineState": "new"
         }

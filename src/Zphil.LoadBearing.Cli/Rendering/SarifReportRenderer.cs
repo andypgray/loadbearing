@@ -189,6 +189,7 @@ internal static class SarifReportRenderer
             ViolationKind.Injection => $"{violation.Source!.FullName} injects {violation.Target!.FullName}",
             ViolationKind.Catch => $"{violation.Source!.FullName} catches {violation.Target!.FullName}",
             ViolationKind.Throw => $"{violation.Source!.FullName} throws {violation.Target!.FullName}",
+            ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
             ViolationKind.Shape => violation.Subject!.FullName,
             ViolationKind.MemberShape => MemberSubjectDisplay(violation.SubjectMember!),
             _ => string.Empty

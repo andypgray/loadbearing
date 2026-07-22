@@ -62,6 +62,14 @@ public enum ViolationKind
     /// </summary>
     Throw,
 
+    /// <summary>
+    ///     A forbidden exposure edge (GRAMMAR §4.9): <c>Source</c> exposes <c>Target</c> (the exposed type) in a
+    ///     public signature position, carrying every declaration <c>Sites</c>. One per (rule, source, exposed) —
+    ///     every signature position of one exposed type within a source collapses to one identity since the sites
+    ///     are evidence, not identity (§4.3).
+    /// </summary>
+    Expose,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

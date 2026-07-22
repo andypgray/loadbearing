@@ -38,7 +38,7 @@ internal sealed class OutboxProcessor(
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
             try
             {
-                await partner.SendAsync(message, cancellationToken);
+                await partner.SendAsync(new PartnerEnvelope(message.MessageId, message.Payload), cancellationToken);
                 return true;
             }
             catch (HttpRequestException)

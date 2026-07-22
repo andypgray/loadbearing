@@ -349,6 +349,42 @@ public class ModelReificationTests
         sugar.Targets[0].Adjectives.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void MustNotExposeRule_ReifiesToWalkableExposeConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new ExposeRuleSpec()).Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustNotExposeConstraint>();
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        constraint.Targets.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        // MustNotExpose is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustNotExpose_TypeSugar_ReifiesIdenticallyToWrappedSelection()
+    {
+        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
+        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exposed type either way.
+        var sugar = ArchModelBuilder.Build(new ExposeTypeSugarSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotExposeConstraint>();
+        var wrapped = ArchModelBuilder.Build(new ExposeWrappedSelectionSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotExposeConstraint>();
+
+        sugar.Targets.Count.ShouldBe(1);
+        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        sugarType.ShouldBe(typeof(SqlConnection));
+        wrappedType.ShouldBe(sugarType);
+        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+    }
+
     // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
     private sealed class MemberUseSpec : IArchitectureSpec
     {
@@ -518,6 +554,38 @@ public class ModelReificationTests
         {
             arch.Rule("errors/throw-only")
                 .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
+                .Because("Reason.");
+        }
+    }
+
+    // A single MustNotExpose-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private sealed class ExposeRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("api/no-leaky-surface")
+                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
+                .Because("Public signatures must not leak infrastructure types.");
+        }
+    }
+
+    // The MustNotExpose Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
+    private sealed class ExposeTypeSugarSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("api/no-expose")
+                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class ExposeWrappedSelectionSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("api/no-expose")
+                .Enforce(arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))))
                 .Because("Reason.");
         }
     }

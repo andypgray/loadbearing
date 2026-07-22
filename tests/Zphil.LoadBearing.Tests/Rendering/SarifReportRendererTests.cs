@@ -108,6 +108,27 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
+    public void Serialize_ExposeViolation_EmitsExposesMessageText()
+    {
+        // A red MustNotExpose violation drives the SARIF MessageText expose arm (a missing arm renders empty text
+        // and reads green): message `Source exposes Target`, level error (GRAMMAR §4.9).
+        const string source = """
+                              namespace Secrets { public class Data {} }
+                              namespace App { public class Facade { public void Take(Secrets.Data d) {} } }
+                              """;
+        CheckReport report = Checker.Run(source, arch =>
+            arch.Rule("api/no-expose")
+                .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
+                .Because("Keep internal types off the public API."));
+
+        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
+
+        JsonElement result = Results(json).ShouldHaveSingleItem();
+        result.GetProperty("level").GetString().ShouldBe("error");
+        result.GetProperty("message").GetProperty("text").GetString().ShouldBe("App.Facade exposes Secrets.Data");
+    }
+
+    [Fact]
     public void Serialize_ThrowViolation_EmitsThrowsMessageText()
     {
         // A red MustOnlyThrow violation drives the SARIF MessageText throw arm: an external, unlisted throw is

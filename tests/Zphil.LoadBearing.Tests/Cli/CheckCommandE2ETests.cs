@@ -106,6 +106,25 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_ReportsExposeRuleWithExposesLinesAndInitHint()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
+        // signature that surfaces the banned type, and — uncaptured Migrate — the same --init hint as any ratcheted
+        // rule. Both controllers red: InvoiceController is grandfathered for its DataTable *reference* under
+        // data-access/no-inline-sql, but the *exposure* edge is a distinct baseline identity, so it reds here.
+        result.Out.ShouldContain("FAIL api/return-dtos — The Web layer must not expose `DataTable`.");
+        result.Out.ShouldContain(
+            "MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController exposes System.Data.DataTable");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceController.cs:14 — MyApp.Web.InvoiceController exposes System.Data.DataTable");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
+    }
+
+    [Fact]
     public async Task Check_CleanSpec_ExitsZero()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);

@@ -1,6 +1,5 @@
 using System.Text;
 using Meridian.Interchange.Configuration;
-using Meridian.Interchange.Outbox;
 using Microsoft.Extensions.Options;
 
 namespace Meridian.Interchange.Partners;
@@ -24,12 +23,12 @@ internal sealed class LegacyManifestClient : IPartnerClient
 
     public string Channel => "legacy";
 
-    public Task SendAsync(OutboxMessage message, CancellationToken cancellationToken)
+    public Task SendAsync(PartnerEnvelope envelope, CancellationToken cancellationToken)
     {
         // The legacy manifest SDK is synchronous while everything beneath it is async, so this
         // adapter blocks at three points: serializing the manifest, taking the single-flight gate,
         // and posting it. These are the only blocking calls in the subsystem.
-        string manifest = SerializeAsync(message, cancellationToken).GetAwaiter().GetResult();
+        string manifest = SerializeAsync(envelope, cancellationToken).GetAwaiter().GetResult();
 
         using StringContent content = new(manifest, Encoding.UTF8, "application/xml");
 
@@ -47,11 +46,11 @@ internal sealed class LegacyManifestClient : IPartnerClient
         return Task.CompletedTask;
     }
 
-    private Task<string> SerializeAsync(OutboxMessage message, CancellationToken cancellationToken)
+    private Task<string> SerializeAsync(PartnerEnvelope envelope, CancellationToken cancellationToken)
     {
         // The gateway expects each manifest addressed to the configured legacy system.
         var manifest =
-            $"""<manifest system="{_options.Partners.LegacyManifest}" id="{message.MessageId}">{message.Payload}</manifest>""";
+            $"""<manifest system="{_options.Partners.LegacyManifest}" id="{envelope.MessageId}">{envelope.Payload}</manifest>""";
         return Task.FromResult(manifest);
     }
 }

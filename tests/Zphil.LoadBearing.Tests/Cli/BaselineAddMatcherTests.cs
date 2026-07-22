@@ -112,6 +112,32 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveEdge_ExposeByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    {
+        // An expose violation resolves on both type endpoints exactly like a reference/construction edge (the
+        // exposed type rides the Target slot, GRAMMAR §4.9) — full name, symbol ID, and mixed all match.
+        Violation edge = Violation.Expose(Node("N.Facade", "T:N.Facade"), Node("N.Secret", "T:N.Secret"), Array.Empty<SourceLocation>());
+        Violation[] violations = [edge];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Facade", "N.Secret").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Facade", "T:N.Secret").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Facade", "T:N.Secret").ShouldBeSameAs(edge);
+    }
+
+    [Fact]
+    public void ResolveEdge_ExposeNoMatch_ListsSourceArrowExposedFullNameForm()
+    {
+        // FullNameForm's default arm already renders an expose candidate as `Source -> Exposed`, no code change
+        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
+        Violation edge = Violation.Expose(Node("N.Facade", "T:N.Facade"), Node("N.Secret", "T:N.Secret"), Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Facade", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  N.Facade -> N.Secret");
+    }
+
+    [Fact]
     public void ResolveEdge_ThrowByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
     {
         // A throw violation resolves on both type endpoints exactly like a reference/construction edge (the

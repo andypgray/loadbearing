@@ -18,7 +18,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class EvaluatorFailClosedTests
 {
-    private static readonly CodebaseModel EmptyCodebase = new([], [], [], [], [], [], [], [], [], []);
+    private static readonly CodebaseModel EmptyCodebase = new([], [], [], [], [], [], [], [], [], [], []);
 
     [Fact]
     public void ByNoun_UnknownNoun_ThrowsNamingTheType()

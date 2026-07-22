@@ -375,6 +375,32 @@ public class AgentContextRendererTests
         block.ShouldNotContain("throw = a source-level `throw`");
     }
 
+    [Fact]
+    public void RootBlock_WithExposeRule_ExtendsGlossaryWithExposeClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new ExposeRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The expose clause appears beside "reference" only when a MustNotExpose rule exists (no other axis
+        // here). Expose is the seventh axis — last in clause order.
+        block.ShouldContain(
+            "reference = a source-level type reference; expose = a public signature position " +
+            "(return, parameter, or property/field/event type) on a public member of an externally visible type. " +
+            "Expand any rule ID with `loadbearing explain <rule-id>`.");
+        block.ShouldNotContain("catch = a source-level `catch`");
+    }
+
+    [Fact]
+    public void RootBlock_WithoutExposeRule_OmitsExposeGlossaryClause()
+    {
+        // A spec without a MustNotExpose verb renders byte-identically to before this axis existed
+        // (GRAMMAR §10 gate discipline) — the expose clause defaults off.
+        ArchitectureModel model = ArchModelBuilder.Build(new DogfoodShapeSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Zphil.LoadBearing.ArchSpec");
+        block.ShouldNotContain("expose = a public signature position");
+    }
+
     // A single Migrate-rule spec — no layers, no Enforce rules — for the Migrations-section pins.
     private sealed class PolicySpec(MigrationPolicy policy) : IArchitectureSpec
     {
@@ -545,6 +571,17 @@ public class AgentContextRendererTests
             arch.Rule("errors/throw-domain-only")
                 .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
                 .Because("Domain code must surface only sanctioned exception types.");
+        }
+    }
+
+    // A MustNotExpose verb over a type — triggers the expose glossary clause but no other axis.
+    private sealed class ExposeRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("api/no-leaky-surface")
+                .Enforce(arch.Types.MustNotExpose(typeof(DateTime)))
+                .Because("Public signatures must not leak infrastructure types.");
         }
     }
 }

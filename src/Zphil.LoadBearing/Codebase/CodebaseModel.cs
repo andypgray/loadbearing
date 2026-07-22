@@ -3,14 +3,16 @@ namespace Zphil.LoadBearing.Codebase;
 /// <summary>
 ///     The extracted codebase: its types, the reference edges between them, the member-use edges
 ///     (GRAMMAR §4.5), the construction edges (§4.5), the constructor-injection edges (§4.7), the catch and
-///     throw edges (§4.8), the container-registration facts (§4.7), and its projects — the deterministic
-///     substrate the checker evaluates rules against. Every list is ordered for reproducibility:
+///     throw edges (§4.8), the signature-exposure edges (§4.9), the container-registration facts (§4.7), and
+///     its projects — the deterministic substrate the checker evaluates rules against. Every list is ordered
+///     for reproducibility:
 ///     <see cref="Types" /> by <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source
 ///     FullName, target FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
 ///     <see cref="MemberReference.SymbolId" />) (ordinal), <see cref="ConstructorEdges" /> by (source
 ///     FullName, constructed FullName) (ordinal), <see cref="InjectionEdges" /> by (source FullName,
 ///     injected FullName) (ordinal), <see cref="CatchEdges" /> by (source FullName, caught FullName)
 ///     (ordinal), <see cref="ThrowEdges" /> by (source FullName, thrown FullName) (ordinal),
+///     <see cref="ExposureEdges" /> by (source FullName, exposed FullName) (ordinal),
 ///     <see cref="ServiceRegistrations" /> by (lifetime, service FullName,
 ///     implementation FullName) (ordinal), and <see cref="Projects" /> by
 ///     <see cref="ProjectNode.Name" /> (ordinal). <see cref="MergeNotes" /> carries the advisory
@@ -26,6 +28,7 @@ public sealed class CodebaseModel
         IReadOnlyList<InjectionEdge> injectionEdges,
         IReadOnlyList<CatchEdge> catchEdges,
         IReadOnlyList<ThrowEdge> throwEdges,
+        IReadOnlyList<ExposureEdge> exposureEdges,
         IReadOnlyList<ServiceRegistration> serviceRegistrations,
         IReadOnlyList<ProjectNode> projects,
         IReadOnlyList<string> mergeNotes)
@@ -37,6 +40,7 @@ public sealed class CodebaseModel
         InjectionEdges = injectionEdges;
         CatchEdges = catchEdges;
         ThrowEdges = throwEdges;
+        ExposureEdges = exposureEdges;
         ServiceRegistrations = serviceRegistrations;
         Projects = projects;
         MergeNotes = mergeNotes;
@@ -85,6 +89,15 @@ public sealed class CodebaseModel
     ///     recorded beside its <see cref="ConstructorEdges">construction edge</see> and the type-level edge.
     /// </summary>
     public IReadOnlyList<ThrowEdge> ThrowEdges { get; }
+
+    /// <summary>
+    ///     All signature-exposure edges (GRAMMAR §4.9), ordered by (source FullName, exposed FullName). Read
+    ///     from every public signature position — a method's return and parameter types, a property/field/event
+    ///     type — of each effectively-public member (a public member whose containing-type chain is public at
+    ///     every level) of each solution-declared type. Recorded beside <see cref="Edges" />, never instead of
+    ///     it: the signature type-name syntax also mints a type-level edge to that type.
+    /// </summary>
+    public IReadOnlyList<ExposureEdge> ExposureEdges { get; }
 
     /// <summary>
     ///     All container-registration facts (GRAMMAR §4.7), ordered by (lifetime, service FullName,

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
 using CoreTypeKind = Zphil.LoadBearing.TypeKind;
+using RoslynAccessibility = Microsoft.CodeAnalysis.Accessibility;
 
 namespace Zphil.LoadBearing.Roslyn;
 
@@ -33,6 +34,14 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             one <see cref="FragmentInjectionEdge" /> per (source, injected FQN) at every constructor
 ///             parameter, with the parameter type decomposed definition-level like a type edge, self-injection
 ///             dropped, sites deduped.
+///         </item>
+///         <item>
+///             Exposure edges (GRAMMAR §4.9) — a declaration-side pass over each declared type's members,
+///             minting one <see cref="FragmentExposureEdge" /> per (source, exposed FQN) at every public
+///             signature position (a method's return and parameter types, a property/field/event type) of an
+///             effectively-public member — a public member whose containing-type chain is public at every level
+///             — with each signature type decomposed definition-level like a type edge, self-exposure dropped,
+///             sites deduped.
 ///         </item>
 ///         <item>
 ///             Registration facts (GRAMMAR §4.7) — a whole-compilation walk over every syntax tree, minting
@@ -293,6 +302,46 @@ internal static class FragmentExtractor
         return TypeKindMapper.TryMap(definition, out _);
     }
 
+    // The signature-position types one inventoried member contributes as exposure edges (GRAMMAR §4.9): a
+    // method's return type (System.Void skipped — a void return names nothing) and each parameter type; a
+    // property/field/event's own type. Only members IsInventoried admits reach here (Ordinary methods,
+    // non-indexer properties, fields, events), so constructors, accessors, operators, and the delegate Invoke
+    // never contribute. Each yielded type is decomposed definition-level by DecomposeType, exactly like a
+    // constructor-parameter type on the injection axis.
+    private static IEnumerable<ITypeSymbol> SignatureTypesOf(ISymbol member)
+    {
+        switch (member)
+        {
+            case IMethodSymbol method:
+                if (!method.ReturnsVoid) yield return method.ReturnType;
+                foreach (IParameterSymbol parameter in method.Parameters)
+                    yield return parameter.Type;
+                break;
+            case IPropertySymbol property:
+                yield return property.Type;
+                break;
+            case IFieldSymbol field:
+                yield return field.Type;
+                break;
+            case IEventSymbol @event:
+                yield return @event.Type;
+                break;
+        }
+    }
+
+    // Effective visibility (GRAMMAR §4.9): the member is public AND every containing type up the chain is
+    // public. A public member nested in an internal type is not surface, so it mints nothing — the honesty
+    // boundary (an internal member is not part of the type's external contract). Explicit interface
+    // implementations report Private accessibility, so this gate excludes them without a special case.
+    private static bool IsEffectivelyPublicMember(ISymbol member)
+    {
+        if (member.DeclaredAccessibility != RoslynAccessibility.Public) return false;
+        for (INamedTypeSymbol? type = member.ContainingType; type is not null; type = type.ContainingType)
+            if (type.DeclaredAccessibility != RoslynAccessibility.Public)
+                return false;
+        return true;
+    }
+
     // The declaration site of a constructor parameter: its in-source identifier location (a primary-constructor
     // parameter, an ordinary-constructor parameter — both point at the parameter name), file path raw from the
     // syntax tree and 1-based line, the same discipline every other site pass uses. Null for a parameter with
@@ -326,6 +375,7 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
+        private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
@@ -351,6 +401,12 @@ internal static class FragmentExtractor
             // Pass 3b — injection edges (declared instance constructors; primary ctors included).
             foreach (DeclaredBuilder builder in _declared.Values)
                 WalkInjectionEdges(builder.Symbol);
+
+            // Pass 3c — exposure edges (signature positions of effectively-public members). Its own
+            // declaration-side pass, never folded into the Pass-1 inventory loop: an in-solution endpoint must
+            // resolve against the fully-populated _declared table, not be minted as an external mid-inventory.
+            foreach (DeclaredBuilder builder in _declared.Values)
+                WalkExposureEdges(builder.Symbol);
 
             // Pass R — registration facts (whole-compilation walk; a top-level-statements Program is not a
             // declared type, so a per-declared-type walk would miss the most common composition root).
@@ -532,6 +588,32 @@ internal static class FragmentExtractor
             }
         }
 
+        // Exposure edges (GRAMMAR §4.9): a declaration-side pass over the members of one type. An edge is minted
+        // from every public signature position (SignatureTypesOf: a method's return + parameter types, a
+        // property/field/event's type) of each effectively-public member — an inventoried member (§4.6) that is
+        // itself public AND nested only in public types. Each signature type decomposes definition-level like a
+        // type edge (§4.1); self-exposure is dropped like the type-edge self-drop (which also self-drops an enum
+        // value's self-typing); ResolveName runs on every decomposed endpoint so external exposed types get
+        // nodes. The member's declaration sites (a partial member's several parts union) are the edge's sites.
+        private void WalkExposureEdges(INamedTypeSymbol symbol)
+        {
+            string srcFqn = FullNameOf(symbol);
+            foreach (ISymbol member in symbol.GetMembers())
+            {
+                if (!IsInventoried(member) || !IsEffectivelyPublicMember(member)) continue;
+
+                var sites = MemberDeclarationSites(member);
+                foreach (ITypeSymbol signatureType in SignatureTypesOf(member))
+                foreach (INamedTypeSymbol endpoint in DecomposeType(signatureType))
+                {
+                    string exposedFqn = ResolveName(endpoint);
+                    if (exposedFqn == srcFqn) continue; // self-exposure dropped (enum value self-typing self-drops here)
+                    foreach (FragmentSite site in sites)
+                        ExposureEdgeSites((srcFqn, exposedFqn)).Add(site);
+                }
+            }
+        }
+
         // Registration facts (GRAMMAR §4.7): a whole-compilation walk over every syntax tree. Registration is a
         // string-side fact needing no per-type attribution — its most common composition root is a
         // top-level-statements Program — so one pass over every tree is the natural formulation. Each
@@ -639,6 +721,12 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentThrowEdge(kv.Key.Src, kv.Key.Thrown, kv.Value.ToList()))
                 .ToList();
 
+            var exposureEdges = _exposureEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Exposed, StringComparer.Ordinal)
+                .Select(kv => new FragmentExposureEdge(kv.Key.Src, kv.Key.Exposed, kv.Value.ToList()))
+                .ToList();
+
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
                 .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
@@ -648,7 +736,7 @@ internal static class FragmentExtractor
 
             return new CodebaseFragment(
                 input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges,
-                injectionEdges, catchEdges, throwEdges, serviceRegistrations);
+                injectionEdges, catchEdges, throwEdges, exposureEdges, serviceRegistrations);
         }
 
         private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
@@ -701,6 +789,17 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _injectionEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ExposureEdgeSites((string Src, string Exposed) key)
+        {
+            if (!_exposureEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _exposureEdgeSites[key] = sites;
             }
 
             return sites;

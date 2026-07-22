@@ -113,6 +113,23 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_ExposeViolation_RendersExposesLineAtExposureSite()
+    {
+        // ViolationLines has no default arm, so a missing Expose case would render nothing and a red report would
+        // read green. Pin the located line text: `Source exposes Target` at the exposing member's site (GRAMMAR §4.9).
+        Violation exposeViolation = Violation.Expose(
+            Node("App.Facade"), Node("Secrets.Secret"), [new SourceLocation("Facade.cs", 5)]);
+        var result = new RuleResult(
+            EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, [], 0, false);
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Expose);
+        block.ShouldContain("App.Facade exposes Secrets.Secret");
+        block.ShouldContain(":5 — App.Facade exposes Secrets.Secret");
+    }
+
+    [Fact]
     public void RuleBlock_ThrowViolation_RendersThrowsLineAtThrowSite()
     {
         // Likewise the Throw arm: a missing case would silently render nothing. Pin `Source throws Target` at the

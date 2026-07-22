@@ -140,6 +140,23 @@ public static class SelectionConstraints
     }
 
     /// <summary>
+    ///     The subject must not expose any of the targets — a listed target appearing in a public signature
+    ///     position (a return, parameter, or property/field/event type) of an effectively-public member
+    ///     (GRAMMAR §5.3, §4.9). Exposure-ness lives in the verb, so ordinary selections name what may not
+    ///     surface on the public API; there is no expression overload (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotExpose(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotExposeConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not expose any of the targets (type sugar).</summary>
+    public static Constraint MustNotExpose(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotExposeConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
     ///     The subject may throw only the targets — STRICT: every thrown type, including BCL and external
     ///     exception types, must be in the allowed list (unlike <c>MustOnlyReference</c>, which exempts
     ///     external packages, GRAMMAR §4.1). Throw-ness lives in the verb, so ordinary selections name the

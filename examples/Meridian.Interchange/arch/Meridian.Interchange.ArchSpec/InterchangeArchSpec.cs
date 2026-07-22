@@ -106,5 +106,13 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
                 .MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute)))
             .Because("A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles")
             .Fix("Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.");
+
+        // 12 — CQRS reads (ViewModels/DTOs made for the consumer): a persisted entity must not surface on the public partner contract; hand partners a DTO.
+        arch.Rule("contracts/no-entity-exposure")
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+                .Except(arch.Namespace("Meridian.Interchange.Outbox.*"))
+                .MustNotExpose(typeof(OutboxMessage)))
+            .Because("Exposing a persisted entity on a public signature couples partner-facing code to the storage model, so a change to how a message is persisted reshapes the partner contract; hand partners a DTO made for the wire instead — https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads")
+            .Fix("Map the message to a PartnerEnvelope at the OutboxProcessor boundary and expose that; keep OutboxMessage inside the Outbox module.");
     }
 }

@@ -99,6 +99,15 @@ internal static class Checker
             .ToList();
     }
 
+    /// <summary>Exposure violations rendered as <c>Source -&gt; Exposed</c>, in report order (§4.9).</summary>
+    public static IReadOnlyList<string> ExposurePairs(this RuleResult result)
+    {
+        return result.Violations
+            .Where(v => v.Kind == ViolationKind.Expose)
+            .Select(v => $"{v.Source!.FullName} -> {v.Target!.FullName}")
+            .ToList();
+    }
+
     /// <summary>Shape-violation subject FullNames, in report order.</summary>
     public static IReadOnlyList<string> ShapeSubjects(this RuleResult result)
     {

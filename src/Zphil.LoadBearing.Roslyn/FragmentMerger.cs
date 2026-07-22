@@ -66,6 +66,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             self-throw dropped, endpoints the same <see cref="TypeNode" /> instances held by
 ///             <see cref="CodebaseModel.Types" /> (an external thrown type resolves to a shared external node).
 ///         </item>
+///         <item>
+///             <b>M11</b> — exposure edges (GRAMMAR §4.9): site-sets union per <c>(source, exposed)</c>,
+///             self-exposure dropped, endpoints the same <see cref="TypeNode" /> instances held by
+///             <see cref="CodebaseModel.Types" /> (an external exposed type resolves to a shared external node).
+///         </item>
 ///     </list>
 ///     One code path serves cold runs, the fast test path, and cache hits, so the cache
 ///     cannot change results by construction.
@@ -91,6 +96,7 @@ internal static class FragmentMerger
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
+        private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externalFacts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
@@ -164,6 +170,12 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
                 MergeThrowEdge(throwEdge);
+
+            // M11 — exposure edges (GRAMMAR §4.9): site-sets union per (src, exposed); self-exposure guard
+            // mirrors M3; endpoints are the same merged nodes (an external exposed type shares one node).
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
+                MergeExposureEdge(exposureEdge);
 
             return Materialize(fragments);
         }
@@ -312,6 +324,17 @@ internal static class FragmentMerger
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
+        private void MergeExposureEdge(FragmentExposureEdge edge)
+        {
+            // Self-exposure guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(edge.SourceFullName, edge.ExposedFullName, StringComparison.Ordinal)) return;
+
+            ResolveNode(edge.SourceFullName);
+            ResolveNode(edge.ExposedFullName);
+            var sites = ExposureEdgeSites((edge.SourceFullName, edge.ExposedFullName));
+            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+        }
+
         private void MergeInjectionEdge(FragmentInjectionEdge edge)
         {
             // Self-injection guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
@@ -403,6 +426,12 @@ internal static class FragmentMerger
                 .Select(kv => new ThrowEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Thrown], ToLocations(kv.Value)))
                 .ToList();
 
+            var exposureEdges = _exposureEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Exposed, StringComparer.Ordinal)
+                .Select(kv => new ExposureEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Exposed], ToLocations(kv.Value)))
+                .ToList();
+
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
                 .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
@@ -416,7 +445,7 @@ internal static class FragmentMerger
 
             return new CodebaseModel(
                 types, edges, memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges,
-                serviceRegistrations, BuildProjects(fragments), mergeNotes);
+                exposureEdges, serviceRegistrations, BuildProjects(fragments), mergeNotes);
         }
 
         // Member edges ordered by (source FullName, member SymbolId). A single MemberReference is minted per
@@ -540,6 +569,17 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _injectionEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ExposureEdgeSites((string Src, string Exposed) key)
+        {
+            if (!_exposureEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _exposureEdgeSites[key] = sites;
             }
 
             return sites;

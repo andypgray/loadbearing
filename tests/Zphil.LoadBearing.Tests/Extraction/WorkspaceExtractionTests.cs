@@ -418,6 +418,43 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             """);
     }
 
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerExposure_PinsSignaturePositionEdges()
+    {
+        // The exposure channel (GRAMMAR §4.9) for HomeController, pinned whole: one edge per definition-level
+        // type named in a public signature position of an effectively-public member — return + parameter types
+        // and property/field/event types. Load's Task<int> mints BOTH the open Task`1 and Int32; the two
+        // DateTime-returning clock methods union to two sites, as do the two Task-returning save methods; the
+        // string return+param of RenderOrder dedupe to one site. Deliberately ABSENT: the private `log` field's
+        // StringBuilder (not effectively public — the honesty boundary), the constructor axis (§4.7), and the
+        // method-body member uses (§4.5) — only static signatures surface here.
+        string rendered = string.Join("\n", fixture.Model.ExposureEdges
+            .Where(e => e.Source.FullName == "MyApp.Web.HomeController")
+            .Select(fixture.RenderExposureEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Web.HomeController -> MyApp.Legacy.Billing.IBillingFacade @ MyApp.Web/HomeController.cs:17
+            MyApp.Web.HomeController -> System.Data.DataTable @ MyApp.Web/HomeController.cs:24
+            MyApp.Web.HomeController -> System.DateTime @ MyApp.Web/HomeController.cs:30, MyApp.Web/HomeController.cs:35
+            MyApp.Web.HomeController -> System.Decimal @ MyApp.Web/HomeController.cs:17
+            MyApp.Web.HomeController -> System.Int32 @ MyApp.Web/HomeController.cs:48
+            MyApp.Web.HomeController -> System.String @ MyApp.Web/HomeController.cs:11
+            MyApp.Web.HomeController -> System.Threading.Tasks.Task @ MyApp.Web/HomeController.cs:43, MyApp.Web/HomeController.cs:53
+            MyApp.Web.HomeController -> System.Threading.Tasks.Task<TResult> @ MyApp.Web/HomeController.cs:48
+            """);
+
+        // The in-solution exposed endpoint is the same declared node (reference equality, not just name), and the
+        // exposure edge rides beside the ordinary §4.1 reference edge the same signature type-name mints.
+        fixture.Model.ExposureEdge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
+            .Exposed.IsExternal.ShouldBeFalse();
+        fixture.Model.HasEdge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade").ShouldBeTrue();
+
+        // The private `log` field is not surface, so its StringBuilder type is never exposed (though the field's
+        // in-body uses still mint their own §4.5 member edges) — the effective-visibility boundary.
+        fixture.Model.HasExposureEdge("MyApp.Web.HomeController", "System.Text.StringBuilder").ShouldBeFalse();
+    }
+
     private static List<string> RenderBillingEdges(IEnumerable<ReferenceEdge> edges, Func<SourceLocation, string> path)
     {
         return edges

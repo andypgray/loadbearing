@@ -161,9 +161,9 @@ Constraint MustNotReference(Type first, params Type[] more)      // sugar for ar
 ```
 
 Same shape for `MustOnlyReference`, `MustNotBeReferencedBy`, `MustOnlyBeReferencedBy`, the
-constructor-ban verb `MustNotConstruct`, the injection-ban verb `MustNotInject`, and the
-exception verbs `MustNotCatch` and `MustOnlyThrow`: each
-carries the identical pair — a `Selection`
+constructor-ban verb `MustNotConstruct`, the injection-ban verb `MustNotInject`, the
+exception verbs `MustNotCatch` and `MustOnlyThrow`, and the signature-exposure verb
+`MustNotExpose`: each carries the identical pair — a `Selection`
 list and the `Type` sugar — and deliberately **no expression overload**. Constructor-ness lives in
 the verb, not the anchor, so ordinary selections name what may not be `new`ed
 (`arch.Types.Implementing(typeof(IHandler<>))`), which scales to "all registered services" where a
@@ -172,7 +172,9 @@ way, and its natural operands are the registration-fact selections
 (`arch.Registered(Lifetime.Scoped)`, §4.7), though any selection or bare type works.
 Catch-ness and throw-ness live in the verb the same way again: the operands name exception
 types, most often through the bare `typeof` sugar (`MustNotCatch(typeof(Exception))`); their
-edge semantics are §4.8. The
+edge semantics are §4.8. Exposure-ness lives in the verb the same way: the operands name the
+types that may not surface in a public signature position, most often through the bare `typeof`
+sugar (`MustNotExpose(typeof(DataTable))`); its edge semantics are §4.9. The
 `(first, more)` shape makes zero-argument calls **uncompilable** and keeps single-argument
 overload resolution unambiguous. Mixing selections and types in one call = wrap the type:
 `MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
@@ -242,7 +244,7 @@ lands only where the whole list is static and one form:
 - Checker behavior: an empty *subject* selection **fails** the rule by default
   (ArchUnit and ArchUnitNET precedent, with a pinned message). An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
-  `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch`) whose operand is a
+  `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch` / `MustNotExpose`) whose operand is a
   **pattern selection**
   (Layer / Namespace / Project
   or a refined `Types`); a bare `typeof(...)` target absent from the codebase is the *win
@@ -325,6 +327,12 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   ID)` — the same shape (the thrown type keys the target slot), riding
   `BaselineEntry.ForEdge` with **zero format change**. Throw sites are evidence, not
   identity; a grandfathered thrown type plus a *different* disallowed thrown type from the
+  same source is NEW and red.
+- **Exposure verb** (`MustNotExpose`, §4.9/§5.3): `(ruleId, source symbol ID, exposed symbol
+  ID)` — the same edge-key shape once more (the exposed type keys the target slot), riding
+  `BaselineEntry.ForEdge` with **zero baseline-format change**. Signature positions are
+  evidence, not identity: every signature position of one exposed type within a source rides
+  together, and a grandfathered exposure plus a *different* forbidden exposed type from the
   same source is NEW and red.
 - **Shape/naming/inheritance/attribute verbs and escape hatches**:
   `(ruleId, subject symbol ID)`.
@@ -613,6 +621,52 @@ records both; the `MustNotCatch` and `MustOnlyThrow` verbs (§3.3, §5.3) consum
   a source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not
   recorded)"* whenever it carries a `MustOnlyThrow` rule.
 
+### 4.9 Exposure edges (public signature positions)
+
+The API-surface policy — a layer's public types must not leak another layer's types through
+their own signatures — needs a fact no other section records: which type a public member
+*names* in a signature position. Extraction records it; the `MustNotExpose` verb (§3.3, §5.3)
+consumes it.
+
+- **An exposure edge** is `(source type, exposed type, file:line sites)`, recorded at every
+  public **signature position** of an effectively-public member: a method's return type and each
+  parameter type, and a property/field/event's type. The sites are the exposing members'
+  declaration lines. An exposure edge is minted **beside** the ordinary reference edge the same
+  signature type-name syntax mints (the double-mint of §4.5's explicit-`new` precedent) — one
+  site, two facts, the exposure channel never standing in for the type edge.
+- **The effective-visibility pin.** An edge is minted only from a member that is itself public
+  **and** whose containing-type chain is public at every level. A `public` member nested in an
+  `internal` type mints **nothing**: an internal type has no external contract, so nothing it
+  declares is surface. This is the honesty boundary — internal members are not the API, and a
+  rule about what a type exposes must not fire on what it keeps to itself. Explicit interface
+  implementations are private, so they never mint; interface members are public, so a public
+  interface's own signatures do.
+- **Excluded**, because none is a member's public signature: constructors (their parameters are
+  the injection axis's, §4.7), base-type and interface lists (inheritance, §5.2, not members),
+  indexers/operators/conversions/accessors and every compiler-generated or record-synthesized
+  member (the §4.6 inventory filter), `void` returns (a void return names no type), and
+  non-public members. Type parameters, pointers, and `dynamic` mint nothing (the shared
+  reference-universe gates); an enum's value fields are typed as the enum itself and self-drop.
+- **Decomposition is definition-level and recursive**, exactly as a reference-edge target (§4.1)
+  and an injected parameter type (§4.7): a constructed generic yields its open definition **and**
+  every type argument (`Task<Order>` → `Task<>` and `Order`), an array yields its element type,
+  and a plain named type yields itself. Primitives and framework types **do** mint (factual and
+  harmless — an operand selection never names them), so a `public string Name` exposes
+  `System.String`; the noise stays invisible until a rule chooses to constrain it.
+- **The honesty boundary is static signatures only.** Laundering an exposed type behind `object`
+  (or `dynamic`, or an interface the caller downcasts) is invisible to this axis — the edge
+  records the *declared* signature type, not what flows through it, exactly as the construction
+  axis is blind to reflection. A signature that says `object` exposes `System.Object` and nothing
+  more; the cure for a laundering signature is a named growth path (§11), not a wider match here.
+- **Matching is exact, definition-level FQN**: `MustNotExpose(typeof(DataTable))` flags a
+  `DataTable` return but not a `DataView` one, and there is no hierarchy-aware operand matching
+  (growth, §11). Self-exposure (a type naming itself in its own signature) is dropped like the
+  type-edge self-drop (§4.1).
+- Rendered glossary line, beside the reference entry and gated on the §4.5
+  byte-identical-without-it terms: *"expose = a public signature position (return, parameter, or
+  property/field/event type) on a public member of an externally visible type"* whenever the
+  spec carries a `MustNotExpose` rule.
+
 ## 5. Vocabulary v1 (closed; every member ships with pinned fragments)
 
 ### 5.1 Nouns
@@ -683,6 +737,7 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 | `.MustNotInject(target, ...)` | "must not inject {list}" — selection/type targets; the captive-dependency verb (§3.3, §4.7). Never warns: an empty `Registered` operand means no such registrations exist — the win condition, the §4.1 bare-`typeof` precedent |
 | `.MustNotCatch(target, ...)` | "must not catch {list}" — selection/type exception targets; the catch verb (§3.3, §4.8) |
 | `.MustOnlyThrow(target, ...)` | "must throw only {list}" — selection/type exception targets (§3.3, §4.8); **strict**: external thrown types are constrained too, so the fragment carries no external-packages parenthetical — the caveat's absence is the strictness rendering |
+| `.MustNotExpose(target, ...)` | "must not expose {list}" — selection/type targets in a public signature position; the signature-exposure verb (§3.3, §4.9) |
 | `.MustResideInNamespace(glob)` | "must reside in `{glob}`" |
 | `.MustHaveSuffix("Handler")` | "must be named `*Handler`" |
 | `.MustHavePrefix("I")` | "must be named `I*`" |
@@ -1046,9 +1101,12 @@ agent fixing a spec sees every problem in one pass.
   source-level `catch` clause (a bare `catch` counts as `System.Exception`)"* — the fifth axis
   (§4.8). The throw verb is *throw* (`MustOnlyThrow`), glossary-pinned as *"throw = a
   source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not
-  recorded)"* — the sixth axis (§4.8). The glossary line composes from these per-axis clauses (reference always; use iff a
+  recorded)"* — the sixth axis (§4.8). The exposure verb is *expose* (`MustNotExpose`),
+  glossary-pinned as *"expose = a public signature position (return, parameter, or
+  property/field/event type) on a public member of an externally visible type"* — the seventh
+  axis (§4.9). The glossary line composes from these per-axis clauses (reference always; use iff a
   member-target rule; construct iff a ctor rule; inject iff an injection rule; catch iff a
-  catch rule; throw iff a throw rule) joined with "; "
+  catch rule; throw iff a throw rule; expose iff an exposure rule) joined with "; "
   and closed by the drill-down tail, so each axis
   gates independently and a spec without a given axis renders byte-identically to before that axis
   existed (§4.1/§4.5's byte-identical-without-it discipline, generalized). A `Registered` noun
@@ -1120,6 +1178,20 @@ sanctioned log-and-rethrow site is excepted or grandfathered deliberately); hier
 operand matching (exact definition-level FQN is pinned, so a ban on `Exception` deliberately
 does not reach derived catches — a hierarchy-matching form would be a new, explicitly named
 semantic, not a widening of this one); and `graph` catch/throw data.
+
+On the exposure axis (§4.9): the `MustOnlyExpose` allow-list complement — the §4.1
+`MustOnly*` external exemption would apply to it naturally, but v1's canon for surface
+policy is the Not-form — and the `MustNotBeExposedBy` passive twin; accessibility variants
+(a protected-inclusive surface, or minting from declared rather than effective visibility —
+v1 mints only from effectively-public members, because an internal type has no external
+contract); generic-constraint-clause positions (`where T : Order` mints nothing in v1 — a
+constraint clause names a type without placing it in a signature position); member-granular
+*source* attribution (the edge keys the exposing *type*, not the exposing member — the same
+residue the dependency verbs carry above); laundering awareness — a signature declared
+`object` exposes `System.Object` and nothing more (the §4.9 honesty boundary: the edge is a
+static-signature fact, and internal members are not surface), so a flow- or cast-aware form
+would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
+exposure data (exposure edges stay out of the graph).
 
 Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); surface union
 `arch.AnyOf(...)` (also the future multi-type noun); a layered-architecture macro (deferred:

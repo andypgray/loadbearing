@@ -143,6 +143,28 @@ internal static class ModelQuery
         return edge.Sites.Select(s => s.Line).ToList();
     }
 
+    // ── exposure edges (GRAMMAR §4.9) ─────────────────────────────────────────────────────────────────────
+
+    public static ExposureEdge ExposureEdge(this CodebaseModel model, string sourceFullName, string exposedFullName)
+    {
+        return model.ExposureEdges.Single(e => e.Source.FullName == sourceFullName && e.Exposed.FullName == exposedFullName);
+    }
+
+    public static IReadOnlyList<ExposureEdge> ExposureEdges(this CodebaseModel model, string sourceFullName)
+    {
+        return model.ExposureEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+    }
+
+    public static bool HasExposureEdge(this CodebaseModel model, string sourceFullName, string exposedFullName)
+    {
+        return model.ExposureEdges.Any(e => e.Source.FullName == sourceFullName && e.Exposed.FullName == exposedFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this ExposureEdge edge)
+    {
+        return edge.Sites.Select(s => s.Line).ToList();
+    }
+
     // ── registration facts (GRAMMAR §4.7) ─────────────────────────────────────────────────────────────────
 
     public static ServiceRegistration Registration(
