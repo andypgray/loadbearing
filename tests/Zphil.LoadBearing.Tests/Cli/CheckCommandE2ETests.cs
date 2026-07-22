@@ -77,6 +77,35 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_ReportsCatchRuleWithCatchesLineAndInitHint()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
+        // catch site's file:line, and — uncaptured catch-level Migrate — the same --init hint as any ratcheted rule.
+        result.Out.ShouldContain("FAIL exceptions/no-general-catch — The Web layer must not catch `Exception`.");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsThrowRuleWithThrowsLineAndAllowsDomainException()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
+        // is red at its site; its sanctioned OrderRuleViolation throw is green — allowed, so never listed.
+        result.Out.ShouldContain("FAIL exceptions/domain-throws-domain — The Domain layer must throw only `OrderRuleViolation`.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
+        result.Out.ShouldNotContain("throws MyApp.Domain.OrderRuleViolation");
+    }
+
+    [Fact]
     public async Task Check_CleanSpec_ExitsZero()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);

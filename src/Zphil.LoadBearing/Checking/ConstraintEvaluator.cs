@@ -5,10 +5,12 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
-///     §4.5, §4.7, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
+///     §4.5, §4.7, §4.8, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
 ///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
 ///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
-///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; shape verbs test each
+///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verb
+///     (<c>MustNotCatch</c>) walks <see cref="CodebaseModel.CatchEdges" />; the throw verb
+///     (<c>MustOnlyThrow</c>) walks <see cref="CodebaseModel.ThrowEdges" />; shape verbs test each
 ///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
 ///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
@@ -22,12 +24,14 @@ internal sealed class ConstraintEvaluator
 
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
+    private readonly IReadOnlyList<CatchEdge> _catchEdges;
     private readonly IReadOnlyList<ConstructorEdge> _constructorEdges;
     private readonly IReadOnlyList<ReferenceEdge> _edges;
     private readonly IReadOnlyList<InjectionEdge> _injectionEdges;
     private readonly IReadOnlyList<MemberEdge> _memberEdges;
     private readonly MemberSelectionEvaluator _memberSelections;
     private readonly SelectionEvaluator _selections;
+    private readonly IReadOnlyList<ThrowEdge> _throwEdges;
 
     internal ConstraintEvaluator(CodebaseModel model)
     {
@@ -35,6 +39,8 @@ internal sealed class ConstraintEvaluator
         _memberEdges = model.MemberEdges;
         _constructorEdges = model.ConstructorEdges;
         _injectionEdges = model.InjectionEdges;
+        _catchEdges = model.CatchEdges;
+        _throwEdges = model.ThrowEdges;
         _selections = new SelectionEvaluator(model);
         _memberSelections = new MemberSelectionEvaluator(_selections);
     }
@@ -65,6 +71,10 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenConstruction(subjects, c.Targets);
             case MustNotInjectConstraint c:
                 return ForbiddenInjection(subjects, c.Targets);
+            case MustNotCatchConstraint c:
+                return ForbiddenCatch(subjects, c.Targets);
+            case MustOnlyThrowConstraint c:
+                return OnlyThrow(subjects, c.Targets);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -199,6 +209,31 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings);
     }
 
+    // The catch verb (GRAMMAR §4.8, §5.3): a catch edge is a hit when its source is a subject AND the caught
+    // type is a forbidden operand — the "you may throw it; you may not swallow it" ban. Matching is exact
+    // definition-level FQN on the operand set (the shared HashSet<TypeNode> membership): MustNotCatch(
+    // typeof(Exception)) flags only `catch (System.Exception)` and bare-catch edges (a bare catch already
+    // synthesized System.Exception at extraction), never a narrower `catch (IOException)`. Inert-target warning
+    // semantics mirror ForbiddenConstruction exactly: a forbidden set that resolves empty from a pattern operand
+    // can never fire, so it is loudly flagged inert (a bare typeof absent from the codebase is the win condition,
+    // not a warning).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (CatchEdge edge in _catchEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught))
+                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.Sites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedTargets)
     {
@@ -225,6 +260,26 @@ internal sealed class ConstraintEvaluator
         foreach (ReferenceEdge edge in _edges)
             if (subjects.Contains(edge.Target) && !allowed.Contains(edge.Source))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+
+        return (violations, NoWarnings);
+    }
+
+    // The throw verb (GRAMMAR §4.8, §5.3): a STRICT allow-list — every throw edge from a subject whose thrown
+    // type is not in the allowed set is a violation, EXTERNAL thrown types included. This is OnlyReference
+    // MINUS its external-target exemption: MustOnlyThrow constrains external throws too, so an unlisted
+    // System.TimeoutException throw is red unless typeof(TimeoutException) is in the allow-set (a Type-sugar
+    // operand resolves the external node by FQN, since the target universe includes externals). An allowed
+    // type absent from the model resolves empty and harmlessly allows nothing. MustOnly* never warns — an
+    // empty allow-set is loud by itself (the point of departure from ForbiddenCatch).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyThrow(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedThrows)
+    {
+        var allowed = ResolveOperands(allowedThrows);
+        var violations = new List<Violation>();
+
+        foreach (ThrowEdge edge in _throwEdges)
+            if (subjects.Contains(edge.Source) && !allowed.Contains(edge.Thrown))
+                violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         return (violations, NoWarnings);
     }

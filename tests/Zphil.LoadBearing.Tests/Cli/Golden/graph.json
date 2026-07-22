@@ -7,11 +7,11 @@
       "projectReferences": [
         "MyApp.Web"
       ],
-      "types": 5,
+      "types": 7,
       "namespaces": [
         {
           "namespace": "MyApp.Domain",
-          "types": 5
+          "types": 7
         }
       ]
     },
@@ -31,11 +31,11 @@
       "projectReferences": [
         "MyApp.Legacy.Billing"
       ],
-      "types": 16,
+      "types": 17,
       "namespaces": [
         {
           "namespace": "MyApp.Web",
-          "types": 16
+          "types": 17
         }
       ]
     }
@@ -54,6 +54,11 @@
   ],
   "externalEdges": [
     {
+      "source": "MyApp.Domain",
+      "targetNamespaceRoot": "System",
+      "references": 2
+    },
+    {
       "source": "MyApp.Legacy.Billing",
       "targetNamespaceRoot": "System",
       "references": 2
@@ -66,7 +71,7 @@
     {
       "source": "MyApp.Web",
       "targetNamespaceRoot": "System",
-      "references": 2
+      "references": 3
     },
     {
       "source": "MyApp.Web",

@@ -1,5 +1,6 @@
 using Meridian.Interchange.Configuration;
 using Meridian.Interchange.Host;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meridian.Interchange.Dispatch;
@@ -7,9 +8,11 @@ namespace Meridian.Interchange.Dispatch;
 /// <summary>
 ///     The outbound dispatcher: a hosted BackgroundService that wakes on a fixed interval and drains
 ///     the outbox each time. It is a singleton, so it captures no scoped services itself — it
-///     delegates each poll to the scoped runner and reads only its singleton-safe options.
+///     delegates each poll to the scoped runner and reads only its singleton-safe options. A failed
+///     dispatch cycle is logged and the loop carries on to the next poll, so one bad cycle never
+///     stops the host.
 /// </summary>
-internal sealed class OutboxDispatcher(ScopedDispatchRunner runner, IOptions<InterchangeOptions> options) : BackgroundService
+internal sealed class OutboxDispatcher(ScopedDispatchRunner runner, IOptions<InterchangeOptions> options, ILogger<OutboxDispatcher> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -17,7 +20,14 @@ internal sealed class OutboxDispatcher(ScopedDispatchRunner runner, IOptions<Int
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await runner.RunPendingAsync(stoppingToken);
+            try
+            {
+                await runner.RunPendingAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Dispatch cycle failed; carrying on to the next poll.");
+            }
 
             try
             {

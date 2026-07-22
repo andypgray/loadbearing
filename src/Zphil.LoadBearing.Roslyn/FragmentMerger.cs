@@ -56,6 +56,16 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             <c>(lifetime, service FQN, implementation FQN)</c>, string-side (no node resolution), so a
 ///             registration reported by several fragments (or several sites) collapses to one fact.
 ///         </item>
+///         <item>
+///             <b>M9</b> — catch edges (GRAMMAR §4.8): site-sets union per <c>(source, caught)</c>,
+///             self-catch dropped, endpoints the same <see cref="TypeNode" /> instances held by
+///             <see cref="CodebaseModel.Types" /> (an external caught type resolves to a shared external node).
+///         </item>
+///         <item>
+///             <b>M10</b> — throw edges (GRAMMAR §4.8): site-sets union per <c>(source, thrown)</c>,
+///             self-throw dropped, endpoints the same <see cref="TypeNode" /> instances held by
+///             <see cref="CodebaseModel.Types" /> (an external thrown type resolves to a shared external node).
+///         </item>
 ///     </list>
 ///     One code path serves cold runs, the fast test path, and cache hits, so the cache
 ///     cannot change results by construction.
@@ -77,6 +87,7 @@ internal static class FragmentMerger
 
     private sealed class MergeState
     {
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
@@ -89,6 +100,7 @@ internal static class FragmentMerger
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
         private readonly HashSet<(string Fqn, string Loser)> _notedConflations = [];
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
+        private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
         {
@@ -140,6 +152,18 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentServiceRegistration registration in fragment.ServiceRegistrations)
                 MergeRegistration(registration);
+
+            // M9 — catch edges (GRAMMAR §4.8): site-sets union per (src, caught); self-catch guard mirrors M3;
+            // endpoints are the same merged nodes (an external caught type shares one node).
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentCatchEdge catchEdge in fragment.CatchEdges)
+                MergeCatchEdge(catchEdge);
+
+            // M10 — throw edges (GRAMMAR §4.8): site-sets union per (src, thrown); self-throw guard mirrors M3;
+            // endpoints are the same merged nodes (an external thrown type shares one node).
+            foreach (CodebaseFragment fragment in fragments)
+            foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
+                MergeThrowEdge(throwEdge);
 
             return Materialize(fragments);
         }
@@ -263,6 +287,28 @@ internal static class FragmentMerger
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
+        private void MergeCatchEdge(FragmentCatchEdge edge)
+        {
+            // Self-catch guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(edge.SourceFullName, edge.CaughtFullName, StringComparison.Ordinal)) return;
+
+            ResolveNode(edge.SourceFullName);
+            ResolveNode(edge.CaughtFullName);
+            var sites = CatchEdgeSites((edge.SourceFullName, edge.CaughtFullName));
+            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+        }
+
+        private void MergeThrowEdge(FragmentThrowEdge edge)
+        {
+            // Self-throw guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(edge.SourceFullName, edge.ThrownFullName, StringComparison.Ordinal)) return;
+
+            ResolveNode(edge.SourceFullName);
+            ResolveNode(edge.ThrownFullName);
+            var sites = ThrowEdgeSites((edge.SourceFullName, edge.ThrownFullName));
+            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+        }
+
         private void MergeInjectionEdge(FragmentInjectionEdge edge)
         {
             // Self-injection guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
@@ -342,6 +388,18 @@ internal static class FragmentMerger
                 .Select(kv => new InjectionEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Injected], ToLocations(kv.Value)))
                 .ToList();
 
+            var catchEdges = _catchEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
+                .Select(kv => new CatchEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Caught], ToLocations(kv.Value)))
+                .ToList();
+
+            var throwEdges = _throwEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Thrown, StringComparer.Ordinal)
+                .Select(kv => new ThrowEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Thrown], ToLocations(kv.Value)))
+                .ToList();
+
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
                 .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
@@ -354,8 +412,8 @@ internal static class FragmentMerger
             var mergeNotes = _mergeNotes.OrderBy(note => note, StringComparer.Ordinal).ToList();
 
             return new CodebaseModel(
-                types, edges, memberEdges, constructorEdges, injectionEdges, serviceRegistrations,
-                BuildProjects(fragments), mergeNotes);
+                types, edges, memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges,
+                serviceRegistrations, BuildProjects(fragments), mergeNotes);
         }
 
         // Member edges ordered by (source FullName, member SymbolId). A single MemberReference is minted per
@@ -446,6 +504,28 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _constructorEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ThrowEdgeSites((string Src, string Thrown) key)
+        {
+            if (!_throwEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _throwEdgeSites[key] = sites;
             }
 
             return sites;

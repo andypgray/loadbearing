@@ -2,14 +2,16 @@ namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
 ///     The extracted codebase: its types, the reference edges between them, the member-use edges
-///     (GRAMMAR §4.5), the construction edges (§4.5), the constructor-injection edges (§4.7), the
-///     container-registration facts (§4.7), and its projects — the deterministic substrate the checker
-///     evaluates rules against. Every list is ordered for reproducibility:
+///     (GRAMMAR §4.5), the construction edges (§4.5), the constructor-injection edges (§4.7), the catch and
+///     throw edges (§4.8), the container-registration facts (§4.7), and its projects — the deterministic
+///     substrate the checker evaluates rules against. Every list is ordered for reproducibility:
 ///     <see cref="Types" /> by <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source
 ///     FullName, target FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
 ///     <see cref="MemberReference.SymbolId" />) (ordinal), <see cref="ConstructorEdges" /> by (source
 ///     FullName, constructed FullName) (ordinal), <see cref="InjectionEdges" /> by (source FullName,
-///     injected FullName) (ordinal), <see cref="ServiceRegistrations" /> by (lifetime, service FullName,
+///     injected FullName) (ordinal), <see cref="CatchEdges" /> by (source FullName, caught FullName)
+///     (ordinal), <see cref="ThrowEdges" /> by (source FullName, thrown FullName) (ordinal),
+///     <see cref="ServiceRegistrations" /> by (lifetime, service FullName,
 ///     implementation FullName) (ordinal), and <see cref="Projects" /> by
 ///     <see cref="ProjectNode.Name" /> (ordinal). <see cref="MergeNotes" /> carries the advisory
 ///     diagnostics the fragment merge raised while assembling this model.
@@ -22,6 +24,8 @@ public sealed class CodebaseModel
         IReadOnlyList<MemberEdge> memberEdges,
         IReadOnlyList<ConstructorEdge> constructorEdges,
         IReadOnlyList<InjectionEdge> injectionEdges,
+        IReadOnlyList<CatchEdge> catchEdges,
+        IReadOnlyList<ThrowEdge> throwEdges,
         IReadOnlyList<ServiceRegistration> serviceRegistrations,
         IReadOnlyList<ProjectNode> projects,
         IReadOnlyList<string> mergeNotes)
@@ -31,6 +35,8 @@ public sealed class CodebaseModel
         MemberEdges = memberEdges;
         ConstructorEdges = constructorEdges;
         InjectionEdges = injectionEdges;
+        CatchEdges = catchEdges;
+        ThrowEdges = throwEdges;
         ServiceRegistrations = serviceRegistrations;
         Projects = projects;
         MergeNotes = mergeNotes;
@@ -63,6 +69,22 @@ public sealed class CodebaseModel
     ///     also mints a type-level edge to that type.
     /// </summary>
     public IReadOnlyList<InjectionEdge> InjectionEdges { get; }
+
+    /// <summary>
+    ///     All catch edges (GRAMMAR §4.8), ordered by (source FullName, caught FullName). Read from every
+    ///     <c>catch</c> clause of each solution-declared type; a bare <c>catch</c> records
+    ///     <c>System.Exception</c>. A typed catch is recorded beside <see cref="Edges" />, never instead of
+    ///     it: its type-name syntax also mints a type-level edge (a bare catch names no type, so mints none).
+    /// </summary>
+    public IReadOnlyList<CatchEdge> CatchEdges { get; }
+
+    /// <summary>
+    ///     All throw edges (GRAMMAR §4.8), ordered by (source FullName, thrown FullName). Read from every
+    ///     <c>throw</c> statement and throw expression of each solution-declared type, keyed on the thrown
+    ///     expression's static type; a bare rethrow (<c>throw;</c>) records nothing. A <c>throw new X()</c> is
+    ///     recorded beside its <see cref="ConstructorEdges">construction edge</see> and the type-level edge.
+    /// </summary>
+    public IReadOnlyList<ThrowEdge> ThrowEdges { get; }
 
     /// <summary>
     ///     All container-registration facts (GRAMMAR §4.7), ordered by (lifetime, service FullName,

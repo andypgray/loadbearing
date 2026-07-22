@@ -99,6 +99,50 @@ internal static class ModelQuery
         return edge.Sites.Select(s => s.Line).ToList();
     }
 
+    // ── catch edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
+
+    public static CatchEdge CatchEdge(this CodebaseModel model, string sourceFullName, string caughtFullName)
+    {
+        return model.CatchEdges.Single(e => e.Source.FullName == sourceFullName && e.Caught.FullName == caughtFullName);
+    }
+
+    public static IReadOnlyList<CatchEdge> CatchEdges(this CodebaseModel model, string sourceFullName)
+    {
+        return model.CatchEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+    }
+
+    public static bool HasCatchEdge(this CodebaseModel model, string sourceFullName, string caughtFullName)
+    {
+        return model.CatchEdges.Any(e => e.Source.FullName == sourceFullName && e.Caught.FullName == caughtFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this CatchEdge edge)
+    {
+        return edge.Sites.Select(s => s.Line).ToList();
+    }
+
+    // ── throw edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
+
+    public static ThrowEdge ThrowEdge(this CodebaseModel model, string sourceFullName, string thrownFullName)
+    {
+        return model.ThrowEdges.Single(e => e.Source.FullName == sourceFullName && e.Thrown.FullName == thrownFullName);
+    }
+
+    public static IReadOnlyList<ThrowEdge> ThrowEdges(this CodebaseModel model, string sourceFullName)
+    {
+        return model.ThrowEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+    }
+
+    public static bool HasThrowEdge(this CodebaseModel model, string sourceFullName, string thrownFullName)
+    {
+        return model.ThrowEdges.Any(e => e.Source.FullName == sourceFullName && e.Thrown.FullName == thrownFullName);
+    }
+
+    public static IReadOnlyList<int> Lines(this ThrowEdge edge)
+    {
+        return edge.Sites.Select(s => s.Line).ToList();
+    }
+
     // ── registration facts (GRAMMAR §4.7) ─────────────────────────────────────────────────────────────────
 
     public static ServiceRegistration Registration(

@@ -175,6 +175,51 @@ public sealed class FragmentRoundTripTests
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void SerializeDeserializeMerge_CatchAndThrowEdges_SurviveRoundTripByteStably()
+    {
+        // Arrange — a cross-project source exercising both new edge families (GRAMMAR §4.8): a typed catch of a
+        // declared exception, a bare catch (synthesized System.Exception), a throw of a declared exception, and
+        // a throw of an external one — so a lost edge, dropped site, or mis-unified endpoint would move the dump.
+        CompilationInput lib = CompilationFactory.Compile("Lib",
+            ("Errors.cs", """
+                          namespace N;
+                          public class DomainError : System.Exception {}
+                          """));
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib",
+            ("Use.cs", """
+                       using System;
+                       using N;
+                       namespace M;
+                       public class Handler
+                       {
+                           public void Do()
+                           {
+                               try { Work(); }
+                               catch (DomainError) { throw; }
+                               catch { throw new DomainError(); }
+                           }
+                           public int Parse(string s) => int.TryParse(s, out int v) ? v : throw new FormatException();
+                           private void Work() {}
+                       }
+                       """));
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+
+        // Act
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+
+        // Assert — both families present (declared + external endpoints, bare catch → System.Exception), and the
+        // round-trip is invisible to the merged model.
+        direct.CatchEdges.Select(e => (e.Source.FullName, e.Caught.FullName)).ShouldBe(
+            [("M.Handler", "N.DomainError"), ("M.Handler", "System.Exception")]);
+        direct.ThrowEdges.Select(e => (e.Source.FullName, e.Thrown.FullName)).ShouldBe(
+            [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
+        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

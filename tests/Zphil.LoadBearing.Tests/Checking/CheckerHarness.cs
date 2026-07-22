@@ -81,6 +81,24 @@ internal static class Checker
             .ToList();
     }
 
+    /// <summary>Catch violations rendered as <c>Source -&gt; Caught</c>, in report order (§4.8).</summary>
+    public static IReadOnlyList<string> CatchPairs(this RuleResult result)
+    {
+        return result.Violations
+            .Where(v => v.Kind == ViolationKind.Catch)
+            .Select(v => $"{v.Source!.FullName} -> {v.Target!.FullName}")
+            .ToList();
+    }
+
+    /// <summary>Throw violations rendered as <c>Source -&gt; Thrown</c>, in report order (§4.8).</summary>
+    public static IReadOnlyList<string> ThrowPairs(this RuleResult result)
+    {
+        return result.Violations
+            .Where(v => v.Kind == ViolationKind.Throw)
+            .Select(v => $"{v.Source!.FullName} -> {v.Target!.FullName}")
+            .ToList();
+    }
+
     /// <summary>Shape-violation subject FullNames, in report order.</summary>
     public static IReadOnlyList<string> ShapeSubjects(this RuleResult result)
     {

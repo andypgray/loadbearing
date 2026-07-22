@@ -86,6 +86,58 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveEdge_CatchByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    {
+        // A catch violation resolves on both type endpoints exactly like a reference/construction edge (the
+        // caught type rides the Target slot, GRAMMAR §4.8) — full name, symbol ID, and mixed all match.
+        Violation edge = Violation.Catch(Node("N.Handler", "T:N.Handler"), Node("N.Err", "T:N.Err"), Array.Empty<SourceLocation>());
+        Violation[] violations = [edge];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Handler", "N.Err").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Handler", "T:N.Err").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Handler", "T:N.Err").ShouldBeSameAs(edge);
+    }
+
+    [Fact]
+    public void ResolveEdge_CatchNoMatch_ListsSourceArrowCaughtFullNameForm()
+    {
+        // FullNameForm's default arm already renders a catch candidate as `Source -> Caught`, no code change
+        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
+        Violation edge = Violation.Catch(Node("N.Handler", "T:N.Handler"), Node("N.Err", "T:N.Err"), Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Handler", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  N.Handler -> N.Err");
+    }
+
+    [Fact]
+    public void ResolveEdge_ThrowByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    {
+        // A throw violation resolves on both type endpoints exactly like a reference/construction edge (the
+        // thrown type rides the Target slot, GRAMMAR §4.8) — full name, symbol ID, and mixed all match.
+        Violation edge = Violation.Throw(Node("N.Service", "T:N.Service"), Node("N.Boom", "T:N.Boom"), Array.Empty<SourceLocation>());
+        Violation[] violations = [edge];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Service", "N.Boom").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Service", "T:N.Boom").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, "N.Service", "T:N.Boom").ShouldBeSameAs(edge);
+    }
+
+    [Fact]
+    public void ResolveEdge_ThrowNoMatch_ListsSourceArrowThrownFullNameForm()
+    {
+        // FullNameForm's default arm already renders a throw candidate as `Source -> Thrown`, no code change
+        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
+        Violation edge = Violation.Throw(Node("N.Service", "T:N.Service"), Node("N.Boom", "T:N.Boom"), Array.Empty<SourceLocation>());
+
+        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Service", "N.Other"));
+
+        error.Message.ShouldContain("the baseline records observed reality");
+        error.Message.ShouldContain("  N.Service -> N.Boom");
+    }
+
+    [Fact]
     public void ResolveEdge_SourceAndTargetMatchDifferentViolations_NoMatchListsBothCandidates()
     {
         Violation ab = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());

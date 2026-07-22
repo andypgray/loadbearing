@@ -47,6 +47,11 @@ public sealed class BaselineAddE2ETests
     private const string ReportSchedulerId = "T:MyApp.Web.ReportScheduler";
     private const string OrderFeedInterfaceId = "T:MyApp.Web.IOrderFeed";
 
+    private const string CatchRule = "exceptions/no-general-catch";
+    private const string ThrowRule = "exceptions/domain-throws-domain";
+    private const string ReportEndpointId = "T:MyApp.Web.ReportEndpoint";
+    private const string SystemExceptionId = "T:System.Exception";
+
     // A SECOND forbidden System.Data edge on HomeController (DataSet), inserted alongside the stock DataTable
     // one — so the Migrate rule has two current reds and --add grandfathers exactly one of them.
     private const string DataSetMethod =
@@ -68,6 +73,7 @@ public sealed class BaselineAddE2ETests
     private static readonly string[] AsyncBaselineFile = ["arch", "baselines", "naming", "async-suffix.json"];
     private static readonly string[] ConstructionBaselineFile = ["arch", "baselines", "di", "handlers-via-registry.json"];
     private static readonly string[] CaptiveBaselineFile = ["arch", "baselines", "di", "no-captive-dependencies.json"];
+    private static readonly string[] CatchBaselineFile = ["arch", "baselines", "exceptions", "no-general-catch.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -435,6 +441,84 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         reinit.Exit.ShouldBe(0);
         File.ReadAllBytes(captivePath).ShouldBe(snapshot);
+    }
+
+    [Fact]
+    public async Task BaselineAdd_CatchRule_GrandfathersOneSwallowAndThrowBystanderStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Red first: the catch Migrate rule exceptions/no-general-catch is uncaptured, so ReportEndpoint's
+        // blanket catch (GRAMMAR §4.8) is a current catch violation keyed by the (source, caught) type pair.
+        CliResult red = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement redRule = RuleElement(red.Out, CatchRule);
+        redRule.GetProperty("status").GetString().ShouldBe("failed");
+        redRule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("target").GetString())
+            .ShouldBe(["System.Exception"], true);
+
+        // Capture: --init grandfathers the catch identity (T: source × T: caught ForEdge entry, minting the
+        // arch/baselines/exceptions/ directory), and the re-check sees the rule green with the swallow baselined.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("exceptions/no-general-catch: captured 1 grandfathered");
+
+        CliResult captured = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement capturedRule = RuleElement(captured.Out, CatchRule);
+        capturedRule.GetProperty("status").GetString().ShouldBe("passed");
+        capturedRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+
+        // Un-capture (composer as arrangement, the member/construction/injection facts' idiom): a digest-valid
+        // EMPTY section turns the swallow red again on a captured rule — the state the valve exists for.
+        string catchPath = workspace.PathOf(CatchBaselineFile);
+        File.WriteAllText(catchPath, ComposeSections((CatchRule, [])));
+
+        // The valve, catch flavor: full-name --source/--target (no T: prefix) resolve the (source, caught)
+        // type-pair violation, echoed exactly as 'loadbearing check' renders it.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", CatchRule,
+            "--source", "MyApp.Web.ReportEndpoint", "--target", "System.Exception", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "exceptions/no-general-catch: added 1 grandfathered entry — MyApp.Web.ReportEndpoint -> System.Exception (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry keying the (source, caught) type pair via ForEdge.
+        Normalize(File.ReadAllText(catchPath)).ShouldBe(ComposeSections(
+            (CatchRule, [BaselineEntry.ForEdge(ReportEndpointId, SystemExceptionId).WithBecause("INC-1234")])));
+        LineSet(File.ReadAllText(catchPath)).Count(line => line.Contains("\"source\":")).ShouldBe(1);
+
+        // The added swallow now passes; the cross-rule bystander — the strict Enforce throw rule's BCL throw,
+        // which is never ratcheted and so can never be grandfathered — stays red.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        check.Exit.ShouldBe(1);
+        JsonElement catchRule = RuleElement(check.Out, CatchRule);
+        catchRule.GetProperty("status").GetString().ShouldBe("passed");
+        catchRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        JsonElement throwRule = RuleElement(check.Out, ThrowRule);
+        throwRule.GetProperty("status").GetString().ShouldBe("failed");
+        JsonElement bystander = throwRule.GetProperty("violations").EnumerateArray().ToList().ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("throw");
+        bystander.GetProperty("source").GetString().ShouldBe("MyApp.Domain.OrderApproval");
+        bystander.GetProperty("target").GetString().ShouldBe("System.InvalidOperationException");
+
+        // The attribution round-trips: --accept-reductions keeps the still-observed swallow entry and a second
+        // --init leaves the captured section be — byte-identical both ways.
+        byte[] snapshot = File.ReadAllBytes(catchPath);
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.Exit.ShouldBe(0);
+        File.ReadAllBytes(catchPath).ShouldBe(snapshot);
+        CliResult catchReinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        catchReinit.Exit.ShouldBe(0);
+        File.ReadAllBytes(catchPath).ShouldBe(snapshot);
     }
 
     [Fact]

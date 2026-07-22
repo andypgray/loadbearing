@@ -46,6 +46,22 @@ public enum ViolationKind
     /// </summary>
     Injection,
 
+    /// <summary>
+    ///     A forbidden catch edge (GRAMMAR §4.8): <c>Source</c> catches <c>Target</c> (the caught exception
+    ///     type) in a <c>catch</c> clause, carrying every <c>catch</c> <c>Sites</c>. One per (rule, source,
+    ///     caught) — a bare <c>catch</c> rides as <c>System.Exception</c>, and every catch clause of one caught
+    ///     type within a source collapses to one identity since the sites are evidence, not identity (§4.3).
+    /// </summary>
+    Catch,
+
+    /// <summary>
+    ///     A non-permitted throw edge (GRAMMAR §4.8): <c>Source</c> throws <c>Target</c> (the thrown exception
+    ///     type) with a <c>throw</c> statement or expression, carrying every <c>throw</c> <c>Sites</c>. One per
+    ///     (rule, source, thrown) — every throw of one type within a source collapses to one identity since the
+    ///     sites are evidence, not identity (GRAMMAR §4.3).
+    /// </summary>
+    Throw,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

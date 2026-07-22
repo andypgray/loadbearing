@@ -191,6 +191,42 @@
               "properties": {
                 "posture": "freeze"
               }
+            },
+            {
+              "id": "exceptions/no-general-catch",
+              "shortDescription": {
+                "text": "The Web layer must not catch `Exception`."
+              },
+              "fullDescription": {
+                "text": "A catch-all hides the failures you meant to handle; catch the specific exception instead."
+              },
+              "help": {
+                "text": "Catch the specific exception type you can handle, not System.Exception."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "exceptions/domain-throws-domain",
+              "shortDescription": {
+                "text": "The Domain layer must throw only `OrderRuleViolation`."
+              },
+              "fullDescription": {
+                "text": "Domain code signals rule failures with the domain's own exception, not a generic BCL type."
+              },
+              "help": {
+                "text": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
             }
           ]
         }
@@ -645,6 +681,54 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-general-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/domain-throws-domain",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderApproval throws System.InvalidOperationException"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
           },
           "baselineState": "new"
         }

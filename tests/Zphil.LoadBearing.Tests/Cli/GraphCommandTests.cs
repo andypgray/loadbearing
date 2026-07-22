@@ -9,7 +9,9 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     <c>--json</c> document (schemaVersion 1) are both pinned by goldens. The fixture truth behind the
 ///     numbers: 3 projects; Domain→Web = 2 observed type-pairs; Web→Legacy.Billing = 3; Web→System.Data = 2;
 ///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms); Web→Microsoft.Extensions = 2
-///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions).
+///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions);
+///     Domain→System = 2 (OrderRuleViolation's Exception base + OrderApproval's InvalidOperationException throw)
+///     and Web→System = 3 (now including ReportEndpoint's caught Exception).
 /// </summary>
 [Collection("Serial")]
 public sealed class GraphCommandTests
@@ -19,23 +21,24 @@ public sealed class GraphCommandTests
         Codebase survey: MyApp.sln
 
         Projects (3):
-          MyApp.Domain — 5 types; references: MyApp.Web
+          MyApp.Domain — 7 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 16 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 17 types; references: MyApp.Legacy.Billing
 
         Observed project references (distinct type pairs):
           MyApp.Domain -> MyApp.Web: 2
           MyApp.Web -> MyApp.Legacy.Billing: 3
 
         Namespaces:
-          MyApp.Domain: MyApp.Domain (5)
+          MyApp.Domain: MyApp.Domain (7)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
-          MyApp.Web: MyApp.Web (16)
+          MyApp.Web: MyApp.Web (17)
 
         External references (by namespace root):
+          MyApp.Domain -> System: 2
           MyApp.Legacy.Billing -> System: 2
           MyApp.Web -> Microsoft.Extensions: 2
-          MyApp.Web -> System: 2
+          MyApp.Web -> System: 3
           MyApp.Web -> System.Data: 2
           MyApp.Web -> System.Text: 1
           MyApp.Web -> System.Threading: 2

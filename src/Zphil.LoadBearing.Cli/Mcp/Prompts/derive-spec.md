@@ -431,7 +431,9 @@ within one segment, never crossing a dot; lone `*` = everything. So `MyApp.Domai
 **Semantics worth knowing** — "reference" means a source-level type reference; "use" means a
 source-level member access; "construct" means a source-level object creation (`new`, including
 target-typed `new()`); "inject" means a source-level constructor-parameter dependency (primary
-constructors included): the checker records all four edge kinds. A construction ban keys the
+constructors included); "catch" means a source-level `catch` clause (a bare `catch` counts as
+`System.Exception`); "throw" means a source-level `throw` of the thrown expression's static
+type (bare rethrows `throw;` are not recorded): the checker records all six edge kinds. A construction ban keys the
 (source, constructed) type pair (overload-indifferent) and is honest about reflection — a DI
 *registration* mints only a type reference, never a construct edge, so a container-resolved type is
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned
@@ -448,7 +450,10 @@ and compiler-generated members are excluded; external types carry no member inve
 an empty member subject fails the rule exactly like an empty type subject. Type subjects
 range over solution-declared types; targets also reach external (BCL/NuGet) types. `MustOnlyReference` constrains solution-declared targets only (external
 packages are exempt, and the rendered sentence says so) and is strict — list a layer's own
-selection among its allowed targets if self-references are fine. `Implementing`/`DerivedFrom`
+selection among its allowed targets if self-references are fine. `MustOnlyThrow` is stricter
+still: external thrown types ARE constrained (no type must throw a BCL exception), so its
+sentence carries no exemption. `MustNotCatch` matches its operands exactly — banning
+`Exception` never flags a narrower catch, which is the good state. `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
 matches any construction. `AttributedWith` sees declared attributes only. Hierarchy
 adjectives never match external types (their hierarchy is not extracted). Closed generics are

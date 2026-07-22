@@ -75,9 +75,11 @@ internal static class BaselineAddMatcher
 
     // A --source/--target pair matches a reference edge on both type endpoints, a construction edge on both
     // type endpoints likewise (the constructed type rides the Target slot, GRAMMAR §4.5), an injection edge on
-    // both type endpoints likewise (the injected parameter type rides the Target slot, §4.7), or a member-use
-    // edge on the source type and the banned member (by full name or member symbol ID, §4.5). The injected type
-    // needs no dedicated FullNameForm arm — the default `Source -> Target` covers it (verified by test).
+    // both type endpoints likewise (the injected parameter type rides the Target slot, §4.7), a catch edge on
+    // both type endpoints likewise (the caught type rides the Target slot, §4.8), a throw edge on both type
+    // endpoints likewise (the thrown type rides the Target slot, §4.8), or a member-use edge on the source type
+    // and the banned member (by full name or member symbol ID, §4.5). The construction/injection/catch/thrown
+    // types need no dedicated FullNameForm arm — the default `Source -> Target` covers them (verified by test).
     private static bool MatchesEdge(Violation violation, string source, string target)
     {
         return violation.Kind switch
@@ -85,6 +87,8 @@ internal static class BaselineAddMatcher
             ViolationKind.Reference => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.Construction => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.Injection => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            ViolationKind.Catch => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            ViolationKind.Throw => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.MemberUse => Matches(violation.Source!, source) && MatchesMember(violation.Member!, target),
             _ => false
         };

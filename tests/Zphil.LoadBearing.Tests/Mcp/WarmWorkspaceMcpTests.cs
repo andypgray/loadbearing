@@ -167,6 +167,43 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task ArchCheck_SecondSwallowingCatchAddedOnDisk_ReflectsNewCatchSiteAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, whose catch Migrate rule exceptions/no-general-catch
+        // (uncaptured) is already red on ReportEndpoint's blanket catch (GRAMMAR §4.8). This is the catch-axis
+        // analog of the member-use edit test: adding a SECOND catch (Exception) to the SAME type is the SAME
+        // (source, caught) identity, so the one catch violation just grows a second site — not a new identity.
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+        // Act — append a second swallowing catch on the SAME Web type on disk, then re-check the still-warm
+        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        string reportEndpoint = fixture.PathOf(Web, "ReportEndpoint.cs");
+        EditOnDisk(reportEndpoint, InsertAnotherSwallowingCatch);
+        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        CliResult coldEdited = await CliRunner.InvokeAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the violation identity is unchanged (still ONE catch violation for the (ReportEndpoint,
+        // Exception) pair), its site set grows from one to two, the payload changed, and it is byte-identical
+        // to the cold run on the edited tree.
+        CatchViolationCount(before).ShouldBe(1);
+        CatchViolationCount(after).ShouldBe(1);
+        CatchSiteCount(before).ShouldBe(1);
+        CatchSiteCount(after).ShouldBe(2);
+        Normalize(after).ShouldNotBe(Normalize(before));
+        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+        // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
+        // reverse-dependent Domain.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
     public async Task ArchCheck_SteadyStateNoDiskChange_ReadsAndReloadsNothing()
     {
         // Arrange — load, then promote every document past the racy window (backdate + one reconcile) so the
@@ -336,6 +373,15 @@ public sealed class WarmWorkspaceMcpTests
         return source.Replace("AddScoped<IOrderFeed, OrderFeed>", "AddSingleton<IOrderFeed, OrderFeed>");
     }
 
+    // Appends a second swallowing catch (System.Exception) to ReportEndpoint — a second catch site folding into
+    // the existing (ReportEndpoint, System.Exception) catch violation's site set (GRAMMAR §4.8), not a new identity.
+    private static string InsertAnotherSwallowingCatch(string source)
+    {
+        int lastBrace = source.LastIndexOf('}');
+        return source[..lastBrace]
+               + "    public int RenderAgain(int id) { try { return id; } catch (System.Exception) { return -1; } }\n}\n";
+    }
+
     // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
     private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
     {
@@ -367,6 +413,26 @@ public sealed class WarmWorkspaceMcpTests
         JsonElement now = rule.GetProperty("violations").EnumerateArray()
             .Single(v => v.GetProperty("targetMember").GetString() == "P:System.DateTime.Now");
         return now.GetProperty("sites").GetArrayLength();
+    }
+
+    // The number of distinct catch violations (one per (source, caught) type pair) under exceptions/no-general-catch.
+    private static int CatchViolationCount(string checkJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
+        return rule.GetProperty("violations").GetArrayLength();
+    }
+
+    // The number of catch sites reported for the (ReportEndpoint, System.Exception) swallow under exceptions/no-general-catch.
+    private static int CatchSiteCount(string checkJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
+        JsonElement swallow = rule.GetProperty("violations").EnumerateArray()
+            .Single(v => v.GetProperty("target").GetString() == "System.Exception");
+        return swallow.GetProperty("sites").GetArrayLength();
     }
 
     private static void EditOnDisk(string path, Func<string, string> transform)

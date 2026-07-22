@@ -160,14 +160,18 @@ Constraint MustNotReference(Type first, params Type[] more)      // sugar for ar
 ```
 
 Same shape for `MustOnlyReference`, `MustNotBeReferencedBy`, `MustOnlyBeReferencedBy`, the
-constructor-ban verb `MustNotConstruct`, and the injection-ban verb `MustNotInject`: each
+constructor-ban verb `MustNotConstruct`, the injection-ban verb `MustNotInject`, and the
+exception verbs `MustNotCatch` and `MustOnlyThrow`: each
 carries the identical pair — a `Selection`
 list and the `Type` sugar — and deliberately **no expression overload**. Constructor-ness lives in
 the verb, not the anchor, so ordinary selections name what may not be `new`ed
 (`arch.Types.Implementing(typeof(IHandler<>))`), which scales to "all registered services" where a
 per-constructor anchor would be dummy-argument noise. Injection-ness lives in the verb the same
 way, and its natural operands are the registration-fact selections
-(`arch.Registered(Lifetime.Scoped)`, §4.7), though any selection or bare type works. The
+(`arch.Registered(Lifetime.Scoped)`, §4.7), though any selection or bare type works.
+Catch-ness and throw-ness live in the verb the same way again: the operands name exception
+types, most often through the bare `typeof` sugar (`MustNotCatch(typeof(Exception))`); their
+edge semantics are §4.8. The
 `(first, more)` shape makes zero-argument calls **uncompilable** and keeps single-argument
 overload resolution unambiguous. Mixing selections and types in one call = wrap the type:
 `MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
@@ -220,11 +224,14 @@ lands only where the whole list is static and one form:
 - **Targets** range over **all referenced types, including metadata references** —
   `MustNotReference(typeof(SqlConnection))` and `arch.Namespace("System.Web.*")` as a target
   both work against BCL/NuGet types.
-- **`MustOnly*` complement universe = solution-declared types.** BCL/NuGet references are
+- **`MustOnly*` complement universe = solution-declared types — for the *reference* verbs.**
+  BCL/NuGet references are
   exempt, and the fragment states it: *"must reference only {list} (external packages are not
   constrained by this rule)"*. Without this pin every `MustOnlyReference` rule is either 100%
   violated (`System.String`) or renders a false sentence — both fatal to "the prose is
-  provably true".
+  provably true". `MustOnlyThrow` diverges deliberately: no type must *throw* a BCL
+  exception, so the exemption's rationale never applies — the verb is strict and its
+  fragment carries no caveat (§4.8).
 - **`MustOnly*` is strict — no implicit self-allowance.** A subject's reference to another
   member of its own selection is a violation unless that selection is itself among the allowed
   targets; authors list their own layer when they mean it. Internal precedent: the Freeze
@@ -234,7 +241,8 @@ lands only where the whole list is static and one form:
 - Checker behavior: an empty *subject* selection **fails** the rule by default
   (ArchUnit and ArchUnitNET precedent, with a pinned message). An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
-  `MustNotBeReferencedBy` / `MustNotConstruct`) whose operand is a **pattern selection**
+  `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch`) whose operand is a
+  **pattern selection**
   (Layer / Namespace / Project
   or a refined `Types`); a bare `typeof(...)` target absent from the codebase is the *win
   condition* and stays silent, the `MustOnly*` verbs never warn (an empty allow-set is loud
@@ -306,6 +314,17 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   are evidence, not identity. A grandfathered captive injection plus a *different* forbidden
   injected target from the same source is NEW and red; multiple injecting parameters within
   one (source, injected) pair ride together.
+- **Catch verb** (`MustNotCatch`, §4.8/§5.3): `(ruleId, source symbol ID, caught symbol
+  ID)` — the same edge-key shape once more (the caught exception type keys the target slot),
+  riding `BaselineEntry.ForEdge` with **zero baseline-format change**. Catch sites are
+  evidence, not identity: multiple `catch` clauses within one (source, caught) pair ride
+  together, and a grandfathered catch plus a *different* forbidden caught type from the same
+  source is NEW and red.
+- **Throw verb** (`MustOnlyThrow`, §4.8/§5.3): `(ruleId, source symbol ID, thrown symbol
+  ID)` — the same shape (the thrown type keys the target slot), riding
+  `BaselineEntry.ForEdge` with **zero format change**. Throw sites are evidence, not
+  identity; a grandfathered thrown type plus a *different* disallowed thrown type from the
+  same source is NEW and red.
 - **Shape/naming/inheritance/attribute verbs and escape hatches**:
   `(ruleId, subject symbol ID)`.
 - Symbol IDs are Roslyn `DocumentationCommentId` strings — stable across file moves and
@@ -520,6 +539,60 @@ needs two facts no other section provides: who is *registered* with what lifetim
   empty `Registered` **operand** on `MustNotInject` means no such registrations exist — the
   win condition — so `MustNotInject` **never warns** (§5.3, the bare-`typeof` precedent).
 
+### 4.8 Exception edges (catch and throw)
+
+The scoped exception-catch policy — only top-level handlers may catch base `Exception` — and
+the custom-exceptions rule — scoped code throws its own domain exceptions, not bare BCL ones —
+need facts no other section records: who *catches* what, and who *throws* what. Extraction
+records both; the `MustNotCatch` and `MustOnlyThrow` verbs (§3.3, §5.3) consume them.
+
+- **A catch edge** is `(source type, caught type, file:line sites)`, recorded at every
+  source-level `catch` clause. A typed catch mints the catch edge **only** — its type-name
+  syntax already mints the ordinary reference edge, so the catch channel never double-mints
+  (the explicit-`new` precedent, §4.5). A **bare `catch`** records `System.Exception` — the
+  language's own semantics — as a catch edge only: nothing in source names the type, so no
+  reference edge exists (and if the compilation cannot resolve `System.Exception`, nothing is
+  minted). `when` filters never suppress the edge, and filter contents mint their ordinary
+  type/member edges. **A rethrowing catch still mints**: `catch (Exception) { throw; }` is a
+  catch of `Exception` — edges are facts, and a sanctioned log-and-rethrow site is excepted or
+  grandfathered deliberately, never silently exempted. Type-parameter catches mint nothing;
+  constructed generic caught types normalize to their definition (§4.1); self-catches drop;
+  lambda and local-function catches attribute to the enclosing type; top-level-statements
+  catches attribute to `Program`.
+- **A throw edge** is `(source type, thrown expression's static type, file:line sites)`,
+  recorded at throw statements and throw expressions alike (`?? throw`, conditional and
+  switch-expression arms, and the expression-bodied `=> throw new X()`). A bare rethrow
+  `throw;` mints nothing — it introduces no thrown expression — while `throw ex` mints the
+  variable's **static** type (a pinned asymmetry): under a strict `MustOnlyThrow`, a
+  `catch (Exception ex) { …; throw ex; }` in scoped code is red, and the cure is `throw;` —
+  which also preserves the stack trace. `throw null` and type-parameter throws mint nothing;
+  `throw new T()` coexists with its construction edge (§4.5) — one site, two facts;
+  constructed generics normalize; self-throws drop; attribution follows the catch rules.
+- **Throw helpers are the honesty boundary**: `ArgumentNullException.ThrowIfNull(x)` is an
+  invocation, not a throw — it mints a member-use edge (§4.5) and no throw edge. A
+  helper-mediated throw is invisible to this axis, exactly as reflection construction is
+  invisible to the construction axis; the member-use axis is how helper calls are governed.
+- **Matching is exact, definition-level FQN**: `MustNotCatch(typeof(Exception))` does not
+  flag `catch (IOException)` — the narrow catch is the good state the rule steers toward,
+  and widening the match would punish it. There is no hierarchy-aware operand matching
+  (growth, §11); hierarchy adjectives as operands (`arch.Types.DerivedFrom<X>()`) match
+  solution-declared types only, because external types carry a shallow hierarchy (§5.2) — a
+  `DerivedFrom` operand never matches an external exception type.
+- **`MustOnlyThrow` is strict.** The §4.1 "`MustOnly*` complement universe =
+  solution-declared" exemption is scoped to the *reference* verbs: the unavoidable-BCL-noise
+  argument does not hold for throw statements — no type must throw a BCL exception, guard
+  throws are enumerable — and the custom-exceptions rule's teeth are exactly the
+  `throw new InvalidOperationException(…)` in scoped code. External thrown types ARE
+  constrained, and the fragment carries no exemption parenthetical (§5.3) because there is no
+  exemption to state. A `Type`-sugar operand (`MustOnlyThrow(typeof(TimeoutException))`)
+  resolves external allowed-set members by FQN as targets always have (§4.1); an allowed type
+  absent from the model resolves empty and harmlessly allows nothing.
+- Rendered glossary lines, beside the reference entry and gated per axis on the §4.5
+  byte-identical-without-it terms: *"catch = a source-level `catch` clause (a bare `catch`
+  counts as `System.Exception`)"* whenever the spec carries a `MustNotCatch` rule; *"throw =
+  a source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not
+  recorded)"* whenever it carries a `MustOnlyThrow` rule.
+
 ## 5. Vocabulary v1 (closed; every member ships with pinned fragments)
 
 ### 5.1 Nouns
@@ -584,6 +657,8 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 | `.MustNotUse(member, ...)` | "must not use {list}" — member targets (§4.5) |
 | `.MustNotConstruct(target, ...)` | "must not construct {list}" — selection/type targets; the DI-construction verb (§3.3) |
 | `.MustNotInject(target, ...)` | "must not inject {list}" — selection/type targets; the captive-dependency verb (§3.3, §4.7). Never warns: an empty `Registered` operand means no such registrations exist — the win condition, the §4.1 bare-`typeof` precedent |
+| `.MustNotCatch(target, ...)` | "must not catch {list}" — selection/type exception targets; the catch verb (§3.3, §4.8) |
+| `.MustOnlyThrow(target, ...)` | "must throw only {list}" — selection/type exception targets (§3.3, §4.8); **strict**: external thrown types are constrained too, so the fragment carries no external-packages parenthetical — the caveat's absence is the strictness rendering |
 | `.MustResideInNamespace(glob)` | "must reside in `{glob}`" |
 | `.MustHaveSuffix("Handler")` | "must be named `*Handler`" |
 | `.MustHavePrefix("I")` | "must be named `I*`" |
@@ -907,8 +982,13 @@ agent fixing a spec sees every problem in one pass.
   creation (`new`, including target-typed `new()`)"* — the third axis beside reference and use.
   The injection-ban verb is *inject* (`MustNotInject`), glossary-pinned as *"inject = a
   source-level constructor-parameter dependency (primary constructors included)"* — the fourth
-  axis (§4.7). The glossary line composes from these per-axis clauses (reference always; use iff a
-  member-target rule; construct iff a ctor rule; inject iff an injection rule) joined with "; "
+  axis (§4.7). The catch verb is *catch* (`MustNotCatch`), glossary-pinned as *"catch = a
+  source-level `catch` clause (a bare `catch` counts as `System.Exception`)"* — the fifth axis
+  (§4.8). The throw verb is *throw* (`MustOnlyThrow`), glossary-pinned as *"throw = a
+  source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not
+  recorded)"* — the sixth axis (§4.8). The glossary line composes from these per-axis clauses (reference always; use iff a
+  member-target rule; construct iff a ctor rule; inject iff an injection rule; catch iff a
+  catch rule; throw iff a throw rule) joined with "; "
   and closed by the drill-down tail, so each axis
   gates independently and a spec without a given axis renders byte-identically to before that axis
   existed (§4.1/§4.5's byte-identical-without-it discipline, generalized). A `Registered` noun
@@ -953,6 +1033,15 @@ the pinned call table — keyed services, `ServiceDescriptor`/`TryAddEnumerable`
 registrars — the table is the fence, everything outside it the documented honesty boundary;
 lifetime facts on `ITypeInfo` (registration membership stays model-side, resolved at evaluation);
 and `graph` registration data.
+
+On the exception axis (§4.8): the `MustOnlyCatch` / `MustNotThrow` and `MustNotBeCaughtBy` /
+`MustNotBeThrownBy` twins; `when`-filter awareness (today a filter neither suppresses the
+catch edge nor refines the match); rethrow-aware refinement — distinguishing
+`catch … { throw; }` from a swallow — ratified against for v1 (edges are facts, and a
+sanctioned log-and-rethrow site is excepted or grandfathered deliberately); hierarchy-aware
+operand matching (exact definition-level FQN is pinned, so a ban on `Exception` deliberately
+does not reach derived catches — a hierarchy-matching form would be a new, explicitly named
+semantic, not a widening of this one); and `graph` catch/throw data.
 
 Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); surface union
 `arch.AnyOf(...)` (also the future multi-type noun); a layered-architecture macro (deferred:

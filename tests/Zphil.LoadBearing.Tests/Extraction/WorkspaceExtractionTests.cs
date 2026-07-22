@@ -46,6 +46,11 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             MyApp.Domain.Order -> MyApp.Domain.Money @ MyApp.Domain/Order.Validation.cs:5, MyApp.Domain/Order.cs:7, MyApp.Domain/Order.cs:9
             MyApp.Domain.Order -> MyApp.Domain.Order.Line @ MyApp.Domain/Order.cs:9
             MyApp.Domain.Order.Line -> MyApp.Domain.Money @ MyApp.Domain/Order.cs:13, MyApp.Domain/Order.cs:21
+            MyApp.Domain.OrderApproval -> MyApp.Domain.Money @ MyApp.Domain/OrderApproval.cs:10
+            MyApp.Domain.OrderApproval -> MyApp.Domain.Order @ MyApp.Domain/OrderApproval.cs:8, MyApp.Domain/OrderApproval.cs:10, MyApp.Domain/OrderApproval.cs:15
+            MyApp.Domain.OrderApproval -> MyApp.Domain.OrderRuleViolation @ MyApp.Domain/OrderApproval.cs:12
+            MyApp.Domain.OrderApproval -> System.InvalidOperationException @ MyApp.Domain/OrderApproval.cs:17
+            MyApp.Domain.OrderRuleViolation -> System.Exception @ MyApp.Domain/OrderRuleViolation.cs:5
             MyApp.Domain.OrderService -> MyApp.Domain.Order @ MyApp.Domain/OrderService.cs:7, MyApp.Domain/OrderService.cs:10
             MyApp.Domain.OrderService -> MyApp.Web.HomeController @ MyApp.Domain/OrderService.cs:9, MyApp.Domain/OrderService.cs:10, MyApp.Domain/OrderService.cs:13
             MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions @ MyApp.Domain/OrderService.cs:10
@@ -58,9 +63,11 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     public void ExtractFromSolutionAsync_DomainProject_PinsCompleteMemberEdgeList()
     {
         // The member-use channel (GRAMMAR §4.5) for the Domain project, pinned whole: property accesses fold
-        // to P: (Reference, Amount), the cross-project call is the M: overload (RenderOrder), and the reduced
-        // extension resolves to the declaring static class (WebTextExtensions), never to string. Deliberately
-        // ABSENT: OrderService's `new HomeController()` (constructor) and `typeof(HomeController)` — neither is a use.
+        // to P: (Reference, Amount, Total), the cross-project call is the M: overload (RenderOrder), and the
+        // reduced extension resolves to the declaring static class (WebTextExtensions), never to string.
+        // OrderApproval's throw-guard reads its own `order.Total.Amount` (two P: hops) and calls Validate (M:).
+        // Deliberately ABSENT: OrderService's `new HomeController()` and OrderApproval's two `throw new` sites
+        // (constructions, not uses), and `typeof(HomeController)` — none is a use.
         string rendered = string.Join("\n", fixture.Model.MemberEdges
             .Where(e => e.Source.ProjectName == "MyApp.Domain")
             .Select(fixture.RenderMemberEdge));
@@ -68,6 +75,9 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         rendered.ShouldBe(
             """
             MyApp.Domain.Order -> P:MyApp.Domain.Money.Amount @ MyApp.Domain/Order.Validation.cs:5
+            MyApp.Domain.OrderApproval -> M:MyApp.Domain.Order.Validate @ MyApp.Domain/OrderApproval.cs:15
+            MyApp.Domain.OrderApproval -> P:MyApp.Domain.Money.Amount @ MyApp.Domain/OrderApproval.cs:10
+            MyApp.Domain.OrderApproval -> P:MyApp.Domain.Order.Total @ MyApp.Domain/OrderApproval.cs:10
             MyApp.Domain.OrderService -> M:MyApp.Web.HomeController.RenderOrder(System.String) @ MyApp.Domain/OrderService.cs:10
             MyApp.Domain.OrderService -> M:MyApp.Web.WebTextExtensions.ToWebDisplay(System.String) @ MyApp.Domain/OrderService.cs:10
             MyApp.Domain.OrderService -> P:MyApp.Domain.Order.Reference @ MyApp.Domain/OrderService.cs:10
@@ -78,8 +88,10 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     public void ExtractFromSolutionAsync_DomainProject_PinsCompleteConstructorEdgeList()
     {
         // The construction channel (GRAMMAR §4.5) for the Domain project, pinned whole: Order builds its nested
-        // Line, and OrderService `new`s the cross-project HomeController. Deliberately ABSENT: OrderService's
-        // typeof(HomeController) at line 13 (a type reference, not a construction — no ctor edge).
+        // Line, OrderService `new`s the cross-project HomeController, and OrderApproval's throw-guard `new`s both
+        // its domain OrderRuleViolation and the BCL InvalidOperationException. Deliberately ABSENT: OrderService's
+        // typeof(HomeController) at line 13 (a type reference, not a construction) and OrderRuleViolation's
+        // `: base(message)` (a base-constructor call, not a `new`) — neither is a ctor edge.
         string rendered = string.Join("\n", fixture.Model.ConstructorEdges
             .Where(e => e.Source.ProjectName == "MyApp.Domain")
             .Select(fixture.RenderConstructorEdge));
@@ -87,6 +99,8 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         rendered.ShouldBe(
             """
             MyApp.Domain.Order -> MyApp.Domain.Order.Line @ MyApp.Domain/Order.cs:9
+            MyApp.Domain.OrderApproval -> MyApp.Domain.OrderRuleViolation @ MyApp.Domain/OrderApproval.cs:12
+            MyApp.Domain.OrderApproval -> System.InvalidOperationException @ MyApp.Domain/OrderApproval.cs:17
             MyApp.Domain.OrderService -> MyApp.Web.HomeController @ MyApp.Domain/OrderService.cs:9
             """);
 

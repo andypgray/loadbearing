@@ -87,6 +87,48 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
+    public void Serialize_CatchViolation_EmitsCatchesMessageText()
+    {
+        // A red MustNotCatch violation drives the SARIF MessageText catch arm (a missing arm renders empty text
+        // and reads green): message `Source catches Target`, level error (GRAMMAR §4.8).
+        const string source = """
+                              namespace Errors { public class DbError : System.Exception {} }
+                              namespace App { public class Handler { public void Run() { try { } catch (Errors.DbError) { } } } }
+                              """;
+        CheckReport report = Checker.Run(source, arch =>
+            arch.Rule("ex/no-catch")
+                .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
+                .Because("Catch specific exceptions, not the domain base."));
+
+        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
+
+        JsonElement result = Results(json).ShouldHaveSingleItem();
+        result.GetProperty("level").GetString().ShouldBe("error");
+        result.GetProperty("message").GetProperty("text").GetString().ShouldBe("App.Handler catches Errors.DbError");
+    }
+
+    [Fact]
+    public void Serialize_ThrowViolation_EmitsThrowsMessageText()
+    {
+        // A red MustOnlyThrow violation drives the SARIF MessageText throw arm: an external, unlisted throw is
+        // red (no external exemption), message `Source throws Target`, level error (GRAMMAR §4.8).
+        const string source = """
+                              namespace App { public class Service { public void Run() => throw new System.InvalidOperationException(); } }
+                              """;
+        CheckReport report = Checker.Run(source, arch =>
+            arch.Rule("ex/only-throw")
+                .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Sanctioned.*")))
+                .Because("Throw only the sanctioned exception types."));
+
+        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
+
+        JsonElement result = Results(json).ShouldHaveSingleItem();
+        result.GetProperty("level").GetString().ShouldBe("error");
+        result.GetProperty("message").GetProperty("text").GetString()
+            .ShouldBe("App.Service throws System.InvalidOperationException");
+    }
+
+    [Fact]
     public void Serialize_EmptySubjectAndRuleError_ProduceNoResults()
     {
         // EmptySubject and RuleError violations are site-less by construction (the model deliberately carries no

@@ -335,6 +335,46 @@ public class AgentContextRendererTests
             "Singleton-registered types must not inject scoped-registered types or transient-registered types.");
     }
 
+    [Fact]
+    public void RootBlock_WithCatchRule_ExtendsGlossaryWithCatchClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new CatchRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The catch clause appears beside "reference" only when a MustNotCatch rule exists (no other axis here).
+        block.ShouldContain(
+            "reference = a source-level type reference; catch = a source-level `catch` clause " +
+            "(a bare `catch` counts as `System.Exception`). Expand any rule ID with `loadbearing explain <rule-id>`.");
+        block.ShouldNotContain("throw = a source-level `throw`");
+    }
+
+    [Fact]
+    public void RootBlock_WithThrowRule_ExtendsGlossaryWithThrowClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new ThrowRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The throw clause appears beside "reference" only when a MustOnlyThrow rule exists (no other axis here).
+        // Exact substring equality proves the strict verb emits no external-packages caveat of its own.
+        block.ShouldContain(
+            "reference = a source-level type reference; throw = a source-level `throw` of the thrown " +
+            "expression's type (bare rethrows `throw;` are not recorded). " +
+            "Expand any rule ID with `loadbearing explain <rule-id>`.");
+        block.ShouldNotContain("catch = a source-level `catch`");
+    }
+
+    [Fact]
+    public void RootBlock_WithoutCatchOrThrow_OmitsBothGlossaryClauses()
+    {
+        // A reference-only spec carries neither exception verb, so the block renders byte-identically to before
+        // the catch/throw axes existed (GRAMMAR §10 gate discipline) — the two new clauses default off.
+        ArchitectureModel model = ArchModelBuilder.Build(new DogfoodShapeSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Zphil.LoadBearing.ArchSpec");
+        block.ShouldNotContain("catch = a source-level `catch`");
+        block.ShouldNotContain("throw = a source-level `throw`");
+    }
+
     // A single Migrate-rule spec — no layers, no Enforce rules — for the Migrations-section pins.
     private sealed class PolicySpec(MigrationPolicy policy) : IArchitectureSpec
     {
@@ -483,6 +523,28 @@ public class AgentContextRendererTests
                 .Enforce(arch.Registered(Lifetime.Singleton)
                     .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
                 .Because("Singletons capturing scoped/transient services leak state across scopes.");
+        }
+    }
+
+    // A MustNotCatch verb over a BCL exception type — triggers the catch glossary clause but no throw clause.
+    private sealed class CatchRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-catch-ioe")
+                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+                .Because("Swallowing invalid-operation signals hides real defects.");
+        }
+    }
+
+    // A MustOnlyThrow verb over a BCL exception type — triggers the throw glossary clause but no catch clause.
+    private sealed class ThrowRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/throw-domain-only")
+                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+                .Because("Domain code must surface only sanctioned exception types.");
         }
     }
 }

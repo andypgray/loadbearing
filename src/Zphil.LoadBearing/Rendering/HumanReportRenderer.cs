@@ -104,6 +104,16 @@ public static class HumanReportRenderer
                         located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
                             $"{violation.Source!.FullName} injects {violation.Target!.FullName}"));
                     break;
+                case ViolationKind.Catch:
+                    foreach (SourceLocation site in violation.Sites)
+                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
+                            $"{violation.Source!.FullName} catches {violation.Target!.FullName}"));
+                    break;
+                case ViolationKind.Throw:
+                    foreach (SourceLocation site in violation.Sites)
+                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
+                            $"{violation.Source!.FullName} throws {violation.Target!.FullName}"));
+                    break;
                 case ViolationKind.Shape:
                     SourceLocation? first = violation.Subject!.DeclarationSites.FirstOrDefault();
                     if (first is not null)

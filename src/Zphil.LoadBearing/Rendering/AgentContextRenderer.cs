@@ -34,6 +34,12 @@ public static class AgentContextRenderer
     private const string GlossaryInjectClause =
         "inject = a source-level constructor-parameter dependency (primary constructors included)";
 
+    private const string GlossaryCatchClause =
+        "catch = a source-level `catch` clause (a bare `catch` counts as `System.Exception`)";
+
+    private const string GlossaryThrowClause =
+        "throw = a source-level `throw` of the thrown expression's type (bare rethrows `throw;` are not recorded)";
+
     // A separate, independently-gated glossary line (not an axis clause): rendered as ONE line whenever any
     // rule's subject or operands carry a Registered noun, on the same byte-identical-without-it terms as the
     // axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
@@ -75,12 +81,14 @@ public static class AgentContextRenderer
         bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
         bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
         bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
+        bool hasCatchRule = model.Rules.Any(rule => rule.Constraint is MustNotCatchConstraint);
+        bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint);
         bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule)
+            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule, hasCatchRule, hasThrowRule)
         };
 
         // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
@@ -104,12 +112,15 @@ public static class AgentContextRenderer
     // The glossary/drill-down line, composed from the always-on "reference" clause plus the axis clauses the
     // spec actually exercises, then the shared tail. Reproduces the pre-ctor "reference." and "reference; use."
     // lines byte-for-byte when their axis flags are the only ones set (GRAMMAR §4.1/§4.5/§10).
-    private static string GlossaryLine(bool hasMemberRule, bool hasCtorRule, bool hasInjectRule)
+    private static string GlossaryLine(
+        bool hasMemberRule, bool hasCtorRule, bool hasInjectRule, bool hasCatchRule, bool hasThrowRule)
     {
         var clauses = new List<string> { GlossaryReferenceClause };
         if (hasMemberRule) clauses.Add(GlossaryUseClause);
         if (hasCtorRule) clauses.Add(GlossaryConstructClause);
         if (hasInjectRule) clauses.Add(GlossaryInjectClause);
+        if (hasCatchRule) clauses.Add(GlossaryCatchClause);
+        if (hasThrowRule) clauses.Add(GlossaryThrowClause);
 
         return string.Join("; ", clauses) + ". " + GlossaryTail;
     }

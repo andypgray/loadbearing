@@ -122,6 +122,40 @@ public static class SelectionConstraints
         return new MustNotInjectConstraint(subject, WrappedTypes(subject, first, more));
     }
 
+    /// <summary>
+    ///     The subject must not catch any of the targets — a source-level <c>catch</c> clause whose caught
+    ///     type resolves to a listed target, a bare <c>catch</c> counting as <c>System.Exception</c>
+    ///     (GRAMMAR §5.3). Catch-ness lives in the verb, so ordinary selections name what may not be caught;
+    ///     there is no expression overload (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotCatch(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotCatchConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not catch any of the targets (type sugar).</summary>
+    public static Constraint MustNotCatch(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotCatchConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
+    ///     The subject may throw only the targets — STRICT: every thrown type, including BCL and external
+    ///     exception types, must be in the allowed list (unlike <c>MustOnlyReference</c>, which exempts
+    ///     external packages, GRAMMAR §4.1). Throw-ness lives in the verb, so ordinary selections name the
+    ///     permitted thrown types; there is no expression overload (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustOnlyThrow(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustOnlyThrowConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject may throw only the targets (type sugar).</summary>
+    public static Constraint MustOnlyThrow(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustOnlyThrowConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
     /// <summary>The subject must reside in a namespace glob.</summary>
     public static Constraint MustResideInNamespace(this Selection subject, string glob)
     {

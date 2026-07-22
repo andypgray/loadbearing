@@ -4,10 +4,10 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     The extraction of one <see cref="CompilationInput" /> (one project, one target framework) as pure,
 ///     self-contained data: the project's name and forward references, the types it declares, the
 ///     externals it references, its reference edges, its member-use edges (GRAMMAR §4.5), its
-///     construction edges (§4.5), its constructor-injection edges (§4.7), and its container-registration
-///     facts (§4.7). It holds no Roslyn types (no <c>ISymbol</c>, <c>Compilation</c>, or
-///     <c>Location</c>) so it is System.Text.Json-serializable by design — the persisted extraction cache
-///     stores exactly this — and
+///     construction edges (§4.5), its constructor-injection edges (§4.7), its catch and throw edges (§4.8),
+///     and its container-registration facts (§4.7). It holds no Roslyn types (no <c>ISymbol</c>,
+///     <c>Compilation</c>, or <c>Location</c>) so it is System.Text.Json-serializable by design — the
+///     persisted extraction cache stores exactly this — and
 ///     <see cref="FragmentMerger.Merge" /> reconstructs a <see cref="Zphil.LoadBearing.Codebase.CodebaseModel" />
 ///     from a set of fragments, reproducing the global cross-input semantics.
 /// </summary>
@@ -17,8 +17,9 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     unification. The fragment's own collections are materialized in a canonical order (declared types
 ///     and externals ordinal by FQN, edges by source then target, member edges by source then member
 ///     SymbolId, construction edges by source then constructed, injection edges by source then injected,
-///     registrations by lifetime then service then implementation) so serialization is stable; global
-///     ordering is re-derived at merge, so a fragment's internal order never affects the model.
+///     catch edges by source then caught, throw edges by source then thrown, registrations by lifetime then
+///     service then implementation) so serialization is stable; global ordering is re-derived at merge, so a
+///     fragment's internal order never affects the model.
 /// </remarks>
 internal sealed record CodebaseFragment(
     string ProjectName,
@@ -29,4 +30,6 @@ internal sealed record CodebaseFragment(
     IReadOnlyList<FragmentMemberEdge> MemberEdges,
     IReadOnlyList<FragmentConstructorEdge> ConstructorEdges,
     IReadOnlyList<FragmentInjectionEdge> InjectionEdges,
+    IReadOnlyList<FragmentCatchEdge> CatchEdges,
+    IReadOnlyList<FragmentThrowEdge> ThrowEdges,
     IReadOnlyList<FragmentServiceRegistration> ServiceRegistrations);

@@ -96,6 +96,40 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_CatchViolation_RendersCatchesLineAtCatchSite()
+    {
+        // ViolationLines has no default arm, so a missing Catch case would render nothing and a red report would
+        // read green. Pin the located line text: `Source catches Target` at the `catch` site (GRAMMAR §4.8).
+        Violation catchViolation = Violation.Catch(
+            Node("App.Handler"), Node("Errors.DbError"), [new SourceLocation("Handler.cs", 9)]);
+        var result = new RuleResult(
+            EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, [], 0, false);
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Catch);
+        block.ShouldContain("App.Handler catches Errors.DbError");
+        block.ShouldContain(":9 — App.Handler catches Errors.DbError");
+    }
+
+    [Fact]
+    public void RuleBlock_ThrowViolation_RendersThrowsLineAtThrowSite()
+    {
+        // Likewise the Throw arm: a missing case would silently render nothing. Pin `Source throws Target` at the
+        // `throw` site (GRAMMAR §4.8).
+        Violation throwViolation = Violation.Throw(
+            Node("App.Service"), Node("Errors.InfraError"), [new SourceLocation("Service.cs", 14)]);
+        var result = new RuleResult(
+            EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, [], 0, false);
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Throw);
+        block.ShouldContain("App.Service throws Errors.InfraError");
+        block.ShouldContain(":14 — App.Service throws Errors.InfraError");
+    }
+
+    [Fact]
     public void RuleBlock_MixedUnlocatedAndLocated_EmitsUnlocatedBeforeLocated()
     {
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered

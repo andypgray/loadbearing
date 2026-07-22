@@ -303,15 +303,64 @@
       "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.",
       "violations": [],
       "warnings": []
+    },
+    {
+      "id": "exceptions/no-general-catch",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not catch `Exception`.",
+      "because": "A catch-all hides the failures you meant to handle; catch the specific exception instead.",
+      "fix": "Catch the specific exception type you can handle, not System.Exception.",
+      "baseline": {
+        "path": "arch/baselines/exceptions/no-general-catch.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/domain-throws-domain",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must throw only `OrderRuleViolation`.",
+      "because": "Domain code signals rule failures with the domain's own exception, not a generic BCL type.",
+      "fix": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.",
+      "violations": [
+        {
+          "kind": "throw",
+          "source": "MyApp.Domain.OrderApproval",
+          "target": "System.InvalidOperationException",
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderApproval.cs",
+              "line": 17
+            }
+          ]
+        }
+      ],
+      "warnings": []
     }
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 11,
+    "rulesChecked": 13,
     "rulesPassed": 2,
-    "rulesFailed": 8,
+    "rulesFailed": 10,
     "rulesSkipped": 1,
-    "violations": 13,
+    "violations": 15,
     "warnings": 1
   }
 }

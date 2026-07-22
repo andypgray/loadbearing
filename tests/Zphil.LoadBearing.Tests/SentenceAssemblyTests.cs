@@ -215,6 +215,55 @@ public class SentenceAssemblyTests
         SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
     }
 
+    // ---- Exception edges (GRAMMAR §5.3, §3.3): the catch-ban and STRICT throw-allowlist dependency verbs ----
+
+    [Fact]
+    public void MustNotCatch_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6): a bare layer subject speaks collectively — "The Web layer must not catch …".
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustNotCatch(typeof(InvalidOperationException)))
+            .ShouldBe("The Web layer must not catch `InvalidOperationException`.");
+    }
+
+    [Fact]
+    public void MustNotCatch_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice —
+        // "Types in the Web layer named `*Controller` …", never a bare "The Web layer …".
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotCatch(typeof(Exception)))
+            .ShouldBe("Types in the Web layer named `*Controller` must not catch `Exception`.");
+    }
+
+    [Fact]
+    public void MustNotCatch_MultipleTargets_JoinWithOr()
+    {
+        Constraint constraint = Arch.Types.MustNotCatch(typeof(InvalidOperationException), typeof(TimeoutException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not catch `InvalidOperationException` or `TimeoutException`.");
+    }
+
+    [Fact]
+    public void MustOnlyThrow_NamespaceSubject_RendersLocativeAndStrictAllowlist()
+    {
+        // The namespace-locative subject + the strict throw allowlist: exact equality proves no external-
+        // packages caveat rides along (unlike MustOnlyReference), which is the strictness rendering (§5.3).
+        Constraint constraint = Arch.Namespace("MyApp.Domain.*").MustOnlyThrow(typeof(InvalidOperationException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types in `MyApp.Domain.*` must throw only `InvalidOperationException`.");
+    }
+
+    [Fact]
+    public void MustOnlyThrow_ThreeTargets_JoinWithCommasAndOr_NoOxfordComma()
+    {
+        // Shares TargetList with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
+        Constraint constraint = Arch.Types.MustOnlyThrow(
+            typeof(InvalidOperationException), typeof(ArgumentException), typeof(TimeoutException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must throw only `InvalidOperationException`, `ArgumentException` or `TimeoutException`.");
+    }
+
     // ---- Member subjects (GRAMMAR §4.6, §5.7, §6) ----
 
     [Fact]

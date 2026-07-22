@@ -12,6 +12,10 @@ namespace Zphil.LoadBearing.Checking;
 ///     <see cref="Source" /> and <see cref="Target" /> (the constructed type) with the construction edge's
 ///     <see cref="Sites" />; a <see cref="ViolationKind.Injection" /> carries <see cref="Source" /> and
 ///     <see cref="Target" /> (the injected parameter type) with the injection edge's <see cref="Sites" />;
+///     a <see cref="ViolationKind.Catch" /> carries <see cref="Source" /> and <see cref="Target" /> (the
+///     caught exception type) with the catch edge's <see cref="Sites" />; a
+///     <see cref="ViolationKind.Throw" /> carries <see cref="Source" /> and <see cref="Target" /> (the
+///     thrown exception type) with the throw edge's <see cref="Sites" />;
 ///     a <see cref="ViolationKind.Shape" /> carries
 ///     <see cref="Subject" /> with its declaration sites; a <see cref="ViolationKind.MemberShape" />
 ///     carries <see cref="SubjectMember" /> with its declaration sites;
@@ -45,13 +49,15 @@ public sealed class Violation
 
     /// <summary>
     ///     The referencing type (Reference kind — for the inbound verbs this is where the edit happens), the
-    ///     constructing type (Construction kind), or the injecting type (Injection kind).
+    ///     constructing type (Construction kind), the injecting type (Injection kind), the catching type
+    ///     (Catch kind), or the throwing type (Throw kind).
     /// </summary>
     public TypeNode? Source { get; }
 
     /// <summary>
-    ///     The referenced type (Reference kind), the constructed type (Construction kind), or the injected
-    ///     parameter type (Injection kind).
+    ///     The referenced type (Reference kind), the constructed type (Construction kind), the injected
+    ///     parameter type (Injection kind), the caught exception type (Catch kind), or the thrown exception
+    ///     type (Throw kind).
     /// </summary>
     public TypeNode? Target { get; }
 
@@ -74,9 +80,11 @@ public sealed class Violation
     ///     This violation's stable baseline identity (GRAMMAR §4.3): an edge key
     ///     (<see cref="Source" />, <see cref="Target" /> symbol IDs) for a Reference, a Construction
     ///     (the constructed type in <see cref="Target" />; all ctor overloads share the one type-pair
-    ///     identity), or an Injection (the injected parameter type in <see cref="Target" />; every parameter
-    ///     typed on it shares the one type-pair identity), an edge key (<see cref="Source" /> symbol ID,
-    ///     <see cref="Member" />'s member DocId) for a MemberUse, a
+    ///     identity), an Injection (the injected parameter type in <see cref="Target" />; every parameter
+    ///     typed on it shares the one type-pair identity), a Catch (the caught type in <see cref="Target" />;
+    ///     every catch clause of it shares the one type-pair identity), or a Throw (the thrown type in
+    ///     <see cref="Target" />; every throw of it shares the one type-pair identity), an edge key
+    ///     (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId) for a MemberUse, a
     ///     subject key for a Shape, and a member-subject key (<see cref="SubjectMember" />'s member DocId)
     ///     for a MemberShape (GRAMMAR §4.6). <see cref="ViolationKind.EmptySubject" /> and
     ///     <see cref="ViolationKind.RuleError" /> have no stable identity and return null — they can
@@ -89,6 +97,8 @@ public sealed class Violation
             ViolationKind.Reference => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.Construction => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.Injection => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            ViolationKind.Catch => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            ViolationKind.Throw => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
@@ -109,6 +119,16 @@ public sealed class Violation
     internal static Violation Injection(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
         return new Violation(ViolationKind.Injection, source, target, null, null, null, sites, null);
+    }
+
+    internal static Violation Catch(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.Catch, source, target, null, null, null, sites, null);
+    }
+
+    internal static Violation Throw(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.Throw, source, target, null, null, null, sites, null);
     }
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)

@@ -126,12 +126,34 @@
       "status": "skipped",
       "violations": 0,
       "warnings": 0
+    },
+    {
+      "id": "exceptions/no-general-catch",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/exceptions/no-general-catch.json",
+        "captured": false,
+        "remaining": 0,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "exceptions/domain-throws-domain",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 11,
+    "rulesChecked": 13,
     "rulesPassed": 2,
-    "rulesFailed": 8,
+    "rulesFailed": 10,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

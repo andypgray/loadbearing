@@ -56,6 +56,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"injection"`); registrations made by assembly scanning, factory internals, or framework
   defaults are the documented honesty boundary. The `Meridian.Interchange` guidance pack now
   enforces it as `di/no-captive-dependencies` with the Microsoft DI-guidelines citation.
+- SARIF output: `check --sarif <path>` writes SARIF 2.1.0 beside the human and `--json`
+  renderers, over the same report — one result per violation site with stable,
+  line-independent alert identities (`partialFingerprints`), red sites as `error`/`new`,
+  grandfathered sites as suppressed `note`/`unchanged` results carrying the baseline's
+  `--because` attribution, and workspace diagnostics as tool-execution notifications. The
+  repo's own CI uploads its self-check to GitHub code scanning; gating stays the CLI exit
+  code — SARIF is visibility, not enforcement.
+- Exception edges: the `MustNotCatch` and `MustOnlyThrow` verbs over two new edge families.
+  "The Web layer must not catch `Exception`" and "the Domain layer must throw only
+  `OrderRuleViolation`" are now one-line, ratcheted rules with `file:line` sites: catch
+  edges record every `catch` clause (a bare `catch` counts as `System.Exception`; `when`
+  filters never suppress; a rethrowing catch still mints — sanctioned log-and-rethrow sites
+  are excepted or grandfathered deliberately), and throw edges record every throw statement
+  and throw expression at the thrown expression's static type (`throw;` mints nothing;
+  `throw ex` mints the variable's static type; `ArgumentNullException.ThrowIfNull` stays a
+  member use — the documented honesty boundary). Operand matching is exact: banning
+  `Exception` never flags a narrower catch — the narrow catch is the good state.
+  `MustOnlyThrow` is strict: external thrown types are constrained too (no type must throw
+  a BCL exception), so its sentence carries no external-packages caveat. Reported human
+  (`{source} catches {target}` / `{source} throws {target}`), JSON (kinds
+  `"catch"`/`"throw"`), and SARIF. The `Meridian.Interchange` pack now enforces the
+  Framework Design Guidelines scoped catch policy as `exceptions/no-general-catch` — only
+  the `BackgroundService` dispatcher may catch base `Exception` — with the
+  using-standard-exception-types citation.
 
 ## [0.1.0] - 2026-07-14
 

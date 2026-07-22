@@ -13,8 +13,9 @@ namespace Meridian.Interchange.ArchSpec;
 ///     outbox and transmits booking confirmations, status updates, and customs filings to trading
 ///     partners over HTTP. Its rules encode canonical Microsoft .NET guidance: partner clients are
 ///     wired through the composition root, HttpClients come from the factory, nothing resolves from
-///     the provider outside that root, the hosted service scopes its own work, and Task-returning
-///     methods carry the Async suffix — with the one legacy manifest corner that still blocks
+///     the provider outside that root, the hosted service scopes its own work, base Exception is
+///     caught only in a top-level handler, and Task-returning methods carry the Async suffix — with
+///     the one legacy manifest corner that still blocks
 ///     grandfathered until its gateway goes async.
 /// </summary>
 public sealed class InterchangeArchSpec : IArchitectureSpec
@@ -84,5 +85,12 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
             .Because("Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Rename the method to end in Async.");
+
+        // 9 — Standard exception types (FDG): catch base Exception only in a top-level handler; the dispatcher's poll loop is the one sanctioned catch-all.
+        arch.Rule("exceptions/no-general-catch")
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Except(arch.Types.DerivedFrom<BackgroundService>())
+                .MustNotCatch(typeof(Exception)))
+            .Because("Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle — https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types")
+            .Fix("Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.");
     }
 }

@@ -277,6 +277,78 @@ public class ModelReificationTests
         sugar.Targets[0].Adjectives.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void MustNotCatchRule_ReifiesToWalkableCatchConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new CatchRuleSpec()).Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustNotCatchConstraint>();
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        constraint.Targets.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        // MustNotCatch is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustOnlyThrowRule_ReifiesToWalkableThrowConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new ThrowRuleSpec()).Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustOnlyThrowConstraint>();
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        constraint.Targets.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        // MustOnlyThrow is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustNotCatch_TypeSugar_ReifiesIdenticallyToWrappedSelection()
+    {
+        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
+        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
+        var sugar = ArchModelBuilder.Build(new CatchTypeSugarSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotCatchConstraint>();
+        var wrapped = ArchModelBuilder.Build(new CatchWrappedSelectionSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotCatchConstraint>();
+
+        sugar.Targets.Count.ShouldBe(1);
+        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        sugarType.ShouldBe(typeof(InvalidOperationException));
+        wrappedType.ShouldBe(sugarType);
+        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustOnlyThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
+    {
+        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
+        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
+        var sugar = ArchModelBuilder.Build(new ThrowTypeSugarSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustOnlyThrowConstraint>();
+        var wrapped = ArchModelBuilder.Build(new ThrowWrappedSelectionSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustOnlyThrowConstraint>();
+
+        sugar.Targets.Count.ShouldBe(1);
+        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        sugarType.ShouldBe(typeof(InvalidOperationException));
+        wrappedType.ShouldBe(sugarType);
+        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+    }
+
     // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
     private sealed class MemberUseSpec : IArchitectureSpec
     {
@@ -382,6 +454,70 @@ public class ModelReificationTests
         {
             arch.Rule("di/no-inject-sql")
                 .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
+                .Because("Reason.");
+        }
+    }
+
+    // A single MustNotCatch-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private sealed class CatchRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-catch-ioe")
+                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+                .Because("Swallowing invalid-operation signals hides real defects.");
+        }
+    }
+
+    // A single MustOnlyThrow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private sealed class ThrowRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/throw-domain-only")
+                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+                .Because("Domain code must surface only sanctioned exception types.");
+        }
+    }
+
+    // The MustNotCatch Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
+    private sealed class CatchTypeSugarSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-catch")
+                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class CatchWrappedSelectionSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-catch")
+                .Enforce(arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))))
+                .Because("Reason.");
+        }
+    }
+
+    // The MustOnlyThrow Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
+    private sealed class ThrowTypeSugarSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/throw-only")
+                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class ThrowWrappedSelectionSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/throw-only")
+                .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
                 .Because("Reason.");
         }
     }

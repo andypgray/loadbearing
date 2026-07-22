@@ -19,9 +19,12 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <item>
 ///             Edges — walk each declaring part's source for source-name-derived reference edges, deduped by (file,
 ///             line), self-edges dropped. The same walk yields the member-use edges (GRAMMAR §4.5) beside the type
-///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped — and
-///             the construction edges (§4.5) — one per (source, constructed FQN) at every object-creation
-///             expression, sites deduped, self-construction dropped, riding independently of the type channel.
+///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped — the
+///             construction edges (§4.5) — one per (source, constructed FQN) at every object-creation
+///             expression, sites deduped, self-construction dropped — and the catch and throw edges (§4.8) — one
+///             per (source, caught FQN) at every <c>catch</c> clause and one per (source, thrown FQN) at every
+///             <c>throw</c> statement/expression, sites deduped, self-catch/self-throw dropped. Every channel
+///             rides independently of the type channel.
 ///         </item>
 ///         <item>
 ///             Injection edges (GRAMMAR §4.7) — a declaration-side pass over each declared type's
@@ -32,10 +35,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             dropped, sites deduped.
 ///         </item>
 ///         <item>
-///             Registration facts (GRAMMAR §4.7) — a whole-compilation walk over every syntax tree (a
-///             top-level-statements <c>Program</c> is not a declared type, so this is not a per-type walk),
-///             minting one <see cref="FragmentServiceRegistration" /> per (lifetime, service FQN,
-///             implementation FQN) recognized call, sites deduped. See <see cref="RegistrationRecognizer" />.
+///             Registration facts (GRAMMAR §4.7) — a whole-compilation walk over every syntax tree, minting
+///             one <see cref="FragmentServiceRegistration" /> per (lifetime, service FQN, implementation FQN)
+///             recognized call, sites deduped. Registration is a string-side fact needing no per-type
+///             attribution (its most common composition root is a top-level-statements <c>Program</c>), so one
+///             pass over every tree is the natural formulation. See <see cref="RegistrationRecognizer" />.
 ///         </item>
 ///     </list>
 ///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
@@ -302,6 +306,7 @@ internal static class FragmentExtractor
 
     private sealed class ExtractState
     {
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
@@ -309,6 +314,7 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
+        private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
         public CodebaseFragment Run(CompilationInput input)
         {
@@ -406,7 +412,7 @@ internal static class FragmentExtractor
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
-                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, string file, int line)
+                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, INamedTypeSymbol? thrown, string file, int line)
                          in ReferenceWalker.Walk(root, model))
                 {
                     var site = new FragmentSite(file, line);
@@ -437,6 +443,32 @@ internal static class FragmentExtractor
                         {
                             ResolveName(constructed);
                             ConstructorEdgeSites((srcFqn, ctorFqn)).Add(site);
+                        }
+                    }
+
+                    // The catch channel (§4.8): mint the catch edge, self-catch dropped like the type-edge self-drop.
+                    // Rides independently — a typed catch arrives here with target=null (its type-name syntax minted
+                    // the reference edge on its own visit) and a bare catch names no type at all.
+                    if (caught is not null)
+                    {
+                        string caughtFqn = FullNameOf(caught);
+                        if (caughtFqn != srcFqn)
+                        {
+                            ResolveName(caught);
+                            CatchEdgeSites((srcFqn, caughtFqn)).Add(site);
+                        }
+                    }
+
+                    // The throw channel (§4.8): mint the throw edge, self-throw dropped like the type-edge self-drop.
+                    // Rides independently of the construct channel — a `throw new X()` mints BOTH the construction
+                    // edge (above) and the throw edge here at the same site.
+                    if (thrown is not null)
+                    {
+                        string thrownFqn = FullNameOf(thrown);
+                        if (thrownFqn != srcFqn)
+                        {
+                            ResolveName(thrown);
+                            ThrowEdgeSites((srcFqn, thrownFqn)).Add(site);
                         }
                     }
                 }
@@ -484,8 +516,9 @@ internal static class FragmentExtractor
             }
         }
 
-        // Registration facts (GRAMMAR §4.7): a whole-compilation walk over every syntax tree — a
-        // top-level-statements Program is not in _declared, so a per-declared-type walk would miss it. Each
+        // Registration facts (GRAMMAR §4.7): a whole-compilation walk over every syntax tree. Registration is a
+        // string-side fact needing no per-type attribution — its most common composition root is a
+        // top-level-statements Program — so one pass over every tree is the natural formulation. Each
         // recognized call (RegistrationRecognizer) yields a (lifetime, service, implementation?) fact recorded
         // string-side (definition-level FQNs, never resolved to nodes — registration is many-to-many).
         private void WalkRegistrations(Compilation compilation)
@@ -578,6 +611,18 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentInjectionEdge(kv.Key.Src, kv.Key.Injected, kv.Value.ToList()))
                 .ToList();
 
+            var catchEdges = _catchEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
+                .Select(kv => new FragmentCatchEdge(kv.Key.Src, kv.Key.Caught, kv.Value.ToList()))
+                .ToList();
+
+            var throwEdges = _throwEdgeSites
+                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
+                .ThenBy(kv => kv.Key.Thrown, StringComparer.Ordinal)
+                .Select(kv => new FragmentThrowEdge(kv.Key.Src, kv.Key.Thrown, kv.Value.ToList()))
+                .ToList();
+
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
                 .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
@@ -587,7 +632,7 @@ internal static class FragmentExtractor
 
             return new CodebaseFragment(
                 input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges,
-                injectionEdges, serviceRegistrations);
+                injectionEdges, catchEdges, throwEdges, serviceRegistrations);
         }
 
         private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
@@ -607,6 +652,28 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _constructorEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> ThrowEdgeSites((string Src, string Thrown) key)
+        {
+            if (!_throwEdgeSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _throwEdgeSites[key] = sites;
             }
 
             return sites;

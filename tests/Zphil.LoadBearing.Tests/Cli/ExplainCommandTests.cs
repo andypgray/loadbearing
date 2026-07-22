@@ -52,6 +52,8 @@ public sealed class ExplainCommandTests
             "  data-access/no-inline-sql\n" +
             "  di/handlers-via-registry\n" +
             "  di/no-captive-dependencies\n" +
+            "  exceptions/domain-throws-domain\n" +
+            "  exceptions/no-general-catch\n" +
             "  layering/billing-independent\n" +
             "  layering/domain-independent\n" +
             "  layering/no-ghost\n" +

@@ -88,6 +88,18 @@ internal static class CompilationFactory
     }
 
     /// <summary>
+    ///     Extract from a compilation with NO metadata references — not even the core library — so
+    ///     <c>Compilation.GetTypeByMetadataName</c> cannot resolve BCL types like <c>System.Exception</c>.
+    ///     Exercises the defensive null-lookup guards (a synthesized-type lookup that returns null mints
+    ///     nothing rather than throwing).
+    /// </summary>
+    public static CodebaseModel ExtractWithoutReferences(params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("NoRefs", [], files);
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "NoRefs", [])]);
+    }
+
+    /// <summary>
     ///     A single-project input compiled against the DI/Hosting abstractions (see <see cref="DiReferences" />),
     ///     so <c>AddSingleton&lt;IFoo, Foo&gt;()</c>, <c>AddHostedService&lt;T&gt;()</c>, and the rest bind to
     ///     the real framework symbols the registration recognizer (GRAMMAR §4.7) gates on. EF Core and

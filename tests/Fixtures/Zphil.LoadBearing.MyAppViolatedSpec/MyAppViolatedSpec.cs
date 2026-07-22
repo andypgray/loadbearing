@@ -1,3 +1,4 @@
+using MyApp.Domain;
 using MyApp.Legacy.Billing;
 using MyApp.Web;
 
@@ -17,9 +18,12 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     (uncaptured — the captive-dependency flagship, the singleton ReportScheduler injects a scoped
 ///     <c>IOrderFeed</c> and a transient <c>IOrderFormatter</c>, exercising the <c>injection</c> kind), an
 ///     inert-target warning rule, a
-///     failing empty-subject rule, and a frozen billing scope whose containment is uncaptured (an explicit,
+///     failing empty-subject rule, a frozen billing scope whose containment is uncaptured (an explicit,
 ///     deliberately-uncommitted
-///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>.
+///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>, a ratcheted Migrate
+///     catch rule (uncaptured — ReportEndpoint's blanket <c>catch (Exception)</c> is red, exercising the
+///     <c>catch</c> kind), and a strict Enforce throw rule (the Domain layer must throw only its own
+///     <c>OrderRuleViolation</c>, so OrderApproval's BCL throw is red, exercising the <c>throw</c> kind).
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
@@ -117,5 +121,27 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Baseline("arch/violated-freeze-baseline.json")
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
             .Because("Replacement scheduled; not worth stabilizing.");
+
+        // Migrate (ratcheted, catch): omits .Baseline, so the conventional path arch/baselines/exceptions/
+        // no-general-catch.json is uncommitted, leaving the rule uncaptured — ReportEndpoint's blanket
+        // `catch (Exception)` is a hard-red catch violation with the --init hint, exercising the catch kind
+        // and the report/JSON schema's `catches` line (GRAMMAR §4.8). MustNotCatch(typeof(Exception)) flags
+        // only the broad catch, never a narrower one.
+        arch.Rule("exceptions/no-general-catch")
+            .Migrate(
+                "Some handlers wrap their work in a blanket catch and swallow every exception.",
+                web.MustNotCatch(typeof(Exception)))
+            .Because("A catch-all hides the failures you meant to handle; catch the specific exception instead.")
+            .Fix("Catch the specific exception type you can handle, not System.Exception.");
+
+        // Enforce (strict throw allow-list): the Domain layer may throw only its own OrderRuleViolation.
+        // OrderApproval's `throw new InvalidOperationException(...)` is an unlisted BCL throw — hard red — while
+        // its `throw new OrderRuleViolation(...)` is the sanctioned one (green). MustOnlyThrow constrains
+        // external thrown types too (GRAMMAR §4.8), so the BCL throw is not exempt — the throw half of the
+        // report/JSON schema (the throw kind, the `throws` line).
+        arch.Rule("exceptions/domain-throws-domain")
+            .Enforce(domain.MustOnlyThrow(arch.Type<OrderRuleViolation>()))
+            .Because("Domain code signals rule failures with the domain's own exception, not a generic BCL type.")
+            .Fix("Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.");
     }
 }

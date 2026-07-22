@@ -205,4 +205,34 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.MustNotInject(typeof(SqlConnection)))
             .ShouldBe("Types must not inject `SqlConnection`.");
     }
+
+    // ---- Exception-edge verbs (GRAMMAR §5.3): "must not catch {list}" and the STRICT "must throw only {list}" ----
+
+    [Fact]
+    public void MustNotCatch_RendersFragment()
+    {
+        // The exception-catch-ban verb (GRAMMAR §5.3): "must not catch {list}".
+        SentenceRenderer.Sentence(Arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+            .ShouldBe("Types must not catch `InvalidOperationException`.");
+    }
+
+    [Fact]
+    public void MustOnlyThrow_RendersStrictFragmentWithNoCaveat()
+    {
+        // The strict throw-allowlist verb (GRAMMAR §5.3): "must throw only {list}". Unlike MustOnlyReference,
+        // there is NO "(external packages…)" caveat — MustOnlyThrow constrains external thrown types too, and
+        // exact string equality proves the parenthetical is absent (the strictness rendering).
+        SentenceRenderer.Sentence(Arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+            .ShouldBe("Types must throw only `InvalidOperationException`.");
+    }
+
+    [Fact]
+    public void MustOnlyThrow_RendersNoParentheticalCaveat()
+    {
+        // Belt-and-braces beside the exact-equality pin: the absence of the "(external packages are not
+        // constrained by this rule)" caveat that MustOnlyReference carries IS the strictness rendering —
+        // MustOnlyThrow constrains external thrown types too, so no parenthetical exemption is emitted.
+        string sentence = SentenceRenderer.Sentence(Arch.Types.MustOnlyThrow(typeof(InvalidOperationException)));
+        sentence.ShouldNotContain("(");
+    }
 }
