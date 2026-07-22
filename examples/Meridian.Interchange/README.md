@@ -21,7 +21,7 @@ That last point is the crux the app is built around. The dispatcher is a singlet
 
 ## The spec
 
-Ten rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs](arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs). Each carries a posture, a reason ending in its citation URL, and a fix.
+Eleven rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs](arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs). Each carries a posture, a reason ending in its citation URL, and a fix.
 
 | Rule | Posture | What it says |
 |---|---|---|
@@ -35,8 +35,9 @@ Ten rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArchS
 | `naming/async-suffix` | Enforce | `Task`-returning methods end in `Async` |
 | `exceptions/no-general-catch` | Enforce | catch base `Exception` only in a top-level handler |
 | `async/accept-cancellation` | Enforce | `Task`-returning methods accept a `CancellationToken` |
+| `persistence/no-mapping-attributes` | Enforce | no `[Table]`/`[ComplexType]` on a persisted type |
 
-Nine rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red. Two of the rules read like this in the spec, the citation URL sitting at the end of each `Because`:
+Ten rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red. Two of the rules read like this in the spec, the citation URL sitting at the end of each `Because`:
 
 ```csharp
 arch.Rule("http/reuse-httpclient")
@@ -93,7 +94,8 @@ pass di/no-captive-dependencies
 pass naming/async-suffix
 pass exceptions/no-general-catch
 pass async/accept-cancellation
-Checked 10 rules: 10 passed, 0 failed, 0 skipped. Burndown: 4 grandfathered remaining, 0 fixed awaiting acceptance.
+pass persistence/no-mapping-attributes
+Checked 11 rules: 11 passed, 0 failed, 0 skipped. Burndown: 4 grandfathered remaining, 0 fixed awaiting acceptance.
 ```
 
 The four blocking calls are recorded, not accepted. New blocking anywhere in the worker is red on sight, and when the legacy SDK exposes an async surface and the corner is rewritten, the count drops to zero and the rule is ready to promote to `Enforce`.
@@ -196,6 +198,40 @@ FAIL async/accept-cancellation — Methods of types in `Meridian.Interchange.*` 
 
 The violation is keyed to the method at its declaration site, `ScopedDispatchRunner.cs:13`, and it is the only red: `RunPendingAsync` still ends in `Async`, so `naming/async-suffix` stays green. Revert the three touches and `check` is exit 0 again.
 
+## The persistence-ignorant outbox
+
+`persistence/no-mapping-attributes` is green over a worker whose persisted type stays a plain record. `OutboxMessage` is a POCO (three properties, no base class, no mapping attribute), and the outbox that holds it is an in-memory list a real deployment would back with a table. The rule encodes persistence ignorance, which Microsoft defines as "types that need to be persisted, but whose code is unaffected by the choice of persistence technology"; the same page lists "persistence-specific required attributes" among the couplings that violate it. The rule bans the two type-level mapping attributes, `[Table]` and `[ComplexType]`, across `Meridian.Interchange.*`.
+
+```csharp
+arch.Rule("persistence/no-mapping-attributes")
+    .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+        .MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute)))
+    .Because("A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles")
+    .Fix("Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.");
+```
+
+The rule reads the type's own declared attributes. It names `[Table]` and `[ComplexType]` rather than banning the `DataAnnotations` namespace wholesale, because that namespace also carries the validation attributes a domain may legitimately want; the two persistence markers live in its `Schema` sub-namespace and tag the type itself as a mapped entity. A mapping attribute on a property (a `[Column]` or `[Key]`) sits below the type surface this rule reads, so v1 does not see it; keeping that mapping out of the domain type is the same discipline the `Fix` names, fluent configuration in the persistence layer.
+
+Attribute the record as a mapped entity, the coupling the guideline warns about, and give it a table name:
+
+```csharp
+using System.ComponentModel.DataAnnotations.Schema;
+
+[Table("InterchangeOutbox")]
+public sealed record OutboxMessage(string MessageId, string Channel, string Payload);
+```
+
+`dotnet build` is green: `[Table]` is a valid attribute. `check` is not:
+
+```text
+FAIL persistence/no-mapping-attributes — Types in `Meridian.Interchange.*` must not be attributed with `[Table]` or `[ComplexType]`.
+  because: A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles
+  fix: Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.
+  src/Meridian.Interchange/Outbox/OutboxMessage.cs:10 — Meridian.Interchange.Outbox.OutboxMessage
+```
+
+The violation is keyed to the record at its declaration site, `OutboxMessage.cs:10`, and it is the only red: the attribute mints an ordinary reference to `TableAttribute`, and no rule bans that. Revert the attribute and `check` is exit 0 again.
+
 ## The citations
 
 Every rule's reason ends in the page it enforces. The quoted phrase below is drawn from that page, verified against the live doc.
@@ -212,15 +248,15 @@ Every rule's reason ends in the page it enforces. The quoted phrase below is dra
 | `naming/async-suffix` | "Asynchronous methods in TAP include the Async suffix" | [Task-based asynchronous pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
 | `exceptions/no-general-catch` | "AVOID catching System.Exception or System.SystemException, except in top-level exception handlers" | [Using standard exception types](https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types) |
 | `async/accept-cancellation` | "consider adding a CancellationToken parameter" | [Task-based asynchronous pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
+| `persistence/no-mapping-attributes` | "Persistence-specific required attributes" | [Architectural principles](https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles) |
 
 Four rules share the DI guidelines page, which is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter, the two conventions it fixes for a `Task`-returning method.
 
 ## Not yet enforceable
 
-The pack encodes the guidance the current vocabulary can express. Two neighboring rules from the same Microsoft docs are out of reach in v1. Each is named here with the workaround that holds the line today, no roadmap attached.
+The pack encodes the guidance the current vocabulary can express. One neighboring rule from the same Microsoft docs is out of reach in v1. It is named here with the workaround that holds the line today, no roadmap attached.
 
 - Signature exposure cannot be told apart from a reference. v1 treats a reference and an exposure as the same edge, so "domain entities must not surface on the presentation layer; return DTOs" is not expressible. What holds the line: the layer reference rules (`MustOnlyReference`, shown in `Meridian.Operations`) constrain which namespaces may see the domain at all.
-- Persistence ignorance has no negative verb. v1 has no negative hierarchy or attribute combinator, so "a persisted type carries no ORM base class or `[Table]`/`[Column]` attribute" is expressible only through the general `.Must(predicate, description:)` escape hatch. What holds the line: that predicate, since a whole-namespace ban would also block the `DataAnnotations` validation attributes the domain legitimately uses.
 
 ## Pairing with analyzers
 
@@ -234,11 +270,12 @@ Several rules have a neighbor in the analyzer ecosystem. What none of those neig
 - `naming/async-suffix`: VSTHRD200 enforces the `Async` suffix, blanket-wide. The delta is scoping (this rule names the `Meridian.Interchange.*` cone) and the citation carried in the reason.
 - `exceptions/no-general-catch`: CA1031 (Do not catch general exception types) flags every `catch (System.Exception)`, blanket-wide, and is widely turned off because the one place a catch-all belongs (the top-level handler) trips it too. The delta is scoping: this rule excepts `BackgroundService`-derived types, so the dispatcher's poll loop is sanctioned while the ban holds across the rest of the worker, and the citation rides in the reason.
 - `async/accept-cancellation`: CA1068 (CancellationToken parameters must come last) governs the position of a token that is already present, not whether one is present. Meziantou's MA0032, MA0040, and MA0079 flag a call site that forwards no token when one is in scope. Both act only once a token exists on the surface; requiring the parameter there in the first place is the white space this rule fills across `Meridian.Interchange.*`. The match is definition-level and exact: a `CancellationToken?` or a `params CancellationToken[]` parameter is a different declared type and does not satisfy the rule.
+- `persistence/no-mapping-attributes`: ArchUnitNET and NetArchTest can both assert that a type does not carry a given attribute, in hand-written test code, so the check is expressible elsewhere. The delta is the usual one: this rule is turnkey and declarative, runs whole-solution, and renders into the agent's context with its citation. No analyzer polices mapping attributes on a domain type; persistence ignorance is a documented principle with no build-time enforcer of its own.
 - `di/no-service-locator`: one honesty note. This rule bans the `GetService`/`GetRequiredService` members, and a ban on an interface member catches a call through that interface, not a call through a concrete type that re-declares the member. In this worker every resolve goes through `IServiceProvider` or the `ServiceProviderServiceExtensions` methods, so the ban is complete here; a codebase that resolved through a concrete container type would need that type named too.
 
 ## Introduce a violation
 
-Each posture goes red on a small edit and back to green on revert. The `new HttpClient()` edit is [the silent win](#the-silent-win), the captured store is [the captive dependency](#the-captive-dependency), the blanket `catch` is [the scoped catch](#the-scoped-catch), and the dropped token is [the flowed token](#the-flowed-token), all above. Two more show the rest.
+Each posture goes red on a small edit and back to green on revert. The `new HttpClient()` edit is [the silent win](#the-silent-win), the captured store is [the captive dependency](#the-captive-dependency), the blanket `catch` is [the scoped catch](#the-scoped-catch), the dropped token is [the flowed token](#the-flowed-token), and the mapping attribute is [the persistence-ignorant outbox](#the-persistence-ignorant-outbox), all above. Two more show the rest.
 
 Change `OutboxDispatcher`'s constructor parameter from `IOptions<InterchangeOptions>` to `IOptionsSnapshot<InterchangeOptions>`. It compiles, and it would even resolve, which is the trap: `IOptionsSnapshot` is scoped, the dispatcher is a singleton, and the snapshot would be captured for the whole process. `OutboxProcessor`, being scoped, uses `IOptionsSnapshot` correctly; the singleton dispatcher must not. The rule reads that from the type hierarchy alone:
 
@@ -276,7 +313,7 @@ dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
 loadbearing check examples/Meridian.Interchange/Meridian.Interchange.slnx
 ```
 
-`check` exits 0 here: `Checked 10 rules: 10 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
+`check` exits 0 here: `Checked 11 rules: 11 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
 
 ## From here
 

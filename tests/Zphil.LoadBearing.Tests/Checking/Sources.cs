@@ -64,4 +64,27 @@ internal static class Sources
                                     [Mark] public class Tagged {}
                                     public class Plain {}
                                     """;
+
+    /// <summary>
+    ///     Transitivity / type-argument-substitution / declared-only-attribute fixture for the negative
+    ///     hierarchy verbs (GRAMMAR §5.2–§5.3): a transitive interface implementer (via a base class), a
+    ///     substitution handler (a class extending a generic base that implements <c>IHandler&lt;T&gt;</c>),
+    ///     and an attributed base with an un-attributed derived type. Anchors are the reflectable
+    ///     <see cref="Targets" /> types, re-declared here in lockstep (a separate compilation) — the same
+    ///     discipline as <see cref="Hierarchy" />.
+    /// </summary>
+    public const string HierarchyTransitive = """
+                                              using System;
+                                              namespace Zphil.LoadBearing.Tests.Checking.Targets;
+                                              public interface IThing {}
+                                              public interface IHandler<T> {}
+                                              public class Order {}
+                                              public sealed class MarkAttribute : Attribute {}
+                                              public class Widget : IThing {}
+                                              public class WidgetChild : Widget {}
+                                              public class HandlerBase<T> : IHandler<T> {}
+                                              public class SubstHandler : HandlerBase<Order> {}
+                                              [Mark] public class AttrBase {}
+                                              public class AttrDerived : AttrBase {}
+                                              """;
 }

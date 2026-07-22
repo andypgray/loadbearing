@@ -123,6 +123,7 @@ internal static class SpecValidator
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
+        CheckHierarchyAnchors(rule, errors);
         CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
         CheckLifetimes(rule, errors);
     }
@@ -275,6 +276,57 @@ internal static class SpecValidator
             errors.Add(new SpecValidationError(Code.MemberAcceptParameterClosedGeneric, rule.Id,
                 $"'{SafeFullDisplay(accept.ParameterType)}' is a closed generic; MustAcceptParameter matches definition-level — " +
                 $"use typeof({TypeofForm(Generics.Definition(accept.ParameterType))}) (used by '{rule.Id}').", rule.Location));
+    }
+
+    // GRAMMAR §8 item 21: a category-invalid hierarchy anchor, both polarities. A Must[Not]Implement anchor
+    // must be an interface; a Must[Not]DeriveFrom anchor must not be an interface; a Must[Not]BeAttributedWith
+    // anchor must derive from System.Attribute (typeof(Attribute) itself is refused — the declared-attribute
+    // matcher could never match it). A wrong-category anchor never matches, so a positive is an always-red rule
+    // and a negative an always-pass — both silent slips; the error names the anchor's FQN and steers to the
+    // right-category verb. Applies to the positives' single anchor and every anchor in a negative's list, all
+    // reported in the same all-at-once pass at the rule's spec-source location (one shared code, item-18 precedent).
+    private static void CheckHierarchyAnchors(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        switch (rule.Constraint)
+        {
+            case MustImplementConstraint c:
+                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => !t.IsInterface,
+                    t => $"'{SafeFullDisplay(t)}' is not an interface; MustImplement requires an interface anchor — use MustDeriveFrom for a base class");
+                break;
+            case MustNotImplementConstraint c:
+                CheckAnchorCategory(rule, errors, c.Types, t => !t.IsInterface,
+                    t => $"'{SafeFullDisplay(t)}' is not an interface; MustNotImplement requires an interface anchor — use MustNotDeriveFrom for a base class");
+                break;
+            case MustDeriveFromConstraint c:
+                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => t.IsInterface,
+                    t => $"'{SafeFullDisplay(t)}' is an interface; MustDeriveFrom requires a non-interface anchor — use MustImplement for an interface");
+                break;
+            case MustNotDeriveFromConstraint c:
+                CheckAnchorCategory(rule, errors, c.Types, t => t.IsInterface,
+                    t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
+                break;
+            case MustBeAttributedWithConstraint c:
+                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => !t.IsSubclassOf(typeof(Attribute)),
+                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustBeAttributedWith requires an attribute anchor");
+                break;
+            case MustNotBeAttributedWithConstraint c:
+                CheckAnchorCategory(rule, errors, c.Types, t => !t.IsSubclassOf(typeof(Attribute)),
+                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustNotBeAttributedWith requires an attribute anchor");
+                break;
+        }
+    }
+
+    // Walks a hierarchy verb's anchors (one for a positive, the whole list for a negative), emitting the
+    // shared Code.HierarchyAnchorWrongCategory with the caller's message core plus the "(used by '{id}')" tail
+    // and the rule's spec-source location — the items-19/20 convention, no new location plumbing.
+    private static void CheckAnchorCategory(
+        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<Type> anchors,
+        Func<Type, bool> invalid, Func<Type, string> message)
+    {
+        foreach (Type anchor in anchors)
+            if (invalid(anchor))
+                errors.Add(new SpecValidationError(Code.HierarchyAnchorWrongCategory, rule.Id,
+                    $"{message(anchor)} (used by '{rule.Id}').", rule.Location));
     }
 
     // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.

@@ -64,6 +64,27 @@ public class GenericSugarTests
             .ShouldBe(Sentence(arch => arch.Types.MustBeAttributedWith(typeof(SugarAttribute))));
     }
 
+    [Fact]
+    public void MustNotImplement_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.MustNotImplement<ISugarPort>())
+            .ShouldBe(Sentence(arch => arch.Types.MustNotImplement(typeof(ISugarPort))));
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.MustNotDeriveFrom<SugarBase>())
+            .ShouldBe(Sentence(arch => arch.Types.MustNotDeriveFrom(typeof(SugarBase))));
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.MustNotBeAttributedWith<SugarAttribute>())
+            .ShouldBe(Sentence(arch => arch.Types.MustNotBeAttributedWith(typeof(SugarAttribute))));
+    }
+
     private static string Sentence(Func<Arch, Constraint> constraint)
     {
         return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule").Enforce(constraint(arch)).Because("b")))

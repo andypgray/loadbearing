@@ -105,5 +105,17 @@ public enum SpecValidationErrorCode
     ///     matching is definition-level, so the error guides to the open definition
     ///     (<c>typeof(IProgress&lt;&gt;)</c>).
     /// </summary>
-    MemberAcceptParameterClosedGeneric
+    MemberAcceptParameterClosedGeneric,
+
+    /// <summary>
+    ///     A category-invalid hierarchy anchor, both polarities (§8 item 21): a <c>Must[Not]Implement</c>
+    ///     anchor must be an interface; a <c>Must[Not]DeriveFrom</c> anchor must not be an interface; a
+    ///     <c>Must[Not]BeAttributedWith</c> anchor must derive from <see cref="System.Attribute" />
+    ///     (<c>typeof(Attribute)</c> itself is refused — the declared-attribute matcher could never match it).
+    ///     A wrong-category anchor never matches, making a positive an always-red rule and a negative an
+    ///     always-pass, so the error names the anchor's FQN and steers to the right-category verb. One code
+    ///     covers all three categories (the item-18 one-code-many-messages precedent), fired over the
+    ///     positives' single anchor and every anchor in a negative's list.
+    /// </summary>
+    HierarchyAnchorWrongCategory
 }

@@ -657,7 +657,11 @@ name). `AttributedWith` is **declared attributes only** — no inheritance. Exte
 types carry a **shallow** hierarchy: extraction records their identity but not their
 bases/interfaces/attributes, so the hierarchy adjectives never match an external type (a
 documented boundary; pattern and name adjectives still work on externals). The same three
-matchers back the `MustImplement` / `MustDeriveFrom` / `MustBeAttributedWith` constraint verbs.
+matchers back the `MustImplement` / `MustDeriveFrom` / `MustBeAttributedWith`
+constraint verbs and, negated per subject over the anchor list, their `MustNot*` twins (§5.3).
+Under a negative the shallow-external boundary reads in the passing direction: an anchor
+reachable only through an external type's own bases/interfaces never matches, so the ban
+silently passes.
 
 **Generic sugar.** Each hierarchy adjective carries a thin generic twin —
 `Implementing<T>()` ≡ `Implementing(typeof(T))`, likewise `DerivedFrom<T>()` and
@@ -686,6 +690,9 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 | `.MustImplement(type)` | "must implement `{X}`" |
 | `.MustDeriveFrom(type)` | "must derive from `{X}`" |
 | `.MustBeAttributedWith(type)` | "must be attributed with `[{X}]`" |
+| `.MustNotImplement(type, ...)` | "must not implement {list}" — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10) |
+| `.MustNotDeriveFrom(type, ...)` | "must not derive from {list}" |
+| `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — anchors bracketed and `Attribute`-stripped like the positive |
 | `.MustBeSealed()` | "must be sealed" |
 | `.MustBeStatic()` | "must be static" |
 | `.MustBeAbstract()` | "must be abstract" |
@@ -701,6 +708,9 @@ Generic sugar: the three type-taking hierarchy verbs carry generic twins —
 `MustImplement<T>()` ≡ `MustImplement(typeof(T))`, `MustDeriveFrom<T>()`, and
 `MustBeAttributedWith<T>()` (`where T : Attribute`) — desugaring to the identical constraint, on
 the same terms as the §5.2 adjective twins (open generics stay `typeof`).
+The negatives carry the same twins — `MustNotImplement<T>()` / `MustNotDeriveFrom<T>()` /
+`MustNotBeAttributedWith<T>()` (`where T : Attribute`) — each desugaring to its verb's
+single-anchor call.
 
 ### 5.4 Posture verbs and options
 
@@ -960,6 +970,18 @@ matches the anchor's definition FQN.
     definition-level — use `typeof(IProgress<>)`"). A non-generic anchor
     (`typeof(CancellationToken)`) and an open-generic anchor (`typeof(IProgress<>)`) are both
     accepted. The checker carries a matching backstop (§4.6).
+21. Category-invalid hierarchy anchor, both polarities (§5.2, §5.3): a `Must[Not]Implement`
+    anchor must be an interface; a `Must[Not]DeriveFrom` anchor must not be an interface; a
+    `Must[Not]BeAttributedWith` anchor must derive from `System.Attribute` (`typeof(Attribute)`
+    itself is refused — declared-attribute matching could never match it). A wrong-category
+    anchor can never match, which makes a positive an always-red rule and a negative an
+    always-pass — both silent authoring slips, so the error steers to the right verb
+    ("`System.Exception` is not an interface; `MustNotImplement` requires an interface anchor —
+    use `MustNotDeriveFrom` for a base class"; "`System.IDisposable` is an interface;
+    `MustDeriveFrom` requires a non-interface anchor — use `MustImplement` for an interface";
+    "`System.Attribute` does not derive from `System.Attribute`; `MustNotBeAttributedWith`
+    requires an attribute anchor"). Reported in the same all-at-once pass with the rule's
+    spec-source `file:line`, like items 19/20.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -1041,7 +1063,9 @@ agent fixing a spec sees every problem in one pass.
 - `(first, params more)` signatures wherever an empty list would be meaningless.
   `MustAcceptParameter` is deliberately single-`Type`: over several parameter anchors one
   sentence cannot say whether ALL are required or ANY suffices, so a second required
-  parameter type is a second rule.
+  parameter type is a second rule. The same ambiguity keeps the positive hierarchy verbs
+  single-`Type`, but it does not bite a negation, so their `MustNot*` twins take
+  `(Type first, params Type[] more)` — "must not implement `A` or `B`" is unambiguous none-of.
 - Named arguments are the documentation convention for prose parameters (`from:`, `to:`,
   `description:`).
 - **Admission rule**: a new vocabulary member ships with model node + fragment(s) + pinned
@@ -1063,8 +1087,11 @@ member axis: the
 dependency verbs (today a violation names the using *type*, not the using member); string-FQN
 member anchoring — now the remaining *anchoring* residue, the escape hatch for a member that
 neither `typeof` + `nameof` nor an expression lambda can name (a member on a type the spec
-project cannot reference); indexer/operator bans (the syntax-walk boundary moves
-deliberately, §4.5); and subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`, …)
+project cannot reference); member-level attribute facts and the member-side `AttributedWith` /
+`MustNotBeAttributedWith` pair — the type-level attribute verbs read declared *type* attributes
+only, so a `[Column]`/`[Key]` on a *property* is invisible to them; indexer/operator bans
+(the syntax-walk boundary moves deliberately, §4.5); and subject-side member *shape*
+adjectives (`.Methods.ThatAreVirtual()`, …)
 — the member constraint-side verbs and the `IMemberInfo` flags shipped (§5.7, §5.6), only the
 adjective position remains, exactly mirroring the type-side gap below.
 

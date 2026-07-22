@@ -1353,4 +1353,118 @@ public class SpecValidationTests
                 .Because("Reason.");
         }
     }
+
+    // GRAMMAR §8 item 21: a category-invalid hierarchy anchor, both polarities. Appended at the very end so
+    // every caller-info golden above keeps its authored line number (and, like the appends above, this file
+    // must NOT be run through a member-reordering cleanup profile). One shared code covers the three categories
+    // (the item-18 precedent); the check applies to the positives' single anchor and every anchor in a
+    // negative's list, all reported in the same all-at-once pass with the rule's spec-source file:line.
+    [Fact]
+    public void HierarchyAnchorWrongCategory_NonInterfaceOnMustNotImplement_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new NonInterfaceImplementAnchorSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.HierarchyAnchorWrongCategory).Message
+            .ShouldBe("SpecValidationTests.cs:1420: 'System.Exception' is not an interface; MustNotImplement requires an interface anchor — " +
+                      "use MustNotDeriveFrom for a base class (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void HierarchyAnchorWrongCategory_InterfaceOnMustDeriveFrom_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new InterfaceDeriveFromAnchorSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.HierarchyAnchorWrongCategory).Message
+            .ShouldBe("SpecValidationTests.cs:1431: 'System.IDisposable' is an interface; MustDeriveFrom requires a non-interface anchor — " +
+                      "use MustImplement for an interface (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void HierarchyAnchorWrongCategory_NonAttributeOnMustNotBeAttributedWith_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new NonAttributeAttributedAnchorSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.HierarchyAnchorWrongCategory).Message
+            .ShouldBe("SpecValidationTests.cs:1442: 'System.Attribute' does not derive from System.Attribute; MustNotBeAttributedWith " +
+                      "requires an attribute anchor (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void HierarchyAnchorWrongCategory_InvalidAnchorInNegativeList_BesideMissingBecause_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new HierarchyAllAtOnceSpec());
+
+        // The invalid anchor is the SECOND in the negative's list (the first is a valid interface), and the
+        // rule omits .Because — the category error and the missing Because report together (the §8 all-at-once
+        // contract, and proof the check walks every anchor in a negative's list).
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.ShouldContain(e => e.Code == Code.MissingBecause && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ValidHierarchyAnchors_CategoryCorrectPositivesAndNegatives_BuildWithoutError()
+    {
+        // Interface anchors on (Must[Not])Implement, non-interface anchors on (Must[Not])DeriveFrom, and
+        // Attribute-derived anchors on (Must[Not])BeAttributedWith are all accepted — only wrong-category fails.
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidHierarchyAnchorsSpec()));
+    }
+
+    private sealed class NonInterfaceImplementAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // System.Exception is a class, not an interface — refused; use MustNotDeriveFrom for a base class.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotImplement(typeof(Exception)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class InterfaceDeriveFromAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // System.IDisposable is an interface — refused on the positive DeriveFrom; use MustImplement.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustDeriveFrom(typeof(IDisposable)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class NonAttributeAttributedAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // typeof(Attribute) itself does not derive from System.Attribute — refused (the ratified edge case).
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotBeAttributedWith(typeof(Attribute)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class HierarchyAllAtOnceSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // First anchor (IDisposable) is a valid interface; the second (Exception) is not — and no .Because.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotImplement(typeof(IDisposable), typeof(Exception)));
+        }
+    }
+
+    private sealed class ValidHierarchyAnchorsSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/implement").Enforce(arch.Types.MustNotImplement(typeof(IDisposable))).Because("Reason.");
+            arch.Rule("area/derive").Enforce(arch.Types.MustNotDeriveFrom(typeof(Exception))).Because("Reason.");
+            arch.Rule("area/attributed").Enforce(arch.Types.MustNotBeAttributedWith(typeof(SerializableAttribute))).Because("Reason.");
+            arch.Rule("area/implement-pos").Enforce(arch.Types.MustImplement(typeof(IDisposable))).Because("Reason.");
+            arch.Rule("area/derive-pos").Enforce(arch.Types.MustDeriveFrom(typeof(Exception))).Because("Reason.");
+            arch.Rule("area/attributed-pos").Enforce(arch.Types.MustBeAttributedWith(typeof(SerializableAttribute))).Because("Reason.");
+        }
+    }
 }

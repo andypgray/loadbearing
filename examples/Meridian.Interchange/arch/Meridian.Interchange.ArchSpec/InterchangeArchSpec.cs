@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.CompilerServices;
 using Meridian.Interchange.Outbox;
 using Meridian.Interchange.Partners;
@@ -98,5 +99,12 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
             .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
+
+        // 11 — Architectural principles (persistence ignorance): a persisted type carries no ORM mapping attribute; validation DataAnnotations are untouched.
+        arch.Rule("persistence/no-mapping-attributes")
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+                .MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute)))
+            .Because("A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles")
+            .Fix("Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.");
     }
 }

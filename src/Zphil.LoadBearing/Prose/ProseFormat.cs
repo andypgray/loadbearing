@@ -83,6 +83,28 @@ internal static class ProseFormat
     }
 
     /// <summary>
+    ///     Joins backticked simple type names as an or-list — <c>`A` or `B`</c> (GRAMMAR §5.3, §6):
+    ///     the list form of the single-type <see cref="Backtick" />(<see cref="TypeName.Simple" />)
+    ///     rendering the positive hierarchy verbs use, for the <c>MustNotImplement</c> /
+    ///     <c>MustNotDeriveFrom</c> anchor lists. An open generic renders declared type-parameter
+    ///     names (<c>IHandler&lt;T&gt;</c>).
+    /// </summary>
+    internal static string TypeList(IReadOnlyList<Type> types)
+    {
+        return JoinReferences(types.Select(t => Backtick(TypeName.Simple(t))).ToList());
+    }
+
+    /// <summary>
+    ///     Joins backticked, <c>Attribute</c>-stripped, bracketed attribute names as an or-list —
+    ///     <c>`[Table]` or `[ComplexType]`</c> (GRAMMAR §5.3, §6): the list form of the single-attribute
+    ///     rendering <c>MustBeAttributedWith</c> uses, for the <c>MustNotBeAttributedWith</c> anchor list.
+    /// </summary>
+    internal static string AttributeList(IReadOnlyList<Type> types)
+    {
+        return JoinReferences(types.Select(t => Backtick(AttributeName(t))).ToList());
+    }
+
+    /// <summary>
     ///     Joins already-rendered reference fragments with no Oxford comma (GRAMMAR §6):
     ///     2 → <c>`A` or `B`</c>; 3+ → <c>`A`, `B` or `C`</c>.
     /// </summary>

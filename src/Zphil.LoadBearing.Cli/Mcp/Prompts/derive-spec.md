@@ -389,11 +389,15 @@ arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
 `MustResideInNamespace(glob)`
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
-`MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustBeSealed` / `MustBeStatic` /
+`MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustNotImplement(type, …)` /
+`MustNotDeriveFrom(type, …)` / `MustNotBeAttributedWith(type, …)` (the negative hierarchy/attribute
+bans — none-of over the anchors, so unlike the single-`Type` positives they take one-or-more anchors;
+each with a generic twin — `MustNotImplement<T>()`, `MustNotDeriveFrom<T>()`,
+`MustNotBeAttributedWith<T>()`) · `MustBeSealed` / `MustBeStatic` /
 `MustBeAbstract` / `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
 
 The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>()` /
-`.AttributedWith<T>()`, the three `Must*<T>` verbs, the `arch.Member<X>(x => x.M)` /
+`.AttributedWith<T>()`, the six `Must[Not]*<T>` hierarchy verbs, the `arch.Member<X>(x => x.M)` /
 `arch.Member(() => X.M)` anchors, and the static `MustNotUse(() => X.M)` verb forms — are pure
 sugar for the `typeof`/`nameof` form and reify identically. An **open** generic has no
 type-argument form, so it stays `typeof` (`Implementing(typeof(IHandler<>))`,
@@ -464,7 +468,9 @@ still: external thrown types ARE constrained (no type must throw a BCL exception
 sentence carries no exemption. `MustNotCatch` matches its operands exactly — banning
 `Exception` never flags a narrower catch, which is the good state. `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
-matches any construction. `AttributedWith` sees declared attributes only. Hierarchy
+matches any construction. `AttributedWith` sees declared attributes only. The `MustNot*`
+hierarchy verbs share these three matchers, negated per subject over the anchor list (a
+subject reds iff it matches ANY anchor). Hierarchy
 adjectives never match external types (their hierarchy is not extracted). Closed generics are
 refused in reference positions — ban the open definition and/or the argument type. An empty
 subject fails the rule; an inert target warns; both are authoring signals, not code evidence.

@@ -17,6 +17,7 @@ public sealed class HierarchyVerbTests
     private const string T = "Zphil.LoadBearing.Tests.Checking.Targets.";
 
     private static readonly CodebaseModel Model = CompilationFactory.Extract(Sources.Hierarchy);
+    private static readonly CodebaseModel TransitiveModel = CompilationFactory.Extract(Sources.HierarchyTransitive);
 
     [Fact]
     public void Implementing_OpenGeneric_SelectsEveryConstruction()
@@ -114,5 +115,107 @@ public sealed class HierarchyVerbTests
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith(typeof(MarkAttribute))).Because("b"))
             .Single().ShapeSubjects().ShouldBe([$"{T}Plain"]);
+    }
+
+    // ── negative twins: red where the positive matches an anchor, green on the inverse (GRAMMAR §5.3) ──
+
+    [Fact]
+    public void MustNotImplement_RedsImplementer_PassesForNonImplementer()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement(typeof(IThing))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Widget"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement(typeof(IThing))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_RedsDeriver_PassesForNonDeriver()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom(typeof(ThingBase))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}SubType"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom(typeof(ThingBase))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_RedsAttributed_PassesForBare()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Tagged"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    // ── open-vs-closed generic anchors, negated (GRAMMAR §5.2) ──
+
+    [Fact]
+    public void MustNotImplement_ClosedGenericAnchor_RedsOnlyThatConstruction()
+    {
+        // typeof(IHandler<Order>) reds OrderHandler (that construction) but not TextHandler (IHandler<string>).
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<Order>))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}OrderHandler"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<Order>))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotImplement_OpenGenericAnchor_RedsEveryConstruction()
+    {
+        // typeof(IHandler<>) reds every construction — both OrderHandler and TextHandler.
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<>))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}OrderHandler"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<>))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}TextHandler"]);
+    }
+
+    // ── matcher parity over the transitive/substitution/declared-only fixture (GRAMMAR §5.2, negated) ──
+
+    [Fact]
+    public void MustNotImplement_TransitiveInterfaceThroughBaseClass_Reds()
+    {
+        // WidgetChild : Widget : IThing — an interface reached through a base class still reds the ban (the
+        // negative reads the full interface closure, exactly like the positive matcher).
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement(typeof(IThing))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}WidgetChild"]);
+    }
+
+    [Fact]
+    public void MustNotImplement_TypeArgumentSubstitutionThroughGenericBase_RedsClosedConstruction()
+    {
+        // SubstHandler : HandlerBase<Order> where HandlerBase<T> : IHandler<T> — the substituted IHandler<Order>
+        // reds MustNotImplement(typeof(IHandler<Order>)) (the §5.2 substitution example, negated).
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement(typeof(IHandler<Order>))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}SubstHandler"]);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_DeclaredOnly_BaseAttributeDoesNotRedDerived()
+    {
+        // Attributes are declared-only (§5.2): [Mark] on AttrBase reds it, but AttrDerived : AttrBase does not
+        // inherit the attribute, so the ban silently passes for the derived type.
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("AttrBase").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}AttrBase"]);
+
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("AttrDerived").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
     }
 }

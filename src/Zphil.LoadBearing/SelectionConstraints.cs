@@ -223,6 +223,53 @@ public static class SelectionConstraints
         return subject.MustBeAttributedWith(typeof(T));
     }
 
+    /// <summary>
+    ///     The subject must not implement any of the interface anchors — none-of semantics (GRAMMAR §5.3, §10).
+    ///     The negatives take <c>(Type first, params Type[] more)</c>: "must not implement `A` or `B`" is
+    ///     unambiguous, unlike the single-<c>Type</c> positive.
+    /// </summary>
+    public static Constraint MustNotImplement(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotImplementConstraint(Subject(subject), AnchorTypes(first, more));
+    }
+
+    /// <summary>The subject must not derive from any of the base-type anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
+    public static Constraint MustNotDeriveFrom(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotDeriveFromConstraint(Subject(subject), AnchorTypes(first, more));
+    }
+
+    /// <summary>The subject must not be attributed with any of the attribute anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
+    public static Constraint MustNotBeAttributedWith(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
+    }
+
+    /// <summary>
+    ///     The subject must not implement <typeparamref name="T" /> — <c>≡ MustNotImplement(typeof(T))</c>; an open
+    ///     generic stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustNotImplement<T>(this Selection subject)
+    {
+        return subject.MustNotImplement(typeof(T));
+    }
+
+    /// <summary>
+    ///     The subject must not derive from <typeparamref name="T" /> — <c>≡ MustNotDeriveFrom(typeof(T))</c>; an open
+    ///     generic stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustNotDeriveFrom<T>(this Selection subject)
+    {
+        return subject.MustNotDeriveFrom(typeof(T));
+    }
+
+    /// <summary>The subject must not carry attribute <typeparamref name="T" /> — <c>≡ MustNotBeAttributedWith(typeof(T))</c>.</summary>
+    public static Constraint MustNotBeAttributedWith<T>(this Selection subject)
+        where T : Attribute
+    {
+        return subject.MustNotBeAttributedWith(typeof(T));
+    }
+
     /// <summary>The subject must be sealed.</summary>
     public static Constraint MustBeSealed(this Selection subject)
     {
@@ -277,6 +324,17 @@ public static class SelectionConstraints
         Guard.NotNull(subject, nameof(subject));
         var list = new List<Selection>(1 + more.Length) { Wrap(subject, NotNull(first, nameof(first))) };
         foreach (Type type in more) list.Add(Wrap(subject, NotNull(type, nameof(more))));
+
+        return list;
+    }
+
+    // The raw-Type anchor list of a negative hierarchy verb (MustNotImplement / MustNotDeriveFrom /
+    // MustNotBeAttributedWith): stored directly on the node (the hierarchy-verb shape, GRAMMAR §10), never
+    // wrapped as selections. Null/empty-params edges mirror the WrappedTypes helper exactly.
+    private static IReadOnlyList<Type> AnchorTypes(Type first, Type[] more)
+    {
+        var list = new List<Type>(1 + more.Length) { NotNull(first, nameof(first)) };
+        foreach (Type type in more) list.Add(NotNull(type, nameof(more)));
 
         return list;
     }

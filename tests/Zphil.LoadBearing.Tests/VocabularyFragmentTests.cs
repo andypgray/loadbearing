@@ -81,6 +81,39 @@ public class VocabularyFragmentTests
             .ShouldBe("Types must be attributed with `[ApiController]`.");
     }
 
+    // ---- Negative hierarchy/attribute verbs (GRAMMAR §5.3): none-of over the anchor list ----
+
+    [Fact]
+    public void MustNotImplement_SingleAnchor_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustNotImplement(typeof(IBillingFacade)))
+            .ShouldBe("Types must not implement `IBillingFacade`.");
+    }
+
+    [Fact]
+    public void MustNotImplement_OrList_JoinsAnchorsAndRendersOpenGenericTypeParameter()
+    {
+        // The or-list join (§6) plus open-generic rendering with declared type-parameter names (§5.2): two
+        // anchors, the second an open generic → `IHandler<T>`.
+        SentenceRenderer.Sentence(Arch.Types.MustNotImplement(typeof(IBillingFacade), typeof(IHandler<>)))
+            .ShouldBe("Types must not implement `IBillingFacade` or `IHandler<T>`.");
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_SingleAnchor_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustNotDeriveFrom(typeof(ControllerBase)))
+            .ShouldBe("Types must not derive from `ControllerBase`.");
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_OrList_StripsAttributeSuffixBracketsAndJoins()
+    {
+        // Each anchor is Attribute-stripped and bracketed like the positive verb, joined as an or-list (§5.3, §6).
+        SentenceRenderer.Sentence(Arch.Types.MustNotBeAttributedWith(typeof(ApiControllerAttribute), typeof(SerializableAttribute)))
+            .ShouldBe("Types must not be attributed with `[ApiController]` or `[Serializable]`.");
+    }
+
     [Fact]
     public void MustBeSealed_RendersFragment()
     {

@@ -91,6 +91,12 @@ internal sealed class ConstraintEvaluator
                 return Shape(subjects, SelectionEvaluator.BaseTypeMatcher(c.Type));
             case MustBeAttributedWithConstraint c:
                 return Shape(subjects, SelectionEvaluator.AttributeMatcher(c.Type));
+            case MustNotImplementConstraint c:
+                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.InterfaceMatcher));
+            case MustNotDeriveFromConstraint c:
+                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.BaseTypeMatcher));
+            case MustNotBeAttributedWithConstraint c:
+                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.AttributeMatcher));
             case MustBeSealedConstraint:
                 return Shape(subjects, t => t.IsSealed);
             case MustBeStaticConstraint:
@@ -292,6 +298,16 @@ internal sealed class ConstraintEvaluator
                 violations.Add(Violation.Shape(subject, subject.DeclarationSites));
 
         return (violations, NoWarnings);
+    }
+
+    // The negative hierarchy/attribute verbs (GRAMMAR §5.3): a subject VIOLATES iff ANY anchor matches, so it
+    // PASSES iff NONE do — the per-subject negation over the anchor list. The three matchers are the same ones
+    // backing the positives (SelectionEvaluator), built once eagerly per anchor so an unrepresentable anchor
+    // throws (→ RuleError) before any subject is tested, exactly as the positive Shape arms do.
+    private static Func<TypeNode, bool> NoneOf(IReadOnlyList<Type> anchors, Func<Type, Func<TypeNode, bool>> matcher)
+    {
+        var matchers = anchors.Select(matcher).ToList();
+        return subject => !matchers.Any(match => match(subject));
     }
 
     // The member modal verbs (GRAMMAR §5.7): resolve the member subject, then test each surviving member

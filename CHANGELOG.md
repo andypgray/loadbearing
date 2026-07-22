@@ -91,6 +91,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused at spec build), violations are member-shape reds at declaration `file:line`,
   ratcheted by member identity like the naming verbs. The `Meridian.Interchange` pack now
   enforces it as `async/accept-cancellation` with the TAP citation.
+- Negative hierarchy/attribute verbs: `MustNotImplement` / `MustNotDeriveFrom` /
+  `MustNotBeAttributedWith` (each with a generic twin) ban what a type may implement,
+  derive from, or carry — "types in `Meridian.Interchange.*` must not be attributed with
+  `[Table]` or `[ComplexType]`" is now a one-line rule. None-of over one or more anchors
+  (`(Type first, params Type[] more)`; the positives stay deliberately single-type), with
+  the same matching semantics as the positive twins — transitive with type-argument
+  substitution for implement/derive, declared attributes only for attributes — red at the
+  subject's declaration `file:line`. Spec build now refuses category-invalid hierarchy
+  anchors on both polarities (a non-interface on `Must[Not]Implement`, an interface on
+  `Must[Not]DeriveFrom`, a non-attribute on `Must[Not]BeAttributedWith`), steering to the
+  right verb where the old behavior was a silent always-red or always-pass. The
+  `Meridian.Interchange` pack now enforces persistence ignorance as
+  `persistence/no-mapping-attributes` with the architectural-principles citation.
 
 ## [0.1.0] - 2026-07-14
 
