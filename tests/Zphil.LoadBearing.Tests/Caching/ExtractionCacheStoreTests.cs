@@ -33,11 +33,11 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion6_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion7_ReturnsMiss()
     {
-        // Arrange — a v6 cache predates the catch edges + throw edges (schema bumped 6→7): its fragments carry
-        // neither the FragmentCatchEdge nor the FragmentThrowEdge channel, so a v6 cache.json is not usable
-        // under v7 and must degrade cleanly.
+        // Arrange — a v7 cache predates the member-inventory parameter facts (schema bumped 7→8): its member
+        // facts carry no ParameterFacts list, so a v7 cache.json is not usable under v8 and must degrade
+        // cleanly.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -45,7 +45,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 6);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 7);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

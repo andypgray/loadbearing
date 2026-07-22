@@ -57,6 +57,13 @@ public interface IMemberInfo
     /// </summary>
     string? MemberTypeFullName { get; }
 
+    /// <summary>
+    ///     A method's declared parameters in declaration order, or an empty list for a
+    ///     property/field/event member (never null). What a <c>MustAcceptParameter</c> anchor matches
+    ///     against (GRAMMAR §4.6). Additive contract growth, the §5.6 discipline.
+    /// </summary>
+    IReadOnlyList<IParameterInfo> Parameters { get; }
+
     /// <summary>The distinct file paths declaring the member, verbatim as compiled.</summary>
     IReadOnlyList<string> FilePaths { get; }
 }

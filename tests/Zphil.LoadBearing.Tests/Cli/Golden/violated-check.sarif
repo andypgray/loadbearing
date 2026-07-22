@@ -227,6 +227,24 @@
               "properties": {
                 "posture": "enforce"
               }
+            },
+            {
+              "id": "async/accept-cancellation",
+              "shortDescription": {
+                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`."
+              },
+              "fullDescription": {
+                "text": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on."
+              },
+              "help": {
+                "text": "Add a CancellationToken parameter and flow it to the calls you await."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
             }
           ]
         }
@@ -729,6 +747,78 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Load()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Load|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Save()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 43
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Save|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.SaveAsync()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 53
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.SaveAsync|MyApp.Web/HomeController.cs|0"
           },
           "baselineState": "new"
         }

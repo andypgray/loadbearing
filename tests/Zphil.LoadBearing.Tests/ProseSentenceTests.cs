@@ -90,6 +90,17 @@ public class ProseSentenceTests
     }
 
     [Fact]
+    public void Enforce_AcceptCancellation_RendersMemberSubjectAcceptParameterFlagship()
+    {
+        // The parameter-facts flagship in Layer voice (GRAMMAR §4.6, §5.7): Web-layer methods returning a
+        // Task must accept a CancellationToken. Two Returning anchors join with "or"; the verb renders the
+        // article-safe "a parameter of type `X`" fragment.
+        ArchModelBuilder.Build(new AcceptCancellationSpec())
+            .Rules.Single(rule => rule.Id == "async/accept-cancellation").Sentence
+            .ShouldBe("Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.");
+    }
+
+    [Fact]
     public void MustNotUse_ExpressionMintedMethod_RendersParens()
     {
         // The no-churn proof: an expression-minted method anchor renders byte-identically to the
@@ -154,6 +165,19 @@ public class ProseSentenceTests
             arch.Rule("naming/async-suffix")
                 .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                 .Because("Async methods are discovered by suffix; agents grep by *Async.");
+        }
+    }
+
+    // The parameter-facts flagship (GRAMMAR §4.6, §5.7): Web-layer methods returning a Task must accept a
+    // CancellationToken. Layer subject, multi-anchor Returning, single-Type MustAcceptParameter.
+    private sealed class AcceptCancellationSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            arch.Rule("async/accept-cancellation")
+                .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+                .Because("Async Web methods must honor cancellation; agents thread the token through.");
         }
     }
 

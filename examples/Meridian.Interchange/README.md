@@ -21,7 +21,7 @@ That last point is the crux the app is built around. The dispatcher is a singlet
 
 ## The spec
 
-Nine rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs](arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs). Each carries a posture, a reason ending in its citation URL, and a fix.
+Ten rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs](arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs). Each carries a posture, a reason ending in its citation URL, and a fix.
 
 | Rule | Posture | What it says |
 |---|---|---|
@@ -34,8 +34,9 @@ Nine rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeArch
 | `di/no-captive-dependencies` | Enforce | a singleton injects no scoped or transient service |
 | `naming/async-suffix` | Enforce | `Task`-returning methods end in `Async` |
 | `exceptions/no-general-catch` | Enforce | catch base `Exception` only in a top-level handler |
+| `async/accept-cancellation` | Enforce | `Task`-returning methods accept a `CancellationToken` |
 
-Eight rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red. Two of the rules read like this in the spec, the citation URL sitting at the end of each `Because`:
+Nine rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red. Two of the rules read like this in the spec, the citation URL sitting at the end of each `Because`:
 
 ```csharp
 arch.Rule("http/reuse-httpclient")
@@ -91,7 +92,8 @@ pass di/hosted-services-scope-their-work
 pass di/no-captive-dependencies
 pass naming/async-suffix
 pass exceptions/no-general-catch
-Checked 9 rules: 9 passed, 0 failed, 0 skipped. Burndown: 4 grandfathered remaining, 0 fixed awaiting acceptance.
+pass async/accept-cancellation
+Checked 10 rules: 10 passed, 0 failed, 0 skipped. Burndown: 4 grandfathered remaining, 0 fixed awaiting acceptance.
 ```
 
 The four blocking calls are recorded, not accepted. New blocking anywhere in the worker is red on sight, and when the legacy SDK exposes an async surface and the corner is rewritten, the count drops to zero and the rule is ready to promote to `Enforce`.
@@ -155,6 +157,45 @@ FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except t
 
 The match is exact: `MustNotCatch(typeof(Exception))` flags a catch of base `Exception`, and a `catch (TimeoutException)` beside it stays invisible to the rule, which is the good state the guidance wants. Revert the catch and `check` is exit 0 again.
 
+## The flowed token
+
+`async/accept-cancellation` is green over a worker that carries a token the whole way down. Every `Task`-returning method in `Meridian.Interchange.*` accepts a `CancellationToken`: `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make, and the partner clients and the outbox store take it at the leaf. The rule requires the parameter on every one of them.
+
+```csharp
+arch.Rule("async/accept-cancellation")
+    .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+    .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
+    .Fix("Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
+```
+
+The rule reads the declared parameter list. A method satisfies it by declaring a `CancellationToken` parameter; whether the body then forwards that token to the calls it makes is a separate question of flow this presence rule does not answer. What it guarantees is that the token is on the surface for a caller to pass.
+
+Drop the token from `ScopedDispatchRunner.RunPendingAsync`, the seam the dispatcher's `stoppingToken` flows through. The parameter is load-bearing, so removing it takes three touches to compile: the signature loses the parameter, the interior `ProcessPendingAsync` call falls back to `CancellationToken.None`, and the `OutboxDispatcher` call site drops its argument.
+
+```csharp
+// ScopedDispatchRunner.cs
+public async Task RunPendingAsync()
+{
+    using IServiceScope scope = scopeFactory.CreateScope();
+    var processor = scope.ServiceProvider.GetRequiredService<IOutboxProcessor>();
+    await processor.ProcessPendingAsync(CancellationToken.None);
+}
+
+// OutboxDispatcher.cs, in the poll loop
+await runner.RunPendingAsync();
+```
+
+`dotnet build` is green: dropping a parameter is valid C#. `check` is not:
+
+```text
+FAIL async/accept-cancellation — Methods of types in `Meridian.Interchange.*` returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.
+  because: Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
+  fix: Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.
+  src/Meridian.Interchange/Host/ScopedDispatchRunner.cs:13 — Meridian.Interchange.Host.ScopedDispatchRunner.RunPendingAsync()
+```
+
+The violation is keyed to the method at its declaration site, `ScopedDispatchRunner.cs:13`, and it is the only red: `RunPendingAsync` still ends in `Async`, so `naming/async-suffix` stays green. Revert the three touches and `check` is exit 0 again.
+
 ## The citations
 
 Every rule's reason ends in the page it enforces. The quoted phrase below is drawn from that page, verified against the live doc.
@@ -170,14 +211,14 @@ Every rule's reason ends in the page it enforces. The quoted phrase below is dra
 | `di/no-captive-dependencies` | "A singleton can inadvertently capture scoped or transient dependencies" | [Dependency injection guidelines](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines) |
 | `naming/async-suffix` | "Asynchronous methods in TAP include the Async suffix" | [Task-based asynchronous pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
 | `exceptions/no-general-catch` | "AVOID catching System.Exception or System.SystemException, except in top-level exception handlers" | [Using standard exception types](https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types) |
+| `async/accept-cancellation` | "consider adding a CancellationToken parameter" | [Task-based asynchronous pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
 
-Four rules share the DI guidelines page, which is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections.
+Four rules share the DI guidelines page, which is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter, the two conventions it fixes for a `Task`-returning method.
 
 ## Not yet enforceable
 
-The pack encodes the guidance the current vocabulary can express. Three neighboring rules from the same Microsoft docs are out of reach in v1. Each is named here with the workaround that holds the line today, no roadmap attached.
+The pack encodes the guidance the current vocabulary can express. Two neighboring rules from the same Microsoft docs are out of reach in v1. Each is named here with the workaround that holds the line today, no roadmap attached.
 
-- CancellationToken presence cannot be required. v1 knows a member by its name and return type, not its parameters, so "a public `Task`-returning method should accept a `CancellationToken`" is inexpressible. What holds the line: `naming/async-suffix` enforces the name, and CA1068 keeps a token in the right position wherever one is already present.
 - Signature exposure cannot be told apart from a reference. v1 treats a reference and an exposure as the same edge, so "domain entities must not surface on the presentation layer; return DTOs" is not expressible. What holds the line: the layer reference rules (`MustOnlyReference`, shown in `Meridian.Operations`) constrain which namespaces may see the domain at all.
 - Persistence ignorance has no negative verb. v1 has no negative hierarchy or attribute combinator, so "a persisted type carries no ORM base class or `[Table]`/`[Column]` attribute" is expressible only through the general `.Must(predicate, description:)` escape hatch. What holds the line: that predicate, since a whole-namespace ban would also block the `DataAnnotations` validation attributes the domain legitimately uses.
 
@@ -192,11 +233,12 @@ Several rules have a neighbor in the analyzer ecosystem. What none of those neig
 - `di/no-captive-dependencies`: two community analyzers, Excubo.Analyzers.DependencyInjectionValidation and georgepwall1991/DependencyInjection.Lifetime.Analyzers, flag a captive dependency statically, each within a single compilation, while the runtime scope validation named above throws only when the host builds. The delta is whole-solution reach across a registration and a constructor that can live in different projects, and the citation carried in the reason.
 - `naming/async-suffix`: VSTHRD200 enforces the `Async` suffix, blanket-wide. The delta is scoping (this rule names the `Meridian.Interchange.*` cone) and the citation carried in the reason.
 - `exceptions/no-general-catch`: CA1031 (Do not catch general exception types) flags every `catch (System.Exception)`, blanket-wide, and is widely turned off because the one place a catch-all belongs (the top-level handler) trips it too. The delta is scoping: this rule excepts `BackgroundService`-derived types, so the dispatcher's poll loop is sanctioned while the ban holds across the rest of the worker, and the citation rides in the reason.
+- `async/accept-cancellation`: CA1068 (CancellationToken parameters must come last) governs the position of a token that is already present, not whether one is present. Meziantou's MA0032, MA0040, and MA0079 flag a call site that forwards no token when one is in scope. Both act only once a token exists on the surface; requiring the parameter there in the first place is the white space this rule fills across `Meridian.Interchange.*`. The match is definition-level and exact: a `CancellationToken?` or a `params CancellationToken[]` parameter is a different declared type and does not satisfy the rule.
 - `di/no-service-locator`: one honesty note. This rule bans the `GetService`/`GetRequiredService` members, and a ban on an interface member catches a call through that interface, not a call through a concrete type that re-declares the member. In this worker every resolve goes through `IServiceProvider` or the `ServiceProviderServiceExtensions` methods, so the ban is complete here; a codebase that resolved through a concrete container type would need that type named too.
 
 ## Introduce a violation
 
-Each posture goes red on a small edit and back to green on revert. The `new HttpClient()` edit is [the silent win](#the-silent-win), the captured store is [the captive dependency](#the-captive-dependency), and the blanket `catch` is [the scoped catch](#the-scoped-catch), all above. Two more show the rest.
+Each posture goes red on a small edit and back to green on revert. The `new HttpClient()` edit is [the silent win](#the-silent-win), the captured store is [the captive dependency](#the-captive-dependency), the blanket `catch` is [the scoped catch](#the-scoped-catch), and the dropped token is [the flowed token](#the-flowed-token), all above. Two more show the rest.
 
 Change `OutboxDispatcher`'s constructor parameter from `IOptions<InterchangeOptions>` to `IOptionsSnapshot<InterchangeOptions>`. It compiles, and it would even resolve, which is the trap: `IOptionsSnapshot` is scoped, the dispatcher is a singleton, and the snapshot would be captured for the whole process. `OutboxProcessor`, being scoped, uses `IOptionsSnapshot` correctly; the singleton dispatcher must not. The rule reads that from the type hierarchy alone:
 
@@ -234,7 +276,7 @@ dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
 loadbearing check examples/Meridian.Interchange/Meridian.Interchange.slnx
 ```
 
-`check` exits 0 here: `Checked 9 rules: 9 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
+`check` exits 0 here: `Checked 10 rules: 10 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
 
 ## From here
 

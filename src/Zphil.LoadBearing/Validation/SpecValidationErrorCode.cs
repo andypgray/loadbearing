@@ -98,5 +98,12 @@ public enum SpecValidationErrorCode
     ///     defined set — a cast such as <c>(Lifetime)7</c> names no lifetime (§8 item 19). Reported in the
     ///     same all-at-once pass; membership resolution never sees it because the build throws first.
     /// </summary>
-    UndefinedLifetime
+    UndefinedLifetime,
+
+    /// <summary>
+    ///     A closed-generic <c>MustAcceptParameter</c> anchor on a method selection (§8 item 20); parameter-type
+    ///     matching is definition-level, so the error guides to the open definition
+    ///     (<c>typeof(IProgress&lt;&gt;)</c>).
+    /// </summary>
+    MemberAcceptParameterClosedGeneric
 }

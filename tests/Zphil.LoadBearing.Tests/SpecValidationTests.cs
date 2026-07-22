@@ -1284,4 +1284,73 @@ public class SpecValidationTests
                 .Because("Reason.");
         }
     }
+
+    // GRAMMAR §8 item 20: a closed-generic MustAcceptParameter anchor on a method selection. Appended at the
+    // very end so every caller-info golden above keeps its authored line number (and, like the appends above,
+    // this file must NOT be run through a member-reordering cleanup profile). Parameter-type matching is
+    // definition-level, so a closed construction is refused with the open-definition steer; the check mirrors
+    // the item-14 .Returning refusal, reading as its sibling with the verb named in place of .Returning.
+    [Fact]
+    public void MemberAcceptParameterClosedGeneric_ClosedAnchor_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new ClosedGenericAcceptParameterSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberAcceptParameterClosedGeneric && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.MemberAcceptParameterClosedGeneric).Message
+            .ShouldBe("SpecValidationTests.cs:1328: 'System.IProgress<System.Int32>' is a closed generic; MustAcceptParameter matches definition-level — " +
+                      "use typeof(IProgress<>) (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberAcceptParameterClosedGeneric_BesideAnotherError_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new AcceptParameterAllAtOnceSpec());
+
+        // The closed-generic parameter anchor and the rule's missing Because report together (the §8
+        // all-at-once contract).
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberAcceptParameterClosedGeneric && e.RuleId == "area/rule");
+        ex.Errors.ShouldContain(e => e.Code == Code.MissingBecause && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ValidAcceptParameter_NonGenericAndOpenGenericAnchors_BuildWithoutError()
+    {
+        // A non-generic anchor (typeof(CancellationToken)) and an open-generic one (typeof(IProgress<>)) are
+        // both accepted — only closed generics fail.
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidAcceptParameterSpec()));
+    }
+
+    private sealed class ClosedGenericAcceptParameterSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // typeof(IProgress<int>) is a closed construction — refused; ban the open definition instead.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.MustAcceptParameter(typeof(IProgress<int>)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class AcceptParameterAllAtOnceSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // Closed-generic parameter anchor AND no .Because → two codes in one pass.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.MustAcceptParameter(typeof(IProgress<int>)));
+        }
+    }
+
+    private sealed class ValidAcceptParameterSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/nongeneric")
+                .Enforce(arch.Types.Methods.MustAcceptParameter(typeof(CancellationToken)))
+                .Because("Reason.");
+            arch.Rule("area/opengeneric")
+                .Enforce(arch.Types.Methods.MustAcceptParameter(typeof(IProgress<>)))
+                .Because("Reason.");
+        }
+    }
 }

@@ -29,7 +29,7 @@ internal sealed class LegacyManifestClient : IPartnerClient
         // The legacy manifest SDK is synchronous while everything beneath it is async, so this
         // adapter blocks at three points: serializing the manifest, taking the single-flight gate,
         // and posting it. These are the only blocking calls in the subsystem.
-        string manifest = SerializeAsync(message).GetAwaiter().GetResult();
+        string manifest = SerializeAsync(message, cancellationToken).GetAwaiter().GetResult();
 
         using StringContent content = new(manifest, Encoding.UTF8, "application/xml");
 
@@ -47,7 +47,7 @@ internal sealed class LegacyManifestClient : IPartnerClient
         return Task.CompletedTask;
     }
 
-    private Task<string> SerializeAsync(OutboxMessage message)
+    private Task<string> SerializeAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
         // The gateway expects each manifest addressed to the configured legacy system.
         var manifest =

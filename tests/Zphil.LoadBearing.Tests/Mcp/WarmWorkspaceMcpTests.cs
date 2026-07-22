@@ -31,6 +31,32 @@ public sealed class WarmWorkspaceMcpTests
     private const string SaveMemberId = "M:MyApp.Web.HomeController.Save";
     private const string LoadMemberId = "M:MyApp.Web.HomeController.Load";
     private const string DeleteMemberId = "M:MyApp.Web.HomeController.Delete";
+    private const string SaveAsyncMemberId = "M:MyApp.Web.HomeController.SaveAsync";
+
+    // A one-rule spec (member-subject MustAcceptParameter): Web Task-returning methods must accept a
+    // CancellationToken. Compiled to a throwaway DLL by SpecAssemblyCompiler because the committed fixture
+    // specs (golden-pinned) do not carry this rule. String-selected subject + BCL anchors only, so the spec
+    // depends on nothing but the core and the BCL.
+    private const string AcceptCancellationSpecSource = """
+                                                        using System.Threading;
+                                                        using System.Threading.Tasks;
+                                                        using Zphil.LoadBearing;
+
+                                                        namespace WarmAcceptCancellation
+                                                        {
+                                                            public sealed class AcceptCancellationSpec : IArchitectureSpec
+                                                            {
+                                                                public void Define(Arch arch)
+                                                                {
+                                                                    arch.Rule("async/accept-cancellation")
+                                                                        .Enforce(arch.Namespace("MyApp.Web.*").Methods
+                                                                            .Returning(typeof(Task), typeof(Task<>))
+                                                                            .MustAcceptParameter(typeof(CancellationToken)))
+                                                                        .Because("Async Web methods must honor cancellation.");
+                                                                }
+                                                            }
+                                                        }
+                                                        """;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -128,6 +154,53 @@ public sealed class WarmWorkspaceMcpTests
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
+    public async Task ArchCheck_CancellationTokenParamAddedOnDisk_ClearsMemberShapeRedAndMatchesColdCli()
+    {
+        // Arrange — compile a one-rule spec DLL (member-subject MustAcceptParameter) to a private temp dir,
+        // then bind a warm server to a fixture copy + that spec. HomeController's three tokenless Task-returning
+        // methods Save/Load/SaveAsync are all red (GRAMMAR §4.6). This is the parameter-facts warm analog of the
+        // async-suffix member-subject test above — it proves Parameters survive the warm reconcile + cache path.
+        string specDirectory = Path.Combine(
+            Path.GetTempPath(), "loadbearing-warm-mcp-param", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(specDirectory);
+        string specDll = Path.Combine(specDirectory, "WarmAcceptCancellationSpec.dll");
+        SpecAssemblyCompiler.EmitSpecDll(
+            AcceptCancellationSpecSource, specDll, "Zphil.LoadBearing.WarmAcceptCancellationSpec");
+        try
+        {
+            using var fixture = new TempFixtureWorkspace();
+            await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+                Binding(fixture.SolutionPath, specDll), Ct);
+            var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+            string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+            // Act — add a CancellationToken parameter to the tokenless Save on disk, then re-check the
+            // still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle.
+            string homeController = fixture.PathOf(Web, "HomeController.cs");
+            EditOnDisk(homeController, AddCancellationTokenToSave);
+            string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+            CliResult coldEdited = await CliRunner.InvokeAsync(
+                "check", fixture.SolutionPath, "--spec", specDll, "--json");
+
+            // Assert — Save's member-shape red clears (Save now accepts the token, so the accept-cancellation
+            // subject set shrinks from {Save, Load, SaveAsync} to {Load, SaveAsync}), the payload changed, and
+            // the warm result is byte-identical to the cold run on the edited tree.
+            AcceptCancellationSubjectMembers(before).ShouldBe([SaveMemberId, LoadMemberId, SaveAsyncMemberId], true);
+            AcceptCancellationSubjectMembers(after).ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
+            Normalize(after).ShouldNotBe(Normalize(before));
+            Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+            // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
+            store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        }
+        finally
+        {
+            TryDeleteDirectory(specDirectory);
+        }
     }
 
     [Fact]
@@ -365,6 +438,17 @@ public sealed class WarmWorkspaceMcpTests
                + "    public System.Threading.Tasks.Task Delete() => System.Threading.Tasks.Task.CompletedTask;\n}\n";
     }
 
+    // Turns HomeController's tokenless Save into one accepting a CancellationToken — the compliant signature,
+    // so its member-shape red under async/accept-cancellation clears (its DocId changes as the parameter joins
+    // the signature, and it drops out of the Task-returning subject's red set). Save has no callers, so the
+    // signature change keeps MyApp.Web compiling.
+    private static string AddCancellationTokenToSave(string source)
+    {
+        return source.Replace(
+            "public System.Threading.Tasks.Task Save()",
+            "public System.Threading.Tasks.Task Save(System.Threading.CancellationToken cancellationToken)");
+    }
+
     // Flips IOrderFeed's registration from scoped to singleton in ServiceWiring — a singleton dependency injected
     // by a singleton is not captive, so the IOrderFeed edge drops out of di/no-captive-dependencies (GRAMMAR §4.7),
     // leaving only the transient IOrderFormatter red.
@@ -385,9 +469,21 @@ public sealed class WarmWorkspaceMcpTests
     // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
     private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
     {
+        return SubjectMembersOf(checkJson, "naming/async-suffix");
+    }
+
+    // The member subjects (subjectMember DocIds) reported red under the member-subject rule async/accept-cancellation.
+    private static IReadOnlyList<string> AcceptCancellationSubjectMembers(string checkJson)
+    {
+        return SubjectMembersOf(checkJson, "async/accept-cancellation");
+    }
+
+    // The member subjects (subjectMember DocIds) a member-subject rule reports red, keyed by rule id.
+    private static IReadOnlyList<string> SubjectMembersOf(string checkJson, string ruleId)
+    {
         using JsonDocument document = JsonDocument.Parse(checkJson);
         JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "naming/async-suffix");
+            .Single(r => r.GetProperty("id").GetString() == ruleId);
         return rule.GetProperty("violations").EnumerateArray()
             .Select(v => v.GetProperty("subjectMember").GetString()!)
             .ToList();
@@ -441,6 +537,22 @@ public sealed class WarmWorkspaceMcpTests
         File.WriteAllText(path, transform(content));
         // A future mtime guarantees the reconcile sweep sees a delta against the load-time fingerprint.
         File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(2));
+    }
+
+    // Best-effort temp cleanup: a collectible spec ALC may not have released the emitted DLL's file handle by
+    // teardown (unload is GC-timed), so a failed delete is swallowed and the OS reclaims the temp dir later.
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static void BackdateAllDocuments(WorkspaceSnapshot snapshot)

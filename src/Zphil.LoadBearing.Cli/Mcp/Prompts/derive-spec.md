@@ -191,6 +191,12 @@ arch.Rule("data-access/no-inline-sql")
   intended. Member-level conventions are candidates too:
   `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")` where the
   codebase names its async methods `*Async`.
+- Token-presence candidates: where the codebase's `Task`-returning methods already accept a
+  `CancellationToken`, the convention is one line —
+  `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))`.
+  Matching is declaration-level and exact (a `CancellationToken?` or `params CancellationToken[]`
+  parameter is a different declared type and does not count); whether a body *flows* the token
+  is call-site analyzer territory, not this rule's.
 - DI-construction candidates: a type resolved through a container or a discovery registry may be
   *referenced* but must not be *constructed* — `arch.Types.Except(arch.Type<HandlerRegistry>())
   .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>)))` where a family of types
@@ -392,9 +398,9 @@ The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>(
 sugar for the `typeof`/`nameof` form and reify identically. An **open** generic has no
 type-argument form, so it stays `typeof` (`Implementing(typeof(IHandler<>))`,
 `.Returning(typeof(Task<>))`). The dependency verbs take
-`typeof` or a wrapping `arch.Type<X>()` (never a generic verb); `.Returning` takes `typeof` only:
-its sole overload is `Returning(Type, params Type[])`, and a `Selection` such as `arch.Type<X>()`
-is not a `Type`.
+`typeof` or a wrapping `arch.Type<X>()` (never a generic verb); `.Returning` and
+`MustAcceptParameter` take `typeof` only (`Returning(Type, params Type[])`,
+`MustAcceptParameter(Type)`), and a `Selection` such as `arch.Type<X>()` is not a `Type`.
 
 **Member subjects** — a projection turns any selection into a selection of its declared
 members, constrained directly: projections `.Members` / `.Methods` / `.Properties` / `.Fields`
@@ -404,7 +410,10 @@ declared return type at the definition level — `typeof(Task<>)` matches every 
 and a closed generic like `typeof(Task<int>)` is refused) · `.Where(pred, description:)` ·
 member verbs `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustBePublic` /
 `MustBeInternal` / `MustBePrivate` · `MustBeStatic` / `MustBeAbstract` / `MustBeVirtual` ·
-`.Must(pred, description:)` (member predicates see `IMemberInfo`). The flagship:
+`MustAcceptParameter(typeof(CancellationToken))` (methods-only, so it chains only off
+`.Methods` like `.Returning`; one anchor, matched at the definition level — `typeof(IProgress<>)`
+matches every construction, and a closed generic is refused) ·
+`.Must(pred, description:)` (member predicates see `IMemberInfo`, parameters included). The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in
 `MyApp.Web.*` returning `Task` must be named `*Async`."*
 

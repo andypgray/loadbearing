@@ -179,6 +179,23 @@ public class VocabularyFragmentTests
             .ShouldBe("Methods of types must return a Task.");
     }
 
+    [Fact]
+    public void Member_MustAcceptParameter_RendersArticleSafeFragment()
+    {
+        // The parameter-facts verb (GRAMMAR §5.7, §4.6): the article-safe "must accept a parameter of type
+        // `X`" phrasing, methods-only by receiver type.
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter(typeof(CancellationToken)))
+            .ShouldBe("Methods of types must accept a parameter of type `CancellationToken`.");
+    }
+
+    [Fact]
+    public void Member_MustAcceptParameter_OpenGenericRendersDeclaredTypeParameterName()
+    {
+        // An open-generic anchor renders declared type-parameter names — typeof(IProgress<>) → `IProgress<T>`.
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter(typeof(IProgress<>)))
+            .ShouldBe("Methods of types must accept a parameter of type `IProgress<T>`.");
+    }
+
     // ---- Registered noun fragments + the injection-ban verb (GRAMMAR §4.7, §5.1, §5.3) ----
 
     [Theory]

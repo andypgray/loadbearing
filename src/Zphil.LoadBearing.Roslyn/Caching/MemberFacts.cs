@@ -25,6 +25,12 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         definition-level FQN in extraction format, so a method's <see cref="ReturnTypeFullName" />
 ///         compares equal to the <c>.Returning</c> anchor's <c>TypeName.FullDisplay</c> (GRAMMAR §4.6).
 ///     </para>
+///     <para>
+///         <see cref="Parameters" /> is the method's declared parameters in declaration order — each a
+///         <see cref="ParameterFacts" /> whose type is normalized by the same helper as
+///         <see cref="ReturnTypeFullName" /> (GRAMMAR §4.6, §5.6). It is empty for properties, fields, and
+///         events, and for a parameterless method.
+///     </para>
 /// </remarks>
 internal sealed record MemberFacts(
     string SymbolId,
@@ -36,4 +42,5 @@ internal sealed record MemberFacts(
     bool IsVirtual,
     bool IsAsync,
     string? ReturnTypeFullName,
-    string? MemberTypeFullName);
+    string? MemberTypeFullName,
+    IReadOnlyList<ParameterFacts> Parameters);

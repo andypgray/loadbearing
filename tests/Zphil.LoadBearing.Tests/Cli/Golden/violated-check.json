@@ -352,15 +352,56 @@
         }
       ],
       "warnings": []
+    },
+    {
+      "id": "async/accept-cancellation",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.",
+      "because": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.",
+      "fix": "Add a CancellationToken parameter and flow it to the calls you await.",
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Load",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 48
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Save",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 43
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.SaveAsync",
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 53
+            }
+          ]
+        }
+      ],
+      "warnings": []
     }
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 13,
+    "rulesChecked": 14,
     "rulesPassed": 2,
-    "rulesFailed": 10,
+    "rulesFailed": 11,
     "rulesSkipped": 1,
-    "violations": 15,
+    "violations": 18,
     "warnings": 1
   }
 }

@@ -233,6 +233,15 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
 
         home.Member("M:MyApp.Web.HomeController.RenderOrder(System.String)").ReturnTypeFullName.ShouldBe("System.String");
 
+        // Parameter facts (GRAMMAR §4.6, §5.6) survive the real MSBuild workspace + cache round-trip:
+        // definition-level types in declaration order, an external parameter type kept whole, and a
+        // parameterless method carrying the empty list.
+        home.Member("M:MyApp.Web.HomeController.RenderOrder(System.String)").Parameters
+            .Select(p => (p.Name, p.TypeFullName)).ShouldBe([("description", "System.String")]);
+        home.Member("M:MyApp.Web.HomeController.ShowInvoiceTotal(MyApp.Legacy.Billing.IBillingFacade)").Parameters
+            .Select(p => (p.Name, p.TypeFullName)).ShouldBe([("facade", "MyApp.Legacy.Billing.IBillingFacade")]);
+        home.Member("M:MyApp.Web.HomeController.Save").Parameters.ShouldBeEmpty();
+
         // Externals carry no inventory (the member axis is solution-declared-only).
         fixture.Model.Type("System.Text.StringBuilder").Members.ShouldBeEmpty();
     }

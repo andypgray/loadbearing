@@ -326,4 +326,172 @@ public sealed class CodebaseExtractorMemberInventoryTests
         split.Member("M:N.Split.C").FilePaths.ShouldBe(["PartA.cs"]);
         split.Member("M:N.Split.C").DeclarationLines().ShouldBe([2]);
     }
+
+    [Fact]
+    public void Inventory_MethodParameters_AreCapturedInDeclarationOrderWithDefaultValuedCounted()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Seed(int count, System.Threading.CancellationToken cancellationToken = default) {}
+                                                         }
+                                                         """);
+
+        // Declaration order is preserved ([count, cancellationToken], not sorted or reversed) and a
+        // default-valued parameter is a fact like any other — it counts (GRAMMAR §4.6, §5.6).
+        MemberNode seed = model.Type("N.C").Members.Single(m => m.Name == "Seed");
+        seed.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
+        [
+            ("count", "System.Int32"),
+            ("cancellationToken", "System.Threading.CancellationToken")
+        ]);
+    }
+
+    [Fact]
+    public void Inventory_ExtensionMethod_IncludesTheThisParameter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public static class StringExtensions
+                                                         {
+                                                             public static string Shout(this string text) => text;
+                                                         }
+                                                         """);
+
+        // The DECLARED static method's parameter list is read (never the reduced instance form), so the `this`
+        // receiver parameter is a recorded fact — present in both the DocId and the parameter facts.
+        MemberNode shout = model.Type("N.StringExtensions").Member("M:N.StringExtensions.Shout(System.String)");
+        shout.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("text", "System.String")]);
+    }
+
+    [Fact]
+    public void Inventory_RefInOutParameters_RecordTheUnderlyingType()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Move(ref int a, in int b, out int c) { c = a + b; }
+                                                         }
+                                                         """);
+
+        // ref/in/out are calling-convention modifiers, not part of the recorded parameter type — all three
+        // record the underlying System.Int32.
+        MemberNode move = model.Type("N.C").Members.Single(m => m.Name == "Move");
+        move.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
+        [
+            ("a", "System.Int32"),
+            ("b", "System.Int32"),
+            ("c", "System.Int32")
+        ]);
+    }
+
+    [Fact]
+    public void Inventory_ParamsArrayParameter_RecordsTheArrayType()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void CancelAll(params System.Threading.CancellationToken[] tokens) {}
+                                                         }
+                                                         """);
+
+        // A params parameter records the ARRAY type, never the element type.
+        MemberNode cancelAll = model.Type("N.C").Members.Single(m => m.Name == "CancelAll");
+        cancelAll.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
+            [("tokens", "System.Threading.CancellationToken[]")]);
+    }
+
+    [Fact]
+    public void Inventory_NullableValueTypeParameter_RecordsNullableDefinitionForm()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Maybe(System.Threading.CancellationToken? token) {}
+                                                         }
+                                                         """);
+
+        // A T? parameter records System.Nullable<T>'s definition form (never the unwrapped T), the same
+        // construction-erasing normalization the return type uses.
+        MemberNode maybe = model.Type("N.C").Members.Single(m => m.Name == "Maybe");
+        maybe.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("token", "System.Nullable<T>")]);
+    }
+
+    [Fact]
+    public void Inventory_TypeParameterTypedParameter_RecordsDeclaredTypeParameterName()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public T Echo<T>(T value) => value; }
+                                                         """);
+
+        // The same definition-level path that renders Echo's RETURN type as "T" renders its parameter type "T".
+        MemberNode echo = model.Type("N.C").Members.Single(m => m.Name == "Echo");
+        echo.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("value", "T")]);
+    }
+
+    [Fact]
+    public void Inventory_PositionalRecord_PropertyCarriesNoParameters()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public record R(int X);
+                                                         """);
+
+        // The positional list surfaces as the generated property X only; the primary constructor is outside the
+        // member inventory, so nothing here carries parameter facts.
+        TypeNode r = model.Type("N.R");
+        r.MemberIds().ShouldBe(["P:N.R.X"]);
+        r.Member("P:N.R.X").Parameters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_PartialMethod_ReadsParametersOnceInDeclarationOrder()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host { partial void OnScan(int index, string label); }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host { partial void OnScan(int index, string label) {} }
+                            """));
+
+        // A partial method's defining and implementing parts resolve to ONE inventory member (Single throws on
+        // a duplicate), and its parameters are read once — [index, label], never doubled to four or reordered.
+        MemberNode onScan = model.Type("N.Host").Members.Single(m => m.Name == "OnScan");
+        onScan.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
+        [
+            ("index", "System.Int32"),
+            ("label", "System.String")
+        ]);
+    }
+
+    [Fact]
+    public void Inventory_PropertyFieldEvent_CarryEmptyParameterLists()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Field;
+                                                             public int Prop { get; set; }
+                                                             public event System.Action Evt;
+                                                             public void Nullary() {}
+                                                         }
+                                                         """);
+
+        // Only methods carry parameters; a property, field, and event each hold the empty list, as does a
+        // parameterless method.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field").Parameters.ShouldBeEmpty();
+        c.Member("P:N.C.Prop").Parameters.ShouldBeEmpty();
+        c.Member("E:N.C.Evt").Parameters.ShouldBeEmpty();
+        c.Member("M:N.C.Nullary").Parameters.ShouldBeEmpty();
+    }
 }

@@ -68,9 +68,35 @@ public sealed class MemberSubjectVerbTests
                                  }
                                  """;
 
+    // The MustAcceptParameter substrate (GRAMMAR §4.6, §5.7): every method returns a Task form (so the
+    // .Returning(Task, Task<>) subject keeps them all), and the parameter lists span the compliant and
+    // non-compliant shapes — a bare token, a token behind other params, a defaulted token (the common
+    // compliant signature), an open-generic IProgress<int>, and the two definition-level "honesty" traps a
+    // CancellationToken? (System.Nullable<T>) and a params CancellationToken[] (the array type) that do NOT
+    // match a System.Threading.CancellationToken anchor.
+    private const string Parameters = """
+                                      namespace App.Parameters
+                                      {
+                                          using System;
+                                          using System.Threading;
+                                          using System.Threading.Tasks;
+                                          public class Handlers
+                                          {
+                                              public Task HandleWithToken(CancellationToken cancellationToken) => Task.CompletedTask;
+                                              public Task<int> FetchWithToken(string key, CancellationToken cancellationToken) => Task.FromResult(0);
+                                              public Task PollWithoutToken() => Task.CompletedTask;
+                                              public Task DefaultedToken(CancellationToken cancellationToken = default) => Task.CompletedTask;
+                                              public Task ReportProgress(IProgress<int> progress) => Task.CompletedTask;
+                                              public Task NullableTokenOnly(CancellationToken? cancellationToken) => Task.CompletedTask;
+                                              public Task ParamsTokensOnly(params CancellationToken[] tokens) => Task.CompletedTask;
+                                          }
+                                      }
+                                      """;
+
     private static readonly CodebaseModel MembersModel = CompilationFactory.Extract(Members);
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(Async);
     private static readonly CodebaseModel KindsModel = CompilationFactory.Extract(Kinds);
+    private static readonly CodebaseModel ParametersModel = CompilationFactory.Extract(Parameters);
 
     // ── naming verbs ──────────────────────────────────────────────────────────────────────────────────
 
@@ -238,6 +264,78 @@ public sealed class MemberSubjectVerbTests
             .ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
     }
 
+    // ── MustAcceptParameter (definition-level) ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void MustAcceptParameter_TokenBearingMethodPasses_TokenlessMethodRedsAtDeclarationSite()
+    {
+        // Under .Returning(Task, Task<>).MustAcceptParameter(CancellationToken): a method that declares a
+        // CancellationToken parameter passes.
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+            .WithPrefix("HandleWithToken").Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)));
+
+        // …a tokenless one reds, keyed on its own M: DocId and located at its declaration site (Test.cs).
+        RuleResult result = Checker.Run(ParametersModel, arch => arch.Rule("member/x").Enforce(
+                arch.Namespace("App.Parameters.*").Methods.WithPrefix("PollWithoutToken")
+                    .Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))).Because("b"))
+            .Single();
+        Violation red = result.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
+        red.SubjectMember!.SymbolId.ShouldBe("M:App.Parameters.Handlers.PollWithoutToken");
+        red.Sites.ShouldContain(site => site.FilePath.EndsWith("Test.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MustAcceptParameter_BareMethodsSubject_HoldsAndFlagsMismatch()
+    {
+        // The bare .Methods.MustAcceptParameter form (no .Returning narrowing): a method that accepts a token
+        // behind another parameter passes (any position counts), a tokenless one reds.
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+            .WithPrefix("FetchWithToken").MustAcceptParameter(typeof(CancellationToken)));
+
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+                .WithPrefix("PollWithoutToken").MustAcceptParameter(typeof(CancellationToken)))
+            .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
+    }
+
+    [Fact]
+    public void MustAcceptParameter_OpenGenericAnchor_MatchesAnyConstruction()
+    {
+        // typeof(IProgress<>) matches a method accepting IProgress<int> at the definition level (any
+        // construction on the definition name, GRAMMAR §4.6) — the parameter analog of .Returning(typeof(Task<>)).
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+            .WithPrefix("ReportProgress").MustAcceptParameter(typeof(IProgress<>)));
+
+        // …and reds a method accepting no IProgress construction.
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+                .WithPrefix("PollWithoutToken").MustAcceptParameter(typeof(IProgress<>)))
+            .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
+    }
+
+    [Fact]
+    public void MustAcceptParameter_DefaultValuedParameter_Counts()
+    {
+        // A `CancellationToken cancellationToken = default` parameter counts — the most common compliant
+        // signature. Extraction reads the declared symbol, so a default value never drops the parameter.
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+            .WithPrefix("DefaultedToken").MustAcceptParameter(typeof(CancellationToken)));
+    }
+
+    [Fact]
+    public void MustAcceptParameter_DefinitionLevelHonesty_NullableAndParamsArrayRed()
+    {
+        // Definition-level honesty (GRAMMAR §4.6): a CancellationToken? parameter records System.Nullable<T>'s
+        // definition, and a params CancellationToken[] records the array type — NEITHER equals the
+        // System.Threading.CancellationToken anchor, so both red. Asserted through the real evaluator over
+        // real extracted facts, not by faking a parameter list.
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+                .WithPrefix("NullableTokenOnly").MustAcceptParameter(typeof(CancellationToken)))
+            .ShouldBe(["M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})"]);
+
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+                .WithPrefix("ParamsTokensOnly").MustAcceptParameter(typeof(CancellationToken)))
+            .ShouldBe(["M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])"]);
+    }
+
     // ── deterministic ordering ────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -297,6 +395,27 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*").Methods
                 .Must(m => m.DeclaringType.Name == "KeepThis", "be declared on KeepThis"))
             .ShouldBe(["M:App.Hatch.DropThis.B"]);
+    }
+
+    [Fact]
+    public void Where_EscapeHatch_ReachesParametersEndToEnd()
+    {
+        // Self-guarding: the Where narrows to methods declaring a System.Threading.CancellationToken
+        // parameter — if Parameters/TypeFullName were unpopulated the subject would be empty and the rule
+        // would FAIL. Passed proves the real extracted parameter facts reach the checker end-to-end.
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+            .Where(m => m.Parameters.Any(p => p.TypeFullName == "System.Threading.CancellationToken"), "that accept a token")
+            .MustBePublic());
+    }
+
+    [Fact]
+    public void Must_EscapeHatch_ReachesParameterCountEndToEnd()
+    {
+        // The Must predicate reads m.Parameters.Count: the one parameterless method reds, proving the
+        // parameter list reaches the member predicate end-to-end (the other six declare a parameter and pass).
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
+                .Must(m => m.Parameters.Count > 0, "declare at least one parameter"))
+            .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
     }
 
     // ── empty member subject ──────────────────────────────────────────────────────────────────────────
@@ -381,6 +500,68 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(regressed).ShouldBe(["M:App.Async.HomeController.Delete"]);
     }
 
+    [Fact]
+    public void MemberSubjectRatchet_MustAcceptParameter_GrandfathersMember_ThenNewMemberIsRed()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("async/accept-cancellation")
+            .Migrate("legacy Task-returning methods do not accept a CancellationToken",
+                arch.Namespace("App.Cancel.*").Methods
+                    .Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+            .Because("Async methods must honor cancellation.")));
+
+        const string before = """
+                              namespace App.Cancel
+                              {
+                                  using System.Threading;
+                                  using System.Threading.Tasks;
+                                  public class Api
+                                  {
+                                      public Task Poll() => Task.CompletedTask;
+                                      public Task Fetch(CancellationToken cancellationToken) => Task.CompletedTask;
+                                  }
+                              }
+                              """;
+        CodebaseModel beforeModel = CompilationFactory.Extract(before);
+
+        // Empty baseline → Poll() is red (Fetch passes); capture its member-subject identity (a M: DocId).
+        RuleResult red = ArchChecker.Check(model, beforeModel, BaselineIndex.Empty).Single();
+        red.Status.ShouldBe(RuleStatus.Failed);
+        Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
+        BaselineEntry identity = observed.BaselineIdentity()!;
+        identity.Subject.ShouldBe("M:App.Cancel.Api.Poll");
+
+        // Grandfather Poll through an in-memory BaselineIndex carrying an attribution — the shape-verb
+        // identity substrate, zero baseline-format changes (GRAMMAR §4.6).
+        var index = new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
+        {
+            ["async/accept-cancellation"] = new([identity.WithBecause("INC-1")])
+        });
+        RuleResult grandfathered = ArchChecker.Check(model, beforeModel, index).Single();
+        grandfathered.Status.ShouldBe(RuleStatus.Passed);
+        grandfathered.Grandfathered.Count.ShouldBe(1);
+        grandfathered.GrandfatheredEntries.Single().Because.ShouldBe("INC-1"); // --because attribution round-trips
+
+        // Add a NEW tokenless Task method: its identity is its own DocId, so the grandfathered blessing does
+        // not cover it — a NEW red beside the still-grandfathered bystander (Poll).
+        const string after = """
+                             namespace App.Cancel
+                             {
+                                 using System.Threading;
+                                 using System.Threading.Tasks;
+                                 public class Api
+                                 {
+                                     public Task Poll() => Task.CompletedTask;
+                                     public Task Fetch(CancellationToken cancellationToken) => Task.CompletedTask;
+                                     public Task Purge() => Task.CompletedTask;
+                                 }
+                             }
+                             """;
+        RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index).Single();
+        regressed.Status.ShouldBe(RuleStatus.Failed);
+        regressed.Grandfathered.Count.ShouldBe(1);
+        FailedMemberIds(regressed).ShouldBe(["M:App.Cancel.Api.Purge"]);
+    }
+
     // ── closed-generic check-time backstop ────────────────────────────────────────────────────────────
 
     [Fact]
@@ -401,6 +582,28 @@ public sealed class MemberSubjectVerbTests
         violation.Kind.ShouldBe(ViolationKind.RuleError);
         violation.Detail.ShouldBe(
             "`Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
+            "Anchor on the open definition instead.");
+    }
+
+    [Fact]
+    public void MustAcceptParameter_ClosedGenericAnchor_IsRefusedAsRuleErrorAtCheckTime()
+    {
+        // Spec build refuses a closed-generic MustAcceptParameter (GRAMMAR §8 item 20); the checker carries
+        // the same refusal as a backstop — the sibling of the .Returning backstop above, resolving the anchor
+        // through the SAME definition-FQN path. A hand-built model bypasses spec-build validation to reach it:
+        // the closed construction surfaces as a RuleError, not a crash.
+        var arch = new Arch();
+        Constraint constraint = arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(IProgress<int>));
+        var model = new ArchitectureModel(
+            [new ArchRule("async/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+
+        RuleResult result = ArchChecker.Check(model, ParametersModel).Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.RuleError);
+        violation.Detail.ShouldBe(
+            "`IProgress<Int32>` is a closed generic construction; member parameter matching is definition-level. " +
             "Anchor on the open definition instead.");
     }
 

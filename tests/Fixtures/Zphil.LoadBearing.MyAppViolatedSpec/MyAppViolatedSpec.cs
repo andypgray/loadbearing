@@ -22,8 +22,12 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     deliberately-uncommitted
 ///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>, a ratcheted Migrate
 ///     catch rule (uncaptured — ReportEndpoint's blanket <c>catch (Exception)</c> is red, exercising the
-///     <c>catch</c> kind), and a strict Enforce throw rule (the Domain layer must throw only its own
-///     <c>OrderRuleViolation</c>, so OrderApproval's BCL throw is red, exercising the <c>throw</c> kind).
+///     <c>catch</c> kind), a strict Enforce throw rule (the Domain layer must throw only its own
+///     <c>OrderRuleViolation</c>, so OrderApproval's BCL throw is red, exercising the <c>throw</c> kind), and
+///     an Enforce member-subject parameter rule (the Web layer's Task-returning methods must accept a
+///     <c>CancellationToken</c>, so all three of HomeController's tokenless ones — <c>Save</c>, <c>Load</c>,
+///     and <c>SaveAsync</c> — are red, reusing the <c>memberShape</c> kind and <c>subjectMember</c> field;
+///     <c>SaveAsync</c> is green under <c>naming/async-suffix</c> but red here).
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
@@ -143,5 +147,15 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Enforce(domain.MustOnlyThrow(arch.Type<OrderRuleViolation>()))
             .Because("Domain code signals rule failures with the domain's own exception, not a generic BCL type.")
             .Fix("Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.");
+
+        // Enforce (member-shape): the Web layer's Task-returning methods must accept a CancellationToken.
+        // Enforce is a hard red (no baseline, nothing to grandfather), so all THREE tokenless Task-returning
+        // methods fail — Save (:43), Load (:48, Task<int> — the open-generic match) and SaveAsync (:53).
+        // SaveAsync is green under naming/async-suffix (it carries the suffix) but red here: the two
+        // member-subject rules are orthogonal, both keyed on the member DocId and driving the memberShape kind.
+        arch.Rule("async/accept-cancellation")
+            .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+            .Because("A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.")
+            .Fix("Add a CancellationToken parameter and flow it to the calls you await.");
     }
 }

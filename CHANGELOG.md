@@ -80,6 +80,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Framework Design Guidelines scoped catch policy as `exceptions/no-general-catch` — only
   the `BackgroundService` dispatcher may catch base `Exception` — with the
   using-standard-exception-types citation.
+- Parameter facts and the CancellationToken-presence rule: the member inventory now records
+  each method's declared parameters (name + definition-level type, reaching escape-hatch
+  predicates via `IMemberInfo.Parameters`), and the methods-only `MustAcceptParameter` verb
+  turns TAP's token guidance into closed vocabulary: "methods returning `Task` or
+  `Task<TResult>` must accept a parameter of type `CancellationToken`" — a presence rule no
+  analyzer ships (CA1068 orders a token already present; the call-site flow analyzers require
+  one in scope). Matching is definition-level and exact (`CancellationToken?` and
+  `params CancellationToken[]` are different declared types; a closed-generic anchor is
+  refused at spec build), violations are member-shape reds at declaration `file:line`,
+  ratcheted by member identity like the naming verbs. The `Meridian.Interchange` pack now
+  enforces it as `async/accept-cancellation` with the TAP citation.
 
 ## [0.1.0] - 2026-07-14
 

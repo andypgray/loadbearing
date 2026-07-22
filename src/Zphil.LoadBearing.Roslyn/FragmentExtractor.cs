@@ -179,9 +179,25 @@ internal static class FragmentExtractor
             member.IsVirtual, // false for an override or abstract member — an override is not itself "virtual"
             member is IMethodSymbol { IsAsync: true },
             returnTypeFullName,
-            memberTypeFullName);
+            memberTypeFullName,
+            ParametersOf(member));
 
         return new FragmentMember(facts, MemberDeclarationSites(member));
+    }
+
+    // The declared parameters of a member (GRAMMAR §4.6, §5.6): a method's own parameter list in declaration
+    // order, each type normalized by the same DefinitionName helper the return type uses (a constructed generic
+    // erases to its definition). The list is read off the DECLARED symbol, so an extension method's `this`
+    // parameter is included and a default-valued parameter counts; ref/in/out leave the recorded type alone,
+    // a `params T[]` records the array type, and a `T?` records System.Nullable<T>'s definition form. A
+    // property/field/event carries no parameters, so it yields the empty list.
+    private static IReadOnlyList<ParameterFacts> ParametersOf(ISymbol member)
+    {
+        if (member is not IMethodSymbol method) return [];
+
+        return method.Parameters
+            .Select(parameter => new ParameterFacts(parameter.Name, DefinitionName(parameter.Type)))
+            .ToList();
     }
 
     // Exactly one of the two names is non-null: a method carries its return type (System.Void for void), a

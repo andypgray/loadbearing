@@ -122,6 +122,7 @@ internal static class SpecValidator
         CheckForeign(RuleSelections(rule), rule.Id, arch, rule.Location, errors);
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
+        CheckMemberAcceptParameter(rule, errors);
         CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
         CheckLifetimes(rule, errors);
     }
@@ -259,6 +260,21 @@ internal static class SpecValidator
                         errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
                             $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
                             $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
+    }
+
+    // GRAMMAR §8 item 20: a MustAcceptParameter anchor is definition-level, so a closed-generic anchor
+    // (typeof(IProgress<int>)) is refused with guidance to the open definition (typeof(IProgress<>)) — the
+    // sibling of the item-14 .Returning refusal, with the verb named in the steer. A non-generic or
+    // open-generic anchor is accepted; only MemberMustAcceptParameterConstraint carries the ParameterType. The
+    // anchor is the consuming rule's statement, so it renders at the rule's location.
+    private static void CheckMemberAcceptParameter(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MemberMustAcceptParameterConstraint accept) return;
+
+        if (Generics.IsConstructed(accept.ParameterType))
+            errors.Add(new SpecValidationError(Code.MemberAcceptParameterClosedGeneric, rule.Id,
+                $"'{SafeFullDisplay(accept.ParameterType)}' is a closed generic; MustAcceptParameter matches definition-level — " +
+                $"use typeof({TypeofForm(Generics.Definition(accept.ParameterType))}) (used by '{rule.Id}').", rule.Location));
     }
 
     // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.

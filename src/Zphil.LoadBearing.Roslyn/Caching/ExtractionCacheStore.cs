@@ -130,13 +130,14 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v7 adds catch edges (a FragmentCatchEdge list) and throw edges (a FragmentThrowEdge list) to each
-    // fragment (GRAMMAR §4.8); a v6 cache.json has neither channel, so it degrades to a clean Miss and is
-    // rebuilt — the cache is disposable derived data, never a loud error. (v6 added constructor-injection edges
-    // and container-registration facts; v5 added construction-use edges; v4 aligned CaptureFingerprint's
-    // cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3 added the member
-    // inventory; v2 added member-use edges over v1's type-only fragments — every prior version likewise misses.)
-    private const int CurrentSchemaVersion = 7;
+    // v8 adds parameter facts to the member inventory (a ParameterFacts list per method member, GRAMMAR
+    // §4.6/§5.6); a v7 cache.json carries no parameter data, so it degrades to a clean Miss and is rebuilt —
+    // the cache is disposable derived data, never a loud error. (v7 added catch edges and throw edges; v6 added
+    // constructor-injection edges and container-registration facts; v5 added construction-use edges; v4 aligned
+    // CaptureFingerprint's cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3
+    // added the member inventory; v2 added member-use edges over v1's type-only fragments — every prior version
+    // likewise misses.)
+    private const int CurrentSchemaVersion = 8;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as

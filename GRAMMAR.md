@@ -115,6 +115,7 @@ MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatc
                → the SAME concrete member-selection type; member modal verbs → Constraint (terminal)
 MethodSelection — a MemberSelection minted by .Methods that additionally offers
                .Returning(Type first, params Type[] more) → MethodSelection (§4.6)
+               and .MustAcceptParameter(Type) → Constraint (terminal; §5.7)
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
 IEnforceRule — .Because / .Fix
 IMigrateRule — .Because / .Fix / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
@@ -147,10 +148,10 @@ Structural consequences, all deliberate:
   (a `.WithSuffix` call binds to the type-side or member-side vocabulary purely by receiver
   type). Member adjectives are generic self-type extensions, so a chain preserves its concrete
   type: `.Methods.Returning(...).WithSuffix(...)` is still a `MethodSelection`, and
-  `.Returning` stays reachable in any adjective order. Because `.Returning` lives only on
-  `MethodSelection` (the `.Methods` projection's type), calling it off `.Properties` / `.Fields`
-  / `.Events` / `.Members` is uncompilable by construction — a structural consequence, not a
-  validated one.
+  `.Returning` stays reachable in any adjective order. Because `.Returning` and
+  `MustAcceptParameter` live only on `MethodSelection` (the `.Methods` projection's type),
+  calling either off `.Properties` / `.Fields` / `.Events` / `.Members` is uncompilable by
+  construction — a structural consequence, not a validated one.
 
 ### 3.3 Dependency-verb overloads (pinned)
 
@@ -470,6 +471,25 @@ desugaring (§7) — keeps working unchanged on the type side.
   property never type-checks. There is deliberately **no `.Returning<T>()` generic twin**
   (decided against): the open-generic anchor is the main use and is inexpressible as
   a type argument, and a closed-generic type argument would only reproduce the §8 item 14 refusal.
+- **Parameter facts.** Extraction inventories, per declared *method*, its parameters in
+  declaration order — each `(Name, TypeFullName)` with the type definition-normalized exactly
+  like the return type (§5.6); properties, fields, and events carry an empty list (accessors,
+  constructors, operators, and indexers are already outside the inventory).
+  `MustAcceptParameter` (§5.7) evaluates against these facts: a subject method passes iff any
+  declared parameter's type matches the anchor's definition FQN — a non-generic anchor
+  exactly, an open-generic anchor on any construction, the `.Returning` matching discipline
+  verbatim. Declaration semantics, pinned in the extraction matrix: a default-valued
+  parameter counts (`CancellationToken cancellationToken = default` — the most common
+  compliant signature); the extension-method `this` parameter is included (the declared
+  static method's list, never the reduced form); `ref`/`in`/`out` do not change the recorded
+  type; `params CancellationToken[]` is the array type and does not match a
+  `CancellationToken` anchor; `CancellationToken?` is `Nullable<>`'s definition and does not
+  match either — the definition-level-exact honesty boundary `.Returning` and `MustNotCatch`
+  already carry, deliberately not widened; a type-parameter-typed parameter records its
+  declared name (`T`) — the same rendering that pins `Echo<T>(T value)`'s return type — so it
+  never matches a `typeof` anchor; a record's positional list surfaces as the generated
+  property, never as parameter facts (the primary constructor is outside the inventory);
+  partial-method parameters are read once and ride the partial-union merge.
 - **Declaration-semantics flags are pinned to C#, not IL.** `IsVirtual` is true for a member
   declared `virtual` and false for an `override` or `abstract` one (an override is not itself
   "virtual" in the authored sense); `IsAbstract` is true for an `abstract` member and for every
@@ -716,8 +736,10 @@ Member-predicate input contract (`IMemberInfo`, the input to a member `.Where`/`
 `ITypeInfo` — the type-side contract, reused so a member predicate can reach its declaring
 type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsAsync`,
 `ReturnTypeFullName` (methods; `System.Void` for a void method; null otherwise),
-`MemberTypeFullName` (the property/field/event type; null for methods), and `FilePaths`
-(declaration file paths). The flags carry the same C# declaration semantics as the member axis
+`MemberTypeFullName` (the property/field/event type; null for methods), `Parameters` (the
+declared parameters in declaration order — each an `IParameterInfo` of `Name` and
+`TypeFullName`, the type definition-normalized exactly like `ReturnTypeFullName`; empty for
+properties, fields, and events), and `FilePaths` (declaration file paths). The flags carry the same C# declaration semantics as the member axis
 (§4.6): an `override` member is not `IsVirtual`, an interface member is `IsAbstract`. The
 contract grows additively, exactly like `ITypeInfo`.
 
@@ -742,7 +764,7 @@ prose).
 | Combinator | Fragment (subject head) |
 |---|---|
 | `.Members` | "members of {ref}" |
-| `.Methods` | "methods of {ref}" — the selection is a `MethodSelection`, so `.Returning` is available |
+| `.Methods` | "methods of {ref}" — the selection is a `MethodSelection`, so `.Returning` and `MustAcceptParameter` are available |
 | `.Properties` | "properties of {ref}" |
 | `.Fields` | "fields of {ref}" |
 | `.Events` | "events of {ref}" |
@@ -770,6 +792,7 @@ prose).
 | `.MustBeStatic()` | "must be static" |
 | `.MustBeAbstract()` | "must be abstract" |
 | `.MustBeVirtual()` | "must be virtual" — member-only vocabulary (no type-side twin, deliberate) |
+| `.MustAcceptParameter(typeof(CancellationToken))` | "must accept a parameter of type `CancellationToken`" — methods-only (it lives on `MethodSelection`, like `.Returning`, §3.2); single-`Type` arity; matching is definition-level (§4.6): a non-generic anchor matches exactly, an open-generic anchor matches any construction and renders declared type-parameter names ("… of type `IProgress<T>`"), a closed-generic anchor is refused at spec build (§8 item 20) |
 | `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IMemberInfo, bool>` (§5.6) |
 
 The naming verbs reuse the type-side "must be named" / "must have a name matching" strings
@@ -777,6 +800,14 @@ verbatim; `MustBePrivate` and `MustBeVirtual` are new member-only vocabulary. Th
 vocabulary shipped complete per the admission rule (§10): reification, pinned fragments, and
 the checker semantics (member inventory, the shape/naming evaluators, the ratchet) landed
 together.
+
+`MustAcceptParameter` is the first methods-only modal verb — receiver-typed to
+`MethodSelection` exactly like `.Returning`, so a parameter constraint on a property, field,
+or event never type-checks. Its fragment is deliberately "a parameter of type `X`",
+article-safe for arbitrary type names ("a/an `X` parameter" garden-paths on `a Order` /
+`an IHandler`). It consumes the `Parameters` facts of §5.6 and evaluates as a member-shape
+constraint (§4.6): a subject method passes iff any declared parameter's `TypeFullName`
+matches the anchor's definition FQN.
 
 ## 6. Sentence assembly
 
@@ -922,6 +953,13 @@ together.
     defined ones ("`(Lifetime)7` is not a defined `Lifetime` — use `Lifetime.Singleton`,
     `Lifetime.Scoped`, or `Lifetime.Transient`") and reports in the same all-at-once pass
     (`SpecValidationErrorCode.UndefinedLifetime`).
+20. Closed-generic `MustAcceptParameter` anchor (§5.7): a
+    `.MustAcceptParameter(typeof(IProgress<int>))` is refused because parameter-type matching
+    is definition-level — the error names the closed construction and the open definition to
+    use ("`System.IProgress<System.Int32>` is a closed generic; `MustAcceptParameter` matches
+    definition-level — use `typeof(IProgress<>)`"). A non-generic anchor
+    (`typeof(CancellationToken)`) and an open-generic anchor (`typeof(IProgress<>)`) are both
+    accepted. The checker carries a matching backstop (§4.6).
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -931,8 +969,8 @@ Enforced at compile time instead (no catalog entry): zero-target dependency verb
 zero-member `MustNotUse`, and zero-glob layers (`(first, more)` signatures); missing
 escape-hatch descriptions (required parameters); trailers before postures (absent from stage
 types); adjectives or modal verbs on a `Member` (a leaf outside the selection hierarchy,
-§3.2); `.Returning` off any projection but `.Methods` (it lives only on `MethodSelection`,
-§3.2, §4.6). Several member-anchor-expression mistakes are refused by the C# compiler outright,
+§3.2); `.Returning` and `MustAcceptParameter` off any projection but `.Methods` (they live
+only on `MethodSelection`, §3.2, §4.6, §5.7). Several member-anchor-expression mistakes are refused by the C# compiler outright,
 so they never reach item 18: an event anchor (CS0070), an inaccessible member (CS0122), a
 `ref`-returning member (CS8153), a `ref struct` receiver (CS8640), and a static member reached
 through an instance expression (CS0176). A method-group body is the one that compiles (with
@@ -1001,6 +1039,9 @@ agent fixing a spec sees every problem in one pass.
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule).
   **Trailers**: conjunctions (`Because`) / nouns (`Fix`).
 - `(first, params more)` signatures wherever an empty list would be meaningless.
+  `MustAcceptParameter` is deliberately single-`Type`: over several parameter anchors one
+  sentence cannot say whether ALL are required or ANY suffices, so a second required
+  parameter type is a second rule.
 - Named arguments are the documentation convention for prose parameters (`from:`, `to:`,
   `description:`).
 - **Admission rule**: a new vocabulary member ships with model node + fragment(s) + pinned
@@ -1026,6 +1067,16 @@ project cannot reference); indexer/operator bans (the syntax-walk boundary moves
 deliberately, §4.5); and subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`, …)
 — the member constraint-side verbs and the `IMemberInfo` flags shipped (§5.7, §5.6), only the
 adjective position remains, exactly mirroring the type-side gap below.
+
+On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
+twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`
+negative twin; multi-`Type` arity (refused in v1 — one sentence cannot say whether ALL anchors
+are required or ANY suffices, §10); richer `IParameterInfo` facts (ref kind, optionality,
+default values, `params`, ordinal position); hierarchy- or assignability-aware parameter
+matching (the exception-axis bar applies: an explicitly named new semantic, never a widening of
+definition-level-exact); accessibility-scoped member subjects (`.Methods.ThatArePublic()` — the
+canon's literal "public surface" scope; the escape hatch reaches `Accessibility` today); and
+`graph` parameter data.
 
 On the injection axis (§4.7): the `MustOnlyInject` / `MustNotBeInjectedBy` twins; property- and
 method-injection edges (constructor parameters are the recorded form); recognition growth beyond

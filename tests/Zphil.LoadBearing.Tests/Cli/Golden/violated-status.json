@@ -148,12 +148,19 @@
       "status": "failed",
       "violations": 1,
       "warnings": 0
+    },
+    {
+      "id": "async/accept-cancellation",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 13,
+    "rulesChecked": 14,
     "rulesPassed": 2,
-    "rulesFailed": 10,
+    "rulesFailed": 11,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

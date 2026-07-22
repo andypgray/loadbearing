@@ -87,8 +87,16 @@ internal static class ModelDump
             .Append(" async=").Append(member.IsAsync).AppendLine();
         builder.Append("  returnType=").Append(member.ReturnTypeFullName ?? "<null>")
             .Append(" memberType=").Append(member.MemberTypeFullName ?? "<null>").AppendLine();
+        builder.Append("  parameters=[").Append(RenderParameters(member.Parameters)).AppendLine("]");
         builder.Append("  declSites=[").Append(RenderSites(member.DeclarationSites)).AppendLine("]");
         builder.Append("  filePaths=[").Append(string.Join(", ", member.FilePaths)).AppendLine("]");
+    }
+
+    // Each declared parameter as name:type (the same colon convention a SourceLocation's file:line uses), in
+    // declaration order; an empty parameter list renders as [] like the other empty collections in the dump.
+    private static string RenderParameters(IReadOnlyList<IParameterInfo> parameters)
+    {
+        return string.Join(", ", parameters.Select(p => $"{p.Name}:{p.TypeFullName}"));
     }
 
     private static void RenderType(StringBuilder builder, TypeNode type)

@@ -49,6 +49,7 @@ public sealed class ExplainCommandTests
         // The post-desugar ID set includes the frozen scope's containment + tripwire children (GRAMMAR §7).
         Normalize(result.Err).ShouldContain(
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
+            "  async/accept-cancellation\n" +
             "  data-access/no-inline-sql\n" +
             "  di/handlers-via-registry\n" +
             "  di/no-captive-dependencies\n" +
