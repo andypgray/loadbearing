@@ -157,8 +157,11 @@ internal static class FragmentExtractor
     // The ratified exclusion filter (GRAMMAR §4.6): drop every compiler-generated/implicitly-declared member
     // (auto-property and field-like-event backing fields, the record equality/clone/deconstruct surface),
     // every non-Ordinary method (which is exactly accessors, constructors incl. static, operators,
-    // conversions, finalizers, and explicit interface implementations), indexers, and anything that is
-    // not a method/property/field/event.
+    // conversions, finalizers, and explicit interface METHOD implementations), indexers, and anything that
+    // is not a method/property/field/event. Explicit interface implementations are excluded uniformly across
+    // all three member kinds: a METHOD impl falls out via the non-Ordinary MethodKind screen, a PROPERTY or
+    // EVENT impl via its non-empty ExplicitInterfaceImplementations. An explicit impl is interface plumbing
+    // (Private, its name fixed by the interface), never authored surface — so no member subject ever sees one.
     private static bool IsInventoried(ISymbol member)
     {
         if (member.IsImplicitlyDeclared) return false;
@@ -166,9 +169,9 @@ internal static class FragmentExtractor
         return member switch
         {
             IMethodSymbol method => method.MethodKind == MethodKind.Ordinary,
-            IPropertySymbol property => !property.IsIndexer,
+            IPropertySymbol { IsIndexer: false, ExplicitInterfaceImplementations.IsEmpty: true } => true,
             IFieldSymbol => true,
-            IEventSymbol => true,
+            IEventSymbol { ExplicitInterfaceImplementations.IsEmpty: true } => true,
             _ => false
         };
     }
@@ -306,8 +309,9 @@ internal static class FragmentExtractor
     // The signature-position types one inventoried member contributes as exposure edges (GRAMMAR §4.9): a
     // method's return type (System.Void skipped — a void return names nothing) and each parameter type; a
     // property/field/event's own type. Only members IsInventoried admits reach here (Ordinary methods,
-    // non-indexer properties, fields, events), so constructors, accessors, operators, and the delegate Invoke
-    // never contribute. Each yielded type is decomposed definition-level by DecomposeType, exactly like a
+    // non-indexer properties, fields, events — never an explicit interface impl of any kind), so constructors,
+    // accessors, operators, and the delegate Invoke never contribute. Each yielded type is decomposed
+    // definition-level by DecomposeType, exactly like a
     // constructor-parameter type on the injection axis.
     private static IEnumerable<ITypeSymbol> SignatureTypesOf(ISymbol member)
     {
@@ -332,8 +336,11 @@ internal static class FragmentExtractor
 
     // Effective visibility (GRAMMAR §4.9): the member is public AND every containing type up the chain is
     // public. A public member nested in an internal type is not surface, so it mints nothing — the honesty
-    // boundary (an internal member is not part of the type's external contract). Explicit interface
-    // implementations report Private accessibility, so this gate excludes them without a special case.
+    // boundary (an internal member is not part of the type's external contract). No explicit interface
+    // implementation ever reaches this gate: IsInventoried (§4.6) drops all three kinds before the exposure
+    // pass runs — a METHOD impl via the non-Ordinary MethodKind screen, a PROPERTY or EVENT impl via its
+    // non-empty ExplicitInterfaceImplementations. So the inventory filter, not this gate, is what keeps
+    // explicit impls (Private plumbing) out of the exposure graph.
     private static bool IsEffectivelyPublicMember(ISymbol member)
     {
         if (member.DeclaredAccessibility != RoslynAccessibility.Public) return false;

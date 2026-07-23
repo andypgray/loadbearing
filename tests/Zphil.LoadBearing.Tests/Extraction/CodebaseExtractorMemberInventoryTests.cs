@@ -9,10 +9,12 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     member-subject analog of <see cref="CodebaseExtractorMemberEdgeTests" />. Each row asserts the
 ///     included <c>SymbolId</c> set and/or a member's facts: kind, return/member type (definition-level),
 ///     the C#-declaration-semantics flags, accessibility, and declaration sites. The ratified exclusions
-///     (accessors, constructors incl. static, operators/conversions, finalizers, indexers, and every
-///     compiler-generated/implicitly-declared member) are pinned by their absence; enum and delegate types
-///     contribute nothing; the positional-record row is pinned <b>empirically</b>. Member sets are ordered
-///     ordinal by SymbolId. Pinned strings are the spec — moving one is a deliberate act.
+///     (accessors, constructors incl. static, operators/conversions, finalizers, explicit interface
+///     implementations of <em>every</em> kind — method via the <c>MethodKind</c> screen, property/event via
+///     <c>ExplicitInterfaceImplementations</c> — indexers, and every compiler-generated/implicitly-declared
+///     member) are pinned by their absence; enum and delegate types contribute nothing; the
+///     positional-record row is pinned <b>empirically</b>.
+///     Member sets are ordered ordinal by SymbolId. Pinned strings are the spec — moving one is a deliberate act.
 /// </summary>
 public sealed class CodebaseExtractorMemberInventoryTests
 {
@@ -120,6 +122,52 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // Only the Ordinary method survives — ctor, static ctor, finalizer, operator, conversion, and indexer
         // are all excluded (the ratified §4.6 list).
         model.Type("N.C").MemberIds().ShouldBe(["M:N.C.Ordinary"]);
+    }
+
+    [Fact]
+    public void Inventory_ExplicitInterfaceMethodImplementation_IsExcluded()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface IFoo { void Bar(); }
+                                                         public class C : IFoo
+                                                         {
+                                                             void IFoo.Bar() {}
+                                                             public void Ordinary() {}
+                                                         }
+                                                         """);
+
+        // An explicit interface METHOD implementation is a non-Ordinary method (its MethodKind is
+        // ExplicitInterfaceImplementation), so the §4.6 kind filter drops it before it can enter the
+        // inventory — only the ordinary method survives. It therefore never becomes a member subject, and
+        // MustAcceptParameter (§5.7) never reads its parameters: it is absent from the inventory both consult.
+        model.Type("N.C").MemberIds().ShouldBe(["M:N.C.Ordinary"]);
+    }
+
+    [Fact]
+    public void Inventory_ExplicitInterfacePropertyAndEventImplementations_AreExcluded()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface IFoo
+                                                         {
+                                                             int P { get; set; }
+                                                             event System.Action E;
+                                                         }
+                                                         public class C : IFoo
+                                                         {
+                                                             public int Q { get; set; }
+                                                             int IFoo.P { get; set; }
+                                                             event System.Action IFoo.E { add {} remove {} }
+                                                         }
+                                                         """);
+
+        // RATIFIED (GRAMMAR §4.6): explicit interface implementations are excluded from the inventory
+        // uniformly across all three member kinds — a METHOD impl via the non-Ordinary MethodKind screen, a
+        // PROPERTY or EVENT impl via its non-empty ExplicitInterfaceImplementations. An explicit impl is
+        // interface plumbing (Private, name fixed by the interface), never authored surface: no member subject
+        // sees one and MustAcceptParameter (§5.7) never reads one. Only the ordinary property Q survives.
+        model.Type("N.C").MemberIds().ShouldBe(["P:N.C.Q"]);
     }
 
     [Fact]

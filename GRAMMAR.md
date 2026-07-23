@@ -454,7 +454,15 @@ desugaring (§7) — keeps working unchanged on the type side.
   declared type, its declared methods, properties, fields, and events. **Excluded** (ratified):
   property/event accessors (they fold into the property/event, matching the §4.5 member-use
   normalization), constructors including static constructors, operators and conversions,
-  finalizers, indexers, and any compiler-generated or implicitly-declared member. **Enum and
+  finalizers, **explicit interface implementations of every kind** — method (`void IFoo.Bar()`),
+  property (`int IFoo.P`), and event (`event Action IFoo.E`) alike — indexers, and any
+  compiler-generated or implicitly-declared member. An explicit interface implementation is
+  interface plumbing, not authored surface: its accessibility is `Private` and its name is fixed
+  by the interface, so a naming or shape verb could never sensibly apply. The *method* impl is
+  dropped by the non-`Ordinary` `MethodKind` screen, the *property* and *event* impls by their
+  non-empty `ExplicitInterfaceImplementations`. A member subject and `MustAcceptParameter` (§5.7)
+  therefore never see an explicit implementation of any kind, and none mints an exposure edge
+  (§4.9 gates on public — moot now that they carry no inventory). **Enum and
   delegate types contribute no inventory** — an enum's fields are its values (an enum-value read
   stays a recorded field *use*, §4.5, untouched by this section) and a delegate's `Invoke`/
   `BeginInvoke` are runtime plumbing, not authored surface. **External (metadata) types carry no
