@@ -15,9 +15,11 @@ namespace Zphil.LoadBearing.Cli;
 ///     a rule that "passes" only because a project did not load is worse than no answer. The gate keys
 ///     strictly on the workspace-load diagnostics (<see cref="CodebaseSource.Diagnostics" />); the advisory
 ///     merge notes (<see cref="CodebaseSource.MergeNotes" />) render into the same diagnostics stream
-///     but never gate. Expected failures surface as <see cref="UserErrorException" />; the top-level handler
-///     maps them to exit 2. Output/error writers are injected so the in-process e2e tests can capture them,
-///     and the <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     but never gate. NuGetAudit advisories (NU19xx) also ride that stream but are carved out of the gate
+///     the same way — external advisory-publication timing must not flip a deterministic verdict
+///     (<see cref="NuGetAuditDiagnostics" />). Expected failures surface as <see cref="UserErrorException" />;
+///     the top-level handler maps them to exit 2. Output/error writers are injected so the in-process e2e
+///     tests can capture them, and the <see cref="IEnvironment" /> seam supplies the cache-root override.
 /// </summary>
 internal sealed class CheckRunner(
     TextWriter output,
@@ -57,10 +59,14 @@ internal sealed class CheckRunner(
         IReadOnlyList<string> renderedDiagnostics = [.. source.Diagnostics, .. source.MergeNotes];
 
         // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
-        // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Keyed strictly
-        // on the workspace-load diagnostics — never on the advisory merge notes, which must not trip this
-        // gate. Hoisted above Render so the SARIF renderer stamps the same verdict the gate below returns.
-        bool executionSuccessful = !(source.Diagnostics.Count > 0 && !request.AllowWorkspaceDiagnostics);
+        // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Merge notes
+        // never reach this gate by construction (they ride source.MergeNotes); NuGetAudit advisories (NU19xx)
+        // do land in source.Diagnostics, so they are filtered out here — external advisory-publication timing
+        // is time-varying noise that must not flip a deterministic gate, and it still renders above. Hoisted
+        // above Render so the SARIF renderer stamps the same verdict the gate below returns.
+        IReadOnlyList<string> gatingDiagnostics =
+            [.. source.Diagnostics.Where(d => !NuGetAuditDiagnostics.IsAudit(d))];
+        bool executionSuccessful = !(gatingDiagnostics.Count > 0 && !request.AllowWorkspaceDiagnostics);
 
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),

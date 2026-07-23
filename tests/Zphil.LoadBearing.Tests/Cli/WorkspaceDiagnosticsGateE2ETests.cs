@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The workspace-diagnostics contract on <c>check</c>. Two halves, both against the real MyApp
+///     The workspace-diagnostics contract on <c>check</c>. Three parts, all against the real MyApp
 ///     fixture (each opens a workspace, hence <c>Serial</c>):
 ///     <list type="bullet">
 ///         <item>
@@ -26,12 +26,26 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             stream — <c>warning:</c> on stderr, the <c>workspaceDiagnostics</c> array in JSON — while the
 ///             exit stays 0: the advisory notes are kept out of the fail-closed gate by construction.
 ///         </item>
+///         <item>
+///             <b>NuGetAudit advisories never gate.</b> An injected NU19xx advisory — external publication
+///             timing, not a broken model — renders on the same stream (the <c>warning:</c> line, the
+///             <c>workspaceDiagnostics</c> array, a SARIF notification) while the exit stays 0/1:
+///             <see cref="NuGetAuditDiagnostics" /> carves the family out of the gate input, yet a genuine
+///             load failure riding alongside it still fails closed.
+///         </item>
 ///     </list>
 /// </summary>
 [Collection("Serial")]
 public sealed class WorkspaceDiagnosticsGateE2ETests
 {
     private const string LoadDiagnostic = "Project 'MyApp.Broken' failed to load: simulated workspace-load failure.";
+
+    // A synthetic NuGetAudit advisory in the shape MSBuildWorkspace re-raises: code, package + version,
+    // severity, GHSA URL. Modelled on the real System.Security.Cryptography.Xml incident; the GHSA slug is
+    // invented. The word-bounded NU1903 token is what NuGetAuditDiagnostics.IsAudit keys on.
+    private const string AuditDiagnostic =
+        "NU1903: Package 'System.Security.Cryptography.Xml' 4.7.0 has a known high severity vulnerability, "
+        + "https://github.com/advisories/GHSA-7h4f-3q2m-9xrv";
 
     private const string GateLine =
         "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
@@ -146,15 +160,93 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Out.ShouldNotContain("error: the model is incomplete");
     }
 
+    // ── NuGetAudit advisories render but never gate ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Check_NuGetAuditDiagnostic_NoFlag_RendersWarningWithoutTrippingGate()
+    {
+        // A NuGetAudit advisory is external-timing noise, not a broken model — the clean spec still exits 0.
+        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false);
+
+        result.Exit.ShouldBe(0);
+        result.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory still renders as a warning
+        result.Err.ShouldNotContain("error: the model is incomplete"); // but the gate never fired
+    }
+
+    [Fact]
+    public async Task Check_NuGetAuditDiagnostic_ViolatedSpecNoFlag_ExitsOneAndDoesNotGate()
+    {
+        // Filtering the advisory out of the gate must not mask a real violation — the violated spec exits 1.
+        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.ViolatedSpecDll, false, false);
+
+        result.Exit.ShouldBe(1);
+        result.Err.ShouldNotContain("error: the model is incomplete"); // the fail-closed gate did NOT fire
+    }
+
+    [Fact]
+    public async Task Check_NuGetAuditPlusLoadFailure_NoFlag_StillFailsClosed()
+    {
+        // An advisory riding alongside a genuine load failure: the load failure still gates, and both render.
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [AuditDiagnostic, LoadDiagnostic], CliRunner.CleanSpecDll, false, false);
+
+        result.Exit.ShouldBe(2);
+        result.Err.ShouldContain(GateLine);
+        result.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory renders
+        result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and so does the load failure — no over-filtering
+    }
+
+    [Fact]
+    public async Task Check_NuGetAuditDiagnosticJson_NoFlag_ExitsCleanWithAdvisoryInWorkspaceDiagnostics()
+    {
+        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true);
+
+        result.Exit.ShouldBe(0);
+        // stdout stays pure JSON: the advisory rides the workspaceDiagnostics array and no gate line leaks.
+        result.Out.Trim().ShouldStartWith("{");
+        result.Out.ShouldContain("\"workspaceDiagnostics\"");
+        result.Out.ShouldContain(AuditDiagnostic);
+        result.Out.ShouldNotContain("error: the model is incomplete");
+        result.Err.ShouldNotContain("error: the model is incomplete"); // no gate line anywhere
+    }
+
+    [Fact]
+    public async Task Check_NuGetAuditDiagnosticSarif_RecordsExecutionSuccessful()
+    {
+        // SARIF records a successful invocation: the advisory rides as a tool-execution notification but,
+        // filtered out of the gate, it does not flip executionSuccessful — the run exits 0.
+        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
+        try
+        {
+            CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false, sarifPath);
+
+            result.Exit.ShouldBe(0);
+            string sarif = File.ReadAllText(sarifPath);
+            sarif.ShouldContain("\"executionSuccessful\": true");
+            sarif.ShouldContain("\"toolExecutionNotifications\"");
+            sarif.ShouldContain(AuditDiagnostic);
+        }
+        finally
+        {
+            File.Delete(sarifPath);
+        }
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
+    private static Task<CliResult> RunWithInjectedDiagnosticAsync(
         string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
+    {
+        return RunWithInjectedDiagnosticAsync([LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif);
+    }
+
+    private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
+        IReadOnlyList<string> diagnostics, string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         string solution = CliRunner.MyAppSolution;
-        var runner = new CheckRunner(output, error, new DiagnosticInjectingSolutionSource([LoadDiagnostic]), new FakeEnvironment());
+        var runner = new CheckRunner(output, error, new DiagnosticInjectingSolutionSource(diagnostics), new FakeEnvironment());
 
         int exit = await runner.RunAsync(
             new CheckRequest(

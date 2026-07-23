@@ -16,7 +16,8 @@ namespace Zphil.LoadBearing.Cli;
 ///     any workspace-load failure diagnostic fails the run with exit 2, overriding the 0/1 verdict, because
 ///     a rule that "passes" only because a project did not load is worse than no answer. <c>true</c> opts
 ///     back into the prior behavior — the diagnostics print as warnings and the run exits 0/1. Keys strictly
-///     on workspace-load failures, never on the advisory merge notes that share the diagnostics stream.
+///     on workspace-load failures, never on the advisory merge notes or NuGetAudit advisories (NU19xx)
+///     that share the diagnostics stream.
 /// </param>
 /// <param name="Sarif">
 ///     The <c>--sarif</c> path to write a SARIF 2.1.0 report to — a third renderer over the same result
