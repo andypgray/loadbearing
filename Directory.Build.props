@@ -8,7 +8,7 @@
          knobs, symbol packages) is identical across the four, so it lives here rather than being
          copy-pasted into each csproj. -->
     <PropertyGroup>
-        <Version>0.1.0</Version>
+        <Version>0.2.0</Version>
         <Authors>Andrew Gray</Authors>
         <Copyright>Copyright (c) 2026 Andrew Gray</Copyright>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-23
+
+Pre-alpha. The verb vocabulary grows past dependency bans — member access, construction, DI
+lifetimes, exceptions, parameters, hierarchy/attribute negatives, and signature exposure — and
+checks now run build-free from caches, with SARIF as a third render target.
+
 ### Added
 
 - Warm MCP server: the workspace loads on the first tool call, then is held warm and
@@ -115,6 +121,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Meridian.Interchange` pack now enforces it as `contracts/no-entity-exposure` with the
   DDD/CQRS citation.
 
+### Changed
+
+- The member inventory excludes explicit interface implementations of every kind: property and
+  event implementations now join the method implementations the kind screen always dropped. An
+  explicit implementation is interface plumbing (`Private` accessibility, a name fixed by the
+  interface), so member subjects, the member-shape verbs, and `MustAcceptParameter` never see
+  one, and none mints an exposure edge.
+
+### Fixed
+
+- `check` no longer fails closed on NuGet audit advisories: the NU19xx family (advisory
+  re-raises and the audit-fetch failure) is filtered out of the workspace-diagnostics gate
+  input, because advisory publication timing is an external input that must not flip a
+  deterministic verdict. The advisories still render everywhere they did — the stderr
+  warnings, the JSON `workspaceDiagnostics` array, and SARIF tool-execution notifications.
+- Colliding simple names widen in every multi-operand list: the negative hierarchy/attribute
+  anchor lists (`MustNotImplement` / `MustNotDeriveFrom` / `MustNotBeAttributedWith`) now
+  qualify colliding anchors with the minimal distinguishing trailing namespace segments,
+  exactly as the dependency target lists already did, with the attribute form qualifying
+  inside the brackets (`[Billing.Audit]` or `[Sales.Audit]`).
+
 ## [0.1.0] - 2026-07-14
 
 Initial public release, pre-alpha. One fluent C# architecture spec, two render targets:
@@ -136,5 +163,6 @@ deterministic enforcement and generated AI-agent context.
 - xUnit adapter (`Zphil.LoadBearing.Xunit`): every rule in the spec as an individually named
   xUnit test, failure text identical to the CLI.
 
-[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/andypgray/loadbearing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/andypgray/loadbearing/releases/tag/v0.1.0
