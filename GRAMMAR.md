@@ -641,9 +641,14 @@ consumes it.
 - **An exposure edge** is `(source type, exposed type, file:line sites)`, recorded at every
   public **signature position** of an effectively-public member: a method's return type and each
   parameter type, and a property/field/event's type. The sites are the exposing members'
-  declaration lines. An exposure edge is minted **beside** the ordinary reference edge the same
-  signature type-name syntax mints (the double-mint of §4.5's explicit-`new` precedent) — one
-  site, two facts, the exposure channel never standing in for the type edge.
+  declaration lines. Where the signature **textually names** its type, the exposure edge is
+  minted **beside** the ordinary reference edge that type-name syntax mints (the double-mint of
+  §4.5's explicit-`new` precedent) — one site, two facts, the exposure channel never standing
+  in for the type edge. A signature spelling that names no type mints no twin: the wrappers
+  decomposition synthesizes from tuple and `?` syntax (nothing in `(Order, Widget)` or `int?`
+  spells `ValueTuple` or `Nullable`) and a predefined keyword like `int` (keywords mint no type
+  edge) reach the exposure channel alone — a twin-less endpoint is the designed record of a
+  signature fact the reference axis never sees, not a gap.
 - **The effective-visibility pin.** An edge is minted only from a member that is itself public
   **and** whose containing-type chain is public at every level. A `public` member nested in an
   `internal` type mints **nothing**: an internal type has no external contract, so nothing it
@@ -660,7 +665,11 @@ consumes it.
 - **Decomposition is definition-level and recursive**, exactly as a reference-edge target (§4.1)
   and an injected parameter type (§4.7): a constructed generic yields its open definition **and**
   every type argument (`Task<Order>` → `Task<>` and `Order`), an array yields its element type,
-  and a plain named type yields itself. Primitives and framework types **do** mint (factual and
+  a tuple yields the open `ValueTuple` definition **and** every element type (`(Order, Widget)`
+  → `(T1, T2)`, `Order`, `Widget` — the open tuple definition is recorded under its display form
+  `(T1, T2)`, not `System.ValueTuple<T1, T2>`), a nullable value type yields the open definition
+  **and** its argument (`int?` → `System.Nullable<T>` and `System.Int32`), and a plain named
+  type yields itself. Primitives and framework types **do** mint (factual and
   harmless — an operand selection never names them), so a `public string Name` exposes
   `System.String`; the noise stays invisible until a rule chooses to constrain it.
 - **The honesty boundary is static signatures only.** Laundering an exposed type behind `object`

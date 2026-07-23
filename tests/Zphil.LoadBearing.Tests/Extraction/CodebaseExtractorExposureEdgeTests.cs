@@ -126,12 +126,10 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.ExposureEdges("N.C").Select(e => e.Exposed.FullName).ShouldBe(
             ["(T1, T2)", "N.Order", "N.Widget"]);
 
-        // Reference-edge-twin observation (for the §4.9 doc reconciliation task — NOT touched here): the element
-        // types DO have their ordinary §4.1 reference-edge twin (their names appear verbatim in the source), but
-        // the synthesized ValueTuple wrapper `(T1, T2)` does NOT — nothing in the tuple syntax `(Order, Widget)`
-        // textually names ValueTuple, so no name-driven type edge is minted for it. The exposure channel's
-        // definition-level DecomposeType therefore yields an endpoint with no "recorded beside the type-level edge"
-        // twin, contrary to the ExposureEdge remark's blanket wording.
+        // Reference-edge twins (§4.9's textually-names split): the element types DO have their ordinary §4.1
+        // reference-edge twin (their names appear verbatim in the source), but the synthesized ValueTuple wrapper
+        // `(T1, T2)` does NOT — nothing in the tuple syntax `(Order, Widget)` textually names ValueTuple, so no
+        // name-driven type edge is minted for it and the exposure endpoint stands alone by design.
         model.HasEdge("N.C", "N.Order").ShouldBeTrue();
         model.HasEdge("N.C", "N.Widget").ShouldBeTrue();
         model.HasEdge("N.C", "(T1, T2)").ShouldBeFalse();
@@ -150,12 +148,11 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.ExposureEdges("N.C").Select(e => e.Exposed.FullName).ShouldBe(
             ["System.Int32", "System.Nullable<T>"]);
 
-        // Reference-edge-twin observation (for the §4.9 doc reconciliation task — NOT touched here): NEITHER
-        // endpoint has an ordinary §4.1 reference-edge twin — `int?` names neither System.Nullable (the wrapper is
-        // synthesized by DecomposeType) nor System.Int32 (a predefined-type keyword mints no type edge; see
-        // CodebaseExtractorEdgeTests.ExtractFromCompilations_PredefinedType_ProducesNoEdge). So both exposure
-        // endpoints here are twin-less, again contrary to the ExposureEdge remark's blanket "recorded beside"
-        // wording.
+        // Reference-edge twins (§4.9's textually-names split): NEITHER endpoint has an ordinary §4.1
+        // reference-edge twin — `int?` names neither System.Nullable (the wrapper is synthesized by DecomposeType)
+        // nor System.Int32 (a predefined-type keyword mints no type edge; see
+        // CodebaseExtractorEdgeTests.ExtractFromCompilations_PredefinedType_ProducesNoEdge). Both exposure
+        // endpoints stand alone by design.
         model.HasEdge("N.C", "System.Nullable<T>").ShouldBeFalse();
         model.HasEdge("N.C", "System.Int32").ShouldBeFalse();
     }

@@ -7,7 +7,9 @@ namespace Zphil.LoadBearing.Codebase;
 ///     chain is public at every level, so a <c>public</c> member nested in an <c>internal</c> type surfaces nothing
 ///     (the honesty boundary: an internal member is not surface). Signature types decompose definition-level like
 ///     type edges (§4.1): <c>Task&lt;Order&gt;</c> yields edges to both <c>Task&lt;&gt;</c> and <c>Order</c>, an
-///     array yields its element type, and a constructed generic yields the definition and every argument.
+///     array yields its element type, a tuple yields the open definition (recorded under its display form
+///     <c>(T1, T2)</c>, not <c>System.ValueTuple&lt;T1, T2&gt;</c>) and every element type, and <c>int?</c>
+///     yields <c>System.Nullable&lt;T&gt;</c> and <c>System.Int32</c>.
 ///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions of the exposing members (their
 ///     declaration lines), deduped by (file, line).
 /// </summary>
@@ -18,9 +20,11 @@ namespace Zphil.LoadBearing.Codebase;
 ///     endpoint. Self-exposure (a type naming itself in its own signature) is never produced — the exposure
 ///     analog of the reference-edge self-drop (§4.1), which also self-drops the enum-value-self-typing case.
 ///     Constructor parameters are the injection axis's (§4.7), not this one's, and base-type/interface lists are
-///     inheritance (§5.2), not members — neither mints an exposure edge. An exposure edge is recorded
-///     <em>beside</em> the type-level <see cref="ReferenceEdge" /> the same signature type-name syntax mints,
-///     never instead of it — one site, two facts.
+///     inheritance (§5.2), not members — neither mints an exposure edge. Where the signature textually names its
+///     type, the exposure edge is recorded <em>beside</em> the type-level <see cref="ReferenceEdge" /> that
+///     type-name syntax mints, never instead of it — one site, two facts. A spelling that names no type (tuple
+///     and <c>?</c> syntax, whose wrappers decomposition synthesizes; predefined keywords like <c>int</c>) mints
+///     no twin: the exposure edge stands alone there by design.
 /// </remarks>
 public sealed class ExposureEdge
 {
