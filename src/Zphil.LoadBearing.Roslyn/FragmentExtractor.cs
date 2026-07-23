@@ -157,7 +157,8 @@ internal static class FragmentExtractor
     // The ratified exclusion filter (GRAMMAR §4.6): drop every compiler-generated/implicitly-declared member
     // (auto-property and field-like-event backing fields, the record equality/clone/deconstruct surface),
     // every non-Ordinary method (which is exactly accessors, constructors incl. static, operators,
-    // conversions, and finalizers), indexers, and anything that is not a method/property/field/event.
+    // conversions, finalizers, and explicit interface implementations), indexers, and anything that is
+    // not a method/property/field/event.
     private static bool IsInventoried(ISymbol member)
     {
         if (member.IsImplicitlyDeclared) return false;

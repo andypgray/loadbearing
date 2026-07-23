@@ -90,7 +90,9 @@ public sealed class Arch
 
     /// <summary>
     ///     A member-access ban target — a declaring type plus a member name (GRAMMAR §4.5). A
-    ///     target-only leaf for <see cref="SelectionConstraints.MustNotUse" />, not a
+    ///     target-only leaf for
+    ///     <see cref="SelectionConstraints.MustNotUse(Selection,Zphil.LoadBearing.Member,Zphil.LoadBearing.Member[])" />, not
+    ///     a
     ///     <see cref="Selection" />; matching is by declaring type + member name, so one ban covers
     ///     every overload. Canonical call: <c>arch.Member(typeof(DateTime), nameof(DateTime.Now))</c>.
     /// </summary>
@@ -104,7 +106,8 @@ public sealed class Arch
     ///     A member-access ban target from a typed instance-member lambda whose member returns a value
     ///     (GRAMMAR §4.5): <c>arch.Member&lt;Task&lt;int&gt;&gt;(t =&gt; t.Result)</c> anchors
     ///     <c>Task&lt;T&gt;.Result</c>. Pure authoring sugar — desugars at mint to the same leaf as
-    ///     <see cref="Member(System.Type,System.String)" />, with the type↔member pairing additionally
+    ///     <see cref="Member(System.Type,System.String,System.String,System.Int32)" />, with the type↔member pairing
+    ///     additionally
     ///     compiler-checked; the anchor is the lambda's resolved member (a constructed generic normalized
     ///     to its definition), and an unresolvable lambda is reported at spec build (GRAMMAR §8).
     /// </summary>

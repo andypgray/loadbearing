@@ -80,7 +80,9 @@ trailer      :=  Because(prose) | Fix(prose)
 Modal-verb targets are selections for the dependency verbs (§3.3) and members for the
 member-access verb `MustNotUse` (§4.5). The member-modal verbs (§4.6) take no target — they
 are shape/naming assertions over the projected member set, so `member-selection` is itself the
-whole subject side of a member-shape sentence.
+whole subject side of a member-shape sentence. The one exception is the methods-only
+`.MustAcceptParameter(Type)` (§5.7), whose `Type` anchor renders on the verb side of the
+sentence.
 
 ### 3.2 Stage machine
 

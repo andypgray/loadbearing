@@ -6,9 +6,10 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     A member-access ban target (GRAMMAR §4.5) — a declaring type plus a member name, minted by
-///     <see cref="Arch.Member(System.Type,System.String)" /> (or the expression-anchor overloads
+///     <see cref="Arch.Member(System.Type,System.String,System.String,System.Int32)" /> (or the expression-anchor
+///     overloads
 ///     <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> / <c>arch.Member(() =&gt; Type.M)</c>, which desugar at
-///     mint to the same leaf) for <see cref="SelectionConstraints.MustNotUse" />. A target-only
+///     mint to the same leaf) for <see cref="SelectionConstraints.MustNotUse(Selection,Member,Member[])" />. A target-only
 ///     leaf, deliberately <em>not</em> a <see cref="Selection" />: it never enters the selection
 ///     hierarchy, so adjectives and modal verbs are uncompilable on it by construction (GRAMMAR §3.2).
 ///     Matching is by declaring type + member name, so one ban covers every overload — there is no

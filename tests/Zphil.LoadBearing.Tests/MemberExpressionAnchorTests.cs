@@ -133,7 +133,7 @@ public class MemberExpressionAnchorTests
         // Convert on the receiver is peeled to find the parameter, but the tree's resolved method is
         // IAnchorReadable.Read). The (IAnchorReadable) cast is load-bearing: it moves the statically-resolved
         // method the expression tree records from the concrete AnchorReadable.Read to the interface, so it
-        // must survive ReSharper's redundant-cast strip (redundant for runtime dispatch, not for this).
+        // must survive redundant-cast cleanup (redundant for runtime dispatch, not for this).
         // ReSharper disable once RedundantCast
         Member member = new Arch().Member<AnchorReadable>(r => ((IAnchorReadable)r).Read());
 
@@ -197,7 +197,7 @@ public class MemberExpressionAnchorTests
         // An as-cast receiver is identity-preserving like the interface Convert: peeled to find the
         // parameter, but the tree's resolved method is IAnchorReadable.Read. The (r as IAnchorReadable)
         // cast is load-bearing — it moves the statically-resolved method to the interface — so it must
-        // survive ReSharper's cast strip; the `!` guards the IAnchorReadable? receiver (CS8602).
+        // survive redundant-cast cleanup; the `!` guards the IAnchorReadable? receiver (CS8602).
         // ReSharper disable once RedundantCast
         // ReSharper disable once RedundantSuppressNullableWarningExpression
         Member member = new Arch().Member<AnchorReadable>(r => (r as IAnchorReadable)!.Read());
@@ -213,7 +213,7 @@ public class MemberExpressionAnchorTests
         // An extension called in the static form `() => Ext.M(arg)` anchors the declaring static class like
         // any other static call — the reduced-form receiver redirect is gated on the instance form only. The
         // explicit static spelling is deliberate (it is the mirror of the reduced form below), so it must
-        // survive ReSharper's reduce-to-extension-call cleanup.
+        // survive reduce-to-extension-call cleanup.
         // ReSharper disable once InvokeAsExtensionMember
         Member member = new Arch().Member(() => AnchorWidgetExtensions.Doubled(new AnchorWidget()));
 

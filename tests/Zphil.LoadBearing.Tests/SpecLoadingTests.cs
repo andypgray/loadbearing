@@ -35,7 +35,7 @@ public class SpecLoadingTests
         }
         finally
         {
-            // Best-effort unload; the phase does not gate on GC timing.
+            // Best-effort unload; nothing gates on GC timing.
             context.Unload();
         }
     }

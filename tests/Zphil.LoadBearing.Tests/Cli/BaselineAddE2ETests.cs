@@ -13,7 +13,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     diff while same-rule and other-rule bystanders stay red; a Freeze-containment <c>--add</c>
 ///     grandfathers a new inbound edge and turns the rule green; a present entry only has its attribution
 ///     updated; the attribution survives an <c>--init</c>/<c>--accept-reductions</c> round-trip
-///     byte-for-byte; the four refusals exit 2 with their pinned messages; and — the point of the phase —
+///     byte-for-byte; the four refusals exit 2 with their pinned messages; and — by design —
 ///     no <c>check</c>/<c>status</c> violation output or hint ever names <c>--add</c>. Each fact batches its
 ///     assertions to keep the expensive CLI/workspace runs to a minimum.
 /// </summary>

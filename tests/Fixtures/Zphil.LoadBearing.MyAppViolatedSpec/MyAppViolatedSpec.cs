@@ -168,8 +168,8 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
         // return-dtos.json is uncommitted, leaving the rule uncaptured — both HomeController's ExportOrders and
         // InvoiceController's ExportInvoices return a System.Data.DataTable straight from their public signature,
         // so both are hard red with the --init hint, exercising the expose kind (GRAMMAR §4.9). The whole point:
-        // InvoiceController's DataTable *reference* edge is grandfathered under data-access/no-inline-sql, but the
-        // *exposure* edge is a different baseline identity, so it reds here — per-family identity, not per-type.
+        // InvoiceController's DataTable *reference* edge is grandfathered under data-access/no-inline-sql, but
+        // baselines are per-rule, so the byte-identical exposure edge reds here — per-family capture, not per-type.
         arch.Rule("api/return-dtos")
             .Migrate(
                 "Some controllers return a System.Data.DataTable straight from their public methods.",

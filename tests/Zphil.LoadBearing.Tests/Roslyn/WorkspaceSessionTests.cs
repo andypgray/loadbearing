@@ -86,7 +86,7 @@ public sealed class WorkspaceSessionTests
         WorkspaceSnapshot before = await session.GetCurrentAsync(fixture.SolutionPath, ct);
         string moneyFile = fixture.PathOf("MyApp.Domain", "Money.cs");
 
-        // Act — bump the mtime without changing the bytes (a ReSharper-style touch).
+        // Act — bump the mtime without changing the bytes (an IDE-style touch).
         File.SetLastWriteTimeUtc(moneyFile, DateTime.UtcNow.AddSeconds(2));
         WorkspaceSnapshot after = await session.GetCurrentAsync(fixture.SolutionPath, ct);
 

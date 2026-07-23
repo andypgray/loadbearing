@@ -1110,7 +1110,7 @@ public class SpecValidationTests
         }
     }
 
-    // WP-2 — SpecValidator blank-pattern arms (GRAMMAR §8 item 15). Appended at the very end of the class so
+    // SpecValidator blank-pattern arms (GRAMMAR §8 item 15). Appended at the very end of the class so
     // every file:line golden above keeps its authored line number (the caller-info maintenance contract) — and
     // for the same reason this file must NOT be run through a member-reordering cleanup profile. Each arm — the
     // shape/naming verb's own glob, a subject-side adjective, and their member analogs — routes through
@@ -1239,7 +1239,7 @@ public class SpecValidationTests
     // walk hook, like the reference verbs), so the existing §8 item 10 foreign-selection walk
     // (ConstraintSelections → CheckForeign) reaches a construct target minted on another Arch with no new
     // validator arm. Appended at the very end so every caller-info golden above keeps its authored line number
-    // (and, like the WP-2 append above, this file must NOT be run through a member-reordering cleanup profile).
+    // (and, like the blank-pattern append above, this file must NOT be run through a member-reordering cleanup profile).
     [Fact]
     public void ForeignSelection_ConstructTargetFromAnotherArch_IsReported()
     {

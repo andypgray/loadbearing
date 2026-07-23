@@ -386,6 +386,12 @@ constructed type may be *referenced* but not *created*, keying the (source, cons
 included, keying the (source, injected) type pair; the natural operands are `Registered`
 selections — `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
 arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
+`MustNotCatch(target, …)` (bans `catch` clauses naming the target, keying the (source, caught)
+type pair; matching is exact at the definition level, so banning `Exception` does not ban its
+subclasses — though a bare `catch` counts as catching `Exception`) ·
+`MustOnlyThrow(target, …)` (the strict throw allow-list: every `throw new X()` / `throw expr`
+must mint a listed type, with no exemption for external packages, keying the (source, thrown)
+type pair; a bare rethrow `throw;` mints nothing) ·
 `MustNotExpose(target, …)` (bans a type appearing in a public signature position — a return,
 parameter, or property/field/event type — of an effectively-public member, keying the (source,
 exposed) type pair; the type may be *referenced* internally but not *surfaced* on the public API) ·

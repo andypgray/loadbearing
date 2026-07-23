@@ -96,7 +96,7 @@ internal static class ReferenceWalker
     {
         if (symbol is null) return null;
 
-        var definition = (INamedTypeSymbol)symbol.OriginalDefinition;
+        INamedTypeSymbol definition = symbol.OriginalDefinition;
         if (definition.IsImplicitlyDeclared || !definition.CanBeReferencedByName) return null;
         if (!TypeKindMapper.TryMap(definition, out _)) return null;
 

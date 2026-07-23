@@ -34,9 +34,9 @@ public sealed class WarmWorkspaceMcpTests
     private const string SaveAsyncMemberId = "M:MyApp.Web.HomeController.SaveAsync";
 
     // A one-rule spec (member-subject MustAcceptParameter): Web Task-returning methods must accept a
-    // CancellationToken. Compiled to a throwaway DLL by SpecAssemblyCompiler because the committed fixture
-    // specs (golden-pinned) do not carry this rule. String-selected subject + BCL anchors only, so the spec
-    // depends on nothing but the core and the BCL.
+    // CancellationToken. Compiled to a throwaway DLL by SpecAssemblyCompiler because no committed fixture
+    // spec carries this rule in isolation (MyAppViolatedSpec has it, plus fourteen rules of noise).
+    // String-selected subject + BCL anchors only, so the spec depends on nothing but the core and the BCL.
     private const string AcceptCancellationSpecSource = """
                                                         using System.Threading;
                                                         using System.Threading.Tasks;
