@@ -1,6 +1,6 @@
-# Meridian.Operations
+# Module isolation as law: Meridian.Operations
 
-Meridian.Operations is a modular monolith: five modules as namespace subtrees inside one ASP.NET Core web project. The modules are Dispatch, Tracking, Invoicing, a frozen Demurrage engine, and a Host composition root, and module isolation between them is the enforceable law. This example foregrounds what no other one does: a scoped rules card in every module directory, which `loadbearing render` writes beside each module's code. The fiction is the same freight-forwarding company as [`../Meridian/`](../Meridian/), built this time as modules inside one deployable.
+Module isolation is the enforceable law here: five modules as namespace subtrees inside one ASP.NET Core web project. This example foregrounds what no other one does: a scoped rules card in every module directory, which `loadbearing render` writes beside each module's code. The fiction is the same freight-forwarding company as [`../Meridian/`](../Meridian/), built this time as modules inside one deployable.
 
 ## The card beside the rules
 

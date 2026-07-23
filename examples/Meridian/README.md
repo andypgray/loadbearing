@@ -1,6 +1,6 @@
-# Meridian
+# All three postures on one codebase: Meridian
 
-Meridian is a freight-forwarding monolith caught mid-migration. It is the LoadBearing example where all three postures meet a codebase that does not yet match its own target: the law it already keeps, the debt it is working off, and the one module nobody should touch.
+One codebase carries all three postures: the law it keeps, the debt it works off, and the module nobody touches. It is the example where the spec meets code that does not yet match its own target. That codebase is Meridian, a freight-forwarding monolith caught mid-migration.
 
 An agent dropped into a repository reads the files around its task and copies what it finds. In Meridian most of what it finds is the pattern being retired. The spec below is how the build tells the agent which patterns are the target and which are grandfathered, in words the agent reads before it writes and the same rules the build enforces after.
 

@@ -1,6 +1,6 @@
-# Meridian.Quoting
+# Enforce-only clean architecture: Meridian.Quoting
 
-Meridian.Quoting is a greenfield customer-quoting service, the strangler step after the Meridian monolith migrated its quoting controllers. It looks like the incumbents' clean-architecture READMEs on purpose: the nine rules below are all `Enforce`, and Enforce-only layering and naming are exactly what ArchUnitNET already shows. The difference is the generated agent context beside the spec, not the rules. Same fiction as [`../Meridian/`](../Meridian/): one freight-forwarding company, one subsystem it has already pulled clean.
+Nine rules hold a four-layer clean architecture, every one `Enforce`, zero baselines: exactly what ArchUnitNET already shows. The difference is the generated agent context beside the spec, not the rules. The worked codebase is a greenfield customer-quoting service, the strangler step after the monolith in [`../Meridian/`](../Meridian/) migrated its quoting controllers.
 
 ## The subsystem
 

@@ -1,10 +1,10 @@
-# Meridian.Interchange
+# Microsoft guidance, enforced and cited: Meridian.Interchange
 
-Meridian.Interchange is an outbound integration worker whose architecture rules encode canonical Microsoft .NET guidance, each rule citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with the Microsoft URL behind it, so the rendered agent context quotes the guidance with its provenance and a reviewer can follow the link to the source.
+Twelve rules encode canonical Microsoft .NET guidance, each citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with the Microsoft URL behind it, so the rendered agent context quotes the guidance with its provenance and a reviewer can follow the link to the source.
 
 The other examples state house rules. This one states Microsoft's rules and shows its work. An agent dropped into the worker reads the rules before it writes, and here each reason ends in a canonical URL: "reuse HttpClient" arrives as the documented .NET guideline with the page that says so, not as one team's preference. The rule the agent reads is the rule the build enforces, and both carry the citation. It reads as a cookbook: canon sentence, then the spec line that encodes it, then the real violation output when the code breaks it.
 
-The subsystem is Meridian's outbound interchange worker, the freight-forwarding fiction shared with [`../Meridian/`](../Meridian/). It is shaped like the systems the tool is built for: long-lived, business-critical, the transmit path other teams depend on.
+The worked codebase is Meridian's outbound interchange worker, the freight-forwarding fiction shared with [`../Meridian/`](../Meridian/): long-lived, business-critical, the transmit path other teams depend on.
 
 ## The worker
 

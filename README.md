@@ -53,12 +53,12 @@ dotnet test Zphil.LoadBearing.slnx
 
 Worked examples live in [`examples/`](https://github.com/andypgray/loadbearing/tree/main/examples). CI builds each one, runs `check` against its committed baselines, and re-runs `render` to prove the committed agent context matches the code.
 
-- [`Meridian`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a freight-forwarding monolith mid-migration, carrying all three postures on one codebase. The law, a ratcheted migration with its burndown, and a frozen scope with dragons.
-- [`Meridian.Quoting`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): a greenfield clean-architecture quoting subsystem, Enforce-only. The generated `AGENTS.md` block beside the spec that produced it, and every rule as an individually named xUnit test.
-- [`Meridian.Operations`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): a modular monolith with module isolation as enforceable law. Each module directory carries its own generated `AGENTS.md` card, and one module is frozen behind its facade.
-- [`Meridian.Interchange`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange): an outbound integration worker that transmits to trading partners over HTTP, with every rule's `Because` citing the Microsoft guidance it enforces. The cookbook example: canon sentence, spec excerpt, real violation.
-- [`Meridian/ADOPTING.md`](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md): the day-one adoption walkthrough. The full derive flow against an existing codebase, every step a real command with real output.
-- [`Meridian/hooks`](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian/hooks): the agent-loop showcase. A Claude Code hook runs `check` after each edit, so new code in a retired pattern goes red at the moment of creation; the storyboard walks one task from the old pattern to self-correction, every block real captured output.
+- [All three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): the `Meridian` monolith mid-migration. The law, a ratcheted migration with its burndown, and a frozen scope with dragons.
+- [Enforce-only clean architecture](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): the greenfield `Meridian.Quoting` subsystem. The generated `AGENTS.md` block beside the spec that produced it, and every rule as an individually named xUnit test.
+- [Module isolation as law](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): the `Meridian.Operations` modular monolith. Each module directory carries its own generated `AGENTS.md` card, and one module is frozen behind its facade.
+- [Microsoft guidance, enforced and cited](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange): the `Meridian.Interchange` outbound worker, every rule's `Because` citing the learn.microsoft.com page it enforces. The cookbook example: canon sentence, spec excerpt, real violation.
+- [Day-one adoption on an existing codebase](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md): the `Meridian/ADOPTING.md` walkthrough. The full derive flow, every step a real command with real output.
+- [The agent loop, closed by a hook](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian/hooks): the `Meridian/hooks` showcase. A Claude Code hook runs `check` after each edit, so new code in a retired pattern goes red at the moment of creation; the storyboard walks one task from the old pattern to self-correction, every block real captured output.
 
 ## License
 

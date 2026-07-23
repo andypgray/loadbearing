@@ -31,6 +31,7 @@ public sealed class DocHygieneTests
         "src/Zphil.LoadBearing/README.md",
         "src/Zphil.LoadBearing.Roslyn/README.md",
         "src/Zphil.LoadBearing.Xunit/README.md",
+        "examples/README.md",
         "examples/Meridian/README.md",
         "examples/Meridian/ADOPTING.md",
         "examples/Meridian.Quoting/README.md",
