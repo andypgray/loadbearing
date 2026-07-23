@@ -419,6 +419,37 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     }
 
     [Fact]
+    public void ExtractFromSolutionAsync_ExceptionEdges_PinReportEndpointCatchAndOrderApprovalThrows()
+    {
+        // The catch/throw channels (GRAMMAR §4.8) survive the real MSBuild workspace + cache round-trip.
+        // ReportEndpoint's blanket `catch (System.Exception)` is the sole catch edge — the
+        // exceptions/no-general-catch red; OrderApproval's two `throw new` sites are throw edges — its own
+        // sanctioned in-solution OrderRuleViolation and the BCL InvalidOperationException the strict
+        // exceptions/domain-throws-domain rule reds on. Each rides beside the §4.1 reference edge its
+        // type-name syntax mints (a bare catch would name no type and mint none, but this catch is typed).
+
+        // At least one CatchEdge: the blanket catch, external caught type, at the catch-clause line, with its
+        // co-existing §4.1 reference edge.
+        CatchEdge swallow = fixture.Model.CatchEdge("MyApp.Web.ReportEndpoint", "System.Exception");
+        swallow.Caught.IsExternal.ShouldBeTrue();
+        swallow.Lines().ShouldBe([15]);
+        fixture.Model.CatchEdges("MyApp.Web.ReportEndpoint").Select(e => e.Caught.FullName).ShouldBe(["System.Exception"]);
+        fixture.Model.HasEdge("MyApp.Web.ReportEndpoint", "System.Exception").ShouldBeTrue();
+
+        // At least one ThrowEdge: OrderApproval's whole throw set, pinned — the in-solution domain exception at
+        // its `throw new` line and the BCL one at its own, each beside the §4.1 reference edge and (for `throw
+        // new`) the §4.5 construction edge.
+        fixture.Model.ThrowEdges("MyApp.Domain.OrderApproval").Select(e => e.Thrown.FullName)
+            .ShouldBe(["MyApp.Domain.OrderRuleViolation", "System.InvalidOperationException"]);
+        fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "MyApp.Domain.OrderRuleViolation").Lines().ShouldBe([12]);
+
+        ThrowEdge bclThrow = fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException");
+        bclThrow.Thrown.IsExternal.ShouldBeTrue();
+        bclThrow.Lines().ShouldBe([17]);
+        fixture.Model.HasEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException").ShouldBeTrue();
+    }
+
+    [Fact]
     public void ExtractFromSolutionAsync_HomeControllerExposure_PinsSignaturePositionEdges()
     {
         // The exposure channel (GRAMMAR §4.9) for HomeController, pinned whole: one edge per definition-level

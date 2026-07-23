@@ -49,6 +49,7 @@ public sealed class BaselineAddE2ETests
 
     private const string CatchRule = "exceptions/no-general-catch";
     private const string ThrowRule = "exceptions/domain-throws-domain";
+    private const string ExposeRule = "api/return-dtos";
     private const string ReportEndpointId = "T:MyApp.Web.ReportEndpoint";
     private const string SystemExceptionId = "T:System.Exception";
 
@@ -74,6 +75,7 @@ public sealed class BaselineAddE2ETests
     private static readonly string[] ConstructionBaselineFile = ["arch", "baselines", "di", "handlers-via-registry.json"];
     private static readonly string[] CaptiveBaselineFile = ["arch", "baselines", "di", "no-captive-dependencies.json"];
     private static readonly string[] CatchBaselineFile = ["arch", "baselines", "exceptions", "no-general-catch.json"];
+    private static readonly string[] ExposeBaselineFile = ["arch", "baselines", "api", "return-dtos.json"];
     private static readonly string[] HomeControllerFile = ["MyApp.Web", "HomeController.cs"];
 
     [Fact]
@@ -519,6 +521,85 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         catchReinit.Exit.ShouldBe(0);
         File.ReadAllBytes(catchPath).ShouldBe(snapshot);
+    }
+
+    [Fact]
+    public async Task BaselineAdd_ExposeRule_GrandfathersOneSurfacedDataTableAndBystanderStaysRed()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Red first: the exposure Migrate rule api/return-dtos is uncaptured, so both Web controllers that return
+        // a System.Data.DataTable from a public method (GRAMMAR §4.9) are current expose violations —
+        // HomeController.ExportOrders and InvoiceController.ExportInvoices — each keyed by the (source, exposed)
+        // type pair. This is the expose analog of the catch-kind E2E above: expose rides the SAME ForEdge valve
+        // path (BaselineAddMatcher matches ViolationKind.Expose on both type endpoints, exactly as it does Catch).
+        CliResult red = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement redRule = RuleElement(red.Out, ExposeRule);
+        redRule.GetProperty("status").GetString().ShouldBe("failed");
+        redRule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("source").GetString())
+            .ShouldBe(["MyApp.Web.HomeController", "MyApp.Web.InvoiceController"], true);
+
+        // Capture: --init grandfathers both exposure identities (T: source × T: exposed ForEdge entries, minting
+        // the arch/baselines/api/ directory), and the re-check sees the rule green with both surfaces baselined.
+        CliResult init = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        init.Exit.ShouldBe(0);
+        init.Out.ShouldContain("api/return-dtos: captured 2 grandfathered violations.");
+
+        CliResult captured = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        JsonElement capturedRule = RuleElement(captured.Out, ExposeRule);
+        capturedRule.GetProperty("status").GetString().ShouldBe("passed");
+        capturedRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(2);
+
+        // Un-capture the pair (composer as arrangement, the catch/injection facts' idiom): a digest-valid EMPTY
+        // section turns both surfaces red again on a captured rule — the state the valve exists for.
+        string exposePath = workspace.PathOf(ExposeBaselineFile);
+        File.WriteAllText(exposePath, ComposeSections((ExposeRule, [])));
+
+        // The valve, exposure flavor: full-name --source/--target (no T: prefix) resolve the (source, exposed)
+        // type-pair violation, echoed exactly as 'loadbearing check' renders it.
+        CliResult add = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
+            "--add", "--rule", ExposeRule,
+            "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "INC-1234");
+
+        add.Exit.ShouldBe(0);
+        add.Out.ShouldContain(
+            "api/return-dtos: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
+        add.Out.ShouldContain("wrote");
+
+        // Composer as oracle: exactly one appended entry keying the (source, exposed) type pair via ForEdge.
+        Normalize(File.ReadAllText(exposePath)).ShouldBe(ComposeSections(
+            (ExposeRule, [BaselineEntry.ForEdge(HomeId, DataTableId).WithBecause("INC-1234")])));
+        LineSet(File.ReadAllText(exposePath)).Count(line => line.Contains("\"source\":")).ShouldBe(1);
+
+        // The bystander pin: the OTHER surfaced DataTable (InvoiceController) is still red; only HomeController is
+        // grandfathered.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        check.Exit.ShouldBe(1);
+        JsonElement exposeRule = RuleElement(check.Out, ExposeRule);
+        exposeRule.GetProperty("status").GetString().ShouldBe("failed");
+        exposeRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
+        JsonElement bystander = exposeRule.GetProperty("violations").EnumerateArray().ToList().ShouldHaveSingleItem();
+        bystander.GetProperty("kind").GetString().ShouldBe("expose");
+        bystander.GetProperty("source").GetString().ShouldBe("MyApp.Web.InvoiceController");
+        bystander.GetProperty("target").GetString().ShouldBe("System.Data.DataTable");
+
+        // The attribution round-trips: --accept-reductions keeps the still-observed HomeController entry (refusing
+        // the InvoiceController growth) and a second --init leaves the captured section be — byte-identical both ways.
+        byte[] snapshot = File.ReadAllBytes(exposePath);
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.Exit.ShouldBe(0);
+        File.ReadAllBytes(exposePath).ShouldBe(snapshot);
+        CliResult reinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        reinit.Exit.ShouldBe(0);
+        File.ReadAllBytes(exposePath).ShouldBe(snapshot);
     }
 
     [Fact]

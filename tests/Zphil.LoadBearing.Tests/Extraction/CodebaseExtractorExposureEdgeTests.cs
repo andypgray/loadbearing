@@ -110,6 +110,57 @@ public sealed class CodebaseExtractorExposureEdgeTests
     }
 
     [Fact]
+    public void ExtractFromCompilations_TupleReturn_DecomposesToValueTupleDefinitionAndEachElement()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class Order {}
+                                                         public class Widget {}
+                                                         public class C { public (Order, Widget) Pair() => default; }
+                                                         """);
+
+        // A tuple return decomposes definition-level exactly like any constructed generic (§4.1/§4.9): the open
+        // System.ValueTuple<T1, T2> definition PLUS each element type. The open ValueTuple definition renders in
+        // C# tuple syntax `(T1, T2)` — Roslyn's default display formats even the unbound ValueTuple`2 tuple-style,
+        // so that (not `System.ValueTuple<T1, T2>`) is the endpoint's FullName in the model.
+        model.ExposureEdges("N.C").Select(e => e.Exposed.FullName).ShouldBe(
+            ["(T1, T2)", "N.Order", "N.Widget"]);
+
+        // Reference-edge-twin observation (for the §4.9 doc reconciliation task — NOT touched here): the element
+        // types DO have their ordinary §4.1 reference-edge twin (their names appear verbatim in the source), but
+        // the synthesized ValueTuple wrapper `(T1, T2)` does NOT — nothing in the tuple syntax `(Order, Widget)`
+        // textually names ValueTuple, so no name-driven type edge is minted for it. The exposure channel's
+        // definition-level DecomposeType therefore yields an endpoint with no "recorded beside the type-level edge"
+        // twin, contrary to the ExposureEdge remark's blanket wording.
+        model.HasEdge("N.C", "N.Order").ShouldBeTrue();
+        model.HasEdge("N.C", "N.Widget").ShouldBeTrue();
+        model.HasEdge("N.C", "(T1, T2)").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_NullableValueTypeReturn_DecomposesToNullableDefinitionAndInt32()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public int? Maybe() => null; }
+                                                         """);
+
+        // A nullable value type decomposes to the open System.Nullable<T> definition PLUS its Int32 argument (the
+        // same definition form a T? parameter records on the member axis, §4.6).
+        model.ExposureEdges("N.C").Select(e => e.Exposed.FullName).ShouldBe(
+            ["System.Int32", "System.Nullable<T>"]);
+
+        // Reference-edge-twin observation (for the §4.9 doc reconciliation task — NOT touched here): NEITHER
+        // endpoint has an ordinary §4.1 reference-edge twin — `int?` names neither System.Nullable (the wrapper is
+        // synthesized by DecomposeType) nor System.Int32 (a predefined-type keyword mints no type edge; see
+        // CodebaseExtractorEdgeTests.ExtractFromCompilations_PredefinedType_ProducesNoEdge). So both exposure
+        // endpoints here are twin-less, again contrary to the ExposureEdge remark's blanket "recorded beside"
+        // wording.
+        model.HasEdge("N.C", "System.Nullable<T>").ShouldBeFalse();
+        model.HasEdge("N.C", "System.Int32").ShouldBeFalse();
+    }
+
+    [Fact]
     public void ExtractFromCompilations_OwnTypeParameter_MintsNothing()
     {
         CodebaseModel model = CompilationFactory.Extract("""

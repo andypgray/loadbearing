@@ -74,6 +74,32 @@ public sealed class EvaluatorFailClosedTests
     }
 
     [Fact]
+    public void UnknownMemberAdjectiveInRule_IsContainedAsRuleErrorNotCrash()
+    {
+        // The member-dispatch twin of UnknownAdjectiveInRule_IsContainedAsRuleErrorNotCrash: a member constraint
+        // whose member subject carries a fake adjective routes the throw out of ConstraintEvaluator.Evaluate's
+        // member branch (it dispatches MemberConstraints to EvaluateMember, which resolves the member subject) and
+        // is contained by ArchChecker.CheckRule as a per-rule RuleError (the run continues; the rule is Failed).
+        // The member-switch default arm itself is unreachable — MemberConstraint's private protected constructor
+        // blocks a fake subclass across the InternalsVisibleTo boundary — so, exactly as on the type side, the
+        // fail-closed containment guarantee is exercised through the selection the member verb evaluates.
+        var arch = new Arch();
+        var memberSelection = new KindMemberSelection(
+            arch.Types, MemberKindFilter.Any, new MemberAdjective[] { new UnknownMemberAdjective() });
+        Constraint constraint = memberSelection.MustHaveSuffix("Async");
+        var model = new ArchitectureModel(
+            [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+
+        RuleResult result = ArchChecker.Check(model, EmptyCodebase).Results.Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.RuleError);
+        violation.Detail.ShouldNotBeNull();
+        violation.Detail.ShouldContain("Unhandled member adjective 'UnknownMemberAdjective'.");
+    }
+
+    [Fact]
     public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
     {
         // A UnionSelection is the internal, Freeze-only union (GRAMMAR §7): rendered only in reference

@@ -220,6 +220,57 @@ public sealed class FragmentRoundTripTests
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void SerializeDeserializeMerge_ExposureEdges_SurviveRoundTripByteStably()
+    {
+        // Arrange — a cross-project source exercising every exposure signature position (GRAMMAR §4.9): a
+        // method's return + parameter types, a property/field/event type, plus a constructed-generic return that
+        // decomposes to the open definition AND its argument (an external Task`1 endpoint riding along) — so a
+        // lost edge, dropped site, or dropped decomposition endpoint would move the merged dump. Exposure edges
+        // otherwise ride only ExtractRichSolution's omnibus fragment; this pins them on their own.
+        CompilationInput lib = CompilationFactory.Compile("Lib",
+            ("Types.cs", """
+                         namespace N;
+                         public class Widget {}
+                         public class Gadget {}
+                         public class Cog {}
+                         public class Sprocket {}
+                         public delegate void Notify();
+                         """));
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib",
+            ("Api.cs", """
+                       namespace M;
+                       public class Service
+                       {
+                           public N.Widget Make(N.Gadget g) => null;
+                           public System.Threading.Tasks.Task<N.Widget> Load() => null;
+                           public N.Cog Setting { get; set; }
+                           public N.Sprocket Field;
+                           public event N.Notify Ev;
+                       }
+                       """));
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+
+        // Act
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+
+        // Assert — every signature position surfaced (the constructed generic split to open definition + argument,
+        // the external Task`1 endpoint kept whole), and the round-trip is invisible to the merged model.
+        direct.ExposureEdges.Select(e => (e.Source.FullName, e.Exposed.FullName)).ShouldBe(
+        [
+            ("M.Service", "N.Cog"),
+            ("M.Service", "N.Gadget"),
+            ("M.Service", "N.Notify"),
+            ("M.Service", "N.Sprocket"),
+            ("M.Service", "N.Widget"),
+            ("M.Service", "System.Threading.Tasks.Task<TResult>")
+        ]);
+        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",
