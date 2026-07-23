@@ -6,7 +6,8 @@ namespace Zphil.LoadBearing.Prose;
 ///     Assembles the deterministic law sentence from a <see cref="Constraint" /> (GRAMMAR §6). The
 ///     nouns and adjectives own their local fragments; this orchestrates the cross-node concerns:
 ///     the collective-vs-types voice switch, sentence-final canonicalization of <c>Except</c>/
-///     <c>Where</c>, colliding-simple-name qualification in target lists, and capitalization.
+///     <c>Where</c>, colliding-simple-name qualification in target lists (the shared
+///     <see cref="ProseFormat.ResolveTypeDisplays" /> primitive), and capitalization.
 /// </summary>
 internal static class SentenceRenderer
 {
@@ -54,7 +55,7 @@ internal static class SentenceRenderer
             if (TryBareType(target, out Type type))
                 types.Add(type);
 
-        var display = ResolveTypeDisplays(types);
+        var display = ProseFormat.ResolveTypeDisplays(types);
         var parts = new List<string>(targets.Count);
         foreach (Selection target in targets)
             parts.Add(TryBareType(target, out Type type)
@@ -69,12 +70,12 @@ internal static class SentenceRenderer
     ///     backticked declaring-type dot member — <c>`DateTime.Now`</c>, <c>`Task.Wait()`</c> with
     ///     <c>()</c> appended iff a method — then joins with no Oxford comma. Colliding declaring-type
     ///     simple names widen by the same minimal-trailing-segments rule as the reference list (fed
-    ///     through <see cref="ResolveTypeDisplays" />), including when the member names differ.
+    ///     through <see cref="ProseFormat.ResolveTypeDisplays" />), including when the member names differ.
     /// </summary>
     internal static string MemberList(IReadOnlyList<Member> members)
     {
         var declaringTypes = members.Select(member => member.DeclaringType).ToList();
-        var display = ResolveTypeDisplays(declaringTypes);
+        var display = ProseFormat.ResolveTypeDisplays(declaringTypes);
 
         var parts = new List<string>(members.Count);
         foreach (Member member in members)
@@ -152,33 +153,5 @@ internal static class SentenceRenderer
 
         type = null!;
         return false;
-    }
-
-    private static Dictionary<Type, string> ResolveTypeDisplays(IReadOnlyList<Type> types)
-    {
-        var result = new Dictionary<Type, string>();
-        foreach (var group in types.GroupBy(TypeName.Simple))
-        {
-            var members = group.Distinct().ToList();
-            if (members.Count == 1)
-            {
-                result[members[0]] = TypeName.Simple(members[0]);
-                continue;
-            }
-
-            // Widen from the simple name outward until every colliding member is distinct.
-            int maxDepth = members.Max(TypeName.SegmentDepth);
-            int chosen = maxDepth;
-            for (var count = 1; count <= maxDepth; count++)
-                if (members.Select(t => TypeName.Qualified(t, count)).Distinct().Count() == members.Count)
-                {
-                    chosen = count;
-                    break;
-                }
-
-            foreach (Type member in members) result[member] = TypeName.Qualified(member, chosen);
-        }
-
-        return result;
     }
 }

@@ -215,6 +215,34 @@ public class SentenceAssemblyTests
         SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
     }
 
+    // ---- Colliding anchors, negative hierarchy/attribute verbs (GRAMMAR §6): the raw-Type anchor lists
+    //      widen by the same minimal-trailing-segments rule as the dependency target lists ----
+
+    [Fact]
+    public void MustNotImplement_CollidingAnchors_QualifyWithMinimalTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustNotImplement(typeof(IReceipt), typeof(Stubs.Sales.IReceipt));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not implement `Billing.IReceipt` or `Sales.IReceipt`.");
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_CollidingAnchors_QualifyWithMinimalTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustNotDeriveFrom(typeof(LedgerBase), typeof(Stubs.Sales.LedgerBase));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not derive from `Billing.LedgerBase` or `Sales.LedgerBase`.");
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_CollidingAnchors_WidenInsideTheBrackets()
+    {
+        // The attribute form qualifies inside the brackets — `[Billing.Audit]` / `[Sales.Audit]`, not a bare `[Audit]`.
+        Constraint constraint = Arch.Types.MustNotBeAttributedWith(typeof(AuditAttribute), typeof(Stubs.Sales.AuditAttribute));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not be attributed with `[Billing.Audit]` or `[Sales.Audit]`.");
+    }
+
     // ---- Exception edges (GRAMMAR §5.3, §3.3): the catch-ban and STRICT throw-allowlist dependency verbs ----
 
     [Fact]
@@ -245,6 +273,15 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MustNotCatch_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        // Catch targets share TargetList, so colliding exception names widen like the reference verbs.
+        Constraint constraint = Arch.Types.MustNotCatch(typeof(DataException), typeof(Stubs.Sales.DataException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not catch `Billing.DataException` or `Sales.DataException`.");
+    }
+
+    [Fact]
     public void MustOnlyThrow_NamespaceSubject_RendersLocativeAndStrictAllowlist()
     {
         // The namespace-locative subject + the strict throw allowlist: exact equality proves no external-
@@ -262,6 +299,14 @@ public class SentenceAssemblyTests
             typeof(InvalidOperationException), typeof(ArgumentException), typeof(TimeoutException));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must throw only `InvalidOperationException`, `ArgumentException` or `TimeoutException`.");
+    }
+
+    [Fact]
+    public void MustOnlyThrow_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustOnlyThrow(typeof(DataException), typeof(Stubs.Sales.DataException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must throw only `Billing.DataException` or `Sales.DataException`.");
     }
 
     // ---- Signature exposure (GRAMMAR §5.3, §3.3): the dependency-shape exposure-ban verb ----
@@ -282,6 +327,15 @@ public class SentenceAssemblyTests
         Constraint constraint = Arch.Types.MustNotExpose(typeof(SqlConnection), typeof(ControllerBase));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not expose `SqlConnection` or `ControllerBase`.");
+    }
+
+    [Fact]
+    public void MustNotExpose_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        // Reuses the Order collision pair; expose shares TargetList so its targets widen identically.
+        Constraint constraint = Arch.Types.MustNotExpose(typeof(Order), typeof(Stubs.Sales.Order));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not expose `Billing.Order` or `Sales.Order`.");
     }
 
     // ---- Member subjects (GRAMMAR §4.6, §5.7, §6) ----

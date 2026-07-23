@@ -891,7 +891,10 @@ matches the anchor's definition FQN.
   prevents garden-path sentences ("types, except `Foo`, named `*Service`").
 - **Colliding simple names**: when two targets in one sentence share a simple name, both are
   qualified with the minimal distinguishing trailing namespace segments
-  ("`Billing.Order` or `Sales.Order`"). Pinned rule.
+  ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
+  lists (`MustNotImplement`/`MustNotDeriveFrom`/`MustNotBeAttributedWith`) widen by the same rule —
+  the attribute form qualifies *inside* the brackets ("`[Billing.Audit]` or `[Sales.Audit]`") — so
+  every multi-operand list disambiguates identically.
 - **Member references** (§4.5) render as the backticked declaring type dot member —
   "`DateTime.Now`" — with `()` appended iff the member is a method ("`Task.Wait()`"; never
   a signature). Generic anchors use declared type-parameter names ("`Task<TResult>.Result`").
