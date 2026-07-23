@@ -70,16 +70,16 @@
          are loaded at runtime by MSBuildLocator.RegisterDefaults(). ExcludeAssets="runtime" keeps the
          engine DLLs out of the build output, and PrivateAssets="all" keeps these off the published
          nuspec — a consumer of this package (or of the tool that bundles it) must resolve MSBuild from
-         the SDK on the host, never from us. The four Microsoft.Build engine packages are exact-pinned
-         to 18.7.1; Microsoft.NET.StringTools — a leaf string-interning utility they depend on — rides
-         ahead at 18.8.2 (Dependabot keeps it current, and the engine packages' >= floor accepts it).
+         the SDK on the host, never from us. The four Microsoft.Build engine packages and
+         Microsoft.NET.StringTools — a leaf string-interning utility they depend on — are
+         exact-pinned, with Dependabot keeping them current.
          Exact versions rather than floating "*", because a lock file cannot capture a wildcard and
          supply-chain locking demands a determinate version. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Build" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.7.1" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
         <PackageReference Include="Microsoft.NET.StringTools" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
     </ItemGroup>
 

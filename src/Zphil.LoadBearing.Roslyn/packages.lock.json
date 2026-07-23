@@ -19,11 +19,11 @@
       },
       "Microsoft.Build": {
         "type": "Direct",
-        "requested": "[18.7.1, )",
-        "resolved": "18.7.1",
-        "contentHash": "BWFGVuZs9M6eSef12215dFwQUxoXAUW7VluUd2LLqa7nY09U9AzO/6Ms0RziPGmZ9Wa+MrXayOgsX6YjJkPWiw==",
+        "requested": "[18.8.2, )",
+        "resolved": "18.8.2",
+        "contentHash": "o30Qy4z+5KbJgHo+nmOt4sqrnIvb3BQlpEtE+Izlfk9eQKvppwHZGfQ1JUmFfkdcVpqZkgbqCPnqIkI/98dcIA==",
         "dependencies": {
-          "Microsoft.Build.Framework": "18.7.1",
+          "Microsoft.Build.Framework": "18.8.2",
           "System.Configuration.ConfigurationManager": "10.0.4",
           "System.Diagnostics.EventLog": "10.0.4",
           "System.Reflection.MetadataLoadContext": "10.0.4",
@@ -32,11 +32,11 @@
       },
       "Microsoft.Build.Framework": {
         "type": "Direct",
-        "requested": "[18.7.1, )",
-        "resolved": "18.7.1",
-        "contentHash": "OkLtppCHnD0hrfeTQDZNSe6oxYW2/1qKmtE/iyF8ZzsdC541Txv0pUGrDZQTNr0E/OYxzpt5oVHqR26A6mzYnw==",
+        "requested": "[18.8.2, )",
+        "resolved": "18.8.2",
+        "contentHash": "0rH2AaR+TyRhISTU3DEW1pskvOCrBa3QlHnItRqtBTExfCi14CxYNL3/COXxCfd+H40h2WB3XOYSYUlF5IFIwA==",
         "dependencies": {
-          "Microsoft.NET.StringTools": "18.7.1"
+          "Microsoft.NET.StringTools": "18.8.2"
         }
       },
       "Microsoft.Build.Locator": {
@@ -47,12 +47,12 @@
       },
       "Microsoft.Build.Tasks.Core": {
         "type": "Direct",
-        "requested": "[18.7.1, )",
-        "resolved": "18.7.1",
-        "contentHash": "f4enIPf1pkYAmiuRSgehfF0rxZvcqffoGOtSr9qiKFJrAD6ik/wcHR1/SxIK/iz9ucsVF1qD8sAoN/iyxDqcug==",
+        "requested": "[18.8.2, )",
+        "resolved": "18.8.2",
+        "contentHash": "b8xLTPf+e29A6jarQe//8SkoQexeaKKu6svTshoVPSHcSyoHuRyMWkLxeh4S0u2SC4oI7VJ8PyOvBLxBDLNIag==",
         "dependencies": {
-          "Microsoft.Build.Framework": "18.7.1",
-          "Microsoft.Build.Utilities.Core": "18.7.1",
+          "Microsoft.Build.Framework": "18.8.2",
+          "Microsoft.Build.Utilities.Core": "18.8.2",
           "System.CodeDom": "10.0.4",
           "System.Configuration.ConfigurationManager": "10.0.4",
           "System.Diagnostics.EventLog": "10.0.4",
@@ -65,11 +65,11 @@
       },
       "Microsoft.Build.Utilities.Core": {
         "type": "Direct",
-        "requested": "[18.7.1, )",
-        "resolved": "18.7.1",
-        "contentHash": "qxESKA3linJoBtnZMJ1w7ykrr8vzINDzEoCpAFWrqvzuXedPVUMq6t82xYueyAeAZsbOTpi/lrWk7o8FcJIBMw==",
+        "requested": "[18.8.2, )",
+        "resolved": "18.8.2",
+        "contentHash": "C3gjkM3Xmup6OYbU1DQ9e92tLwg/uUaS82NzJi36lW8J0g+bP/xgyT4oRbmKUWiOm+LaD1C8AUN4yVMvFrCAZQ==",
         "dependencies": {
-          "Microsoft.Build.Framework": "18.7.1",
+          "Microsoft.Build.Framework": "18.8.2",
           "System.Configuration.ConfigurationManager": "10.0.4",
           "System.Diagnostics.EventLog": "10.0.4",
           "System.Security.Cryptography.ProtectedData": "10.0.4"
