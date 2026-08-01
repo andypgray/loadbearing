@@ -1,3 +1,6 @@
+// The namespace IS the fixture: it makes typeof(IFacade) carry the codebase type's full name.
+// ReSharper disable once CheckNamespace
+
 namespace App.Legacy;
 
 /// <summary>

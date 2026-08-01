@@ -2,6 +2,8 @@
 // (TypeNameFullDisplayTests). Each shape declared here is re-declared byte-for-byte as source in
 // that test and extracted through Roslyn; the two independent renderings must agree. Keep the two
 // copies in lockstep — that lockstep IS the pin.
+// The parameters are never used because arity, not the body, is the shape under test.
+// ReSharper disable UnusedTypeParameter
 
 namespace Zphil.LoadBearing.Tests.Correspondence;
 

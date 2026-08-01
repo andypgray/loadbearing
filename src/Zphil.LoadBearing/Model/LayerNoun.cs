@@ -23,7 +23,7 @@ internal sealed class LayerNoun(string name, IReadOnlyList<string> globs) : Sele
 
     internal override string ReferenceFragment => $"the {Name} layer";
 
-    internal override string? CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    internal override string CollapsedLocative(IReadOnlyList<SelectionNoun> group)
     {
         return $" in the {LayerNames(group)} layers";
     }

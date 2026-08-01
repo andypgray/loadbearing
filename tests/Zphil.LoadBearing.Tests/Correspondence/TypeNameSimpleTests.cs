@@ -35,8 +35,11 @@ public sealed class TypeNameSimpleTests
         TypeName.Simple(typeof(GenericOuter<string>.PlainInner)).ShouldBe("PlainInner");
     }
 
+    // Arity is the shape under test — neither parameter is meant to be used.
+    // ReSharper disable once UnusedTypeParameter
     private sealed class GenericOuter<TOuter>
     {
+        // ReSharper disable once UnusedTypeParameter
         public sealed class GenericInner<TInner>;
 
         public sealed class PlainInner;

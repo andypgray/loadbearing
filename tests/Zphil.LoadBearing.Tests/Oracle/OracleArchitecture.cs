@@ -183,6 +183,6 @@ public sealed class OracleArchitecture
 
         path.ShouldNotBeNullOrEmpty();
         File.Exists(path).ShouldBeTrue($"MyApp fixture DLL for '{key}' should exist at the baked path '{path}'.");
-        return path!;
+        return path;
     }
 }

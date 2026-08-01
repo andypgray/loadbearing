@@ -47,7 +47,7 @@ internal static class SpecResolver
     {
         return string.IsNullOrWhiteSpace(specArgument)
             ? ResolveByConvention(solution, solutionPath)
-            : ResolveExplicit(solution, solutionPath, specArgument!);
+            : ResolveExplicit(solution, solutionPath, specArgument);
     }
 
     /// <summary>
@@ -65,7 +65,7 @@ internal static class SpecResolver
     internal static SpecResolution? TryResolveWithoutSolution(string? specArgument)
     {
         if (string.IsNullOrWhiteSpace(specArgument)) return null;
-        if (specArgument!.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) return null;
+        if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) return null;
 
         string fullPath = Path.GetFullPath(specArgument);
         if (!File.Exists(fullPath))

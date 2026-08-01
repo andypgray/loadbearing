@@ -209,6 +209,9 @@ public sealed class ServerShutdownTests : IDisposable
         });
 
         using ManualResetEventSlim exited = new();
+        // The await at the end of the test keeps `exited` alive for as long as ExitWith can call it; were an
+        // assertion below to fail first, the Set would fault the unobserved task and nothing else.
+        // ReSharper disable once AccessToDisposedClosure
         Task shutdown = Task.Run(() => ServerShutdown.ExitWith(
             "test", exited.Set, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5)));
 

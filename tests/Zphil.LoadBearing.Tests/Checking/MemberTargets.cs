@@ -2,6 +2,8 @@
 // re-declares these — with their members — plus subject types that use them; the two copies must stay
 // in lockstep, the same discipline as CheckerTargets / Sources.Hierarchy and the FullDisplay
 // correspondence test.
+// The sub-namespace keeps the targets apart from the tests that select them.
+// ReSharper disable once CheckNamespace
 
 namespace Zphil.LoadBearing.Tests.Checking.MemberTargets;
 

@@ -47,6 +47,6 @@ public class SpecLoadingTests
             .SingleOrDefault(attribute => attribute.Key == "SpecFixturePath")?.Value;
 
         path.ShouldNotBeNullOrEmpty();
-        return path!;
+        return path;
     }
 }

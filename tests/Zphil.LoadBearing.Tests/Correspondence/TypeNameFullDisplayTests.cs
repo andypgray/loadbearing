@@ -2,15 +2,14 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Prose;
-using Zphil.LoadBearing.Tests.Correspondence;
 using Zphil.LoadBearing.Tests.Extraction;
 
-namespace Zphil.LoadBearing.Tests;
+namespace Zphil.LoadBearing.Tests.Correspondence;
 
 /// <summary>
 ///     The load-bearing correspondence pin (plan Step 2): for each type shape,
 ///     <see cref="TypeName.FullDisplay" /> over the reflection type must equal the FullName Roslyn
-///     extraction produces for the byte-identical source. <see cref="CorrespondenceTypes" /> declares
+///     extraction produces for the byte-identical source. <c>CorrespondenceTypes.cs</c> declares
 ///     the reflectable mirrors; the source below re-declares them. If either renderer drifts, a
 ///     <c>typeof(...)</c> in a spec silently stops matching — so both are pinned together here.
 /// </summary>

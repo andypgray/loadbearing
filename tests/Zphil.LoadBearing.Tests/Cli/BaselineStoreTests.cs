@@ -54,7 +54,7 @@ public sealed class BaselineStoreTests : IDisposable
         BaselineDocument? document = BaselineStore.TryReadDocument(path);
 
         document.ShouldNotBeNull();
-        document!.Sections["data/x"].ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
+        document.Sections["data/x"].ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed class BaselineStoreTests : IDisposable
 
         document.ShouldNotBeNull();
         // Equality ignores attribution, so pin identity and .Because separately.
-        var edges = document!.Sections["data/x"];
+        var edges = document.Sections["data/x"];
         edges.ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
         edges[0].Because.ShouldBe("INC-1234");
         var subjects = document.Sections["legacy/billing/containment"];

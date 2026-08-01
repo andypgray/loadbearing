@@ -14,7 +14,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     fast path (no workspace), <c>arch_context</c> is pinned against the render card text, and the
 ///     <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a real git repo. Serialized
 ///     with the watchdog suites — the filter brackets each call with the shared
-///     <see cref="Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
+///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
 /// </summary>
 /// <remarks>
 ///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync" />, not the warm-by-default

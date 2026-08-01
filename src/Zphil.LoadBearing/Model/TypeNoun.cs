@@ -16,7 +16,7 @@ internal sealed class TypeNoun(Type type) : SelectionNoun
 
     internal override string ReferenceFragment => ProseFormat.Backtick(TypeName.Simple(Type));
 
-    internal override string? CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    internal override string CollapsedLocative(IReadOnlyList<SelectionNoun> group)
     {
         return string.Empty;
     }

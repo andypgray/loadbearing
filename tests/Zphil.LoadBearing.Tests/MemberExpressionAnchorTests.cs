@@ -280,6 +280,9 @@ internal sealed class AnchorWidget
 {
     public int Size = 1;
 
+    // A menagerie of member shapes for anchor expressions to name; the setters exist to make these
+    // ordinary read-write properties, never to be called.
+    // ReSharper disable UnusedAutoPropertyAccessor.Global
     public int Count { get; set; }
 
     public AnchorWidget? Inner { get; set; }
