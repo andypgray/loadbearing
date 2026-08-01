@@ -18,6 +18,7 @@ public sealed class HierarchyVerbTests
 
     private static readonly CodebaseModel Model = CompilationFactory.Extract(Sources.Hierarchy);
     private static readonly CodebaseModel TransitiveModel = CompilationFactory.Extract(Sources.HierarchyTransitive);
+    private static readonly CodebaseModel GenericAttributeModel = CompilationFactory.Extract(Sources.GenericAttributes);
 
     [Fact]
     public void Implementing_OpenGeneric_SelectsEveryConstruction()
@@ -216,6 +217,106 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("AttrDerived").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    // ── string attribute anchors (GRAMMAR §5.2–§5.3): the escape hatch names the attribute DEFINITION by
+    //    fully-qualified string, so a spec need not compile against the attribute's package. Parity band —
+    //    each anchor selects and reds exactly what its typeof twin above does ──
+
+    [Fact]
+    public void AttributedWith_StringAnchor_SelectsWhatTheTypeofTwinSelects()
+    {
+        // The same fixture and the same ZZZ-prefix probe as AttributedWith_SelectsAttributedType: naming
+        // MarkAttribute by FQN string picks out the identical subject.
+        RuleResult result = Checker.Run(Model, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.ShapeSubjects().ShouldBe([$"{T}Tagged"]);
+    }
+
+    [Fact]
+    public void MustBeAttributedWith_StringAnchor_HoldsForAttributed_FailsForBare()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Tagged").MustBeAttributedWith($"{T}MarkAttribute")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith($"{T}MarkAttribute")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Plain"]);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_StringAnchor_RedsAttributed_PassesForBare()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith($"{T}MarkAttribute")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Tagged"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith($"{T}MarkAttribute")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void AttributedWith_StringDefinitionAnchor_SelectsEveryConstruction()
+    {
+        // A string names the DEFINITION, so it reads like an open-generic typeof anchor: `MarkAttribute<T>`
+        // reaches both [Mark<int>] and [Mark<string>].
+        RuleResult result = Checker.Run(GenericAttributeModel, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute<T>").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.ShapeSubjects().ShouldBe([$"{T}TaggedInt", $"{T}TaggedText"]);
+    }
+
+    [Fact]
+    public void AttributedWith_StringConstructedSpelling_SelectsNothing()
+    {
+        // The stated honesty boundary: a constructed spelling names no definition, so it matches nothing —
+        // and the empty subject fails the rule loudly (GRAMMAR §4.1) rather than passing vacuously.
+        RuleResult result = Checker.Run(GenericAttributeModel, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute<System.Int32>").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_StringConstructedSpelling_NeverReds()
+    {
+        // Definition string vs constructed spelling on one subject: the first reds TaggedInt, the second —
+        // naming a construction rather than a definition — silently passes.
+        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<T>")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}TaggedInt"]);
+
+        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<System.Int32>")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_StringAnchorList_RedsOnAnyAnchor()
+    {
+        // None-of over a homogeneous string list: TaggedPlain carries only [Plain], and the list reds it
+        // through the second anchor.
+        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("TaggedPlain")
+                    .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}TaggedPlain"]);
+
+        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Untagged")
+                    .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute")).Because("b"))
             .Single().Status.ShouldBe(RuleStatus.Passed);
     }
 }

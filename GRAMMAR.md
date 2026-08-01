@@ -119,8 +119,9 @@ Arch
 Selection    — adjectives → Selection; modal verbs → Constraint (terminal);
                projections (.Members / .Methods / .Properties / .Fields / .Events)
                → MemberSelection (§4.6)
-MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatching / .Where)
-               → the SAME concrete member-selection type; member modal verbs → Constraint (terminal)
+MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatching /
+               .AttributedWith / .Where) → the SAME concrete member-selection type;
+               member modal verbs → Constraint (terminal)
 MethodSelection — a MemberSelection minted by .Methods that additionally offers
                .Returning(Type first, params Type[] more) → MethodSelection (§4.6)
                and .MustAcceptParameter(Type) → Constraint (terminal; §5.7)
@@ -209,8 +210,12 @@ Member targets are `arch.Member`-anchored — `typeof` + `nameof`, or the expres
 `arch.Member<T>(x => x.M)` / `arch.Member(() => X.M)` (§4.5) — so a
 banned member participates in compilation and refactoring like every other spec reference; the
 expression forms additionally let the compiler check the type↔member pairing that `typeof` +
-`nameof` leaves unverified. There is deliberately no string-FQN sugar overload: string-FQN
-anchoring is named growth (§11).
+`nameof` leaves unverified. There is deliberately no string-FQN member overload: string-FQN
+*member* anchoring stays named growth (§11). Attribute anchors are where the string form has
+shipped (§5.2–§5.3, §5.7), and they set the anchoring policy any later string form inherits:
+`typeof` whenever the spec project can compile against the anchored type — a `typeof`
+participates in compilation and refactoring, and nothing checks a string — and the string only
+when it cannot.
 
 The dependency verbs deliberately grow **no** generic twin (decided against): the
 pinned `(first, params more)` shape has no generic form (a variadic type-argument list is
@@ -539,6 +544,21 @@ desugaring (§7) — keeps working unchanged on the type side.
   never matches a `typeof` anchor; a record's positional list surfaces as the generated
   property, never as parameter facts (the primary constructor is outside the inventory);
   partial-method parameters are read once and ride the partial-union merge.
+- **Attribute facts.** Extraction inventories, per declared member, its **declared
+  attributes** — each a definition/constructed name pair (`IAttributeInfo`, §5.6), the
+  definition open-reduced so a C# 11 generic attribute keeps both its definition
+  (`N.MarkAttribute<T>`) and its substituted construction (`N.MarkAttribute<System.Int32>`),
+  ordinal-sorted by constructed name. Name pairs, not nodes: unlike the type side the fact
+  mints nothing — no reference edge, no graph entry — keeping the member model's
+  by-FQN-string discipline. **Declared-only is the boundary**: an attribute on a property's
+  `get`/`set` accessor hangs off the accessor method symbol (accessors fold into their
+  property and are not inventoried in their own right), and a `[return:]` attribute hangs off
+  the return value — both are outside the fact. A **partial method** reports the **union** of
+  both parts' attributes, because the merged symbol does — pinned empirically in the
+  extraction matrix. The member `AttributedWith` adjective and the member attribute verbs
+  (§5.7) match against these facts on the type side's discipline (§5.2): declared attributes
+  only, a non-generic or open-definition anchor matching on the definition name, a closed
+  `typeof` construction on the constructed name.
 - **Declaration-semantics flags are pinned to C#, not IL.** `IsVirtual` is true for a member
   declared `virtual` and false for an `override` or `abstract` one (an override is not itself
   "virtual" in the authored sense); `IsAbstract` is true for an `abstract` member and for every
@@ -789,7 +809,7 @@ consumes it.
 | `.WithNameMatching("*Repo*")` | "whose name matches `*Repo*`" |
 | `.Implementing(typeof(IHandler<>))` | "implementing `IHandler<T>`" |
 | `.DerivedFrom(typeof(ControllerBase))` | "derived from `ControllerBase`" |
-| `.AttributedWith(typeof(ApiControllerAttribute))` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed |
+| `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string attribute anchors, below) |
 | `.Except(selection)` | ", except {ref}" — canonicalized to sentence-final (§6) |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 | `.Authored()` | head premodifier: "authored types", "authored interfaces" (§6) |
@@ -821,6 +841,25 @@ silently passes.
 the identical adjective, changing nothing in the model. `arch.Type<X>()` ≡ `arch.Type(typeof(X))`
 is the same idea on the noun. An **open** generic has no type-argument form, so it stays `typeof`
 (`Implementing(typeof(IHandler<>))`); the sugar is for the closed/non-generic single-type case.
+
+**String attribute anchors.** Every attribute anchor position — this adjective, the
+`Must[Not]BeAttributedWith` verbs (§5.3), and their member-side twins (§5.7) — carries a
+`string` overload beside the `typeof` form: the escape hatch for an attribute the spec
+project cannot compile against, so that naming someone else's attribute does not force a
+package reference on the spec just to write the `typeof`. The string names the attribute
+**definition**'s FQN in extraction format, `Attribute` suffix included
+(`"ModelContextProtocol.Server.McpServerToolAttribute"`), matched ordinal-exact; it matches
+**any construction** of that definition, exactly as an open-generic `typeof` anchor does. A
+**constructed** spelling (`"N.MarkAttribute<System.Int32>"`) names no definition and never
+matches — the hatch's stated honesty boundary, not a defect. Nothing is inferred from the
+string's shape: a dotless or suffix-less spelling is a legal name that simply never matches,
+and only blankness is validated (§8 item 15). A string anchor renders **byte-identically** to
+its `typeof` twin — the display name is the last dot-segment outside any `<...>`, the
+`Attribute` suffix strips, the brackets close over it, and colliding simple names widen by
+trailing dot-segments inside the brackets (§6) — so which form a spec chose is invisible to
+its sentences. Overloads are homogeneous: one call takes `typeof` anchors or strings, never a
+mix. The policy: `typeof` whenever the attribute is referenceable — the compiler checks a
+`typeof`, and nothing checks a string — and the string when it is not.
 
 **`.Authored()`** narrows a selection to the types a person wrote — the opt-out from the §4.1
 boundary that puts generator output inside a project noun. A type counts as generated when
@@ -857,10 +896,10 @@ would be a worse lie than the one this adjective fixes.
 | `.MustHaveNameMatching(glob)` | "must have a name matching `{glob}`" |
 | `.MustImplement(type)` | "must implement `{X}`" |
 | `.MustDeriveFrom(type)` | "must derive from `{X}`" |
-| `.MustBeAttributedWith(type)` | "must be attributed with `[{X}]`" |
+| `.MustBeAttributedWith(type)` | "must be attributed with `[{X}]`" — also anchors by string (§5.2's escape hatch): `MustBeAttributedWith("N.XAttribute")` |
 | `.MustNotImplement(type, ...)` | "must not implement {list}" — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10) |
 | `.MustNotDeriveFrom(type, ...)` | "must not derive from {list}" |
-| `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — anchors bracketed and `Attribute`-stripped like the positive |
+| `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — anchors bracketed and `Attribute`-stripped like the positive; also `(string first, params string[] more)` (§5.2), each call's list homogeneous |
 | `.MustBeSealed()` | "must be sealed" |
 | `.MustBeStatic()` | "must be static" |
 | `.MustBeAbstract()` | "must be abstract" |
@@ -878,7 +917,10 @@ Generic sugar: the three type-taking hierarchy verbs carry generic twins —
 the same terms as the §5.2 adjective twins (open generics stay `typeof`).
 The negatives carry the same twins — `MustNotImplement<T>()` / `MustNotDeriveFrom<T>()` /
 `MustNotBeAttributedWith<T>()` (`where T : Attribute`) — each desugaring to its verb's
-single-anchor call.
+single-anchor call. The attribute verbs additionally carry the §5.2 string form on both
+polarities and both sides (type and member, §5.7), so every attribute position offers the
+same triple: the compile-checked `typeof`, the no-reference string, and the generic sugar
+(§10).
 
 ### 5.4 Posture verbs and options
 
@@ -919,7 +961,10 @@ type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsAsync`
 `MemberTypeFullName` (the property/field/event type; null for methods), `Parameters` (the
 declared parameters in declaration order — each an `IParameterInfo` of `Name` and
 `TypeFullName`, the type definition-normalized exactly like `ReturnTypeFullName`; empty for
-properties, fields, and events), and `FilePaths` (declaration file paths). The flags carry the same C# declaration semantics as the member axis
+properties, fields, and events), `Attributes` (the member's declared attributes,
+ordinal-sorted by constructed name — each an `IAttributeInfo` of `DefinitionFullName` and
+`FullName`, the definition open-reduced; empty when none; declared-only per §4.6, so accessor
+and `[return:]` attributes are outside it), and `FilePaths` (declaration file paths). The flags carry the same C# declaration semantics as the member axis
 (§4.6): an `override` member is not `IsVirtual`, an interface member is `IsAbstract`. The
 contract grows additively, exactly like `ITypeInfo`.
 
@@ -947,7 +992,10 @@ say). Neither is reachable by `typeof()` however the spec project is built. The 
 anything on that side of the line is a namespace pattern, `arch.Namespace("System.Data.*")`,
 which needs no assembly load. A name pattern is not a substitute: a `Selection` matches only
 types inside the checked codebase, so `arch.Types.WithNameMatching("SqlConnection")` goes inert
-against an external type (§8, the inert-rule warning).
+against an external type (§8, the inert-rule warning). The string attribute anchor (§5.2) is
+the same no-load form in attribute position: it names an attribute **definition** the spec
+project never loads — `[McpServerTool]` on a codebase's methods is matchable without the spec
+referencing the SDK that declares the attribute, which no `typeof` spelling can offer.
 
 ### 5.7 Member vocabulary (member subjects, §4.6)
 
@@ -969,6 +1017,7 @@ against an external type (§8, the inert-rule warning).
 | `.WithPrefix("Get")` | "named `Get*`" |
 | `.WithNameMatching("*Handler*")` | "whose name matches `*Handler*`" |
 | `.Returning(typeof(Task))` | "returning `Task`" — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`". Methods-only. |
+| `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 
 **Member modal verbs** (turn a `MemberSelection` into a terminal `Constraint`):
@@ -984,6 +1033,8 @@ against an external type (§8, the inert-rule warning).
 | `.MustBeStatic()` | "must be static" |
 | `.MustBeAbstract()` | "must be abstract" |
 | `.MustBeVirtual()` | "must be virtual" — member-only vocabulary (no type-side twin, deliberate) |
+| `.MustBeAttributedWith(typeof(X))` | "must be attributed with `[{X}]`" — reuses the type-side fragment verbatim (§5.3); also anchors by string (§5.2) and carries a generic twin (§10) |
+| `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — none-of over the anchors, the type-side negative's `(first, more)` shape and widening; string form included |
 | `.MustAcceptParameter(typeof(CancellationToken))` | "must accept a parameter of type `CancellationToken`" — methods-only (it lives on `MethodSelection`, like `.Returning`, §3.2); single-`Type` arity; matching is definition-level (§4.6): a non-generic anchor matches exactly, an open-generic anchor matches any construction and renders declared type-parameter names ("… of type `IProgress<T>`"), a closed-generic anchor is refused at spec build (§8 item 20) |
 | `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IMemberInfo, bool>` (§5.6) |
 
@@ -992,6 +1043,25 @@ verbatim; `MustBePrivate` and `MustBeVirtual` are new member-only vocabulary. Th
 vocabulary shipped complete per the admission rule (§10): reification, pinned fragments, and
 the checker semantics (member inventory, the shape/naming evaluators, the ratchet) landed
 together.
+
+The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) shipped on
+the same admission-rule terms, over the §4.6 attribute facts. The **verbs** reuse the
+type-side fragments verbatim — verb position is unambiguous, so there is nothing to
+disambiguate. The **adjective** could not: an inline " attributed with" clause would render
+the type-side adjective before a projection and the member adjective after one as **one
+byte-identical sentence** for two different subjects — every method of an attributed type,
+versus the attributed methods of any type — and both attachment sites are live in real
+specs. So the member adjective is a **head prefix**, the `.Authored()` move (§5.2, §6)
+replayed for the same reference-position ambiguity: its fragment premodifies the kind-plural
+("`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`"), and the two
+subjects can never render alike. Unlike the type side's single substituted prefix, stacked
+member head prefixes **concatenate** in authoring order ("`[ApiController]`-attributed
+`[Audit]`-attributed methods of types") — two attribute adjectives are an intersection, and
+a sentence that dropped one would describe a wider subject than the checker uses. The
+generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no partial type
+inference, so the sugar ships as an overload pair on `MemberSelection` and
+`MethodSelection`, the second keeping `.Returning` and `MustAcceptParameter` reachable after
+it.
 
 `MustAcceptParameter` is the first methods-only modal verb — receiver-typed to
 `MethodSelection` exactly like `.Returning`, so a parameter constraint on a property, field,
@@ -1047,15 +1117,19 @@ matches the anchor's definition FQN.
   ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
   lists (`MustNotImplement`/`MustNotDeriveFrom`/`MustNotBeAttributedWith`) widen by the same rule —
   the attribute form qualifies *inside* the brackets ("`[Billing.Audit]` or `[Sales.Audit]`") — so
-  every multi-operand list disambiguates identically.
+  every multi-operand list disambiguates identically. Widening runs on the anchor's dot path,
+  which a string attribute anchor (§5.2) supplies exactly as a `typeof` does — the dots inside
+  a generic argument list belong to the argument's own path and never split — so string
+  anchors collide and widen byte-identically to their `typeof` twins.
 - **Member references** (§4.5) render as the backticked declaring type dot member —
   "`DateTime.Now`" — with `()` appended iff the member is a method ("`Task.Wait()`"; never
   a signature). Generic anchors use declared type-parameter names ("`Task<TResult>.Result`").
   Colliding declaring-type simple names widen by the same minimal-trailing-segments rule —
   including when the member names differ ("`Billing.Order.Total` or `Sales.Order.Refresh()`"),
   because the reader must see they are different `Order`s.
-- **Member subjects** (§4.6) assemble as `{kind-plural} of {selection-reference}` +
-  the inline adjectives in authoring order + the sentence-final `Where`. The kind-plural is the
+- **Member subjects** (§4.6) assemble as the member head prefixes + `{kind-plural} of
+  {selection-reference}` + the inline adjectives in authoring order + the sentence-final
+  `Where`. The kind-plural is the
   projection head ("methods", "properties", …); the `{selection-reference}` is the underlying
   type selection rendered in *reference* position (the same "types in `MyApp.Web.*`" / "the Web
   layer" form a target list uses), so a member subject reads "methods of types in `MyApp.Web.*`".
@@ -1063,7 +1137,12 @@ matches the anchor's definition FQN.
   the order written; the member `Where` canonicalizes sentence-final exactly like the type-side
   `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
   `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
-  `*Async`."*
+  `*Async`."* The member attribute adjective premodifies the kind-plural
+  ("`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`"), and stacked
+  member prefixes concatenate in authoring order rather than replacing (§5.7), so both
+  narrowing facts reach the sentence — the member-side twin of the `.Authored()` head
+  premodification above, on the same grounds: a trailing clause would read as narrowing the
+  wrong set.
 - Posture voices consume these same fragments: Enforce renders as law; Migrate renders the
   counter-prior paragraph (slots: from-prose, to-sentence, policy, baseline burndown); Quarantine
   renders dragons + sanctioned surface. Full paragraph templates are pinned by the renderer's
@@ -1137,7 +1216,12 @@ matches the anchor's definition FQN.
 15. Blank/whitespace glob or affix — a namespace pattern, a type- or member-name pattern, or a
     suffix/prefix left empty. A blank affix is vacuously true and a blank glob throws at check
     time; both are almost always an authoring slip. Applies on the type and member sides alike,
-    and to layer globs (reported spec-wide, named by layer).
+    and to layer globs (reported spec-wide, named by layer). String attribute anchors (§5.2)
+    report through this same family under the label "attribute name" (`Blank attribute name on
+    '{id}'.`) — no new code — on both sides and in every position, adjective and verbs alike.
+    Blankness is the whole of a string anchor's well-formedness: a dotless or suffix-less
+    spelling is a legal name that simply never matches (§5.2), and no other shape check
+    exists.
 16. Dead namespace subtree pattern — a trailing `.*` whose literal prefix carries a `*` (e.g.
     `MyApp.*.Controllers.*`). The subtree operator (§4.2) matches everything before the trailing
     `.*` literally, so the pattern never matches anything; the error names it and steers to a
@@ -1194,7 +1278,16 @@ matches the anchor's definition FQN.
     use `MustNotDeriveFrom` for a base class"; "`System.IDisposable` is an interface;
     `MustDeriveFrom` requires a non-interface anchor — use `MustImplement` for an interface";
     "`System.Attribute` does not derive from `System.Attribute`; `MustNotBeAttributedWith`
-    requires an attribute anchor"). Reported in the same all-at-once pass with the rule's
+    requires an attribute anchor"). The member-side `Must[Not]BeAttributedWith` verbs (§5.7)
+    carry the same check with the same messages. It applies to `typeof` anchors **only**: a
+    string anchor (§5.2) carries no category to check — the name is just a string, extraction
+    facts are the only authority on what it names, and refusing a spelling the host cannot
+    load would break the escape hatch's whole point — so a wrong string is loud on a positive
+    (always red) and silent on a negative, the honesty cost of the hatch. The **adjectives**
+    stay unchecked on both sides and across every hierarchy family, deliberately: a
+    wrong-category adjective empties the subject and the fail-on-empty default (§4.1, §4.6)
+    reds it loudly, whereas the silent slip this item exists to catch is the always-passing
+    `MustNot` verb. Reported in the same all-at-once pass with the rule's
     spec-source `file:line`, like items 19/20.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
@@ -1298,6 +1391,15 @@ agent fixing a spec sees every problem in one pass.
   parameter type is a second rule. The same ambiguity keeps the positive hierarchy verbs
   single-`Type`, but it does not bite a negation, so their `MustNot*` twins take
   `(Type first, params Type[] more)` — "must not implement `A` or `B`" is unambiguous none-of.
+- **Anchor-form triples.** An attribute anchor position ships `Type` / `string` / `<T>`
+  together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
+  generic sugar — all reifying to one internal anchor, so form choice is invisible to the
+  model and the sentence. The generic twin is `TSelf`-generic where inference allows and
+  **receiver-typed where it does not**: C# has no partial type inference, so a
+  `TSelf`-generic member adjective twin would force both type arguments at every call site
+  (`AttributedWith<MethodSelection, MyAttribute>()`); it ships instead as an overload pair on
+  `MemberSelection` and `MethodSelection`, the second keeping `.Returning` and
+  `MustAcceptParameter` reachable after the sugar.
 - Named arguments are the documentation convention for prose parameters (`from:`, `to:`,
   `description:`).
 - **Admission rule**: a new vocabulary member ships with model node + fragment(s) + pinned
@@ -1313,19 +1415,22 @@ Member-level *targets* shipped first (`arch.Member` + `MustNotUse`, §4.5); then
 *subjects* (the `.Members`/`.Methods`/`.Properties`/`.Fields`/`.Events` projections with
 member adjectives and shape/naming verbs, §4.6); then expression member anchors and generic
 type sugar (`arch.Member<T>(x => x.M)` / `arch.Member(() => X.M)` and `arch.Type<X>()` / the
-`Implementing`/`DerivedFrom`/`AttributedWith` twins, §4.5, §5.2–§5.3). Still growth on the
-member axis: the
+`Implementing`/`DerivedFrom`/`AttributedWith` twins, §4.5, §5.2–§5.3); then member attribute
+facts with the member attribute vocabulary (§4.6, §5.7). Still growth on the member axis: the
 `MustOnlyUse` / `MustNotBeUsedBy` verb twins; member-granular *source* attribution on the
 dependency verbs (today a violation names the using *type*, not the using member); string-FQN
-member anchoring — now the remaining *anchoring* residue, the escape hatch for a member that
-neither `typeof` + `nameof` nor an expression lambda can name (a member on a type the spec
-project cannot reference); member-level attribute facts and the member-side `AttributedWith` /
-`MustNotBeAttributedWith` pair — the type-level attribute verbs read declared *type* attributes
-only, so a `[Column]`/`[Key]` on a *property* is invisible to them; indexer/operator bans
-(the syntax-walk boundary moves deliberately, §4.5); and subject-side member *shape*
-adjectives (`.Methods.ThatAreVirtual()`, …)
+*member* anchoring — the anchoring residue that remains now that attribute anchors carry a
+string form (§5.2): the escape hatch for a member that neither `typeof` + `nameof` nor an
+expression lambda can name (a member on a type the spec project cannot reference);
+indexer/operator bans (the syntax-walk boundary moves deliberately, §4.5); and subject-side
+member *shape* adjectives (`.Methods.ThatAreVirtual()`, …)
 — the member constraint-side verbs and the `IMemberInfo` flags shipped (§5.7, §5.6), only the
-adjective position remains, exactly mirroring the type-side gap below.
+adjective position remains, exactly mirroring the type-side gap below. One entry shipped off
+this list whole, and a second narrowed: member-level attribute facts landed with the
+member-side `AttributedWith` / `MustNotBeAttributedWith` pair — carrying the positive
+`MustBeAttributedWith` the entry never promised, per the admission rule (§10) — and the
+*attribute* half of string-FQN anchoring shipped as §5.2's escape hatch, which is why the
+string-FQN entry above now names members alone.
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
 twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`

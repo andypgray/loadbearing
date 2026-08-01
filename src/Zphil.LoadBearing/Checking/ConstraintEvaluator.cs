@@ -116,13 +116,13 @@ internal sealed class ConstraintEvaluator
             case MustDeriveFromConstraint c:
                 return Shape(subjects, SelectionEvaluator.BaseTypeMatcher(c.Type));
             case MustBeAttributedWithConstraint c:
-                return Shape(subjects, SelectionEvaluator.AttributeMatcher(c.Type));
+                return Shape(subjects, SelectionEvaluator.AttributeMatcher(c.Anchor));
             case MustNotImplementConstraint c:
                 return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.InterfaceMatcher));
             case MustNotDeriveFromConstraint c:
                 return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.BaseTypeMatcher));
             case MustNotBeAttributedWithConstraint c:
-                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.AttributeMatcher));
+                return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.AttributeMatcher));
             case MustBeSealedConstraint:
                 return Shape(subjects, t => t.IsSealed);
             case MustBeStaticConstraint:
@@ -418,11 +418,15 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings);
     }
 
-    // The negative hierarchy/attribute verbs (GRAMMAR §5.3): a subject VIOLATES iff ANY anchor matches, so it
-    // PASSES iff NONE do — the per-subject negation over the anchor list. The three matchers are the same ones
-    // backing the positives (SelectionEvaluator), built once eagerly per anchor so an unrepresentable anchor
-    // throws (→ RuleError) before any subject is tested, exactly as the positive Shape arms do.
-    private static Func<TypeNode, bool> NoneOf(IReadOnlyList<Type> anchors, Func<Type, Func<TypeNode, bool>> matcher)
+    // The negative hierarchy/attribute verbs (GRAMMAR §5.3, §5.7): a subject VIOLATES iff ANY anchor matches,
+    // so it PASSES iff NONE do — the per-subject negation over the anchor list. The matchers are the same ones
+    // backing the positives (SelectionEvaluator / MemberSelectionEvaluator), built once eagerly per anchor so
+    // an unrepresentable anchor throws (→ RuleError) before any subject is tested, exactly as the positive
+    // Shape arms do. Generic over the anchor kind because the attribute verbs anchor on an AttributeAnchor
+    // (typeof or definition name, GRAMMAR §5.2) while the two hierarchy verbs anchor on a bare Type; generic
+    // over the subject kind because the same negation serves a type subject and a member one.
+    private static Func<TSubject, bool> NoneOf<TAnchor, TSubject>(
+        IReadOnlyList<TAnchor> anchors, Func<TAnchor, Func<TSubject, bool>> matcher)
     {
         var matchers = anchors.Select(matcher).ToList();
         return subject => !matchers.Any(match => match(subject));
@@ -459,6 +463,13 @@ internal sealed class ConstraintEvaluator
                 return MemberShape(members, m => m.IsAbstract);
             case MemberMustBeVirtualConstraint:
                 return MemberShape(members, m => m.IsVirtual);
+            case MemberMustBeAttributedWithConstraint c:
+                // The same matcher the member attribute ADJECTIVE narrows with (MemberSelectionEvaluator),
+                // built once eagerly per anchor so an unrepresentable anchor throws (→ RuleError) before any
+                // member is tested — the member twin of the type-side Shape arms.
+                return MemberShape(members, MemberSelectionEvaluator.MemberAttributeMatcher(c.Anchor));
+            case MemberMustNotBeAttributedWithConstraint c:
+                return MemberShape(members, NoneOf(c.Anchors, MemberSelectionEvaluator.MemberAttributeMatcher));
             case MemberMustAcceptParameterConstraint c:
                 // The anchor resolves through the SHARED definition-FQN path (SelectionEvaluator.DefinitionFullName,
                 // the same helper .Returning's anchors resolve through) — so a method passes iff one declared

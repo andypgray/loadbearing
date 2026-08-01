@@ -285,6 +285,8 @@ internal static class SpecValidator
     // and a negative an always-pass — both silent slips; the error names the anchor's FQN and steers to the
     // right-category verb. Applies to the positives' single anchor and every anchor in a negative's list, all
     // reported in the same all-at-once pass at the rule's spec-source location (one shared code, item-18 precedent).
+    // A string attribute anchor carries no reflected type, so it is filtered out (TypedAnchors) rather than
+    // guessed at: there is no category to read off an FQN, and inventing one would refuse legal spellings.
     private static void CheckHierarchyAnchors(RuleRegistration rule, List<SpecValidationError> errors)
     {
         switch (rule.Constraint)
@@ -306,11 +308,26 @@ internal static class SpecValidator
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
                 break;
             case MustBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => !t.IsSubclassOf(typeof(Attribute)),
+                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsSubclassOf(typeof(Attribute)),
                     t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustBeAttributedWith requires an attribute anchor");
                 break;
             case MustNotBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, c.Types, t => !t.IsSubclassOf(typeof(Attribute)),
+                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsSubclassOf(typeof(Attribute)),
+                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustNotBeAttributedWith requires an attribute anchor");
+                break;
+
+            // The member attribute verbs (GRAMMAR §5.7) carry the identical category rule and the identical
+            // message: the verb name in the steer is the same word on either side, so a member author reads
+            // the same sentence a type author does. Only the VERBS are checked — a wrong-category member
+            // attribute ADJECTIVE stays unchecked, exactly like its type-side twin: it empties the subject,
+            // which the fail-on-empty gate reds loudly, whereas the always-passing MustNot verb is the silent
+            // slip this item exists to catch.
+            case MemberMustBeAttributedWithConstraint c:
+                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsSubclassOf(typeof(Attribute)),
+                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustBeAttributedWith requires an attribute anchor");
+                break;
+            case MemberMustNotBeAttributedWithConstraint c:
+                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsSubclassOf(typeof(Attribute)),
                     t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustNotBeAttributedWith requires an attribute anchor");
                 break;
         }
@@ -327,6 +344,14 @@ internal static class SpecValidator
             if (invalid(anchor))
                 errors.Add(new SpecValidationError(Code.HierarchyAnchorWrongCategory, rule.Id,
                     $"{message(anchor)} (used by '{rule.Id}').", rule.Location));
+    }
+
+    // The reflected arm of an attribute anchor list — the only anchors item 21 can judge. A string anchor
+    // names a definition FQN and nothing more, so it is dropped here; the asymmetry is deliberate, and the
+    // blank-name check (item 15, via RulePatterns) is the whole of what a string anchor is validated for.
+    private static IReadOnlyList<Type> TypedAnchors(IReadOnlyList<AttributeAnchor> anchors)
+    {
+        return anchors.Where(anchor => anchor.Type is not null).Select(anchor => anchor.Type!).ToList();
     }
 
     // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.
@@ -547,7 +572,8 @@ internal static class SpecValidator
     // The glob/affix walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks: every
     // glob and affix a rule carries, each tagged namespace-glob (the full structural check) or plain
     // (blank only). A namespace glob is `Namespace: true`; a type/member name glob or a suffix/prefix is
-    // `Namespace: false`.
+    // `Namespace: false`. A string attribute anchor rides this walk too — blank is the only
+    // well-formedness a definition FQN has, so it joins the plain kinds under its own label.
     private static IEnumerable<(string Value, bool Namespace, string Label)> RulePatterns(RuleRegistration rule)
     {
         return rule.Constraint == null
@@ -587,6 +613,31 @@ internal static class SpecValidator
                 break;
             case MemberMustHavePrefixConstraint c:
                 yield return (c.Prefix, false, "member prefix");
+                break;
+
+            // The attribute verbs' string anchors (GRAMMAR §8 item 15, the "attribute name" label): a blank
+            // name is a slip that would otherwise mint an anchor matching nothing, silently. Only the string
+            // arm has a name to check; a typeof anchor yields nothing here.
+            case MustBeAttributedWithConstraint c when c.Anchor.DefinitionFullName is { } attributeName:
+                yield return (attributeName, false, "attribute name");
+                break;
+            case MustNotBeAttributedWithConstraint c:
+                foreach (AttributeAnchor anchor in c.Anchors)
+                    if (anchor.DefinitionFullName is { } name)
+                        yield return (name, false, "attribute name");
+
+                break;
+
+            // The member attribute verbs' string anchors, on the same terms and under the same label — blank
+            // is the whole of a definition FQN's well-formedness on either side of the axis (item 15).
+            case MemberMustBeAttributedWithConstraint c when c.Anchor.DefinitionFullName is { } memberAttributeName:
+                yield return (memberAttributeName, false, "attribute name");
+                break;
+            case MemberMustNotBeAttributedWithConstraint c:
+                foreach (AttributeAnchor anchor in c.Anchors)
+                    if (anchor.DefinitionFullName is { } name)
+                        yield return (name, false, "attribute name");
+
                 break;
         }
 
@@ -633,6 +684,10 @@ internal static class SpecValidator
                 case WithPrefixAdjective a:
                     yield return (a.Prefix, false, "prefix");
                     break;
+                case AttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
+                    // The adjective's string anchor, on the same terms as the two verbs' (item 15).
+                    yield return (attributeName, false, "attribute name");
+                    break;
                 case ExceptAdjective a:
                     foreach ((string, bool, string) pattern in SelectionPatterns(a.Payload)) yield return pattern;
                     break;
@@ -651,6 +706,11 @@ internal static class SpecValidator
                 break;
             case MemberWithPrefixAdjective a:
                 yield return (a.Prefix, false, "member prefix");
+                break;
+            case MemberAttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
+                // The member attribute adjective's string anchor (item 15). The category check deliberately
+                // does not reach an adjective on either axis — see CheckHierarchyAnchors.
+                yield return (attributeName, false, "attribute name");
                 break;
         }
     }

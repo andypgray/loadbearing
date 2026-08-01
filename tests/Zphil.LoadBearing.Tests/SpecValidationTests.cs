@@ -1547,4 +1547,198 @@ public class SpecValidationTests
                 .Because("Reason.");
         }
     }
+
+    // ---- String attribute anchors (GRAMMAR §5.2–§5.3). Appended at the very end so every caller-info golden
+    //      above keeps its authored line number. Blank is the ONLY well-formedness a definition FQN has, and it
+    //      reports through the shared Code.BlankPattern family under the "attribute name" label (§8 item 15) —
+    //      no new code. The item-21 category check deliberately does not apply: there is no category to read
+    //      off a string, so a nonsense name builds clean and simply matches nothing. ----
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNameOnAdjective_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeAdjectiveSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message
+            .ShouldBe("SpecValidationTests.cs:1610: Blank attribute name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNameOnMustBeAttributedWith_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeVerbSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message
+            .ShouldBe("SpecValidationTests.cs:1620: Blank attribute name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNameOnMustNotBeAttributedWith_IsReported()
+    {
+        // The blank is the SECOND anchor in the negative's list — proof the walk covers every anchor.
+        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeNegativeVerbSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message
+            .ShouldBe("SpecValidationTests.cs:1630: Blank attribute name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNamesAcrossAdjectiveAndVerb_BesideMissingBecause_AreReportedInOnePass()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeAllAtOnceSpec());
+
+        ex.Errors.Count(e => e.Code == Code.BlankPattern).ShouldBe(2);
+        ex.Errors.ShouldContain(e => e.Code == Code.MissingBecause && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ValidStringAttributeAnchors_NonsenseNames_BuildWithoutError()
+    {
+        // No category check applies to a string: a non-attribute FQN, a dotless name, a suffix-less name, and
+        // even "System.Attribute" — the one spelling whose typeof form item 21 refuses — all build. They name
+        // no declared attribute, so they match nothing; that is the hatch's stated honesty boundary.
+        Should.NotThrow(() => ArchModelBuilder.Build(new NonsenseStringAttributeAnchorSpec()));
+    }
+
+    private sealed class BlankAttributeAdjectiveSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.AttributedWith("   ").MustBeSealed())
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class BlankAttributeVerbSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustBeAttributedWith(""))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class BlankAttributeNegativeVerbSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustNotBeAttributedWith("N.MarkAttribute", "  "))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class BlankAttributeAllAtOnceSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            // A blank adjective anchor AND a blank verb anchor AND no .Because → three errors in one pass.
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.AttributedWith("").MustBeAttributedWith(" "));
+        }
+    }
+
+    private sealed class NonsenseStringAttributeAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/not-an-attribute").Enforce(arch.Types.MustBeAttributedWith("System.Object")).Because("Reason.");
+            arch.Rule("area/dotless").Enforce(arch.Types.AttributedWith("Nonsense").MustBeSealed()).Because("Reason.");
+            arch.Rule("area/no-suffix").Enforce(arch.Types.MustNotBeAttributedWith("N.Mark")).Because("Reason.");
+            arch.Rule("area/attribute-itself").Enforce(arch.Types.MustNotBeAttributedWith("System.Attribute")).Because("Reason.");
+        }
+    }
+
+    // ---- The member attribute axis (GRAMMAR §5.7). Appended at the very end so every caller-info golden
+    //      above keeps its authored line number. The two VERBS carry the item-21 category check with the type
+    //      side's message verbatim; the ADJECTIVE deliberately does not — a wrong-category adjective empties
+    //      the subject, which the fail-on-empty gate reds loudly (pinned in MemberSubjectVerbTests), whereas
+    //      the always-passing MustNot verb is the silent slip the check exists to catch. ----
+
+    [Fact]
+    public void HierarchyAnchorWrongCategory_NonAttributeOnMemberMustBeAttributedWith_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MemberNonAttributeAnchorSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.HierarchyAnchorWrongCategory).Message
+            .ShouldBe("SpecValidationTests.cs:1709: 'System.Exception' does not derive from System.Attribute; MustBeAttributedWith " +
+                      "requires an attribute anchor (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void HierarchyAnchorWrongCategory_AttributeItselfOnMemberMustNotBeAttributedWith_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MemberAttributeItselfAnchorSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.HierarchyAnchorWrongCategory && e.RuleId == "area/rule");
+        ex.Errors.First(e => e.Code == Code.HierarchyAnchorWrongCategory).Message
+            .ShouldBe("SpecValidationTests.cs:1719: 'System.Attribute' does not derive from System.Attribute; MustNotBeAttributedWith " +
+                      "requires an attribute anchor (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void ValidMemberAttributeAnchors_AndAnUncheckedAdjective_BuildWithoutError()
+    {
+        // Attribute-derived anchors on both member verbs are accepted — and so is a wrong-category anchor on
+        // the member ADJECTIVE, which is category-checked on neither axis.
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberAttributeAnchorsSpec()));
+    }
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNamesOnTheMemberNodes_AreReportedInOnePass()
+    {
+        // One blank per member node — the adjective, the positive verb, and the SECOND anchor of a negative's
+        // list — all three reported together under the shared "attribute name" label.
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberAttributeNameSpec());
+
+        ex.Errors.Count(e => e.Code == Code.BlankPattern).ShouldBe(3);
+        ex.Errors.First(e => e.Code == Code.BlankPattern).Message
+            .ShouldBe("SpecValidationTests.cs:1739: Blank attribute name on 'member/adjective'.");
+    }
+
+    private sealed class MemberNonAttributeAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.MustBeAttributedWith(typeof(Exception)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class MemberAttributeItselfAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.Methods.MustNotBeAttributedWith(typeof(Attribute)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class ValidMemberAttributeAnchorsSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/attributed-pos").Enforce(arch.Types.Methods.MustBeAttributedWith(typeof(SerializableAttribute))).Because("Reason.");
+            arch.Rule("member/attributed-neg").Enforce(arch.Types.Methods.MustNotBeAttributedWith(typeof(SerializableAttribute))).Because("Reason.");
+            arch.Rule("member/adjective-uncategorized").Enforce(arch.Types.Methods.AttributedWith(typeof(Exception)).MustBePublic()).Because("Reason.");
+        }
+    }
+
+    private sealed class BlankMemberAttributeNameSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("member/adjective").Enforce(arch.Types.Methods.AttributedWith("   ").MustBePublic()).Because("Reason.");
+            arch.Rule("member/positive").Enforce(arch.Types.Methods.MustBeAttributedWith("")).Because("Reason.");
+            arch.Rule("member/negative").Enforce(arch.Types.Methods.MustNotBeAttributedWith("N.MarkAttribute", " ")).Because("Reason.");
+        }
+    }
 }

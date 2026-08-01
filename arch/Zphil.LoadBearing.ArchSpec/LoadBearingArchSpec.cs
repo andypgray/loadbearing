@@ -53,9 +53,17 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                     builds a second container while configuring services, and nothing does today.
 ///                 </item>
 ///                 <item>
-///                     <c>mcp/tools-accept-cancellation</c>: every <c>Task</c>-returning MCP tool method
+///                     <c>mcp/tools-accept-cancellation</c>: every method carrying <c>[McpServerTool]</c>
 ///                     takes a <c>CancellationToken</c>, so a client cancel is honored and the idle
-///                     watchdog can close.
+///                     watchdog can close. The attribute is the whole subject — a tool method declared
+///                     synchronously, or outside the tools namespace, is still a tool and is still
+///                     governed.
+///                 </item>
+///                 <item>
+///                     <c>mcp/tool-types-attributed</c>: every type in the MCP tools namespace carries
+///                     <c>[McpServerToolType]</c>. Tool discovery is the attribute walk, so a tool class
+///                     without it compiles, registers nothing, and its tools vanish from the server in
+///                     silence.
 ///                 </item>
 ///                 <item>
 ///                     <c>roslyn/no-msbuildlocator-query</c>: no code queries
@@ -157,7 +165,8 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         pack's general one. A rule's <c>Because</c> is not always universal.
 ///     </para>
 ///     <para>
-///         Two more pack rules have local twins for that same reason. <c>mcp/no-blocking-waits</c> stands
+///         Two more pack rules have local twins — one for that same reason, one for a harder one.
+///         <c>mcp/no-blocking-waits</c> stands
 ///         in for <c>async/no-sync-over-async</c>, whose ban list also covers <c>GetAwaiter</c> itself and
 ///         whose prose is the general TAP one; the local rule names what a block actually costs here — a
 ///         thread-pool thread held for a child process's whole lifetime, and a tool call's
@@ -167,10 +176,15 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         namespace: the git and vswhere launchers that could wedge a <c>--diff-base</c> tool call live in
 ///         the CLI's diff plumbing and in the extraction host.
 ///         <c>mcp/tools-accept-cancellation</c> stands in for
-///         <c>async/accept-cancellation</c> on the same grounds: the stake here is a tool method holding
-///         the idle watchdog open for the life of the server, not cancellation in general. Both could
-///         have been pack calls with a narrow subject, since every pack method takes one, so what keeps
-///         them local is the prose rather than the scope. The remaining two are declined as vacuous:
+///         <c>async/accept-cancellation</c> on the same prose grounds — the stake here is a tool method
+///         holding the idle watchdog open for the life of the server, not cancellation in general — and
+///         on a second one it did not have until this spec could name an attribute by string: its subject
+///         is now every <c>[McpServerTool]</c>-attributed method, and that is not a subject a pack call
+///         can take. The pack's method is handed a type selection and applies the <c>Task</c>-returning
+///         method projection itself, so a caller has no way to narrow it to a method-level attribute the
+///         pack has never heard of. Only <c>mcp/no-blocking-waits</c>, then, could still have been a pack
+///         call with a narrow subject: what keeps that one local is the prose, and what keeps this one
+///         local is expressiveness. The remaining two are declined as vacuous:
 ///         <c>http/reuse-httpclient</c> and <c>persistence/no-mapping-attributes</c> have nothing to
 ///         govern in a codebase that makes no HTTP calls and has no ORM.
 ///     </para>
@@ -195,12 +209,12 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         <c>*Constraint</c> derives from <c>Constraint</c> — was tried and passes, but
 ///         <c>model/constraint-nodes</c> already governs that exact set, so landing it would widen the
 ///         verb range and say nothing new.
-///         <c>MustBeAttributedWith</c> and <c>MustNotBeAttributedWith</c> hide the one rule this
-///         repository wants and cannot have: an MCP tool type that does not carry
-///         <c>[McpServerToolType]</c> silently fails to register, which is a real stake, but naming the
-///         attribute would make this spec project reference the CLI and pull the whole tool and its
-///         package closure into the load context of every spec run. Declined on that cost rather than
-///         contrived around.
+///         <c>MustNotBeAttributedWith</c> is the unused half of the attribute family. Its positive twin
+///         left this ledger for <c>mcp/tool-types-attributed</c> — the rule the ledger used to record as
+///         wanted and unaffordable, until a string anchor let this spec name <c>[McpServerToolType]</c>
+///         without referencing the CLI that declares it. The negative has no such rule waiting: no
+///         attribute is forbidden anywhere here, and inventing a ban to exercise the verb is exactly the
+///         contrivance this ledger refuses.
 ///         <c>MustHaveNameMatching</c> is the glob form of the naming family; the two naming laws here
 ///         are a prefix and a suffix, which say it more exactly.
 ///         <c>Must</c> is the predicate escape hatch for what the vocabulary cannot express, and nothing
@@ -342,12 +356,21 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         DotNetGuidance.NoBuildServiceProvider(arch, arch.Types.InNamespace("Zphil.LoadBearing.*"), PackPosture.Enforce);
 
         arch.Rule("mcp/tools-accept-cancellation")
-            .Enforce(arch.Namespace("Zphil.LoadBearing.Cli.Mcp.Tools.*")
-                .Methods.Returning(typeof(Task), typeof(Task<>))
+            .Enforce(arch.Namespace("Zphil.LoadBearing.*")
+                .Methods.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")
                 .MustAcceptParameter(typeof(CancellationToken)))
             .Because("Tool calls run inside one long-lived server process; a tool method without a " +
                      "CancellationToken cannot honor a client cancel and holds the idle watchdog open.")
             .Fix("Add a trailing CancellationToken parameter (default it) and flow it into the runner.");
+
+        arch.Rule("mcp/tool-types-attributed")
+            .Enforce(arch.Namespace("Zphil.LoadBearing.Cli.Mcp.Tools.*")
+                .MustBeAttributedWith("ModelContextProtocol.Server.McpServerToolTypeAttribute"))
+            .Because("Tool discovery is the attribute walk: WithCoercingTools registers the [McpServerTool] " +
+                     "methods of [McpServerToolType]-annotated classes, so a tool class without the type " +
+                     "attribute compiles, registers nothing, and its tools silently vanish from the server.")
+            .Fix("Put [McpServerToolType] on the tool class (see ArchTools), and keep tool classes in " +
+                 "Zphil.LoadBearing.Cli.Mcp.Tools.");
 
         arch.Rule("roslyn/no-msbuildlocator-query")
             .Enforce(arch.Types.InNamespace("Zphil.LoadBearing.*")

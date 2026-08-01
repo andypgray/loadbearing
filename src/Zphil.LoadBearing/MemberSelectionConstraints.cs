@@ -68,6 +68,75 @@ public static class MemberSelectionConstraints
         return new MemberMustBeVirtualConstraint(Subject(subject));
     }
 
+    /// <summary>The subject members must carry an attribute.</summary>
+    public static Constraint MustBeAttributedWith(this MemberSelection subject, Type attributeType)
+    {
+        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
+        return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
+    }
+
+    /// <summary>
+    ///     The subject members must carry an attribute named by string — the escape hatch for an attribute
+    ///     the spec project cannot compile against, so it need not take a package reference just to write
+    ///     the <c>typeof</c>. <paramref name="attributeFullName" /> is the attribute <em>definition</em>'s
+    ///     fully-qualified name in extraction format, <c>Attribute</c> suffix included
+    ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>); it matches any construction of
+    ///     that definition, and a constructed spelling matches nothing. Prefer
+    ///     <see cref="MustBeAttributedWith(MemberSelection,Type)" /> whenever the attribute is
+    ///     referenceable — the compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Constraint MustBeAttributedWith(this MemberSelection subject, string attributeFullName)
+    {
+        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
+    }
+
+    /// <summary>
+    ///     The subject members must carry attribute <typeparamref name="T" /> —
+    ///     <c>≡ MustBeAttributedWith(typeof(T))</c>; an open generic stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustBeAttributedWith<T>(this MemberSelection subject)
+        where T : Attribute
+    {
+        return subject.MustBeAttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     The subject members must not carry any of the attribute anchors — none-of semantics
+    ///     (GRAMMAR §5.7, §10). The negative takes <c>(Type first, params Type[] more)</c>: "must not be
+    ///     attributed with `A` or `B`" is unambiguous, unlike the single-<c>Type</c> positive.
+    /// </summary>
+    public static Constraint MustNotBeAttributedWith(this MemberSelection subject, Type first, params Type[] more)
+    {
+        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
+    }
+
+    /// <summary>
+    ///     The subject members must not carry any of the attribute anchors named by string — none-of
+    ///     semantics (GRAMMAR §5.7, §10) over the escape-hatch form, for attributes the spec project cannot
+    ///     compile against. Each name is an attribute <em>definition</em>'s fully-qualified name in
+    ///     extraction format, <c>Attribute</c> suffix included
+    ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>), matching any construction of that
+    ///     definition; a constructed spelling matches nothing. The overloads are homogeneous — one call is
+    ///     all <c>typeof</c> or all names; write a second rule to mix them. Prefer
+    ///     <see cref="MustNotBeAttributedWith(MemberSelection,Type,Type[])" /> whenever the attributes are
+    ///     referenceable — the compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Constraint MustNotBeAttributedWith(this MemberSelection subject, string first, params string[] more)
+    {
+        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), AnchorNames(first, more));
+    }
+
+    /// <summary>
+    ///     The subject members must not carry attribute <typeparamref name="T" /> —
+    ///     <c>≡ MustNotBeAttributedWith(typeof(T))</c>; an open generic stays <c>typeof</c>.
+    /// </summary>
+    public static Constraint MustNotBeAttributedWith<T>(this MemberSelection subject)
+        where T : Attribute
+    {
+        return subject.MustNotBeAttributedWith(typeof(T));
+    }
+
     /// <summary>
     ///     The member constraint-position escape hatch. The predicate is stored, never evaluated at
     ///     spec build; the required <paramref name="description" /> completes "must …". A blank
@@ -81,6 +150,27 @@ public static class MemberSelectionConstraints
     private static MemberSelection Subject(MemberSelection subject)
     {
         return Guard.NotNull(subject, nameof(subject));
+    }
+
+    // The raw-Type anchor list of the negative attribute verb, minted as typeof AttributeAnchors — the
+    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10).
+    private static IReadOnlyList<AttributeAnchor> AnchorTypes(Type first, Type[] more)
+    {
+        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromType(NotNull(first, nameof(first))) };
+        foreach (Type type in more) list.Add(AttributeAnchor.FromType(NotNull(type, nameof(more))));
+
+        return list;
+    }
+
+    // The string twin of AnchorTypes: the same (first, params more) shape over attribute-definition names.
+    // Only null is refused here — a blank name reaches the validation catalog (GRAMMAR §8 item 15) so it
+    // reports with every other error rather than throwing first.
+    private static IReadOnlyList<AttributeAnchor> AnchorNames(string first, string[] more)
+    {
+        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromName(NotNull(first, nameof(first))) };
+        foreach (string name in more) list.Add(AttributeAnchor.FromName(NotNull(name, nameof(more))));
+
+        return list;
     }
 
     private static T NotNull<T>(T value, string paramName)

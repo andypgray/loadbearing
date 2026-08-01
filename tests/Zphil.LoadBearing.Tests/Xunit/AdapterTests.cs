@@ -38,6 +38,7 @@ public sealed class AdapterTests
             "di/no-service-locator",
             "di/no-buildserviceprovider",
             "mcp/tools-accept-cancellation",
+            "mcp/tool-types-attributed",
             "roslyn/no-msbuildlocator-query",
             "mcp/no-blocking-waits",
             "naming/async-suffix",

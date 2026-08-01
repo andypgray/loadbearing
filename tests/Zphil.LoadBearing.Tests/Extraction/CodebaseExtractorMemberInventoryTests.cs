@@ -542,4 +542,155 @@ public sealed class CodebaseExtractorMemberInventoryTests
         c.Member("E:N.C.Evt").Parameters.ShouldBeEmpty();
         c.Member("M:N.C.Nullary").Parameters.ShouldBeEmpty();
     }
+
+    [Fact]
+    public void Inventory_AllFourKinds_CarryTheirDeclaredAttributes()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark] public int Field;
+                                                             [Mark] public int Prop { get; set; }
+                                                             [Mark] public event System.Action Evt;
+                                                             [Mark] public void Do() {}
+                                                         }
+                                                         """);
+
+        // Every member kind carries its own attribute facts (GRAMMAR §4.6). Each is a definition/constructed
+        // pair; for a non-generic attribute the two names coincide, and both keep the `Attribute` suffix — the
+        // extraction FQN, never the `[Mark]` shorthand the source spells.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("P:N.C.Prop").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("E:N.C.Evt").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("M:N.C.Do").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+    }
+
+    [Fact]
+    public void Inventory_UnattributedMembers_CarryEmptyAttributeLists()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Field;
+                                                             public int Prop { get; set; }
+                                                             public event System.Action Evt;
+                                                             public void Do() {}
+                                                         }
+                                                         """);
+
+        // A member that declares no attribute holds the empty list, never null — the same contract the
+        // parameter facts carry.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field").Attributes.ShouldBeEmpty();
+        c.Member("P:N.C.Prop").Attributes.ShouldBeEmpty();
+        c.Member("E:N.C.Evt").Attributes.ShouldBeEmpty();
+        c.Member("M:N.C.Do").Attributes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_SeveralAttributesOnOneMember_AreOrderedOrdinalByConstructedName()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class ZetaAttribute : System.Attribute {}
+                                                         public sealed class AlphaAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Zeta, Alpha] public void Do() {}
+                                                         }
+                                                         """);
+
+        // Source order is deliberately Zeta-then-Alpha: the recorded order is ordinal by constructed name, so a
+        // persisted fragment is byte-stable however the source (or Roslyn) happened to order the list.
+        model.Type("N.C").Member("M:N.C.Do").Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.AlphaAttribute", "N.ZetaAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_PropertyAccessorAttribute_IsOutsideThePropertysAttributeFact()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public sealed class OnlyGetAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark] public int P { [OnlyGet] get; set; }
+                                                         }
+                                                         """);
+
+        // RATIFIED boundary (GRAMMAR §4.6): the fact is DECLARED-ONLY — read off the member symbol itself. An
+        // attribute on the property is in; one on its `get` accessor is out, because it hangs off the accessor
+        // METHOD symbol, and accessors fold into the property rather than being inventoried in their own right.
+        model.Type("N.C").Member("P:N.C.P").Attributes.Select(a => a.FullName).ShouldBe(["N.MarkAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_ReturnTargetedAttribute_IsOutsideTheMethodsAttributeFact()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public sealed class OnlyReturnAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark]
+                                                             [return: OnlyReturn]
+                                                             public int Do() => 0;
+                                                         }
+                                                         """);
+
+        // The same declared-only boundary on the method side: a `[return:]` attribute hangs off the return-value
+        // pseudo-symbol, not the method, so it is deliberately outside the fact a member subject reads.
+        model.Type("N.C").Member("M:N.C.Do").Attributes.Select(a => a.FullName).ShouldBe(["N.MarkAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_GenericAttribute_RecordsDefinitionAndConstructedNamesSeparately()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute<T> : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark<int>] public void Do() {}
+                                                         }
+                                                         """);
+
+        // A C# 11 generic attribute is where the pair earns its keep: the definition side erases the
+        // construction (so an open-definition anchor matches any construction), while the constructed name keeps
+        // the substituted argument — exactly the type-side attribute-construction discipline, member-level.
+        model.Type("N.C").Member("M:N.C.Do").AttributeNames()
+            .ShouldBe([("N.MarkAttribute<T>", "N.MarkAttribute<System.Int32>")]);
+    }
+
+    [Fact]
+    public void Inventory_PartialMethodParts_UnionBothPartsAttributes_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("Attrs.cs", """
+                         namespace N;
+                         public sealed class OnDefiningAttribute : System.Attribute {}
+                         public sealed class AlsoOnImplementingAttribute : System.Attribute {}
+                         """),
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host { [OnDefining] partial void OnScan(); }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host { [AlsoOnImplementing] partial void OnScan() {} }
+                            """));
+
+        // EMPIRICAL PIN: a partial method's two parts carry different attributes, and the merged symbol the
+        // inventory reads reports BOTH — observed Roslyn merged-symbol behaviour, not a designed rule. The union
+        // is the honest reading for a member subject (either part's attribute is authored surface). The names
+        // are chosen so ordinal order reverses part order, which pins the ordering as by constructed name.
+        model.Type("N.Host").Members.Single(m => m.Name == "OnScan").Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.AlsoOnImplementingAttribute", "N.OnDefiningAttribute"]);
+    }
 }

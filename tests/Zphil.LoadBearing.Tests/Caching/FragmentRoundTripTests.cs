@@ -22,9 +22,10 @@ public sealed class FragmentRoundTripTests
     {
         // Arrange — a solution shape that exercises every fragment DTO field: kinds (class/interface/struct/
         // enum/delegate/record), modifiers (sealed/static/abstract), a base chain, direct + transitive +
-        // constructed interfaces, attributes (with an external System.Attribute), a [GeneratedCode] type and
-        // the nested type that inherits the flag through the containing-type walk, cross-project references,
-        // partials across files (declaration-site union), a multi-site edge, externals, and a multi-TFM project.
+        // constructed interfaces, attributes (with an external System.Attribute) on a type AND on a member, a
+        // [GeneratedCode] type and the nested type that inherits the flag through the containing-type walk,
+        // cross-project references, partials across files (declaration-site union), a multi-site edge,
+        // externals, and a multi-TFM project.
         var fragments = ExtractRichSolution();
 
         // Act
@@ -34,7 +35,14 @@ public sealed class FragmentRoundTripTests
         var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
-        // Assert — total-fact equality: the round-trip is invisible to the merged model.
+        // Assert — the member-attribute fact is non-vacuous here: without a member that actually carries one,
+        // both dumps would render an empty list and a dropped field would still round-trip equal.
+        direct.Type("N.Handler").Member("M:N.Handler.Handle(N.Msg)").AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        fromCache.Type("N.Handler").Member("M:N.Handler.Handle(N.Msg)").AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+
+        // Total-fact equality: the round-trip is invisible to the merged model.
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 
@@ -297,7 +305,7 @@ public sealed class FragmentRoundTripTests
                              public delegate void Notify();
                              public sealed class MarkAttribute : System.Attribute {}
                              public class Msg {}
-                             [Mark] public class Handler : IHandler<Msg>, IDerived<Msg> {}
+                             [Mark] public class Handler : IHandler<Msg>, IDerived<Msg> { [Mark] public void Handle(Msg m) {} }
                              [System.CodeDom.Compiler.GeneratedCode("Tool", "1.0")] public class Emitted { public class Inner {} }
                              """),
             ("SplitA.cs", """

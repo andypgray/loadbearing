@@ -6,6 +6,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Tests.Checking.Targets;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -21,6 +22,8 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class MemberSubjectVerbTests
 {
+    private const string T = "Zphil.LoadBearing.Tests.Checking.Targets.";
+
     private const string Members = """
                                    namespace App.Members
                                    {
@@ -93,10 +96,37 @@ public sealed class MemberSubjectVerbTests
                                       }
                                       """;
 
+    // The member attribute-axis fixture (GRAMMAR §4.6, §5.7): [Mark] on methods and on a property, across two
+    // declaring types. Ignored is bare AND internal, Ledger bare and non-static, so a rule that failed to
+    // narrow would red them too — every adjective pin below is self-guarding. Sweep carries a different
+    // attribute, for the none-of list. MarkAttribute is re-declared here in lockstep with the reflectable
+    // CheckerTargets copy (the Sources.Hierarchy discipline); [Obsolete] is the BCL second anchor.
+    private const string Attributed = """
+                                      namespace Zphil.LoadBearing.Tests.Checking.Targets
+                                      {
+                                          using System;
+                                          public sealed class MarkAttribute : Attribute {}
+                                          public class Tools
+                                          {
+                                              [Mark] public void RunAsync() {}
+                                              [Mark] internal void Hidden() {}
+                                              internal void Ignored() {}
+                                              [Obsolete] public void Sweep() {}
+                                              [Mark] public int Tally { get; set; }
+                                              public int Ledger { get; set; }
+                                          }
+                                          public class Widgets
+                                          {
+                                              [Mark] public void Assemble() {}
+                                          }
+                                      }
+                                      """;
+
     private static readonly CodebaseModel MembersModel = CompilationFactory.Extract(Members);
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(Async);
     private static readonly CodebaseModel KindsModel = CompilationFactory.Extract(Kinds);
     private static readonly CodebaseModel ParametersModel = CompilationFactory.Extract(Parameters);
+    private static readonly CodebaseModel AttributedModel = CompilationFactory.Extract(Attributed);
 
     // ── naming verbs ──────────────────────────────────────────────────────────────────────────────────
 
@@ -334,6 +364,102 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .WithPrefix("ParamsTokensOnly").MustAcceptParameter(typeof(CancellationToken)))
             .ShouldBe(["M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])"]);
+    }
+
+    // ── the attribute axis: one adjective, both verbs (GRAMMAR §5.7) ──────────────────────────────────
+
+    [Fact]
+    public void AttributedWithAdjective_TypeofAndStringAnchors_NarrowToTheSameMembers()
+    {
+        // MustBePublic over the [Mark]-attributed methods reds exactly one — the internal Hidden. Ignored is
+        // internal too and would red alongside it had the adjective not narrowed, so the pin is self-guarding.
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
+                .AttributedWith(typeof(MarkAttribute)).MustBePublic())
+            .ShouldBe([$"M:{T}Tools.Hidden"]);
+
+        // The string arm names the DEFINITION and selects identically — the type side's semantics, member side.
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
+                .AttributedWith($"{T}MarkAttribute").MustBePublic())
+            .ShouldBe([$"M:{T}Tools.Hidden"]);
+    }
+
+    [Fact]
+    public void AttributedWithAdjective_OnThePropertiesProjection_NarrowsWithinTheKind()
+    {
+        // The adjective is kind-agnostic: on .Properties it keeps the attributed Tally and drops the bare
+        // Ledger, which is equally non-static and would red too if the narrowing had not happened.
+        FailedMemberIds(AttributedModel, arch => arch.Types.Properties
+                .AttributedWith(typeof(MarkAttribute)).MustBeStatic())
+            .ShouldBe([$"P:{T}Tools.Tally"]);
+    }
+
+    [Fact]
+    public void AttributedWithAdjective_TypoedStringAnchor_EmptiesTheSubjectAndFailsLoudly()
+    {
+        // Why the ADJECTIVE needs no spec-build category check while the MustNot verb does: a misspelled or
+        // wrong-category anchor as the sole adjective matches nothing, and the fail-on-empty gate reds the
+        // rule in member terms rather than letting it pass vacuously. Pinned, because it is the argument.
+        RuleResult result = Checker.Run(AttributedModel, arch => arch.Rule("member/x")
+                .Enforce(arch.Types.Methods.AttributedWith($"{T}MrakAttribute").MustBePublic()).Because("b"))
+            .Single();
+
+        result.Status.ShouldBe(RuleStatus.Failed);
+        Violation violation = result.Violations.Single();
+        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
+        violation.Detail.ShouldBe(ConstraintEvaluator.EmptyMemberSubjectMessage);
+    }
+
+    [Fact]
+    public void MustBeAttributedWith_HoldsForAttributedMember_RedsBareMemberAtItsDocId()
+    {
+        Pass(AttributedModel, arch => arch.Types.Methods
+            .WithPrefix("RunAsync").MustBeAttributedWith(typeof(MarkAttribute)));
+
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
+                .WithPrefix("Ignored").MustBeAttributedWith(typeof(MarkAttribute)))
+            .ShouldBe([$"M:{T}Tools.Ignored"]);
+
+        // The string arm of the same verb reaches the same two verdicts.
+        Pass(AttributedModel, arch => arch.Types.Methods.WithPrefix("RunAsync").MustBeAttributedWith($"{T}MarkAttribute"));
+
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
+                .WithPrefix("Ignored").MustBeAttributedWith($"{T}MarkAttribute"))
+            .ShouldBe([$"M:{T}Tools.Ignored"]);
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_RedsAttributedMember_PassesForBare()
+    {
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
+                .WithPrefix("RunAsync").MustNotBeAttributedWith(typeof(MarkAttribute)))
+            .ShouldBe([$"M:{T}Tools.RunAsync"]);
+
+        Pass(AttributedModel, arch => arch.Types.Methods
+            .WithPrefix("Ignored").MustNotBeAttributedWith(typeof(MarkAttribute)));
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_AnchorList_RedsOnAnyAnchor()
+    {
+        // None-of over the list: Sweep carries only [Obsolete], so the SECOND anchor is what reds it.
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.WithPrefix("Sweep")
+                .MustNotBeAttributedWith(typeof(MarkAttribute), typeof(ObsoleteAttribute)))
+            .ShouldBe([$"M:{T}Tools.Sweep"]);
+
+        // …and a member carrying neither passes the whole list.
+        Pass(AttributedModel, arch => arch.Types.Methods.WithPrefix("Ignored")
+            .MustNotBeAttributedWith(typeof(MarkAttribute), typeof(ObsoleteAttribute)));
+    }
+
+    [Fact]
+    public void AttributedMemberViolations_OrderByDeclaringTypeThenSymbolId()
+    {
+        // Every [Mark]-attributed member across both declaring types, all instance, so all red. Ordering is
+        // (DeclaringType.FullName, SymbolId): Tools.Tally (a P: id) sorts before Widgets.Assemble (an M: id)
+        // because its declaring type sorts first — a global SymbolId sort would invert the pair.
+        FailedMemberIds(AttributedModel, arch => arch.Types.Members
+                .AttributedWith(typeof(MarkAttribute)).MustBeStatic())
+            .ShouldBe([$"M:{T}Tools.Hidden", $"M:{T}Tools.RunAsync", $"P:{T}Tools.Tally", $"M:{T}Widgets.Assemble"]);
     }
 
     // ── deterministic ordering ────────────────────────────────────────────────────────────────────────

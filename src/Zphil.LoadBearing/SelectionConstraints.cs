@@ -250,7 +250,24 @@ public static class SelectionConstraints
     /// <summary>The subject must carry an attribute.</summary>
     public static Constraint MustBeAttributedWith(this Selection subject, Type type)
     {
-        return new MustBeAttributedWithConstraint(Subject(subject), NotNull(type, nameof(type)));
+        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(type, nameof(type)));
+        return new MustBeAttributedWithConstraint(Subject(subject), anchor);
+    }
+
+    /// <summary>
+    ///     The subject must carry an attribute named by string — the escape hatch for an attribute the
+    ///     spec project cannot compile against, so it need not take a package reference just to write the
+    ///     <c>typeof</c>. <paramref name="attributeFullName" /> is the attribute <em>definition</em>'s
+    ///     fully-qualified name in extraction format, <c>Attribute</c> suffix included
+    ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>); it matches any construction of
+    ///     that definition, and a constructed spelling matches nothing. Prefer
+    ///     <see cref="MustBeAttributedWith(Selection,Type)" /> whenever the attribute is referenceable —
+    ///     the compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Constraint MustBeAttributedWith(this Selection subject, string attributeFullName)
+    {
+        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        return new MustBeAttributedWithConstraint(Subject(subject), anchor);
     }
 
     /// <summary>
@@ -297,7 +314,24 @@ public static class SelectionConstraints
     /// <summary>The subject must not be attributed with any of the attribute anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
     public static Constraint MustNotBeAttributedWith(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
+        var anchors = AnchorTypes(first, more).Select(AttributeAnchor.FromType).ToList();
+        return new MustNotBeAttributedWithConstraint(Subject(subject), anchors);
+    }
+
+    /// <summary>
+    ///     The subject must not be attributed with any of the attribute anchors named by string —
+    ///     none-of semantics (GRAMMAR §5.3, §10) over the escape-hatch form, for attributes the spec
+    ///     project cannot compile against. Each name is an attribute <em>definition</em>'s fully-qualified
+    ///     name in extraction format, <c>Attribute</c> suffix included
+    ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>), matching any construction of
+    ///     that definition; a constructed spelling matches nothing. The overloads are homogeneous — one
+    ///     call is all <c>typeof</c> or all names; write a second rule to mix them. Prefer
+    ///     <see cref="MustNotBeAttributedWith(Selection,Type,Type[])" /> whenever the attributes are
+    ///     referenceable — the compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Constraint MustNotBeAttributedWith(this Selection subject, string first, params string[] more)
+    {
+        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorNames(first, more));
     }
 
     /// <summary>
@@ -390,6 +424,17 @@ public static class SelectionConstraints
     {
         var list = new List<Type>(1 + more.Length) { NotNull(first, nameof(first)) };
         foreach (Type type in more) list.Add(NotNull(type, nameof(more)));
+
+        return list;
+    }
+
+    // The string twin of AnchorTypes for MustNotBeAttributedWith: the same (first, params more) shape over
+    // attribute-definition names, each minted as a string AttributeAnchor. Only null is refused here — a
+    // blank name reaches the validation catalog (GRAMMAR §8 item 15) so it reports with every other error.
+    private static IReadOnlyList<AttributeAnchor> AnchorNames(string first, string[] more)
+    {
+        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromName(NotNull(first, nameof(first))) };
+        foreach (string name in more) list.Add(AttributeAnchor.FromName(NotNull(name, nameof(more))));
 
         return list;
     }

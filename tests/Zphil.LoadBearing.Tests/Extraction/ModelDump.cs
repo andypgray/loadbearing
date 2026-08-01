@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     and sites, every construction edge with its sites (§4.5), every injection edge with its sites (§4.7),
 ///     every catch edge with its sites and its unfiltered subset and every throw edge with its sites (§4.8),
 ///     every exposure edge with its sites (§4.9), every registration fact (§4.7), and every
-///     declared member's scalar facts and declaration sites (GRAMMAR §4.6) — so that if a fact is not rendered
+///     declared member's scalar facts, parameters, declared attributes, and declaration sites (GRAMMAR §4.6) —
+///     so that if a fact is not rendered
 ///     here it is not pinned. The model is already fully ordered (types by FullName, edges by source/target,
 ///     member edges by source/member SymbolId, construction edges by source/constructed, injection edges by
 ///     source/injected, catch edges by source/caught, throw edges by source/thrown, exposure edges by
@@ -98,6 +99,7 @@ internal static class ModelDump
         builder.Append("  returnType=").Append(member.ReturnTypeFullName ?? "<null>")
             .Append(" memberType=").Append(member.MemberTypeFullName ?? "<null>").AppendLine();
         builder.Append("  parameters=[").Append(RenderParameters(member.Parameters)).AppendLine("]");
+        builder.Append("  attributes=[").Append(RenderAttributes(member.Attributes)).AppendLine("]");
         builder.Append("  declSites=[").Append(RenderSites(member.DeclarationSites)).AppendLine("]");
         builder.Append("  filePaths=[").Append(string.Join(", ", member.FilePaths)).AppendLine("]");
     }
@@ -107,6 +109,15 @@ internal static class ModelDump
     private static string RenderParameters(IReadOnlyList<IParameterInfo> parameters)
     {
         return string.Join(", ", parameters.Select(p => $"{p.Name}:{p.TypeFullName}"));
+    }
+
+    // Each declared attribute as definition::constructed — the convention RenderConstruction already uses for
+    // the type-side construction lists, so a generic attribute's substituted arguments are pinned too; an empty
+    // attribute list renders as [] like the other empty collections in the dump. Rendering it here is what lets
+    // the round-trip comparison see a dropped member-attribute field at all.
+    private static string RenderAttributes(IReadOnlyList<IAttributeInfo> attributes)
+    {
+        return string.Join(", ", attributes.Select(a => $"{a.DefinitionFullName}::{a.FullName}"));
     }
 
     private static void RenderType(StringBuilder builder, TypeNode type)

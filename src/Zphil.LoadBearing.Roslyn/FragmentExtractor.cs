@@ -223,7 +223,8 @@ internal static class FragmentExtractor
             member is IMethodSymbol { IsAsync: true },
             returnTypeFullName,
             memberTypeFullName,
-            ParametersOf(member));
+            ParametersOf(member),
+            AttributeConstructionsOf(member));
 
         return new FragmentMember(facts, MemberDeclarationSites(member));
     }
@@ -240,6 +241,26 @@ internal static class FragmentExtractor
 
         return method.Parameters
             .Select(parameter => new ParameterFacts(parameter.Name, DefinitionName(parameter.Type)))
+            .ToList();
+    }
+
+    // The declared attributes of a member (GRAMMAR §4.6): what the member symbol itself carries, each as the
+    // same definition/constructed name pair the type-side attribute-construction fact records — so a C# 11
+    // generic attribute's definition (N.MarkAttribute<T>) and its construction (N.MarkAttribute<System.Int32>)
+    // are both readable, and for the ordinary non-generic case the two names coincide. DECLARED-ONLY is the
+    // boundary: attributes are read off this one symbol, so a property's accessor attributes and a method's
+    // [return:] attributes are deliberately outside the fact — they hang off different symbols (the accessor
+    // method, the return-value pseudo-symbol) that no member subject ever ranges over. Unlike the type side
+    // this mints nothing: the member model keeps its by-FQN-string discipline, so there is no ResolveName
+    // here and no external node is created for an attribute only a member wears. Sorted ordinal by constructed
+    // name so a persisted fragment is byte-stable however Roslyn happened to order the attribute list.
+    private static IReadOnlyList<FragmentConstruction> AttributeConstructionsOf(ISymbol member)
+    {
+        return member.GetAttributes()
+            .Select(a => a.AttributeClass)
+            .Where(c => c is not null)
+            .Select(c => new FragmentConstruction(DefinitionName(c!), c!.ToDisplayString(FullNameFormat)))
+            .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
             .ToList();
     }
 

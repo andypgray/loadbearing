@@ -42,4 +42,19 @@ public sealed class MemberSelectionAdjectivesTests
         Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.Where(null!, "d"))
             .ParamName.ShouldBe("predicate");
     }
+
+    [Fact]
+    public void AttributedWith_NullAttributeType_ThrowsArgumentNullException()
+    {
+        // The cast picks the arm: a bare `null!` is ambiguous between the typeof and string overloads.
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.AttributedWith((Type)null!))
+            .ParamName.ShouldBe("attributeType");
+    }
+
+    [Fact]
+    public void AttributedWith_NullAttributeFullName_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.AttributedWith((string)null!))
+            .ParamName.ShouldBe("attributeFullName");
+    }
 }

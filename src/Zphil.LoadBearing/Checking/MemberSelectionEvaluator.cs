@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Checking;
 
@@ -72,6 +73,11 @@ internal sealed class MemberSelectionEvaluator
                 // backstop here — during resolution — exactly like a closed-generic type noun (§4.1).
                 var anchors = ReturningAnchors(returning.Types);
                 return current.Where(member => member.ReturnTypeFullName is { } returnType && anchors.Contains(returnType));
+            case MemberAttributedWithAdjective attributed:
+                // The matcher is built once, eagerly (before the lazy Where), so an unrepresentable typeof
+                // anchor throws here — during resolution — exactly like the type-side attribute adjective.
+                Func<MemberNode, bool> attributeMatch = MemberAttributeMatcher(attributed.Anchor);
+                return current.Where(attributeMatch);
             case MemberWhereAdjective where:
                 return current.Where(member => SelectionEvaluator.InvokePredicate(where.Predicate, member, "Where"));
             default:
@@ -80,6 +86,31 @@ internal sealed class MemberSelectionEvaluator
                 // throw (ArchChecker contains it per-rule) rather than pass the un-narrowed set through.
                 throw new InvalidOperationException($"Unhandled member adjective '{adjective.GetType().Name}'.");
         }
+    }
+
+    /// <summary>
+    ///     The declared-attribute matcher for a member (GRAMMAR §4.6, §5.7) — the member twin of
+    ///     <see cref="SelectionEvaluator.AttributeMatcher" />, over <see cref="IMemberInfo.Attributes" />
+    ///     instead of a type's attribute constructions, and sharing its three arms exactly. A
+    ///     <em>string</em> anchor is the open-definition arm: a name is a DEFINITION name, so it matches
+    ///     every construction of that definition and a constructed spelling matches nothing. A
+    ///     <em>generic-definition</em> <c>typeof</c> anchor matches the same way; any other <c>typeof</c>
+    ///     matches the constructed name (for a non-generic attribute the two coincide). Declared attributes
+    ///     only — no inheritance, and no accessor or <c>[return:]</c> attributes (they hang off other
+    ///     symbols). <see cref="TypeName.FullDisplay" /> runs once, eagerly, so an unrepresentable anchor
+    ///     throws before any member is tested and <see cref="ArchChecker" /> contains it per-rule as a
+    ///     <see cref="ViolationKind.RuleError" />. Shared with the two member attribute verbs.
+    /// </summary>
+    internal static Func<IMemberInfo, bool> MemberAttributeMatcher(AttributeAnchor anchor)
+    {
+        if (anchor.DefinitionFullName is { } name)
+            return member => member.Attributes.Any(a => a.DefinitionFullName == name);
+
+        Type type = anchor.Type!;
+        string key = TypeName.FullDisplay(type);
+        return type.IsGenericTypeDefinition
+            ? member => member.Attributes.Any(a => a.DefinitionFullName == key)
+            : member => member.Attributes.Any(a => a.FullName == key);
     }
 
     // The definition-level FQNs a .Returning anchor set matches against, byte-identical to the extraction's

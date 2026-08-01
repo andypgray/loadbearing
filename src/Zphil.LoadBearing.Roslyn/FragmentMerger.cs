@@ -254,8 +254,10 @@ internal static class FragmentMerger
 
         // The member's declaration sites are already (file, line) ordinal-ordered from extraction, so — as in
         // Materialize's type FilePaths — Distinct preserves first-occurrence file order (the §5.6 contract). The
-        // parameter facts are already in declaration order and winner-only (M5 takes the winning fragment's
-        // inventory whole), so the Select preserves order and no merge path duplicates or reorders them.
+        // parameter facts are already in declaration order and the attribute facts ordinal by constructed name,
+        // both winner-only (M5 takes the winning fragment's inventory whole), so each Select preserves order and
+        // no merge path duplicates or reorders them. Unlike the type-side attribute list, the member's stays
+        // string-side: no ResolveNode, so an attribute only a member wears mints no external node.
         private static MemberNode NewMember(TypeNode declaringType, FragmentMember member)
         {
             MemberFacts facts = member.Facts;
@@ -266,7 +268,8 @@ internal static class FragmentMerger
                 facts.ReturnTypeFullName, facts.MemberTypeFullName,
                 member.DeclarationSites.Select(s => new SourceLocation(s.File, s.Line)).ToList(),
                 member.DeclarationSites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList(),
-                facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList());
+                facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList(),
+                facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList());
         }
 
         private void MergeEdge(FragmentEdge edge)

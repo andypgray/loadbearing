@@ -216,21 +216,38 @@ internal static class SentenceRenderer
         return nouns[0].CollapsedLocative(nouns) is null ? null : nouns;
     }
 
-    // Member-subject assembly (GRAMMAR §4.6, §6): "{kind-plural} of {selection-reference}" + inline
-    // member adjectives in authoring order + the sentence-final member Where. The kind-plural is the
-    // projection head; the reference is the underlying type selection in reference position.
+    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives + "{kind-plural} of
+    // {selection-reference}" + inline member adjectives in authoring order + the sentence-final member
+    // Where. The kind-plural is the projection head; the reference is the underlying type selection in
+    // reference position. There is no head-SUBSTITUTION arm: the projection fixes the head.
     private static string MemberPhrase(MemberSelection selection)
     {
         string head = ProseFormat.MemberKindPlural(selection.Kind);
         string reference = Reference(selection.Source);
 
+        var headPrefix = string.Empty;
         var inline = string.Empty;
         var subjectFinal = string.Empty;
         foreach (MemberAdjective adjective in selection.Adjectives)
-            if (adjective.Placement == AdjectivePlacement.SubjectFinal) subjectFinal += adjective.Fragment;
-            else inline += adjective.Fragment;
+            switch (adjective.Placement)
+            {
+                case AdjectivePlacement.HeadPrefix:
+                    // NOT a typo for the type side's `headPrefix = adjective.Fragment`: stacked member
+                    // prefixes are an INTERSECTION, so a member narrowed by two attribute adjectives carries
+                    // both and the sentence must say both. Overwriting would silently drop one and describe
+                    // a wider subject than the checker uses. (The type side assigns because its own
+                    // head-prefix vocabulary is the single, idempotent `.Authored()`.)
+                    headPrefix += adjective.Fragment;
+                    break;
+                case AdjectivePlacement.SubjectFinal:
+                    subjectFinal += adjective.Fragment;
+                    break;
+                default:
+                    inline += adjective.Fragment;
+                    break;
+            }
 
-        return head + " of " + reference + inline + subjectFinal;
+        return headPrefix + head + " of " + reference + inline + subjectFinal;
     }
 
     private static bool TryBareType(Selection selection, out Type type)

@@ -31,6 +31,13 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         <see cref="ReturnTypeFullName" /> (GRAMMAR §4.6, §5.6). It is empty for properties, fields, and
 ///         events, and for a parameterless method.
 ///     </para>
+///     <para>
+///         <see cref="Attributes" /> is the member's <em>declared</em> attributes as definition/constructed
+///         name pairs — the <see cref="FragmentConstruction" /> record reused verbatim from the type side, so
+///         a generic attribute's definition and its construction are both carried (GRAMMAR §4.6). Ordered
+///         ordinal by <see cref="FragmentConstruction.ConstructedName" />, and empty when the member declares
+///         none.
+///     </para>
 /// </remarks>
 internal sealed record MemberFacts(
     string SymbolId,
@@ -43,4 +50,5 @@ internal sealed record MemberFacts(
     bool IsAsync,
     string? ReturnTypeFullName,
     string? MemberTypeFullName,
-    IReadOnlyList<ParameterFacts> Parameters);
+    IReadOnlyList<ParameterFacts> Parameters,
+    IReadOnlyList<FragmentConstruction> Attributes);

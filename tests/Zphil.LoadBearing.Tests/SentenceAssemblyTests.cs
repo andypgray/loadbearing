@@ -683,4 +683,98 @@ public class SentenceAssemblyTests
         Constraint constraint = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).MustBeSealed();
         SentenceRenderer.Sentence(constraint).ShouldBe("Types in projects `A` or `B` must be sealed.");
     }
+
+    // ---- String attribute anchors (GRAMMAR §5.2–§5.3, §6): a name-anchored attribute assembles exactly as
+    //      its typeof twin does — same head, same bracket, same collision widening ----
+
+    [Fact]
+    public void AttributedWithStringSubjectHead_StripsAttributeAndBrackets()
+    {
+        // The subject-head twin of AttributedWithSubjectHead_StripsAttributeAndBrackets, reached by string.
+        SentenceRenderer.Subject(Arch.Types.AttributedWith("Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute"))
+            .ShouldBe("Types attributed with `[ApiController]`");
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_CollidingStringAnchors_WidenInsideTheBrackets()
+    {
+        // Widening runs off the anchor's dot path, so string anchors collide and widen exactly as the typeof
+        // pair does — `[Billing.Audit]` / `[Sales.Audit]`, not a bare `[Audit]`.
+        Constraint constraint = Arch.Types.MustNotBeAttributedWith(
+            "Zphil.LoadBearing.Tests.Stubs.Billing.AuditAttribute", "Zphil.LoadBearing.Tests.Stubs.Sales.AuditAttribute");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not be attributed with `[Billing.Audit]` or `[Sales.Audit]`.");
+    }
+
+    [Fact]
+    public void MustBeAttributedWith_GenericDefinitionString_KeepsTheSuffixInsideTheBrackets()
+    {
+        // A generic definition's last segment is `MarkAttribute<T>`, which does not END with "Attribute", so
+        // nothing is stripped — the suffix rule reads the rendered segment, never the name before the angle
+        // brackets.
+        SentenceRenderer.Sentence(Arch.Types.MustBeAttributedWith("N.MarkAttribute<T>"))
+            .ShouldBe("Types must be attributed with `[MarkAttribute<T>]`.");
+    }
+
+    [Fact]
+    public void MustBeAttributedWith_ClosedGenericString_SplitsOnDotsOutsideTheBrackets()
+    {
+        // The dots inside `<...>` belong to the argument's own path: a naive last-dot split would render
+        // `[Int32>]`. (The spelling names a construction, so it matches nothing — it still has to render.)
+        SentenceRenderer.Sentence(Arch.Types.MustBeAttributedWith("N.MarkAttribute<System.Int32>"))
+            .ShouldBe("Types must be attributed with `[MarkAttribute<System.Int32>]`.");
+    }
+
+    // ---- The member attribute adjective (GRAMMAR §5.7, §6): a HEAD PREMODIFIER, so a member-attributed
+    //      subject and a type-attributed one never render the same sentence ----
+
+    [Fact]
+    public void MemberAttributedWith_RendersTheDogfoodSubject()
+    {
+        // The rule this axis exists for, in this repository's own spec: the MCP tool methods, not the types
+        // that happen to declare them. Reached by string, because a spec need not reference the attribute's
+        // package to name it.
+        SentenceRenderer.MemberSubject(Arch.Namespace("Zphil.LoadBearing.*").Methods
+                .AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute"))
+            .ShouldBe("`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`");
+    }
+
+    [Fact]
+    public void MemberAttributedWith_ComposesWithInlineAndSentenceFinalAdjectives()
+    {
+        // The prefix leads, the inline adjective follows the type reference, the Where canonicalizes
+        // sentence-final — three placements in one subject. (That `.Returning` is still reachable after the
+        // adjective is the TSelf-generic shape holding: this line would not compile otherwise.)
+        SentenceRenderer.MemberSubject(Arch.Types.Methods
+                .AttributedWith(typeof(ApiControllerAttribute))
+                .Returning(typeof(Task))
+                .Where(m => m.IsAsync, "that are async"))
+            .ShouldBe("`[ApiController]`-attributed methods of types returning `Task` that are async");
+    }
+
+    [Fact]
+    public void MemberAttributedWith_AndTypeAttributedThenProjected_RenderDifferentSentences()
+    {
+        // THE disambiguation pin — the whole reason the member adjective premodifies. Two different subjects
+        // (every method of an attributed type, versus the attributed methods of any type); an inline member
+        // fragment would give them one byte-identical sentence.
+        string typeAttributed = SentenceRenderer.MemberSubject(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)).Methods);
+        string memberAttributed = SentenceRenderer.MemberSubject(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute)));
+
+        typeAttributed.ShouldBe("Methods of types attributed with `[ApiController]`");
+        memberAttributed.ShouldBe("`[ApiController]`-attributed methods of types");
+        memberAttributed.ShouldNotBe(typeAttributed);
+    }
+
+    [Fact]
+    public void MemberAttributedWith_StackedPrefixes_BothSurfaceInAuthoringOrder()
+    {
+        // Stacked prefixes are an INTERSECTION: a member narrowed by two attribute adjectives carries both,
+        // so both must reach the sentence. Dropping either would describe a wider subject than the checker
+        // uses. (The type side substitutes its single head prefix; the member side accumulates.)
+        SentenceRenderer.MemberSubject(Arch.Types.Methods
+                .AttributedWith(typeof(ApiControllerAttribute))
+                .AttributedWith(typeof(AuditAttribute)))
+            .ShouldBe("`[ApiController]`-attributed `[Audit]`-attributed methods of types");
+    }
 }

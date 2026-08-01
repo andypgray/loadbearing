@@ -153,7 +153,7 @@ internal sealed class SelectionEvaluator
                 var baseMatch = BaseTypeMatcher(derivedFrom.Type);
                 return current.Where(baseMatch);
             case AttributedWithAdjective attributedWith:
-                var attributeMatch = AttributeMatcher(attributedWith.Type);
+                var attributeMatch = AttributeMatcher(attributedWith.Anchor);
                 return current.Where(attributeMatch);
             case ExceptAdjective except:
                 var excluded = Evaluate(except.Payload, SelectionPosition.Target);
@@ -191,8 +191,16 @@ internal sealed class SelectionEvaluator
             : t => t.BaseTypeChain.Any(c => c.FullName == key);
     }
 
-    internal static Func<TypeNode, bool> AttributeMatcher(Type type)
+    // The attribute matcher takes an anchor rather than a Type, because an attribute can also be named by
+    // definition FQN string (GRAMMAR §5.2). The string arm is deliberately the open-definition arm: a name
+    // is a DEFINITION name, so it matches every construction of that definition and a constructed spelling
+    // matches nothing. The typeof arms are the shared open/closed shape above, unchanged.
+    internal static Func<TypeNode, bool> AttributeMatcher(AttributeAnchor anchor)
     {
+        if (anchor.DefinitionFullName is { } name)
+            return t => t.AttributeConstructions.Any(c => c.Definition.FullName == name);
+
+        Type type = anchor.Type!;
         string key = TypeName.FullDisplay(type);
         return type.IsGenericTypeDefinition
             ? t => t.AttributeConstructions.Any(c => c.Definition.FullName == key)

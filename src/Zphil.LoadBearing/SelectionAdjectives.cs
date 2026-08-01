@@ -56,7 +56,24 @@ public static class SelectionAdjectives
     /// <summary>Narrows to types carrying an attribute: " attributed with `[ApiController]`".</summary>
     public static Selection AttributedWith(this Selection selection, Type type)
     {
-        return Append(selection, new AttributedWithAdjective(NotNull(type, nameof(type))));
+        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(type, nameof(type)));
+        return Append(selection, new AttributedWithAdjective(anchor));
+    }
+
+    /// <summary>
+    ///     Narrows to types carrying an attribute named by string — the escape hatch for an attribute the
+    ///     spec project cannot compile against, so it need not take a package reference just to write the
+    ///     <c>typeof</c>. <paramref name="attributeFullName" /> is the attribute <em>definition</em>'s
+    ///     fully-qualified name in extraction format, <c>Attribute</c> suffix included
+    ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>); it matches any construction of
+    ///     that definition, and a constructed spelling matches nothing. Prefer
+    ///     <see cref="AttributedWith(Selection,Type)" /> whenever the attribute is referenceable — the
+    ///     compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Selection AttributedWith(this Selection selection, string attributeFullName)
+    {
+        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        return Append(selection, new AttributedWithAdjective(anchor));
     }
 
     /// <summary>

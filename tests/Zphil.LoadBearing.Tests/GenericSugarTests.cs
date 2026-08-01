@@ -85,6 +85,40 @@ public class GenericSugarTests
             .ShouldBe(Sentence(arch => arch.Types.MustNotBeAttributedWith(typeof(SugarAttribute))));
     }
 
+    // ---- The member attribute axis (GRAMMAR §5.7). The adjective twin is RECEIVER-typed, not TSelf-generic:
+    //      C# has no partial type inference, so a TSelf-generic twin would force both type arguments at every
+    //      call site. One overload per receiver — and the MethodSelection one keeps .Returning reachable ----
+
+    [Fact]
+    public void MemberAttributedWith_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>().MustBePublic())
+            .ShouldBe(Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute)).MustBePublic()));
+    }
+
+    [Fact]
+    public void MemberAttributedWith_GenericOnMethodSelection_KeepsReturningReachable()
+    {
+        // The MethodSelection overload returns a MethodSelection, so `.Returning` chains off the sugar —
+        // this would not compile against the MemberSelection overload alone.
+        Sentence(arch => arch.Types.Methods.AttributedWith<SugarAttribute>().Returning(typeof(Task)).MustBePublic())
+            .ShouldBe(Sentence(arch => arch.Types.Methods.AttributedWith(typeof(SugarAttribute)).Returning(typeof(Task)).MustBePublic()));
+    }
+
+    [Fact]
+    public void MemberMustBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.Methods.MustBeAttributedWith<SugarAttribute>())
+            .ShouldBe(Sentence(arch => arch.Types.Methods.MustBeAttributedWith(typeof(SugarAttribute))));
+    }
+
+    [Fact]
+    public void MemberMustNotBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Sentence(arch => arch.Types.Methods.MustNotBeAttributedWith<SugarAttribute>())
+            .ShouldBe(Sentence(arch => arch.Types.Methods.MustNotBeAttributedWith(typeof(SugarAttribute))));
+    }
+
     [Fact]
     public void AnyOf_MultiTypeSugar_ReifiesIdenticallyToWrappedSelections()
     {

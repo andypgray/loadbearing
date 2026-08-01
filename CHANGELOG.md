@@ -45,6 +45,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `exceptions/no-bare-bcl-throws` (nothing throws `Exception`, `SystemException` or
   `ApplicationException` — green today, and red the day the first one arrives). The managed
   AGENTS.md block's glossary gains its catch clause for the first time.
+- Member attribute facts and the member-side attribute vocabulary: the `.AttributedWith`
+  member adjective and the `MustBeAttributedWith` / `MustNotBeAttributedWith` member verbs,
+  each in `typeof`, string, and generic-twin forms. The member inventory now records each
+  member's declared attributes (reaching escape-hatch predicates via `IMemberInfo.Attributes`),
+  so a rule whose true subject is "the methods carrying attribute X" can finally say so
+  instead of approximating it by namespace or naming convention. Declared attributes only: an
+  attribute on a property's `get`/`set` accessor or a method's `[return:]` attribute hangs off
+  a different symbol and is outside the fact, and a partial method reports the union of both
+  parts' attributes. The adjective renders as a head prefix — "`[McpServerTool]`-attributed
+  methods of types in `Zphil.LoadBearing.*`" — because an inline clause would render an
+  attributed type's methods and a type's attributed methods as one byte-identical sentence
+  for two different subjects; stacked attribute adjectives concatenate, because the subject
+  is their intersection and a sentence that dropped one would lie about it. The persisted
+  extraction cache's schema moves with the new fact: the first check after upgrading pays one
+  cold extraction per solution, then steady state.
+- Attribute anchors by string: every attribute position — the `AttributedWith` adjectives and
+  the `Must[Not]BeAttributedWith` verbs, type-side and member-side — now takes the attribute
+  definition's fully-qualified name (`Attribute` suffix included) beside the `typeof` form,
+  so a spec can govern an attribute without taking a package reference just to write the
+  `typeof`. The string matches any construction of that definition, exactly as an
+  open-generic `typeof` anchor does; a constructed spelling never matches — the stated
+  honesty boundary. A string anchor renders byte-identically to its `typeof` twin, collision
+  widening included, so which form a spec chose is invisible to its sentences. `typeof`
+  remains the right anchor whenever the attribute is referenceable: the compiler checks a
+  `typeof`, and nothing checks a string.
+- A rule this repository's verb ledger recorded as wanted and unaffordable, now affordable
+  and shipped: `mcp/tool-types-attributed` — "Types in `Zphil.LoadBearing.Cli.Mcp.Tools.*`
+  must be attributed with `[McpServerToolType]`". Tool discovery is the attribute walk, so a
+  tool class without the attribute compiles, registers nothing, and its tools vanish from the
+  server in silence. Both MCP attribute rules name their attribute by string: the spec
+  project still takes no SDK package reference, which is what the string anchor bought.
 
 ### Changed
 
@@ -67,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the file is one the extractor cannot see (anything but source, project, and solution
   files), so a documentation edit no longer pays a full solution check. A hand-run wrapper, with
   no payload on stdin, still checks; so does any edit whose payload cannot be parsed.
+- `mcp/tools-accept-cancellation` in this repository's own spec now reads
+  "`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*` must accept a
+  parameter of type `CancellationToken`" — the attribute is the whole subject. The
+  tools-namespace scope and the `Task`-returning narrowing it carried were both
+  approximations of that attribute, and keeping either would have silently exempted a future
+  synchronous tool method, or one declared outside the tools namespace, from the rule meant
+  to catch it.
 
 ### Fixed
 

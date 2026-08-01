@@ -110,21 +110,14 @@ internal static class TypeName
         return own - parent;
     }
 
-    /// <summary>The last <paramref name="segmentCount" /> dot-segments of the type's full path.</summary>
-    internal static string Qualified(Type type, int segmentCount)
-    {
-        var segments = PathSegments(type);
-        int take = Math.Min(Math.Max(segmentCount, 1), segments.Count);
-        return string.Join(".", segments.Skip(segments.Count - take));
-    }
-
-    /// <summary>The number of dot-segments available (namespace depth plus the simple name).</summary>
-    internal static int SegmentDepth(Type type)
-    {
-        return PathSegments(type).Count;
-    }
-
-    private static List<string> PathSegments(Type type)
+    /// <summary>
+    ///     The type's dot-separated path — namespace segments then the simple name — which the
+    ///     colliding-simple-name rule widens outward along (GRAMMAR §6). This is the reflection arm of
+    ///     that rule's input; a string attribute anchor supplies the same shape from its own FQN
+    ///     (<see cref="Model.AttributeAnchor" />), so the widening algorithm itself
+    ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
+    /// </summary>
+    internal static IReadOnlyList<string> PathSegments(Type type)
     {
         var segments = new List<string>();
         if (!string.IsNullOrEmpty(type.Namespace)) segments.AddRange(type.Namespace!.Split('.'));

@@ -312,4 +312,62 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.MustNotExpose(typeof(SqlConnection)))
             .ShouldBe("Types must not expose `SqlConnection`.");
     }
+
+    // ---- String attribute anchors (GRAMMAR §5.2–§5.3): the escape hatch names the attribute definition by
+    //      fully-qualified string, and renders byte-identically to its typeof twin above ----
+
+    [Fact]
+    public void MustBeAttributedWith_StringAnchor_RendersTheTypeofSentence()
+    {
+        // Byte-for-byte the MustBeAttributedWith_StripsAttributeSuffixAndBrackets pin: the string carries the
+        // Attribute suffix, and the renderer strips and brackets it exactly as it does a typeof anchor.
+        SentenceRenderer.Sentence(Arch.Types.MustBeAttributedWith("Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute"))
+            .ShouldBe("Types must be attributed with `[ApiController]`.");
+    }
+
+    [Fact]
+    public void MustNotBeAttributedWith_StringAnchors_RenderTheTypeofOrList()
+    {
+        // The or-list join over a homogeneous string anchor list — the MustNotBeAttributedWith_OrList pin's
+        // sentence, reached without a typeof.
+        SentenceRenderer.Sentence(Arch.Types.MustNotBeAttributedWith(
+                "Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute", "System.SerializableAttribute"))
+            .ShouldBe("Types must not be attributed with `[ApiController]` or `[Serializable]`.");
+    }
+
+    [Fact]
+    public void AttributedWith_StringAnchor_RendersTheTypeofFragment()
+    {
+        // The adjective arm of the same equivalence, asserted against the typeof form directly.
+        SentenceRenderer.Sentence(Arch.Types.AttributedWith("Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute").MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)).MustBeSealed()));
+    }
+
+    // ---- The member attribute axis (GRAMMAR §5.7): one adjective and both verbs. The VERBS reuse the
+    //      type-side phrases verbatim — verb position is unambiguous, so there is nothing to disambiguate.
+    //      The ADJECTIVE does not: it premodifies the member head instead of trailing the type reference ----
+
+    [Fact]
+    public void MemberAttributedWith_PremodifiesTheMemberHead()
+    {
+        // "`[X]`-attributed methods of …", not "methods of types attributed with `[X]`" — the latter is what
+        // the TYPE-side adjective before a projection renders, and it names a different subject.
+        SentenceRenderer.Sentence(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute)).MustBePublic())
+            .ShouldBe("`[ApiController]`-attributed methods of types must be public.");
+    }
+
+    [Fact]
+    public void Member_MustBeAttributedWith_ReusesTypeSideVerbPhrase()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeAttributedWith(typeof(ApiControllerAttribute)))
+            .ShouldBe("Methods of types must be attributed with `[ApiController]`.");
+    }
+
+    [Fact]
+    public void Member_MustNotBeAttributedWith_ReusesTypeSideOrList()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustNotBeAttributedWith(
+                typeof(ApiControllerAttribute), typeof(SerializableAttribute)))
+            .ShouldBe("Methods of types must not be attributed with `[ApiController]` or `[Serializable]`.");
+    }
 }

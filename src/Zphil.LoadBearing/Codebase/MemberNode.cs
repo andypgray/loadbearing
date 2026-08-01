@@ -37,7 +37,8 @@ public sealed class MemberNode : IMemberInfo
         string? memberTypeFullName,
         IReadOnlyList<SourceLocation> declarationSites,
         IReadOnlyList<string> filePaths,
-        IReadOnlyList<IParameterInfo>? parameters = null)
+        IReadOnlyList<IParameterInfo>? parameters = null,
+        IReadOnlyList<IAttributeInfo>? attributes = null)
     {
         DeclaringType = declaringType;
         SymbolId = symbolId;
@@ -53,6 +54,7 @@ public sealed class MemberNode : IMemberInfo
         DeclarationSites = declarationSites;
         FilePaths = filePaths;
         Parameters = parameters ?? Array.Empty<IParameterInfo>();
+        Attributes = attributes ?? Array.Empty<IAttributeInfo>();
     }
 
     /// <summary>
@@ -102,6 +104,9 @@ public sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public IReadOnlyList<IParameterInfo> Parameters { get; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<IAttributeInfo> Attributes { get; }
 
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; }

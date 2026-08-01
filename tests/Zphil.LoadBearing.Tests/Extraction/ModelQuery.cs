@@ -212,4 +212,13 @@ internal static class ModelQuery
     {
         return member.DeclarationSites.Select(s => s.Line).ToList();
     }
+
+    /// <summary>
+    ///     The member's declared attributes as (definition, constructed) name pairs, in recorded order — so a
+    ///     generic attribute's divergence is assertable as one value.
+    /// </summary>
+    public static IReadOnlyList<(string Definition, string Constructed)> AttributeNames(this MemberNode member)
+    {
+        return member.Attributes.Select(a => (a.DefinitionFullName, a.FullName)).ToList();
+    }
 }

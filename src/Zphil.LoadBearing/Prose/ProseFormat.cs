@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Prose;
 ///     Low-level prose formatting helpers shared by the vocabulary nodes and the renderer
 ///     (GRAMMAR §6): backtick wrapping, sentence-initial capitalization, kind pluralization,
 ///     attribute bracketing, the no-Oxford-comma reference-list join, and the colliding-simple-name
-///     qualification (<see cref="ResolveTypeDisplays" />) shared by every multi-operand list.
+///     qualification (<see cref="ResolvePathDisplays" />) shared by every multi-operand list.
 /// </summary>
 internal static class ProseFormat
 {
@@ -72,11 +72,13 @@ internal static class ProseFormat
 
     /// <summary>
     ///     The bracketed attribute form with a trailing <c>Attribute</c> stripped:
-    ///     <c>ApiControllerAttribute</c> → <c>[ApiController]</c> (GRAMMAR §5.2).
+    ///     <c>ApiControllerAttribute</c> → <c>[ApiController]</c> (GRAMMAR §5.2). Reads the anchor's
+    ///     simple display, so a <c>typeof</c> anchor and a string anchor naming the same attribute
+    ///     render the same bracketed form.
     /// </summary>
-    internal static string AttributeName(Type type)
+    internal static string AttributeName(AttributeAnchor anchor)
     {
-        return BracketAttribute(TypeName.Simple(type));
+        return BracketAttribute(anchor.SimpleDisplay);
     }
 
     /// <summary>
@@ -109,15 +111,18 @@ internal static class ProseFormat
     ///     Joins backticked, <c>Attribute</c>-stripped, bracketed attribute names as an or-list —
     ///     <c>`[Table]` or `[ComplexType]`</c> (GRAMMAR §5.3, §6) — for the <c>MustNotBeAttributedWith</c>
     ///     anchor list. Colliding attribute names widen inside the brackets by the shared
-    ///     minimal-trailing-segments rule (<see cref="ResolveTypeDisplays" />):
-    ///     <c>`[Billing.Audit]` or `[Sales.Audit]`</c>.
+    ///     minimal-trailing-segments rule (<see cref="ResolvePathDisplays" />):
+    ///     <c>`[Billing.Audit]` or `[Sales.Audit]`</c>. A string anchor widens exactly as its
+    ///     <c>typeof</c> twin does, because both supply the same path.
     /// </summary>
-    internal static string AttributeList(IReadOnlyList<Type> types)
+    internal static string AttributeList(IReadOnlyList<AttributeAnchor> anchors)
     {
-        var display = ResolveTypeDisplays(types);
-        // Collision keys on the type's simple name; a Foo/FooAttribute pair that shares a bracket
-        // display (distinct simple names) is not widened — an accepted v1 corner.
-        return JoinReferences(types.Select(t => Backtick(BracketAttribute(display[t]))).ToList());
+        // Anchors carry their own path, so a typeof and a string anchor widen through the identical
+        // primitive. Collision keys on the anchor's simple name; a Foo/FooAttribute pair that shares a
+        // bracket display (distinct simple names) is not widened — an accepted v1 corner.
+        var paths = anchors.Select(anchor => anchor.PathSegments).ToList();
+        var displays = ResolvePathDisplays(paths);
+        return JoinReferences(displays.Select(display => Backtick(BracketAttribute(display))).ToList());
     }
 
     /// <summary>
@@ -153,35 +158,76 @@ internal static class ProseFormat
     ///     Maps each type to its display name, qualifying colliding simple names with the minimal
     ///     distinguishing trailing namespace segments (GRAMMAR §6): a lone simple name stays simple
     ///     (<c>Order</c>); a colliding set widens outward until distinct (<c>Billing.Order</c> /
-    ///     <c>Sales.Order</c>). The one collision primitive every multi-operand list shares — the
+    ///     <c>Sales.Order</c>). The <see cref="Type" />-keyed face of
+    ///     <see cref="ResolvePathDisplays" />, for the lists whose operands are reflected types — the
     ///     dependency reference/target lists (through <see cref="SentenceRenderer" />) and the
-    ///     hierarchy/attribute anchor lists (<see cref="TypeList" /> / <see cref="AttributeList" />).
+    ///     hierarchy anchor list (<see cref="TypeList" />).
     /// </summary>
     internal static Dictionary<Type, string> ResolveTypeDisplays(IReadOnlyList<Type> types)
     {
+        var paths = types.Select(TypeName.PathSegments).ToList();
+        var displays = ResolvePathDisplays(paths);
+
+        // Keyed back by Type for the callers that render out of order (a target list interleaves bare
+        // types with pattern selections); a type listed twice re-assigns its own display.
         var result = new Dictionary<Type, string>();
-        foreach (var group in types.GroupBy(TypeName.Simple))
+        for (var i = 0; i < types.Count; i++) result[types[i]] = displays[i];
+
+        return result;
+    }
+
+    /// <summary>
+    ///     The collision primitive itself (GRAMMAR §6), over bare dot-separated paths: each path renders
+    ///     as its last segment, and a set of paths sharing that last segment widens outward together —
+    ///     by the minimal number of trailing segments that tells them apart — until distinct. Returns
+    ///     displays positionally aligned with <paramref name="paths" />. Taking paths rather than
+    ///     <see cref="Type" />s is what lets a string attribute anchor widen identically to its
+    ///     <c>typeof</c> twin.
+    /// </summary>
+    internal static IReadOnlyList<string> ResolvePathDisplays(IReadOnlyList<IReadOnlyList<string>> paths)
+    {
+        var displays = new string[paths.Count];
+        foreach (var group in Enumerable.Range(0, paths.Count).GroupBy(index => Leaf(paths[index])))
         {
-            var members = group.Distinct().ToList();
-            if (members.Count == 1)
+            var indices = group.ToList();
+
+            // Dedupe by full path before judging the group: the SAME operand written twice is one
+            // member, not a collision — and widening could never separate it, so a naive count would
+            // qualify every repeated operand to its full path.
+            int memberCount = indices.Select(index => Qualify(paths[index], paths[index].Count)).Distinct().Count();
+            if (memberCount == 1)
             {
-                result[members[0]] = TypeName.Simple(members[0]);
+                foreach (int index in indices) displays[index] = Leaf(paths[index]);
+
                 continue;
             }
 
             // Widen from the simple name outward until every colliding member is distinct.
-            int maxDepth = members.Max(TypeName.SegmentDepth);
+            int maxDepth = indices.Max(index => paths[index].Count);
             int chosen = maxDepth;
             for (var count = 1; count <= maxDepth; count++)
-                if (members.Select(t => TypeName.Qualified(t, count)).Distinct().Count() == members.Count)
+                if (indices.Select(index => Qualify(paths[index], count)).Distinct().Count() == memberCount)
                 {
                     chosen = count;
                     break;
                 }
 
-            foreach (Type member in members) result[member] = TypeName.Qualified(member, chosen);
+            foreach (int index in indices) displays[index] = Qualify(paths[index], chosen);
         }
 
-        return result;
+        return displays;
+    }
+
+    /// <summary>The path's last segment — the simple name every collision group keys on.</summary>
+    private static string Leaf(IReadOnlyList<string> segments)
+    {
+        return segments[segments.Count - 1];
+    }
+
+    /// <summary>The last <paramref name="segmentCount" /> segments of a path, dotted.</summary>
+    private static string Qualify(IReadOnlyList<string> segments, int segmentCount)
+    {
+        int take = Math.Min(Math.Max(segmentCount, 1), segments.Count);
+        return string.Join(".", segments.Skip(segments.Count - take));
     }
 }

@@ -87,4 +87,22 @@ internal static class Sources
                                               [Mark] public class AttrBase {}
                                               public class AttrDerived : AttrBase {}
                                               """;
+
+    /// <summary>
+    ///     The generic-attribute fixture for string attribute anchors (GRAMMAR §5.2): one generic attribute
+    ///     applied at two constructions, plus a non-generic one and a bare type. A definition-name anchor
+    ///     must reach both constructions while a constructed spelling reaches neither. Its own compilation
+    ///     because the <see cref="Hierarchy" /> pins assert exact selected sets — a new attributed type
+    ///     there would move them.
+    /// </summary>
+    public const string GenericAttributes = """
+                                            using System;
+                                            namespace Zphil.LoadBearing.Tests.Checking.Targets;
+                                            public sealed class MarkAttribute<T> : Attribute {}
+                                            public sealed class PlainAttribute : Attribute {}
+                                            [Mark<int>] public class TaggedInt {}
+                                            [Mark<string>] public class TaggedText {}
+                                            [Plain] public class TaggedPlain {}
+                                            public class Untagged {}
+                                            """;
 }

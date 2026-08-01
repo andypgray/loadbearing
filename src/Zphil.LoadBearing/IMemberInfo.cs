@@ -64,6 +64,14 @@ public interface IMemberInfo
     /// </summary>
     IReadOnlyList<IParameterInfo> Parameters { get; }
 
+    /// <summary>
+    ///     The member's declared attributes, or an empty list when it declares none (never null). What a
+    ///     member-side attribute adjective matches against (GRAMMAR §4.6). Declared-only: a property's
+    ///     accessor attributes and a method's <c>[return:]</c> attributes hang off other symbols and are
+    ///     outside this fact. Additive contract growth, the §5.6 discipline.
+    /// </summary>
+    IReadOnlyList<IAttributeInfo> Attributes { get; }
+
     /// <summary>The distinct file paths declaring the member, verbatim as compiled.</summary>
     IReadOnlyList<string> FilePaths { get; }
 }
