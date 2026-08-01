@@ -345,8 +345,8 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_CrossProjectLoserDeclaredInTwoFrameworks_RecordsExactlyOneNote()
     {
-        // Winner Aproj declares N.Dup once; loser Bproj declares it in two frameworks. The (FQN, loser)
-        // dedup collapses the loser's two declarations to a single note.
+        // Winner Aproj declares N.Dup once; loser Bproj declares it in two frameworks. The loser set
+        // collapses the loser's two declarations to a single entry, and so to a single note.
         CompilationInput winner = CompilationFactory.Compile("Aproj", ("A.cs", """
                                                                                namespace N;
                                                                                public class Dup {}
@@ -366,5 +366,34 @@ public sealed class FragmentMergeTests
 
         model.MergeNotes.Count.ShouldBe(1);
         model.MergeNotes[0].ShouldContain("declared by projects 'Aproj' and 'Bproj'");
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameFqnLostByThreeProjects_RecordsOneNoteNamingEveryLoser()
+    {
+        // The shape this repo's own fixture layout produces: one type shadowed by several sibling projects
+        // (name-carrier stubs so their specs' typeof() anchors compile). Grouping by FQN keeps that to one
+        // line naming every loser, rather than a line per loser — nothing dropped, the channel stays legible.
+        CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """
+                                                                                 namespace N;
+                                                                                 public class Dup {}
+                                                                                 """));
+        CompilationInput stubB = CompilationFactory.Compile("Spec.B", ("B.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+        CompilationInput stubA = CompilationFactory.Compile("Spec.A", ("A.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+
+        // Losers arrive out of order; the note orders them ordinal so the line is stable across runs.
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, stubB, stubA]);
+
+        model.MergeNotes.ShouldBe([
+            "Type 'N.Dup' is declared by projects 'App.Web', 'Spec.A' and 'Spec.B'; its facts and project "
+            + "attribution follow 'App.Web' (the first declarer), so arch.Project('Spec.A') and "
+            + "arch.Project('Spec.B') selections will not include it."
+        ]);
     }
 }

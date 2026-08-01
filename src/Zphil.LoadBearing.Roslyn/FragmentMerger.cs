@@ -14,8 +14,9 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             projects, or a project's several target frameworks). A later declarer under a
 ///             <em>different</em> project name is same-FQN cross-project conflation: the facts still follow
 ///             the first declarer, and an advisory <see cref="CodebaseModel.MergeNotes">merge note</see>
-///             records it (deduped per (FQN, loser); a project's own several target frameworks share its
-///             name and so stay silent).
+///             records it — one note per conflated FQN, naming every losing project, so a type several
+///             projects shadow costs one line rather than one per shadow. A project's own several target
+///             frameworks share its name and so stay silent.
 ///         </item>
 ///         <item>
 ///             <b>M2</b> — hierarchy comes from the winning fragment only; <c>ResolveNode(fqn)</c> is the
@@ -96,7 +97,12 @@ internal static class FragmentMerger
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
+
+        // Conflated FQN → every project that declared it after the winner, ordinal-sorted. One entry per
+        // type, not per (type, loser) pair, so the advisory note can name all the losers in one line.
+        private readonly Dictionary<string, SortedSet<string>> _conflatedLosers = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
+
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
@@ -105,9 +111,7 @@ internal static class FragmentMerger
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
-        private readonly List<string> _mergeNotes = [];
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
-        private readonly HashSet<(string Fqn, string Loser)> _notedConflations = [];
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
@@ -202,19 +206,43 @@ internal static class FragmentMerger
 
         // A second (or later) declarer of an already-declared FQN. When its project name differs from the
         // winner's, this is same-FQN cross-project conflation: the facts and ProjectName keep following the
-        // first declarer, so the loser's copy is invisible to arch.Project selections — record one advisory
-        // note. A matching project name is a project's own several target frameworks (M1's legitimate union),
-        // which stays silent; the (FQN, loser) dedup collapses a multi-TFM loser to a single note.
+        // first declarer, so the loser's copy is invisible to arch.Project selections — record the loser
+        // against the type. A matching project name is a project's own several target frameworks (M1's
+        // legitimate union), which stays silent; the loser set collapses a multi-TFM loser to one entry.
         private void NoteConflationIfCrossProject(string fqn, string laterProjectName)
         {
             string winner = _nodes[fqn].ProjectName;
             if (string.Equals(winner, laterProjectName, StringComparison.Ordinal)) return;
-            if (!_notedConflations.Add((fqn, laterProjectName))) return;
 
-            _mergeNotes.Add(
-                $"Type '{fqn}' is declared by projects '{winner}' and '{laterProjectName}'; its facts and "
-                + $"project attribution follow '{winner}' (the first declarer), so arch.Project('{laterProjectName}') "
-                + "selections will not include it.");
+            if (!_conflatedLosers.TryGetValue(fqn, out var losers))
+                _conflatedLosers[fqn] = losers = new SortedSet<string>(StringComparer.Ordinal);
+
+            losers.Add(laterProjectName);
+        }
+
+        // One note per conflated type, naming every project that loses it. Grouping is what keeps a type
+        // stubbed by several sibling projects from spending a line per stub: six FQNs shadowed across six
+        // fixture projects were sixteen lines before this, and are six after, with nothing dropped. A single
+        // loser renders exactly as it always did — the list joiner degrades to "'A' and 'B'" at two items.
+        private string ConflationNote(string fqn)
+        {
+            string winner = _nodes[fqn].ProjectName;
+            var losers = _conflatedLosers[fqn];
+
+            string declarers = JoinWithAnd([$"'{winner}'", .. losers.Select(loser => $"'{loser}'")]);
+            string selections = JoinWithAnd([.. losers.Select(loser => $"arch.Project('{loser}')")]);
+
+            return $"Type '{fqn}' is declared by projects {declarers}; its facts and "
+                   + $"project attribution follow '{winner}' (the first declarer), so {selections} "
+                   + "selections will not include it.";
+        }
+
+        // "A", "A and B", "A, B and C" — each caller formats its own items, so this only joins.
+        private static string JoinWithAnd(IReadOnlyList<string> items)
+        {
+            if (items.Count == 1) return items[0];
+
+            return string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1];
         }
 
         private void RecordExternal(FragmentExternal external)
@@ -455,9 +483,12 @@ internal static class FragmentMerger
                 .Select(kv => new ServiceRegistration(kv.Key.Lifetime, kv.Key.Service, kv.Key.Impl, ToLocations(kv.Value)))
                 .ToList();
 
-            // Sort the advisory notes ordinal (they key first on the FQN) so the list is stable across runs
-            // regardless of the order distinct conflations were first seen.
-            var mergeNotes = _mergeNotes.OrderBy(note => note, StringComparer.Ordinal).ToList();
+            // Sort the advisory notes by the FQN they key on, so the list is stable across runs regardless
+            // of the order distinct conflations were first seen.
+            var mergeNotes = _conflatedLosers.Keys
+                .OrderBy(fqn => fqn, StringComparer.Ordinal)
+                .Select(ConflationNote)
+                .ToList();
 
             return new CodebaseModel(
                 types, edges, memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges,

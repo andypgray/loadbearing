@@ -46,8 +46,14 @@ internal static class CliRunner
     /// <summary>The net48 spec DLL, built at the C# 7.3 default.</summary>
     public static string LegacySpecDll => Metadata("LegacySpecPath");
 
+    /// <summary>The net48 spec DLL whose <c>Define()</c> anchors a type that cannot load on .NET.</summary>
+    public static string LegacyBrokenSpecDll => Metadata("LegacyBrokenSpecPath");
+
     /// <summary>The net48 pattern-only spec that drives <c>check</c> against the ClassicApp solution.</summary>
     public static string ClassicAppSpecDll => Metadata("ClassicAppSpecPath");
+
+    /// <summary>The MyApp domain assembly — an ordinary product DLL, carrying no spec at all.</summary>
+    public static string MyAppDomainDll => Metadata("MyAppDomainPath");
 
     /// <summary>The non-SDK-style .NET Framework fixture solution, copied to the test output as content.</summary>
     public static string ClassicAppSolution =>
