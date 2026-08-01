@@ -5,11 +5,12 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
 /// <summary>
-///     The walkthrough gate over quoted source anchors. The example walkthroughs quote <c>check</c>
-///     violation output inside fenced code blocks, and each quoted line carries a <c>file:line</c>
-///     anchor into a committed example source. This gate lifts every anchor and holds it to its
-///     source: a committed-source anchor must match the line it names, by content or by a landmark pin
-///     that keys a documented walkthrough edit to the committed line it lands on; a demonstration
+///     The walkthrough gate over quoted source anchors. The example walkthroughs and the root README
+///     quote <c>check</c> violation output inside fenced code blocks, and each quoted line carries a
+///     <c>file:line</c> anchor into a committed source: an example's own tree for the walkthroughs, this
+///     repository's tree for the root README's dogfood spine. This gate lifts every anchor and holds it
+///     to its source: a committed-source anchor must match the line it names, by content or by a landmark
+///     pin that keys a documented walkthrough edit to the committed line it lands on; a demonstration
 ///     anchor — check output over a hypothetical edit that adds new code — must stay unmatched, so the
 ///     day that code lands the anchor graduates to a real one. A drifted anchor fails the suite instead
 ///     of publishing stale output.
@@ -21,7 +22,9 @@ public sealed class ReadmeAnchorGateTests
     private const string ExpireQuotesHandler = "src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs";
     private const string InvoicePreview = "src/Meridian.Operations/Dispatch/InvoicePreview.cs";
     private const string RequestQuoteHandler = "src/Meridian.Quoting.Application/Handlers/RequestQuoteHandler.cs";
+    private const string ProgressPrinter = "src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs";
 
+    private const string RootReadme = "README.md";
     private const string MeridianReadme = "examples/Meridian/README.md";
     private const string Storyboard = "examples/Meridian/hooks/storyboard.md";
     private const string QuotingReadme = "examples/Meridian.Quoting/README.md";
@@ -32,7 +35,13 @@ public sealed class ReadmeAnchorGateTests
     private const string OperationsRoot = "examples/Meridian.Operations";
     private const string InterchangeRoot = "examples/Meridian.Interchange";
 
-    /// <summary>The anchor-bearing docs, each paired with the example root its anchors resolve against.</summary>
+    /// <summary>
+    ///     This repository's own root, the anchor base for docs that quote its own sources rather than an
+    ///     example's. Empty because such anchors are already repository-relative.
+    /// </summary>
+    private const string SelfRoot = "";
+
+    /// <summary>The anchor-bearing docs, each paired with the root its anchors resolve against.</summary>
     private static readonly (string Doc, string ExampleRoot)[] AnchorDocs =
     [
         (MeridianReadme, MeridianRoot),
@@ -40,7 +49,10 @@ public sealed class ReadmeAnchorGateTests
         (Storyboard, MeridianRoot),
         (QuotingReadme, QuotingRoot),
         (OperationsReadme, OperationsRoot),
-        ("examples/Meridian.Interchange/README.md", InterchangeRoot)
+        ("examples/Meridian.Interchange/README.md", InterchangeRoot),
+        // The root README's dogfood spine quotes a self-check over this solution, so its anchors name
+        // this repository's own paths.
+        (RootReadme, SelfRoot)
     ];
 
     /// <summary>
@@ -111,6 +123,12 @@ public sealed class ReadmeAnchorGateTests
         (Storyboard, BookingsController, 74),
         (Storyboard, BookingsController, 75),
         (Storyboard, BookingsController, 77),
+
+        // The root README's hook beat quotes the block a red self-check feeds an agent: the hypothetical
+        // edit is a whole new ProgressPrinter file dropped into the CLI's Rendering directory, which is
+        // not committed, because this repository ships its own self-check green.
+        (RootReadme, ProgressPrinter, 10),
+        (RootReadme, ProgressPrinter, 15),
 
         // The layering walkthrough drops a new ExpireQuotesHandler file into the Api project to breach the
         // Application boundary; that file is not committed, because the subsystem ships green.

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": ["Bash(loadbearing baseline*)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "pwsh -File .claude/arch-hook.ps1" }
+        ]
+      }
+    ]
+  }
+}

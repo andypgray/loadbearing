@@ -110,7 +110,7 @@ Move a controller onto a repository and its grandfathered count drops. When a Mi
 
 ## Run it yourself
 
-LoadBearing ships as a .NET global tool (it needs the .NET 10 runtime):
+LoadBearing ships as a .NET global tool (solution-loading commands need a .NET 10 SDK):
 
 ```bash
 dotnet tool install -g Zphil.LoadBearing.Cli

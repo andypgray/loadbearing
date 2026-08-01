@@ -107,6 +107,22 @@ public sealed class SourceAnchorTests
     }
 
     [Fact]
+    public void Classify_EmptyExampleRoot_ResolvesAgainstTheRepositoryRoot()
+    {
+        // Arrange: a doc quoting this repository's own sources anchors with no example root, so the
+        // anchor's path is already repository-relative. Prefixing a separator would make it rooted, and a
+        // rooted path resolves outside the repository — every such anchor would silently miss the gate.
+        SourceAnchor anchor = new("README.md", 5, "src/A.cs", 3, "Ns.T references Ns.Pkg.Foo");
+        var reader = Reader("src/A.cs", "one", "two", "here is Foo on line three");
+
+        // Act
+        SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, string.Empty, NoLandmarks, reader);
+
+        // Assert
+        result.Bucket.ShouldBe(SourceAnchors.AnchorBucket.Content);
+    }
+
+    [Fact]
     public void Classify_TokenShiftedByOneLine_Unresolved()
     {
         // Arrange: the token sits on line 3, but the anchor claims line 4.

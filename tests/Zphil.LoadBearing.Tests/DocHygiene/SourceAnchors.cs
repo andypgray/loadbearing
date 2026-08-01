@@ -78,6 +78,47 @@ internal static class SourceAnchors
     }
 
     /// <summary>
+    ///     Splits <paramref name="docText" /> into the content lines of each fenced code block, one list
+    ///     per block in document order. Fence state is tracked exactly as <see cref="Extract" /> tracks it
+    ///     — a fence opens on a line whose first non-whitespace content is a run of three or more backticks
+    ///     or tildes and closes on the next line with at least as long a run of the same character and
+    ///     nothing after it but whitespace — but here the opening and closing fence lines are dropped and
+    ///     the lines between them are kept verbatim, so a caller can hold a quoted block to the source it
+    ///     was cut from. An unclosed fence keeps every line to the end of the text as its final block.
+    ///     Input newlines are normalized to <c>"\n"</c> first.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<string>> Fences(string docText)
+    {
+        string normalized = docText.Replace("\r\n", "\n");
+        string[] lines = normalized.Split('\n');
+        List<IReadOnlyList<string>> fences = new();
+        List<string>? current = null;
+        var fenceChar = '\0';
+        var fenceLength = 0;
+
+        foreach (string line in lines)
+            if (current is null)
+            {
+                if (TryOpenFence(line, out fenceChar, out fenceLength)) current = new List<string>();
+            }
+            else if (ClosesFence(line, fenceChar, fenceLength))
+            {
+                fences.Add(current);
+                current = null;
+                fenceChar = '\0';
+                fenceLength = 0;
+            }
+            else
+            {
+                current.Add(line);
+            }
+
+        if (current is not null) fences.Add(current);
+
+        return fences;
+    }
+
+    /// <summary>
     ///     Derives the content token the committed source line must contain from an anchor message's
     ///     tail. A <c>uses A.B.Member</c> tail yields the last two dotted segments (so an accessor keeps
     ///     its declaring type); a <c>references</c>/<c>constructs</c>/<c>injects</c>/<c>exposes</c>/
@@ -105,8 +146,10 @@ internal static class SourceAnchors
     ///     the derived token sits on the reported line (the content bucket); failing that, when a landmark
     ///     for the anchor's key pins a committed line whose content holds the landmark snippet (the
     ///     landmark bucket). An anchor satisfying neither is unresolved, with a reason naming the doc, the
-    ///     source line, and what was expected. <paramref name="readLines" /> reads a repository-relative
-    ///     path into its lines, or returns <see langword="null" /> when the file is absent.
+    ///     source line, and what was expected. <paramref name="exampleRoot" /> is the directory the
+    ///     anchor's path hangs off, or empty when the doc quotes this repository's own sources and the path
+    ///     is already repository-relative. <paramref name="readLines" /> reads a repository-relative path
+    ///     into its lines, or returns <see langword="null" /> when the file is absent.
     /// </summary>
     public static AnchorResult Classify(
         SourceAnchor anchor,
@@ -114,7 +157,7 @@ internal static class SourceAnchors
         IReadOnlyDictionary<AnchorKey, Landmark> landmarks,
         Func<string, IReadOnlyList<string>?> readLines)
     {
-        var repoRelativeFile = $"{exampleRoot}/{anchor.File}";
+        string repoRelativeFile = RepoRelative(exampleRoot, anchor.File);
         var lines = readLines(repoRelativeFile);
         if (lines is null) return Unresolved(anchor, $"source file not found at {repoRelativeFile}");
 
@@ -186,6 +229,18 @@ internal static class SourceAnchors
             string full = Path.Combine(repoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar));
             return File.Exists(full) ? File.ReadAllLines(full) : null;
         };
+    }
+
+    /// <summary>
+    ///     Composes the repository-relative path an anchor resolves against. An empty
+    ///     <paramref name="exampleRoot" /> means the anchoring doc quotes this repository's own sources, so
+    ///     the anchor's path is already repository-relative and is returned unchanged: prefixing a separator
+    ///     would yield a rooted path, which <see cref="Path.Combine(string,string)" /> resolves outside the
+    ///     repository and would silently take every such anchor out of the gate's reach.
+    /// </summary>
+    private static string RepoRelative(string exampleRoot, string file)
+    {
+        return exampleRoot.Length == 0 ? file : $"{exampleRoot}/{file}";
     }
 
     private static AnchorResult Unresolved(SourceAnchor anchor, string reason)

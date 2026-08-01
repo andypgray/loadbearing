@@ -117,7 +117,7 @@ The differences are as real. Spring Modulith is Java and Spring, and it reads th
 
 ## Run it yourself
 
-LoadBearing ships as a .NET global tool (it needs the .NET 10 runtime):
+LoadBearing ships as a .NET global tool (solution-loading commands need a .NET 10 SDK):
 
 ```bash
 dotnet tool install -g Zphil.LoadBearing.Cli
