@@ -263,6 +263,42 @@
               "properties": {
                 "posture": "migrate"
               }
+            },
+            {
+              "id": "exceptions/no-unfiltered-catch",
+              "shortDescription": {
+                "text": "The Web or Domain layers must not catch `Exception` without a `when` filter."
+              },
+              "fullDescription": {
+                "text": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects."
+              },
+              "help": {
+                "text": "Add a `when` filter naming the exceptions you can handle, or catch those types directly."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "exceptions/no-bare-bcl-throw",
+              "shortDescription": {
+                "text": "The Domain layer must not throw `InvalidOperationException`."
+              },
+              "fullDescription": {
+                "text": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures."
+              },
+              "help": {
+                "text": "Throw OrderRuleViolation instead of System.InvalidOperationException."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
             }
           ]
         }
@@ -885,6 +921,54 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-unfiltered-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-bare-bcl-throw",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderApproval throws System.InvalidOperationException"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
           },
           "baselineState": "new"
         }

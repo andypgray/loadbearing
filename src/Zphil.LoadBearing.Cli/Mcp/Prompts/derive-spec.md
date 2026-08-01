@@ -400,9 +400,17 @@ arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
 `MustNotCatch(target, …)` (bans `catch` clauses naming the target, keying the (source, caught)
 type pair; matching is exact at the definition level, so banning `Exception` does not ban its
 subclasses — though a bare `catch` counts as catching `Exception`) ·
+`MustNotCatchUnfiltered(target, …)` (the same ban narrowed to `catch` clauses that carry no
+`when` filter — a filtered broad catch is the good state it rewards; filter presence is
+syntactic, so `when (true)` counts as filtered, and a violation's sites are the unfiltered
+clauses alone, keying the same (source, caught) type pair) ·
 `MustOnlyThrow(target, …)` (the strict throw allow-list: every `throw new X()` / `throw expr`
 must mint a listed type, with no exemption for external packages, keying the (source, thrown)
 type pair; a bare rethrow `throw;` mints nothing) ·
+`MustNotThrow(target, …)` (the ban polarity beside it, for when the forbidden thrown types are
+enumerable and the permitted ones are not — enumerating fifteen legitimate ones to ban three is
+the wrong tool; exact definition-level matching again, so banning `Exception` does not reach a
+derived throw) ·
 `MustNotExpose(target, …)` (bans a type appearing in a public signature position — a return,
 parameter, or property/field/event type — of an effectively-public member, keying the (source,
 exposed) type pair; the type may be *referenced* internally but not *surfaced* on the public API) ·
@@ -465,8 +473,9 @@ within one segment, never crossing a dot; lone `*` = everything. So `MyApp.Domai
 source-level member access; "construct" means a source-level object creation (`new`, including
 target-typed `new()`); "inject" means a source-level constructor-parameter dependency (primary
 constructors included); "catch" means a source-level `catch` clause (a bare `catch` counts as
-`System.Exception`); "throw" means a source-level `throw` of the thrown expression's static
-type (bare rethrows `throw;` are not recorded); "expose" means a type named in a public signature position (a public member's return, parameter, or property/field/event type) of an externally visible type: the checker records all seven edge kinds. A construction ban keys the
+`System.Exception`, and whether the clause spells a `when` filter is recorded beside it, so a
+ban can reach the unfiltered ones alone); "throw" means a source-level `throw` of the thrown
+expression's static type (bare rethrows `throw;` are not recorded); "expose" means a type named in a public signature position (a public member's return, parameter, or property/field/event type) of an externally visible type: the checker records all seven edge kinds. A construction ban keys the
 (source, constructed) type pair (overload-indifferent) and is honest about reflection — a DI
 *registration* mints only a type reference, never a construct edge, so a container-resolved type is
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned
@@ -485,8 +494,11 @@ range over solution-declared types; targets also reach external (BCL/NuGet) type
 packages are exempt, and the rendered sentence says so) and is strict — list a layer's own
 selection among its allowed targets if self-references are fine. `MustOnlyThrow` is stricter
 still: external thrown types ARE constrained (no type must throw a BCL exception), so its
-sentence carries no exemption. `MustNotCatch` matches its operands exactly — banning
-`Exception` never flags a narrower catch, which is the good state. `Implementing`/`DerivedFrom`
+sentence carries no exemption; `MustNotThrow` is its ban twin, and a spec may carry either or
+both. All four exception verbs match their operands exactly — banning `Exception` never flags a
+narrower catch or a derived throw, which is the good state — and the two catch verbs key the
+same (source, caught) edge, so a baseline entry means the same thing under either.
+`Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
 matches any construction. `AttributedWith` sees declared attributes only. The `MustNot*`
 hierarchy verbs share these three matchers, negated per subject over the anchor list (a

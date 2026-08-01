@@ -364,6 +364,34 @@ public class AgentContextRendererTests
     }
 
     [Fact]
+    public void RootBlock_WithUnfilteredCatchRule_ExtendsGlossaryWithTheSameCatchClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new UnfilteredCatchRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // The clause gates on the axis, not on one verb: the filter-aware catch verb renders the very same catch
+        // clause MustNotCatch renders — the fact being glossed is the same fact.
+        block.ShouldContain(
+            "reference = a source-level type reference; catch = a source-level `catch` clause " +
+            "(a bare `catch` counts as `System.Exception`). Expand any rule ID with `loadbearing explain <rule-id>`.");
+        block.ShouldNotContain("throw = a source-level `throw`");
+    }
+
+    [Fact]
+    public void RootBlock_WithThrowBanRule_ExtendsGlossaryWithTheSameThrowClause()
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new ThrowBanRuleSpec());
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+        // Same axis gate on the throw side: the ban polarity renders the clause the strict allow-list renders.
+        block.ShouldContain(
+            "reference = a source-level type reference; throw = a source-level `throw` of the thrown " +
+            "expression's type (bare rethrows `throw;` are not recorded). " +
+            "Expand any rule ID with `loadbearing explain <rule-id>`.");
+        block.ShouldNotContain("catch = a source-level `catch`");
+    }
+
+    [Fact]
     public void RootBlock_WithoutCatchOrThrow_OmitsBothGlossaryClauses()
     {
         // A reference-only spec carries neither exception verb, so the block renders byte-identically to before
@@ -571,6 +599,30 @@ public class AgentContextRendererTests
             arch.Rule("errors/throw-domain-only")
                 .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
                 .Because("Domain code must surface only sanctioned exception types.");
+        }
+    }
+
+    // A MustNotCatchUnfiltered verb over the broadest exception type — triggers the same catch glossary clause
+    // the plain catch verb triggers, and no throw clause.
+    private sealed class UnfilteredCatchRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/filter-broad-catches")
+                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
+                .Because("A broad catch names what it expects in a `when` filter.");
+        }
+    }
+
+    // A MustNotThrow verb over a BCL exception type — triggers the same throw glossary clause the strict
+    // allow-list verb triggers, and no catch clause.
+    private sealed class ThrowBanRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-bare-bcl-throws")
+                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
+                .Because("Bare BCL exception types carry no meaning a caller can dispatch on.");
         }
     }
 

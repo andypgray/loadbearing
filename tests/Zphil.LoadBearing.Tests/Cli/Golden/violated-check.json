@@ -431,15 +431,59 @@
         }
       ],
       "warnings": []
+    },
+    {
+      "id": "exceptions/no-unfiltered-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Web or Domain layers must not catch `Exception` without a `when` filter.",
+      "because": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.",
+      "fix": "Add a `when` filter naming the exceptions you can handle, or catch those types directly.",
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-bare-bcl-throw",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must not throw `InvalidOperationException`.",
+      "because": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
+      "fix": "Throw OrderRuleViolation instead of System.InvalidOperationException.",
+      "violations": [
+        {
+          "kind": "throw",
+          "source": "MyApp.Domain.OrderApproval",
+          "target": "System.InvalidOperationException",
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderApproval.cs",
+              "line": 17
+            }
+          ]
+        }
+      ],
+      "warnings": []
     }
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 15,
+    "rulesChecked": 17,
     "rulesPassed": 2,
-    "rulesFailed": 12,
+    "rulesFailed": 14,
     "rulesSkipped": 1,
-    "violations": 20,
+    "violations": 22,
     "warnings": 1
   }
 }

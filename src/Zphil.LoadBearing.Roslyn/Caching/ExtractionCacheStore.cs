@@ -130,10 +130,16 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v11 adds the per-type generated flag (TypeFacts.IsGenerated, GRAMMAR §5.2), the fact `.Authored()`
+    // v12 adds the catch edge's unfiltered-site subset (FragmentCatchEdge.UnfilteredSites, GRAMMAR §4.8), the
+    // fact a filter-aware catch rule reads: the one on-disk format this covers is this per-solution cache file,
+    // where `Fragments[*].CatchEdges[*]` gains an `UnfilteredSites` array under JsonOptions. A v11 record has no
+    // such field, so every catch edge would deserialize with a null subset and the filter fact would read wrong
+    // on a hit. It degrades to a clean Miss instead. Nothing else moves: baselines, the `--json` report, SARIF,
+    // and the binlog replay store are untouched formats, and a warm session's fragments never leave memory.
+    // (v11 added the per-type generated flag (TypeFacts.IsGenerated, GRAMMAR §5.2), the fact `.Authored()`
     // filters on: a v10 record has no such field, so every type would deserialize as authored and a rule
-    // narrowed to authored types would silently widen on a cache hit. It degrades to a clean Miss instead.
-    // (v10 reshaped SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
+    // narrowed to authored types would silently widen on a cache hit.
+    // v10 reshaped SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
     // plus the private plumbing only it references), and the hit path replays that set rather than one name.
     // A v9 record carries the old single name, so it degrades to a clean Miss and is rebuilt — the cache is
     // disposable derived data, never a loud error. v9 added signature-exposure edges (a FragmentExposureEdge
@@ -142,7 +148,7 @@ internal sealed class ExtractionCacheStore
     // and container-registration facts; v5 added construction-use edges; v4 aligned CaptureFingerprint's
     // cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3 added the member
     // inventory; v2 added member-use edges over v1's type-only fragments — every prior version likewise misses.)
-    private const int CurrentSchemaVersion = 11;
+    private const int CurrentSchemaVersion = 12;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as

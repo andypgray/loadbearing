@@ -121,6 +121,12 @@ internal static class ModelQuery
         return edge.Sites.Select(s => s.Line).ToList();
     }
 
+    /// <summary>The lines of the edge's unfiltered sites — the subset whose clause spells no `when` filter.</summary>
+    public static IReadOnlyList<int> UnfilteredLines(this CatchEdge edge)
+    {
+        return edge.UnfilteredSites.Select(s => s.Line).ToList();
+    }
+
     // ── throw edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
 
     public static ThrowEdge ThrowEdge(this CodebaseModel model, string sourceFullName, string thrownFullName)

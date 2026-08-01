@@ -22,6 +22,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI's self-check job now renders this repository's own spec and requires a zero diff, and runs
   `status`, `graph` and `explain` against this solution. Before, `check` was the only command any
   gate pointed at this repository.
+- Filter-aware catch bans and the throw ban: the `MustNotCatchUnfiltered` and `MustNotThrow`
+  verbs. "The Web layer must not catch `Exception` without a `when` filter" is now a one-line,
+  ratcheted rule: every catch edge additionally records which of its sites spell no `when`
+  filter, and the verb reds a matching edge only when at least one site is unfiltered — an edge
+  whose broad catches are all filtered passes, which is what a plain `MustNotCatch` could never
+  say. Violations list the unfiltered sites only. A bare `catch` counts as `System.Exception`
+  and counts as unfiltered; filter presence is syntactic, so a filter's contents are never
+  judged (`when (true)` counts as filtered) and `when` filters still never suppress the catch
+  edge. `MustNotThrow` is the ban polarity beside the strict allow-list `MustOnlyThrow`, for the
+  case where the forbidden thrown types are a handful and the permitted ones are the rest of the
+  world. Both verbs match exact definition-level FQN, report through the existing catch and
+  throw kinds in human, JSON, and SARIF output, and key the same edge identities as their
+  siblings, so a baseline never records which verb a spec chose. The persisted extraction
+  cache's schema moves with the new fact: the first check after upgrading pays one cold
+  extraction per solution, then steady state.
+- Two more rules over this repository's real code: `exceptions/broad-catches-filtered` (a broad
+  catch names what it expects in a `when` filter; the sanctioned broad handlers — top-level
+  fault boundaries, background loops, the shutdown drain, and writers of disposable derived
+  data — are exempt by type name, stated in the spec rather than recorded in a baseline, and the
+  types whose broad catches are all filtered stay inside the rule and pass it) and
+  `exceptions/no-bare-bcl-throws` (nothing throws `Exception`, `SystemException` or
+  `ApplicationException` — green today, and red the day the first one arrives). The managed
+  AGENTS.md block's glossary gains its catch clause for the first time.
 
 ### Changed
 
@@ -31,6 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the real code and declined rather than contrived, and the stance on `baseline --add`. A
   new test holds the ledger complete against the public `Must*` surface, so a verb that ships with
   neither a self-use nor a ledger line reddens CI.
+- Spec-load diagnostics now cover .NET Framework specs. A `typeof()` anchor whose type closure
+  reaches a Framework-only assembly (a base type or implemented interface in `System.Web`, say)
+  used to surface as a raw `TypeLoadException`; it is now a spec-load error naming the type that
+  could not be loaded and pointing at the namespace-pattern anchor, which needs no assembly load.
+  The missing-dependency message it sits beside was reworded for the same reason: its remedy used
+  to lead with `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`, which is the fix
+  for a NuGet-packaged dependency and a dead end for a .NET Framework reference assembly, because
+  such an assembly resolves from the targeting pack or the GAC and is never staged into `bin`.
+  Both remedies are now named, each with the case it applies to.
+- The hook wrappers read the edited file's path from the PostToolUse payload and skip the check
+  when the file is one the extractor cannot see (anything but source, project, and solution
+  files), so a documentation edit no longer pays a full solution check. A hand-run wrapper, with
+  no payload on stdin, still checks; so does any edit whose payload cannot be parsed.
 
 ### Fixed
 
@@ -50,22 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `${CLAUDE_PROJECT_DIR}` and the wrappers change to that directory before checking. The
   snippet also sets an explicit 120-second hook timeout: the 60-second default sits too close to
   a cold check.
-
-### Changed
-
-- Spec-load diagnostics now cover .NET Framework specs. A `typeof()` anchor whose type closure
-  reaches a Framework-only assembly (a base type or implemented interface in `System.Web`, say)
-  used to surface as a raw `TypeLoadException`; it is now a spec-load error naming the type that
-  could not be loaded and pointing at the namespace-pattern anchor, which needs no assembly load.
-  The missing-dependency message it sits beside was reworded for the same reason: its remedy used
-  to lead with `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`, which is the fix
-  for a NuGet-packaged dependency and a dead end for a .NET Framework reference assembly, because
-  such an assembly resolves from the targeting pack or the GAC and is never staged into `bin`.
-  Both remedies are now named, each with the case it applies to.
-- The hook wrappers read the edited file's path from the PostToolUse payload and skip the check
-  when the file is one the extractor cannot see (anything but source, project, and solution
-  files), so a documentation edit no longer pays a full solution check. A hand-run wrapper, with
-  no payload on stdin, still checks; so does any edit whose payload cannot be parsed.
 
 ## [0.3.0] - 2026-07-24
 

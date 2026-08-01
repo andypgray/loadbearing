@@ -283,6 +283,46 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task ArchCheck_WhenFilterAddedOnDisk_ClearsUnfilteredCatchRedWhileCatchBanStaysRedAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, where ReportEndpoint's ONE blanket catch is red
+        // under two rules at once: the plain catch ban exceptions/no-general-catch (its site is unfiltered, so
+        // both agree today) and the filter-aware exceptions/no-unfiltered-catch. This is the filter-fact analog
+        // of the second-catch edit above, and the only place the new fact crosses the dirty-rewalk path.
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+
+        // Act — add a `when` filter to that same catch on disk, then re-check the still-warm server. A fresh
+        // cold CLI run over the same edited tree is the parity oracle.
+        string reportEndpoint = fixture.PathOf(Web, "ReportEndpoint.cs");
+        EditOnDisk(reportEndpoint, AddWhenFilterToSwallowingCatch);
+        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — one edit, two rules, opposite answers: the filter-aware rule flips to passed with nothing
+        // left to report, while the plain catch ban stays red at the very same single site, because a `when`
+        // filter never suppresses the catch edge — it only changes which of the edge's sites are recorded
+        // unfiltered (GRAMMAR §4.8). And the warm answer is byte-identical to the cold one.
+        RuleStatusOf(before, "exceptions/no-unfiltered-catch").ShouldBe("failed");
+        RuleStatusOf(after, "exceptions/no-unfiltered-catch").ShouldBe("passed");
+        ViolationCountOf(after, "exceptions/no-unfiltered-catch").ShouldBe(0);
+        RuleStatusOf(before, "exceptions/no-general-catch").ShouldBe("failed");
+        RuleStatusOf(after, "exceptions/no-general-catch").ShouldBe("failed");
+        CatchSiteCount(after).ShouldBe(1);
+        Normalize(after).ShouldNotBe(Normalize(before));
+        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+
+        // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
+        // reverse-dependent Domain.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+    }
+
+    [Fact]
     public async Task ArchCheck_SteadyStateNoDiskChange_ReadsAndReloadsNothing()
     {
         // Arrange — load, then promote every document past the racy window (backdate + one reconcile) so the
@@ -472,6 +512,16 @@ public sealed class WarmWorkspaceMcpTests
                + "    public int RenderAgain(int id) { try { return id; } catch (System.Exception) { return -1; } }\n}\n";
     }
 
+    // Adds a `when` filter to ReportEndpoint's blanket catch, using the method's own parameter so nothing new is
+    // referenced. The catch edge and its §4.1 reference edge are minted exactly as before (GRAMMAR §4.8) — only
+    // the recorded unfiltered-site set changes, which is what separates the two catch rules over this one site.
+    private static string AddWhenFilterToSwallowingCatch(string source)
+    {
+        return source.Replace(
+            "catch (System.Exception)",
+            "catch (System.Exception) when (reportId > 0)");
+    }
+
     // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
     private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
     {
@@ -535,6 +585,24 @@ public sealed class WarmWorkspaceMcpTests
         JsonElement swallow = rule.GetProperty("violations").EnumerateArray()
             .Single(v => v.GetProperty("target").GetString() == "System.Exception");
         return swallow.GetProperty("sites").GetArrayLength();
+    }
+
+    // A named rule's reported status — "passed", "failed" or "skipped".
+    private static string RuleStatusOf(string checkJson, string ruleId)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == ruleId);
+        return rule.GetProperty("status").GetString()!;
+    }
+
+    // The number of red violations a named rule reports.
+    private static int ViolationCountOf(string checkJson, string ruleId)
+    {
+        using JsonDocument document = JsonDocument.Parse(checkJson);
+        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
+            .Single(r => r.GetProperty("id").GetString() == ruleId);
+        return rule.GetProperty("violations").GetArrayLength();
     }
 
     private static void EditOnDisk(string path, Func<string, string> transform)

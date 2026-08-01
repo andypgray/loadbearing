@@ -33,11 +33,11 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion10_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion11_ReturnsMiss()
     {
-        // Arrange — a v10 cache predates the per-type generated flag (schema bumped 10→11): its type facts
-        // carry no IsGenerated, so every type would replay as authored and an `.Authored()` subject would
-        // silently widen on a hit. It must degrade cleanly instead.
+        // Arrange — a v11 cache predates the catch edge's unfiltered-site subset (schema bumped 11→12): its
+        // catch edges carry no UnfilteredSites, so every one would replay with a null subset and a filter-aware
+        // catch rule would read the wrong fact on a hit. It must degrade cleanly instead.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -45,7 +45,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 10);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 11);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

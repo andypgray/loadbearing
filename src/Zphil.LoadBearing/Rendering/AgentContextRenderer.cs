@@ -84,8 +84,11 @@ public static class AgentContextRenderer
         bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
         bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
         bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
-        bool hasCatchRule = model.Rules.Any(rule => rule.Constraint is MustNotCatchConstraint);
-        bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint);
+        // The two exception clauses gate on the axis, not on one verb: any catch verb renders the catch clause
+        // and any throw verb the throw clause, so a spec that swaps MustNotCatch for MustNotCatchUnfiltered (or
+        // MustOnlyThrow for MustNotThrow) renders byte-identically — the fact being glossed is the same fact.
+        bool hasCatchRule = model.Rules.Any(rule => rule.Constraint is MustNotCatchConstraint or MustNotCatchUnfilteredConstraint);
+        bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint or MustNotThrowConstraint);
         bool hasExposeRule = model.Rules.Any(rule => rule.Constraint is MustNotExposeConstraint);
         bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
         var sections = new List<string>

@@ -60,6 +60,8 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             <b>M9</b> — catch edges (GRAMMAR §4.8): site-sets union per <c>(source, caught)</c>,
 ///             self-catch dropped, endpoints the same <see cref="TypeNode" /> instances held by
 ///             <see cref="CodebaseModel.Types" /> (an external caught type resolves to a shared external node).
+///             The edge's unfiltered-site subset unions under the same key and the same guard, so a
+///             <c>file:line</c> some fragment reports unfiltered stays unfiltered in the merged edge.
 ///         </item>
 ///         <item>
 ///             <b>M10</b> — throw edges (GRAMMAR §4.8): site-sets union per <c>(source, thrown)</c>,
@@ -93,6 +95,7 @@ internal static class FragmentMerger
     private sealed class MergeState
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
@@ -311,6 +314,12 @@ internal static class FragmentMerger
             ResolveNode(edge.CaughtFullName);
             var sites = CatchEdgeSites((edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
+
+            // The unfiltered subset unions under the same key and the same guard. Unioning the UNFILTERED sites
+            // is what keeps a `#if`-divergent filter honest: a (file, line) filtered in one fragment and
+            // unfiltered in another reads unfiltered here, the truthful answer for a ban.
+            var unfilteredSites = CatchEdgeUnfilteredSites((edge.SourceFullName, edge.CaughtFullName));
+            foreach (FragmentSite site in edge.UnfilteredSites) unfilteredSites.Add(site);
         }
 
         private void MergeThrowEdge(FragmentThrowEdge edge)
@@ -414,10 +423,14 @@ internal static class FragmentMerger
                 .Select(kv => new InjectionEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Injected], ToLocations(kv.Value)))
                 .ToList();
 
+            // Both site lists come out of SortedSets, so each is (file, line) ordered and the second is a subset
+            // of the first; an edge with no unfiltered site materializes the empty list.
             var catchEdges = _catchEdgeSites
                 .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
                 .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
-                .Select(kv => new CatchEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Caught], ToLocations(kv.Value)))
+                .Select(kv => new CatchEdge(
+                    _nodes[kv.Key.Src], _nodes[kv.Key.Caught], ToLocations(kv.Value),
+                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? ToLocations(unfiltered) : []))
                 .ToList();
 
             var throwEdges = _throwEdgeSites
@@ -547,6 +560,17 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _catchEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeUnfilteredSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeUnfilteredSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeUnfilteredSites[key] = sites;
             }
 
             return sites;

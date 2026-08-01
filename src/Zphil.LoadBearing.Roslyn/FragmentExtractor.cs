@@ -410,6 +410,12 @@ internal static class FragmentExtractor
     private sealed class ExtractState
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
+
+        // The unfiltered subset of _catchEdgeSites, keyed identically (GRAMMAR §4.8). Recorded as its own
+        // parallel fact rather than derived by complement: sites dedupe by (file, line), so a filtered and an
+        // unfiltered catch of one type on one physical line collapse to a single site, and a complement would
+        // then hide the unfiltered clause. Recording the unfiltered sites is truthful for a ban either way.
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
         private readonly Dictionary<string, DeclaredBuilder> _declared = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
@@ -522,7 +528,7 @@ internal static class FragmentExtractor
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
-                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, INamedTypeSymbol? thrown, string file, int line)
+                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, INamedTypeSymbol? thrown, string file, int line)
                          in ReferenceWalker.Walk(root, model))
                 {
                     var site = new FragmentSite(file, line);
@@ -558,7 +564,9 @@ internal static class FragmentExtractor
 
                     // The catch channel (§4.8): mint the catch edge, self-catch dropped like the type-edge self-drop.
                     // Rides independently — a typed catch arrives here with target=null (its type-name syntax minted
-                    // the reference edge on its own visit) and a bare catch names no type at all.
+                    // the reference edge on its own visit) and a bare catch names no type at all. The same site also
+                    // joins the edge's unfiltered subset when the clause spells no `when` filter, so the subset holds
+                    // by construction; a bare `catch` is unfiltered, a bare `catch when (…)` is not.
                     if (caught is not null)
                     {
                         string caughtFqn = FullNameOf(caught);
@@ -566,6 +574,7 @@ internal static class FragmentExtractor
                         {
                             ResolveName(caught);
                             CatchEdgeSites((srcFqn, caughtFqn)).Add(site);
+                            if (!caughtHasFilter) CatchEdgeUnfilteredSites((srcFqn, caughtFqn)).Add(site);
                         }
                     }
 
@@ -747,10 +756,14 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentInjectionEdge(kv.Key.Src, kv.Key.Injected, kv.Value.ToList()))
                 .ToList();
 
+            // An edge whose every site is filtered has no entry in the parallel table, which materializes as the
+            // empty list — the honest reading, since nothing about that edge is unfiltered.
             var catchEdges = _catchEdgeSites
                 .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
                 .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
-                .Select(kv => new FragmentCatchEdge(kv.Key.Src, kv.Key.Caught, kv.Value.ToList()))
+                .Select(kv => new FragmentCatchEdge(
+                    kv.Key.Src, kv.Key.Caught, kv.Value.ToList(),
+                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? unfiltered.ToList() : []))
                 .ToList();
 
             var throwEdges = _throwEdgeSites
@@ -805,6 +818,17 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _catchEdgeSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeUnfilteredSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeUnfilteredSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeUnfilteredSites[key] = sites;
             }
 
             return sites;

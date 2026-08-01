@@ -79,6 +79,8 @@ public sealed class CodebaseModel
     ///     <c>catch</c> clause of each solution-declared type; a bare <c>catch</c> records
     ///     <c>System.Exception</c>. A typed catch is recorded beside <see cref="Edges" />, never instead of
     ///     it: its type-name syntax also mints a type-level edge (a bare catch names no type, so mints none).
+    ///     Each edge additionally carries its <see cref="CatchEdge.UnfilteredSites" /> — the subset of its
+    ///     sites whose clause spells no <c>when</c> filter.
     /// </summary>
     public IReadOnlyList<CatchEdge> CatchEdges { get; }
 

@@ -9,8 +9,8 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three generic
 ///     construction lists, every reference edge with its sites, every member-use edge with its member facts
 ///     and sites, every construction edge with its sites (§4.5), every injection edge with its sites (§4.7),
-///     every catch edge and throw edge with its sites (§4.8), every exposure edge with its sites (§4.9), every
-///     registration fact (§4.7), and every
+///     every catch edge with its sites and its unfiltered subset and every throw edge with its sites (§4.8),
+///     every exposure edge with its sites (§4.9), every registration fact (§4.7), and every
 ///     declared member's scalar facts and declaration sites (GRAMMAR §4.6) — so that if a fact is not rendered
 ///     here it is not pinned. The model is already fully ordered (types by FullName, edges by source/target,
 ///     member edges by source/member SymbolId, construction edges by source/constructed, injection edges by
@@ -56,10 +56,13 @@ internal static class ModelDump
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Injected.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
 
+        // The catch line renders both site lists: the totality contract means the unfiltered subset (§4.8) must
+        // show up here or it is not pinned by any dump comparison. An all-filtered edge renders `unfiltered=[]`.
         builder.AppendLine("== CATCH EDGES ==");
         foreach (CatchEdge edge in model.CatchEdges)
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Caught.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+                .Append(" @ [").Append(RenderSites(edge.Sites))
+                .Append("] unfiltered=[").Append(RenderSites(edge.UnfilteredSites)).AppendLine("]");
 
         builder.AppendLine("== THROW EDGES ==");
         foreach (ThrowEdge edge in model.ThrowEdges)

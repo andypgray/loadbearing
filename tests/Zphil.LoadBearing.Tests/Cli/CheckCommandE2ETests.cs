@@ -106,6 +106,44 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_ReportsUnfilteredCatchRuleAndSparesTheFilteredCatch()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
+        // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's blanket catch spells no
+        // `when` filter, so it is red at the very site exceptions/no-general-catch reds — a second rule over one
+        // edge, each with its own identity.
+        result.Out.ShouldContain(
+            "FAIL exceptions/no-unfiltered-catch — The Web or Domain layers must not catch `Exception` without a `when` filter.");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        // The green half, stated as an absence: RetryPolicy catches the identical type under the identical
+        // subject, and its `when` filter keeps it out of the evidence entirely — no site line, no mention.
+        result.Out.ShouldNotContain("RetryPolicy");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsThrowBanRuleAlongsideTheThrowAllowList()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
+        // its own identity. The 'throws' evidence line is shared text with exceptions/domain-throws-domain, so
+        // what tells the two blocks apart is the prose — this rule names the one type it bans, not the set it
+        // permits — and those are the pins.
+        result.Out.ShouldContain(
+            "FAIL exceptions/no-bare-bcl-throw — The Domain layer must not throw `InvalidOperationException`.");
+        result.Out.ShouldContain(
+            "because: InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.");
+        result.Out.ShouldContain("fix: Throw OrderRuleViolation instead of System.InvalidOperationException.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
+    }
+
+    [Fact]
     public async Task Check_ViolatedSpec_ReportsExposeRuleWithExposesLinesAndInitHint()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);

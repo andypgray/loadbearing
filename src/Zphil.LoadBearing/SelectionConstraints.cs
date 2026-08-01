@@ -140,6 +140,25 @@ public static class SelectionConstraints
     }
 
     /// <summary>
+    ///     The subject must not catch any of the targets in a <c>catch</c> clause that carries no
+    ///     <c>when</c> filter — a bare <c>catch</c> counts as <c>System.Exception</c> and counts as
+    ///     unfiltered, while a <c>catch when (…)</c> of any form is filtered (GRAMMAR §5.3). Filter
+    ///     presence is syntactic: the filter's contents are never judged. Catch-ness lives in the verb,
+    ///     so ordinary selections name what may not be caught unfiltered; there is no expression overload
+    ///     (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotCatchUnfiltered(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotCatchUnfilteredConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not catch any of the targets without a <c>when</c> filter (type sugar).</summary>
+    public static Constraint MustNotCatchUnfiltered(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotCatchUnfilteredConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
     ///     The subject must not expose any of the targets — a listed target appearing in a public signature
     ///     position (a return, parameter, or property/field/event type) of an effectively-public member
     ///     (GRAMMAR §5.3, §4.9). Exposure-ness lives in the verb, so ordinary selections name what may not
@@ -154,6 +173,25 @@ public static class SelectionConstraints
     public static Constraint MustNotExpose(this Selection subject, Type first, params Type[] more)
     {
         return new MustNotExposeConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
+    ///     The subject must not throw any of the targets — the ban polarity beside the strict allow-list
+    ///     <c>MustOnlyThrow</c>, for the case where the forbidden thrown types are enumerable and the
+    ///     permitted ones are not (GRAMMAR §5.3). Matching is exact definition-level FQN, so a ban on
+    ///     <c>Exception</c> deliberately does not reach derived throws. Throw-ness lives in the verb, so
+    ///     ordinary selections name the forbidden thrown types; there is no expression overload
+    ///     (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotThrow(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotThrowConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not throw any of the targets (type sugar).</summary>
+    public static Constraint MustNotThrow(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotThrowConstraint(subject, WrappedTypes(subject, first, more));
     }
 
     /// <summary>

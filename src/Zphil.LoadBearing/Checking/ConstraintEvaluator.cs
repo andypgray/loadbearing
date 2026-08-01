@@ -9,12 +9,12 @@ namespace Zphil.LoadBearing.Checking;
 ///     §4.5, §4.7, §4.8, §4.9, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
 ///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
 ///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
-///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verb
-///     (<c>MustNotCatch</c>) walks <see cref="CodebaseModel.CatchEdges" />; the throw verb
-///     (<c>MustOnlyThrow</c>) walks <see cref="CodebaseModel.ThrowEdges" />; the exposure verb
-///     (<c>MustNotExpose</c>) walks <see cref="CodebaseModel.ExposureEdges" />; shape verbs test each
-///     subject. Every verb first requires a non-empty subject set — an empty subject fails the rule by
-///     default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
+///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verbs
+///     (<c>MustNotCatch</c>, <c>MustNotCatchUnfiltered</c>) walk <see cref="CodebaseModel.CatchEdges" />; the
+///     throw verbs (<c>MustOnlyThrow</c>, <c>MustNotThrow</c>) walk <see cref="CodebaseModel.ThrowEdges" />;
+///     the exposure verb (<c>MustNotExpose</c>) walks <see cref="CodebaseModel.ExposureEdges" />; shape verbs
+///     test each subject. Every verb first requires a non-empty subject set — an empty subject fails the rule
+///     by default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
 /// </summary>
 internal sealed class ConstraintEvaluator
 {
@@ -93,10 +93,14 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenInjection(subjects, c.Targets);
             case MustNotCatchConstraint c:
                 return ForbiddenCatch(subjects, c.Targets);
+            case MustNotCatchUnfilteredConstraint c:
+                return ForbiddenUnfilteredCatch(subjects, c.Targets);
             case MustNotExposeConstraint c:
                 return ForbiddenExposure(subjects, c.Targets);
             case MustOnlyThrowConstraint c:
                 return OnlyThrow(subjects, c.Targets);
+            case MustNotThrowConstraint c:
+                return ForbiddenThrow(subjects, c.Targets);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -254,6 +258,57 @@ internal sealed class ConstraintEvaluator
         foreach (CatchEdge edge in _catchEdges)
             if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught))
                 violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.Sites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
+    // The filter-aware catch verb (GRAMMAR §4.8, §5.3): the same walk as ForbiddenCatch over the same edges,
+    // decided on the edge's recorded UNFILTERED sites instead of its sites. A matching edge violates iff at
+    // least one of its `catch` clauses spells no `when` filter, and the evidence is exactly those sites — so an
+    // edge every one of whose sites is filtered is GREEN, and no printed file:line is ever a filtered site.
+    // Extraction records the unfiltered subset as its own fact (§4.8), so this arm reads it directly as evidence
+    // rather than subtracting one set from another (the polarity that keeps a same-line collision red-biased).
+    // Identity is untouched — the (source, caught) type pair, the very key ForbiddenCatch's violations carry, so
+    // the unfiltered sites are evidence and never identity (§4.3) and a baseline entry means the same thing under
+    // either catch verb. Matching stays exact definition-level FQN and the inert-target warning is the §4.1
+    // forbidden-set family's, both exactly as ForbiddenCatch.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenUnfilteredCatch(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (CatchEdge edge in _catchEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught) && edge.UnfilteredSites.Count > 0)
+                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.UnfilteredSites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
+    // The throw-ban verb (GRAMMAR §4.8, §5.3): the ban polarity beside MustOnlyThrow's strict allow-list — a
+    // throw edge is a hit when its source is a subject AND the thrown type is a forbidden operand, for the case
+    // where the forbidden thrown types are enumerable and the permitted ones are not. Matching is exact
+    // definition-level FQN on the operand set, so a ban on Exception never reaches a derived throw (the narrow
+    // throw is the good state, mirroring the catch verbs). Inert-target warning semantics are the §4.1
+    // forbidden-set family's, exactly as ForbiddenCatch — the point of departure from OnlyThrow, which never
+    // warns because an empty allow-set is loud on its own.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenThrow(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (ThrowEdge edge in _throwEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Thrown))
+                violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
             ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }

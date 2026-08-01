@@ -147,6 +147,66 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_UnfilteredCatchViolation_RendersCatchesLineAtTheUnfilteredSiteOnly()
+    {
+        // MustNotCatchUnfiltered reuses the Catch arm, so it renders the same `Source catches Target` line — and
+        // because its violation carries the edge's UNFILTERED sites, the filtered clause at line 9 is never
+        // printed while the unfiltered one at line 11 is. That is what keeps every rendered line true under a
+        // verb whose law the line itself does not state: nobody is pointed at a site the rule sanctions.
+        const string source = """
+                              namespace Errors { public class DbError : System.Exception {} }
+                              namespace App
+                              {
+                                  public class Handler
+                                  {
+                                      public void Run(bool flag)
+                                      {
+                                          try { }
+                                          catch (Errors.DbError) when (flag) { }
+                                          try { }
+                                          catch (Errors.DbError) { }
+                                      }
+                                  }
+                              }
+                              """;
+        RuleResult result = Checker.Run(source, arch =>
+            arch.Rule("ex/filter-catches")
+                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                .Because("A broad catch names what it expects.")).Single();
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Catch);
+        block.ShouldContain("Test.cs:11 — App.Handler catches Errors.DbError");
+        block.ShouldNotContain("Test.cs:9");
+    }
+
+    [Fact]
+    public void RuleBlock_ForbiddenThrowViolation_RendersThrowsLineAtThrowSite()
+    {
+        // MustNotThrow reuses the Throw arm: the ban polarity renders the same `Source throws Target` line the
+        // allow-list does, at the `throw` site — one arm serving the whole fact family.
+        const string source = """
+                              namespace App
+                              {
+                                  public class Service
+                                  {
+                                      public void Run() => throw new System.Exception();
+                                  }
+                              }
+                              """;
+        RuleResult result = Checker.Run(source, arch =>
+            arch.Rule("ex/no-bare-throws")
+                .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
+                .Because("Throw a type a caller can dispatch on.")).Single();
+
+        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.Throw);
+        block.ShouldContain("Test.cs:5 — App.Service throws System.Exception");
+    }
+
+    [Fact]
     public void RuleBlock_MixedUnlocatedAndLocated_EmitsUnlocatedBeforeLocated()
     {
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered

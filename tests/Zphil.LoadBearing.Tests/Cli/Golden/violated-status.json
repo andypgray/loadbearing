@@ -170,12 +170,26 @@
         "stale": 0,
         "promotable": false
       }
+    },
+    {
+      "id": "exceptions/no-unfiltered-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "exceptions/no-bare-bcl-throw",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 15,
+    "rulesChecked": 17,
     "rulesPassed": 2,
-    "rulesFailed": 12,
+    "rulesFailed": 14,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

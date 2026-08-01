@@ -315,6 +315,78 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MustNotCatchUnfiltered_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6) survives the trailing filter qualifier — the verb phrase closes the sentence.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustNotCatchUnfiltered(typeof(Exception)))
+            .ShouldBe("The Web layer must not catch `Exception` without a `when` filter.");
+    }
+
+    [Fact]
+    public void MustNotCatchUnfiltered_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotCatchUnfiltered(typeof(Exception)))
+            .ShouldBe("Types in the Web layer named `*Controller` must not catch `Exception` without a `when` filter.");
+    }
+
+    [Fact]
+    public void MustNotCatchUnfiltered_MultipleTargets_JoinWithOr()
+    {
+        // The target list joins before the filter qualifier — never one qualifier per target.
+        Constraint constraint = Arch.Types.MustNotCatchUnfiltered(typeof(InvalidOperationException), typeof(TimeoutException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not catch `InvalidOperationException` or `TimeoutException` without a `when` filter.");
+    }
+
+    [Fact]
+    public void MustNotCatchUnfiltered_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        // Shares TargetList with the other catch verb, so colliding exception names widen the same way.
+        Constraint constraint = Arch.Types.MustNotCatchUnfiltered(typeof(DataException), typeof(Stubs.Sales.DataException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not catch `Billing.DataException` or `Sales.DataException` without a `when` filter.");
+    }
+
+    [Fact]
+    public void MustNotThrow_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6): a bare layer subject speaks collectively — "The Domain layer must not throw …".
+        Layer domain = Arch.Layer("Domain", "MyApp.Domain.*");
+        SentenceRenderer.Sentence(domain.MustNotThrow(typeof(Exception)))
+            .ShouldBe("The Domain layer must not throw `Exception`.");
+    }
+
+    [Fact]
+    public void MustNotThrow_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        // Head truth under adjectives (§6): the layer subject switches to types voice under WithSuffix.
+        Layer domain = Arch.Layer("Domain", "MyApp.Domain.*");
+        SentenceRenderer.Sentence(domain.WithSuffix("Service").MustNotThrow(typeof(Exception)))
+            .ShouldBe("Types in the Domain layer named `*Service` must not throw `Exception`.");
+    }
+
+    [Fact]
+    public void MustNotThrow_ThreeTargets_JoinWithCommasAndOr_NoOxfordComma()
+    {
+        // Shares TargetList with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
+        Constraint constraint = Arch.Types.MustNotThrow(
+            typeof(Exception), typeof(SystemException), typeof(ApplicationException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not throw `Exception`, `SystemException` or `ApplicationException`.");
+    }
+
+    [Fact]
+    public void MustNotThrow_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustNotThrow(typeof(DataException), typeof(Stubs.Sales.DataException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not throw `Billing.DataException` or `Sales.DataException`.");
+    }
+
+    [Fact]
     public void MustOnlyThrow_NamespaceSubject_RendersLocativeAndStrictAllowlist()
     {
         // The namespace-locative subject + the strict throw allowlist: exact equality proves no external-

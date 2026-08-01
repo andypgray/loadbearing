@@ -10,7 +10,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     numbers: 3 projects; Domain→Web = 2 observed type-pairs; Web→Legacy.Billing = 3; Web→System.Data = 2;
 ///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms); Web→Microsoft.Extensions = 2
 ///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions);
-///     Domain→System = 2 (OrderRuleViolation's Exception base + OrderApproval's InvalidOperationException throw)
+///     Domain→System = 3 (OrderRuleViolation's Exception base, OrderApproval's InvalidOperationException throw
+///     and RetryPolicy's `when`-filtered caught Exception — a filter never suppresses the reference edge)
 ///     and Web→System = 3 (now including ReportEndpoint's caught Exception).
 /// </summary>
 [Collection("Serial")]
@@ -21,7 +22,7 @@ public sealed class GraphCommandTests
         Codebase survey: MyApp.sln
 
         Projects (3):
-          MyApp.Domain — 7 types; references: MyApp.Web
+          MyApp.Domain — 8 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
           MyApp.Web — 17 types; references: MyApp.Legacy.Billing
 
@@ -30,12 +31,12 @@ public sealed class GraphCommandTests
           MyApp.Web -> MyApp.Legacy.Billing: 3
 
         Namespaces:
-          MyApp.Domain: MyApp.Domain (7)
+          MyApp.Domain: MyApp.Domain (8)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
           MyApp.Web: MyApp.Web (17)
 
         External references (by namespace root):
-          MyApp.Domain -> System: 2
+          MyApp.Domain -> System: 3
           MyApp.Legacy.Billing -> System: 2
           MyApp.Web -> Microsoft.Extensions: 2
           MyApp.Web -> System: 3

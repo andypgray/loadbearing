@@ -150,6 +150,69 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
+    public void Serialize_UnfilteredCatchViolation_EmitsOneResultAtTheUnfilteredSite()
+    {
+        // MustNotCatchUnfiltered reuses the Catch arm, so SARIF needs no new message form. The evidence-subset
+        // dividend shows here end to end: the edge has two catch sites but the violation carries only the
+        // unfiltered one, so exactly ONE result is emitted, and it points at line 11 — never at the sanctioned
+        // `when`-filtered clause on line 9. The filter law itself rides the descriptor's shortDescription (the
+        // rule's own sentence), so a standalone viewer reads it beside the message.
+        const string source = """
+                              namespace Errors { public class DbError : System.Exception {} }
+                              namespace App
+                              {
+                                  public class Handler
+                                  {
+                                      public void Run(bool flag)
+                                      {
+                                          try { }
+                                          catch (Errors.DbError) when (flag) { }
+                                          try { }
+                                          catch (Errors.DbError) { }
+                                      }
+                                  }
+                              }
+                              """;
+        CheckReport report = Checker.Run(source, arch =>
+            arch.Rule("ex/filter-catches")
+                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                .Because("A broad catch names what it expects."));
+
+        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
+
+        JsonElement result = Results(json).ShouldHaveSingleItem();
+        result.GetProperty("level").GetString().ShouldBe("error");
+        result.GetProperty("message").GetProperty("text").GetString().ShouldBe("App.Handler catches Errors.DbError");
+        StartLine(result).ShouldBe(11);
+
+        // The filter law is not in the message, so it has to be somewhere a standalone viewer looks: the rule
+        // descriptor's shortDescription, which carries the law sentence verbatim.
+        string sentence = report.Results.Single().Rule.Sentence;
+        sentence.ShouldContain("without a `when` filter");
+        Rules(json).Single().GetProperty("shortDescription").GetProperty("text").GetString().ShouldBe(sentence);
+    }
+
+    [Fact]
+    public void Serialize_ForbiddenThrowViolation_EmitsThrowsMessageText()
+    {
+        // A red MustNotThrow violation drives the same SARIF MessageText throw arm the allow-list drives —
+        // the ban polarity adds no arm, so there is no new way for a red to render as nothing.
+        const string source = """
+                              namespace App { public class Service { public void Run() => throw new System.Exception(); } }
+                              """;
+        CheckReport report = Checker.Run(source, arch =>
+            arch.Rule("ex/no-bare-throws")
+                .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
+                .Because("Throw a type a caller can dispatch on."));
+
+        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
+
+        JsonElement result = Results(json).ShouldHaveSingleItem();
+        result.GetProperty("level").GetString().ShouldBe("error");
+        result.GetProperty("message").GetProperty("text").GetString().ShouldBe("App.Service throws System.Exception");
+    }
+
+    [Fact]
     public void Serialize_EmptySubjectAndRuleError_ProduceNoResults()
     {
         // EmptySubject and RuleError violations are site-less by construction (the model deliberately carries no
@@ -286,6 +349,13 @@ public sealed class SarifReportRendererTests
     private static string Fingerprint(JsonElement result)
     {
         return result.GetProperty("partialFingerprints").GetProperty("loadBearingViolationIdentity/v1").GetString()!;
+    }
+
+    // The 1-based source line of a single-location result — the site the reader is sent to.
+    private static int StartLine(JsonElement result)
+    {
+        return result.GetProperty("locations")[0].GetProperty("physicalLocation").GetProperty("region")
+            .GetProperty("startLine").GetInt32();
     }
 
     private static JsonElement Run(string json)

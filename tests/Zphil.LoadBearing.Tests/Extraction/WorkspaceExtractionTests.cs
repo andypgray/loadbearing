@@ -56,6 +56,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions @ MyApp.Domain/OrderService.cs:10
             MyApp.Domain.PricingStrategy -> MyApp.Domain.Money @ MyApp.Domain/PricingStrategy.cs:3
             MyApp.Domain.PricingStrategy -> MyApp.Domain.Order @ MyApp.Domain/PricingStrategy.cs:3
+            MyApp.Domain.RetryPolicy -> System.Exception @ MyApp.Domain/RetryPolicy.cs:18
             """);
     }
 
@@ -422,11 +423,11 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     public void ExtractFromSolutionAsync_ExceptionEdges_PinReportEndpointCatchAndOrderApprovalThrows()
     {
         // The catch/throw channels (GRAMMAR §4.8) survive the real MSBuild workspace + cache round-trip.
-        // ReportEndpoint's blanket `catch (System.Exception)` is the sole catch edge — the
-        // exceptions/no-general-catch red; OrderApproval's two `throw new` sites are throw edges — its own
-        // sanctioned in-solution OrderRuleViolation and the BCL InvalidOperationException the strict
-        // exceptions/domain-throws-domain rule reds on. Each rides beside the §4.1 reference edge its
-        // type-name syntax mints (a bare catch would name no type and mint none, but this catch is typed).
+        // ReportEndpoint's blanket `catch (System.Exception)` is the exceptions/no-general-catch red;
+        // OrderApproval's two `throw new` sites are throw edges — its own sanctioned in-solution
+        // OrderRuleViolation and the BCL InvalidOperationException the strict exceptions/domain-throws-domain
+        // rule reds on. Each rides beside the §4.1 reference edge its type-name syntax mints (a bare catch would
+        // name no type and mint none, but this catch is typed).
 
         // At least one CatchEdge: the blanket catch, external caught type, at the catch-clause line, with its
         // co-existing §4.1 reference edge.
@@ -435,6 +436,16 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         swallow.Lines().ShouldBe([15]);
         fixture.Model.CatchEdges("MyApp.Web.ReportEndpoint").Select(e => e.Caught.FullName).ShouldBe(["System.Exception"]);
         fixture.Model.HasEdge("MyApp.Web.ReportEndpoint", "System.Exception").ShouldBeTrue();
+
+        // The filter fact, through the same workspace + cache path: ReportEndpoint's clause spells no `when`, so
+        // its one site is recorded unfiltered, while RetryPolicy catches the identical external type behind a
+        // filter and records none. Both edges — and both reference edges — exist either way, which is the
+        // difference the filter-aware verb reads and the plain catch verb cannot see.
+        swallow.UnfilteredLines().ShouldBe([15]);
+        CatchEdge guarded = fixture.Model.CatchEdge("MyApp.Domain.RetryPolicy", "System.Exception");
+        guarded.Lines().ShouldBe([18]);
+        guarded.UnfilteredLines().ShouldBeEmpty();
+        fixture.Model.HasEdge("MyApp.Domain.RetryPolicy", "System.Exception").ShouldBeTrue();
 
         // At least one ThrowEdge: OrderApproval's whole throw set, pinned — the in-solution domain exception at
         // its `throw new` line and the BCL one at its own, each beside the §4.1 reference edge and (for `throw

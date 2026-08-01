@@ -33,7 +33,12 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     <c>System.Data.DataTable</c> surface it on their public signature, exercising the <c>expose</c> kind
 ///     (GRAMMAR §4.9); InvoiceController is grandfathered for its DataTable reference edge under
 ///     <c>data-access/no-inline-sql</c> but red here, because the exposure edge is a different baseline
-///     identity — per-family identity, not per-type).
+///     identity — per-family identity, not per-type), an Enforce filter-aware catch rule over the union of
+///     both layers (ReportEndpoint's unfiltered blanket catch is red, while RetryPolicy's <c>when</c>-filtered
+///     catch of the identical type is green — the same catch edge <c>exceptions/no-general-catch</c> reds,
+///     judged instead on the sites extraction recorded as unfiltered), and an Enforce throw-ban rule (the ban
+///     polarity beside the allow-list above — OrderApproval's BCL throw is red under a second rule ID, and the
+///     deliberately unbanned <c>OrderRuleViolation</c> stays green under both).
 /// </summary>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
@@ -176,5 +181,25 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                 web.MustNotExpose(typeof(DataTable)))
             .Because("An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model.")
             .Fix("Return a DTO instead of exposing System.Data.DataTable.");
+
+        // Enforce (filter-aware catch ban): a union subject, so the sentence speaks in union voice — "The Web
+        // or Domain layers must not …". ReportEndpoint's blanket `catch (System.Exception)` spells no `when`
+        // filter, so it is hard red at the SAME catch edge exceptions/no-general-catch reds, under a different
+        // rule ID asking a different question. RetryPolicy catches the identical type in the Domain layer
+        // behind a `when` filter: the edge is minted either way (a filter never suppresses it, GRAMMAR §4.8),
+        // but only the unfiltered sites are evidence here, so RetryPolicy's is green and never listed.
+        arch.Rule("exceptions/no-unfiltered-catch")
+            .Enforce(arch.AnyOf(web, domain).MustNotCatchUnfiltered(typeof(Exception)))
+            .Because("An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.")
+            .Fix("Add a `when` filter naming the exceptions you can handle, or catch those types directly.");
+
+        // Enforce (throw ban): the ban polarity beside the strict allow-list above. OrderApproval's BCL throw
+        // is red at the SAME throw edge exceptions/domain-throws-domain reds — two rules, two identities, one
+        // edge. The domain's own OrderRuleViolation is deliberately NOT banned, and exact-FQN matching means
+        // banning InvalidOperationException reaches neither it nor any other type.
+        arch.Rule("exceptions/no-bare-bcl-throw")
+            .Enforce(domain.MustNotThrow(typeof(InvalidOperationException)))
+            .Because("InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.")
+            .Fix("Throw OrderRuleViolation instead of System.InvalidOperationException.");
     }
 }

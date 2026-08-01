@@ -93,6 +93,16 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                     <see cref="System.InvalidOperationException" />, its two documented setup errors.
 ///                 </item>
 ///                 <item>
+///                     <c>exceptions/broad-catches-filtered</c>: a broad <c>catch (Exception)</c> in the
+///                     shipping code names what it expects in a <c>when</c> filter; the sanctioned
+///                     best-effort handlers are exempt by type name.
+///                 </item>
+///                 <item>
+///                     <c>exceptions/no-bare-bcl-throws</c>: nothing throws <c>Exception</c>,
+///                     <c>SystemException</c> or <c>ApplicationException</c> — types a caller cannot
+///                     filter on. A forward tripwire, true here today.
+///                 </item>
+///                 <item>
 ///                     <c>packs/depends-on-core-only</c>: the rule pack is a leaf — it reaches for the
 ///                     Core vocabulary and nothing else, so taking it never drags the tool into a spec
 ///                     project's load context.
@@ -128,15 +138,19 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         reason alone and carry no anchored rule, so they render a module-map row and no card; the same
 ///         honest negative the Quoting example shows. Layers are the spec's vocabulary here rather than a
 ///         second one beside <c>Project</c>, so the sentences read in layer voice throughout — including
-///         <c>naming/async-suffix</c> and <c>mcp/no-blocking-waits</c>, whose union subjects anchor nothing
-///         (a union has no single home directory) and so are documented negatives rather than more cards.
+///         <c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>, <c>exceptions/broad-catches-filtered</c>
+///         and <c>exceptions/no-bare-bcl-throws</c>, whose union subjects anchor nothing (a union has no
+///         single home directory) and so are documented negatives rather than more cards.
 ///     </para>
 ///     <para>
 ///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
 ///         purpose — a pack is a menu, and not calling a method is the whole opt-out mechanism.
-///         <c>exceptions/no-general-catch</c> is red here at around twenty sites that are deliberate
-///         best-effort catches (a failed cache write is disposable derived data), so taking it at Migrate
-///         would record debt that does not exist. <c>naming/async-suffix</c> and
+///         <c>exceptions/no-general-catch</c> bans the broad catch itself, and is red here at around twenty
+///         types, because a <c>when</c> filter never suppresses the catch edge and the house form is exactly
+///         that: a broad catch that names what it expects. Declining it used to be the end of that story,
+///         and is not now — <c>exceptions/broad-catches-filtered</c> asks the question the pack rule could
+///         not, so the types whose broad catches are all filtered stay inside a live rule and pass it
+///         instead of being counted as debt nobody owes. <c>naming/async-suffix</c> and
 ///         <c>di/no-captive-dependencies</c> stay local, and the second is the finding worth keeping: the
 ///         pack cannot express this spec's two named method exceptions or its <c>ValueTask</c> return set,
 ///         and the MCP-specific rationale below names the actual singletons, which reads better than the
@@ -164,7 +178,9 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         The verb ledger. Every <c>Must*</c> verb this spec does not use is named here with its reason,
 ///         and a self-spec test holds the list complete against the public surface, so the ledger cannot
 ///         quietly rot as the vocabulary grows.
-///         <c>MustNotCatch</c> is red at around twenty deliberate best-effort catches, reasoned above.
+///         <c>MustNotCatch</c> bans the broad catch outright, and that is not the law here: this spec
+///         adopted <c>MustNotCatchUnfiltered</c> instead, and the plain verb would red the house-style
+///         <c>when</c>-filtered catches that <c>exceptions/broad-catches-filtered</c> passes on purpose.
 ///         <c>MustBeSealed</c>, <c>MustBeAbstract</c>, <c>MustBeStatic</c>, <c>MustBePublic</c> and
 ///         <c>MustBeInternal</c> are the type-shape modals, and no layer here has a uniform shape. Two
 ///         were tried against the real code: the Model layer sealed is red at its five abstract bases,
@@ -215,6 +231,41 @@ namespace Zphil.LoadBearing.ArchSpec;
 /// </summary>
 public sealed class LoadBearingArchSpec : IArchitectureSpec
 {
+    /// <summary>
+    ///     The types whose broad catches are deliberately unfiltered, exempted from
+    ///     <c>exceptions/broad-catches-filtered</c>. Four kinds of handler, and nothing else belongs here:
+    ///     the top-level fault boundaries that turn any failure into an exit code or a rule result
+    ///     (<c>CommandEntryPoint</c>, <c>ArchChecker</c>, <c>SelectionEvaluator</c>, <c>ArchRuleTests</c>);
+    ///     the background loops and the shutdown drain (<c>IdleTimeoutWatchdog</c>,
+    ///     <c>ParentProcessWatcher</c>, <c>ServerShutdown</c>); the host bootstrap and replay probes that
+    ///     translate any failure into a degraded mode (<c>MsBuildGate</c>, <c>VsWhereLocator</c>,
+    ///     <c>ModelPipeline</c>, <c>CodebaseSource</c>, <c>LazyCaptureReplaySource</c>,
+    ///     <c>BinlogReplayer</c>); and the writers of disposable derived data, where a failed write costs a
+    ///     cache miss and nothing else (<c>AtomicFile</c>, <c>ExtractionCacheStore</c>,
+    ///     <c>BinlogCaptureStore</c>). The exemption is by type name, so it covers a type's future catches
+    ///     as well as today's — the granularity a baseline entry would have, kept in the spec where it is
+    ///     read rather than in a file that is not.
+    /// </summary>
+    private static readonly HashSet<string> SanctionedBroadCatchers =
+    [
+        "ArchChecker",
+        "ArchRuleTests",
+        "AtomicFile",
+        "BinlogCaptureStore",
+        "BinlogReplayer",
+        "CodebaseSource",
+        "CommandEntryPoint",
+        "ExtractionCacheStore",
+        "IdleTimeoutWatchdog",
+        "LazyCaptureReplaySource",
+        "ModelPipeline",
+        "MsBuildGate",
+        "ParentProcessWatcher",
+        "SelectionEvaluator",
+        "ServerShutdown",
+        "VsWhereLocator"
+    ];
+
     public void Define(Arch arch)
     {
         // The five assembly-shaped layers plus three inside Core, in module-map order. Core's globs are
@@ -367,6 +418,36 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "rule results.")
             .Fix("Route new failure modes through FileNotFoundException (missing solution) or " +
                  "InvalidOperationException (bad configuration).");
+
+        arch.Rule("exceptions/broad-catches-filtered")
+            .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
+                .Where(t => !SanctionedBroadCatchers.Contains(t.Name),
+                    description: "whose name is not one of the sanctioned broad handlers (the top-level " +
+                                 "fault boundaries, the background loops and the shutdown drain, the host " +
+                                 "bootstrap and replay probes, and the writers of disposable derived data)")
+                .MustNotCatchUnfiltered(typeof(Exception)))
+            .Because("An unfiltered broad catch holds the failures nobody thought about — a cancellation, " +
+                     "an out-of-memory, the bug introduced two lines up — and hands the caller a wrong " +
+                     "answer that reads like a right one. The `when` filter is where a handler writes down " +
+                     "what it is actually for, so everything else keeps travelling to code that can still " +
+                     "act on it; the house form here is `catch (Exception ex) when (ex is IOException or " +
+                     "UnauthorizedAccessException)`. The sanctioned handlers are exempt by type name rather " +
+                     "than by site, the same granularity a baseline would give, stated in the spec instead " +
+                     "of recorded in a file.")
+            .Fix("Add a `when` filter naming the exceptions this handler is for, or catch those types " +
+                 "directly. A handler that genuinely has to hold everything, like a process boundary or a " +
+                 "background loop, goes on the spec's sanctioned list instead.");
+
+        arch.Rule("exceptions/no-bare-bcl-throws")
+            .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
+                .MustNotThrow(typeof(Exception), typeof(SystemException), typeof(ApplicationException)))
+            .Because("A bare BCL exception type says only that something went wrong. A caller cannot filter " +
+                     "on it, so throwing one forces every handler above into the unfiltered broad catch " +
+                     "`exceptions/broad-catches-filtered` exists to prevent, and leaves a message string as " +
+                     "the only thing left to match on. Nothing here throws one today; this rule is what " +
+                     "stops the first one arriving quietly.")
+            .Fix("Throw a type that names the failure — one of this repo's own error types, or the closest " +
+                 "BCL type such as InvalidOperationException or IOException — so a handler can filter on it.");
 
         arch.Rule("packs/depends-on-core-only")
             .Enforce(pack.MustOnlyReference(core, pack))

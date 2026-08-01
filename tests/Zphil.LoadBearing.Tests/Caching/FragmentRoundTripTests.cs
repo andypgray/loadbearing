@@ -182,6 +182,8 @@ public sealed class FragmentRoundTripTests
         // Arrange — a cross-project source exercising both new edge families (GRAMMAR §4.8): a typed catch of a
         // declared exception, a bare catch (synthesized System.Exception), a throw of a declared exception, and
         // a throw of an external one — so a lost edge, dropped site, or mis-unified endpoint would move the dump.
+        // The `when`-filtered clause keeps the unfiltered-site subset non-vacuous: without it every site would
+        // be unfiltered and a subset dropped in serialization would still round-trip equal.
         CompilationInput lib = CompilationFactory.Compile("Lib",
             ("Errors.cs", """
                           namespace N;
@@ -197,6 +199,7 @@ public sealed class FragmentRoundTripTests
                            public void Do()
                            {
                                try { Work(); }
+                               catch (DomainError e) when (e.Message.Length > 0) { }
                                catch (DomainError) { throw; }
                                catch { throw new DomainError(); }
                            }
@@ -212,12 +215,16 @@ public sealed class FragmentRoundTripTests
         var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
-        // Assert — both families present (declared + external endpoints, bare catch → System.Exception), and the
-        // round-trip is invisible to the merged model.
+        // Assert — both families present (declared + external endpoints, bare catch → System.Exception), the
+        // DomainError edge's unfiltered subset is a proper subset of its sites (the filtered clause at line 9 is
+        // absent from it, the bare `catch` at line 11 counts as unfiltered), and the round-trip is invisible.
         direct.CatchEdges.Select(e => (e.Source.FullName, e.Caught.FullName)).ShouldBe(
             [("M.Handler", "N.DomainError"), ("M.Handler", "System.Exception")]);
         direct.ThrowEdges.Select(e => (e.Source.FullName, e.Thrown.FullName)).ShouldBe(
             [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
+        direct.CatchEdge("M.Handler", "N.DomainError").Lines().ShouldBe([9, 10]);
+        direct.CatchEdge("M.Handler", "N.DomainError").UnfilteredLines().ShouldBe([10]);
+        direct.CatchEdge("M.Handler", "System.Exception").UnfilteredLines().ShouldBe([11]);
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 

@@ -267,6 +267,23 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustNotCatchUnfiltered_RendersFragment()
+    {
+        // The filter-aware catch-ban verb (GRAMMAR §5.3): "must not catch {list} without a `when` filter".
+        // The backticks around `when` are literal output characters, not markdown the renderer adds.
+        SentenceRenderer.Sentence(Arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
+            .ShouldBe("Types must not catch `Exception` without a `when` filter.");
+    }
+
+    [Fact]
+    public void MustNotThrow_RendersFragment()
+    {
+        // The throw-ban verb (GRAMMAR §5.3): "must not throw {list}" — the ban polarity beside MustOnlyThrow.
+        SentenceRenderer.Sentence(Arch.Types.MustNotThrow(typeof(InvalidOperationException)))
+            .ShouldBe("Types must not throw `InvalidOperationException`.");
+    }
+
+    [Fact]
     public void MustOnlyThrow_RendersStrictFragmentWithNoCaveat()
     {
         // The strict throw-allowlist verb (GRAMMAR §5.3): "must throw only {list}". Unlike MustOnlyReference,
