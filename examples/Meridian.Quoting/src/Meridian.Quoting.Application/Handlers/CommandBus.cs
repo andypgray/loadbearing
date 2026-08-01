@@ -10,6 +10,7 @@ namespace Meridian.Quoting.Application.Handlers;
 /// </summary>
 public sealed class CommandBus(IServiceProvider services) : ICommandBus
 {
+    /// <inheritdoc />
     public async Task SendAsync(ICommand command)
     {
         ArgumentNullException.ThrowIfNull(command);

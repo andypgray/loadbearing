@@ -7,6 +7,7 @@ namespace Meridian.Quoting.Application.Handlers;
 /// <summary>Reads a quote by reference and projects it to a <see cref="QuoteView" />, or null if there is none.</summary>
 public sealed class GetQuoteHandler(IQuoteRepository quotes) : IQueryHandler<GetQuoteQuery, QuoteView?>
 {
+    /// <inheritdoc />
     public async Task<QuoteView?> HandleAsync(GetQuoteQuery query)
     {
         Quote? quote = await quotes.Get(query.Reference);

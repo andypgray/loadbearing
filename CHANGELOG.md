@@ -37,11 +37,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   siblings, so a baseline never records which verb a spec chose. The persisted extraction
   cache's schema moves with the new fact: the first check after upgrading pays one cold
   extraction per solution, then steady state.
-- Two more rules over this repository's real code: `exceptions/broad-catches-filtered` (a broad
-  catch names what it expects in a `when` filter; the sanctioned broad handlers — top-level
-  fault boundaries, background loops, the shutdown drain, and writers of disposable derived
-  data — are exempt by type name, stated in the spec rather than recorded in a baseline, and the
-  types whose broad catches are all filtered stay inside the rule and pass it) and
+- The rethrow-aware catch ban: the `MustNotSwallow` verb. "The Web layer must not swallow
+  `Exception`" is the third and narrowest question on the catch axis, and the one a broad-catch
+  policy usually means: a catch edge reds only where a clause matches the banned type, spells no
+  `when` filter, **and** does not end in a `throw`. A cleanup-and-rethrow and a
+  translate-and-throw suppress nothing, so both pass — which is what `MustNotCatchUnfiltered`
+  could never say, and what forced a policy to exempt whole types just to spare them. Every catch
+  edge now additionally records which of its unfiltered sites swallow, and violations list those
+  sites only. The rethrow fact is syntactic, and its boundary is stated rather than discovered:
+  it reads the block's **last statement**, never an all-paths flow analysis, so
+  `catch { if (…) return; throw; }` counts as throwing and `catch { if (…) throw; Cleanup(); }`
+  counts as swallowing. The throw's operand is never judged. Like its siblings the verb matches
+  exact definition-level FQN, reports through the existing catch kind in human, JSON and SARIF
+  output, and keys the same edge identity, so a baseline entry means the same thing under all
+  three catch verbs.
+- Two more rules over this repository's real code: `exceptions/no-swallowed-broad-catches` (a
+  broad catch either names what it expects in a `when` filter or ends in a `throw`; the seven
+  sanctioned handlers — the process, rule and test boundaries, two background loops, the shutdown
+  drain and one quarantined probe — are exempt by type name, each with its reason written beside
+  it, stated in the spec rather than recorded in a baseline, and every type whose broad catches
+  all either filter or rethrow stays inside the rule and passes it) and
   `exceptions/no-bare-bcl-throws` (nothing throws `Exception`, `SystemException` or
   `ApplicationException` — green today, and red the day the first one arrives). The managed
   AGENTS.md block's glossary gains its catch clause for the first time.

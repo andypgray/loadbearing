@@ -69,7 +69,7 @@ internal static class CompilationFactory
     }
 
     /// <summary>
-    ///     Extract a model from a <see cref="OutputKind.ConsoleApplication" /> compilation — the output kind
+    ///     Extracts a model from a <see cref="OutputKind.ConsoleApplication" /> compilation — the output kind
     ///     that makes Roslyn synthesize the top-level-statements <c>Program</c> entry point (a library has no
     ///     entry point, so this is the only way to exercise it on the fast path).
     /// </summary>
@@ -107,7 +107,7 @@ internal static class CompilationFactory
     }
 
     /// <summary>
-    ///     Extract from a compilation with NO metadata references — not even the core library — so
+    ///     Extracts from a compilation with NO metadata references — not even the core library — so
     ///     <c>Compilation.GetTypeByMetadataName</c> cannot resolve BCL types like <c>System.Exception</c>.
     ///     Exercises the defensive null-lookup guards (a synthesized-type lookup that returns null mints
     ///     nothing rather than throwing).
@@ -150,7 +150,7 @@ internal static class CompilationFactory
     }
 
     /// <summary>
-    ///     Extract a model from a <see cref="OutputKind.ConsoleApplication" /> compilation against the
+    ///     Extracts a model from a <see cref="OutputKind.ConsoleApplication" /> compilation against the
     ///     DI/Hosting abstractions — the output kind that makes Roslyn synthesize the top-level-statements
     ///     <c>Program</c>, so a registration call in top-level statements (the most common composition root,
     ///     not a declared type) is exercised through the whole-compilation registration walk.

@@ -105,6 +105,8 @@ internal static class IdleTimeoutWatchdog
     /// </summary>
     public static void Start()
     {
+        // A 30-second poll against a timeout measured in minutes: the cost of overshooting the deadline by
+        // up to one interval is a leaked idle process for half a minute, so the wake-ups stay cheap.
         Start(
             ParseTimeoutMinutes(Environment.GetEnvironmentVariable(TimeoutVariable)),
             TimeSpan.FromSeconds(30),
@@ -130,6 +132,8 @@ internal static class IdleTimeoutWatchdog
         Interlocked.Exchange(ref s_lastActivityTicks, clock());
         // Warning so a post-mortem at default min-level confirms attach (cf. ParentProcessWatcher).
         Log.Warning("Idle-timeout watchdog attached: {Minutes} min timeout", timeout.TotalMinutes);
+        // Detached, never awaited: the poll loop runs for the life of the server, and Start must return so
+        // the transport can begin serving.
         _ = Task.Run(() => WatchAsync(timeout, pollInterval, clock, onIdleTimeout));
     }
 

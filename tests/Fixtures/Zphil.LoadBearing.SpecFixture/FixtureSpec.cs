@@ -8,6 +8,7 @@ namespace Zphil.LoadBearing.SpecFixture;
 /// </summary>
 public sealed class FixtureSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         arch.Rule("fixture/interfaces")

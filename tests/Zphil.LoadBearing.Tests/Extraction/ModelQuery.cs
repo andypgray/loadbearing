@@ -127,6 +127,15 @@ internal static class ModelQuery
         return edge.UnfilteredSites.Select(s => s.Line).ToList();
     }
 
+    /// <summary>
+    ///     The lines of the edge's swallowing sites — the unfiltered subset whose block does not end in a
+    ///     `throw`.
+    /// </summary>
+    public static IReadOnlyList<int> SwallowingLines(this CatchEdge edge)
+    {
+        return edge.SwallowingSites.Select(s => s.Line).ToList();
+    }
+
     // ── throw edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
 
     public static ThrowEdge ThrowEdge(this CodebaseModel model, string sourceFullName, string thrownFullName)

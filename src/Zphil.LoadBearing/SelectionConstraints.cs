@@ -159,6 +159,27 @@ public static class SelectionConstraints
     }
 
     /// <summary>
+    ///     The subject must not swallow any of the targets — a <c>catch</c> clause whose caught type resolves
+    ///     to a listed target, which carries no <c>when</c> filter, and whose block does not end in a
+    ///     <c>throw</c> (GRAMMAR §5.3, §4.8). A bare <c>catch</c> counts as <c>System.Exception</c> and counts
+    ///     as unfiltered; a filtered catch and a rethrowing catch are both lawful, so what the verb bans is
+    ///     holding a failure and continuing. Both facts are syntactic: the filter's contents are never judged,
+    ///     and the throw fact is the block's last statement, never an all-paths analysis. Catch-ness lives in
+    ///     the verb, so ordinary selections name what may not be swallowed; there is no expression overload
+    ///     (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustNotSwallow(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustNotSwallowConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>The subject must not swallow any of the targets (type sugar).</summary>
+    public static Constraint MustNotSwallow(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotSwallowConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
     ///     The subject must not expose any of the targets — a listed target appearing in a public signature
     ///     position (a return, parameter, or property/field/event type) of an effectively-public member
     ///     (GRAMMAR §5.3, §4.9). Exposure-ness lives in the verb, so ordinary selections name what may not

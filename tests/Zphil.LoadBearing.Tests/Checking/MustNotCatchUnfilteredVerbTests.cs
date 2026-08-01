@@ -13,7 +13,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The filter-aware catch verb <c>MustNotCatchUnfiltered</c> over the fast path (GRAMMAR §4.8, §4.3, §5.3):
 ///     a catch edge trips only where a subject <c>catch</c>es a forbidden type at a clause that spells no
-///     <c>when</c> filter. The two pins the sibling <c>MustNotCatch</c> cannot carry are here — an edge whose
+///     <c>when</c> filter.
+/// </summary>
+/// <remarks>
+///     The two pins the sibling <c>MustNotCatch</c> cannot carry are here — an edge whose
 ///     every site is filtered is <b>green</b>, and a mixed edge's evidence is the <b>unfiltered sites only</b>,
 ///     so no reader is ever pointed at a site the rule considers good. The rest clones the sibling: matching by
 ///     exact definition-level FQN (banning <c>typeof(Exception)</c> never flags a narrower
@@ -23,7 +26,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     JSON kind. The verb reuses <see cref="ViolationKind.Catch" /> — the kind names the fact family, not the
 ///     verb — so identity stays the (source, caught) type pair riding <see cref="BaselineEntry.ForEdge" />
 ///     unchanged, and the unfiltered sites are evidence, never identity.
-/// </summary>
+/// </remarks>
 public sealed class MustNotCatchUnfilteredVerbTests
 {
     // Errors.DbError is the domain exception nobody may swallow blind. DataHandler catches it with no filter

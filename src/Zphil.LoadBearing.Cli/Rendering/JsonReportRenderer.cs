@@ -64,8 +64,8 @@ internal static class JsonReportRenderer
 
     // A memberUse violation carries Source (the using type, as Reference does) and the banned member's raw
     // symbol ID in targetMember; a memberShape violation carries the offending member's raw symbol ID in
-    // subjectMember (Subject/Target stay null). Every slot is null-omitted, so a report with no member
-    // violation is byte-identical to before (schemaVersion unchanged).
+    // subjectMember (Subject/Target stay null). Every slot is null-omitted, so a report from a spec with
+    // no member rule carries neither key.
     private static ViolationJson ToViolation(Violation violation, string solutionDirectory)
     {
         return new ViolationJson(

@@ -9,10 +9,15 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </summary>
 public sealed class UserErrorException : InvalidOperationException
 {
+    /// <summary>Initializes a new instance with the message rendered to the user.</summary>
+    /// <param name="message">The user-facing text, complete on its own — no stack trace accompanies it.</param>
     public UserErrorException(string message) : base(message)
     {
     }
 
+    /// <summary>Initializes a new instance with the message rendered to the user and the fault beneath it.</summary>
+    /// <param name="message">The user-facing text, complete on its own — no stack trace accompanies it.</param>
+    /// <param name="innerException">The underlying fault this error was raised for.</param>
     public UserErrorException(string message, Exception innerException) : base(message, innerException)
     {
     }

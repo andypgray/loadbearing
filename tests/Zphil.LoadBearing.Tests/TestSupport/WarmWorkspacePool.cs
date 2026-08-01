@@ -6,12 +6,14 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     A small, process-wide set of warm <see cref="WorkspaceSession" />s, keyed by solution path — the
-///     harness's answer to the suite's dominant cost. A measured run opened <b>146</b>
-///     <c>MSBuildWorkspace</c>es (~2.5 s each for the MyApp fixture, ~17-24 s for this repo's own
-///     solution) against a serial path of ~435 s. Nearly all of them re-opened a solution some earlier
-///     test in the same class had already loaded.
+///     harness's answer to the suite's dominant cost.
 /// </summary>
 /// <remarks>
+///     <para>
+///         <b>What it buys.</b> A measured run opened <b>146</b> <c>MSBuildWorkspace</c>es (~2.5 s each
+///         for the MyApp fixture, ~17-24 s for this repo's own solution) against a serial path of ~435 s.
+///         Nearly all of them re-opened a solution some earlier test in the same class had already loaded.
+///     </para>
 ///     <para>
 ///         <b>Correct by reconcile, not by luck.</b> Every acquisition goes through
 ///         <see cref="WorkspaceSession.GetCurrentAsync" />, which reconciles against disk before it answers:
@@ -31,25 +33,10 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         back. <c>WarmWorkspacePoolTests</c> pins this end to end.
 ///     </para>
 ///     <para>
-///         <b>What stays cold, and why.</b> Three kinds of test must keep opening real workspaces, and each
-///         says so at its call site.
-///         <list type="number">
-///             <item>
-///                 <b>Load-count pins.</b> <c>BinlogCliE2ETests</c> and <c>FrameworkBinlogReplayTests</c>
-///                 read the <see cref="WorkspaceLoader.LoadCount" /> delta to tell a replayed run from a
-///                 built one, so each invocation has to open, or decline to open, its own workspace.
-///             </item>
-///             <item>
-///                 <b>Cold oracles.</b> <c>WarmWorkspaceMcpTests</c> and <c>CliMcpParityTests</c> compare a
-///                 warm MCP answer against a freshly loaded CLI run. Serving both sides from one pooled
-///                 workspace would make them compare the warm path with itself.
-///             </item>
-///             <item>
-///                 <b>The loading itself as subject.</b> <c>CheckCacheE2ETests</c> counts workspace
-///                 acquisitions through its own source, and <c>WorkspaceSessionTests</c> /
-///                 <c>SessionFragmentStoreTests</c> mint the sessions they are testing.
-///             </item>
-///         </list>
+///         <b>Not every test may use it.</b> A test that pins the
+///         <see cref="WorkspaceLoader.LoadCount" /> delta, that needs a cold run as an oracle against a
+///         warm one, or that has workspace loading itself as its subject must keep opening real
+///         workspaces; each such test says so at its own call site.
 ///     </para>
 ///     <para>
 ///         <b>Bounded.</b> At most <see cref="Capacity" /> sessions are live, evicted least-recently-used
@@ -102,9 +89,12 @@ internal static class WarmWorkspacePool
 
     /// <summary>
     ///     Disposes every session whose solution lives under <paramref name="directory" />, releasing the
-    ///     workspaces and their BuildHosts. Callers that are about to rewrite or delete a tree use this so a
-    ///     warm workspace can never be the reason a file is locked.
+    ///     workspaces and their BuildHosts.
     /// </summary>
+    /// <remarks>
+    ///     Call this before rewriting or deleting a tree, so a warm workspace can never be the reason a
+    ///     file is locked.
+    /// </remarks>
     internal static void DropUnder(string directory)
     {
         string prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
@@ -125,7 +115,7 @@ internal static class WarmWorkspacePool
         }
     }
 
-    /// <summary>Disposes every live session. Called once from the pipeline's shutdown hook.</summary>
+    /// <summary>Disposes every live session.</summary>
     internal static void DropAll()
     {
         Gate.Wait();

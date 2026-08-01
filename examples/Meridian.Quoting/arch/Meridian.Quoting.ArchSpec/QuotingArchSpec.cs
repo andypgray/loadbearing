@@ -10,6 +10,7 @@ namespace Meridian.Quoting.ArchSpec;
 /// </summary>
 public sealed class QuotingArchSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer domain = arch.Layer("Domain", "Meridian.Quoting.Domain.*");

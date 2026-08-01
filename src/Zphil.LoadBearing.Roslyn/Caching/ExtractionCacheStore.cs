@@ -101,8 +101,7 @@ internal sealed record ExtractionResult(
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
 ///     <c>cache.json</c> holding the manifest and every fragment. Validation runs with zero
 ///     MSBuild: it stats (and selectively re-hashes) the recorded inputs, scans each project cone for added
-///     source, and recomputes the content/Merkle keys to produce a dirty set. This type is <em>unwired</em>
-///     — no runner, pipeline, or CLI flag consults it yet.
+///     source, and recomputes the content/Merkle keys to produce a dirty set.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -130,30 +129,16 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v13 adds member-level attribute facts (a FragmentConstruction list per inventoried member, GRAMMAR §4.6),
-    // the fact a member-side attribute adjective reads: `Fragments[*].DeclaredTypes[*].DeclaredMembers[*].Facts`
-    // gains an `Attributes` array under JsonOptions. A v12 record has no such field, so every member would
-    // deserialize as unattributed and a rule narrowed to attributed members would silently empty on a hit. It
-    // degrades to a clean Miss instead. Nothing else moves: baselines, the `--json` report, SARIF, and the
-    // binlog replay store are untouched formats, and a warm session's fragments never leave memory.
-    // (v12 added the catch edge's unfiltered-site subset (FragmentCatchEdge.UnfilteredSites, GRAMMAR §4.8), the
-    // fact a filter-aware catch rule reads: the one on-disk format this covers is this per-solution cache file,
-    // where `Fragments[*].CatchEdges[*]` gains an `UnfilteredSites` array under JsonOptions. A v11 record has no
-    // such field, so every catch edge would deserialize with a null subset and the filter fact would read wrong
-    // on a hit. It degrades to a clean Miss instead.
-    // v11 added the per-type generated flag (TypeFacts.IsGenerated, GRAMMAR §5.2), the fact `.Authored()`
-    // filters on: a v10 record has no such field, so every type would deserialize as authored and a rule
-    // narrowed to authored types would silently widen on a cache hit.
-    // v10 reshaped SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
-    // plus the private plumbing only it references), and the hit path replays that set rather than one name.
-    // A v9 record carries the old single name, so it degrades to a clean Miss and is rebuilt — the cache is
-    // disposable derived data, never a loud error. v9 added signature-exposure edges (a FragmentExposureEdge
-    // list per fragment, GRAMMAR §4.9); v8 added parameter facts to the member inventory (a ParameterFacts list
-    // per method member, §4.6/§5.6); v7 added catch edges and throw edges; v6 added constructor-injection edges
-    // and container-registration facts; v5 added construction-use edges; v4 aligned CaptureFingerprint's
-    // cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3 added the member
-    // inventory; v2 added member-use edges over v1's type-only fragments — every prior version likewise misses.)
-    private const int CurrentSchemaVersion = 13;
+    // v14 adds the catch edge's swallowing-site subset (FragmentCatchEdge.SwallowingSites, GRAMMAR §4.8), the
+    // fact a rethrow-aware catch rule reads: the one on-disk format this covers is this per-solution cache file,
+    // where `Fragments[*].CatchEdges[*]` gains a `SwallowingSites` array under JsonOptions. A v13 record has no
+    // such field, so every catch edge would deserialize with a null subset and the rethrow fact would read wrong
+    // on a hit. It degrades to a clean Miss instead, as does a record from any earlier version — the cache is
+    // disposable derived data, so a schema it cannot read is rebuilt, never a loud error. Nothing else moves:
+    // baselines, the `--json` report, SARIF, and the binlog replay store are untouched formats, and a warm
+    // session's fragments never leave memory. Bump this whenever a fragment gains a fact, or a hit would
+    // deserialize the new field as its default and answer with a fact the extraction never recorded.
+    private const int CurrentSchemaVersion = 14;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
@@ -289,14 +274,12 @@ internal sealed class ExtractionCacheStore
         {
             return ValidateCore(ct);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Any unexpected failure (I/O mid-scan, a malformed record STJ still bound) degrades to a miss:
             // the cache is disposable, so the run falls back to the cold path rather than surfacing an error.
+            // The filter is the whole cancellation clause — it names what this handler is NOT for, so a
+            // cancellation travels on untouched.
             return CacheReadResult.Miss();
         }
     }

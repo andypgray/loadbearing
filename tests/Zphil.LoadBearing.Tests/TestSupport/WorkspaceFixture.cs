@@ -18,10 +18,11 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>The extracted model. Set during <see cref="InitializeAsync" />.</summary>
     public CodebaseModel Model { get; private set; } = null!;
 
+    /// <summary>Opens the fixture solution and extracts <see cref="Model" /> from it.</summary>
     /// <remarks>
     ///     Loads through the shared <see cref="WarmWorkspacePool" /> rather than owning a workspace of its
-    ///     own: the CLI e2e suites read this same solution, so pooling both shares one load and leaves the
-    ///     workspace bounded by the pool's own lifetime instead of pinning one for the whole run.
+    ///     own, so the load is shared with anything else reading this solution and the workspace stays
+    ///     bounded by the pool's lifetime instead of being pinned for the whole run.
     /// </remarks>
     public async ValueTask InitializeAsync()
     {
@@ -29,6 +30,7 @@ public sealed class WorkspaceFixture : IAsyncLifetime
         Model = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
     }
 
+    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         return ValueTask.CompletedTask;

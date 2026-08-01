@@ -7,7 +7,10 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
 ///     Catch edges (GRAMMAR §4.8), over the MSBuild-free fast path — the catch analog of
-///     <see cref="CodebaseExtractorConstructorEdgeTests" />. One fact per <c>catch</c> shape: a typed catch
+///     <see cref="CodebaseExtractorConstructorEdgeTests" />.
+/// </summary>
+/// <remarks>
+///     One fact per <c>catch</c> shape: a typed catch
 ///     (catch-channel beside the reference edge its type-name mints, no double-mint), a bare catch
 ///     (synthesized <c>System.Exception</c>, no reference edge, plus the null-lookup defensive row), <c>when</c>
 ///     filters, a rethrowing catch, and the must-NOT-mint rows (type-parameter, self-catch, error type). Plus
@@ -15,8 +18,12 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     Line numbers are 1-based and count from the first content line of each raw source literal.
 ///     The <see cref="CatchEdge.UnfilteredSites" /> rows carry the filter fact: which sites spell no
 ///     <c>when</c> filter, including the two corners that decided the recorded subset's polarity — a
-///     same-line collision and a filter that diverges across fragments.
-/// </summary>
+///     same-line collision and a filter that diverges across fragments. The
+///     <see cref="CatchEdge.SwallowingSites" /> rows carry the rethrow fact on top of it: which of those
+///     sites do not end in a <c>throw</c>, the same two polarity corners, and both sides of the syntactic
+///     honesty boundary — a throw that is the last statement but not on every path, and a throw on some path
+///     that is not the last statement.
+/// </remarks>
 public sealed class CodebaseExtractorCatchEdgeTests
 {
     [Fact]
@@ -525,5 +532,291 @@ public sealed class CodebaseExtractorCatchEdgeTests
         foreach (CatchEdge edge in model.CatchEdges("N.Worker"))
             edge.UnfilteredSites.Select(s => s.ToString())
                 .ShouldBeSubsetOf(edge.Sites.Select(s => s.ToString()));
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_UnfilteredCatchNotEndingInThrow_RecordsTheSiteSwallowing()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) { }
+                                                             }
+                                                         }
+                                                         """);
+
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Lines().ShouldBe([8]);
+        edge.UnfilteredLines().ShouldBe([8]);
+        edge.SwallowingLines().ShouldBe([8]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_RethrowingCatch_MintsTheEdgeWithAnEmptySwallowingSubset()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) { Cleanup(); throw; }
+                                                             }
+                                                             private void Cleanup() {}
+                                                         }
+                                                         """);
+
+        // The rethrow leaves the edge and its unfiltered subset untouched — it only keeps the site out of the
+        // swallowing subset, which is the whole of the new fact.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Lines().ShouldBe([8]);
+        edge.UnfilteredLines().ShouldBe([8]);
+        edge.SwallowingLines().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_TranslatingCatch_MintsTheEdgeWithAnEmptySwallowingSubset()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError e) { throw new System.InvalidOperationException("x", e); }
+                                                             }
+                                                         }
+                                                         """);
+
+        // `throw new X(…)` and a bare `throw;` are both throw statements, so the fact reads the same for the
+        // translate-and-throw shape as for cleanup-and-rethrow — the throw operand is never judged.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.UnfilteredLines().ShouldBe([8]);
+        edge.SwallowingLines().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_BareCatchNotEndingInThrow_RecordsSystemExceptionSwallowing()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { }
+                                                                 catch { }
+                                                             }
+                                                         }
+                                                         """);
+
+        CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
+        edge.UnfilteredLines().ShouldBe([7]);
+        edge.SwallowingLines().ShouldBe([7]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_FilteredCatchNotEndingInThrow_RecordsAnEmptySwallowingSubset()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run(bool flag)
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) when (flag) { }
+                                                             }
+                                                         }
+                                                         """);
+
+        // The swallowing subset is a subset of the UNFILTERED subset, not of the sites: a filtered clause that
+        // swallows is where the handler named its expectations, and stays lawful.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Lines().ShouldBe([8]);
+        edge.UnfilteredLines().ShouldBeEmpty();
+        edge.SwallowingLines().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ReturnBeforeATerminalThrow_CountsAsThrowing()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run(bool flag)
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) { if (flag) return; throw; }
+                                                             }
+                                                         }
+                                                         """);
+
+        // The documented honesty boundary, one side: the fact is the block's LAST STATEMENT, never an all-paths
+        // flow analysis, so a handler that can leave without throwing still reads as throwing.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.UnfilteredLines().ShouldBe([8]);
+        edge.SwallowingLines().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ThrowThatIsNotTheLastStatement_CountsAsSwallowing()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run(bool flag)
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) { if (flag) throw; Cleanup(); }
+                                                             }
+                                                             private void Cleanup() {}
+                                                         }
+                                                         """);
+
+        // The other side of the same boundary, and the reason it is stated rather than hidden: a handler that
+        // throws on some path but ends on another statement reads as swallowing.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.UnfilteredLines().ShouldBe([8]);
+        edge.SwallowingLines().ShouldBe([8]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_RethrowingAndSwallowingCatchesOfOnePair_RecordOnlyTheSwallowingSite()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) { throw; }
+                                                                 try { }
+                                                                 catch (MyError) { }
+                                                             }
+                                                         }
+                                                         """);
+
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Lines().ShouldBe([8, 10]);
+        edge.UnfilteredLines().ShouldBe([8, 10]);
+        edge.SwallowingLines().ShouldBe([10]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_RethrowingAndSwallowingCatchesOnOneLine_RecordTheCollapsedSiteSwallowing()
+    {
+        // The polarity corner, one level down from the filter subset's, and the reason the swallowing sites are
+        // recorded rather than derived. Sites dedupe by (file, line), so a rethrowing and a swallowing catch of
+        // one type on ONE physical line collapse to a single site — the corner the test above cannot reach,
+        // because its two clauses sit on lines of their own. Recording the SWALLOWING sites reads that collapsed
+        // site swallowing, the truthful answer for a ban; a recorded THROWING set with the complement taken at
+        // the merge would read the very same site lawful and hide the swallow.
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run()
+                                                             {
+                                                                 try { } catch (MyError) { throw; } try { } catch (MyError) { }
+                                                             }
+                                                         }
+                                                         """);
+
+        // One site, not two: the collapse is the premise, so asserting it here is what keeps the corner real.
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Lines().ShouldBe([7]);
+        edge.UnfilteredLines().ShouldBe([7]);
+        edge.SwallowingLines().ShouldBe([7]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_RethrowDivergingAcrossFragments_RecordsTheSharedSiteSwallowing()
+    {
+        // The second corner: one file, two compilations of it — a `#if`-guarded rethrow across target frameworks
+        // — so one (file, line) rethrows in one fragment and swallows in the other. Unioning the SWALLOWING sites
+        // reads the shared site swallowing, the truthful answer for a ban.
+        CompilationInput rethrowing = CompilationFactory.Compile("P", ("Worker.cs", """
+                                                                                    namespace N;
+                                                                                    public class MyError : System.Exception {}
+                                                                                    public class Worker
+                                                                                    {
+                                                                                        public void Run()
+                                                                                        {
+                                                                                            try { }
+                                                                                            catch (MyError) { throw; }
+                                                                                        }
+                                                                                    }
+                                                                                    """));
+        CompilationInput swallowing = CompilationFactory.Compile("P", ("Worker.cs", """
+                                                                                    namespace N;
+                                                                                    public class MyError : System.Exception {}
+                                                                                    public class Worker
+                                                                                    {
+                                                                                        public void Run()
+                                                                                        {
+                                                                                            try { }
+                                                                                            catch (MyError) { }
+                                                                                        }
+                                                                                    }
+                                                                                    """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([rethrowing, swallowing]);
+
+        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
+        edge.Sites.Select(s => s.ToString()).ShouldBe(["Worker.cs:8"]);
+        edge.UnfilteredSites.Select(s => s.ToString()).ShouldBe(["Worker.cs:8"]);
+        edge.SwallowingSites.Select(s => s.ToString()).ShouldBe(["Worker.cs:8"]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_MixedCatchShapes_KeepSwallowingSitesASubsetOfUnfilteredSites()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class MyError : System.Exception {}
+                                                         public class Worker
+                                                         {
+                                                             public void Run(bool flag)
+                                                             {
+                                                                 try { }
+                                                                 catch (MyError) when (flag) { }
+                                                                 try { }
+                                                                 catch (MyError) { }
+                                                                 try { }
+                                                                 catch (System.InvalidOperationException) { throw; }
+                                                                 try { }
+                                                                 catch { }
+                                                             }
+                                                         }
+                                                         """);
+
+        // The subset-of-a-subset invariant the parallel recording holds by construction: every swallowing site is
+        // an unfiltered site, and every unfiltered site is a site.
+        model.CatchEdges("N.Worker").Count.ShouldBe(3);
+        foreach (CatchEdge edge in model.CatchEdges("N.Worker"))
+        {
+            edge.UnfilteredSites.Select(s => s.ToString())
+                .ShouldBeSubsetOf(edge.Sites.Select(s => s.ToString()));
+            edge.SwallowingSites.Select(s => s.ToString())
+                .ShouldBeSubsetOf(edge.UnfilteredSites.Select(s => s.ToString()));
+        }
     }
 }

@@ -23,14 +23,11 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     </para>
 ///     <para>
 ///         <b>Correct at call time, by construction — no watcher.</b> The solution only has to be correct
-///         <em>at</em> a tool call, so each call runs a per-call reconcile sweep (cheapest checks first)
-///         instead of a background <see cref="System.IO.FileSystemWatcher" />: a structural stat sweep
-///         (solution file, every csproj, <c>Directory.Build.props</c>/<c>.targets</c>/<c>global.json</c>
-///         probe chains with absence recorded, per-project <c>obj/project.assets.json</c>), a cone scan
-///         for newly-added <c>*.cs</c> under each project directory, then a per-document stat sweep with
-///         the racy-window semantics of <see cref="FileFreshness" />. Any structural delta, any new or
-///         deleted source file disposes the workspace and reloads wholesale; an in-place content edit is
-///         folded into the snapshot chain via
+///         <em>at</em> a tool call, so each call runs a per-call reconcile sweep, cheapest checks first,
+///         instead of a background <see cref="System.IO.FileSystemWatcher" />. The sweep methods state
+///         what each one stats and why; what they add up to is the contract callers depend on: any
+///         structural delta and any added or deleted source file dispose the workspace and reload
+///         wholesale, while an in-place content edit is folded into the snapshot chain via
 ///         <see cref="Solution.WithDocumentText(DocumentId,SourceText,PreservationMode)" />.
 ///     </para>
 ///     <para>

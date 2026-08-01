@@ -22,8 +22,8 @@ public static class AgentContextRenderer
 
     // The glossary composes from per-axis clauses, not 2^N whole-string constants: the "reference" clause is
     // always present, "use" iff a member-target rule exists, "construct" iff a ctor rule exists — each axis
-    // gates independently, so a spec without a given axis renders byte-identically to before that axis existed
-    // (GRAMMAR §4.1/§4.5/§10). The clauses join with "; " and the tail follows a ". " separator.
+    // gates independently, so a spec is never glossed a term it does not use (GRAMMAR §4.1/§4.5/§10). The
+    // clauses join with "; " and the tail follows a ". " separator.
     private const string GlossaryReferenceClause = "reference = a source-level type reference";
 
     private const string GlossaryUseClause = "use = a source-level member access";
@@ -44,8 +44,8 @@ public static class AgentContextRenderer
         "expose = a public signature position (return, parameter, or property/field/event type) on a public member of an externally visible type";
 
     // A separate, independently-gated glossary line (not an axis clause): rendered as ONE line whenever any
-    // rule's subject or operands carry a Registered noun, on the same byte-identical-without-it terms as the
-    // axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
+    // rule's subject or operands carry a Registered noun, and absent entirely otherwise — the same gating
+    // discipline as the axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
     private const string GlossaryRegisteredLine =
         "registered = named in a source-level container registration " +
         "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
@@ -85,9 +85,11 @@ public static class AgentContextRenderer
         bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
         bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
         // The two exception clauses gate on the axis, not on one verb: any catch verb renders the catch clause
-        // and any throw verb the throw clause, so a spec that swaps MustNotCatch for MustNotCatchUnfiltered (or
-        // MustOnlyThrow for MustNotThrow) renders byte-identically — the fact being glossed is the same fact.
-        bool hasCatchRule = model.Rules.Any(rule => rule.Constraint is MustNotCatchConstraint or MustNotCatchUnfilteredConstraint);
+        // and any throw verb the throw clause, so a spec that swaps MustNotCatch for MustNotCatchUnfiltered or
+        // MustNotSwallow (or MustOnlyThrow for MustNotThrow) renders byte-identically — the fact being glossed
+        // is the same fact.
+        bool hasCatchRule = model.Rules.Any(rule =>
+            rule.Constraint is MustNotCatchConstraint or MustNotCatchUnfilteredConstraint or MustNotSwallowConstraint);
         bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint or MustNotThrowConstraint);
         bool hasExposeRule = model.Rules.Any(rule => rule.Constraint is MustNotExposeConstraint);
         bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
@@ -117,8 +119,8 @@ public static class AgentContextRenderer
     }
 
     // The glossary/drill-down line, composed from the always-on "reference" clause plus the axis clauses the
-    // spec actually exercises, then the shared tail. Reproduces the pre-ctor "reference." and "reference; use."
-    // lines byte-for-byte when their axis flags are the only ones set (GRAMMAR §4.1/§4.5/§10).
+    // spec actually exercises, then the shared tail — so a spec that exercises no axis beyond references
+    // renders the bare "reference." line and nothing more (GRAMMAR §4.1/§4.5/§10).
     private static string GlossaryLine(
         bool hasMemberRule, bool hasCtorRule, bool hasInjectRule, bool hasCatchRule, bool hasThrowRule, bool hasExposeRule)
     {

@@ -242,13 +242,11 @@ internal static class MsBuildGate
         {
             return new BinlogCaptureStore(solutionPath, cacheRoot).Validate(ct);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // No resolvable cache location (or an unexpected store-construction failure): the silent cold path.
+            // The filter is the whole cancellation clause — it names what this handler is NOT for, so a
+            // cancellation travels on untouched.
             return CaptureValidation.Absent();
         }
     }

@@ -18,9 +18,8 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         surfaces without the valid-value list, forcing the model to guess.
 ///     </para>
 ///     <para>
-///         Covers every <c>T : struct, Enum</c> in tool parameters. No <c>arch_*</c> tool has an
-///         enum parameter today; the factory is generic so any future enum parameter is validated
-///         the same way.
+///         Generic over every <c>T : struct, Enum</c>, so any enum-typed tool parameter is validated
+///         this way without a per-parameter registration.
 ///     </para>
 /// </remarks>
 internal sealed class EnumValidationConverterFactory : JsonConverterFactory

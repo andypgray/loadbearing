@@ -10,6 +10,7 @@ public sealed class DemurrageCalculator : IDemurrageCalculator
     private readonly FreeTimeCalendar calendar = new();
     private readonly DemurrageTariffTable tariff = new();
 
+    /// <inheritdoc />
     public decimal CalculateCharge(string containerId, DateOnly dischargedAt, DateOnly gatedOutAt)
     {
         var billableDays = calendar.BillableDays(dischargedAt, gatedOutAt);

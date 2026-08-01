@@ -41,8 +41,8 @@ internal static class CliErrorMapper
             return 2;
         }
 
-        // WriteLine per LF-split line so a multi-line message adopts the writer's newline, byte-identical
-        // to the former per-line emission (and to the MCP surface after normalization).
+        // WriteLine per LF-split line so a multi-line message adopts the writer's own newline rather than
+        // carrying embedded LFs onto a CRLF console (and matches the MCP surface after normalization).
         foreach (string line in userFacing.Split('\n')) error.WriteLine(line);
         return 2;
     }

@@ -22,8 +22,8 @@ internal static class ManagedBlockFile
     private static readonly byte[] Utf8Bom = [0xEF, 0xBB, 0xBF];
 
     // Strict UTF-8: invalid bytes throw DecoderFallbackException on read (refused, not silently replaced
-    // with U+FFFD), and no preamble is emitted on write (the BOM is prepended by hand below). GetBytes
-    // over a valid string is byte-identical to the prior new UTF8Encoding(false), so output does not move.
+    // with U+FFFD), and no preamble is emitted on write (the BOM is prepended by hand below). Strictness
+    // is a read-side property only — GetBytes over a valid string emits the same bytes either way.
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static WriteOutcome Splice(string path, string body)

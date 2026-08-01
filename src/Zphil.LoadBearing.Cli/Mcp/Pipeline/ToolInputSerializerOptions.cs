@@ -4,46 +4,10 @@ using System.Text.Json.Serialization.Metadata;
 namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 
 /// <summary>
-///     <see cref="JsonSerializerOptions" /> used by <c>AIFunctionFactory</c> when marshalling
-///     JSON-RPC tool-call arguments into typed parameters. Custom converter factories replace
-///     SDK defaults that would otherwise surface user-facing input errors as opaque
-///     deserializer messages:
-///     <list type="bullet">
-///         <item>
-///             <description>
-///                 <see cref="EnumValidationConverterFactory" /> — invalid enum names throw
-///                 <see cref="Roslyn.UserErrorException" /> listing every valid value, so the client
-///                 can self-correct on the next call instead of seeing a generic JSON parse error.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <see cref="EnumArrayCoercerFactory" /> — enum-array analog of
-///                 <see cref="StringArrayCoercerFactory" />: silently coerces a stringified
-///                 array (<c>"[\"Warning\",\"Error\"]"</c>) and a bare string (<c>"Warning"</c>)
-///                 into the enum array the model intended, validating each element via
-///                 <see cref="Enum.IsDefined" /> with the same valid-values message as
-///                 <see cref="EnumValidationConverterFactory" />.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <see cref="StringArrayCoercerFactory" /> — silently coerces stringified arrays
-///                 (<c>"[\"A\",\"B\"]"</c>) and bare strings (<c>"A"</c>) into the
-///                 <c>string[]</c> the model intended, instead of failing with a byte-position
-///                 deserializer error that gives the model nothing actionable.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <see cref="StringCoercerFactory" /> — the symmetric counterpart: silently
-///                 unwraps a single-element array (<c>["A"]</c>) into the scalar <c>string</c>
-///                 the model intended, and coerces an empty array (<c>[]</c>) to <c>null</c>.
-///                 Multi-element arrays and non-string tokens still throw
-///                 <see cref="Roslyn.UserErrorException" /> naming the offending token kind.
-///             </description>
-///         </item>
-///     </list>
+///     The <see cref="JsonSerializerOptions" /> that marshal JSON-RPC tool-call arguments into typed
+///     parameters. The registered converter factories replace SDK defaults that would otherwise surface a
+///     user-facing input error as an opaque byte-position deserializer message; each documents the token
+///     shapes it forgives.
 /// </summary>
 /// <remarks>
 ///     An explicit <see cref="DefaultJsonTypeInfoResolver" /> is required on .NET 10 because

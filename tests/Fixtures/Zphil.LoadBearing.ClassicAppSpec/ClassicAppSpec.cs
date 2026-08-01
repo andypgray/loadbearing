@@ -7,14 +7,15 @@ namespace Zphil.LoadBearing.ClassicAppSpec
     ///     pattern, which is the remedy a Framework codebase actually needs: a <c>typeof()</c> anchor on
     ///     <c>System.Data.SqlClient.SqlConnection</c> would need an assembly that does not exist on .NET,
     ///     while <c>arch.Namespace("System.Data.*")</c> needs no assembly load at all.
-    ///     <para>
-    ///         Note that a name pattern is not a substitute either: a <c>Selection</c> only matches types
-    ///         inside the checked codebase, so <c>arch.Types.WithNameMatching("SqlConnection")</c> would go
-    ///         inert. The namespace target is the one that reaches an external type.
-    ///     </para>
     /// </summary>
+    /// <remarks>
+    ///     A name pattern is not a substitute either: a <c>Selection</c> only matches types inside the
+    ///     checked codebase, so <c>arch.Types.WithNameMatching("SqlConnection")</c> would go inert. The
+    ///     namespace target is the one that reaches an external type.
+    /// </remarks>
     public sealed class ClassicAppSpec : IArchitectureSpec
     {
+        /// <inheritdoc />
         public void Define(Arch arch)
         {
             arch.Rule("naming/interfaces")

@@ -17,13 +17,15 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///         external thrown types
 ///         included
 ///     </b>
-///     (the point of departure from <c>MustOnlyReference</c>, which exempts external targets). A
-///     <c>Type</c>-sugar operand resolves an external allowed type by FQN (so an allowed external throw passes);
+///     (the point of departure from <c>MustOnlyReference</c>, which exempts external targets).
+/// </summary>
+/// <remarks>
+///     A <c>Type</c>-sugar operand resolves an external allowed type by FQN (so an allowed external throw passes);
 ///     an allowed type absent from the model resolves empty and harmlessly allows nothing; the verb
 ///     <b>never warns</b> (an empty allow-set is loud on its own); the (source, thrown) type-pair ratchet with a
 ///     bystander; and the pinned human line + JSON kind. Violation identity is the (source, thrown) type pair,
 ///     riding <see cref="BaselineEntry.ForEdge" /> unchanged.
-/// </summary>
+/// </remarks>
 public sealed class MustOnlyThrowVerbTests
 {
     // Service throws a permitted DomainError and a non-permitted InfraError; only DomainError is in the allow-set.

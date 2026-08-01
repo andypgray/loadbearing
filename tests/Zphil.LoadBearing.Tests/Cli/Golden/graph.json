@@ -31,11 +31,11 @@
       "projectReferences": [
         "MyApp.Legacy.Billing"
       ],
-      "types": 17,
+      "types": 18,
       "namespaces": [
         {
           "namespace": "MyApp.Web",
-          "types": 17
+          "types": 18
         }
       ]
     }
@@ -71,7 +71,7 @@
     {
       "source": "MyApp.Web",
       "targetNamespaceRoot": "System",
-      "references": 3
+      "references": 4
     },
     {
       "source": "MyApp.Web",

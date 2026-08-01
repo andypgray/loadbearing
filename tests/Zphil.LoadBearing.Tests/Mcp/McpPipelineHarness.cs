@@ -14,16 +14,24 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
 ///     A real MCP client and server connected in-process over a pair of pipes — no child process, no real
-///     stdio — composed exactly as <c>McpServerCommand</c> composes the production server (same DI graph,
-///     including the shared warm <c>WorkspaceSession</c> + <c>ISolutionSource</c> registration, with the
-///     <see cref="IEnvironment" /> seam faked, the coercing tools, the prompt surface, and global
-///     call-tool filter installed), swapping stdio for a stream transport. The one deliberate omission: the harness never
-///     starts the orphan-server watchdogs, so <c>Environment.Exit</c> can never fire during a test.
-///     Per-test-instance and lets integration tests drive the <c>tools/call</c> pipeline end to end and
-///     assert both on what the client sees and on what the server logged. Disposal tears the host down
-///     asynchronously (the warm session is <see cref="IAsyncDisposable" />) and resets
-///     <c>ServerShutdown</c>'s registered disposers so the warm session's disposer cannot leak across tests.
+///     stdio — so an integration test can drive the <c>tools/call</c> pipeline end to end and assert both
+///     on what the client sees and on what the server logged.
 /// </summary>
+/// <remarks>
+///     <para>
+///         Composed exactly as <c>McpServerCommand</c> composes the production server: the same DI graph,
+///         including the shared warm <c>WorkspaceSession</c> + <c>ISolutionSource</c> registration, with the
+///         <see cref="IEnvironment" /> seam faked, the coercing tools, the prompt surface and the global
+///         call-tool filter installed, swapping only stdio for a stream transport. The one omission is the
+///         orphan-server watchdogs, which the harness never starts, so <c>Environment.Exit</c> can never
+///         fire during a test.
+///     </para>
+///     <para>
+///         Per test instance. Disposal tears the host down asynchronously (the warm session is
+///         <see cref="IAsyncDisposable" />) and resets <c>ServerShutdown</c>'s registered disposers, so the
+///         warm session's disposer cannot leak across tests.
+///     </para>
+/// </remarks>
 internal sealed class McpPipelineHarness : IAsyncDisposable
 {
     private readonly IHost _host;

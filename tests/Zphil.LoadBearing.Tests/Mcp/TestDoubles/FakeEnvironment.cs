@@ -16,7 +16,8 @@ internal sealed class FakeEnvironment : IEnvironment
         return _variables.GetValueOrDefault(name);
     }
 
-    /// <summary>Set (or, with a <c>null</c> value, clear) an environment variable. Returns <c>this</c> for chaining.</summary>
+    /// <summary>Sets (or, with a <c>null</c> value, clears) an environment variable.</summary>
+    /// <returns><c>this</c>, for chaining.</returns>
     public FakeEnvironment SetVariable(string name, string? value)
     {
         if (value is null)

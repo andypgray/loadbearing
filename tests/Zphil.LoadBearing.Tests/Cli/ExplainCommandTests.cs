@@ -57,6 +57,7 @@ public sealed class ExplainCommandTests
             "  exceptions/domain-throws-domain\n" +
             "  exceptions/no-bare-bcl-throw\n" +
             "  exceptions/no-general-catch\n" +
+            "  exceptions/no-swallowed-catch\n" +
             "  exceptions/no-unfiltered-catch\n" +
             "  layering/billing-independent\n" +
             "  layering/domain-independent\n" +

@@ -82,7 +82,7 @@ internal sealed class SelectionEvaluator
                 var registeredNames = RegisteredFullNames(registered.Lifetime);
                 return universe.Where(t => registeredNames.Contains(t.FullName));
             default:
-                // Fail closed (M4): the closed noun hierarchy makes this arm unreachable for any v1 noun. An
+                // Fail closed: the closed noun hierarchy makes this arm unreachable for any v1 noun. An
                 // unknown noun means a new noun without a switch arm; throw rather than select nothing (which
                 // would vacuously pass every shape verb over an empty subject). ArchChecker contains it per-rule.
                 throw new InvalidOperationException($"Unhandled selection noun '{noun.GetType().Name}'.");
@@ -163,7 +163,7 @@ internal sealed class SelectionEvaluator
             case AuthoredAdjective:
                 return current.Where(t => !t.IsGenerated);
             default:
-                // Fail closed (M4): an unknown adjective would silently widen the selection — and in a
+                // Fail closed: an unknown adjective would silently widen the selection — and in a
                 // MustOnly* target position a silently-widened allow-set is fail-open enforcement. A missing
                 // arm is a bug; throw (ArchChecker contains it per-rule) rather than pass the widened set through.
                 throw new InvalidOperationException($"Unhandled selection adjective '{adjective.GetType().Name}'.");

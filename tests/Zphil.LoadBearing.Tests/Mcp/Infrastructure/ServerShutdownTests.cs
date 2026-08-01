@@ -9,8 +9,7 @@ namespace Zphil.LoadBearing.Tests.Mcp.Infrastructure;
 /// <summary>
 ///     Exercises <see cref="ServerShutdown" />'s gate, disposal-then-flush-then-exit order,
 ///     timeout fallback, and registration-order semantics through the injectable exit/timeout
-///     test seam — no real process exits during these tests. Mirrors the static-state reset
-///     idiom used by <see cref="IdleTimeoutWatchdogTests" />.
+///     test seam — no real process exits during these tests.
 /// </summary>
 [Collection("Serial")]
 public sealed class ServerShutdownTests : IDisposable

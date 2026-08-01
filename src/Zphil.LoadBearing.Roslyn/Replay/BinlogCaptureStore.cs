@@ -49,8 +49,7 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 ///     <see cref="ExtractionCacheStore" /> and mirrors its disciplines exactly: atomic temp-file-then-move
 ///     writes, <see cref="FileStamp" /> content-hash tolerance of a bare mtime touch, stamp promotion so the
 ///     steady state validates on stat alone, "any failure degrades, never a wrong answer", and an internal
-///     <see cref="ContentHashCount" /> observable for the promotion pin. This type is <em>unwired</em> — the
-///     CLI's <c>--binlog</c> option, source selection, and notice printing are not yet wired.
+///     <see cref="ContentHashCount" /> observable for the promotion pin.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -82,9 +81,10 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 /// </remarks>
 internal sealed class BinlogCaptureStore
 {
-    // v2: each project entry records its cone-file membership at ingest so the cone scan no longer reads an
-    // excluded stray *.cs as a perpetual add. A v1 manifest has no ConeFiles, so it degrades to one
-    // UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
+    // Each project entry records its cone-file membership at ingest, so the cone scan does not read an
+    // excluded stray *.cs as a perpetual add. A manifest from an earlier schema carries no ConeFiles, so it
+    // degrades to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a
+    // wrong answer.
     private const int CurrentSchemaVersion = 2;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
@@ -291,14 +291,12 @@ internal sealed class BinlogCaptureStore
         {
             return ValidateCore(ct);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Any unexpected failure (I/O mid-sweep, a malformed record STJ still bound) degrades to the
             // unreadable variant: the capture is disposable, so the run falls back rather than surfacing it.
+            // The filter is the whole cancellation clause — it names what this handler is NOT for, so a
+            // cancellation travels on untouched.
             return CaptureValidation.Invalid(UnreadableNotice);
         }
     }

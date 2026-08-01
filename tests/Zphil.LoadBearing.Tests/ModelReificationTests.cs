@@ -315,6 +315,25 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void MustNotSwallowRule_ReifiesToWalkableCatchConstraint()
+    {
+        ArchRule rule = ArchModelBuilder.Build(new SwallowRuleSpec()).Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustNotSwallowConstraint>();
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        constraint.Targets.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(constraint.Targets);
+        // Both the filter condition and the rethrow condition live in the verb, so the node's shape is the plain
+        // catch verb's — no extra operand carries either, and the member hook stays empty.
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void MustNotThrowRule_ReifiesToWalkableThrowConstraint()
     {
         ArchRule rule = ArchModelBuilder.Build(new ThrowBanRuleSpec()).Rules.Single();
@@ -377,6 +396,24 @@ public class ModelReificationTests
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
         var wrapped = ArchModelBuilder.Build(new UnfilteredCatchWrappedSelectionSpec()).Rules.Single().Constraint
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
+
+        sugar.Targets.Count.ShouldBe(1);
+        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        sugarType.ShouldBe(typeof(Exception));
+        wrappedType.ShouldBe(sugarType);
+        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustNotSwallow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
+    {
+        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
+        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
+        var sugar = ArchModelBuilder.Build(new SwallowTypeSugarSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotSwallowConstraint>();
+        var wrapped = ArchModelBuilder.Build(new SwallowWrappedSelectionSpec()).Rules.Single().Constraint
+            .ShouldBeOfType<MustNotSwallowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
         Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
@@ -655,6 +692,17 @@ public class ModelReificationTests
         }
     }
 
+    // A single MustNotSwallow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private sealed class SwallowRuleSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-swallowed-broad-catches")
+                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
+                .Because("A handler that holds a failure and continues hides it.");
+        }
+    }
+
     // A single MustNotThrow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
     private sealed class ThrowBanRuleSpec : IArchitectureSpec
     {
@@ -715,6 +763,27 @@ public class ModelReificationTests
         {
             arch.Rule("errors/no-unfiltered-catch")
                 .Enforce(arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))))
+                .Because("Reason.");
+        }
+    }
+
+    // The MustNotSwallow Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
+    private sealed class SwallowTypeSugarSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-swallow")
+                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class SwallowWrappedSelectionSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("errors/no-swallow")
+                .Enforce(arch.Types.MustNotSwallow(arch.Type(typeof(Exception))))
                 .Because("Reason.");
         }
     }

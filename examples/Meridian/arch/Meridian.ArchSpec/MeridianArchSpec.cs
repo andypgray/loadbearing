@@ -15,6 +15,7 @@ namespace Meridian.ArchSpec;
 /// </summary>
 public sealed class MeridianArchSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer domain = arch.Layer("Domain", "Meridian.Domain.*");

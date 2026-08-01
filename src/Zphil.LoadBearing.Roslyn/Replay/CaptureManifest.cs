@@ -10,21 +10,8 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 ///     re-hash of the recorded structural inputs, and an existence sweep over the recorded documents.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <b>Structure-only, deliberately.</b> Unlike the fragment cache (<see cref="CacheManifest" />),
-///         which keys on structure <em>and</em> per-document content so any source edit re-extracts, the
-///         capture keys on structure alone: replay reads source text from current disk, so a content edit is
-///         invisible to it and must not invalidate the capture. What <em>does</em> invalidate it is anything
-///         that changes the captured csc command lines' meaning — a csproj/sln/props/targets/global.json/assets
-///         edit (caught by the structural stamps) or a change to the source-file membership (caught by the
-///         document existence sweep and the project-cone scan).
-///     </para>
-///     <para>
-///         <b>No tamper story.</b> Like the fragment cache, this is disposable local derived data: a garbled,
-///         truncated, hand-edited, or version-mismatched manifest degrades to a validation
-///         <em>Invalid</em>/<em>Absent</em> and the run falls back to a design-time build — never an exception,
-///         never a wrong answer. See <see cref="BinlogCaptureStore" />.
-///     </para>
+///     Why the capture keys on structure alone, and why a manifest it cannot read degrades rather than
+///     throws, belong to <see cref="BinlogCaptureStore" /> — the type that writes these and enforces both.
 /// </remarks>
 /// <param name="SchemaVersion">The manifest schema version; a mismatch is treated as unreadable.</param>
 /// <param name="ToolVersion">

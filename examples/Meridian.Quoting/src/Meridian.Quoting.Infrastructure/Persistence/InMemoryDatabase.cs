@@ -13,6 +13,7 @@ public sealed class InMemoryDatabase
     private readonly List<RateCard> rateCards;
     private long lastQuoteNumber;
 
+    /// <summary>Initializes an empty store seeded with the subsystem's fixed rate cards.</summary>
     public InMemoryDatabase()
     {
         // Seeded with fixed UTC literals, never a clock read: the store must stand up the same

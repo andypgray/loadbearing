@@ -1,12 +1,50 @@
 <wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<!-- Named arguments are a deliberate prose-parameter documentation convention (GRAMMAR §10:
-	     from:, to:, description:). Disable the "redundant argument name" inspections so neither the
-	     IDE nor inspectcode flags a deliberate name as removable. This is the project-shared stance
-	     and replaces the per-file "disable" comments that used to live in source. Contributors need
-	     not run ReSharper; the file is simply ignored by anything that doesn't. -->
+	     from:, to:, description:). Protecting them takes TWO settings, because inspect and cleanup
+	     read different axes and do not share a switch.
+
+	     1. The inspection severities below stop the IDE and inspectcode REPORTING a deliberate name
+	        as removable. They have no effect on cleanup: cleanup overrides the severity of every
+	        rule its enabled modules need, so DO_NOT_SHOW cannot reach it.
+	     2. The cleanup profile below stops cleanup REWRITING it. "Arrange argument style" is the
+	        cleanup task that normalises arguments to positional, and turning it off is the only way
+	        to leave argument style as-authored — the style setting itself is binary (positional or
+	        named) with no "leave alone" value.
+
+	     Contributors need not run ReSharper; the file is simply ignored by anything that doesn't. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ArgumentsStyleLiteral/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ArgumentsStyleStringLiteral/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ArgumentsStyleNamedExpression/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ArgumentsStyleOther/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ArgumentsStyleAnonymousFunction/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+
+	<!-- The cleanup profile: "Built-in: Full Cleanup" with one task off, ArrangeArgumentsStyle.
+
+	     A profile is a single XML-encoded blob under /Default/CodeStyle/CodeCleanup/Profiles/=<Name>/,
+	     and it is NOT a diff against a built-in: any task the blob omits reads back as the
+	     descriptor's default, which is off. So this enumerates every C# cleanup task Full Cleanup
+	     turns on. The list was read off ReSharper 2026.1.2's own cleanup modules, not guessed —
+	     re-derive it on a ReSharper upgrade (CodeStylesCleanupModule.ALL_CODE_STYLES and the
+	     SetDefaultSetting(FULL) arm of each ICodeCleanupModule). A task JetBrains adds later will
+	     be missing here and silently not run; a missing task is a nicety not applied, never a
+	     rewrite of code you meant to keep.
+
+	     CSUpdateFileHeader is False deliberately: Full Cleanup leaves it off too.
+
+	     Not covered: cleanup strips the trailing newline at EOF, and that is NOT configurable here.
+	     The final-newline knob is an .editorconfig standard property (insert_final_newline) with no
+	     .DotSettings equivalent, and this repo deliberately has no .editorconfig. Every .cs file in
+	     the repo is consistently newline-free at EOF as a result. -->
+	<s:String x:Key="/Default/CodeStyle/CodeCleanup/Profiles/=LoadBearing_003A_0020Full_0020Cleanup_0020_0028keep_0020named_0020arguments_0029/@EntryIndexedValue">&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Profile name="LoadBearing: Full Cleanup (keep named arguments)"&gt;&lt;CSReformatCode&gt;True&lt;/CSReformatCode&gt;&lt;CSharpFormatDocComments&gt;True&lt;/CSharpFormatDocComments&gt;&lt;CSharpReformatComments&gt;True&lt;/CSharpReformatComments&gt;&lt;CSOptimizeUsings&gt;&lt;OptimizeUsings&gt;True&lt;/OptimizeUsings&gt;&lt;EmbraceInRegion&gt;False&lt;/EmbraceInRegion&gt;&lt;RegionName&gt;&lt;/RegionName&gt;&lt;/CSOptimizeUsings&gt;&lt;CSShortenReferences&gt;True&lt;/CSShortenReferences&gt;&lt;CSReorderTypeMembers&gt;True&lt;/CSReorderTypeMembers&gt;&lt;CSUpdateFileHeader&gt;False&lt;/CSUpdateFileHeader&gt;&lt;RemoveCodeRedundancies&gt;True&lt;/RemoveCodeRedundancies&gt;&lt;CSUseAutoProperty&gt;True&lt;/CSUseAutoProperty&gt;&lt;CSMakeFieldReadonly&gt;True&lt;/CSMakeFieldReadonly&gt;&lt;CSMakeAutoPropertyGetOnly&gt;True&lt;/CSMakeAutoPropertyGetOnly&gt;&lt;CSArrangeQualifiers&gt;True&lt;/CSArrangeQualifiers&gt;&lt;CSFixBuiltinTypeReferences&gt;True&lt;/CSFixBuiltinTypeReferences&gt;&lt;CSCodeStyleAttributes ArrangeVarStyle="True" ArrangeTypeAccessModifier="True" ArrangeTypeMemberAccessModifier="True" SortModifiers="True" ArrangeAccessors="True" ArrangeArgumentsStyle="False" RemoveRedundantParentheses="True" AddMissingParentheses="True" ArrangeBraces="True" ArrangeAttributes="True" ArrangeCodeBodyStyle="True" ArrangeTrailingCommas="True" ArrangeObjectCreation="True" ArrangeDefaultValue="True" ArrangeEmptyString="True" ArrangeNamespaces="True" ArrangeNullCheckingPattern="True" /&gt;&lt;/Profile&gt;</s:String>
+
+	<!-- ReSharper's "profile to use when nobody picks one".
+
+	     This key is only consulted by a runner that chooses to honour it, so a caller that needs the
+	     named arguments kept must name the profile itself rather than lean on this default — the
+	     profile above is what protects them, and a call without it silently gets Full Cleanup and
+	     strips them again.
+
+	     Bare `jb cleanupcode` never reads this key: jb always defaults to Full Cleanup, so a direct
+	     CLI run needs --profile regardless. -->
+	<s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">LoadBearing: Full Cleanup (keep named arguments)</s:String>
 </wpf:ResourceDictionary>

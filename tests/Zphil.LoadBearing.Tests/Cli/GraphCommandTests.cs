@@ -12,7 +12,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions);
 ///     Domain→System = 3 (OrderRuleViolation's Exception base, OrderApproval's InvalidOperationException throw
 ///     and RetryPolicy's `when`-filtered caught Exception — a filter never suppresses the reference edge)
-///     and Web→System = 3 (now including ReportEndpoint's caught Exception).
+///     and Web→System = 4 (ReportEndpoint's and ReportPublisher's caught Exception among them; a rethrowing
+///     catch mints its reference edge like any other).
 /// </summary>
 [Collection("Serial")]
 public sealed class GraphCommandTests
@@ -24,7 +25,7 @@ public sealed class GraphCommandTests
         Projects (3):
           MyApp.Domain — 8 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 17 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 18 types; references: MyApp.Legacy.Billing
 
         Observed project references (distinct type pairs):
           MyApp.Domain -> MyApp.Web: 2
@@ -33,13 +34,13 @@ public sealed class GraphCommandTests
         Namespaces:
           MyApp.Domain: MyApp.Domain (8)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
-          MyApp.Web: MyApp.Web (17)
+          MyApp.Web: MyApp.Web (18)
 
         External references (by namespace root):
           MyApp.Domain -> System: 3
           MyApp.Legacy.Billing -> System: 2
           MyApp.Web -> Microsoft.Extensions: 2
-          MyApp.Web -> System: 3
+          MyApp.Web -> System: 4
           MyApp.Web -> System.Data: 2
           MyApp.Web -> System.Text: 1
           MyApp.Web -> System.Threading: 2

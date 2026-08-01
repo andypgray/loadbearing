@@ -276,6 +276,15 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustNotSwallow_RendersFragment()
+    {
+        // The rethrow-aware catch-ban verb (GRAMMAR §5.3): "must not swallow {list}". A single verb word rather
+        // than a participle on `catch`, because the fact it reads is a composite of three (§10).
+        SentenceRenderer.Sentence(Arch.Types.MustNotSwallow(typeof(Exception)))
+            .ShouldBe("Types must not swallow `Exception`.");
+    }
+
+    [Fact]
     public void MustNotThrow_RendersFragment()
     {
         // The throw-ban verb (GRAMMAR §5.3): "must not throw {list}" — the ban polarity beside MustOnlyThrow.

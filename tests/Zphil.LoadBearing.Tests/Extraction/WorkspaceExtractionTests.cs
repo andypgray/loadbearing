@@ -447,6 +447,18 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         guarded.UnfilteredLines().ShouldBeEmpty();
         fixture.Model.HasEdge("MyApp.Domain.RetryPolicy", "System.Exception").ShouldBeTrue();
 
+        // The rethrow fact, through that same path: ReportEndpoint's clause returns -1, so its unfiltered site is
+        // also a swallowing site, while ReportPublisher catches the identical external type just as unfiltered and
+        // ends its block in `throw;`, so its site is recorded unfiltered and NOT swallowing. That difference is
+        // what the rethrow-aware verb reads and neither of the other two catch verbs can see; RetryPolicy's
+        // filtered clause is out of both subsets, the subset-of-a-subset holding end to end.
+        swallow.SwallowingLines().ShouldBe([15]);
+        CatchEdge rethrowing = fixture.Model.CatchEdge("MyApp.Web.ReportPublisher", "System.Exception");
+        rethrowing.Lines().ShouldBe([22]);
+        rethrowing.UnfilteredLines().ShouldBe([22]);
+        rethrowing.SwallowingLines().ShouldBeEmpty();
+        guarded.SwallowingLines().ShouldBeEmpty();
+
         // At least one ThrowEdge: OrderApproval's whole throw set, pinned — the in-solution domain exception at
         // its `throw new` line and the BCL one at its own, each beside the §4.1 reference edge and (for `throw
         // new`) the §4.5 construction edge.

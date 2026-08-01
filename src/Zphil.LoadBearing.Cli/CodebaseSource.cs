@@ -35,10 +35,8 @@ internal enum CodebaseSourceOutcome
 ///     <see cref="Resolution" /> (both absent for the spec-less <c>graph</c> survey), the discovered
 ///     <see cref="SolutionPath" />, and the workspace <see cref="Diagnostics" /> — and defers the codebase to
 ///     a lazy <see cref="ExtractAsync" /> so the pipeline can still fail fast on a tampered baseline before
-///     any extraction. On a cache <see cref="CodebaseSourceOutcome.Hit" /> the model is merged from persisted
-///     fragments with no workspace, no MSBuild, and no design-time build; otherwise a workspace is acquired
-///     through the injected <see cref="ISolutionSource" />, every C# project is extracted (the clean ones
-///     reused on a partial), the requested subset is merged, and the whole set is written back.
+///     any extraction. A workspace, where the run still needs one, is acquired through the injected
+///     <see cref="ISolutionSource" />.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -59,7 +57,7 @@ internal enum CodebaseSourceOutcome
 ///         Disabled branch is not always a full cold walk, though: when the handle carries a warm fragment
 ///         extractor (<see cref="SolutionHandle.WarmFragments" />) it merges the session store's
 ///         reused-plus-re-extracted fragments instead, so a warm re-check re-walks only the projects whose
-///         bytes changed — while the model stays byte-identical to a cold run through the one merge path.
+///         bytes changed.
 ///     </para>
 /// </remarks>
 internal sealed class CodebaseSource : IDisposable

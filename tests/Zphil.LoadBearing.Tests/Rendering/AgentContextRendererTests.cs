@@ -218,7 +218,7 @@ public class AgentContextRendererTests
     {
         ArchitectureModel model = ArchModelBuilder.Build(new PolicySpec(MigrationPolicy.MigrateIfSmall));
 
-        // The optional live-count provider (not yet wired into the CLI) appends the burndown sentence.
+        // The optional live-count provider supplies the count the burndown sentence reports.
         AgentContextRenderer.RootBlock(model, "Spec", _ => 7).ShouldContain("Grandfathered sites remaining: 7.");
     }
 

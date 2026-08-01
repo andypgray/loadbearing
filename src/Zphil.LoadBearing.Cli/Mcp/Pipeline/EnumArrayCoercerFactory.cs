@@ -14,11 +14,10 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         No tool currently advertises an enum-array parameter; this factory is the symmetric
-///         half of "enum coercion" (the array analog of <see cref="EnumValidationConverterFactory" />),
-///         kept so a future enum-array parameter is coerced the same forgiving way its scalar and
-///         <c>string[]</c> siblings already are. Handled token shapes for any <c>TEnum[]</c>
-///         parameter where <c>TEnum</c> is an enum:
+///         Generic over every <c>TEnum[]</c> parameter, so the enum-array shape is coerced as
+///         forgivingly as its scalar (<see cref="EnumValidationConverterFactory" />) and
+///         <c>string[]</c> siblings without a per-parameter registration. Handled token shapes for
+///         any <c>TEnum[]</c> parameter where <c>TEnum</c> is an enum:
 ///     </para>
 ///     <list type="bullet">
 ///         <item>

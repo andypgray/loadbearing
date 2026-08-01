@@ -15,6 +15,8 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 /// </remarks>
 internal static class VsWhereLocator
 {
+    // A local enumeration that normally returns in well under a second, so 10s only trips on a wedge —
+    // and a trip costs nothing but the RegisterDefaults() fallback this probe already degrades to.
     private static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(10);
 
     private static readonly string VsWherePath = Path.Combine(

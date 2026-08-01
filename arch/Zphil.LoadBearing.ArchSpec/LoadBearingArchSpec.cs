@@ -9,284 +9,94 @@ namespace Zphil.LoadBearing.ArchSpec;
 
 /// <summary>
 ///     LoadBearing's own architecture spec — the dogfood render source, governing this repo's real code
-///     so the product governs itself honestly. It exercises all three postures, eight declared layers,
-///     and the verb families this codebase can honestly exercise — which is not all of them. The verb
-///     ledger below names every remaining verb family with a reason, and a test holds it complete, so a
-///     verb that ships without either a self-use or a ledger line reddens CI. Every rule below is a
-///     genuine boundary: nothing in the build system prevents breaking it. The rendered block lives in the
-///     committed root <c>AGENTS.md</c>, kept current by the self-spec tests.
-///     <list type="bullet">
-///         <item>
-///             <b>Enforce</b> — the always-true laws.
-///             <list type="bullet">
-///                 <item>
-///                     <c>layering/core-no-roslyn</c>: Core, the netstandard2.0 reified model both render
-///                     targets consume, references neither the Extraction layer nor the
-///                     <c>Microsoft.CodeAnalysis</c>/<c>Microsoft.Build</c> packages behind it (a package
-///                     reference is the route the build cannot block).
-///                 </item>
-///                 <item>
-///                     <c>layering/model-independent</c>: the Model references neither Checking nor
-///                     Rendering — the product thesis (one reified model, two independent render targets)
-///                     stated as law rather than as an intention.
-///                 </item>
-///                 <item>
-///                     <c>cli/no-stdout</c>: the CLI owns stdout as a protocol channel — JSON-RPC for the
-///                     MCP server, System.CommandLine for the commands — so nothing writes to
-///                     <see cref="System.Console" /> directly.
-///                 </item>
-///                 <item>
-///                     <c>di/no-captive-dependencies</c>: the all-singleton MCP host must not inject a
-///                     scoped or transient service into a singleton (a forward ratchet — no such
-///                     registration exists yet).
-///                 </item>
-///                 <item>
-///                     <c>di/no-service-locator</c> (from the <c>DotNetGuidance</c> pack): nothing in the
-///                     CLI resolves a service from an <c>IServiceProvider</c> outside two sanctioned
-///                     seams. <c>McpServerCommand</c> is the composition root. <c>GlobalCallToolFilter</c>
-///                     is the second: <c>AddCallToolFilter</c> registers a delegate, so there is no
-///                     constructor to inject into, and the request context is the only DI handle the SDK
-///                     hands it. Both are named in the <c>Fix</c>, so a reader of a violation learns where
-///                     resolving is allowed and why.
-///                 </item>
-///                 <item>
-///                     <c>di/no-buildserviceprovider</c> (from the pack): a forward ratchet — nothing
-///                     builds a second container while configuring services, and nothing does today.
-///                 </item>
-///                 <item>
-///                     <c>mcp/tools-accept-cancellation</c>: every method carrying <c>[McpServerTool]</c>
-///                     takes a <c>CancellationToken</c>, so a client cancel is honored and the idle
-///                     watchdog can close. The attribute is the whole subject — a tool method declared
-///                     synchronously, or outside the tools namespace, is still a tool and is still
-///                     governed.
-///                 </item>
-///                 <item>
-///                     <c>mcp/tool-types-attributed</c>: every type in the MCP tools namespace carries
-///                     <c>[McpServerToolType]</c>. Tool discovery is the attribute walk, so a tool class
-///                     without it compiles, registers nothing, and its tools vanish from the server in
-///                     silence.
-///                 </item>
-///                 <item>
-///                     <c>roslyn/no-msbuildlocator-query</c>: no code queries
-///                     <c>MSBuildLocator.QueryVisualStudioInstances</c> — on .NET hosts it returns no
-///                     instances, so the sanctioned vswhere path is the only route.
-///                 </item>
-///                 <item>
-///                     <c>mcp/no-blocking-waits</c>: nothing in the CLI or the extraction host blocks on a
-///                     task (<c>Wait</c>/<c>Result</c>/<c>GetResult</c>) — a block there holds a thread-pool
-///                     thread and drops the tool call's cancellation; the shutdown drain is the one
-///                     sanctioned block.
-///                 </item>
-///                 <item>
-///                     <c>mcp/no-path-assembly-loads</c>: nothing in the CLI loads an assembly from a path.
-///                     A path load pins that file for the whole life of a long-lived host, so a warm server
-///                     blocks every rebuild of what it loaded; <c>SpecLoadContext</c> is the one sanctioned
-///                     caller, and it reads bytes.
-///                 </item>
-///                 <item>
-///                     <c>naming/async-suffix</c>: <c>Task</c>- and <c>ValueTask</c>-returning methods
-///                     carry the <c>Async</c> suffix across the union of the four shipping projects, with
-///                     two named method exceptions.
-///                 </item>
-///                 <item>
-///                     <c>mcp/warm-state-constructed-once</c>: only the server composition root constructs
-///                     the single workspace session and fragment store the warm server holds for its
-///                     lifetime.
-///                 </item>
-///                 <item>
-///                     <c>roslyn/no-engine-types-on-seam</c>: the Roslyn project exposes no
-///                     <c>Microsoft.Build.*</c> engine type on a public signature, preserving the
-///                     runtime-bind split its csproj sets up.
-///                 </item>
-///                 <item>
-///                     <c>xunit/leaf-adapter</c>: no product project references the xUnit adapter, so a
-///                     test framework never ships to a package's consumers.
-///                 </item>
-///                 <item>
-///                     <c>xunit/throws-setup-errors-only</c>: the adapter throws only
-///                     <see cref="System.IO.FileNotFoundException" /> or
-///                     <see cref="System.InvalidOperationException" />, its two documented setup errors.
-///                 </item>
-///                 <item>
-///                     <c>exceptions/broad-catches-filtered</c>: a broad <c>catch (Exception)</c> in the
-///                     shipping code names what it expects in a <c>when</c> filter; the sanctioned
-///                     best-effort handlers are exempt by type name.
-///                 </item>
-///                 <item>
-///                     <c>exceptions/no-bare-bcl-throws</c>: nothing throws <c>Exception</c>,
-///                     <c>SystemException</c> or <c>ApplicationException</c> — types a caller cannot
-///                     filter on. A forward tripwire, true here today.
-///                 </item>
-///                 <item>
-///                     <c>packs/depends-on-core-only</c>: the rule pack is a leaf — it reaches for the
-///                     Core vocabulary and nothing else, so taking it never drags the tool into a spec
-///                     project's load context.
-///                 </item>
-///                 <item>
-///                     <c>naming/interfaces</c>: every interface carries the <c>I</c> prefix, so <c>I*</c>
-///                     stays a reliable grep for this codebase's seams.
-///                 </item>
-///                 <item>
-///                     <c>model/constraint-nodes</c>: every <c>*Constraint</c> node lives in
-///                     <c>Zphil.LoadBearing.Model</c>, where the evaluator and the sentence renderer each
-///                     switch over the whole set. The public <c>Constraint</c> base is the one named
-///                     exception — it belongs with the authoring surface.
-///                 </item>
-///             </list>
-///         </item>
-///         <item>
-///             <b>Migrate</b> (<c>mcp/env-through-seam</c>): the MCP infrastructure still reaches for
-///             <see cref="System.Environment" /> directly in a few places; the sanctioned path is the
-///             <c>IEnvironment</c> seam (adapter <c>SystemEnvironment</c>). Grandfathered sites are captured;
-///             the ratchet keeps any new infra type reaching for the static red.
-///         </item>
-///         <item>
-///             <b>Quarantine</b> (<c>roslyn/msbuild-bootstrap</c>): the preview-VS MSBuild bootstrap is the
-///             gnarliest code in the repo. Its interior is contained behind
-///             <see cref="MsBuildBootstrap" />; the dragons prose records the load-bearing weirdness.
-///         </item>
-///     </list>
+///     so the product governs itself honestly. It exercises all three postures across eight declared
+///     layers, and every rule below is a genuine boundary: nothing in the build system prevents breaking
+///     it. The rendered block lives in the committed root <c>AGENTS.md</c>, kept current by the self-spec
+///     tests. Each rule carries its own law, <c>Because</c> and <c>Fix</c>, so this comment holds only
+///     what the code cannot say.
 ///     <para>
-///         The eight layers are a hybrid: five are assembly-shaped (Core, Extraction, Host, Adapter,
-///         Pack), and three more — Model, Checking, Rendering — cut Core into the pieces
-///         <c>layering/model-independent</c> needs to name. Checking and Rendering are declared for that
-///         reason alone and carry no anchored rule, so they render a module-map row and no card; the same
-///         honest negative the Quoting example shows. Layers are the spec's vocabulary here rather than a
-///         second one beside <c>Project</c>, so the sentences read in layer voice throughout — including
-///         <c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>, <c>exceptions/broad-catches-filtered</c>
-///         and <c>exceptions/no-bare-bcl-throws</c>, whose union subjects anchor nothing (a union has no
-///         single home directory) and so are documented negatives rather than more cards.
+///         Layers: five are assembly-shaped (Core, Extraction, Host, Adapter, Pack), and three more —
+///         Model, Checking, Rendering — cut Core into the pieces <c>layering/model-independent</c> needs
+///         to name. Checking and Rendering carry no anchored rule on purpose: a declared layer with
+///         nothing to say renders a module-map row and no card, an honest negative. The union-subject
+///         rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c> and the exception laws) place
+///         no card either — a union has no single home directory.
 ///     </para>
 ///     <para>
 ///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
-///         purpose — a pack is a menu, and not calling a method is the whole opt-out mechanism.
-///         <c>exceptions/no-general-catch</c> bans the broad catch itself, and is red here at around twenty
-///         types, because a <c>when</c> filter never suppresses the catch edge and the house form is exactly
-///         that: a broad catch that names what it expects. Declining it used to be the end of that story,
-///         and is not now — <c>exceptions/broad-catches-filtered</c> asks the question the pack rule could
-///         not, so the types whose broad catches are all filtered stay inside a live rule and pass it
-///         instead of being counted as debt nobody owes. <c>naming/async-suffix</c> and
-///         <c>di/no-captive-dependencies</c> stay local, and the second is the finding worth keeping: the
-///         pack cannot express this spec's two named method exceptions or its <c>ValueTask</c> return set,
-///         and the MCP-specific rationale below names the actual singletons, which reads better than the
-///         pack's general one. A rule's <c>Because</c> is not always universal.
+///         purpose — a pack is a menu, and not calling a method is the whole opt-out mechanism. Two of
+///         its rules have nothing to govern in a codebase with no HTTP calls and no ORM; the others are
+///         declined for local twins whose <c>Because</c> names what the failure actually costs here.
 ///     </para>
 ///     <para>
-///         Two more pack rules have local twins — one for that same reason, one for a harder one.
-///         <c>mcp/no-blocking-waits</c> stands
-///         in for <c>async/no-sync-over-async</c>, whose ban list also covers <c>GetAwaiter</c> itself and
-///         whose prose is the general TAP one; the local rule names what a block actually costs here — a
-///         thread-pool thread held for a child process's whole lifetime, and a tool call's
-///         <c>CancellationToken</c> dropped, so a client cancel becomes a zombie — and sanctions
-///         <c>ServerShutdown</c>'s drain by name. Its subject is the union of the two host-shaped layers
-///         rather than the MCP namespace, because the code the server blocks in mostly is not in that
-///         namespace: the git and vswhere launchers that could wedge a <c>--diff-base</c> tool call live in
-///         the CLI's diff plumbing and in the extraction host.
-///         <c>mcp/tools-accept-cancellation</c> stands in for
-///         <c>async/accept-cancellation</c> on the same prose grounds — the stake here is a tool method
-///         holding the idle watchdog open for the life of the server, not cancellation in general — and
-///         on a second one it did not have until this spec could name an attribute by string: its subject
-///         is now every <c>[McpServerTool]</c>-attributed method, and that is not a subject a pack call
-///         can take. The pack's method is handed a type selection and applies the <c>Task</c>-returning
-///         method projection itself, so a caller has no way to narrow it to a method-level attribute the
-///         pack has never heard of. Only <c>mcp/no-blocking-waits</c>, then, could still have been a pack
-///         call with a narrow subject: what keeps that one local is the prose, and what keeps this one
-///         local is expressiveness. The remaining two are declined as vacuous:
-///         <c>http/reuse-httpclient</c> and <c>persistence/no-mapping-attributes</c> have nothing to
-///         govern in a codebase that makes no HTTP calls and has no ORM.
-///     </para>
-///     <para>
-///         The verb ledger. Every <c>Must*</c> verb this spec does not use is named here with its reason,
-///         and a self-spec test holds the list complete against the public surface, so the ledger cannot
-///         quietly rot as the vocabulary grows.
-///         <c>MustNotCatch</c> bans the broad catch outright, and that is not the law here: this spec
-///         adopted <c>MustNotCatchUnfiltered</c> instead, and the plain verb would red the house-style
-///         <c>when</c>-filtered catches that <c>exceptions/broad-catches-filtered</c> passes on purpose.
+///         The verb ledger. Every <c>Must*</c> verb this spec does not use is named here with its
+///         reason, and a self-spec test holds the list complete against the public surface, so the
+///         ledger cannot quietly rot as the vocabulary grows. <c>MustNotCatch</c> and
+///         <c>MustNotCatchUnfiltered</c> are the unrefined forms on the catch axis; the law here is
+///         <c>MustNotSwallow</c>, which passes the house catch shapes both of them would red.
 ///         <c>MustBeSealed</c>, <c>MustBeAbstract</c>, <c>MustBeStatic</c>, <c>MustBePublic</c> and
-///         <c>MustBeInternal</c> are the type-shape modals, and no layer here has a uniform shape. Two
-///         were tried against the real code: the Model layer sealed is red at its five abstract bases,
-///         and the Host layer internal is red at seven private nested helpers, because
-///         <c>MustBeInternal</c> means exactly internal and private is not it. Each would need an
-///         <c>Except</c> list longer than the rule, which is noise rather than a law.
-///         <c>MustBePrivate</c> and <c>MustBeVirtual</c> are their member-level twins; nothing here
-///         constrains a member's accessibility or virtuality.
-///         <c>MustImplement</c>, <c>MustNotImplement</c>, <c>MustDeriveFrom</c> and
-///         <c>MustNotDeriveFrom</c> are the hierarchy family, and the seams here are consumed by
-///         injection rather than by inheritance. The one true statement available — every
-///         <c>*Constraint</c> derives from <c>Constraint</c> — was tried and passes, but
-///         <c>model/constraint-nodes</c> already governs that exact set, so landing it would widen the
-///         verb range and say nothing new.
-///         <c>MustNotBeAttributedWith</c> is the unused half of the attribute family. Its positive twin
-///         left this ledger for <c>mcp/tool-types-attributed</c> — the rule the ledger used to record as
-///         wanted and unaffordable, until a string anchor let this spec name <c>[McpServerToolType]</c>
-///         without referencing the CLI that declares it. The negative has no such rule waiting: no
-///         attribute is forbidden anywhere here, and inventing a ban to exercise the verb is exactly the
-///         contrivance this ledger refuses.
-///         <c>MustHaveNameMatching</c> is the glob form of the naming family; the two naming laws here
-///         are a prefix and a suffix, which say it more exactly.
-///         <c>Must</c> is the predicate escape hatch for what the vocabulary cannot express, and nothing
-///         here needs it — reaching for it ahead of the vocabulary would be the wrong instinct.
+///         <c>MustBeInternal</c> found no layer with a uniform type shape — the two tried against the
+///         real code each went red on legitimate members and needed an <c>Except</c> list longer than
+///         the rule — and their member-level twins <c>MustBePrivate</c> and <c>MustBeVirtual</c>
+///         constrain nothing here either. <c>MustImplement</c>, <c>MustNotImplement</c>,
+///         <c>MustDeriveFrom</c> and <c>MustNotDeriveFrom</c> idle because the seams here are consumed
+///         by injection rather than inheritance, and the one true hierarchy statement is already
+///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
+///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
+///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
+///         prefix and a suffix, which say it more exactly. <c>Must</c>, the predicate escape hatch,
+///         idles because nothing here defeats the vocabulary. The unused sugar overloads and the unused
+///         <c>.Baseline(path)</c>, <c>.WhileYoureThere</c> and <c>.DragonsDoc</c> surfaces are the same
+///         story: their defaults are the intent here, and exercising an API for its own sake is not
+///         dogfood.
 ///     </para>
 ///     <para>
-///         Beyond the verbs, three more surfaces are unused on purpose. Sugar twins of forms already
-///         used — <c>arch.Type(typeof(X))</c> beside <c>arch.Type&lt;X&gt;()</c>,
-///         <c>arch.AnyOf(Type…)</c> beside the selection overload, <c>arch.Registered()</c> beside the
-///         lifetime-specific one — would exercise the API rather than this architecture.
-///         <c>.Baseline(path)</c>, <c>.WhileYoureThere</c> and <c>.DragonsDoc</c> are unused because
-///         their defaults <em>are</em> the intent here: the conventional baseline path, the default
-///         boy-scout policy, and dragons prose short enough to live inline. And <c>baseline --add</c>,
-///         the attributed-exception surface, has never been used here and structurally cannot be: an
-///         attributed exception records a real waiver with a real reason, this repository has none to
-///         record, and inventing one to exercise the verb is exactly the contrivance this ledger exists
-///         to refuse.
-///     </para>
-///     <para>
-///         Anchor doctrine: in a self-spec, an expression member anchor (e.g.
-///         <c>arch.Member&lt;Task&gt;(t =&gt; t.Wait())</c>) is real syntax — it mints a use edge attributed
-///         to this spec class. A rule whose subject sweeps the spec assembly must therefore anchor with
+///         Anchor doctrine, for anyone editing this file: in a self-spec, an expression member anchor
+///         (e.g. <c>arch.Member&lt;Task&gt;(t =&gt; t.Wait())</c>) is real syntax — it mints a use edge
+///         attributed to this spec class. A rule whose subject sweeps the spec assembly must anchor with
 ///         <c>typeof</c> + <c>nameof</c> (nameof operands mint nothing), as
-///         <c>roslyn/no-msbuildlocator-query</c> does; expression anchors are safe only under subjects that
-///         exclude the spec assembly, as <c>mcp/no-blocking-waits</c> is — its subject is the Host and
-///         Extraction layers, and this spec class is in neither.
+///         <c>roslyn/no-msbuildlocator-query</c> does; expression anchors are safe only under subjects
+///         that exclude the spec assembly, as <c>mcp/no-blocking-waits</c>'s host-and-extraction
+///         subject does.
 ///     </para>
 /// </summary>
 public sealed class LoadBearingArchSpec : IArchitectureSpec
 {
     /// <summary>
-    ///     The types whose broad catches are deliberately unfiltered, exempted from
-    ///     <c>exceptions/broad-catches-filtered</c>. Four kinds of handler, and nothing else belongs here:
-    ///     the top-level fault boundaries that turn any failure into an exit code or a rule result
-    ///     (<c>CommandEntryPoint</c>, <c>ArchChecker</c>, <c>SelectionEvaluator</c>, <c>ArchRuleTests</c>);
-    ///     the background loops and the shutdown drain (<c>IdleTimeoutWatchdog</c>,
-    ///     <c>ParentProcessWatcher</c>, <c>ServerShutdown</c>); the host bootstrap and replay probes that
-    ///     translate any failure into a degraded mode (<c>MsBuildGate</c>, <c>VsWhereLocator</c>,
-    ///     <c>ModelPipeline</c>, <c>CodebaseSource</c>, <c>LazyCaptureReplaySource</c>,
-    ///     <c>BinlogReplayer</c>); and the writers of disposable derived data, where a failed write costs a
-    ///     cache miss and nothing else (<c>AtomicFile</c>, <c>ExtractionCacheStore</c>,
-    ///     <c>BinlogCaptureStore</c>). The exemption is by type name, so it covers a type's future catches
-    ///     as well as today's — the granularity a baseline entry would have, kept in the spec where it is
-    ///     read rather than in a file that is not.
+    ///     The types whose broad catches deliberately hold any failure and continue, exempted from
+    ///     <c>exceptions/no-swallowed-broad-catches</c>. One kind of handler belongs here and nothing else:
+    ///     a boundary whose job is to absorb whatever arrives and carry on down a sanctioned degraded path.
+    ///     <list type="bullet">
+    ///         <item><c>CommandEntryPoint</c> — the process boundary: every CLI failure becomes an exit code
+    ///         and a message rather than a stack trace.</item>
+    ///         <item><c>ArchChecker</c> — the per-rule boundary: a fault evaluating one rule becomes that
+    ///         rule's errored result, so the others still report.</item>
+    ///         <item><c>ArchRuleTests</c> — the discovery boundary: a spec that fails to build becomes one
+    ///         failing test row rather than a silently empty theory.</item>
+    ///         <item><c>IdleTimeoutWatchdog</c> — a background loop: a poll fault logs and disables the
+    ///         watchdog rather than taking the server down.</item>
+    ///         <item><c>ParentProcessWatcher</c> — a probe plus a background loop: both fail toward the safe
+    ///         direction for a leak guard.</item>
+    ///         <item><c>ServerShutdown</c> — the drain: a faulting disposer must not stop the remaining
+    ///         disposers, or the process exits holding a lock.</item>
+    ///         <item><c>VsWhereLocator</c> — a quarantined probe: any vswhere failure degrades to an empty
+    ///         instance list and the <c>MSBuildLocator.RegisterDefaults()</c> fallback.</item>
+    ///     </list>
+    ///     The exemption is by type name, so it covers a type's future catches as well as today's — the
+    ///     granularity a baseline entry would have, kept in the spec where it is read.
     /// </summary>
     private static readonly HashSet<string> SanctionedBroadCatchers =
     [
         "ArchChecker",
         "ArchRuleTests",
-        "AtomicFile",
-        "BinlogCaptureStore",
-        "BinlogReplayer",
-        "CodebaseSource",
         "CommandEntryPoint",
-        "ExtractionCacheStore",
         "IdleTimeoutWatchdog",
-        "LazyCaptureReplaySource",
-        "ModelPipeline",
-        "MsBuildGate",
         "ParentProcessWatcher",
-        "SelectionEvaluator",
         "ServerShutdown",
         "VsWhereLocator"
     ];
 
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         // The five assembly-shaped layers plus three inside Core, in module-map order. Core's globs are
@@ -464,32 +274,35 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Route new failure modes through FileNotFoundException (missing solution) or " +
                  "InvalidOperationException (bad configuration).");
 
-        arch.Rule("exceptions/broad-catches-filtered")
+        arch.Rule("exceptions/no-swallowed-broad-catches")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
                 .Where(t => !SanctionedBroadCatchers.Contains(t.Name),
-                    description: "whose name is not one of the sanctioned broad handlers (the top-level " +
-                                 "fault boundaries, the background loops and the shutdown drain, the host " +
-                                 "bootstrap and replay probes, and the writers of disposable derived data)")
-                .MustNotCatchUnfiltered(typeof(Exception)))
-            .Because("An unfiltered broad catch holds the failures nobody thought about — a cancellation, " +
-                     "an out-of-memory, the bug introduced two lines up — and hands the caller a wrong " +
-                     "answer that reads like a right one. The `when` filter is where a handler writes down " +
-                     "what it is actually for, so everything else keeps travelling to code that can still " +
-                     "act on it; the house form here is `catch (Exception ex) when (ex is IOException or " +
-                     "UnauthorizedAccessException)`. The sanctioned handlers are exempt by type name rather " +
-                     "than by site, the same granularity a baseline would give, stated in the spec instead " +
-                     "of recorded in a file.")
-            .Fix("Add a `when` filter naming the exceptions this handler is for, or catch those types " +
-                 "directly. A handler that genuinely has to hold everything, like a process boundary or a " +
-                 "background loop, goes on the spec's sanctioned list instead.");
+                    description: "whose name is not one of the sanctioned broad handlers (the process, rule " +
+                                 "and test boundaries, the background loops, and the quarantined probes — " +
+                                 "the handlers that hold any failure and continue on a sanctioned degraded " +
+                                 "path)")
+                .MustNotSwallow(typeof(Exception)))
+            .Because("A broad catch that holds the failure and continues holds the ones nobody thought " +
+                     "about — a cancellation, an out-of-memory, the bug introduced two lines up — and hands " +
+                     "the caller a wrong answer that reads like a right one. Two shapes are not that, and " +
+                     "this rule passes both: a `when` filter is where a handler writes down what it is " +
+                     "actually for, so everything else keeps travelling (`catch (Exception ex) when (ex is " +
+                     "IOException or UnauthorizedAccessException)`); and a clause that ends in a `throw` — " +
+                     "cleanup-and-rethrow, or translate-and-throw — suppresses nothing at all. The " +
+                     "sanctioned handlers are exempt by type name rather than by site, the same granularity " +
+                     "a baseline would give, stated in the spec instead of recorded in a file.")
+            .Fix("Rethrow after the cleanup, translate to a type that names the failure, or add a `when` " +
+                 "filter naming the exceptions this handler is for. A handler that genuinely has to hold " +
+                 "everything and continue, like a process boundary or a background loop, goes on the spec's " +
+                 "sanctioned list instead.");
 
         arch.Rule("exceptions/no-bare-bcl-throws")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
                 .MustNotThrow(typeof(Exception), typeof(SystemException), typeof(ApplicationException)))
             .Because("A bare BCL exception type says only that something went wrong. A caller cannot filter " +
-                     "on it, so throwing one forces every handler above into the unfiltered broad catch " +
-                     "`exceptions/broad-catches-filtered` exists to prevent, and leaves a message string as " +
-                     "the only thing left to match on. Nothing here throws one today; this rule is what " +
+                     "on it, so throwing one forces every handler above into the swallowed broad catch " +
+                     "`exceptions/no-swallowed-broad-catches` exists to prevent, and leaves a message string " +
+                     "as the only thing left to match on. Nothing here throws one today; this rule is what " +
                      "stops the first one arriving quietly.")
             .Fix("Throw a type that names the failure — one of this repo's own error types, or the closest " +
                  "BCL type such as InvalidOperationException or IOException — so a handler can filter on it.");

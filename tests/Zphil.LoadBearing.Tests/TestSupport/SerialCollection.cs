@@ -25,10 +25,10 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         race entirely so that ceiling never trips.
 ///     </para>
 ///     <para>
-///         It also subsumes the former <c>WatchdogStatics</c> group:
-///         <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />'s
-///         process-global counter is read/reset by the watchdog suites and bumped by the MCP call filter the
-///         parity tests drive, so those must not interleave either. They belong to the same serial world.
+///         It covers process-global watchdog state too:
+///         <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />'s counter is read and
+///         reset by the watchdog suites and bumped by the MCP call filter the parity tests drive, so those
+///         must not interleave either. They belong to the same serial world.
 ///     </para>
 /// </remarks>
 [CollectionDefinition("Serial", DisableParallelization = true)]

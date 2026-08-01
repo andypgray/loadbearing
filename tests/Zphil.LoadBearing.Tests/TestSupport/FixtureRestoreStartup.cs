@@ -11,10 +11,10 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///     after the runner's assembly-info probe, before any test executes.
 /// </summary>
 /// <remarks>
-///     Deliberately a pipeline-startup hook rather than a <c>[ModuleInitializer]</c>: module
-///     initializers also run during the assembly-info probe, whose 60-second no-response deadline a
-///     cold fixture restore (minutes) blows past, timing out discovery so zero tests run. See
-///     <see cref="FixtureRestorer" /> for the full rationale.
+///     A pipeline-startup hook rather than a <c>[ModuleInitializer]</c>: module initializers also run
+///     during the runner's assembly-info probe, whose 60-second no-response deadline a cold fixture
+///     restore (minutes) blows past, timing out discovery so zero tests run. Pipeline startup runs only
+///     in the discover/run pass, which has no such deadline.
 /// </remarks>
 internal sealed class FixtureRestoreStartup : ITestPipelineStartup
 {

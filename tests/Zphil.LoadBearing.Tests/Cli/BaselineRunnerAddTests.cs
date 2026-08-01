@@ -12,7 +12,10 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The <c>baseline --add</c> runner path (<see cref="BaselineRunner.AddEntry" />) over an in-memory
-///     fast-tier check — no workspace, unlike the fixture e2e. Pins the member regression: a
+///     fast-tier check — no workspace, unlike the fixture e2e.
+/// </summary>
+/// <remarks>
+///     Pins the member regression: a
 ///     <see cref="ViolationKind.MemberUse" /> violation resolved by a full-name <c>--target</c> carries a
 ///     null <c>Target</c> slot, so the added-entry echo must render through the shared full-name form
 ///     (<c>Source -&gt; member display</c>, GRAMMAR §4.5) and the appended entry must key the member's
@@ -23,7 +26,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     filter-aware catch reach (GRAMMAR §4.8): an unfiltered-catch violation resolves by its (source, caught)
 ///     pair and writes the same <c>ForEdge</c> entry as any other catch verb, because the recorded unfiltered
 ///     sites are evidence, never identity — so the valve reaches the new verb with no <c>--add</c> arm of its own.
-/// </summary>
+/// </remarks>
 public sealed class BaselineRunnerAddTests : IDisposable
 {
     private const string RuleId = "time/inject-clock";

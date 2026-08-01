@@ -51,12 +51,17 @@ internal static class SpecResolver
     }
 
     /// <summary>
-    ///     The workspace-free half of resolution: a built-DLL <c>--spec</c> resolves directly,
-    ///     because that branch never touches the <see cref="Solution" />. Returns null when resolution
-    ///     needs the workspace — the convention default (no <c>--spec</c>) and a solution-member csproj.
-    ///     A DLL path that does not exist is still a loud error. This is what lets <c>explain</c> run
-    ///     with no MSBuild load at all.
+    ///     The workspace-free half of resolution: a built-DLL <c>--spec</c> resolves directly, because that
+    ///     branch never touches the <see cref="Solution" />.
     /// </summary>
+    /// <returns>
+    ///     The resolution, or <see langword="null" /> when resolution needs the workspace — the convention
+    ///     default (no <c>--spec</c>) and a solution-member csproj.
+    /// </returns>
+    /// <remarks>
+    ///     A DLL path that does not exist is still a loud error. This is what lets <c>explain</c> run with no
+    ///     MSBuild load at all.
+    /// </remarks>
     internal static SpecResolution? TryResolveWithoutSolution(string? specArgument)
     {
         if (string.IsNullOrWhiteSpace(specArgument)) return null;

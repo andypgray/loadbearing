@@ -5,8 +5,7 @@ using System.Text;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     The one child-process launcher in this repository — used by <c>--diff-base</c>'s git calls, the
-///     vswhere probe, and every test that shells a real process. It starts a process with all three
+///     The one child-process launcher in this repository. It starts a process with all three
 ///     standard streams redirected, hands it a stdin it closes immediately, captures stdout and stderr,
 ///     and bounds the whole thing: on expiry it kills the process tree rather than waiting on.
 /// </summary>

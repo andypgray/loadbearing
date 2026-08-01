@@ -10,7 +10,8 @@ namespace Zphil.LoadBearing.Checking;
 ///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
 ///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
 ///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verbs
-///     (<c>MustNotCatch</c>, <c>MustNotCatchUnfiltered</c>) walk <see cref="CodebaseModel.CatchEdges" />; the
+///     (<c>MustNotCatch</c>, <c>MustNotCatchUnfiltered</c>, <c>MustNotSwallow</c>) walk
+///     <see cref="CodebaseModel.CatchEdges" />; the
 ///     throw verbs (<c>MustOnlyThrow</c>, <c>MustNotThrow</c>) walk <see cref="CodebaseModel.ThrowEdges" />;
 ///     the exposure verb (<c>MustNotExpose</c>) walks <see cref="CodebaseModel.ExposureEdges" />; shape verbs
 ///     test each subject. Every verb first requires a non-empty subject set — an empty subject fails the rule
@@ -95,6 +96,8 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenCatch(subjects, c.Targets);
             case MustNotCatchUnfilteredConstraint c:
                 return ForbiddenUnfilteredCatch(subjects, c.Targets);
+            case MustNotSwallowConstraint c:
+                return ForbiddenSwallow(subjects, c.Targets);
             case MustNotExposeConstraint c:
                 return ForbiddenExposure(subjects, c.Targets);
             case MustOnlyThrowConstraint c:
@@ -136,7 +139,7 @@ internal sealed class ConstraintEvaluator
             case MustConstraint c:
                 return Shape(subjects, t => SelectionEvaluator.InvokePredicate(c.Predicate, t, "Must"));
             default:
-                // Fail closed (M4): the closed Constraint hierarchy makes this arm unreachable for any v1
+                // Fail closed: the closed Constraint hierarchy makes this arm unreachable for any v1
                 // verb, so an unknown subclass means a new verb shipped without a switch arm. Surface it
                 // loudly — ArchChecker.CheckRule contains the throw as a per-rule RuleError — rather than
                 // passing the rule silently (a missing arm must never read green).
@@ -161,7 +164,7 @@ internal sealed class ConstraintEvaluator
         }
 
         // Inert only when the forbidden operand set is empty AND at least one operand is a pattern
-        // selection; a bare typeof target absent from the codebase is the win condition (decision 3).
+        // selection; a bare typeof target absent from the codebase is the win condition, not a warning.
         var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
             ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
             : NoWarnings;
@@ -173,7 +176,7 @@ internal sealed class ConstraintEvaluator
     // its used member matches a banned (declaring type, name) pair — ordinal, one ban covering every
     // overload. Per-overload edges yield per-overload MemberUse violations (the §4.3 identity substrate).
     // The banned set is resolved eagerly so a closed-generic member anchor is refused (RuleError) before
-    // any edge is tested — mirroring the type-noun refusal (decision 2).
+    // any edge is tested — mirroring the type-noun refusal in SelectionEvaluator.DefinitionFullName.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenMemberUse(
         HashSet<TypeNode> subjects, IReadOnlyList<Member> members)
     {
@@ -285,6 +288,32 @@ internal sealed class ConstraintEvaluator
         foreach (CatchEdge edge in _catchEdges)
             if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught) && edge.UnfilteredSites.Count > 0)
                 violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.UnfilteredSites));
+
+        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+            : NoWarnings;
+
+        return (violations, warnings);
+    }
+
+    // The rethrow-aware catch verb (GRAMMAR §4.8, §5.3): the same walk again over the same edges, decided on the
+    // edge's recorded SWALLOWING sites — the ones that are unfiltered AND do not end in a throw. A matching edge
+    // violates iff at least one of its clauses holds the failure and continues, and the evidence is exactly those
+    // sites, so an edge whose every unfiltered clause rethrows or translates is GREEN and no printed file:line is
+    // ever a rethrowing site. Extraction records this subset as its own fact for the same polarity reason as the
+    // unfiltered subset (§4.8) — read the sites the ban forbids, never a complement. Identity is untouched: the
+    // (source, caught) type pair, so a baseline entry means the same thing under all three catch verbs, the sites
+    // stay evidence (§4.3), and narrowing which sites a violation prints never narrows what it keys. Matching
+    // stays exact definition-level FQN and the inert-target warning is the §4.1 forbidden-set family's.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenSwallow(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+    {
+        var operandSet = ResolveOperands(operands);
+        var violations = new List<Violation>();
+
+        foreach (CatchEdge edge in _catchEdges)
+            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught) && edge.SwallowingSites.Count > 0)
+                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.SwallowingSites));
 
         var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
             ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
@@ -484,7 +513,7 @@ internal sealed class ConstraintEvaluator
             case MemberMustConstraint c:
                 return MemberShape(members, m => SelectionEvaluator.InvokePredicate(c.Predicate, m, "Must"));
             default:
-                // Fail closed (M4): as with the type-subject switch, an unhandled member verb is a missing
+                // Fail closed: as with the type-subject switch, an unhandled member verb is a missing
                 // arm, not a pass — throw so it surfaces (contained per-rule by ArchChecker), never green.
                 throw new InvalidOperationException($"Unhandled member constraint '{constraint.GetType().Name}'.");
         }

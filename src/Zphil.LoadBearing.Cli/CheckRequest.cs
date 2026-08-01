@@ -14,8 +14,8 @@ namespace Zphil.LoadBearing.Cli;
 /// <param name="AllowWorkspaceDiagnostics">
 ///     Whether to check against the partial model when a project fails to load. Default (<c>false</c>):
 ///     any workspace-load failure diagnostic fails the run with exit 2, overriding the 0/1 verdict, because
-///     a rule that "passes" only because a project did not load is worse than no answer. <c>true</c> opts
-///     back into the prior behavior — the diagnostics print as warnings and the run exits 0/1. Keys strictly
+///     a rule that "passes" only because a project did not load is worse than no answer. <c>true</c> prints
+///     those diagnostics as warnings instead and lets the run exit 0/1. Keys strictly
 ///     on workspace-load failures, never on the advisory merge notes or NuGetAudit advisories (NU19xx)
 ///     that share the diagnostics stream.
 /// </param>

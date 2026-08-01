@@ -16,14 +16,14 @@ internal static class DocProse
     private static readonly Regex TicWords =
         new("deliberately|intentionally", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    /// <summary>
-    ///     Returns <paramref name="text" /> with every fenced code block removed. A fence opens on a
-    ///     line whose first non-whitespace content is a run of three or more backticks or tildes; it
-    ///     closes on the next line that, after optional leading whitespace, is a run of at least as many
-    ///     of the same fence character with nothing after it but whitespace. The opening and closing
-    ///     lines and everything between them are removed, and an unclosed fence removes everything to
-    ///     the end of the text. Input newlines are normalized to <c>"\n"</c> first.
-    /// </summary>
+    /// <summary>Returns <paramref name="text" /> with every fenced code block removed.</summary>
+    /// <remarks>
+    ///     A fence opens on a line whose first non-whitespace content is a run of three or more backticks
+    ///     or tildes; it closes on the next line that, after optional leading whitespace, is a run of at
+    ///     least as many of the same fence character with nothing after it but whitespace. The opening and
+    ///     closing lines and everything between them are removed, and an unclosed fence removes everything
+    ///     to the end of the text. Input newlines are normalized to <c>"\n"</c> first.
+    /// </remarks>
     public static string StripFences(string text)
     {
         string normalized = text.Replace("\r\n", "\n");

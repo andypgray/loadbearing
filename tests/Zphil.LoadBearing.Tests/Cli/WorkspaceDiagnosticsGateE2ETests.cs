@@ -6,9 +6,9 @@ using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
-/// <summary>
-///     The workspace-diagnostics contract on <c>check</c>. Three parts, all against the real MyApp
-///     fixture (each opens a workspace, hence <c>Serial</c>):
+/// <summary>The workspace-diagnostics contract on <c>check</c>.</summary>
+/// <remarks>
+///     Three parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>):
 ///     <list type="bullet">
 ///         <item>
 ///             <b>Fail closed.</b> A workspace-load failure means the model is incomplete, so
@@ -34,7 +34,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             load failure riding alongside it still fails closed.
 ///         </item>
 ///     </list>
-/// </summary>
+/// </remarks>
 [Collection("Serial")]
 public sealed class WorkspaceDiagnosticsGateE2ETests
 {

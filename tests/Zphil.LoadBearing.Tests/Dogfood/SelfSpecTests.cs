@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Shouldly;
 using Xunit;
@@ -12,21 +13,8 @@ using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Dogfood;
 
-/// <summary>
-///     The dogfood gates. One class so the workspace-heavy runs serialize.
-///     <see cref="SelfSpec_Check_ExitsZero" /> is the CI-equivalent self-spec gate: LoadBearing checks
-///     itself and passes, with the advisory channel beside the verdict asserted clean on the same run.
-///     <see cref="AgentsMd_IsCurrent" /> is the provably-current gate, no workspace
-///     needed: it composes the root block in-process and asserts the committed <c>AGENTS.md</c>'s single
-///     managed block equals it exactly — the product thesis in one test.
-///     <see cref="ArchitectureMd_IsCurrent" /> is the same gate over the rendered diagram, and unlike its
-///     pure-spec sibling it does need a workspace: one of that block's two fences is drawn from the
-///     codebase rather than from the spec, so the solution has to be loaded and extracted to compose it.
-///     <see cref="ArchitectureMd_CarriesBothFences" /> is its workspace-free shape half, naming the fence a
-///     composer bypass would drop.
-///     <see cref="ScopedCards_AreCurrent" /> closes the class: every per-directory card this repo commits,
-///     gated as a class rather than one file at a time.
-/// </summary>
+/// <summary>The dogfood gates: LoadBearing checked against itself, and its own generated files.</summary>
+/// <remarks>One class, so the workspace-heavy runs serialize. Each gate states its own contract below.</remarks>
 [Collection("Serial")]
 public sealed class SelfSpecTests
 {
@@ -217,6 +205,37 @@ public sealed class SelfSpecTests
         unaccounted.ShouldBeEmpty(
             "these verbs are neither used by the self-spec nor named in its ledger — use them on this " +
             "repo's real code, or add a line to the ledger saying plainly why not.");
+    }
+
+    /// <summary>
+    ///     The sanctioned-broad-catcher pin: the discipline that holds an advisory channel empty by test,
+    ///     applied to an exemption list. <c>exceptions/no-swallowed-broad-catches</c> carves seven type names
+    ///     out of its own subject, and an exemption list is exactly the kind of thing that grows by one name at
+    ///     a time until it means nothing. Pinning it to the exact seven makes every addition a deliberate act:
+    ///     the list can only grow by moving this assertion in the same commit, where a reviewer sees the name
+    ///     and the reason together.
+    /// </summary>
+    [Fact]
+    public void SanctionedBroadCatchers_AreExactlyTheSevenHoldAndContinueBoundaries()
+    {
+        FieldInfo? field = typeof(LoadBearingArchSpec).GetField(
+            "SanctionedBroadCatchers", BindingFlags.NonPublic | BindingFlags.Static);
+        field.ShouldNotBeNull("the self-spec no longer carries a SanctionedBroadCatchers set; move this pin with it.");
+
+        var sanctioned = (HashSet<string>)field.GetValue(null)!;
+        var ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal).ToList();
+
+        ordered.ShouldBe(
+            [
+                "ArchChecker",
+                "ArchRuleTests",
+                "CommandEntryPoint",
+                "IdleTimeoutWatchdog",
+                "ParentProcessWatcher",
+                "ServerShutdown",
+                "VsWhereLocator"
+            ], customMessage: "a name added here leaves the broad-catch law; add it with its reason in the set's " +
+                              "xmldoc, or rewrite the handler to filter or rethrow.");
     }
 
     /// <summary>Every <c>Must*</c> verb on Core's public surface, by name.</summary>

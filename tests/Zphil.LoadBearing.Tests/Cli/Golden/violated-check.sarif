@@ -283,6 +283,24 @@
               }
             },
             {
+              "id": "exceptions/no-swallowed-catch",
+              "shortDescription": {
+                "text": "The Web or Domain layers must not swallow `Exception`."
+              },
+              "fullDescription": {
+                "text": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling."
+              },
+              "help": {
+                "text": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
               "id": "exceptions/no-bare-bcl-throw",
               "shortDescription": {
                 "text": "The Domain layer must not throw `InvalidOperationException`."
@@ -781,6 +799,30 @@
           "baselineState": "new"
         },
         {
+          "ruleId": "exceptions/no-general-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportPublisher catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportPublisher|T:System.Exception||MyApp.Web/ReportPublisher.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
           "ruleId": "exceptions/domain-throws-domain",
           "level": "error",
           "message": {
@@ -926,6 +968,54 @@
         },
         {
           "ruleId": "exceptions/no-unfiltered-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-unfiltered-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportPublisher catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportPublisher|T:System.Exception||MyApp.Web/ReportPublisher.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-swallowed-catch",
           "level": "error",
           "message": {
             "text": "MyApp.Web.ReportEndpoint catches System.Exception"

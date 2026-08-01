@@ -9,6 +9,7 @@ namespace Zphil.LoadBearing.MyAppCleanSpec;
 /// </summary>
 public sealed class MyAppCleanSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         arch.Rule("layering/billing-independent")

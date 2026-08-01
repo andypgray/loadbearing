@@ -14,6 +14,7 @@ namespace Zphil.LoadBearing.MyAppLayerSpec;
 /// </summary>
 public sealed class MyAppLayerSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");

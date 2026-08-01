@@ -351,6 +351,41 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MustNotSwallow_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6): the third catch verb closes on its target list, with no trailing qualifier at all.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustNotSwallow(typeof(Exception)))
+            .ShouldBe("The Web layer must not swallow `Exception`.");
+    }
+
+    [Fact]
+    public void MustNotSwallow_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotSwallow(typeof(Exception)))
+            .ShouldBe("Types in the Web layer named `*Controller` must not swallow `Exception`.");
+    }
+
+    [Fact]
+    public void MustNotSwallow_MultipleTargets_JoinWithOr()
+    {
+        Constraint constraint = Arch.Types.MustNotSwallow(typeof(InvalidOperationException), typeof(TimeoutException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not swallow `InvalidOperationException` or `TimeoutException`.");
+    }
+
+    [Fact]
+    public void MustNotSwallow_CollidingTargets_QualifyWithMinimalTrailingSegments()
+    {
+        // Shares TargetList with the other catch verbs, so colliding exception names widen the same way.
+        Constraint constraint = Arch.Types.MustNotSwallow(typeof(DataException), typeof(Stubs.Sales.DataException));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not swallow `Billing.DataException` or `Sales.DataException`.");
+    }
+
+    [Fact]
     public void MustNotThrow_BareLayerSubject_SpeaksCollectively()
     {
         // Layer voice (§6): a bare layer subject speaks collectively — "The Domain layer must not throw …".

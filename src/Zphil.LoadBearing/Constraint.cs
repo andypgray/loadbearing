@@ -22,8 +22,8 @@ public abstract class Constraint
 
     /// <summary>
     ///     Selection operands beyond the subject — the target/source list of a dependency verb.
-    ///     Empty for shape/naming/escape-hatch verbs. Used by validation to walk every selection
-    ///     reachable from a rule (GRAMMAR §8 item 10, foreign selection).
+    ///     Empty for shape/naming/escape-hatch verbs. Together with the subject these reach every
+    ///     selection a rule names, which is what the foreign-selection walk needs (GRAMMAR §8 item 10).
     /// </summary>
     internal virtual IReadOnlyList<Selection> Operands => Array.Empty<Selection>();
 

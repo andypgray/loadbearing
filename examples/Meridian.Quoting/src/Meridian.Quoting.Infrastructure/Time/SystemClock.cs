@@ -8,5 +8,6 @@ namespace Meridian.Quoting.Infrastructure.Time;
 /// </summary>
 public sealed class SystemClock : IClock
 {
+    /// <inheritdoc />
     public DateTime UtcNow => DateTime.UtcNow;
 }

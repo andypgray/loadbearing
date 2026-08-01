@@ -12,6 +12,7 @@ namespace Zphil.LoadBearing.MyAppRenderSpec;
 /// </summary>
 public sealed class MyAppRenderSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         arch.Layer("Domain", "MyApp.Domain.*");

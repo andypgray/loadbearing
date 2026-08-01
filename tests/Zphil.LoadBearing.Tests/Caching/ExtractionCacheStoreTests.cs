@@ -33,11 +33,11 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion12_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion13_ReturnsMiss()
     {
-        // Arrange — a v12 cache predates member-level attribute facts (schema bumped 12→13): its members carry
-        // no Attributes, so every one would replay as unattributed and a rule narrowed to attributed members
-        // would silently empty on a hit. It must degrade cleanly instead.
+        // Arrange — a v13 cache predates the catch edge's swallowing-site subset (schema bumped 13→14): its catch
+        // edges carry no SwallowingSites, so every one would replay with a null subset and the rethrow fact would
+        // read wrong on a hit. It must degrade cleanly instead.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -45,7 +45,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 12);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 13);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

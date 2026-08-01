@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Zphil.LoadBearing.Packs.DotNet;
 
 /// <summary>
-///     Canonical .NET guidance as a rule pack: nine project-independent rules, one static method each,
+///     Canonical .NET guidance as a rule pack: project-independent rules, one static method each,
 ///     declared on the caller's <see cref="Arch" />. A pack is an ordinary class library — there is no
 ///     plugin host and no discovery, so a rule lands only where a spec calls for it, and opting out
 ///     means not making the call.
@@ -228,12 +228,12 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     Declares all nine rules at one posture, with no <c>Fix</c> overrides. A convenience for
-    ///     proving the pack's full surface in one call — no real spec wants all nine, so prefer naming
+    ///     Declares every rule in the pack at one posture, with no <c>Fix</c> overrides. A convenience for
+    ///     proving the pack's full surface in one call — no real spec wants all of them, so prefer naming
     ///     the ones you mean.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types the seven whole-surface rules govern.</param>
+    /// <param name="subject">The types the whole-surface rules govern.</param>
     /// <param name="compositionRoot">The wiring seam exempted from client construction and service resolution.</param>
     /// <param name="singletons">The singleton selection <c>di/no-captive-dependencies</c> governs.</param>
     /// <param name="topLevelHandler">The one place a catch-all belongs.</param>

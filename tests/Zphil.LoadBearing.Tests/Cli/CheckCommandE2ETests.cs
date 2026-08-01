@@ -112,16 +112,34 @@ public sealed class CheckCommandE2ETests
 
         result.Exit.ShouldBe(1);
         // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
-        // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's blanket catch spells no
-        // `when` filter, so it is red at the very site exceptions/no-general-catch reds — a second rule over one
-        // edge, each with its own identity.
+        // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's and ReportPublisher's
+        // blanket catches spell no `when` filter, so both are red at the very sites exceptions/no-general-catch
+        // reds — a second rule over the same two edges, each with its own identity.
         result.Out.ShouldContain(
             "FAIL exceptions/no-unfiltered-catch — The Web or Domain layers must not catch `Exception` without a `when` filter.");
         result.Out.ShouldContain(
             "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportPublisher.cs:22 — MyApp.Web.ReportPublisher catches System.Exception");
         // The green half, stated as an absence: RetryPolicy catches the identical type under the identical
         // subject, and its `when` filter keeps it out of the evidence entirely — no site line, no mention.
         result.Out.ShouldNotContain("RetryPolicy");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsSwallowRuleAndSparesTheRethrowingCatch()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.Exit.ShouldBe(1);
+        // The rethrow-aware catch half of the report (GRAMMAR §4.8), and the axis differentiator end to end.
+        // ReportPublisher's catch is red under BOTH rules above — same type, same lack of filter — and green
+        // here, because its clause ends in `throw;` and suppresses nothing. Its absence from this one block is
+        // therefore the whole difference between the three catch verbs, read off a single report.
+        string block = RuleBlock(result.Out, "exceptions/no-swallowed-catch");
+        block.ShouldContain("The Web or Domain layers must not swallow `Exception`.");
+        block.ShouldContain("MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        block.ShouldNotContain("ReportPublisher");
     }
 
     [Fact]
@@ -245,5 +263,20 @@ public sealed class CheckCommandE2ETests
     private static string Normalize(string value)
     {
         return value.Replace("\r\n", "\n").Trim();
+    }
+
+    // One rule's block out of the human report: its marker line plus the indented lines under it. Needed
+    // wherever an assertion is an ABSENCE — a type named by one rule and not another is invisible to a
+    // whole-report ShouldNotContain.
+    private static string RuleBlock(string report, string ruleId)
+    {
+        string[] lines = Normalize(report).Split('\n');
+        int start = Array.FindIndex(lines, line => line.Contains($" {ruleId} —", StringComparison.Ordinal));
+        start.ShouldBeGreaterThanOrEqualTo(0, $"the report names no rule {ruleId}");
+
+        int end = start + 1;
+        while (end < lines.Length && lines[end].StartsWith("  ", StringComparison.Ordinal)) end++;
+
+        return string.Join("\n", lines[start..end]);
     }
 }

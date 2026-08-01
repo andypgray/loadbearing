@@ -213,7 +213,7 @@ public sealed class FragmentMergeTests
         model.ConstructorEdge("P.B", "P.A").Sites.Count.ShouldBe(1);
     }
 
-    // ── M7 injection edges / M8 registration facts (GRAMMAR §4.7) ─────────────────────────────────────
+    // ── Injection edges / registration facts (GRAMMAR §4.7) ───────────────────────────────────────────
 
     [Fact]
     public void ExtractFromCompilations_CrossInputInjection_InjectedIsSameInstanceAsTypesNode()
@@ -261,7 +261,7 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_SameRegistrationInTwoFrameworks_UnionsToOneFactPerKey()
     {
-        // One project's two target frameworks make the identical registration; M8 unions per
+        // One project's two target frameworks make the identical registration; the merge unions per
         // (lifetime, service, implementation) key to a single fact (its one shared site deduped).
         var file = ("Reg.cs", """
                               using Microsoft.Extensions.DependencyInjection;
@@ -372,9 +372,9 @@ public sealed class FragmentMergeTests
     public void ExtractFromCompilations_SameFqnLostByThreeProjects_RecordsOneNoteNamingEveryLoser()
     {
         // The shape a spec-fixture layout produces when several sibling spec projects declare name-carrier
-        // stubs so their typeof() anchors compile: one type shadowed several times over. This repo used to
-        // be that consumer and no longer is — its fixtures reference the projects they govern — but the
-        // shape is what any real solution with stubbed anchors reports, so it stays pinned here. Grouping by
+        // stubs so their typeof() anchors compile: one type shadowed several times over. No fixture here has
+        // that layout — this repo's fixtures reference the projects they govern — but the shape is what any
+        // real solution with stubbed anchors reports, so it stays pinned here. Grouping by
         // FQN keeps it to one line naming every loser rather than a line per loser: nothing dropped, and the
         // channel stays legible enough that a reader still notices a line arriving.
         CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """

@@ -131,13 +131,13 @@
       "id": "exceptions/no-general-catch",
       "posture": "migrate",
       "status": "failed",
-      "violations": 1,
+      "violations": 2,
       "warnings": 0,
       "ratchet": {
         "baselinePath": "arch/baselines/exceptions/no-general-catch.json",
         "captured": false,
         "remaining": 0,
-        "newViolations": 1,
+        "newViolations": 2,
         "stale": 0,
         "promotable": false
       }
@@ -175,6 +175,13 @@
       "id": "exceptions/no-unfiltered-catch",
       "posture": "enforce",
       "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "exceptions/no-swallowed-catch",
+      "posture": "enforce",
+      "status": "failed",
       "violations": 1,
       "warnings": 0
     },
@@ -187,9 +194,9 @@
     }
   ],
   "summary": {
-    "rulesChecked": 17,
+    "rulesChecked": 18,
     "rulesPassed": 2,
-    "rulesFailed": 14,
+    "rulesFailed": 15,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

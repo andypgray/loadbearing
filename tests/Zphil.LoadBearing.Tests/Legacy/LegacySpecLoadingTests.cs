@@ -58,11 +58,11 @@ public sealed class LegacySpecLoadingTests
                 .Select(loaded => loaded.GetName().Name)
                 .ShouldNotContain(ProductAssemblyName);
 
-            // App-local resolution used to be pinned by product.Location's directory. The context now loads
-            // dependencies from their bytes so a warm host leaves the spec's build output replaceable
-            // (SpecLoadNoLockTests), and a stream-loaded assembly reports no location — so the two facts
-            // above carry the claim instead: the file exists only beside the spec, and the resolver is the
-            // context's one route to it.
+            // The context loads dependencies from their bytes so a warm host leaves the spec's build output
+            // replaceable (SpecLoadNoLockTests), and a stream-loaded assembly reports no location — so
+            // app-local resolution cannot be pinned through product.Location. The two facts above carry the
+            // claim instead: the file exists only beside the spec, and the resolver is the context's one
+            // route to it.
             product.Location.ShouldBeEmpty();
         }
         finally

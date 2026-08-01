@@ -327,6 +327,17 @@
               "line": 15
             }
           ]
+        },
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportPublisher",
+          "target": "System.Exception",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportPublisher.cs",
+              "line": 22
+            }
+          ]
         }
       ],
       "warnings": []
@@ -450,6 +461,39 @@
               "line": 15
             }
           ]
+        },
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportPublisher",
+          "target": "System.Exception",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportPublisher.cs",
+              "line": 22
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-swallowed-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Web or Domain layers must not swallow `Exception`.",
+      "because": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling.",
+      "fix": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle.",
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
         }
       ],
       "warnings": []
@@ -479,11 +523,11 @@
   ],
   "workspaceDiagnostics": [],
   "summary": {
-    "rulesChecked": 17,
+    "rulesChecked": 18,
     "rulesPassed": 2,
-    "rulesFailed": 14,
+    "rulesFailed": 15,
     "rulesSkipped": 1,
-    "violations": 22,
+    "violations": 25,
     "warnings": 1
   }
 }

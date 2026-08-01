@@ -46,11 +46,13 @@ internal static class BaselineStore
         return new BaselineIndex(sections);
     }
 
-    /// <summary>
-    ///     Reads and verifies a baseline file. Returns null when the file does not exist (uncaptured).
-    ///     Malformed JSON, a schema violation, or a digest mismatch throw a <see cref="UserErrorException" />
-    ///     naming the path (a mismatch carries the restore hint).
-    /// </summary>
+    /// <summary>Reads and verifies a baseline file.</summary>
+    /// <param name="absolutePath">Absolute path to the baseline file.</param>
+    /// <returns>The verified document, or <see langword="null" /> when the file does not exist (uncaptured).</returns>
+    /// <exception cref="UserErrorException">
+    ///     The file is malformed JSON, violates the schema, or fails its digest check. The message names the
+    ///     path; a digest mismatch also carries the restore hint.
+    /// </exception>
     public static BaselineDocument? TryReadDocument(string absolutePath)
     {
         if (!File.Exists(absolutePath)) return null;
@@ -102,8 +104,8 @@ internal static class BaselineStore
             return WriteOutcome.Unchanged;
 
         // A baseline is a committed, version-controlled file, so the write is atomic: a crash mid-write
-        // must not truncate it. UTF-8 no BOM — byte-identical to the prior File.WriteAllText, since
-        // UTF8Encoding(false) emits no preamble (the round-trip pins are the oracle).
+        // must not truncate it. UTF8Encoding(false) emits no preamble, which is what keeps the file BOM-less
+        // (the round-trip pins are the oracle).
         byte[] bytes = new UTF8Encoding(false).GetBytes(composed);
         AtomicFile.WriteAllBytes(absolutePath, bytes);
         return WriteOutcome.Wrote;

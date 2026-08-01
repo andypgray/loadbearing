@@ -11,12 +11,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     pinned three-line actionable <see cref="UserErrorException" /> with the original attached, and so
 ///     does a <see cref="TypeLoadException" /> from a type whose closure leaves the .NET surface; a
 ///     FileName that is a plain path or absent is not treated as an assembly-load failure.
-///     <para>
-///         The exceptions here are fabricated, which pins the message text. The runtime behaviour behind
-///         each arm — a net48 spec really failing this way in the collectible ALC — is pinned separately
-///         by the legacy fixture tests.
-///     </para>
 /// </summary>
+/// <remarks>
+///     The exceptions here are fabricated, which pins the message text. The runtime behaviour behind each
+///     arm — a net48 spec really failing this way in the collectible ALC — is pinned separately by the
+///     legacy fixture tests.
+/// </remarks>
 public sealed class SpecDependencyLoadFailureTests
 {
     [Fact]

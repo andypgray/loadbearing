@@ -26,10 +26,12 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <item>
 ///             the <b>caught</b> type a <c>catch</c> clause catches — the declared type of a typed
 ///             <c>catch (IOException e)</c>, or synthesized <c>System.Exception</c> for a bare <c>catch</c>
-///             — GRAMMAR §4.8's "a source-level <c>catch</c> clause", carrying beside it the
-///             <b>caught-has-filter</b> bit: whether that clause spells a <c>when</c> filter. Presence is
-///             purely syntactic — a <c>when (true)</c> is a filter — so the filter's contents are never
-///             judged; and
+///             — GRAMMAR §4.8's "a source-level <c>catch</c> clause", carrying beside it two syntactic bits:
+///             the <b>caught-has-filter</b> bit (whether that clause spells a <c>when</c> filter) and the
+///             <b>caught-ends-in-throw</b> bit (whether its block's last statement is a <c>throw</c>, bare or
+///             expression form). Both are purely syntactic — a <c>when (true)</c> is a filter, and
+///             <c>catch { if (…) return; throw; }</c> ends in a throw — so neither a filter's contents nor a
+///             handler's flow is ever judged; and
 ///         </item>
 ///         <item>
 ///             the <b>thrown</b> type a <c>throw</c> statement or throw expression throws — the thrown
@@ -45,8 +47,8 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     <c>base(…)</c>/<c>this(…)</c> initializers, <c>with</c> expressions, and array creation carry no
 ///     object-creation expression, so their exclusion falls out of the syntax). The caught channel is
 ///     non-<see langword="null" /> only on the <c>catch</c>-clause arm and the thrown channel only on the
-///     two throw arms; the caught-has-filter bit rides beside the caught channel and is meaningful only
-///     there, every other arm leaving it <see langword="false" />; a typed catch rides the caught channel
+///     two throw arms; both catch bits ride beside the caught channel and are meaningful only
+///     there, every other arm leaving them <see langword="false" />; a typed catch rides the caught channel
 ///     with a null type channel (its type-name syntax
 ///     mints the §4.1 reference on its own visit — no double-mint, the explicit-<c>new</c> precedent), and a
 ///     bare catch names no type at all so mints no reference edge. The type channel is exactly the tuple
@@ -66,13 +68,13 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 internal static class ReferenceWalker
 {
-    public static IEnumerable<(INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, INamedTypeSymbol? Thrown, string File, int Line)> Walk(
+    public static IEnumerable<(INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, bool CaughtEndsInThrow, INamedTypeSymbol? Thrown, string File, int Line)> Walk(
         SyntaxNode root, SemanticModel model)
     {
         foreach (SyntaxNode node in root.DescendantNodes(n => ReferenceEquals(n, root)
                                                               || n is not (BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)))
         {
-            (INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, INamedTypeSymbol? thrown) = Resolve(node, model);
+            (INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, bool caughtEndsInThrow, INamedTypeSymbol? thrown) = Resolve(node, model);
 
             // Each channel is normalized to its OriginalDefinition and gated independently, so an explicit
             // `new Foo()` (which rides on Target: null, Constructed: Foo) — and a bare `catch` (Target: null,
@@ -88,7 +90,7 @@ internal static class ReferenceWalker
             ISymbol? memberUse = targetDefinition is not null ? member : null;
 
             int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            yield return (targetDefinition, memberUse, constructedDefinition, caughtDefinition, caughtHasFilter, thrownDefinition, node.SyntaxTree.FilePath, line);
+            yield return (targetDefinition, memberUse, constructedDefinition, caughtDefinition, caughtHasFilter, caughtEndsInThrow, thrownDefinition, node.SyntaxTree.FilePath, line);
         }
     }
 
@@ -110,17 +112,17 @@ internal static class ReferenceWalker
 
     /// <summary>
     ///     Resolves a syntax node to (the type it binds a name to, the §4.5 member it uses, the type it
-    ///     constructs, the §4.8 type it catches, whether that catch spells a <c>when</c> filter, the §4.8 type
-    ///     it throws). The type is <see langword="null" />
+    ///     constructs, the §4.8 type it catches, whether that catch spells a <c>when</c> filter, whether its
+    ///     block ends in a <c>throw</c>, the §4.8 type it throws). The type is <see langword="null" />
     ///     when the node is not a reference at all (namespaces, type parameters, locals/params, discards,
     ///     dynamic, arrays/pointers, predefined-type keywords, and unresolved names all fall through). The
     ///     member is <see langword="null" /> whenever the node is not a member use (a constructor is never a
     ///     use). The constructed channel is non-null only on the two object-creation arms, and null there too
     ///     for a delegate creation. The caught channel is non-null only on the <c>catch</c>-clause arm; the
-    ///     thrown channel only on the two throw arms (a bare rethrow leaves it null). The filter bit is
+    ///     thrown channel only on the two throw arms (a bare rethrow leaves it null). Both catch bits are
     ///     <see langword="false" /> on every arm but the <c>catch</c>-clause one.
     /// </summary>
-    private static (INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, INamedTypeSymbol? Thrown) Resolve(
+    private static (INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, bool CaughtEndsInThrow, INamedTypeSymbol? Thrown) Resolve(
         SyntaxNode node, SemanticModel model)
     {
         switch (node)
@@ -131,44 +133,57 @@ internal static class ReferenceWalker
             case SimpleNameSyntax name when name is not IdentifierNameSyntax { IsVar: true }:
                 SymbolInfo info = model.GetSymbolInfo(name);
                 ISymbol? symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
-                return (ContainingTypeOf(symbol), MemberUseOf(symbol, name), null, null, false, null);
+                return (ContainingTypeOf(symbol), MemberUseOf(symbol, name), null, null, false, false, null);
 
             // Explicit `new Foo()`: the inner `Foo` name syntax already mints the type edge on its own visit,
             // so this node contributes the construct channel ONLY — re-minting the type edge here would
             // double-count the §4.1 reference.
             case ObjectCreationExpressionSyntax creation:
-                return (null, null, ConstructedChannelOf(CreatedTypeOf(creation, model)), null, false, null);
+                return (null, null, ConstructedChannelOf(CreatedTypeOf(creation, model)), null, false, false, null);
 
             // Target-typed `new()`: no inner type-name syntax exists, so this node is the sole source of BOTH
             // the type edge to the created type AND the construct edge (the type edge rides even for a
             // delegate `new()`, only the construct channel is delegate-gated).
             case ImplicitObjectCreationExpressionSyntax creation:
                 INamedTypeSymbol? created = CreatedTypeOf(creation, model);
-                return (created, null, ConstructedChannelOf(created), null, false, null);
+                return (created, null, ConstructedChannelOf(created), null, false, false, null);
 
             // A `catch` clause (§4.8): the ONE arm for catches — it reads `.Declaration` for the typed form
             // and synthesizes System.Exception for a bare `catch`, so there is no separate CatchDeclaration
             // arm (a typed catch's type-name syntax is a SimpleName visited on its own, minting the reference
             // edge; this arm carries the caught channel ONLY — no double-mint). A `when` filter is an ordinary
             // sub-expression walked on its own visits, so it never suppresses this edge. Beside the caught type
-            // this arm now also records WHETHER the clause spells a filter — a separate bit, syntactic only,
-            // that leaves the caught channel and every edge-minting rule exactly as they were.
+            // this arm also records WHETHER the clause spells a filter and WHETHER its block's last statement is
+            // a throw — two separate bits, syntactic only, that leave the caught channel and every edge-minting
+            // rule exactly as they were.
             case CatchClauseSyntax catchClause:
-                return (null, null, null, CaughtTypeOf(catchClause, model), catchClause.Filter is not null, null);
+                return (null, null, null, CaughtTypeOf(catchClause, model), catchClause.Filter is not null, EndsInThrow(catchClause), null);
 
             // A `throw` statement with a non-null expression (§4.8): a bare rethrow `throw;` has a null
             // expression, so it never matches this arm and falls through — it throws nothing.
             case ThrowStatementSyntax { Expression: { } thrownExpression }:
-                return (null, null, null, null, false, ThrownTypeOf(thrownExpression, model));
+                return (null, null, null, null, false, false, ThrownTypeOf(thrownExpression, model));
 
             // A throw expression (§4.8): `?? throw …`, a conditional/switch-expression arm, and the
             // expression-bodied `=> throw new X()` — its operand is always present.
             case ThrowExpressionSyntax throwExpression:
-                return (null, null, null, null, false, ThrownTypeOf(throwExpression.Expression, model));
+                return (null, null, null, null, false, false, ThrownTypeOf(throwExpression.Expression, model));
 
             default:
-                return (null, null, null, null, false, null);
+                return (null, null, null, null, false, false, null);
         }
+    }
+
+    /// <summary>
+    ///     Whether a <c>catch</c> clause's block ends in a <c>throw</c> statement (GRAMMAR §4.8) — the bare
+    ///     rethrow <c>throw;</c> and the expression form <c>throw new X(…)</c> alike, both being a
+    ///     <see cref="ThrowStatementSyntax" />. Purely syntactic and purely terminal: it reads the block's
+    ///     <em>last statement</em> and never analyses whether every path reaches it, so
+    ///     <c>catch { if (…) return; throw; }</c> ends in a throw. An empty block does not.
+    /// </summary>
+    private static bool EndsInThrow(CatchClauseSyntax catchClause)
+    {
+        return catchClause.Block.Statements.LastOrDefault() is ThrowStatementSyntax;
     }
 
     /// <summary>

@@ -4,6 +4,10 @@ using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
+/// <summary>
+///     Covers <see cref="VsWhereLocator" />'s parsing of <c>vswhere</c> JSON and its choice among the
+///     instances it finds, over captured output rather than a live probe.
+/// </summary>
 public sealed class VsWhereLocatorTests
 {
     [Fact]

@@ -6,42 +6,16 @@ using MyApp.Web;
 namespace Zphil.LoadBearing.MyAppViolatedSpec;
 
 /// <summary>
-///     A spec for the MyApp fixture whose one run exercises the whole report/JSON schema: a failing
-///     Enforce rule (the acceptance rule — Domain must not reference Web, which OrderService breaks),
-///     a passing rule, a ratcheted Migrate rule (its conventional baseline grandfathers InvoiceController's
-///     DataTable but not HomeController's — so it fails red on the new site), a member-use Migrate rule
-///     (uncaptured — both of HomeController's ambient-clock reads, <c>DateTime.Now</c> and
-///     <c>DateTime.UtcNow</c>, are red), a member-subject Migrate rule (uncaptured — both of
-///     HomeController's unsuffixed Task-returning methods, <c>Save</c> and <c>Load</c>, are red, exercising
-///     the <c>memberShape</c> kind and the <c>subjectMember</c> field), a ratcheted Migrate construction rule
-///     (uncaptured — the DI flagship, InvoiceService news up a handler instead of resolving it through
-///     HandlerRegistry, exercising the <c>construction</c> kind), a ratcheted Migrate injection rule
-///     (uncaptured — the captive-dependency flagship, the singleton ReportScheduler injects a scoped
-///     <c>IOrderFeed</c> and a transient <c>IOrderFormatter</c>, exercising the <c>injection</c> kind), an
-///     inert-target warning rule, a
-///     failing empty-subject rule, a quarantined billing scope whose containment is uncaptured (an explicit,
-///     deliberately-uncommitted
-///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>, a ratcheted Migrate
-///     catch rule (uncaptured — ReportEndpoint's blanket <c>catch (Exception)</c> is red, exercising the
-///     <c>catch</c> kind), a strict Enforce throw rule (the Domain layer must throw only its own
-///     <c>OrderRuleViolation</c>, so OrderApproval's BCL throw is red, exercising the <c>throw</c> kind), and
-///     an Enforce member-subject parameter rule (the Web layer's Task-returning methods must accept a
-///     <c>CancellationToken</c>, so all three of HomeController's tokenless ones — <c>Save</c>, <c>Load</c>,
-///     and <c>SaveAsync</c> — are red, reusing the <c>memberShape</c> kind and <c>subjectMember</c> field;
-///     <c>SaveAsync</c> is green under <c>naming/async-suffix</c> but red here), and a ratcheted Migrate
-///     exposure rule (uncaptured — both HomeController's and InvoiceController's public methods that return a
-///     <c>System.Data.DataTable</c> surface it on their public signature, exercising the <c>expose</c> kind
-///     (GRAMMAR §4.9); InvoiceController is grandfathered for its DataTable reference edge under
-///     <c>data-access/no-inline-sql</c> but red here, because the exposure edge is a different baseline
-///     identity — per-family identity, not per-type), an Enforce filter-aware catch rule over the union of
-///     both layers (ReportEndpoint's unfiltered blanket catch is red, while RetryPolicy's <c>when</c>-filtered
-///     catch of the identical type is green — the same catch edge <c>exceptions/no-general-catch</c> reds,
-///     judged instead on the sites extraction recorded as unfiltered), and an Enforce throw-ban rule (the ban
-///     polarity beside the allow-list above — OrderApproval's BCL throw is red under a second rule ID, and the
-///     deliberately unbanned <c>OrderRuleViolation</c> stays green under both).
+///     A spec for the MyApp fixture whose single run exercises the whole report and JSON schema.
 /// </summary>
+/// <remarks>
+///     Every violation kind, posture and baseline state the renderers can emit is carried by one rule
+///     below, so a newly added kind needs a rule here or no end-to-end run covers it. Each rule states at
+///     its own declaration what it proves and whether it reds.
+/// </remarks>
 public sealed class MyAppViolatedSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer domain = arch.Layer("Domain", "MyApp.Domain.*");
@@ -138,10 +112,11 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Because("Replacement scheduled; not worth stabilizing.");
 
         // Migrate (ratcheted, catch): omits .Baseline, so the conventional path arch/baselines/exceptions/
-        // no-general-catch.json is uncommitted, leaving the rule uncaptured — ReportEndpoint's blanket
-        // `catch (Exception)` is a hard-red catch violation with the --init hint, exercising the catch kind
-        // and the report/JSON schema's `catches` line (GRAMMAR §4.8). MustNotCatch(typeof(Exception)) flags
-        // only the broad catch, never a narrower one.
+        // no-general-catch.json is uncommitted, leaving the rule uncaptured — ReportEndpoint's and
+        // ReportPublisher's blanket `catch (Exception)`es are hard-red catch violations with the --init hint,
+        // exercising the catch kind and the report/JSON schema's `catches` line (GRAMMAR §4.8).
+        // MustNotCatch(typeof(Exception)) flags only the broad catch, never a narrower one, and judges nothing
+        // about the filter or the rethrow — which is why both handlers red here and only one does two rules down.
         arch.Rule("exceptions/no-general-catch")
             .Migrate(
                 "Some handlers wrap their work in a blanket catch and swallow every exception.",
@@ -183,15 +158,26 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Fix("Return a DTO instead of exposing System.Data.DataTable.");
 
         // Enforce (filter-aware catch ban): a union subject, so the sentence speaks in union voice — "The Web
-        // or Domain layers must not …". ReportEndpoint's blanket `catch (System.Exception)` spells no `when`
-        // filter, so it is hard red at the SAME catch edge exceptions/no-general-catch reds, under a different
-        // rule ID asking a different question. RetryPolicy catches the identical type in the Domain layer
-        // behind a `when` filter: the edge is minted either way (a filter never suppresses it, GRAMMAR §4.8),
-        // but only the unfiltered sites are evidence here, so RetryPolicy's is green and never listed.
+        // or Domain layers must not …". ReportEndpoint's and ReportPublisher's blanket `catch (System.Exception)`
+        // spell no `when` filter, so both are hard red at the SAME catch edges exceptions/no-general-catch reds,
+        // under a different rule ID asking a different question. RetryPolicy catches the identical type in the
+        // Domain layer behind a `when` filter: the edge is minted either way (a filter never suppresses it,
+        // GRAMMAR §4.8), but only the unfiltered sites are evidence here, so RetryPolicy's is green and never
+        // listed.
         arch.Rule("exceptions/no-unfiltered-catch")
             .Enforce(arch.AnyOf(web, domain).MustNotCatchUnfiltered(typeof(Exception)))
             .Because("An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.")
             .Fix("Add a `when` filter naming the exceptions you can handle, or catch those types directly.");
+
+        // Enforce (rethrow-aware catch ban): the same union subject and the same banned type as the rule above,
+        // asking the third question on the axis. ReportEndpoint's blanket catch returns -1 and is red here too;
+        // ReportPublisher's identical unfiltered `catch (System.Exception)` ends in `throw;` and is GREEN, though
+        // the rule above reds it — the differentiator, visible end-to-end in one report. RetryPolicy's filtered
+        // catch stays green under both.
+        arch.Rule("exceptions/no-swallowed-catch")
+            .Enforce(arch.AnyOf(web, domain).MustNotSwallow(typeof(Exception)))
+            .Because("A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling.")
+            .Fix("Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle.");
 
         // Enforce (throw ban): the ban polarity beside the strict allow-list above. OrderApproval's BCL throw
         // is red at the SAME throw edge exceptions/domain-throws-domain reds — two rules, two identities, one

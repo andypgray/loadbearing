@@ -90,8 +90,8 @@ public class LayerContextResolverTests
             ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
 
         // A union has no single home directory even when a Layer is one of its operands, so it anchors no
-        // scoped card and the rule renders into the root block only (GRAMMAR §6). Previously a throw —
-        // IsAnchoredOn read the subject's noun, which a union has none of.
+        // scoped card and the rule renders into the root block only (GRAMMAR §6). A union also carries no
+        // noun, so anchoring must never be decided by reading one.
         LayerContextResolver.Resolve(ArchModelBuilder.Build(new UnionSubjectSpec()), codebase).ShouldBeEmpty();
         LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(new UnionSubjectSpec())).ShouldBeFalse();
     }

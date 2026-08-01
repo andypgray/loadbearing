@@ -12,14 +12,15 @@ namespace Zphil.LoadBearing.LegacyBrokenSpec
     ///     <c>typeof()</c> throws <see cref="System.TypeLoadException" /> in the net10 host however this
     ///     project is built. That is the one failure no build setting can fix, which is why it is the
     ///     fixture rather than a missing package.
-    ///     <para>
-    ///         The sibling <see cref="AuditedBillingGateway" /> carries the assembly's <em>other</em> failure
-    ///         mode. Together they mean this single fixture drives two different catch arms depending on
-    ///         whether the product DLL is staged beside it.
-    ///     </para>
     /// </summary>
+    /// <remarks>
+    ///     The sibling <see cref="AuditedBillingGateway" /> carries the assembly's <em>other</em> failure
+    ///     mode. Together they mean this single fixture drives two different catch arms depending on
+    ///     whether the product DLL is staged beside it.
+    /// </remarks>
     public sealed class LegacyBrokenSpec : IArchitectureSpec
     {
+        /// <inheritdoc />
         public void Define(Arch arch)
         {
             arch.Rule("legacy/handlers-not-constructed")
@@ -34,11 +35,11 @@ namespace Zphil.LoadBearing.LegacyBrokenSpec
     ///     every declared type's base and interfaces, so with the product DLL withheld this one fails to
     ///     load and discovery raises <see cref="System.Reflection.ReflectionTypeLoadException" /> before
     ///     <c>Define()</c> ever runs.
-    ///     <para>
-    ///         The spec above deliberately keeps its own foreign reference inside a method body, where
-    ///         <c>GetTypes()</c> does not look — that is what lets the same assembly fail two different ways.
-    ///     </para>
     /// </summary>
+    /// <remarks>
+    ///     The spec above keeps its own foreign reference inside a method body, where <c>GetTypes()</c> does
+    ///     not look — that is what lets the same assembly fail two different ways.
+    /// </remarks>
     public class AuditedBillingGateway : BillingGateway
     {
     }

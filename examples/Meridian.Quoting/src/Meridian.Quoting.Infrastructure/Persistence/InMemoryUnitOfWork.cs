@@ -9,6 +9,7 @@ namespace Meridian.Quoting.Infrastructure.Persistence;
 /// </summary>
 public sealed class InMemoryUnitOfWork(InMemoryDatabase database) : IUnitOfWork
 {
+    /// <inheritdoc />
     public async Task ExecuteAsync(Func<Task> work)
     {
         InMemoryDatabase.Snapshot snapshot = database.Capture();

@@ -58,11 +58,8 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
         Rows.Enqueue($"{testClass}\t{methodUnderTest.Name}\t{loads}\t{elapsed}");
     }
 
-    /// <summary>
-    ///     Writes the collected rows, newest last, with a total line. Called once from
-    ///     <see cref="FixtureRestoreStartup" />'s pipeline shutdown; a write failure is swallowed, since a
-    ///     diagnostic must never fail a run.
-    /// </summary>
+    /// <summary>Writes the collected rows, newest last, with a total line.</summary>
+    /// <remarks>A write failure is swallowed, since a diagnostic must never fail a run.</remarks>
     internal static void Flush()
     {
         string? path = Environment.GetEnvironmentVariable(ProbeFileVariable);

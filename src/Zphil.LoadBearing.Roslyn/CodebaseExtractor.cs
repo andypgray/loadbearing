@@ -29,9 +29,8 @@ public static class CodebaseExtractor
     /// </summary>
     /// <param name="solution">The loaded solution.</param>
     /// <param name="excludeProjects">
-    ///     Project names to exclude from the checked universe — used by the CLI to drop the spec
-    ///     project when it is itself a member of the target solution. Null (the default) excludes
-    ///     nothing, so existing callers are unaffected.
+    ///     Project names to drop from the checked universe — the way a spec project that is itself a
+    ///     member of the target solution stays out of its own check. Null excludes nothing.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>

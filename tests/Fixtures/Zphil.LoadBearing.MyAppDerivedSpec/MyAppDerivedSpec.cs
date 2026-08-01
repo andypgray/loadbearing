@@ -16,6 +16,7 @@ namespace Zphil.LoadBearing.MyAppDerivedSpec;
 /// </summary>
 public sealed class MyAppDerivedSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer domain = arch.Layer("Domain", "MyApp.Domain.*");

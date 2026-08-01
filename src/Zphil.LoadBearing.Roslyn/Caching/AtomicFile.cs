@@ -80,9 +80,9 @@ internal static class AtomicFile
     }
 
     // Streams the bytes to disk and fsyncs them before returning, so the caller's subsequent File.Move promotes
-    // content already persisted — not merely handed to the OS cache, which a power loss could still drop after
-    // the atomic-but-not-durable File.WriteAllBytes this replaces. The using declaration closes the stream at
-    // method exit, before the caller renames — the file must be closed for File.Move to succeed on Windows.
+    // content already persisted — not merely handed to the OS cache, which a power loss could still drop. That
+    // is why this is not a plain File.WriteAllBytes: that call is atomic but not durable. The using declaration
+    // closes the stream at method exit, before the caller renames — File.Move needs the file closed on Windows.
     private static void WriteDurably(string path, byte[] bytes)
     {
         using FileStream stream = new(path, FileMode.Create, FileAccess.Write, FileShare.None);

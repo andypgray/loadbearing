@@ -13,7 +13,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The throw-ban verb <c>MustNotThrow</c> over the fast path (GRAMMAR §4.8, §4.3, §5.3): the ban polarity
 ///     beside the strict allow-list <c>MustOnlyThrow</c>, for the case where the forbidden thrown types are
-///     enumerable and the permitted ones are not. A throw edge trips only where a subject throws a forbidden
+///     enumerable and the permitted ones are not.
+/// </summary>
+/// <remarks>
+///     A throw edge trips only where a subject throws a forbidden
 ///     type, matched by exact definition-level FQN (banning <c>typeof(Exception)</c> never flags a derived
 ///     <c>throw new InvalidOperationException()</c> — the narrow throw is the good state); a hierarchy-adjective
 ///     operand matches solution-declared exception types but never an external one; the type-pair ratchet with a
@@ -22,7 +25,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     human line + JSON kind. The verb reuses <see cref="ViolationKind.Throw" /> — the kind names the fact
 ///     family, not the verb — so identity is the (source, thrown) type pair riding
 ///     <see cref="BaselineEntry.ForEdge" /> unchanged.
-/// </summary>
+/// </remarks>
 public sealed class MustNotThrowVerbTests
 {
     // Service throws a permitted Errors.DomainError and a banned Errors.InfraError; CleanService throws only an

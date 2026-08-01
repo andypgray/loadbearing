@@ -125,12 +125,14 @@ public sealed class OracleArchitecture
     ///     (Mono.Cecil) analog of LoadBearing's member-subject rule
     ///     <c>web.Methods.Returning(typeof(Task), typeof(Task&lt;&gt;)).MustHaveSuffix("Async")</c> (GRAMMAR
     ///     §4.6), reduced to DECLARING-TYPE granularity (the bridge, exactly as row 8's caller-type reduction).
+    /// </summary>
+    /// <remarks>
     ///     ArchUnitNET 0.13.3 has method members with a <see cref="MethodMember.ReturnType" /> but no
     ///     return-type-at-definition fluent predicate, so its dependency model is queried directly.
     ///     Return-type matching is by definition-name prefix, so a <c>Task&lt;int&gt;</c> construction counts —
     ///     the bridge for LoadBearing's definition-level open-generic match. <c>MethodMember.Name</c> is
     ///     parens-inclusive in 0.13.3 ("Save()"), so the suffix test strips the signature first.
-    /// </summary>
+    /// </remarks>
     public IReadOnlySet<string> TypesDeclaringUnsuffixedTaskReturningMethods()
     {
         return MyAppTypes

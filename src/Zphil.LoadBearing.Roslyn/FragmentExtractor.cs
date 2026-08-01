@@ -9,53 +9,32 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     Extracts one <see cref="CompilationInput" /> into a self-contained <see cref="CodebaseFragment" />
-///     by running the model's passes over a <em>single</em> compilation:
-///     <list type="number">
-///         <item>Declare — record a <see cref="FragmentType" /> per solution-declared type in this input.</item>
-///         <item>
-///             Hierarchy — fill each declared type's base type, interfaces, and attributes <em>by FQN</em>,
-///             recording every referenced-but-not-declared FQN in <see cref="CodebaseFragment.Externals" />
-///             with the facts from this compilation's metadata view.
-///         </item>
-///         <item>
-///             Edges — walk each declaring part's source for source-name-derived reference edges, deduped by (file,
-///             line), self-edges dropped. The same walk yields the member-use edges (GRAMMAR §4.5) beside the type
-///             edges — one per (source, member DocumentationCommentId), sites deduped, same-type uses dropped — the
-///             construction edges (§4.5) — one per (source, constructed FQN) at every object-creation
-///             expression, sites deduped, self-construction dropped — and the catch and throw edges (§4.8) — one
-///             per (source, caught FQN) at every <c>catch</c> clause and one per (source, thrown FQN) at every
-///             <c>throw</c> statement/expression, sites deduped, self-catch/self-throw dropped. Every channel
-///             rides independently of the type channel.
-///         </item>
-///         <item>
-///             Injection edges (GRAMMAR §4.7) — a declaration-side pass over each declared type's
-///             <see cref="INamedTypeSymbol.InstanceConstructors" /> (primary constructors included; implicitly
-///             declared ones — the record copy constructor, the parameterless default — filtered out), minting
-///             one <see cref="FragmentInjectionEdge" /> per (source, injected FQN) at every constructor
-///             parameter, with the parameter type decomposed definition-level like a type edge, self-injection
-///             dropped, sites deduped.
-///         </item>
-///         <item>
-///             Exposure edges (GRAMMAR §4.9) — a declaration-side pass over each declared type's members,
-///             minting one <see cref="FragmentExposureEdge" /> per (source, exposed FQN) at every public
-///             signature position (a method's return and parameter types, a property/field/event type) of an
-///             effectively-public member — a public member whose containing-type chain is public at every level
-///             — with each signature type decomposed definition-level like a type edge, self-exposure dropped,
-///             sites deduped.
-///         </item>
-///         <item>
-///             Registration facts (GRAMMAR §4.7) — a whole-compilation walk over every syntax tree, minting
-///             one <see cref="FragmentServiceRegistration" /> per (lifetime, service FQN, implementation FQN)
-///             recognized call, sites deduped. Registration is a string-side fact needing no per-type
-///             attribution (its most common composition root is a top-level-statements <c>Program</c>), so one
-///             pass over every tree is the natural formulation. See <see cref="RegistrationRecognizer" />.
-///         </item>
-///     </list>
-///     This is the per-input half of the split builder: <see cref="FragmentMerger" /> unifies a set of
-///     fragments by FQN to reproduce the global cross-input semantics. Because a fragment sees only its own
-///     compilation, a type another project declares still lands in <see cref="CodebaseFragment.Externals" />
-///     here; the merge — not this pass — decides unification (declared-beats-external).
+///     by running the model's passes over a <em>single</em> compilation: declare the types, fill their
+///     hierarchy, then mint each edge family. Each <c>Walk*</c> method below states what its own family
+///     keys on.
 /// </summary>
+/// <remarks>
+///     <para>
+///         One rule holds across every edge family, so no pass restates it: sites dedupe by (file, line),
+///         the self-edge is dropped, and each endpoint type decomposes to its definition-level FQN the way
+///         a type edge does (GRAMMAR §4.1). What the passes actually divide on is <em>where they read</em>.
+///         The source-name walk reads each declaring part's syntax and yields the type, member-use,
+///         construction, catch and throw edges together (§4.5, §4.8), every channel riding independently of
+///         the type channel. Injection (§4.7) and exposure (§4.9) are declaration-side passes over
+///         constructors and public signature positions, needing no syntax walk at all. Registration facts
+///         (§4.7) take a whole-compilation walk over every syntax tree, because a registration is a
+///         string-side fact needing no per-type attribution — its most common composition root is a
+///         top-level-statements <c>Program</c>, which declares no type to attribute it to.
+///     </para>
+///     <para>
+///         Hierarchy fills <em>by FQN</em>, recording every referenced-but-not-declared FQN in
+///         <see cref="CodebaseFragment.Externals" /> with the facts from this compilation's metadata view.
+///         That is what makes a fragment self-contained, and it is why a type another project declares
+///         still lands in <c>Externals</c> here: this is the per-input half of the split builder, and the
+///         merge — not this pass — decides unification (declared-beats-external). See
+///         <see cref="FragmentMerger" />.
+///     </para>
+/// </remarks>
 internal static class FragmentExtractor
 {
     private const string GeneratedCodeAttributeFullName = "System.CodeDom.Compiler.GeneratedCodeAttribute";
@@ -432,6 +411,12 @@ internal static class FragmentExtractor
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
 
+        // The swallowing subset of _catchEdgeUnfilteredSites, keyed identically (GRAMMAR §4.8): unfiltered AND
+        // not ending in a throw. Recorded as its own parallel fact for the same polarity reason as the
+        // unfiltered subset — a ban must read the sites it forbids directly, never a complement, because sites
+        // dedupe by (file, line) and a complement would hide the swallowing clause of a same-line collision.
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSwallowingSites = new();
+
         // The unfiltered subset of _catchEdgeSites, keyed identically (GRAMMAR §4.8). Recorded as its own
         // parallel fact rather than derived by complement: sites dedupe by (file, line), so a filtered and an
         // unfiltered catch of one type on one physical line collapse to a single site, and a complement would
@@ -549,7 +534,7 @@ internal static class FragmentExtractor
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = compilation.GetSemanticModel(root.SyntaxTree);
-                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, INamedTypeSymbol? thrown, string file, int line)
+                foreach ((INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, bool caughtEndsInThrow, INamedTypeSymbol? thrown, string file, int line)
                          in ReferenceWalker.Walk(root, model))
                 {
                     var site = new FragmentSite(file, line);
@@ -587,7 +572,9 @@ internal static class FragmentExtractor
                     // Rides independently — a typed catch arrives here with target=null (its type-name syntax minted
                     // the reference edge on its own visit) and a bare catch names no type at all. The same site also
                     // joins the edge's unfiltered subset when the clause spells no `when` filter, so the subset holds
-                    // by construction; a bare `catch` is unfiltered, a bare `catch when (…)` is not.
+                    // by construction; a bare `catch` is unfiltered, a bare `catch when (…)` is not. It joins the
+                    // swallowing subset in turn when it is unfiltered AND its block does not end in a throw, so the
+                    // subset-of-a-subset holds by construction too.
                     if (caught is not null)
                     {
                         string caughtFqn = FullNameOf(caught);
@@ -596,6 +583,7 @@ internal static class FragmentExtractor
                             ResolveName(caught);
                             CatchEdgeSites((srcFqn, caughtFqn)).Add(site);
                             if (!caughtHasFilter) CatchEdgeUnfilteredSites((srcFqn, caughtFqn)).Add(site);
+                            if (!caughtHasFilter && !caughtEndsInThrow) CatchEdgeSwallowingSites((srcFqn, caughtFqn)).Add(site);
                         }
                     }
 
@@ -777,14 +765,16 @@ internal static class FragmentExtractor
                 .Select(kv => new FragmentInjectionEdge(kv.Key.Src, kv.Key.Injected, kv.Value.ToList()))
                 .ToList();
 
-            // An edge whose every site is filtered has no entry in the parallel table, which materializes as the
-            // empty list — the honest reading, since nothing about that edge is unfiltered.
+            // An edge whose every site is filtered has no entry in either parallel table, which materializes as
+            // the empty list — the honest reading, since nothing about that edge is unfiltered. An edge whose
+            // every unfiltered site ends in a throw materializes the third list empty for the same reason.
             var catchEdges = _catchEdgeSites
                 .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
                 .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
                 .Select(kv => new FragmentCatchEdge(
                     kv.Key.Src, kv.Key.Caught, kv.Value.ToList(),
-                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? unfiltered.ToList() : []))
+                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? unfiltered.ToList() : [],
+                    _catchEdgeSwallowingSites.TryGetValue(kv.Key, out var swallowing) ? swallowing.ToList() : []))
                 .ToList();
 
             var throwEdges = _throwEdgeSites
@@ -850,6 +840,17 @@ internal static class FragmentExtractor
             {
                 sites = new SortedSet<FragmentSite>();
                 _catchEdgeUnfilteredSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeSwallowingSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeSwallowingSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeSwallowingSites[key] = sites;
             }
 
             return sites;

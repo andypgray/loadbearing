@@ -5,23 +5,13 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
 ///     Renders every fact of a <see cref="CodebaseModel" /> to a single deterministic string, for
-///     string-equality pins. It is deliberately <em>total</em> — projects, every scalar type fact,
-///     declaration sites, file paths, hierarchy (base type, interfaces, attributes), the three generic
-///     construction lists, every reference edge with its sites, every member-use edge with its member facts
-///     and sites, every construction edge with its sites (§4.5), every injection edge with its sites (§4.7),
-///     every catch edge with its sites and its unfiltered subset and every throw edge with its sites (§4.8),
-///     every exposure edge with its sites (§4.9), every registration fact (§4.7), and every
-///     declared member's scalar facts, parameters, declared attributes, and declaration sites (GRAMMAR §4.6) —
-///     so that if a fact is not rendered
-///     here it is not pinned. The model is already fully ordered (types by FullName, edges by source/target,
-///     member edges by source/member SymbolId, construction edges by source/constructed, injection edges by
-///     source/injected, catch edges by source/caught, throw edges by source/thrown, exposure edges by
-///     source/exposed, registrations by
-///     lifetime/service/implementation, each type's members by SymbolId, projects by
-///     name), so a straight walk is stable. Used by the fragment JSON round-trip test to assert that
-///     serialize→deserialize→merge equals a direct merge — so the member inventory round-trips (and, via
-///     the replay-fidelity test, replays) guarded by construction.
+///     string-equality pins.
 /// </summary>
+/// <remarks>
+///     The dump is total by contract: a fact this file does not render is pinned by no dump comparison,
+///     so a new model fact must gain a line here or it ships unguarded. The model arrives fully ordered,
+///     so a straight walk is stable without sorting.
+/// </remarks>
 internal static class ModelDump
 {
     public static string Render(CodebaseModel model)
@@ -57,13 +47,15 @@ internal static class ModelDump
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Injected.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
 
-        // The catch line renders both site lists: the totality contract means the unfiltered subset (§4.8) must
-        // show up here or it is not pinned by any dump comparison. An all-filtered edge renders `unfiltered=[]`.
+        // The catch line renders all three site lists: the totality contract means the unfiltered subset and the
+        // swallowing subset within it (§4.8) must show up here or neither is pinned by any dump comparison. An
+        // all-filtered edge renders `unfiltered=[] swallowing=[]`; an all-rethrowing one `swallowing=[]`.
         builder.AppendLine("== CATCH EDGES ==");
         foreach (CatchEdge edge in model.CatchEdges)
             builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Caught.FullName)
                 .Append(" @ [").Append(RenderSites(edge.Sites))
-                .Append("] unfiltered=[").Append(RenderSites(edge.UnfilteredSites)).AppendLine("]");
+                .Append("] unfiltered=[").Append(RenderSites(edge.UnfilteredSites))
+                .Append("] swallowing=[").Append(RenderSites(edge.SwallowingSites)).AppendLine("]");
 
         builder.AppendLine("== THROW EDGES ==");
         foreach (ThrowEdge edge in model.ThrowEdges)

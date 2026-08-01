@@ -47,7 +47,7 @@ public sealed class AdapterTests
             "roslyn/no-engine-types-on-seam",
             "xunit/leaf-adapter",
             "xunit/throws-setup-errors-only",
-            "exceptions/broad-catches-filtered",
+            "exceptions/no-swallowed-broad-catches",
             "exceptions/no-bare-bcl-throws",
             "packs/depends-on-core-only",
             "naming/interfaces",

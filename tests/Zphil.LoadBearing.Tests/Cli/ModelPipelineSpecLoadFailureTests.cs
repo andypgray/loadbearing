@@ -10,7 +10,10 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The join between <see cref="ModelPipeline.LoadModel" />'s four spec-load catch arms and the
-///     failures they exist for. Each arm's <em>message</em> is pinned elsewhere against a fabricated
+///     failures they exist for.
+/// </summary>
+/// <remarks>
+///     Each arm's <em>message</em> is pinned elsewhere against a fabricated
 ///     exception (<see cref="ModelPipelineLoaderFailureTests" />,
 ///     <c>SpecDependencyLoadFailureTests</c>), and the runtime behaviour of the unloadable type is pinned
 ///     in <c>LegacySpecLoadingTests</c> — but proving both halves does not prove they meet. These tests
@@ -23,7 +26,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         staging it intact fails it during <c>Define()</c>. See <see cref="SpecOutputStager" /> for why
 ///         withholding a real build beats committing a corrupt one.
 ///     </para>
-/// </summary>
+/// </remarks>
 public sealed class ModelPipelineSpecLoadFailureTests
 {
     private const string ProductDll = "Zphil.LoadBearing.LegacyProduct.dll";

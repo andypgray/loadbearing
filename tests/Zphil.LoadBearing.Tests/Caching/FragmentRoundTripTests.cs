@@ -213,6 +213,11 @@ public sealed class FragmentRoundTripTests
                            }
                            public int Parse(string s) => int.TryParse(s, out int v) ? v : throw new FormatException();
                            private void Work() {}
+                           public void Swallow()
+                           {
+                               try { Work(); }
+                               catch (DomainError) { }
+                           }
                        }
                        """));
         var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
@@ -224,15 +229,19 @@ public sealed class FragmentRoundTripTests
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — both families present (declared + external endpoints, bare catch → System.Exception), the
-        // DomainError edge's unfiltered subset is a proper subset of its sites (the filtered clause at line 9 is
-        // absent from it, the bare `catch` at line 11 counts as unfiltered), and the round-trip is invisible.
+        // DomainError edge's two nested subsets are each proper subsets of the one before (the filtered clause at
+        // line 9 is absent from the unfiltered set; the rethrowing clause at line 10 is unfiltered but not
+        // swallowing; only the bare-block clause at line 18 swallows), the bare `catch` at line 11 counts as
+        // unfiltered and its `throw new` keeps it out of the swallowing set, and the round-trip is invisible.
         direct.CatchEdges.Select(e => (e.Source.FullName, e.Caught.FullName)).ShouldBe(
             [("M.Handler", "N.DomainError"), ("M.Handler", "System.Exception")]);
         direct.ThrowEdges.Select(e => (e.Source.FullName, e.Thrown.FullName)).ShouldBe(
             [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
-        direct.CatchEdge("M.Handler", "N.DomainError").Lines().ShouldBe([9, 10]);
-        direct.CatchEdge("M.Handler", "N.DomainError").UnfilteredLines().ShouldBe([10]);
+        direct.CatchEdge("M.Handler", "N.DomainError").Lines().ShouldBe([9, 10, 18]);
+        direct.CatchEdge("M.Handler", "N.DomainError").UnfilteredLines().ShouldBe([10, 18]);
+        direct.CatchEdge("M.Handler", "N.DomainError").SwallowingLines().ShouldBe([18]);
         direct.CatchEdge("M.Handler", "System.Exception").UnfilteredLines().ShouldBe([11]);
+        direct.CatchEdge("M.Handler", "System.Exception").SwallowingLines().ShouldBeEmpty();
         ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
     }
 

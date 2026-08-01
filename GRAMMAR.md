@@ -171,8 +171,9 @@ Constraint MustNotReference(Type first, params Type[] more)      // sugar for ar
 
 Same shape for `MustOnlyReference`, `MustNotBeReferencedBy`, `MustOnlyBeReferencedBy`, the
 constructor-ban verb `MustNotConstruct`, the injection-ban verb `MustNotInject`, the
-exception verbs `MustNotCatch`, `MustNotCatchUnfiltered`, `MustNotThrow` and `MustOnlyThrow`,
-and the signature-exposure verb `MustNotExpose`: each carries the identical pair — a `Selection`
+exception verbs `MustNotCatch`, `MustNotCatchUnfiltered`, `MustNotSwallow`, `MustNotThrow` and
+`MustOnlyThrow`, and the signature-exposure verb `MustNotExpose`: each carries the identical
+pair — a `Selection`
 list and the `Type` sugar — and deliberately **no expression overload**. Constructor-ness lives in
 the verb, not the anchor, so ordinary selections name what may not be `new`ed
 (`arch.Types.Implementing(typeof(IHandler<>))`), which scales to "all registered services" where a
@@ -183,6 +184,8 @@ Catch-ness and throw-ness live in the verb the same way again: the operands name
 types, most often through the bare `typeof` sugar (`MustNotCatch(typeof(Exception))`); their
 edge semantics are §4.8. The `when`-filter condition on `MustNotCatchUnfiltered` rides the verb
 for the same reason and a sharper one — a filter is not a type, so no operand could name it.
+The same holds for the rethrow condition on `MustNotSwallow`: a terminal `throw` is not a type
+either, and the verb reads both conditions together.
 Exposure-ness lives in the verb the same way: the operands name the types that may not surface
 in a public signature position, most often through the bare `typeof` sugar
 (`MustNotExpose(typeof(DataTable))`); its edge semantics are §4.9. The
@@ -273,7 +276,7 @@ lands only where the whole list is static and one form:
   its siblings (§5.1, §9). An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
   `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch` / `MustNotCatchUnfiltered` /
-  `MustNotThrow` / `MustNotExpose`) whose operand is a
+  `MustNotSwallow` / `MustNotThrow` / `MustNotExpose`) whose operand is a
   **pattern selection**
   (Layer / Namespace / Project
   or a refined `Types`); a bare `typeof(...)` target absent from the codebase is the *win
@@ -346,16 +349,18 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   are evidence, not identity. A grandfathered captive injection plus a *different* forbidden
   injected target from the same source is NEW and red; multiple injecting parameters within
   one (source, injected) pair ride together.
-- **Catch verbs** (`MustNotCatch` and `MustNotCatchUnfiltered`, §4.8/§5.3): `(ruleId, source
-  symbol ID, caught symbol ID)` — the same edge-key shape once more (the caught exception type
+- **Catch verbs** (`MustNotCatch`, `MustNotCatchUnfiltered` and `MustNotSwallow`, §4.8/§5.3):
+  `(ruleId, source symbol ID, caught symbol ID)` — the same edge-key shape once more (the caught
+  exception type
   keys the target slot), riding `BaselineEntry.ForEdge` with **zero baseline-format change**.
   Catch sites are evidence, not identity: multiple `catch` clauses within one (source, caught)
   pair ride together, and a grandfathered catch plus a *different* forbidden caught type from
-  the same source is NEW and red. **Both catch verbs key that same edge.** The *unfiltered*
-  sites `MustNotCatchUnfiltered` reports are evidence too — narrowing which sites a violation
+  the same source is NEW and red. **All three catch verbs key that same edge.** The *unfiltered*
+  sites `MustNotCatchUnfiltered` reports and the *swallowing* sites `MustNotSwallow` reports are
+  evidence too — narrowing which sites a violation
   prints never narrows what it keys — so an entry written under one catch verb keys the
-  identical edge under the other, and adding a `when` filter to one clause of a grandfathered
-  pair moves the evidence, not the baseline.
+  identical edge under the others, and adding a `when` filter or a terminal `throw` to one clause
+  of a grandfathered pair moves the evidence, not the baseline.
 - **Throw verbs** (`MustOnlyThrow` and `MustNotThrow`, §4.8/§5.3): `(ruleId, source symbol ID,
   thrown symbol ID)` — the same shape (the thrown type keys the target slot), riding
   `BaselineEntry.ForEdge` with **zero format change**. Throw sites are evidence, not
@@ -633,8 +638,8 @@ needs two facts no other section provides: who is *registered* with what lifetim
 The scoped exception-catch policy — only top-level handlers may catch base `Exception` — and
 the custom-exceptions rule — scoped code throws its own domain exceptions, not bare BCL ones —
 need facts no other section records: who *catches* what, and who *throws* what. Extraction
-records both; the catch verbs `MustNotCatch` and `MustNotCatchUnfiltered` and the throw verbs
-`MustOnlyThrow` and `MustNotThrow` (§3.3, §5.3) consume them.
+records both; the catch verbs `MustNotCatch`, `MustNotCatchUnfiltered` and `MustNotSwallow` and
+the throw verbs `MustOnlyThrow` and `MustNotThrow` (§3.3, §5.3) consume them.
 
 - **A catch edge** is `(source type, caught type, file:line sites)`, recorded at every
   source-level `catch` clause. A typed catch mints the catch edge **only** — its type-name
@@ -663,6 +668,21 @@ records both; the catch verbs `MustNotCatch` and `MustNotCatchUnfiltered` and th
   boundary: `when (true)` counts as filtered, because this axis records what the source spells
   and never judges what a filter tests. A filter that admits everything is a code-review
   matter, not an extraction one.
+- **A catch edge additionally records its swallowing sites** — a second named fact recorded the
+  same way, and a subset of the unfiltered subset. A site is **swallowing** when its clause
+  carries no `when` filter **and** its block's last statement is not a `throw` statement, bare
+  `throw;` or expression `throw new X(…)` alike. That composite is what a handler needs to hold
+  a failure and continue: a filtered catch named its expectations, and a clause ending in a
+  throw suppresses nothing, so neither is swallowing. The polarity is load-bearing for the same
+  reason as the unfiltered subset — a rethrowing and a swallowing catch of one type on one
+  physical line collapse to a single site, and a `#if`-divergent rethrow reaches the merge as
+  one site reported both ways; recording the *swallowing* sites answers both the way a ban needs.
+  **The rethrow fact is syntactic**, and that is its honesty boundary, stated rather than
+  discovered: it reads the block's **last statement** and never analyses whether every path
+  reaches it. `catch { if (…) return; throw; }` counts as throwing even though one path leaves
+  having suppressed the failure, and `catch { if (…) throw; Cleanup(); }` counts as swallowing
+  even though one path rethrows. The throw's operand is never judged either — a
+  translate-and-throw and a bare rethrow read identically.
 - **A throw edge** is `(source type, thrown expression's static type, file:line sites)`,
   recorded at throw statements and throw expressions alike (`?? throw`, conditional and
   switch-expression arms, and the expression-bodied `=> throw new X()`). A bare rethrow
@@ -895,6 +915,7 @@ would be a worse lie than the one this adjective fixes.
 | `.MustNotInject(target, ...)` | "must not inject {list}" — selection/type targets; the captive-dependency verb (§3.3, §4.7). Never warns: an empty `Registered` operand means no such registrations exist — the win condition, the §4.1 bare-`typeof` precedent |
 | `.MustNotCatch(target, ...)` | "must not catch {list}" — selection/type exception targets; the catch verb (§3.3, §4.8) |
 | `.MustNotCatchUnfiltered(target, ...)` | "must not catch {list} without a `when` filter" — selection/type exception targets; the filter-aware catch verb (§3.3, §4.8). A bare `catch` counts as `System.Exception` and counts as unfiltered; filter presence is syntactic, so the filter's contents are never judged |
+| `.MustNotSwallow(target, ...)` | "must not swallow {list}" — selection/type exception targets; the rethrow-aware catch verb (§3.3, §4.8), banning the composite of three facts: the caught type matches, the clause spells no `when` filter, and its block does not end in a `throw`. Both conditions are syntactic — the throw fact is the block's last statement, never an all-paths analysis — so a filtered catch and a rethrowing catch are both lawful |
 | `.MustNotThrow(target, ...)` | "must not throw {list}" — selection/type exception targets; the ban polarity beside `MustOnlyThrow` (§3.3, §4.8), for the case where the forbidden thrown types are enumerable and the permitted ones are not |
 | `.MustOnlyThrow(target, ...)` | "must throw only {list}" — selection/type exception targets (§3.3, §4.8); **strict**: external thrown types are constrained too, so the fragment carries no external-packages parenthetical — the caveat's absence is the strictness rendering |
 | `.MustNotExpose(target, ...)` | "must not expose {list}" — selection/type targets in a public signature position; the signature-exposure verb (§3.3, §4.9) |
@@ -1377,7 +1398,18 @@ agent fixing a spec sees every problem in one pass.
   (§4.8). Its filter-aware sibling `MustNotCatchUnfiltered` narrows that axis rather than
   opening a new one: the qualifier rides the verb name as a bare past participle and spells
   itself out in the fragment (*"must not catch {list} without a `when` filter"*), because a
-  `when` filter is not a type and so cannot be an operand (§3.3). The throw verb is *throw*
+  `when` filter is not a type and so cannot be an operand (§3.3). Its rethrow-aware sibling
+  `MustNotSwallow` narrows the same axis again, and takes a **verb word of its own** rather than
+  a third participle on `catch`, because what it bans is a composite of three facts — the caught
+  type, the absent filter, and the absent terminal `throw` — and no bare participle names a
+  composite: `MustNotCatchUnfilteredUnrethrown` enumerates the conditions instead of naming what
+  they add up to, and reads as a fourth qualifier rather than a law. *Swallow* is the word the
+  code review already uses for holding a failure and continuing, and it is a verb, so it takes
+  the `Must[Not]` + verb-phrase form directly. The glossary clause does **not** move with it: the
+  clause glosses the *fact* (*"catch = a source-level `catch` clause"*), not the verb, so a spec
+  that swaps any catch verb for another renders that clause byte-identically — the same
+  byte-identical-without-it discipline the axis gating already has, one level down.
+  The throw verb is *throw*
   (the strict allow-list `MustOnlyThrow` and its ban twin `MustNotThrow`), glossary-pinned as
   *"throw = a source-level `throw` of the thrown expression's type (bare rethrows `throw;`
   are not recorded)"* — the sixth axis (§4.8). The exposure verb is *expose* (`MustNotExpose`),
@@ -1468,16 +1500,31 @@ lifetime facts on `ITypeInfo` (registration membership stays model-side, resolve
 and `graph` registration data.
 
 On the exception axis (§4.8): the `MustOnlyCatch` allow-list and the `MustNotBeCaughtBy` /
-`MustNotBeThrownBy` passive twins; rethrow-aware refinement — distinguishing
-`catch … { throw; }` from a swallow — ratified against for v1 (edges are facts, and a
-sanctioned log-and-rethrow site is excepted or grandfathered deliberately); hierarchy-aware
-operand matching (exact definition-level FQN is pinned, so a ban on `Exception` deliberately
+`MustNotBeThrownBy` passive twins; hierarchy-aware operand matching
+(exact definition-level FQN is pinned, so a ban on `Exception` deliberately
 does not reach derived catches — a hierarchy-matching form would be a new, explicitly named
-semantic, not a widening of this one); and `graph` catch/throw data. Two entries shipped off
+semantic, not a widening of this one); and `graph` catch/throw data. Three entries shipped off
 this list on exactly the terms the hierarchy item states (a new, explicitly named semantic,
-never a widening): `MustNotThrow`, and `when`-filter awareness — a filter still never
+never a widening): `MustNotThrow`; `when`-filter awareness — a filter still never
 suppresses the catch edge; what is new is the recorded fact beside it, the unfiltered sites
-`MustNotCatchUnfiltered` reads as its evidence (§4.8).
+`MustNotCatchUnfiltered` reads as its evidence (§4.8) — and, on the same template,
+**rethrow-aware refinement**, which was ratified *against* for v1 on the grounds that edges are
+facts and a sanctioned log-and-rethrow site is excepted or grandfathered deliberately. That
+rationale held until its cost was measured: in this repository's own spec, type-granular
+exemption of nine rethrow sites that suppressed nothing was holding nine already-compliant
+filtered sites out of the law with them. The edge is still a fact and its identity still does
+not move; what is new is a second recorded fact beside filter presence — the swallowing sites —
+and `MustNotSwallow`, the verb that reads it.
+
+Also declined in writing, and this one stays declined: **member-granular source attribution on
+catch edges**, and member subjects for the catch verbs. It would buy nothing measurable — after
+that burndown, the residual sanctioned handlers are small single-role boundary classes
+where the type effectively *is* the site, and there is nothing left for finer granularity to
+recover. The designed-for entry stays under the admission rule, and a consumer arriving with
+evidence reopens it, exactly as this rethrow entry was reopened. **Site-granular sanctioning as
+a spec surface is declined outright**: a per-site ledger inside a spec re-invents baseline
+mechanics under another name, and the candour argument that puts an exemption in the spec where
+it is read cuts equally against a ledger in disguise.
 
 On the exposure axis (§4.9): the `MustOnlyExpose` allow-list complement — the §4.1
 `MustOnly*` external exemption would apply to it naturally, but v1's canon for surface

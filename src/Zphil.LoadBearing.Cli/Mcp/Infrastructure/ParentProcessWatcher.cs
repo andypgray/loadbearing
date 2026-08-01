@@ -73,6 +73,8 @@ internal static class ParentProcessWatcher
 
         // Logged at Warning so post-mortem at the default min-level can confirm the watcher attached.
         Log.Warning("Parent process watcher attached to PID {Pid}", parentPid);
+        // Detached, never awaited: the wait-for-exit loop runs for the life of the server, and Start must
+        // return so the transport can begin serving.
         _ = Task.Run(() => WatchAsync(parent, onParentExited));
     }
 

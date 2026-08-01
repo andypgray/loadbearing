@@ -11,46 +11,28 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     symbol). The recognition gate is <b>symbol-first</b> — never name-only: the invoked method must
 ///     resolve (its reduced form for an extension call) to a method whose containing namespace is
 ///     <c>Microsoft.Extensions.DependencyInjection</c> (or its <c>.Extensions</c> sub-namespace, the
-///     <c>TryAdd*</c> family's home), whose name is in the recognized-call table below, and whose first
-///     parameter is <c>IServiceCollection</c>. A look-alike extension in a user namespace is not recognized;
-///     an in-solution wrapper whose body calls the real thing <em>is</em> seen, because the extractor walks
+///     <c>TryAdd*</c> family's home), whose name is one of the armed calls, and whose first parameter is
+///     <c>IServiceCollection</c>. A look-alike extension in a user namespace is not recognized; an
+///     in-solution wrapper whose body calls the real thing <em>is</em> seen, because the extractor walks
 ///     the wrapper's body like any other tree.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The recognized-call table (each arm is a documented fence; everything else — <c>Configure</c>/
-///         <c>AddOptions</c>, keyed-service overloads, raw <c>ServiceDescriptor</c>/<c>TryAddEnumerable</c>,
-///         assembly-scanning registrars, framework defaults — is the §4.7 honesty boundary and yields
-///         nothing):
+///         The armed calls are <c>Add{Singleton,Scoped,Transient}</c> with their <c>TryAdd*</c> twins and
+///         <c>typeof</c> overloads, <c>AddHostedService</c>, <c>AddDbContext</c>/<c>AddDbContextPool</c>,
+///         and <c>AddHttpClient</c>. Each <c>Recognize*</c> method below states how its own arm maps a call
+///         to a lifetime, a service and an optional implementation.
 ///     </para>
-///     <list type="bullet">
-///         <item>
-///             <c>Add{Singleton,Scoped,Transient}</c> and their <c>TryAdd*</c> twins — lifetime by name; two
-///             type-args → (service, impl); one type-arg → (T, T) iff the call is receiver-only, else
-///             (T, null) (a factory/instance registration names no implementation type); the <c>typeof</c>
-///             overloads mirror the same split by <c>Type</c>-parameter count.
-///         </item>
-///         <item>
-///             <c>AddHostedService&lt;T&gt;</c> — Singleton; service = the synthesized
-///             <c>Microsoft.Extensions.Hosting.IHostedService</c> (implementation-only fallback, T in the
-///             service slot, when it does not resolve); impl = T.
-///         </item>
-///         <item>
-///             <c>AddDbContext&lt;T&gt;</c> / <c>AddDbContextPool&lt;T&gt;</c> — Scoped by default; an
-///             explicit <em>literal</em> <c>ServiceLifetime.X</c> context-lifetime argument is honored; a
-///             non-literal lifetime argument yields nothing (never guess); (service, impl) = (T, T).
-///         </item>
-///         <item>
-///             <c>AddHttpClient&lt;TClient&gt;</c> / <c>AddHttpClient&lt;TClient, TImpl&gt;</c> — Transient;
-///             (TClient, TClient) / (TClient, TImpl); the named-only string form registers no user type and
-///             yields nothing.
-///         </item>
-///     </list>
 ///     <para>
-///         Open-generic <c>typeof</c> registrations record definition-level like every other fact (§4.1) —
-///         the extractor takes each reported symbol's <c>OriginalDefinition</c> FQN. The recognizer resolves
-///         the three framework symbols it needs (<c>IServiceCollection</c>, <c>IHostedService</c>,
-///         <c>ServiceLifetime</c>) once at construction; <see cref="IsActive" /> is false when
+///         Everything else is the §4.7 honesty boundary and yields nothing: <c>Configure</c>/
+///         <c>AddOptions</c>, keyed-service overloads, raw <c>ServiceDescriptor</c> and
+///         <c>TryAddEnumerable</c>, assembly-scanning registrars, and framework defaults. The principle is
+///         that an unreadable registration is absent from the model rather than guessed at, which is why
+///         the DbContext arm declines a non-literal lifetime argument instead of assuming one.
+///     </para>
+///     <para>
+///         The three framework symbols the gate needs (<c>IServiceCollection</c>, <c>IHostedService</c>,
+///         <c>ServiceLifetime</c>) resolve once at construction; <see cref="IsActive" /> is false when
 ///         <c>IServiceCollection</c> is not referenced, so a compilation without MEDI recognizes nothing.
 ///     </para>
 /// </remarks>

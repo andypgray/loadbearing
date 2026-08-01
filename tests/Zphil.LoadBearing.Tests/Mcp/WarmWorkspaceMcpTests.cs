@@ -288,7 +288,9 @@ public sealed class WarmWorkspaceMcpTests
         // Arrange — a warm server bound to the violated spec, where ReportEndpoint's ONE blanket catch is red
         // under two rules at once: the plain catch ban exceptions/no-general-catch (its site is unfiltered, so
         // both agree today) and the filter-aware exceptions/no-unfiltered-catch. This is the filter-fact analog
-        // of the second-catch edit above, and the only place the new fact crosses the dirty-rewalk path.
+        // of the second-catch edit above, and the only place the new fact crosses the dirty-rewalk path. The
+        // filter-aware rule also reds ReportPublisher, whose unfiltered catch this edit never touches — the
+        // constant that makes the ReportEndpoint drop legible.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
@@ -304,13 +306,13 @@ public sealed class WarmWorkspaceMcpTests
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
-        // Assert — one edit, two rules, opposite answers: the filter-aware rule flips to passed with nothing
-        // left to report, while the plain catch ban stays red at the very same single site, because a `when`
+        // Assert — one edit, two rules, opposite answers: the filter-aware rule drops ReportEndpoint entirely
+        // (leaving only ReportPublisher, the Web layer's other broad catcher, which this edit never touched),
+        // while the plain catch ban keeps ReportEndpoint red at the very same single site, because a `when`
         // filter never suppresses the catch edge — it only changes which of the edge's sites are recorded
         // unfiltered (GRAMMAR §4.8). And the warm answer is byte-identical to the cold one.
-        RuleStatusOf(before, "exceptions/no-unfiltered-catch").ShouldBe("failed");
-        RuleStatusOf(after, "exceptions/no-unfiltered-catch").ShouldBe("passed");
-        ViolationCountOf(after, "exceptions/no-unfiltered-catch").ShouldBe(0);
+        UnfilteredCatchSources(before).ShouldBe(["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"], true);
+        UnfilteredCatchSources(after).ShouldBe(["MyApp.Web.ReportPublisher"], true);
         RuleStatusOf(before, "exceptions/no-general-catch").ShouldBe("failed");
         RuleStatusOf(after, "exceptions/no-general-catch").ShouldBe("failed");
         CatchSiteCount(after).ShouldBe(1);
@@ -567,13 +569,16 @@ public sealed class WarmWorkspaceMcpTests
         return now.GetProperty("sites").GetArrayLength();
     }
 
-    // The number of distinct catch violations (one per (source, caught) type pair) under exceptions/no-general-catch.
+    // The number of distinct catch violations ReportEndpoint contributes (one per (source, caught) type pair)
+    // under exceptions/no-general-catch. Scoped to that source because the Web layer carries a second broad
+    // catcher, ReportPublisher, whose rethrowing clause the plain catch ban reds too.
     private static int CatchViolationCount(string checkJson)
     {
         using JsonDocument document = JsonDocument.Parse(checkJson);
         JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
             .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
-        return rule.GetProperty("violations").GetArrayLength();
+        return rule.GetProperty("violations").EnumerateArray()
+            .Count(v => v.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
     }
 
     // The number of catch sites reported for the (ReportEndpoint, System.Exception) swallow under exceptions/no-general-catch.
@@ -583,7 +588,7 @@ public sealed class WarmWorkspaceMcpTests
         JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
             .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
         JsonElement swallow = rule.GetProperty("violations").EnumerateArray()
-            .Single(v => v.GetProperty("target").GetString() == "System.Exception");
+            .Single(v => v.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
         return swallow.GetProperty("sites").GetArrayLength();
     }
 
@@ -596,13 +601,15 @@ public sealed class WarmWorkspaceMcpTests
         return rule.GetProperty("status").GetString()!;
     }
 
-    // The number of red violations a named rule reports.
-    private static int ViolationCountOf(string checkJson, string ruleId)
+    // The catching types exceptions/no-unfiltered-catch reports, one per (source, caught) type pair.
+    private static IReadOnlyList<string> UnfilteredCatchSources(string checkJson)
     {
         using JsonDocument document = JsonDocument.Parse(checkJson);
         JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == ruleId);
-        return rule.GetProperty("violations").GetArrayLength();
+            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-unfiltered-catch");
+        return rule.GetProperty("violations").EnumerateArray()
+            .Select(v => v.GetProperty("source").GetString()!)
+            .ToList();
     }
 
     private static void EditOnDisk(string path, Func<string, string> transform)

@@ -12,6 +12,7 @@ namespace Meridian.Operations.ArchSpec;
 /// </summary>
 public sealed class OperationsArchSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Layer dispatch = arch.Layer("Dispatch", "Meridian.Operations.Dispatch.*");

@@ -27,6 +27,7 @@ namespace Meridian.Interchange.ArchSpec;
 /// </summary>
 public sealed class InterchangeArchSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         Selection host = arch.Namespace("Meridian.Interchange.Host.*");

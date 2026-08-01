@@ -13,6 +13,7 @@ namespace Zphil.LoadBearing.MyAppQuarantinedSpec;
 /// </summary>
 public sealed class MyAppQuarantinedSpec : IArchitectureSpec
 {
+    /// <inheritdoc />
     public void Define(Arch arch)
     {
         arch.Scope("legacy/billing")

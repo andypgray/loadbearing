@@ -5,13 +5,13 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     Runs a <c>dotnet</c> CLI command in a clean SDK environment, draining and bounding it through
-///     <see cref="ChildProcess" /> and throwing with captured output on a non-zero exit. Shared by
-///     <see cref="FixtureRestorer" /> (fixture restore) and <see cref="BinlogFixtureWorkspace" /> (the
-///     one-shot <c>build -bl</c> that produces the replay binlog) so both get identical poisoned-env
-///     stripping and node/server suppression rather than duplicating it. The env hygiene is exposed via
-///     <see cref="ApplyCleanSdkEnvironment" /> so an out-of-process CLI test can shape the same
-///     deployment-normal environment from the one poison-var list.
+///     <see cref="ChildProcess" /> and throwing with captured output on a non-zero exit.
 /// </summary>
+/// <remarks>
+///     The environment hygiene is exposed separately as <see cref="ApplyCleanSdkEnvironment" />, so a test
+///     that shells the SDK itself can shape the same deployment-normal environment from the one
+///     poison-var list rather than assembling its own.
+/// </remarks>
 internal static class DotnetCli
 {
     /// <summary>
@@ -35,9 +35,7 @@ internal static class DotnetCli
 
     /// <summary>
     ///     Gives <paramref name="startInfo" /> a clean SDK environment: node-reuse + MSBuild-server off, and
-    ///     the test host's Visual Studio / MSBuild registration env vars stripped. Shared so every child that
-    ///     shells the SDK — restore, the binlog build, and the out-of-process CLI replay smoke test — sees the
-    ///     same deployment-normal environment from a single poison-var list.
+    ///     the test host's Visual Studio / MSBuild registration env vars stripped.
     /// </summary>
     /// <remarks>
     ///     Node-reuse + MSBuild-server off: otherwise a reused worker node (or, on newer SDKs, an MSBuild

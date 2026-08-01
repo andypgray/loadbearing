@@ -31,8 +31,8 @@ internal sealed record SpecExclusionProject(string Name, string? FilePath, IRead
 ///         <b>Never fail open into an empty universe.</b> When membership cannot be read — an unreadable or
 ///         malformed solution file, or a format
 ///         <see cref="SolutionProjectFileParser.OwnsFormat">the parser does not own</see> (a <c>.slnf</c>,
-///         which <see cref="SolutionDiscovery" /> accepts) — the answer degrades to <c>{spec project}</c>,
-///         the behaviour before this walk existed. An unparsed solution reads as zero declared members, so
+///         which <see cref="SolutionDiscovery" /> accepts) — the answer degrades to <c>{spec project}</c>
+///         alone. An unparsed solution reads as zero declared members, so
 ///         the alternative would subtract the whole closure. For the same reason a project whose path is
 ///         unknown counts as declared: keeping a project in the universe is the safe direction, because
 ///         wrongly excluding one shrinks the codebase under law silently.

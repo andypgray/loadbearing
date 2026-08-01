@@ -5,86 +5,40 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     Merges a set of per-input <see cref="CodebaseFragment" />s into one <see cref="CodebaseModel" />,
-///     unifying by fully-qualified name to reproduce the global cross-input semantics the single-pass
-///     builder produced:
-///     <list type="bullet">
-///         <item>
-///             <b>M1</b> — fragments in input (ordinal-project) order; the first declarer wins a node's
-///             facts and <c>ProjectName</c>; declaration sites union across declarers (partials across
-///             projects, or a project's several target frameworks). A later declarer under a
-///             <em>different</em> project name is same-FQN cross-project conflation: the facts still follow
-///             the first declarer, and an advisory <see cref="CodebaseModel.MergeNotes">merge note</see>
-///             records it — one note per conflated FQN, naming every losing project, so a type several
-///             projects shadow costs one line rather than one per shadow. A project's own several target
-///             frameworks share its name and so stay silent.
-///         </item>
-///         <item>
-///             <b>M2</b> — hierarchy comes from the winning fragment only; <c>ResolveNode(fqn)</c> is the
-///             declared-anywhere node, else a shallow external minted from a facts table. Because M1 fully
-///             precedes M2, a type any fragment declares beats every fragment's external view of it, and
-///             each <see cref="TypeConstruction.Definition" /> is the merged node instance.
-///         </item>
-///         <item>
-///             <b>M3</b> — edge site-sets union per <c>(source, target)</c>, self-edges dropped, endpoints
-///             the same <see cref="TypeNode" /> instances held by <see cref="CodebaseModel.Types" />.
-///         </item>
-///         <item>
-///             <b>M4</b> — member-use edges (GRAMMAR §4.5): site-sets union per
-///             <c>
-///                 (source, member
-///                 DocumentationCommentId)
-///             </c>
-///             , same-type uses dropped, with one shared
-///             <see cref="MemberReference" /> instance per distinct SymbolId and every endpoint a merged node.
-///         </item>
-///         <item>
-///             <b>M5</b> — declared members (GRAMMAR §4.6): the winning fragment's member inventory becomes
-///             the node's <see cref="TypeNode.Members" /> list (winner-only, like M2), each
-///             <see cref="MemberNode.DeclaringType" /> the same merged node; externals keep an empty list.
-///         </item>
-///         <item>
-///             <b>M6</b> — construction edges (GRAMMAR §4.5): site-sets union per
-///             <c>(source, constructed)</c>, self-construction dropped, endpoints the same
-///             <see cref="TypeNode" /> instances held by <see cref="CodebaseModel.Types" />.
-///         </item>
-///         <item>
-///             <b>M7</b> — injection edges (GRAMMAR §4.7): site-sets union per <c>(source, injected)</c>,
-///             self-injection dropped, endpoints the same <see cref="TypeNode" /> instances held by
-///             <see cref="CodebaseModel.Types" /> (an external injected type resolves to a shared external node).
-///         </item>
-///         <item>
-///             <b>M8</b> — registration facts (GRAMMAR §4.7): site-sets union per
-///             <c>(lifetime, service FQN, implementation FQN)</c>, string-side (no node resolution), so a
-///             registration reported by several fragments (or several sites) collapses to one fact.
-///         </item>
-///         <item>
-///             <b>M9</b> — catch edges (GRAMMAR §4.8): site-sets union per <c>(source, caught)</c>,
-///             self-catch dropped, endpoints the same <see cref="TypeNode" /> instances held by
-///             <see cref="CodebaseModel.Types" /> (an external caught type resolves to a shared external node).
-///             The edge's unfiltered-site subset unions under the same key and the same guard, so a
-///             <c>file:line</c> some fragment reports unfiltered stays unfiltered in the merged edge.
-///         </item>
-///         <item>
-///             <b>M10</b> — throw edges (GRAMMAR §4.8): site-sets union per <c>(source, thrown)</c>,
-///             self-throw dropped, endpoints the same <see cref="TypeNode" /> instances held by
-///             <see cref="CodebaseModel.Types" /> (an external thrown type resolves to a shared external node).
-///         </item>
-///         <item>
-///             <b>M11</b> — exposure edges (GRAMMAR §4.9): site-sets union per <c>(source, exposed)</c>,
-///             self-exposure dropped, endpoints the same <see cref="TypeNode" /> instances held by
-///             <see cref="CodebaseModel.Types" /> (an external exposed type resolves to a shared external node).
-///         </item>
-///     </list>
-///     One code path serves cold runs, the fast test path, and cache hits, so the cache
-///     cannot change results by construction.
+///     unifying by fully-qualified name so the model carries global cross-input semantics rather than one
+///     compilation's view. One code path serves cold runs, the fast test path, and cache hits, so the
+///     cache cannot change results by construction.
 /// </summary>
 /// <remarks>
-///     A single documented, unobservable tie-break moves relative to the old single-pass builder: when the
-///     same external FQN carries genuinely different facts across compilations (mixed assembly versions),
-///     its facts are taken from the <em>first fragment in input order</em> that references it, rather than
-///     from whichever compilation the builder's dictionary iteration happened to mint it from first. Both
-///     are deterministic, and with a uniform reference closure (the norm) the facts are identical either
-///     way, so no model observable — and no pinned test — can distinguish them.
+///     <para>
+///         Two rules run across every axis, and each step below states only how its own axis instantiates
+///         them. Per-type <b>facts</b> — a node's shape and <c>ProjectName</c>, its hierarchy, its member
+///         inventory — are <em>winner-only</em>: fragments are visited in input (ordinal-project) order and
+///         the first declarer wins, so a later fragment never overwrites what an earlier one established.
+///         Per-edge <b>evidence</b> is <em>unioned</em>: each axis keys its site-set on the edge's endpoint
+///         pair, drops the self-edge, and resolves both endpoints to the same <see cref="TypeNode" />
+///         instances <see cref="CodebaseModel.Types" /> holds — so an external endpoint is one shared node
+///         however many fragments referenced it.
+///     </para>
+///     <para>
+///         Declaring the nodes fully precedes populating their hierarchy, and that ordering is
+///         load-bearing: it is what makes a type any fragment declares beat every fragment's external view
+///         of it, so <c>ResolveNode</c> mints a shallow external only for an FQN no fragment declares at all.
+///     </para>
+///     <para>
+///         A later declarer under a <em>different</em> project name is same-FQN cross-project conflation.
+///         Facts still follow the first declarer, and an advisory
+///         <see cref="CodebaseModel.MergeNotes">merge note</see> records it — one note per conflated FQN
+///         naming every losing project, so a type several projects shadow costs one line rather than one
+///         per shadow. A project's own several target frameworks share its name, so they union silently.
+///     </para>
+///     <para>
+///         Where one external FQN carries genuinely different facts across compilations (mixed assembly
+///         versions), the winner is the first fragment in input order that <em>references</em> it. With a
+///         uniform reference closure — the norm — the facts are identical whichever fragment wins, so no
+///         model observable distinguishes them; the rule exists to make the tie deterministic rather than
+///         dictionary-iteration order.
+///     </para>
 /// </remarks>
 internal static class FragmentMerger
 {
@@ -96,6 +50,7 @@ internal static class FragmentMerger
     private sealed class MergeState
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
+        private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSwallowingSites = new();
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
 
         // Conflated FQN → every project that declared it after the winner, ordinal-sorted. One entry per
@@ -117,69 +72,68 @@ internal static class FragmentMerger
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
         {
-            // M1 — declared nodes: first declarer (input order) wins facts/ProjectName; sites union.
+            // Declared nodes: first declarer (input order) wins facts/ProjectName; sites union.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentType declared in fragment.DeclaredTypes)
                 DeclareMerged(declared, fragment.ProjectName);
 
             // External facts table: the first fragment (input order) referencing a not-declared-anywhere
-            // FQN wins its facts. Built after M1 so any FQN some fragment declares never becomes external.
+            // FQN wins its facts. Built after declaration so an FQN some fragment declares never goes external.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentExternal external in fragment.Externals)
                 RecordExternal(external);
 
-            // M2 — hierarchy from the winning fragment only; every reference rewired to a merged node.
+            // Hierarchy from the winning fragment only; every reference rewired to a merged node.
             foreach ((string fqn, FragmentType declared) in _hierarchy)
                 PopulateHierarchy(_nodes[fqn], declared);
 
-            // M3 — edge site-sets union per (src, tgt); self-edge guard; endpoints are merged nodes.
+            // Edge site-sets union per (src, tgt).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentEdge edge in fragment.Edges)
                 MergeEdge(edge);
 
-            // M4 — member-use edge site-sets union per (src, member SymbolId); same-type guard; nodes are merged.
+            // Member-use edges (GRAMMAR §4.5) key on (src, member SymbolId) rather than a type pair, and the
+            // self-drop is therefore a same-type guard; one shared MemberReference per distinct SymbolId.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
                 MergeMemberEdge(memberEdge);
 
-            // M5 — declared members (GRAMMAR §4.6): the winning fragment's inventory becomes the node's
-            // MemberNode list, each member's DeclaringType the same merged node; externals keep their empty
-            // default (the member axis is solution-declared-only). Winner-only, exactly like M2 hierarchy.
+            // Declared members (GRAMMAR §4.6) are winner-only like the hierarchy: the winning fragment's
+            // inventory becomes the node's MemberNode list, each member's DeclaringType the same merged node.
+            // Externals keep their empty default — the member axis is solution-declared-only.
             foreach ((string fqn, FragmentType declared) in _hierarchy)
                 PopulateMembers(_nodes[fqn], declared);
 
-            // M6 — construction edges (GRAMMAR §4.5): site-sets union per (src, constructed); self-construction
-            // guard mirrors M3; endpoints are the same merged nodes.
+            // Construction edges (GRAMMAR §4.5) key on (src, constructed).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
                 MergeConstructorEdge(constructorEdge);
 
-            // M7 — injection edges (GRAMMAR §4.7): site-sets union per (src, injected); self-injection guard
-            // mirrors M3; endpoints are the same merged nodes (an external injected type shares one node).
+            // Injection edges (GRAMMAR §4.7) key on (src, injected).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
                 MergeInjectionEdge(injectionEdge);
 
-            // M8 — registration facts (GRAMMAR §4.7): site-sets union per (lifetime, service, impl?), string-side
-            // (no node resolution — registration is many-to-many, resolved model-side at evaluation).
+            // Registration facts (GRAMMAR §4.7) are the one axis with no node resolution: they key on
+            // (lifetime, service, impl?) string-side, because registration is many-to-many and membership is
+            // resolved model-side at evaluation.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentServiceRegistration registration in fragment.ServiceRegistrations)
                 MergeRegistration(registration);
 
-            // M9 — catch edges (GRAMMAR §4.8): site-sets union per (src, caught); self-catch guard mirrors M3;
-            // endpoints are the same merged nodes (an external caught type shares one node).
+            // Catch edges (GRAMMAR §4.8) key on (src, caught), and their unfiltered- and swallowing-site
+            // subsets union under that same key and guard — so a file:line any fragment reports unfiltered
+            // (or swallowing) keeps that standing in the merged edge.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentCatchEdge catchEdge in fragment.CatchEdges)
                 MergeCatchEdge(catchEdge);
 
-            // M10 — throw edges (GRAMMAR §4.8): site-sets union per (src, thrown); self-throw guard mirrors M3;
-            // endpoints are the same merged nodes (an external thrown type shares one node).
+            // Throw edges (GRAMMAR §4.8) key on (src, thrown).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
                 MergeThrowEdge(throwEdge);
 
-            // M11 — exposure edges (GRAMMAR §4.9): site-sets union per (src, exposed); self-exposure guard
-            // mirrors M3; endpoints are the same merged nodes (an external exposed type shares one node).
+            // Exposure edges (GRAMMAR §4.9) key on (src, exposed).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
                 MergeExposureEdge(exposureEdge);
@@ -207,8 +161,8 @@ internal static class FragmentMerger
         // A second (or later) declarer of an already-declared FQN. When its project name differs from the
         // winner's, this is same-FQN cross-project conflation: the facts and ProjectName keep following the
         // first declarer, so the loser's copy is invisible to arch.Project selections — record the loser
-        // against the type. A matching project name is a project's own several target frameworks (M1's
-        // legitimate union), which stays silent; the loser set collapses a multi-TFM loser to one entry.
+        // against the type. A matching project name is a project's own several target frameworks — a
+        // legitimate union, which stays silent; the loser set collapses a multi-TFM loser to one entry.
         private void NoteConflationIfCrossProject(string fqn, string laterProjectName)
         {
             string winner = _nodes[fqn].ProjectName;
@@ -221,9 +175,9 @@ internal static class FragmentMerger
         }
 
         // One note per conflated type, naming every project that loses it. Grouping is what keeps a type
-        // stubbed by several sibling projects from spending a line per stub: six FQNs shadowed across six
-        // fixture projects were sixteen lines before this, and are six after, with nothing dropped. A single
-        // loser renders exactly as it always did — the list joiner degrades to "'A' and 'B'" at two items.
+        // stubbed by several sibling projects from spending a line per stub — six types shadowed across six
+        // projects cost six lines rather than sixteen, with nothing dropped. The list joiner degrades to
+        // "'A' and 'B'" at two items, so a single loser reads as a plain sentence.
         private string ConflationNote(string fqn)
         {
             string winner = _nodes[fqn].ProjectName;
@@ -283,7 +237,7 @@ internal static class FragmentMerger
         // The member's declaration sites are already (file, line) ordinal-ordered from extraction, so — as in
         // Materialize's type FilePaths — Distinct preserves first-occurrence file order (the §5.6 contract). The
         // parameter facts are already in declaration order and the attribute facts ordinal by constructed name,
-        // both winner-only (M5 takes the winning fragment's inventory whole), so each Select preserves order and
+        // both winner-only (the winning fragment's inventory is taken whole), so each Select preserves order and
         // no merge path duplicates or reorders them. Unlike the type-side attribute list, the member's stays
         // string-side: no ResolveNode, so an attribute only a member wears mints no external node.
         private static MemberNode NewMember(TypeNode declaringType, FragmentMember member)
@@ -351,6 +305,11 @@ internal static class FragmentMerger
             // unfiltered in another reads unfiltered here, the truthful answer for a ban.
             var unfilteredSites = CatchEdgeUnfilteredSites((edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.UnfilteredSites) unfilteredSites.Add(site);
+
+            // The swallowing subset unions the same way, and for the same reason: a (file, line) that rethrows
+            // in one fragment and swallows in another reads swallowing here.
+            var swallowingSites = CatchEdgeSwallowingSites((edge.SourceFullName, edge.CaughtFullName));
+            foreach (FragmentSite site in edge.SwallowingSites) swallowingSites.Add(site);
         }
 
         private void MergeThrowEdge(FragmentThrowEdge edge)
@@ -454,14 +413,15 @@ internal static class FragmentMerger
                 .Select(kv => new InjectionEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Injected], ToLocations(kv.Value)))
                 .ToList();
 
-            // Both site lists come out of SortedSets, so each is (file, line) ordered and the second is a subset
-            // of the first; an edge with no unfiltered site materializes the empty list.
+            // All three site lists come out of SortedSets, so each is (file, line) ordered and each is a subset
+            // of the one before it; an edge with no unfiltered (or no swallowing) site materializes the empty list.
             var catchEdges = _catchEdgeSites
                 .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
                 .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
                 .Select(kv => new CatchEdge(
                     _nodes[kv.Key.Src], _nodes[kv.Key.Caught], ToLocations(kv.Value),
-                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? ToLocations(unfiltered) : []))
+                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? ToLocations(unfiltered) : [],
+                    _catchEdgeSwallowingSites.TryGetValue(kv.Key, out var swallowing) ? ToLocations(swallowing) : []))
                 .ToList();
 
             var throwEdges = _throwEdgeSites
@@ -605,6 +565,17 @@ internal static class FragmentMerger
             {
                 sites = new SortedSet<FragmentSite>();
                 _catchEdgeUnfilteredSites[key] = sites;
+            }
+
+            return sites;
+        }
+
+        private SortedSet<FragmentSite> CatchEdgeSwallowingSites((string Src, string Caught) key)
+        {
+            if (!_catchEdgeSwallowingSites.TryGetValue(key, out var sites))
+            {
+                sites = new SortedSet<FragmentSite>();
+                _catchEdgeSwallowingSites[key] = sites;
             }
 
             return sites;
