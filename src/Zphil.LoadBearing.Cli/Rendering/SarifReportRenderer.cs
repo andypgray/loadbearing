@@ -73,7 +73,7 @@ internal static class SarifReportRenderer
             BuildOriginalUriBaseIds(),
             BuildResults(report, solutionDirectory));
         var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
-        return JsonSerializer.Serialize(log, LoadBearingJson.Options);
+        return JsonSerializer.Serialize(log, LoadBearingJson.Context.SarifLog);
     }
 
     // Every rule, in model order — passed and skipped rules included (metadata carries the whole spec, not

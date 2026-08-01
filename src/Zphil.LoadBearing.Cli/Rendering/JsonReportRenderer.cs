@@ -35,7 +35,7 @@ internal static class JsonReportRenderer
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.ViolationCount, report.WarningCount));
 
-        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Options));
+        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson));
     }
 
     private static RuleJson ToRule(RuleResult result, string solutionDirectory)

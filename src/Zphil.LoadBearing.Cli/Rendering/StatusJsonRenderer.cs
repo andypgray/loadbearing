@@ -22,7 +22,7 @@ internal static class StatusJsonRenderer
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.GrandfatheredCount, report.StaleBaselineEntryCount));
 
-        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Options));
+        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.StatusJson));
     }
 
     private static StatusRuleJson ToRule(RuleResult result)

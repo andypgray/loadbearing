@@ -19,7 +19,7 @@ internal static class GraphJsonRenderer
             summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
             summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList());
 
-        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Options));
+        output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson));
     }
 
     private static GraphProjectJson ToProject(ProjectSummary project)
