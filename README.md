@@ -189,6 +189,60 @@ flowchart LR
 
 A solid arrow is a reference some type actually makes; a dotted arrow is a project reference that is declared and never exercised, which the text survey leaves you to work out by reading two of its sections against each other. There are no dotted arrows above, which is itself the report: no project here declares a reference it never uses. Nobody drew that diagram, and nobody can let it rot: [`SelfSpecTests.ArchitectureMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. A hand-drawn architecture diagram is the artifact that rots first; this one is held to the code the same way the rules are.
 
+That fence is drawn from what the code does. The same block carries a second one, drawn from what the spec forbids:
+
+```mermaid
+flowchart LR
+    accTitle: Architecture law: Zphil.LoadBearing.ArchSpec
+    accDescr: The places this spec names, the references it forbids, and the debt it grandfathers.
+
+    subgraph s_Core["Core"]
+        s_Model["Model"]
+        s_Checking["Checking"]
+        s_Rendering["Rendering"]
+    end
+    subgraph s_Extraction["Extraction"]
+        subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
+            s_MsBuildBootstrap[["MsBuildBootstrap"]]
+        end
+    end
+    s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
+    s_Microsoft_Build("Microsoft.Build.*")
+    s_Adapter["Adapter"]
+    subgraph s_Host["Host"]
+        s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
+    end
+    s_Pack["Pack"]
+    s_System_Environment("System.Environment")
+
+    s_Core --x s_Extraction
+    s_Core --x s_Microsoft_CodeAnalysis
+    s_Core --x s_Microsoft_Build
+    s_Model --x s_Checking
+    s_Model --x s_Rendering
+    s_Extraction --x|"expose"| s_Microsoft_Build
+    s_Core --x s_Adapter
+    s_Extraction --x s_Adapter
+    s_Host --x s_Adapter
+    s_Pack --x s_Adapter
+    s_Pack -->|"only"| s_Core
+    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure -.-x|"grandfathered"| s_System_Environment
+
+    subgraph l_legend["Legend"]
+        l_ban["--x = must not reference"]
+        l_expose["--x expose = must not expose on a public signature"]
+        l_only["--> only = the only references allowed"]
+        l_debt["-.-x grandfathered = Migrate debt, with the existing sites baselined"]
+        l_quarantine["Quarantine box = a contained scope; the doubled boxes are its sanctioned surface"]
+        l_outside["Rounded box = a place named only as the target of a rule"]
+        l_nesting["A box inside a box = the inner place is part of the outer"]
+    end
+```
+
+Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, the labelled arrows are the verbs that need naming, the dotted one is the single Migrate rule with its existing sites baselined, and the box inside Extraction is the quarantined scope with its sanctioned surface doubled. Model, Checking and Rendering sit inside Core because Core's globs contain theirs. The legend is generated with the rest, one row per construct this particular drawing uses.
+
+The line under the fence is the honest part. A diagram can only draw a rule whose subject and targets are *places*, and most of this spec's rules are about shapes, names, attributes and members instead. Those rules are listed by ID rather than quietly dropped, so the picture is never mistaken for the whole law.
+
 ## This page is tested
 
 The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The four fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.

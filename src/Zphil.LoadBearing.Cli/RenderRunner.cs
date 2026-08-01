@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     produces. Every target is spliced through
 ///     the byte-level <see cref="ManagedBlockFile" /> adapter and reported as <c>wrote</c>/<c>unchanged</c>
 ///     with a solution-relative path. <c>--diagram &lt;path&gt;</c> adds a second, independent target: the
-///     codebase graph as a Mermaid diagram in its own file's own managed block, reported on the same
+///     codebase graph and the law as two fences, composed by <see cref="DiagramComposer" />, on the same
 ///     wrote/unchanged stream. Render is a mutation, not a gate: it always exits 0 on success;
 ///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
@@ -51,7 +51,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
 
         WriteFiles(composition.Files, solutionDirectory);
 
-        if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, workspace, diagramPath, ct);
+        if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, workspace, specName, diagramPath, ct);
 
         return 0;
     }
@@ -70,13 +70,14 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
     // spec project plus the private plumbing only it references), and reusing it would draw a diagram that
     // disagrees with the survey it is supposed to be. Both feed one GraphSummarizer, so there is still one
     // summary shape; the second extraction is the cost, and only when --diagram and scoped cards coincide.
+    // The law fence beside it costs nothing extra — it is pure over the model already in hand.
     private async Task WriteDiagramAsync(
-        RenderRequest request, WorkspaceModel workspace, string diagramPath, CancellationToken ct)
+        RenderRequest request, WorkspaceModel workspace, string specName, string diagramPath, CancellationToken ct)
     {
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, [], ct);
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
-        string body = GraphDiagramRenderer.Block(
-            summary, Path.GetFileName(workspace.SolutionPath), DiagramScopeFrom(request));
+        string body = DiagramComposer.Compose(
+            summary, Path.GetFileName(workspace.SolutionPath), workspace.Model, specName, DiagramScopeFrom(request));
 
         WriteOutcome outcome = ManagedBlockFile.Splice(diagramPath, body);
         string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";

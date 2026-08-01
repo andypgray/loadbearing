@@ -76,6 +76,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool class without the attribute compiles, registers nothing, and its tools vanish from the
   server in silence. Both MCP attribute rules name their attribute by string: the spec
   project still takes no SDK package reference, which is what the string anchor bought.
+- The committed architecture diagram grows a second fence. `render --diagram` already drew the
+  codebase survey — the projects and the references between them, taken from what the code
+  does. Beside it now sits the architecture law, taken from the spec: forbidden references as
+  `--x` edges, an exposure ban labelled `expose`, the only-verbs as `-->|"only"|` with the
+  self-target allow edge omitted, a Migrate rule's ratcheted debt as a dotted
+  `-.-x|"grandfathered"|` edge, and each quarantined scope as a box holding its sanctioned
+  surface. Layers, namespace globs, projects and named types are the nodes, nested where one
+  glob provably contains another, under a legend carrying only the constructs that drawing
+  uses. One composer writes both fences into the one managed block, and it is the path
+  `render` and the drift gate share, so the command and the test cannot disagree.
+  `--diagram-only` and `--diagram-exclude` scope the survey alone: what the spec forbids is not
+  a property of the projects someone chose to draw, so the law fence can name a place the
+  survey dropped. A diagram can only draw a rule whose subject and targets are places, and most
+  of a real spec is about names, shapes, attributes and members instead. Those rules are listed
+  by ID under the fence with a posture tag and an `explain` pointer, so the picture is never
+  mistaken for the whole law.
 
 ### Changed
 

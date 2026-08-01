@@ -1,4 +1,3 @@
-using System.Text;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Internal;
 
@@ -126,49 +125,23 @@ public static class GraphDiagramRenderer
     }
 
     // Project name → Mermaid node ID: the prefix plus a deterministic slug, deduped with an ordinal suffix
-    // so two names that slug alike (MyApp.Web and MyApp-Web) still get distinct nodes.
+    // so two names that slug alike (MyApp.Web and MyApp-Web) still get distinct nodes. Slugging, dedupe
+    // and label escaping are MermaidText's, shared with the law fence in the same artifact.
     private static Dictionary<string, string> NodeIds(IReadOnlyList<ProjectSummary> projects)
     {
-        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
-        var taken = new HashSet<string>(StringComparer.Ordinal);
-        foreach (ProjectSummary project in projects)
-        {
-            string slug = NodeIdPrefix + Slug(project.Name);
-            string candidate = slug;
-            var suffix = 2;
-            while (!taken.Add(candidate)) candidate = $"{slug}_{suffix++}";
+        var names = projects.Select(project => project.Name).ToList();
+        var minted = MermaidText.UniqueIds(NodeIdPrefix, names);
 
-            ids[project.Name] = candidate;
-        }
+        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i < names.Count; i++) ids[names[i]] = minted[i];
 
         return ids;
     }
 
-    // ASCII letters and digits survive; everything else becomes an underscore. Deliberately not
-    // char.IsLetterOrDigit, which is Unicode-aware and would leave accented letters in an identifier
-    // position where Mermaid's tolerance is unknown.
-    private static string Slug(string name)
-    {
-        var builder = new StringBuilder(name.Length);
-        foreach (char character in name)
-        {
-            bool ascii = (character >= 'a' && character <= 'z')
-                         || (character >= 'A' && character <= 'Z')
-                         || (character >= '0' && character <= '9');
-            builder.Append(ascii ? character : '_');
-        }
-
-        return builder.ToString();
-    }
-
-    // Labels are the project name verbatim, inside a quoted label, with the two characters Mermaid reads
-    // as markup sent out as the entities it reads back as themselves: a double quote would end the label
-    // early, and '#' opens an entity reference (#35; is the documented escape for a literal one).
-    // The '#' pass must run FIRST — reversed, it would rewrite the '#' of an emitted #quot; into #35;quot;.
+    // Labels are the project name verbatim, inside a quoted label, with the characters Mermaid reads as
+    // markup sent out as the entities it reads back as themselves.
     private static string Label(string name)
     {
-        return name
-            .Replace("#", "#35;")
-            .Replace("\"", "#quot;");
+        return MermaidText.Label(name);
     }
 }

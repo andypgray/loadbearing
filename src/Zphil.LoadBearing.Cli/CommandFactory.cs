@@ -133,18 +133,21 @@ internal static class CommandFactory
         Option<string?> diagram = new("--diagram")
         {
             Description =
-                "Also render the codebase graph as a Mermaid diagram into <path>'s managed block "
-                + "(projects and their cross-project references; solid = observed, dotted = declared but unobserved)."
+                "Also render two Mermaid diagrams into <path>'s managed block: the codebase graph "
+                + "(projects and their cross-project references; solid = observed, dotted = declared but unobserved), "
+                + "then the spec's law (the places it names, what they must not reference, and the debt it grandfathers)."
         };
         Option<string?> diagramOnly = new("--diagram-only")
         {
             Description =
-                "Draw only the projects matching these name globs (semicolon-separated, '*' allowed); with --diagram."
+                "Draw only the projects matching these name globs (semicolon-separated, '*' allowed); "
+                + "scopes the codebase survey fence only, never the law fence. With --diagram."
         };
         Option<string?> diagramExclude = new("--diagram-exclude")
         {
             Description =
-                "Drop the projects matching these name globs (semicolon-separated, '*' allowed); with --diagram."
+                "Drop the projects matching these name globs (semicolon-separated, '*' allowed); "
+                + "scopes the codebase survey fence only, never the law fence. With --diagram."
         };
 
         Command render = new("render", "Render the managed AGENTS.md block(s) from the spec.")

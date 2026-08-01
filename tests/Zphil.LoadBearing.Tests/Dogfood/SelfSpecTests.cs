@@ -18,8 +18,10 @@ namespace Zphil.LoadBearing.Tests.Dogfood;
 ///     needed: it composes the root block in-process and asserts the committed <c>AGENTS.md</c>'s single
 ///     managed block equals it exactly — the product thesis in one test.
 ///     <see cref="ArchitectureMd_IsCurrent" /> is the same gate over the rendered diagram, and unlike its
-///     pure-spec sibling it does need a workspace: the diagram is drawn from the codebase rather than from
-///     the spec, so the solution has to be loaded and extracted to compose it.
+///     pure-spec sibling it does need a workspace: one of that block's two fences is drawn from the
+///     codebase rather than from the spec, so the solution has to be loaded and extracted to compose it.
+///     <see cref="ArchitectureMd_CarriesBothFences" /> is its workspace-free shape half, naming the fence a
+///     composer bypass would drop.
 ///     <see cref="ScopedCards_AreCurrent" /> closes the class: every per-directory card this repo commits,
 ///     gated as a class rather than one file at a time.
 /// </summary>
@@ -91,12 +93,33 @@ public sealed class SelfSpecTests
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
 
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
-        string composed = GraphDiagramRenderer.Block(
-            summary, Path.GetFileName(RepoRoot.Solution), new DiagramScope(ShippingProjects, []));
+        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
+        string composed = DiagramComposer.Compose(
+            summary, Path.GetFileName(RepoRoot.Solution), model, SpecName, new DiagramScope(ShippingProjects, []));
         string committed = File.ReadAllText(RepoRoot.ArchitectureMd);
 
         MarkerPairCount(committed).ShouldBe(1);
         ManagedBlock.ExtractBody(committed).ShouldBe(composed);
+    }
+
+    /// <summary>
+    ///     The shape guard behind <see cref="ArchitectureMd_IsCurrent" />, and the cheaper half: no
+    ///     workspace, just the committed file. The block is supposed to carry two drawings of the same
+    ///     system — the codebase survey drawn from what exists, and the architecture law drawn from the
+    ///     spec — and the composer is the only thing that puts them side by side. Rewire the render or the
+    ///     drift gate back to <see cref="GraphDiagramRenderer" /> alone and the committed artifact loses a
+    ///     fence, which the equality gate would catch only after someone re-rendered. This one names the
+    ///     missing half directly.
+    /// </summary>
+    [Fact]
+    public void ArchitectureMd_CarriesBothFences()
+    {
+        string? body = ManagedBlock.ExtractBody(File.ReadAllText(RepoRoot.ArchitectureMd));
+        body.ShouldNotBeNull("ARCHITECTURE.md carries no managed block.");
+
+        Occurrences(body, "```mermaid").ShouldBe(2, "the managed block must carry both drawings.");
+        body.ShouldContain("accTitle: Codebase survey:");
+        body.ShouldContain("accTitle: Architecture law:");
     }
 
     /// <summary>

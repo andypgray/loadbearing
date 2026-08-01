@@ -49,9 +49,16 @@ public sealed class RootReadmeQuoteSyncTests
             SelfSpec),
         new(
             // The one tool-output fence with a committed counterpart: `render --diagram` writes the block
-            // into ARCHITECTURE.md, so the README quote is synced rather than demonstration-exempt.
+            // into ARCHITECTURE.md, so the README quote is synced rather than demonstration-exempt. The
+            // marker is the accessible title rather than `flowchart LR`, which stopped being distinctive
+            // the moment that one block grew a second fence.
             "graph-diagram",
-            "flowchart LR",
+            "accTitle: Codebase survey:",
+            "ARCHITECTURE.md"),
+        new(
+            // The law fence out of the same block, drawn from the spec rather than from the codebase.
+            "law-diagram",
+            "accTitle: Architecture law:",
             "ARCHITECTURE.md"),
 
         // The four entries below quote output captured from a run rather than a committed file, so there
