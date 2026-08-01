@@ -9,6 +9,23 @@
 #
 # Lift this into your own repo: copy it to .claude/arch-hook.sh and change the three values below.
 
+# Hooks run in the session's current directory, which need not be the repository root;
+# Claude Code sets CLAUDE_PROJECT_DIR to the root for every hook it fires.
+[ -n "${CLAUDE_PROJECT_DIR:-}" ] && cd "$CLAUDE_PROJECT_DIR"
+
+# The PostToolUse payload on stdin names the edited file. The check reads code, so an edit to
+# anything else (docs, config, lockfiles) skips it; with no payload (a hand-run), it runs.
+edited_file=''
+if [ ! -t 0 ]; then
+  edited_file=$(grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n 1 | sed 's/.*:[[:space:]]*"//; s/"$//')
+fi
+if [ -n "$edited_file" ]; then
+  case "$(printf '%s' "$edited_file" | tr '[:upper:]' '[:lower:]')" in
+    *.cs|*.csproj|*.props|*.targets|*.sln|*.slnx|*.razor|*.cshtml) ;;
+    *) exit 0 ;;
+  esac
+fi
+
 SOLUTION="${SOLUTION:-examples/Meridian/Meridian.slnx}"
 SPEC="${SPEC:-examples/Meridian/arch/Meridian.ArchSpec/bin/Debug/net10.0/Meridian.ArchSpec.dll}"
 DIFF_BASE="${DIFF_BASE:-HEAD}"

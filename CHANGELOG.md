@@ -40,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new drift gate, which asserts every committed card is byte-current and that no committed card
   exists that no placement produced.
 
+- The PowerShell hook wrapper now hands the agent the violation report itself. PowerShell
+  captures multi-line command output as an array, and `[Console]::Error.WriteLine` printed the
+  array's type name — an agent blocked by a red rule read `System.Object[]` where the rule ID,
+  reason, fix, and `file:line` should have been. The lines are joined before writing; the POSIX
+  wrapper was already correct.
+- The hook recipe no longer assumes it fires from the repository root. Claude Code runs command
+  hooks in the session's current directory, so the settings snippet now anchors the wrapper path
+  to `${CLAUDE_PROJECT_DIR}` and the wrappers change to that directory before checking. The
+  snippet also sets an explicit 120-second hook timeout: the 60-second default sits too close to
+  a cold check.
+
 ### Changed
 
 - Spec-load diagnostics now cover .NET Framework specs. A `typeof()` anchor whose type closure
@@ -51,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a NuGet-packaged dependency and a dead end for a .NET Framework reference assembly, because
   such an assembly resolves from the targeting pack or the GAC and is never staged into `bin`.
   Both remedies are now named, each with the case it applies to.
+- The hook wrappers read the edited file's path from the PostToolUse payload and skip the check
+  when the file is one the extractor cannot see (anything but source, project, and solution
+  files), so a documentation edit no longer pays a full solution check. A hand-run wrapper, with
+  no payload on stdin, still checks; so does any edit whose payload cannot be parsed.
 
 ## [0.3.0] - 2026-07-24
 
