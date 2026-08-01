@@ -78,18 +78,34 @@ internal static class DocProse
     {
         var patternList = patterns as Regex[] ?? patterns.ToArray();
         string normalized = text.Replace("\r\n", "\n");
+
+        var present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized)).ToArray();
+        if (present.Length == 0) return [];
+
         string[] lines = normalized.Split('\n');
         List<string> hits = new();
 
         for (var index = 0; index < lines.Length; index++)
         {
             string line = lines[index];
-            foreach (Regex pattern in patternList)
+            foreach (Regex pattern in present)
             foreach (Match match in pattern.Matches(line))
                 hits.Add($"{index + 1}: {match.Value}");
         }
 
         return hits;
+    }
+
+    // A pattern that matches somewhere in a line also matches the text those lines came from, so one
+    // pass over the whole text is a sound filter for the per-line pass — and the callers that scan a
+    // repository run hundreds of patterns over tens of thousands of lines that hit nothing at all.
+    // The exception is an anchored pattern: without Multiline, '^' and '$' mean the ends of the text
+    // rather than the ends of a line, so those skip the filter and are always located line by line.
+    private static bool CanSkipWholeText(Regex pattern)
+    {
+        var source = pattern.ToString();
+
+        return source.Contains('^') || source.Contains('$');
     }
 
     private static bool TryOpenFence(string line, out char fenceChar, out int fenceLength)

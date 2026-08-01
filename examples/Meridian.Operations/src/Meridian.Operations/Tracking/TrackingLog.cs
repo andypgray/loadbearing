@@ -21,7 +21,7 @@ internal sealed class TrackingLog(MilestoneStore store, ILogger<TrackingLog> log
 
     // Departed and Discharged are the milestones downstream subsystems react to, so tracking
     // projects them to domain-event values as they are recorded. Today the event is logged; a
-    // later WP can publish the same value onto a bus without changing this call site.
+    // later release can publish the same value onto a bus without changing this call site.
     private void EmitDomainEvent(ShipmentMilestone milestone)
     {
         object? domainEvent = milestone.Kind switch

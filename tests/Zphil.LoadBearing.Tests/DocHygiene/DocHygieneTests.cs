@@ -40,7 +40,8 @@ public sealed class DocHygieneTests
         "examples/Meridian/ADOPTING.md",
         "examples/Meridian.Quoting/README.md",
         "examples/Meridian.Operations/README.md",
-        "examples/Meridian.Interchange/README.md"
+        "examples/Meridian.Interchange/README.md",
+        "hooks/README.md"
     ];
 
     private static readonly string[] VoiceDocs =
@@ -52,21 +53,57 @@ public sealed class DocHygieneTests
     ];
 
     /// <summary>
-    ///     References the published documentation must never contain: the project's internal
-    ///     working-document filenames, its working-notes directory, and internal phase and work-item
-    ///     labels. The patterns are case-sensitive so ordinary prose that merely shares a word is left
-    ///     alone.
+    ///     References the published tree must never contain: the project's internal working-document
+    ///     filenames, its working-notes directory, the labels its build was coordinated by, and the
+    ///     digit-free vocabulary that coordination is narrated in.
     /// </summary>
+    /// <remarks>
+    ///     The digit-bearing and filename forms stay case-sensitive, which is what lets ordinary prose
+    ///     share a word with a label. The narration and vocabulary forms are case-insensitive, because
+    ///     narration is written in sentence case as often as not — so they are written to be precise
+    ///     instead. The article in the narration form is the whole of its precision: a bare
+    ///     <c>\bphase\b</c> also reds a concurrency term and this very summary, while requiring
+    ///     <em>this/the/that</em> in front of it reds only prose about a stage of the build.
+    /// </remarks>
     internal static readonly Regex[] InternalReferencePatterns =
     [
-        new(@"\bPhase\s+[0-9]"),
-        new(@"\bWP\s*[0-9]"),
+        new(@"\bPhase\s*-?\s*[0-9]"),
+        new(@"\bWP-?\s*[0-9]"),
+        new(@"\bWP\b"),
+        new(@"\b(this|the|that)\s+(current|next|last|previous|final|first)?\s*phase\b", RegexOptions.IgnoreCase),
+        new(@"\btask-[0-9]+\b", RegexOptions.IgnoreCase),
+        new(@"\bwork package\b", RegexOptions.IgnoreCase),
+        new(@"\btracker\b", RegexOptions.IgnoreCase),
         new(@"\bDESIGN\.md\b"),
         new(@"\bPLAN\.md\b"),
         new(@"\bPLAN-ARCHIVE\.md\b"),
         new(@"\bEXAMPLES\.md\b"),
         new(@"\bGUIDANCE-PACK\.md\b"),
+        new(@"\bEVALUATION\.md\b"),
+        new(@"\boutside-review\.md\b"),
         new(@"\bdocs/")
+    ];
+
+    /// <summary>
+    ///     The development environment a published tree never names: a machine path, a home directory,
+    ///     or a personal identity.
+    /// </summary>
+    /// <remarks>
+    ///     These are shapes rather than names on purpose. A private sibling repository can only be
+    ///     matched by name, and a denylist that spells such a name out publishes it permanently — so
+    ///     those patterns are read from an untracked local file instead, and this array holds only
+    ///     what can be described without disclosing anything. See <see cref="LocalPrivatePatterns" />.
+    ///     Known-benign forms these are drawn tightly enough to leave alone: an environment-variable
+    ///     root with no drive letter, and a drive-rooted path to a machine-independent location such
+    ///     as an installed toolchain or a build output directory.
+    /// </remarks>
+    internal static readonly Regex[] PrivateEnvironmentPatterns =
+    [
+        new(@"[A-Za-z]:[\\/](Users|source|repos)\b", RegexOptions.IgnoreCase),
+        new(@"/home/[a-z]"),
+        new(@"/Users/[a-z]"),
+        new(@"%USERPROFILE%", RegexOptions.IgnoreCase),
+        new(@"@gmail\.com", RegexOptions.IgnoreCase)
     ];
 
     /// <summary>Off-voice descriptions of a codebase that the reader-facing docs never use.</summary>
@@ -159,6 +196,25 @@ public sealed class DocHygieneTests
         // Assert
         uncovered.ShouldBeEmpty(
             $"README(s) under examples/ or src/ are outside the budgeted set:\n{string.Join("\n", uncovered)}");
+
+        const string adopting = "examples/Meridian/ADOPTING.md";
+        if (File.Exists(Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
+    }
+
+    [Fact]
+    public void EveryTrackedReadme_IsInsideTheBudgetGate()
+    {
+        // Act: the walk above descends one level under examples/ and src/, which is how a README at
+        // a new top-level directory stayed invisible to it. Asking git for the set closes that blind
+        // spot without another directory name to keep up to date.
+        var uncovered = TrackedFiles.All
+            .Where(static path => path == "README.md" || path.EndsWith("/README.md", StringComparison.Ordinal))
+            .Where(static path => !BudgetDocs.Contains(path))
+            .ToList();
+
+        // Assert
+        uncovered.ShouldBeEmpty(
+            $"Tracked README(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
 
         const string adopting = "examples/Meridian/ADOPTING.md";
         if (File.Exists(Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");

@@ -180,13 +180,24 @@ public sealed class DocProseTests
 
     [Theory]
     [InlineData("Phase 12")]
+    [InlineData("Phase-4")]
     [InlineData("WP3")]
     [InlineData("WP 3")]
+    [InlineData("WP-7")]
+    [InlineData("WP")]
+    [InlineData("this phase")]
+    [InlineData("the current phase")]
+    [InlineData("that final phase")]
+    [InlineData("task-131")]
+    [InlineData("work package")]
+    [InlineData("tracker")]
     [InlineData("DESIGN.md")]
     [InlineData("PLAN.md")]
     [InlineData("PLAN-ARCHIVE.md")]
     [InlineData("EXAMPLES.md")]
     [InlineData("GUIDANCE-PACK.md")]
+    [InlineData("EVALUATION.md")]
+    [InlineData("outside-review.md")]
     [InlineData("docs/notes.md")]
     public void FindForbidden_ForbiddenTokenOnSecondLine_ReportsHitWithLineNumber(string token)
     {
@@ -206,10 +217,55 @@ public sealed class DocProseTests
     [InlineData("phase two, without a digit")]
     [InlineData("see PLAN.mdx for details")]
     [InlineData("the EXAMPLES.mdown file")]
+    [InlineData("WPF data bindings")]
+    [InlineData("two-phase ready tasks")]
+    [InlineData("internal phase and work-item labels")]
+    [InlineData("the phased rollout continues")]
+    [InlineData("Task-returning methods await their result")]
+    [InlineData("a sweep of a large backlog")]
+    [InlineData("the guidance-pack spec")]
+    [InlineData("the twenty-rule board")]
     public void FindForbidden_BenignLookalike_ReportsNoHit(string text)
     {
         // Act
         var hits = DocProse.FindForbidden(text, DocHygieneTests.InternalReferencePatterns);
+
+        // Assert
+        hits.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(@"C:\Users\someone\notes.txt")]
+    [InlineData("D:/repos/a-sibling")]
+    [InlineData("/home/runner/work")]
+    [InlineData("/Users/someone/dev")]
+    [InlineData(@"%USERPROFILE%\.nuget")]
+    [InlineData("someone@gmail.com")]
+    public void FindForbidden_PrivateEnvironmentTokenOnSecondLine_ReportsHitWithLineNumber(string token)
+    {
+        // Arrange
+        var text = $"first clean line\nprefix {token} suffix\nthird clean line";
+
+        // Act
+        var hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
+
+        // Assert
+        hits.ShouldNotBeEmpty();
+        hits.ShouldAllBe(hit => hit.StartsWith("2: "));
+    }
+
+    [Theory]
+    [InlineData(@"%LOCALAPPDATA%\Zphil.LoadBearing\logs")]
+    [InlineData(@"C:\Program Files\Microsoft Visual Studio")]
+    [InlineData("\"C:/pkgs/library.dll\"")]
+    [InlineData("\"C:/out/build\"")]
+    [InlineData("https://github.com/andypgray/loadbearing")]
+    [InlineData("noreply@example.invalid")]
+    [InlineData("the homepage link")]
+    public void FindForbidden_PrivateEnvironmentLookalike_ReportsNoHit(string text)
+    {
+        // Act
+        var hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
 
         // Assert
         hits.ShouldBeEmpty();
