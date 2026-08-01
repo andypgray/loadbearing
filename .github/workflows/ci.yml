@@ -80,9 +80,12 @@ jobs:
       contents: read           # checkout
       security-events: write   # upload SARIF to code scanning
     steps:
+      # fetch-depth: 0 so origin/main exists as a local ref for --diff-base below; the default
+      # single-commit checkout leaves nothing to diff against.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
@@ -92,13 +95,46 @@ jobs:
       # pick (the self-spec test passes the same path).
       - name: Build
         run: dotnet build Zphil.LoadBearing.slnx
+      # --diff-base arms the Quarantine tripwire: a change set touching roslyn/msbuild-bootstrap
+      # draws a warning naming the file, which is the recommended CI shape and the one this
+      # repository owed its own quarantined scope. Without the flag the tripwire reports skipped
+      # on every run. Warnings never move the exit code, so this cannot redden CI on its own;
+      # containment, which needs no diff, already could. On a push to main origin/main is HEAD
+      # and the diff is empty; on a pull request it is the base tip, so the warning covers
+      # exactly the proposed change.
       - name: Check self and emit SARIF
-        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --sarif loadbearing.sarif
+        run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --diff-base origin/main --sarif loadbearing.sarif
       # The same self-spec through the xUnit adapter, as its own step so the log reads one line per rule
       # ID — the run the landing page's xUnit beat links. The 3-OS matrix already runs these tests inside
       # the full suite; this leg exists to be readable, not to add coverage.
       - name: Self-spec as named xUnit tests (one test per rule)
         run: dotnet test tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj --no-build --filter "FullyQualifiedName~AdapterSelfSpecTests" --logger "console;verbosity=normal"
+      # Render this repo's own spec and require a zero diff — the same provably-current property the
+      # examples job holds, now over the root block, the diagram, and the whole class of per-directory
+      # cards. The command is character-for-character the one ARCHITECTURE.md publishes as the way to
+      # redraw it, so the documented reproduce line is an executed one rather than a claim. The diff is
+      # unscoped on purpose: a card placed somewhere nobody predicted still has to be committed, and a
+      # path list here would quietly stop covering it. Cost: render pays two extractions (scoped cards,
+      # then the diagram with no project exclusions) on top of check's one. Accepted — this is the only
+      # leg that runs `render` against this solution at all.
+      - name: Render self and assert a single zero diff
+        run: |
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render Zphil.LoadBearing.slnx \
+            --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj \
+            --diagram ARCHITECTURE.md \
+            --diagram-only "Zphil.LoadBearing;Zphil.LoadBearing.Cli;Zphil.LoadBearing.Roslyn;Zphil.LoadBearing.Xunit;Zphil.LoadBearing.Packs.DotNet;Zphil.LoadBearing.ArchSpec"
+          git diff --exit-code
+      # The read verbs, against this solution. `check` used to be the only command that ever ran on this
+      # repository under any gate; a shipped verb nobody points at its own codebase is a verb whose first
+      # real consumer is a stranger. With render above, that leaves only `baseline`, which stays out
+      # deliberately — it is the human escape valve, and a gate that ran it would be moving the ratchet.
+      # Exit 0 is the whole assertion — `status` always exits 0 by design, and `explain` needs no
+      # workspace — so this is a smoke test, not a second check.
+      - name: Read verbs against this solution (status, graph, explain)
+        run: |
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- status Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- graph Zphil.LoadBearing.slnx
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- explain layering/model-independent Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj
       - name: Upload SARIF to code scanning
         if: always() && (github.event_name != 'pull_request' || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
         uses: github/codeql-action/upload-sarif@e0647621c2984b5ed2f768cb892365bf2a616ad1 # v4.37.2

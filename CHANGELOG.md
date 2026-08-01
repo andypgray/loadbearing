@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- This repository's own spec now declares layers, which is what the module map, the per-directory
+  layer cards, and the MCP `arch_context` layer answers are all driven by. Eight of them — Core,
+  Model, Checking, Rendering, Extraction, Host, Adapter and Pack — with seven rule subjects and one
+  union re-anchored onto them, so the rendered sentences read in layer voice ("The Adapter layer
+  must not be referenced by the Core, Extraction, Host or Pack layers"). Six per-directory cards are
+  now committed where there was one, and every path under `src/` answers `arch_context` with
+  something.
+- Four new rules over this repository's real code: `layering/model-independent` (the Model
+  references neither Checking nor Rendering — the product thesis as law), `packs/depends-on-core-only`,
+  `naming/interfaces`, and `model/constraint-nodes`.
+- CI's self-check job now renders this repository's own spec and requires a zero diff, and runs
+  `status`, `graph` and `explain` against this solution. Before, `check` was the only command any
+  gate pointed at this repository.
+
+### Changed
+
+- The self-spec's own documentation no longer claims to exercise "the full posture and verb range",
+  which was true of the postures and false of the verbs. It now says what it exercises, and carries
+  a ledger naming every unused verb family with its reason — including the rules that were tried
+  against the real code and declined rather than contrived, and the stance on `baseline --add`. A
+  new test holds the ledger complete against the public `Must*` surface, so a verb that ships with
+  neither a self-use nor a ledger line reddens CI.
+
+### Fixed
+
+- The per-directory context cards `render` writes were gated by nothing: a scoped card could drift,
+  and a card orphaned by a spec change could sit committed forever with no test that would look at
+  it. The directory-grouping and merge step now lives in one composer shared by the command and a
+  new drift gate, which asserts every committed card is byte-current and that no committed card
+  exists that no placement produced.
+
 ### Changed
 
 - Spec-load diagnostics now cover .NET Framework specs. A `typeof()` anchor whose type closure

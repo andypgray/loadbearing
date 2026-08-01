@@ -32,6 +32,7 @@ public sealed class AdapterTests
         rows.Select(row => row.TestDisplayName).ShouldBe(
         [
             "layering/core-no-roslyn",
+            "layering/model-independent",
             "cli/no-stdout",
             "di/no-captive-dependencies",
             "di/no-service-locator",
@@ -44,6 +45,9 @@ public sealed class AdapterTests
             "roslyn/no-engine-types-on-seam",
             "xunit/leaf-adapter",
             "xunit/throws-setup-errors-only",
+            "packs/depends-on-core-only",
+            "naming/interfaces",
+            "model/constraint-nodes",
             "mcp/env-through-seam",
             "roslyn/msbuild-bootstrap/containment",
             "roslyn/msbuild-bootstrap/tripwire"

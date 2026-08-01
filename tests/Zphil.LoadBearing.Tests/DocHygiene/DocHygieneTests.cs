@@ -21,7 +21,8 @@ public sealed class DocHygieneTests
         "GRAMMAR.md",
         "README.md",
         "ARCHITECTURE.md",
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "AGENTS.md"
     ];
 
     private static readonly string[] BudgetDocs =

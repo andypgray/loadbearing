@@ -72,7 +72,7 @@ public sealed class RootReadmeQuoteSyncTests
             null),
         new(
             "graph-survey",
-            "185 types; references: (none)",
+            "192 types; references: (none)",
             null),
         new(
             "legacy-check",

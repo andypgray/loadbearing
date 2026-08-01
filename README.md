@@ -32,11 +32,11 @@ The compiler is the source of truth for your code. LoadBearing is the source of 
 
 ## This repo's own spec
 
-LoadBearing governs itself. Fourteen rules over this repository's real code live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another. Take the rule that keeps the CLI off stdout:
+LoadBearing governs itself. Eighteen rules over this repository's real code, across eight declared layers, live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another. Take the rule that keeps the CLI off stdout — `host` is the layer the CLI project's namespace defines:
 
 ```csharp
         arch.Rule("cli/no-stdout")
-            .Enforce(arch.Project("Zphil.LoadBearing.Cli")
+            .Enforce(host
                 .MustNotUse(
                     arch.Member(() => Console.Out),
                     arch.Member(typeof(Console), nameof(Console.Write)),
@@ -55,7 +55,7 @@ A rule is a posture verb (`Enforce`), a modal constraint (`MustNotUse`), an ID, 
 `loadbearing render` derives the rule sentence from the constraint, carries the `Because` across verbatim, and writes the result into the managed block of this repository's committed [`AGENTS.md`](https://github.com/andypgray/loadbearing/blob/main/AGENTS.md), the convention file Claude Code, Codex, Cursor, and Copilot read:
 
 ```markdown
-- `cli/no-stdout` — Types in project `Zphil.LoadBearing.Cli` must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
+- `cli/no-stdout` — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
 ```
 
 Nobody wrote that sentence, and nobody can let it go stale: [`SelfSpecTests.AgentsMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. The prose an agent reads is provably the spec the build enforces. Agents that query rather than read get the same model over MCP (`loadbearing mcp`).
@@ -65,14 +65,14 @@ Nobody wrote that sentence, and nobody can let it go stale: [`SelfSpecTests.Agen
 Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The `PostToolUse` hook in [`hooks/`](https://github.com/andypgray/loadbearing/tree/main/hooks) runs `check` on the edit, the rule goes red, and the wrapper exits 2, which is how a Claude Code hook blocks, with the report on the agent's stderr:
 
 ```text
-FAIL cli/no-stdout — Types in project `Zphil.LoadBearing.Cli` must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
+FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:10 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:15 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the sixteen-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
+That stanza is one rule's worth of the twenty-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
 
 ## In xUnit
 
@@ -153,9 +153,9 @@ CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.gith
 `loadbearing graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, every external dependency by root. Five of the twenty project lines for this solution:
 
 ```text
-  Zphil.LoadBearing — 185 types; references: (none)
+  Zphil.LoadBearing — 192 types; references: (none)
   Zphil.LoadBearing.ArchSpec — 1 type; references: Zphil.LoadBearing, Zphil.LoadBearing.Packs.DotNet, Zphil.LoadBearing.Roslyn
-  Zphil.LoadBearing.Cli — 122 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
+  Zphil.LoadBearing.Cli — 120 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
   Zphil.LoadBearing.Roslyn — 78 types; references: Zphil.LoadBearing
   Zphil.LoadBearing.Xunit — 2 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
 ```
@@ -252,7 +252,7 @@ The last two both need Windows with Visual Studio or Build Tools installed, beca
 
 ## Examples
 
-Six worked examples in [`examples/`](https://github.com/andypgray/loadbearing/tree/main/examples) share one fictional freight-forwarding company; CI builds each one and holds `check` green against the committed tree. Three are whole codebases:
+Six worked examples in [`examples/`](https://github.com/andypgray/loadbearing/tree/main/examples) share one fictional freight-forwarding company. Four are solutions: CI builds each one, holds `check` green against the committed tree, and re-renders every managed block under `examples/` to prove a zero diff. The other two walk a flow with captured output. Three are whole codebases:
 
 - [Enforce-only clean architecture](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): the greenfield quoting subsystem. Nine rules hold a four-layer clean architecture, and every rule runs as a named xUnit test.
 - [All three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a mid-migration monolith where six of eight controllers still run inline SQL. The law, three ratchets and their burndown, one quarantined scope.
