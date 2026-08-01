@@ -46,7 +46,10 @@ internal sealed class BinlogFixtureWorkspace
 
     private static BinlogFixtureWorkspace BuildOnce()
     {
-        var copy = new TempFixtureWorkspace();
+        // Dedicated, not leased: the binlog bakes in this copy's absolute paths and a freshness test mutates
+        // a source file in place, so this tree must survive untouched for the whole run rather than be reset
+        // between tests the way a leased copy is.
+        TempFixtureWorkspace copy = TempFixtureWorkspace.Dedicated();
         var fixture = new BinlogFixtureWorkspace(copy);
 
         // One real build with the binary logger. --disable-build-servers (plus DotnetCli's node/server env)
