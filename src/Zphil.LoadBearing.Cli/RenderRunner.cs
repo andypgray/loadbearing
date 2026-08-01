@@ -19,14 +19,16 @@ namespace Zphil.LoadBearing.Cli;
 ///     wrote/unchanged stream. Render is a mutation, not a gate: it always exits 0 on success;
 ///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
-internal sealed class RenderRunner(TextWriter output, TextWriter error)
+internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
 {
+    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
+
     public async Task<int> RunAsync(RenderRequest request, CancellationToken ct)
     {
         ValidateDiagramOptions(request);
 
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            request.Solution, request.Spec, request.WorkingDirectory, ct);
+            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         foreach (string diagnostic in workspace.Diagnostics) error.WriteLine($"warning: {diagnostic}");
 

@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Reflection;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -13,6 +14,15 @@ internal sealed record CliResult(int Exit, string Out, string Err);
 ///     surfaces the MyApp solution path and the fixture spec DLL paths the build bakes into this
 ///     assembly's metadata.
 /// </summary>
+/// <remarks>
+///     <b>Warm by default.</b> <see cref="InvokeAsync" /> hands the CLI the shared
+///     <see cref="WarmWorkspacePool" /> as its host source, so a class's many invocations reuse one loaded
+///     workspace (reconciled against disk on every call) instead of opening one each. Nothing else about
+///     the run changes: the same command tree, the same runners, the same full extraction, the same
+///     stdout/stderr. A test whose subject <em>is</em> the loading — a load-count pin, a
+///     workspace-acquisition count — calls <see cref="InvokeColdAsync" /> instead and gets today's fresh
+///     one-shot workspace per invocation.
+/// </remarks>
 internal static class CliRunner
 {
     public static string MyAppSolution =>
@@ -43,13 +53,29 @@ internal static class CliRunner
     public static string ClassicAppSolution =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "LegacySolutions", "ClassicApp", "ClassicApp.sln");
 
-    public static async Task<CliResult> InvokeAsync(params string[] args)
+    /// <summary>Runs the CLI over the shared warm workspace pool — the default; see the type's remarks.</summary>
+    public static Task<CliResult> InvokeAsync(params string[] args)
+    {
+        return RunAsync(WarmWorkspacePool.Source, args);
+    }
+
+    /// <summary>
+    ///     Runs the CLI with no host source, so every workspace command opens (and disposes) its own
+    ///     <c>MSBuildWorkspace</c>. For tests that assert on <see cref="Zphil.LoadBearing.Roslyn.WorkspaceLoader.LoadCount" />
+    ///     or otherwise measure whether a design-time build ran.
+    /// </summary>
+    public static Task<CliResult> InvokeColdAsync(params string[] args)
+    {
+        return RunAsync(null, args);
+    }
+
+    private static async Task<CliResult> RunAsync(ISolutionSource? hostSource, string[] args)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var configuration = new InvocationConfiguration { Output = output, Error = error };
 
-        int exit = await CliEntry.InvokeAsync(args, configuration);
+        int exit = await CliEntry.InvokeAsync(args, configuration, hostSource);
         return new CliResult(exit, output.ToString(), error.ToString());
     }
 

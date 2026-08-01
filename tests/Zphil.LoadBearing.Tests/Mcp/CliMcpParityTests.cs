@@ -16,6 +16,12 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     with the watchdog suites — the filter brackets each call with the shared
 ///     <see cref="Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
 /// </summary>
+/// <remarks>
+///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync" />, not the warm-by-default
+///     <see cref="CliRunner.InvokeAsync" />. The harness these rows compare against is warm, so this is the
+///     suite's warm-against-cold net; serving both sides from one pooled workspace would make it compare
+///     the warm path with itself.
+/// </remarks>
 [Collection("Serial")]
 public sealed class CliMcpParityTests
 {
@@ -52,7 +58,7 @@ public sealed class CliMcpParityTests
         // arch_check ≡ check --json (CLI exits 1 on the violation; the tool never reports IsError). The
         // ViolatedSpec carries every violation kind including the member-subject rule naming/async-suffix
         // (memberShape / subjectMember, GRAMMAR §4.6), so this byte-parity covers member subjects too.
-        CliResult cliCheck = await CliRunner.InvokeAsync(
+        CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
         cliCheck.Exit.ShouldBe(1);
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
@@ -60,25 +66,25 @@ public sealed class CliMcpParityTests
         Normalize(TextOf(mcpCheck)).ShouldBe(Normalize(cliCheck.Out));
 
         // arch_status ≡ status --json.
-        CliResult cliStatus = await CliRunner.InvokeAsync(
+        CliResult cliStatus = await CliRunner.InvokeColdAsync(
             "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
         CallToolResult mcpStatus = await harness.Client.CallToolAsync("arch_status", cancellationToken: Ct);
         Normalize(TextOf(mcpStatus)).ShouldBe(Normalize(cliStatus.Out));
 
         // arch_graph ≡ graph --json (spec-independent; the survey ignores the bound spec, and graph takes no --spec).
-        CliResult cliGraph = await CliRunner.InvokeAsync("graph", CliRunner.MyAppSolution, "--json");
+        CliResult cliGraph = await CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json");
         CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
         Normalize(TextOf(mcpGraph)).ShouldBe(Normalize(cliGraph.Out));
 
         // arch_explain <known> ≡ explain <known> stdout.
-        CliResult cliExplain = await CliRunner.InvokeAsync(
+        CliResult cliExplain = await CliRunner.InvokeColdAsync(
             "explain", "layering/domain-independent", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
         CallToolResult mcpExplain = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "layering/domain-independent" }, cancellationToken: Ct);
         Normalize(TextOf(mcpExplain)).ShouldBe(Normalize(cliExplain.Out));
 
         // arch_explain <unknown> IsError text ≡ explain <unknown> stderr (CLI exit 2).
-        CliResult cliUnknown = await CliRunner.InvokeAsync(
+        CliResult cliUnknown = await CliRunner.InvokeColdAsync(
             "explain", "unknown/id", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
         cliUnknown.Exit.ShouldBe(2);
         CallToolResult mcpUnknown = await harness.Client.CallToolAsync(
@@ -93,7 +99,7 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(CliRunner.MyAppSolution, CliRunner.CleanSpecDll), Ct);
 
-        CliResult cliCheck = await CliRunner.InvokeAsync(
+        CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll, "--json");
         cliCheck.Exit.ShouldBe(0);
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
@@ -133,7 +139,7 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
 
-        CliResult cliCheck = await CliRunner.InvokeAsync(
+        CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--diff-base", "HEAD");
         CallToolResult mcpCheck = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["diffBase"] = "HEAD" }, cancellationToken: Ct);

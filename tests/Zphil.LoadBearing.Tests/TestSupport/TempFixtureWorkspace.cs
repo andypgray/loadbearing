@@ -32,6 +32,13 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         tree whether it ran first or last. <c>bin</c>/<c>obj</c> are left alone — that is what keeps the
 ///         restore valid — and a re-restore happens only if a project or solution file actually changed.
 ///     </para>
+///     <para>
+///         <b>The reset and the warm pool.</b> A <see cref="WarmWorkspacePool" /> session for this tree
+///         outlives the test that loaded it, which is the point — but it must never make a reset fail or go
+///         unseen. Unseen it cannot: a restored file carries the pristine source's write time, and the
+///         session's reconcile sweep treats any mtime difference as a change. Fail it must not, so a reset
+///         blocked by a held file drops the pooled session and tries once more before giving the lease up.
+///     </para>
 /// </remarks>
 internal sealed class TempFixtureWorkspace : IDisposable
 {
@@ -71,7 +78,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
         if (TryAcquire(key))
         {
             string leased = LeasedDirectory(key);
-            if (TrySyncTree(source, leased, out bool projectsChanged))
+            if (TrySyncTree(source, leased, out bool projectsChanged)
+                || RetryAfterDroppingWarmWorkspaces(source, leased, out projectsChanged))
             {
                 _leaseKey = key;
                 _root = leased;
@@ -80,8 +88,9 @@ internal sealed class TempFixtureWorkspace : IDisposable
                 return;
             }
 
-            // The reset could not complete — a fixture file still held by a previous test's workspace. Give
-            // the lease up and fall through to a private copy: slower, but never a spurious failure.
+            // The reset could not complete even with the warm sessions dropped — a fixture file is held by
+            // something else. Give the lease up and fall through to a private copy: slower, never a spurious
+            // failure.
             Release(key);
         }
 
@@ -114,6 +123,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
             return;
         }
 
+        // A private copy is deleted outright, so any warm workspace still holding it has to go first.
+        WarmWorkspacePool.DropUnder(_root);
         try
         {
             if (Directory.Exists(_root)) Directory.Delete(_root, true);
@@ -167,6 +178,19 @@ internal sealed class TempFixtureWorkspace : IDisposable
         {
             HeldLeases.Remove(key);
         }
+    }
+
+    /// <summary>
+    ///     The second attempt at a reset, after releasing any warm workspace still holding this tree. A
+    ///     pooled <see cref="WarmWorkspacePool">session</see> deliberately outlives the test that loaded it,
+    ///     so it — rather than a leaked handle — is the likeliest thing keeping a fixture file open. Dropping
+    ///     it costs the next test one load; falling through to a private copy would cost a load <em>and</em> a
+    ///     restore, every remaining test in the class.
+    /// </summary>
+    private static bool RetryAfterDroppingWarmWorkspaces(string source, string leased, out bool projectsChanged)
+    {
+        WarmWorkspacePool.DropUnder(leased);
+        return TrySyncTree(source, leased, out projectsChanged);
     }
 
     /// <summary>

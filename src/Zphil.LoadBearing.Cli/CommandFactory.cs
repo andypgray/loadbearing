@@ -11,21 +11,27 @@ namespace Zphil.LoadBearing.Cli;
 /// </summary>
 internal static class CommandFactory
 {
-    public static RootCommand BuildRootCommand()
+    /// <param name="hostSource">
+    ///     The solution source for any run that would otherwise open a fresh one-shot workspace, or
+    ///     <c>null</c> (the real entry point) for <see cref="ColdSolutionSource" />. Carried into every
+    ///     workspace command's action; see <see cref="MsBuildGate" /> for what a host source does and does
+    ///     not displace.
+    /// </param>
+    public static RootCommand BuildRootCommand(ISolutionSource? hostSource = null)
     {
         return new RootCommand("LoadBearing — a fluent architecture spec with deterministic enforcement.")
         {
-            BuildCheckCommand(),
-            BuildExplainCommand(),
-            BuildRenderCommand(),
-            BuildBaselineCommand(),
-            BuildStatusCommand(),
-            BuildGraphCommand(),
+            BuildCheckCommand(hostSource),
+            BuildExplainCommand(hostSource),
+            BuildRenderCommand(hostSource),
+            BuildBaselineCommand(hostSource),
+            BuildStatusCommand(hostSource),
+            BuildGraphCommand(hostSource),
             BuildMcpCommand()
         };
     }
 
-    private static Command BuildCheckCommand()
+    private static Command BuildCheckCommand(ISolutionSource? hostSource)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -82,13 +88,13 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunCheckAsync(request, output, error, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunCheckAsync(request, output, error, hostSource, ct), error);
         });
 
         return check;
     }
 
-    private static Command BuildExplainCommand()
+    private static Command BuildExplainCommand(ISolutionSource? hostSource)
     {
         Argument<string> ruleId = new("rule-id")
         {
@@ -114,13 +120,13 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunExplainAsync(request, output, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunExplainAsync(request, output, hostSource, ct), error);
         });
 
         return explain;
     }
 
-    private static Command BuildRenderCommand()
+    private static Command BuildRenderCommand(ISolutionSource? hostSource)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -162,13 +168,13 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunRenderAsync(request, output, error, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunRenderAsync(request, output, error, hostSource, ct), error);
         });
 
         return render;
     }
 
-    private static Command BuildBaselineCommand()
+    private static Command BuildBaselineCommand(ISolutionSource? hostSource)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -238,13 +244,13 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunBaselineAsync(request, output, error, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunBaselineAsync(request, output, error, hostSource, ct), error);
         });
 
         return baseline;
     }
 
-    private static Command BuildStatusCommand()
+    private static Command BuildStatusCommand(ISolutionSource? hostSource)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -276,13 +282,13 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunStatusAsync(request, output, error, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunStatusAsync(request, output, error, hostSource, ct), error);
         });
 
         return status;
     }
 
-    private static Command BuildGraphCommand()
+    private static Command BuildGraphCommand(ISolutionSource? hostSource)
     {
         var solution = SolutionArgument();
         Option<bool> json = new("--json")
@@ -315,7 +321,7 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunGraphAsync(request, output, error, ct), error);
+            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunGraphAsync(request, output, error, hostSource, ct), error);
         });
 
         return graph;

@@ -19,15 +19,17 @@ namespace Zphil.LoadBearing.Cli;
 ///     on success. Tamper (a hand-edited digest) refuses loudly with the restore hint, the same as
 ///     <c>check</c>. Output/error writers are injected so the e2e tests can capture them.
 /// </summary>
-internal sealed class BaselineRunner(TextWriter output, TextWriter error)
+internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
 {
+    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
+
     public async Task<int> RunAsync(BaselineRequest request, CancellationToken ct)
     {
         // Mode validation FIRST — before discovering a solution or loading a workspace.
         ValidateMode(request);
 
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            request.Solution, request.Spec, request.WorkingDirectory, ct);
+            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
         foreach (string diagnostic in workspace.Diagnostics) error.WriteLine($"warning: {diagnostic}");
 
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(

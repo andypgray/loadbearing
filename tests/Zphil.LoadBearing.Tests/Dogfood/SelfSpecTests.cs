@@ -82,11 +82,13 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task ArchitectureMd_IsCurrent()
     {
-        // Loads the whole solution through MSBuildWorkspace (several seconds — an accepted cost). The
-        // extraction excludes nothing, which is the call `graph` makes: the diagram and the survey are two
-        // renderings of one codebase and must never disagree about what is in it.
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(RepoRoot.Solution);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution);
+        // Through the warm pool, so this shares its ~17-second load of the whole repo solution with
+        // SelfSpec_Check_ExitsZero rather than paying a second one. The extraction excludes nothing, which
+        // is the call `graph` makes: the diagram and the survey are two renderings of one codebase and must
+        // never disagree about what is in it.
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
+            RepoRoot.Solution, TestContext.Current.CancellationToken);
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
 
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string composed = GraphDiagramRenderer.Block(

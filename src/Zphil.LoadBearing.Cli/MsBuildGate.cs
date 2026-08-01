@@ -16,6 +16,17 @@ namespace Zphil.LoadBearing.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
+///         <b>The host source.</b> Every entry point takes an optional <see cref="ISolutionSource" />: the
+///         source to serve a run that would otherwise open a fresh one-shot workspace. <c>null</c> — what
+///         <c>Program</c> passes, and therefore what every real CLI invocation uses — means
+///         <see cref="ColdSolutionSource" />, so production behaviour is exactly as before. A host that
+///         already holds a solution supplies its own: the MCP server does it through DI on the runners it
+///         calls directly, and the in-process e2e harness does it here, so a whole test class's CLI
+///         invocations share one loaded workspace instead of opening one each. The replay decision is
+///         upstream of it — an explicit <c>--binlog</c> or a valid capture still replays — so the host
+///         source only ever replaces the <em>cold</em> branch it names.
+///     </para>
+///     <para>
 ///         <b>The replay branch.</b> <c>check</c>/<c>status</c>/<c>graph</c> route through
 ///         <see cref="SelectSourceAndRunAsync" />, which registers MSBuildLocator once up front and then
 ///         decides the source over only <c>Replay</c>-namespace + BCL types (capture validation, option
@@ -41,50 +52,56 @@ internal static class MsBuildGate
     // ── check / status / graph: replay-aware source selection ────────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static Task<int> RunCheckAsync(CheckRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    public static Task<int> RunCheckAsync(
+        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error,
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
             source => InvokeCheckAsync(request, output, error, source, ct), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static Task<int> RunStatusAsync(StatusRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    public static Task<int> RunStatusAsync(
+        StatusRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error,
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
             source => InvokeStatusAsync(request, output, error, source, ct), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static Task<int> RunGraphAsync(GraphRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    public static Task<int> RunGraphAsync(
+        GraphRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error,
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
             source => InvokeGraphAsync(request, output, error, source, ct), ct);
     }
 
     // ── explain / render / baseline: the plain cold path (no --binlog) ───────────────────────────────────
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static async Task<int> RunExplainAsync(ExplainRequest request, TextWriter output, CancellationToken ct)
+    public static async Task<int> RunExplainAsync(
+        ExplainRequest request, TextWriter output, ISolutionSource? hostSource, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return await InvokeExplainAsync(request, output, ct);
+        return await InvokeExplainAsync(request, output, SourceOrCold(hostSource), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static async Task<int> RunRenderAsync(RenderRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    public static async Task<int> RunRenderAsync(
+        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return await InvokeRenderAsync(request, output, error, ct);
+        return await InvokeRenderAsync(request, output, error, SourceOrCold(hostSource), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static async Task<int> RunBaselineAsync(BaselineRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    public static async Task<int> RunBaselineAsync(
+        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return await InvokeBaselineAsync(request, output, error, ct);
+        return await InvokeBaselineAsync(request, output, error, SourceOrCold(hostSource), ct);
     }
 
     // ── the source-selection gate ────────────────────────────────────────────────────────────────────────
@@ -97,7 +114,7 @@ internal static class MsBuildGate
     // here), and the runner types stay quarantined behind the NoInlining stepping stones until after it.
     private static async Task<int> SelectSourceAndRunAsync(
         string? solutionArgument, string workingDirectory, string? binlog, bool noCache,
-        TextWriter error, Func<ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
+        TextWriter error, ISolutionSource? hostSource, Func<ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
 
@@ -112,12 +129,20 @@ internal static class MsBuildGate
             string solutionPath = ModelPipeline.DiscoverSolution(solutionArgument, workingDirectory);
             CaptureValidation capture = ValidateCapture(solutionPath, cacheRoot, ct);
             if (capture.State == CaptureState.Usable)
-                return await RunCaptureReplayAsync(capture.BinlogCopyPath!, error, invokeRunner);
+                return await RunCaptureReplayAsync(capture.BinlogCopyPath!, error, hostSource, invokeRunner);
             if (capture.State == CaptureState.Invalid)
-                return await RunNoticeColdAsync(capture.Notice!, error, invokeRunner);
+                return await RunNoticeColdAsync(capture.Notice!, error, hostSource, invokeRunner);
         }
 
-        return await RunColdAsync(invokeRunner);
+        return await RunColdAsync(hostSource, invokeRunner);
+    }
+
+    // The source a run that would open its own workspace uses: the host's when one was supplied, today's
+    // fresh one-shot otherwise. One helper so every cold branch — including the capture-replay fallback and
+    // the notice wrapper's inner — resolves it the same way.
+    private static ISolutionSource SourceOrCold(ISolutionSource? hostSource)
+    {
+        return hostSource ?? new ColdSolutionSource();
     }
 
     // Explicit --binlog: replay the user's binlog (wrapping every failure loudly), then — unless --no-cache —
@@ -157,7 +182,7 @@ internal static class MsBuildGate
     // registered from the up-front call); the two runner invocations build independent runners and the failed
     // one wrote nothing, so the retry cannot double-render.
     private static async Task<int> RunCaptureReplayAsync(
-        string binlogCopyPath, TextWriter error, Func<ISolutionSource, Task<int>> invokeRunner)
+        string binlogCopyPath, TextWriter error, ISolutionSource? hostSource, Func<ISolutionSource, Task<int>> invokeRunner)
     {
         LastAcquisition = GateAcquisition.CaptureReplay;
 
@@ -170,7 +195,7 @@ internal static class MsBuildGate
         {
             error.WriteLine($"warning: {ex.Message}");
             LastAcquisition = GateAcquisition.CaptureReplayFellBackToCold;
-            return await invokeRunner(new ColdSolutionSource());
+            return await invokeRunner(SourceOrCold(hostSource));
         }
         finally
         {
@@ -181,17 +206,17 @@ internal static class MsBuildGate
     // A stale/unreadable capture: run cold, printing the capture's notice at workspace-acquisition time
     // (never at startup) so a fragment-cache hit acquires nothing and prints nothing.
     private static async Task<int> RunNoticeColdAsync(
-        string notice, TextWriter error, Func<ISolutionSource, Task<int>> invokeRunner)
+        string notice, TextWriter error, ISolutionSource? hostSource, Func<ISolutionSource, Task<int>> invokeRunner)
     {
         LastAcquisition = GateAcquisition.NoticeCold;
-        return await invokeRunner(new NoticingSolutionSource(notice, error, new ColdSolutionSource()));
+        return await invokeRunner(new NoticingSolutionSource(notice, error, SourceOrCold(hostSource)));
     }
 
     // No capture and no explicit binlog (or --no-cache): today's plain cold path, silent and byte-identical.
-    private static async Task<int> RunColdAsync(Func<ISolutionSource, Task<int>> invokeRunner)
+    private static async Task<int> RunColdAsync(ISolutionSource? hostSource, Func<ISolutionSource, Task<int>> invokeRunner)
     {
         LastAcquisition = GateAcquisition.Cold;
-        return await invokeRunner(new ColdSolutionSource());
+        return await invokeRunner(SourceOrCold(hostSource));
     }
 
     private static ReplayedSolution ReplayOrThrow(
@@ -265,20 +290,23 @@ internal static class MsBuildGate
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Task<int> InvokeExplainAsync(ExplainRequest request, TextWriter output, CancellationToken ct)
+    private static Task<int> InvokeExplainAsync(
+        ExplainRequest request, TextWriter output, ISolutionSource source, CancellationToken ct)
     {
-        return new ExplainRunner(output).RunAsync(request, ct);
+        return new ExplainRunner(output, source).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Task<int> InvokeRenderAsync(RenderRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    private static Task<int> InvokeRenderAsync(
+        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
     {
-        return new RenderRunner(output, error).RunAsync(request, ct);
+        return new RenderRunner(output, error, source).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Task<int> InvokeBaselineAsync(BaselineRequest request, TextWriter output, TextWriter error, CancellationToken ct)
+    private static Task<int> InvokeBaselineAsync(
+        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
     {
-        return new BaselineRunner(output, error).RunAsync(request, ct);
+        return new BaselineRunner(output, error, source).RunAsync(request, ct);
     }
 }

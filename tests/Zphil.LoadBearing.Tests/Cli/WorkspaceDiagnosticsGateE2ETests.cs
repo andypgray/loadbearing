@@ -268,16 +268,16 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         File.WriteAllText(workspace.PathOf("MyApp.Legacy.Billing", "Widget.cs"), widget);
     }
 
-    // Wraps a real cold load, then re-wraps the handle with synthetic workspace-load diagnostics — the real
-    // MyApp fixture loads cleanly, so this is the only way to drive the fail-closed gate without a broken project.
-    // The real handle rides as the owned disposable, so disposing this wrapper's handle disposes the workspace.
+    // Wraps a real load, then re-wraps the handle with synthetic workspace-load diagnostics — the real MyApp
+    // fixture loads cleanly, so this is the only way to drive the fail-closed gate without a broken project.
+    // The inner source is the shared warm pool: nothing here asserts on whether a workspace was opened, only
+    // on what the gate does with the diagnostics riding the handle. The real handle rides as the owned
+    // disposable so the ownership chain still holds — it is the pool's, so disposing it is a no-op.
     private sealed class DiagnosticInjectingSolutionSource(IReadOnlyList<string> diagnostics) : ISolutionSource
     {
-        private readonly ColdSolutionSource inner = new();
-
         public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
         {
-            SolutionHandle real = await inner.AcquireAsync(solution, workingDirectory, ct);
+            SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solution, workingDirectory, ct);
             return new SolutionHandle(real.Solution, real.SolutionPath, diagnostics, real, real.WarmFragments);
         }
     }

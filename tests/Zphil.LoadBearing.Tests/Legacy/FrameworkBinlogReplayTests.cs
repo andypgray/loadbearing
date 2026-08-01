@@ -48,14 +48,16 @@ public sealed class FrameworkBinlogReplayTests
 
         // Act: the same check twice — replaying the Framework build, and opening the workspace itself.
         // --no-cache on both so neither run reads or writes persisted state and the comparison is clean.
+        // Both legs run cold (no host workspace source): the LoadCount deltas below are what tell the
+        // replayed leg from the built one, so each has to open, or decline to open, its own workspace.
         long loaderBeforeReplay = WorkspaceLoader.LoadCount;
-        CliResult replay = await CliRunner.InvokeAsync(
+        CliResult replay = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--binlog", binlog, "--no-cache");
         long replayLoads = WorkspaceLoader.LoadCount - loaderBeforeReplay;
         var replayGate = MsBuildGate.LastAcquisition;
 
         long loaderBeforeCold = WorkspaceLoader.LoadCount;
-        CliResult cold = await CliRunner.InvokeAsync(
+        CliResult cold = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--no-cache");
         long coldLoads = WorkspaceLoader.LoadCount - loaderBeforeCold;
 

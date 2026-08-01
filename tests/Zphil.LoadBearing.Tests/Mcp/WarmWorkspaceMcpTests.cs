@@ -22,6 +22,12 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     <c>MSBuildWorkspace</c>. The existing <see cref="CliMcpParityTests" /> is the broad warm-path parity
 ///     net (it now runs warm by default); this suite pins the warm-specific behaviour that parity cannot see.
 /// </summary>
+/// <remarks>
+///     Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync" />, never the warm-by-default
+///     <see cref="CliRunner.InvokeAsync" />. The oracle in each case is a <em>freshly loaded</em> run over the
+///     edited tree: warm-equals-cold is the claim, so the reference side has to be genuinely cold or the
+///     comparison proves nothing.
+/// </remarks>
 [Collection("Serial")]
 public sealed class WarmWorkspaceMcpTests
 {
@@ -78,7 +84,7 @@ public sealed class WarmWorkspaceMcpTests
         string homeController = fixture.PathOf(Web, "HomeController.cs");
         EditOnDisk(homeController, InsertNewCalculatorMember);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        CliResult coldEdited = await CliRunner.InvokeAsync(
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the edit (the new red edge appears, and the payload changed)
@@ -109,7 +115,7 @@ public sealed class WarmWorkspaceMcpTests
         string homeController = fixture.PathOf(Web, "HomeController.cs");
         EditOnDisk(homeController, InsertAnotherClockRead);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        CliResult coldEdited = await CliRunner.InvokeAsync(
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the new member-use site (the Now violation's site set grows from one
@@ -141,7 +147,7 @@ public sealed class WarmWorkspaceMcpTests
         string homeController = fixture.PathOf(Web, "HomeController.cs");
         EditOnDisk(homeController, InsertUnsuffixedTaskMethod);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        CliResult coldEdited = await CliRunner.InvokeAsync(
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the new member-shape red (the async-suffix subject set grows from
@@ -183,7 +189,7 @@ public sealed class WarmWorkspaceMcpTests
             string homeController = fixture.PathOf(Web, "HomeController.cs");
             EditOnDisk(homeController, AddCancellationTokenToSave);
             string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-            CliResult coldEdited = await CliRunner.InvokeAsync(
+            CliResult coldEdited = await CliRunner.InvokeColdAsync(
                 "check", fixture.SolutionPath, "--spec", specDll, "--json");
 
             // Assert — Save's member-shape red clears (Save now accepts the token, so the accept-cancellation
@@ -223,7 +229,7 @@ public sealed class WarmWorkspaceMcpTests
         string serviceWiring = fixture.PathOf(Web, "ServiceWiring.cs");
         EditOnDisk(serviceWiring, FlipOrderFeedToSingleton);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        CliResult coldEdited = await CliRunner.InvokeAsync(
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the flipped lifetime (the captive set shrinks from
@@ -258,7 +264,7 @@ public sealed class WarmWorkspaceMcpTests
         string reportEndpoint = fixture.PathOf(Web, "ReportEndpoint.cs");
         EditOnDisk(reportEndpoint, InsertAnotherSwallowingCatch);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        CliResult coldEdited = await CliRunner.InvokeAsync(
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         // Assert — the violation identity is unchanged (still ONE catch violation for the (ReportEndpoint,
@@ -389,7 +395,7 @@ public sealed class WarmWorkspaceMcpTests
             // Act — delete the bound spec DLL, then check against the still-warm workspace.
             File.Delete(tempSpec);
             CallToolResult check = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
-            CliResult coldCheck = await CliRunner.InvokeAsync(
+            CliResult coldCheck = await CliRunner.InvokeColdAsync(
                 "check", CliRunner.MyAppSolution, "--spec", tempSpec, "--json");
             coldCheck.Exit.ShouldBe(2);
 

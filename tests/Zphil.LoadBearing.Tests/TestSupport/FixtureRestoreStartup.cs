@@ -26,6 +26,10 @@ internal sealed class FixtureRestoreStartup : ITestPipelineStartup
 
     public ValueTask StopAsync()
     {
+        // Release the pooled warm workspaces (and their BuildHost child processes) before the run ends,
+        // then publish what the probe collected.
+        WarmWorkspacePool.DropAll();
+        WorkspaceLoadProbeAttribute.Flush();
         return ValueTask.CompletedTask;
     }
 }

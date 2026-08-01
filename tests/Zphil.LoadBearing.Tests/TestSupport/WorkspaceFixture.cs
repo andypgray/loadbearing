@@ -11,8 +11,6 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 public sealed class WorkspaceFixture : IAsyncLifetime
 {
-    private LoadedSolution? _loaded;
-
     /// <summary>Absolute path to the fixture solution in the test output directory.</summary>
     public string SolutionPath { get; } =
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "MyApp.sln");
@@ -20,15 +18,19 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>The extracted model. Set during <see cref="InitializeAsync" />.</summary>
     public CodebaseModel Model { get; private set; } = null!;
 
+    /// <remarks>
+    ///     Loads through the shared <see cref="WarmWorkspacePool" /> rather than owning a workspace of its
+    ///     own: the CLI e2e suites read this same solution, so pooling both shares one load and leaves the
+    ///     workspace bounded by the pool's own lifetime instead of pinning one for the whole run.
+    /// </remarks>
     public async ValueTask InitializeAsync()
     {
-        _loaded = await WorkspaceLoader.LoadAsync(SolutionPath);
-        Model = await CodebaseExtractor.ExtractFromSolutionAsync(_loaded.Solution);
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, CancellationToken.None);
+        Model = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
     }
 
     public ValueTask DisposeAsync()
     {
-        _loaded?.Dispose();
         return ValueTask.CompletedTask;
     }
 

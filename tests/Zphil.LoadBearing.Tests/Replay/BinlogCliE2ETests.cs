@@ -294,7 +294,9 @@ public sealed class BinlogCliE2ETests : IDisposable
         long loaderBefore = WorkspaceLoader.LoadCount;
         try
         {
-            CliResult result = await CliRunner.InvokeAsync(args);
+            // Cold, deliberately: every fact here reads the LoadCount delta to tell "replayed" from "built",
+            // so each invocation has to open (or decline to open) its own workspace.
+            CliResult result = await CliRunner.InvokeColdAsync(args);
             return new GateRun(
                 result.Exit, result.Out, result.Err, MsBuildGate.LastAcquisition, WorkspaceLoader.LoadCount - loaderBefore);
         }
