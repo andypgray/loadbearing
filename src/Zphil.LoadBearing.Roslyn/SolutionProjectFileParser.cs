@@ -2,21 +2,30 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Zphil.LoadBearing.Rendering;
 
-namespace Zphil.LoadBearing.Roslyn.Replay;
+namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     Reads a solution file's declared <c>.csproj</c> membership <em>textually</em>, with no MSBuild — the
-///     ground truth <see cref="BinlogCaptureStore" />'s coverage check compares a replayed binlog against, so
-///     it can refuse a binlog that does not build exactly the solution's project set. Handles
-///     both the classic <c>.sln</c> and the XML <c>.slnx</c> format; non-<c>.csproj</c> entries (solution
-///     folders, shared projects, database projects) are ignored, and both slash spellings resolve.
+///     Reads a solution file's <em>declared</em> <c>.csproj</c> membership textually, with no MSBuild.
+///     Handles both the classic <c>.sln</c> and the XML <c>.slnx</c> format; non-<c>.csproj</c> entries
+///     (solution folders, shared projects, database projects) are ignored, and both slash spellings resolve.
 /// </summary>
 /// <remarks>
-///     This is a coverage oracle, not a solution loader: it only needs the project <em>paths</em>, so it does
-///     not evaluate configurations, conditions, or nested-project ownership. Paths are made absolute against
-///     the solution file's directory but not symlink-canonicalized — the store canonicalizes both sides at
-///     comparison time (matching <c>SpecResolver.PathsEqual</c>), so this stays pure and disk-independent for
-///     its <see cref="ParseCsprojMembers" /> core.
+///     <para>
+///         Two consumers, one question — <em>what does the solution declare?</em>
+///         <see cref="Replay.BinlogCaptureStore" />'s coverage check compares a replayed binlog against this
+///         set so it can refuse a binlog that does not build exactly the solution's projects, and
+///         <see cref="SpecExclusion" /> subtracts it from a spec project's <c>ProjectReference</c> closure to
+///         tell the spec's private plumbing from the codebase under law. Both need declared membership rather
+///         than "every project MSBuild loaded", which is why this lives beside them rather than inside
+///         <c>Replay</c>.
+///     </para>
+///     <para>
+///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
+///         does not evaluate configurations, conditions, or nested-project ownership. Paths are made absolute
+///         against the solution file's directory but not symlink-canonicalized — callers canonicalize both
+///         sides at comparison time (matching <c>SpecResolver.PathsEqual</c>), so this stays pure and
+///         disk-independent for its <see cref="ParseCsprojMembers" /> core.
+///     </para>
 /// </remarks>
 internal static class SolutionProjectFileParser
 {
@@ -26,6 +35,20 @@ internal static class SolutionProjectFileParser
     private static readonly Regex SlnProjectLine = new(
         "Project\\(\"\\{[^}]*\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"(?<path>[^\"]*)\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    ///     Whether this parser owns <paramref name="solutionPath" />'s format — the two full-solution
+    ///     formats only. A solution filter (<c>.slnf</c>) is JSON that
+    ///     <see cref="SolutionDiscovery" /> accepts and the classic-<c>.sln</c> regex reads as <em>zero</em>
+    ///     members, so a caller that subtracts declared membership must ask this first rather than mistake an
+    ///     unparsed file for "the solution declares nothing".
+    /// </summary>
+    internal static bool OwnsFormat(string solutionPath)
+    {
+        string extension = Path.GetExtension(solutionPath);
+        return extension.Equals(".sln", StringComparison.OrdinalIgnoreCase)
+               || extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     ///     Reads <paramref name="solutionPath" /> from disk and returns the absolute paths of its

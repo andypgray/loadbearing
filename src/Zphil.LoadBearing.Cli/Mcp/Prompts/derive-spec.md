@@ -123,10 +123,13 @@ Spec discovery is by convention: **the unique solution project that references
 the spec project is excluded from the checked universe — its own types never trip your rules.
 
 **Source-checkout setups only**: `dotnet sln add` follows project references, so it may also
-add the LoadBearing contract library to the solution — and the workspace loads the reference
-closure regardless of membership, so the contract library's types appear in the survey **and
-in the checked universe**. Ignore them in the survey, and scope broad subjects to your product
-namespaces (`arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*")`, not bare
+add the LoadBearing contract library to the solution — and **solution membership decides
+whether its types come under your rules**. A contract library the solution declares is checked
+like any other member; one that only rides in as a project reference of the spec counts as the
+spec's private plumbing and stays out of the checked universe. It appears in the survey either
+way, because `arch_graph` is spec-less and excludes nothing. Ignore it there, and scope broad
+subjects to your product namespaces
+(`arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*")`, not bare
 `arch.Types.OfKind(...)`) so convention rules never bite the tooling. A `PackageReference`
 setup has none of this — the package is a metadata reference, not a project. (Outside the
 LoadBearing repo, expect `dotnet sln add` to record the contract library by a long relative

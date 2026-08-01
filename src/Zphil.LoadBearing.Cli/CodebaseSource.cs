@@ -105,7 +105,7 @@ internal sealed class CodebaseSource : IDisposable
     public ArchitectureModel Model =>
         model ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
-    /// <summary>The resolved spec (DLL + optional excluded project). Absent for the spec-less <c>graph</c> survey.</summary>
+    /// <summary>The resolved spec (DLL + excluded projects). Absent for the spec-less <c>graph</c> survey.</summary>
     public SpecResolution Resolution =>
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
@@ -209,14 +209,15 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     /// <summary>
-    ///     Produces the codebase model, excluding <paramref name="excludeProjectName" /> (the spec project,
-    ///     or null for <c>graph</c>). On a hit the cached fragments are merged directly; otherwise the
-    ///     workspace is fingerprinted, the needed projects are extracted (the clean ones reused on a partial),
-    ///     the subset is merged for the model, and the whole fragment set is written back best-effort.
+    ///     Produces the codebase model, excluding <paramref name="excludeProjectNames" /> (the spec project
+    ///     and its private plumbing, or empty for <c>graph</c>). On a hit the cached fragments are merged
+    ///     directly; otherwise the workspace is fingerprinted, the needed projects are extracted (the clean
+    ///     ones reused on a partial), the subset is merged for the model, and the whole fragment set is
+    ///     written back best-effort.
     /// </summary>
-    public async Task<CodebaseModel> ExtractAsync(string? excludeProjectName, CancellationToken ct)
+    public async Task<CodebaseModel> ExtractAsync(IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
-        CodebaseModel codebase = await ExtractCoreAsync(excludeProjectName, ct);
+        CodebaseModel codebase = await ExtractCoreAsync(excludeProjectNames, ct);
         // The advisory merge notes are a function of the merged fragments, so every path (hit, warm, cold)
         // regenerates them through FragmentMerger — the cache stores fragments, never notes. Captured here,
         // off the one exit, so the runners can surface them beside the workspace-load diagnostics.
@@ -224,10 +225,11 @@ internal sealed class CodebaseSource : IDisposable
         return codebase;
     }
 
-    private async Task<CodebaseModel> ExtractCoreAsync(string? excludeProjectName, CancellationToken ct)
+    private async Task<CodebaseModel> ExtractCoreAsync(
+        IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
         if (Outcome == CodebaseSourceOutcome.Hit)
-            return FragmentMerger.Merge(Retain(cacheRead.ReusableFragments, excludeProjectName));
+            return FragmentMerger.Merge(Retain(cacheRead.ReusableFragments, excludeProjectNames));
 
         Solution solution = handle!.Solution;
 
@@ -241,18 +243,17 @@ internal sealed class CodebaseSource : IDisposable
                 // store's re-extraction set becomes this source's observable so the runner counters keep meaning.
                 SessionFragmentSet warm = await warmFragments(ct);
                 reExtractedProjects = new HashSet<string>(warm.ReExtractedProjects, StringComparer.Ordinal);
-                return FragmentMerger.Merge(Retain(warm.Fragments, excludeProjectName));
+                return FragmentMerger.Merge(Retain(warm.Fragments, excludeProjectNames));
             }
 
-            IReadOnlyCollection<string>? exclude = excludeProjectName is null ? null : [excludeProjectName];
-            return await CodebaseExtractor.ExtractFromSolutionAsync(solution, exclude, ct);
+            return await CodebaseExtractor.ExtractFromSolutionAsync(solution, excludeProjectNames, ct);
         }
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
         var allFragments = await ExtractAllFragmentsAsync(solution, ct);
-        CodebaseModel merged = FragmentMerger.Merge(Retain(allFragments, excludeProjectName));
+        CodebaseModel merged = FragmentMerger.Merge(Retain(allFragments, excludeProjectNames));
 
         if (fingerprint is not null)
             TryWrite(solution, fingerprint, allFragments, ct);
@@ -290,7 +291,7 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
         try
         {
-            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, spec);
+            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec);
             ArchitectureModel model = ModelPipeline.LoadModel(resolution.DllPath);
             return new CodebaseSource(
                 outcome, solutionPath, handle.Diagnostics, model, resolution, handle, store, cacheRead, normalizedSpec);
@@ -336,8 +337,8 @@ internal sealed class CodebaseSource : IDisposable
         SpecResolutionRecord? record = records.FirstOrDefault(r => string.Equals(r.NormalizedSpecArgument, normalized, StringComparison.Ordinal));
         if (record is null) return null;
 
-        string dll = SpecResolver.RequireBuiltOutput(record.ExcludeProjectName ?? normalized, record.OutputFilePath);
-        return new SpecResolution(dll, record.ExcludeProjectName);
+        string dll = SpecResolver.RequireBuiltOutput(record.SpecProjectName ?? normalized, record.OutputFilePath);
+        return new SpecResolution(dll, record.SpecProjectName, record.ExcludeProjectNames);
     }
 
     // ── cache write ───────────────────────────────────────────────────────────────────────────────────────
@@ -369,18 +370,20 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     // The spec record to persist for this run, unioned onto the manifest's existing records (replacing any
-    // with the same normalized argument). Only a solution-member spec (convention/csproj — it excludes a
+    // with the same normalized argument). Only a solution-member spec (convention/csproj — it names a spec
     // project) is recorded, since that is the resolution a hit cannot replay without one; an explicit DLL
-    // resolves on a hit with no record, and graph has no spec at all.
+    // resolves on a hit with no record, and graph has no spec at all. The whole excluded set rides along:
+    // the hit path has no workspace to re-walk the spec project's ProjectReference closure with.
     private IReadOnlyList<SpecResolutionRecord> BuildWriteSpecRecords(Solution solution)
     {
         var existing = cacheRead.SpecResolutions;
-        if (resolution?.ExcludeProjectName is not { } excludeName) return existing;
+        if (resolution?.SpecProjectName is not { } specProjectName) return existing;
 
         string? outputFilePath = solution.Projects
-            .FirstOrDefault(p => string.Equals(p.Name, excludeName, StringComparison.Ordinal))?.OutputFilePath;
+            .FirstOrDefault(p => string.Equals(p.Name, specProjectName, StringComparison.Ordinal))?.OutputFilePath;
 
-        var record = new SpecResolutionRecord(normalizedSpecArgument, excludeName, outputFilePath);
+        var record = new SpecResolutionRecord(
+            normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePath);
         return existing
             .Where(r => !string.Equals(r.NormalizedSpecArgument, normalizedSpecArgument, StringComparison.Ordinal))
             .Append(record)
@@ -389,11 +392,13 @@ internal sealed class CodebaseSource : IDisposable
 
     // ── small helpers ─────────────────────────────────────────────────────────────────────────────────────
 
-    private static List<CodebaseFragment> Retain(IReadOnlyList<CodebaseFragment> fragments, string? excludeProjectName)
+    private static List<CodebaseFragment> Retain(
+        IReadOnlyList<CodebaseFragment> fragments, IReadOnlyCollection<string> excludeProjectNames)
     {
-        return fragments
-            .Where(f => excludeProjectName is null || !string.Equals(f.ProjectName, excludeProjectName, StringComparison.Ordinal))
-            .ToList();
+        if (excludeProjectNames.Count == 0) return fragments.ToList();
+
+        var excluded = new HashSet<string>(excludeProjectNames, StringComparer.Ordinal);
+        return fragments.Where(f => !excluded.Contains(f.ProjectName)).ToList();
     }
 
     private static string NormalizeSpecArgument(string? spec)

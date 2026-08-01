@@ -39,9 +39,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     protected abstract string SolutionPath { get; }
 
     /// <summary>
-    ///     The project to exclude from the checked universe — the spec's own project when the spec is a
-    ///     solution member (mirrors the CLI's spec-member exclusion). Defaults to the spec assembly's name;
-    ///     override to <see langword="null" /> when the spec lives outside the target solution.
+    ///     The spec's own project, when the spec is a solution member — the seed of the checked universe's
+    ///     exclusion (mirrors the CLI's spec-member exclusion). That project and the private plumbing only it
+    ///     references are dropped; projects the solution file declares stay in, even when the spec references
+    ///     them, because those are the code under law. Defaults to the spec assembly's name; override to
+    ///     <see langword="null" /> when the spec lives outside the target solution.
     /// </summary>
     protected virtual string? ExcludeProjectName => typeof(TSpec).Assembly.GetName().Name;
 
@@ -151,7 +153,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         BaselineIndex baselines = BaselineStore.LoadForModel(model, solutionDirectory);
 
         using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath);
-        IReadOnlyCollection<string>? exclude = excludeProjectName is null ? null : [excludeProjectName];
+        // The same closure the CLI applies: the spec project plus the plumbing only it references, with the
+        // solution's declared members subtracted so a spec that references the code it governs never excludes it.
+        var exclude = excludeProjectName is null
+            ? null
+            : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution, exclude);
 
         CheckReport report = ArchChecker.Check(model, codebase, baselines, null);

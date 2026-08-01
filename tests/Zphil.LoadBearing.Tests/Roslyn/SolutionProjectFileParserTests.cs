@@ -1,14 +1,15 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn.Replay;
+using Zphil.LoadBearing.Roslyn;
 
-namespace Zphil.LoadBearing.Tests.Replay;
+namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
 ///     Pure-string tests for <see cref="SolutionProjectFileParser" /> — no fixture, no disk. They pin the
-///     textual csproj-membership extraction the capture's coverage check depends on: both solution formats,
-///     both slash spellings, and the rule that only <c>.csproj</c> entries count (solution folders and other
-///     project kinds are ignored).
+///     textual csproj-membership extraction both the capture's coverage check and
+///     <see cref="SpecExclusion" />'s membership subtraction depend on: both solution formats, both slash
+///     spellings, the rule that only <c>.csproj</c> entries count (solution folders and other project kinds
+///     are ignored), and which formats the parser owns at all.
 /// </summary>
 public sealed class SolutionProjectFileParserTests
 {
@@ -71,5 +72,16 @@ public sealed class SolutionProjectFileParserTests
 
         // Act + Assert
         SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void OwnsFormat_TheTwoFullSolutionFormats_AreOwnedAndNothingElseIs()
+    {
+        // The distinction a membership subtraction depends on: a .slnf is JSON that the classic-.sln regex
+        // would read as zero members, which is not the same statement as "the solution declares nothing".
+        SolutionProjectFileParser.OwnsFormat("/repo/App.sln").ShouldBeTrue();
+        SolutionProjectFileParser.OwnsFormat("/repo/App.SLNX").ShouldBeTrue();
+        SolutionProjectFileParser.OwnsFormat("/repo/Filtered.slnf").ShouldBeFalse();
+        SolutionProjectFileParser.OwnsFormat("/repo/App").ShouldBeFalse();
     }
 }

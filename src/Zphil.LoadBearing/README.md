@@ -33,7 +33,8 @@ public sealed class ArchSpec : IArchitectureSpec
 
 Add the spec project to the target solution (`dotnet sln add arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj`)
 and the tooling discovers it by convention: the unique solution project that references this
-package. The spec project itself is excluded from the checked universe.
+package. The spec project itself is excluded from the checked universe, along with anything
+only it pulls in: a library the spec references that the solution does not declare.
 
 Pick the spec project's target framework by one rule: it must be able to reference the product
 projects it will `typeof()`. This package is `netstandard2.0` with zero dependencies, so a spec

@@ -130,7 +130,8 @@ public sealed class CheckCacheE2ETests
 
         resolution.ShouldNotBeNull();
         resolution.DllPath.ShouldBe(Path.GetFullPath(CliRunner.CleanSpecDll));
-        resolution.ExcludeProjectName.ShouldBeNull(); // an external DLL excludes no solution project
+        resolution.SpecProjectName.ShouldBeNull(); // an external DLL excludes no solution project
+        resolution.ExcludeProjectNames.ShouldBeEmpty();
     }
 
     [Fact]
@@ -151,14 +152,19 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public void ResolveSpecOnHit_ConventionRecordEvaluatedOutputPresent_ResolvesRecordedOutput()
     {
-        // The recorded (Debug-evaluated) output exists, so RequireBuiltOutput returns it directly.
-        var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", CliRunner.CleanSpecDll) };
+        // The recorded (Debug-evaluated) output exists, so RequireBuiltOutput returns it directly. The whole
+        // recorded exclusion set replays: a hit has no workspace to re-walk the spec's reference closure with.
+        var records = new[]
+        {
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch", "MyApp.Arch.Pack"], CliRunner.CleanSpecDll)
+        };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
 
         resolution.ShouldNotBeNull();
         resolution.DllPath.ShouldBe(CliRunner.CleanSpecDll);
-        resolution.ExcludeProjectName.ShouldBe("MyApp.Arch");
+        resolution.SpecProjectName.ShouldBe("MyApp.Arch");
+        resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch", "MyApp.Arch.Pack"]);
     }
 
     [Fact]
@@ -174,13 +180,13 @@ public sealed class CheckCacheE2ETests
         {
             Directory.CreateDirectory(Path.GetDirectoryName(builtRelease)!);
             File.WriteAllText(builtRelease, "");
-            var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", evaluatedDebug) };
+            var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], evaluatedDebug) };
 
             SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
 
             resolution.ShouldNotBeNull();
             resolution.DllPath.ShouldBe(builtRelease);
-            resolution.ExcludeProjectName.ShouldBe("MyApp.Arch");
+            resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
         }
         finally
         {
@@ -194,13 +200,16 @@ public sealed class CheckCacheE2ETests
         // A csproj --spec is looked up by its normalized (full) path, not the raw argument string.
         const string csprojArgument = "spec/MyApp.Arch.csproj";
         string normalized = Path.GetFullPath(csprojArgument);
-        var records = new[] { new SpecResolutionRecord(normalized, "MyApp.Arch", CliRunner.CleanSpecDll) };
+        var records = new[]
+        {
+            new SpecResolutionRecord(normalized, "MyApp.Arch", ["MyApp.Arch"], CliRunner.CleanSpecDll)
+        };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(csprojArgument, records);
 
         resolution.ShouldNotBeNull();
         resolution.DllPath.ShouldBe(CliRunner.CleanSpecDll);
-        resolution.ExcludeProjectName.ShouldBe("MyApp.Arch");
+        resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

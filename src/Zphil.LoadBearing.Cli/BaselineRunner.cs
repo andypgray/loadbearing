@@ -30,8 +30,8 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error)
             request.Solution, request.Spec, request.WorkingDirectory, ct);
         foreach (string diagnostic in workspace.Diagnostics) error.WriteLine($"warning: {diagnostic}");
 
-        IReadOnlyCollection<string>? exclude = workspace.Resolution.ExcludeProjectName is { } name ? [name] : null;
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, exclude, ct);
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
+            workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
 
         // Evaluate against an empty baseline so every current violation surfaces as the state to capture.
         CheckReport report = ArchChecker.Check(workspace.Model, codebase, BaselineIndex.Empty);

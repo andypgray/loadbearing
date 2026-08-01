@@ -7,8 +7,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The spec-resolution convention core (ratified decision 1) over plain tuples — no workspace
-///     needed: the unique project referencing <c>Zphil.LoadBearing.dll</c> wins; zero and many are
-///     loud errors; a missing built output is a loud error pointing at <c>dotnet build</c>.
+///     needed: the unique <em>declared</em> solution member referencing <c>Zphil.LoadBearing.dll</c> wins;
+///     zero and many are loud errors; a missing built output is a loud error pointing at <c>dotnet build</c>.
 /// </summary>
 public sealed class SpecResolverTests
 {
@@ -63,6 +63,48 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
+    public void ResolveConventionProject_NonMemberReferencingCore_IsNotACandidate()
+    {
+        // A rule-pack library the spec project drags into the workspace references the contract library too.
+        // It is not solution material, so it must not turn a perfectly unambiguous solution into an error.
+        SpecProjectCandidate chosen = SpecResolver.ResolveConventionProject([
+            Candidate("MyApp.Arch", CoreDll),
+            Candidate("Guidance.Pack", CoreDll, false)
+        ]);
+
+        chosen.Name.ShouldBe("MyApp.Arch");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_OnlyNonMembersReferenceCore_ThrowsTheUnchangedZeroCandidateError()
+    {
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject([
+                Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll"),
+                Candidate("Guidance.Pack", CoreDll, false)
+            ]));
+
+        error.Message.ShouldContain("No spec project found");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_TwoDeclaredMembersReferenceCore_StillErrorsWithTheUnchangedText()
+    {
+        // Genuine ambiguity survives the membership filter: two spec projects the solution really declares.
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject([
+                Candidate("Arch.One", CoreDll),
+                Candidate("Arch.Two", CoreDll),
+                Candidate("Guidance.Pack", CoreDll, false)
+            ]));
+
+        error.Message.ShouldContain("Multiple spec projects found");
+        error.Message.ShouldContain("Arch.One");
+        error.Message.ShouldContain("Arch.Two");
+        error.Message.ShouldNotContain("Guidance.Pack");
+    }
+
+    [Fact]
     public void RequireBuiltOutput_MissingFile_ThrowsUserErrorPointingAtBuild()
     {
         var error = Should.Throw<UserErrorException>(() =>
@@ -101,8 +143,8 @@ public sealed class SpecResolverTests
         }
     }
 
-    private static SpecProjectCandidate Candidate(string name, string referencePath)
+    private static SpecProjectCandidate Candidate(string name, string referencePath, bool isDeclaredMember = true)
     {
-        return new SpecProjectCandidate(name, [referencePath], $"C:/out/{name}.dll");
+        return new SpecProjectCandidate(name, [referencePath], $"C:/out/{name}.dll", isDeclaredMember);
     }
 }

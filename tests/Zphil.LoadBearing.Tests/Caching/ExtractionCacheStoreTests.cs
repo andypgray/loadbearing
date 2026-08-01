@@ -33,10 +33,10 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion8_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion9_ReturnsMiss()
     {
-        // Arrange — a v8 cache predates the signature-exposure edges (schema bumped 8→9): its fragments carry
-        // no FragmentExposureEdge list, so a v8 cache.json is not usable under v9 and must degrade cleanly.
+        // Arrange — a v9 cache predates the plural spec exclusion (schema bumped 9→10): its spec resolutions
+        // record one project name where v10 records the whole excluded set, so it must degrade cleanly.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -44,9 +44,36 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 8);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 9);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
+        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void ReadAndValidate_PriorSchemaSpecResolutionShape_IsACleanMissNotADeserializationCrash()
+    {
+        // The manifest is parsed before its schema version is checked, so a genuinely v9-shaped spec record —
+        // a scalar `ExcludeProjectName` where v10 expects an `ExcludeProjectNames` list — must not throw its
+        // way out of a read. The cache is disposable derived data: every failure is a miss.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        var extraction = new ExtractionResult(
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], [])).ToList(),
+            [new SpecResolutionRecord("", "A", ["A"], "/out/A.dll")],
+            []);
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction).ShouldBeTrue();
+
+        solution.MutateCacheJson(root =>
+        {
+            root["SchemaVersion"] = 9;
+            var record = (JsonObject)root["SpecResolutions"]![0]!;
+            record.Remove("ExcludeProjectNames");
+            record["ExcludeProjectName"] = "A";
+        });
+
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
@@ -249,7 +276,7 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("B", ["A"], ("B.cs", "class B {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        SpecResolutionRecord[] specs = [new("", "A", "/out/A.dll")];
+        SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], "/out/A.dll")];
         var extraction = new ExtractionResult(
             solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], [])).ToList(),
             specs,
@@ -263,7 +290,13 @@ public sealed class ExtractionCacheStoreTests
         result.Outcome.ShouldBe(CacheOutcome.Hit);
         result.ReusableFragments.Select(f => f.ProjectName).ShouldBe(["A", "B"], true);
         result.DirtyProjects.ShouldBeEmpty();
-        result.SpecResolutions.ShouldBe(specs);
+        // Field-by-field: the record carries a collection, so its synthesized equality compares that member
+        // by reference and a round-tripped list can never equal the written one.
+        SpecResolutionRecord replayed = result.SpecResolutions.ShouldHaveSingleItem();
+        replayed.NormalizedSpecArgument.ShouldBe("");
+        replayed.SpecProjectName.ShouldBe("A");
+        replayed.ExcludeProjectNames.ShouldBe(["A", "PrivatePack"]);
+        replayed.OutputFilePath.ShouldBe("/out/A.dll");
         result.Diagnostics.ShouldBe(["load-diag-1", "load-diag-2"]);
     }
 

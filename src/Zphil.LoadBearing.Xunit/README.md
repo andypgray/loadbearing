@@ -29,7 +29,10 @@ verdict from that shared run. A `Quarantine` tripwire rule reports as skipped (a
 diff context); everything else passes or fails like any other test.
 
 When the spec project is a member of the checked solution it is excluded from the checked
-universe automatically (mirroring the CLI). If your spec lives outside the target solution,
+universe automatically (mirroring the CLI), along with any project only it pulls in: a library
+the spec references that the solution file does not declare, such as a shared rule pack.
+Projects the solution declares stay in the universe even when the spec references them, so a
+spec may reference the very code it governs. If your spec lives outside the target solution,
 override `ExcludeProjectName` to return `null`.
 
 ## Requirements

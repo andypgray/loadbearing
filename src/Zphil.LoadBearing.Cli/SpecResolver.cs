@@ -10,31 +10,44 @@ namespace Zphil.LoadBearing.Cli;
 ///     the output paths of its direct project references: a spec project references the contract library as a
 ///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
 ///     convention must see both (the derive walk caught the P2P blind spot).
+///     <see cref="IsDeclaredMember" /> says whether the solution file declares this project, so the convention
+///     considers only solution material: a rule-pack library that a spec project drags into the workspace also
+///     references the contract library, and would otherwise turn every composing solution into "Multiple spec
+///     projects found".
 /// </summary>
-internal sealed record SpecProjectCandidate(string Name, IReadOnlyList<string> ReferencePaths, string? OutputFilePath);
+internal sealed record SpecProjectCandidate(
+    string Name,
+    IReadOnlyList<string> ReferencePaths,
+    string? OutputFilePath,
+    bool IsDeclaredMember = true);
 
 /// <summary>
-///     The resolved spec: the DLL to load and, when the spec is a solution member, the project to exclude from the
-///     checked universe.
+///     The resolved spec: the DLL to load and, when the spec is a solution member, its project name plus the
+///     projects to exclude from the checked universe — the spec project and its private plumbing
+///     (<see cref="SpecExclusion" />). Both are empty/null for a prebuilt DLL, which excludes nothing.
 /// </summary>
-internal sealed record SpecResolution(string DllPath, string? ExcludeProjectName);
+internal sealed record SpecResolution(
+    string DllPath,
+    string? SpecProjectName,
+    IReadOnlyCollection<string> ExcludeProjectNames);
 
 /// <summary>
 ///     Resolves which spec DLL to load. The CLI
 ///     never builds: <c>--spec</c> takes a prebuilt DLL or a solution-member csproj (resolved to its
-///     output DLL); with no <c>--spec</c>, the convention picks the unique solution project that
-///     references <c>Zphil.LoadBearing.dll</c>. Every failure is a loud <see cref="UserErrorException" />;
-///     a spec project that is a solution member is excluded from the codebase the checker sees.
+///     output DLL); with no <c>--spec</c>, the convention picks the unique <em>declared</em> solution project
+///     that references <c>Zphil.LoadBearing.dll</c>. Every failure is a loud <see cref="UserErrorException" />;
+///     a spec project that is a solution member is excluded from the codebase the checker sees, along with the
+///     plumbing only it pulls in.
 /// </summary>
 internal static class SpecResolver
 {
     private const string CoreAssemblyFile = "Zphil.LoadBearing.dll";
 
-    internal static SpecResolution Resolve(Solution solution, string? specArgument)
+    internal static SpecResolution Resolve(Solution solution, string solutionPath, string? specArgument)
     {
         return string.IsNullOrWhiteSpace(specArgument)
-            ? ResolveByConvention(solution)
-            : ResolveExplicit(solution, specArgument!);
+            ? ResolveByConvention(solution, solutionPath)
+            : ResolveExplicit(solution, solutionPath, specArgument!);
     }
 
     /// <summary>
@@ -53,10 +66,10 @@ internal static class SpecResolver
         if (!File.Exists(fullPath))
             throw new UserErrorException($"--spec '{specArgument}' was not found. Pass a built spec DLL or a solution-member csproj.");
 
-        return new SpecResolution(fullPath, null);
+        return new SpecResolution(fullPath, null, []);
     }
 
-    private static SpecResolution ResolveExplicit(Solution solution, string specArgument)
+    private static SpecResolution ResolveExplicit(Solution solution, string solutionPath, string specArgument)
     {
         if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
@@ -65,22 +78,43 @@ internal static class SpecResolver
                               ?? throw new UserErrorException(
                                   $"--spec '{specArgument}' is not a project in the solution. " +
                                   "Pass a built spec DLL or a csproj that is a member of the target solution.");
-            return new SpecResolution(RequireBuiltOutput(project.Name, project.OutputFilePath), project.Name);
+            return MemberResolution(
+                solution, SpecExclusion.TryReadDeclaredMembers(solutionPath), project.Name, project.OutputFilePath);
         }
 
         // A DLL path — the branch that needs no solution.
         return TryResolveWithoutSolution(specArgument)!;
     }
 
-    private static SpecResolution ResolveByConvention(Solution solution)
+    private static SpecResolution ResolveByConvention(Solution solution, string solutionPath)
     {
+        // Read declared membership once: the convention filters candidates by it, and the exclusion walk
+        // subtracts the same set.
+        var declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+
         var candidates = solution.Projects
             .Where(p => p.Language == LanguageNames.CSharp)
-            .Select(p => new SpecProjectCandidate(p.Name, ReferencePathsOf(p, solution), p.OutputFilePath))
+            .Select(p => new SpecProjectCandidate(
+                p.Name,
+                ReferencePathsOf(p, solution),
+                p.OutputFilePath,
+                SpecExclusion.IsDeclaredMember(declaredMembers, p.FilePath)))
             .ToList();
 
         SpecProjectCandidate chosen = ResolveConventionProject(candidates);
-        return new SpecResolution(RequireBuiltOutput(chosen.Name, chosen.OutputFilePath), chosen.Name);
+        return MemberResolution(solution, declaredMembers, chosen.Name, chosen.OutputFilePath);
+    }
+
+    // The shared tail of both solution-member branches: the built DLL plus the projects the checked universe
+    // drops — the spec project and the plumbing only it references. A null declaredMembers is the unreadable
+    // case, which SpecExclusion degrades to just the spec project.
+    private static SpecResolution MemberResolution(
+        Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName, string? outputFilePath)
+    {
+        return new SpecResolution(
+            RequireBuiltOutput(specProjectName, outputFilePath),
+            specProjectName,
+            SpecExclusion.Compute(solution, declaredMembers, specProjectName));
     }
 
     /// <summary>
@@ -102,12 +136,15 @@ internal static class SpecResolver
     }
 
     /// <summary>
-    ///     The pure convention core: the unique candidate that references <c>Zphil.LoadBearing.dll</c>.
-    ///     Zero candidates and multiple candidates are both loud errors (unit-tested over tuples).
+    ///     The pure convention core: the unique <em>declared</em> solution member that references
+    ///     <c>Zphil.LoadBearing.dll</c>. Zero candidates and multiple candidates are both loud errors
+    ///     (unit-tested over tuples). Undeclared projects are workspace passengers — a spec project's own
+    ///     <c>ProjectReference</c>s pull the contract library and any rule-pack library in — and a passenger
+    ///     that references the contract is not a spec project the user chose to have.
     /// </summary>
     internal static SpecProjectCandidate ResolveConventionProject(IReadOnlyList<SpecProjectCandidate> candidates)
     {
-        var matches = candidates.Where(ReferencesCore).ToList();
+        var matches = candidates.Where(c => c.IsDeclaredMember && ReferencesCore(c)).ToList();
 
         if (matches.Count == 0)
             throw new UserErrorException(

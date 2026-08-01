@@ -48,8 +48,8 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
     // receives its layer unit before its quarantine unit, and WriteGroups merges them in that order.
     private async Task<IEnumerable<ContentUnit>> ScopedUnitsAsync(WorkspaceModel workspace, CancellationToken ct)
     {
-        IReadOnlyCollection<string>? exclude = workspace.Resolution.ExcludeProjectName is { } name ? [name] : null;
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, exclude, ct);
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
+            workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
 
         var units = new List<ContentUnit>();
         foreach (LayerPlacement placement in LayerContextResolver.Resolve(workspace.Model, codebase))

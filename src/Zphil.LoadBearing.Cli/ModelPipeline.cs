@@ -52,7 +52,7 @@ internal static class ModelPipeline
         SolutionHandle handle = await source.AcquireAsync(solution, workingDirectory, ct);
         try
         {
-            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, spec);
+            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, handle.SolutionPath, spec);
             ArchitectureModel model = LoadModel(resolution.DllPath);
             return new WorkspaceModel(handle, model, resolution);
         }

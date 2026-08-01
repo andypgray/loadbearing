@@ -37,7 +37,7 @@ internal sealed class GraphRunner(
         using var source = await CodebaseSource.CreateSpeclessAsync(
             solutionSource, environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
 
-        CodebaseModel codebase = await source.ExtractAsync(null, ct);
+        CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
         GraphSummary summary = GraphSummarizer.Summarize(codebase);

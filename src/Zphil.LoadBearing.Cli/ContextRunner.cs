@@ -31,8 +31,8 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
             return 0;
         }
 
-        IReadOnlyCollection<string>? exclude = workspace.Resolution.ExcludeProjectName is { } name ? [name] : null;
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, exclude, ct);
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
+            workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
 
         string queryFullPath = ResolveQueryPath(request.Path, workspace.SolutionDirectory);
 

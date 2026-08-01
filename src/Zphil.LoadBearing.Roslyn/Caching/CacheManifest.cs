@@ -93,19 +93,26 @@ internal sealed record ProjectCacheEntry(
 // ReSharper restore NotAccessedPositionalProperty.Global
 
 /// <summary>
-///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the
-///     project to exclude and the Debug-evaluated output path. Stored faithfully so a cache hit can replay
-///     spec resolution without a workspace (the hit path consumes these — it re-runs the built-output check
-///     over <see cref="OutputFilePath" /> for a convention/csproj spec, so the hit path resolves identically
-///     to a cold run, including the sibling-configuration fallback and its error text).
+///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the spec
+///     project, the projects to drop from the checked universe, and the Debug-evaluated output path. Stored
+///     faithfully so a cache hit can replay spec resolution without a workspace (the hit path consumes these —
+///     it re-runs the built-output check over <see cref="OutputFilePath" /> for a convention/csproj spec, so
+///     the hit path resolves identically to a cold run, including the sibling-configuration fallback and its
+///     error text).
 /// </summary>
 /// <param name="NormalizedSpecArgument">
 ///     The normalized <c>--spec</c> value this record resolves (an absolute csproj/dll path, or the empty
 ///     string for the no-<c>--spec</c> convention default).
 /// </param>
-/// <param name="ExcludeProjectName">The solution-member project to drop from the checked universe, or null.</param>
+/// <param name="SpecProjectName">The solution-member spec project's name, or null for an explicit DLL.</param>
+/// <param name="ExcludeProjectNames">
+///     Every project to drop from the checked universe — the spec project plus the private plumbing only it
+///     references (<c>SpecExclusion</c>). Recorded whole rather than recomputed, because deriving it needs
+///     the workspace a hit deliberately never opens.
+/// </param>
 /// <param name="OutputFilePath">The Debug-evaluated output path of the spec project, or null for an explicit DLL.</param>
 internal sealed record SpecResolutionRecord(
     string NormalizedSpecArgument,
-    string? ExcludeProjectName,
+    string? SpecProjectName,
+    IReadOnlyList<string> ExcludeProjectNames,
     string? OutputFilePath);

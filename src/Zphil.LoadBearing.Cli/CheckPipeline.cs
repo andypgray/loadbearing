@@ -10,9 +10,9 @@ namespace Zphil.LoadBearing.Cli;
 ///     The shared check core over a <see cref="CodebaseSource" />, reused by <c>check</c> and <c>status</c>:
 ///     load the ratcheted baselines <em>before</em> extraction (so a tampered file fails fast, before the
 ///     expensive Roslyn walk), resolve the optional <c>--diff-base</c> diff (a bad ref also fails fast),
-///     extract the codebase excluding the spec project, and evaluate. The two commands differ only in how
-///     they render the resulting <see cref="CheckReport" /> and their exit codes — <c>check</c> gates,
-///     <c>status</c> reports (and passes no diff base, so its tripwires skip).
+///     extract the codebase excluding the spec project and its private plumbing, and evaluate. The two
+///     commands differ only in how they render the resulting <see cref="CheckReport" /> and their exit
+///     codes — <c>check</c> gates, <c>status</c> reports (and passes no diff base, so its tripwires skip).
 /// </summary>
 /// <remarks>
 ///     The baseline load and diff resolution deliberately precede <see cref="CodebaseSource.ExtractAsync" />:
@@ -29,7 +29,7 @@ internal static class CheckPipeline
         // baseline-before-extraction ordering.
         DiffContext? diff = diffBase is null ? null : GitChangedFiles.Resolve(diffBase, source.SolutionDirectory);
 
-        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectName, ct);
+        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
 
         return ArchChecker.Check(source.Model, codebase, baselines, diff);
     }

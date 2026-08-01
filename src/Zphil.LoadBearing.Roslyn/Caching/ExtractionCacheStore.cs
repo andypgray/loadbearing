@@ -130,15 +130,16 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v9 adds signature-exposure edges (a FragmentExposureEdge list per fragment, GRAMMAR §4.9); a v8
-    // cache.json carries no exposure data, so it degrades to a clean Miss and is rebuilt — the cache is
-    // disposable derived data, never a loud error. (v8 added parameter facts to the member inventory (a
-    // ParameterFacts list per method member, §4.6/§5.6); v7 added catch edges and throw edges; v6 added
-    // constructor-injection edges and container-registration facts; v5 added construction-use edges; v4 aligned
-    // CaptureFingerprint's cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3
-    // added the member inventory; v2 added member-use edges over v1's type-only fragments — every prior version
-    // likewise misses.)
-    private const int CurrentSchemaVersion = 9;
+    // v10 reshapes SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
+    // plus the private plumbing only it references), and the hit path replays that set rather than one name.
+    // A v9 record carries the old single name, so it degrades to a clean Miss and is rebuilt — the cache is
+    // disposable derived data, never a loud error. (v9 added signature-exposure edges (a FragmentExposureEdge
+    // list per fragment, GRAMMAR §4.9); v8 added parameter facts to the member inventory (a ParameterFacts list
+    // per method member, §4.6/§5.6); v7 added catch edges and throw edges; v6 added constructor-injection edges
+    // and container-registration facts; v5 added construction-use edges; v4 aligned CaptureFingerprint's
+    // cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3 added the member
+    // inventory; v2 added member-use edges over v1's type-only fragments — every prior version likewise misses.)
+    private const int CurrentSchemaVersion = 10;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
