@@ -15,6 +15,8 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 /// </remarks>
 internal static class VsWhereLocator
 {
+    private static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(10);
+
     private static readonly string VsWherePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
         "Microsoft Visual Studio",
@@ -86,56 +88,26 @@ internal static class VsWhereLocator
         return result;
     }
 
+    // Synchronous on purpose, and the reason ChildProcess carries a synchronous arm at all. This probe
+    // runs inside MsBuildBootstrap, which the CLI and the xUnit adapter both call from a NoInlining JIT
+    // quarantine: no MSBuild type may be resolvable before MSBuildLocator has registered, so that chain
+    // cannot become asynchronous without either breaking the quarantine or blocking on a Task somewhere
+    // in it. ChildProcess.Run blocks on the process handle and never on a Task, so this path stays
+    // within the no-blocking-waits rule while keeping the quarantine intact — and it still gets the
+    // closed stdin that keeps a child from inheriting (and wedging on) the MCP server's live JSON-RPC
+    // pipe, plus a bounded wait and a kill-tree on expiry.
     private static string RunVsWhere()
     {
         ProcessStartInfo psi = new(VsWherePath, "-all -prerelease -format json -products *")
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
             CreateNoWindow = true
         };
 
-        using Process proc = Process.Start(psi)
-                             ?? throw new InvalidOperationException($"Failed to start {VsWherePath}");
+        ChildProcess.ProcessResult result = ChildProcess.Run(psi, QueryTimeout);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"vswhere exited with code {result.ExitCode}: {result.StandardError}");
 
-        using var timeout = new CancellationTokenSource(10_000);
-        // Drain both streams concurrently AND cancellably. The old code read stdout with a synchronous,
-        // unbounded ReadToEnd() *before* the WaitForExit timeout — so a vswhere child whose stdout write
-        // handle was inherited by a concurrently-spawned long-lived process never reached EOF and wedged
-        // here forever, with the timeout below unreachable. The token now bounds every wait.
-        var outputTask = proc.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderrTask = proc.StandardError.ReadToEndAsync(timeout.Token);
-        try
-        {
-            proc.WaitForExitAsync(timeout.Token).GetAwaiter().GetResult();
-            string output = outputTask.GetAwaiter().GetResult();
-
-            if (proc.ExitCode != 0)
-            {
-                string err = stderrTask.GetAwaiter().GetResult();
-                throw new InvalidOperationException($"vswhere exited with code {proc.ExitCode}: {err}");
-            }
-
-            return output;
-        }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            TryKill(proc);
-            throw new TimeoutException("vswhere did not complete within 10 seconds");
-        }
-    }
-
-    // Best-effort kill of a wedged vswhere process (and any children) before we throw the timeout.
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            if (!process.HasExited) process.Kill(true);
-        }
-        catch
-        {
-            // Already exited or inaccessible — nothing to clean up.
-        }
+        return result.StandardOutput;
     }
 }

@@ -63,8 +63,9 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                     instances, so the sanctioned vswhere path is the only route.
 ///                 </item>
 ///                 <item>
-///                     <c>mcp/no-blocking-waits</c>: the MCP pipeline never blocks on a task
-///                     (<c>Wait</c>/<c>Result</c>/<c>GetResult</c>); the shutdown drain is the one
+///                     <c>mcp/no-blocking-waits</c>: nothing in the CLI or the extraction host blocks on a
+///                     task (<c>Wait</c>/<c>Result</c>/<c>GetResult</c>) — a block there holds a thread-pool
+///                     thread and drops the tool call's cancellation; the shutdown drain is the one
 ///                     sanctioned block.
 ///                 </item>
 ///                 <item>
@@ -127,8 +128,8 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         reason alone and carry no anchored rule, so they render a module-map row and no card; the same
 ///         honest negative the Quoting example shows. Layers are the spec's vocabulary here rather than a
 ///         second one beside <c>Project</c>, so the sentences read in layer voice throughout — including
-///         <c>naming/async-suffix</c>, whose union subject anchors nothing (a union has no single home
-///         directory) and so is a documented negative rather than a sixth card.
+///         <c>naming/async-suffix</c> and <c>mcp/no-blocking-waits</c>, whose union subjects anchor nothing
+///         (a union has no single home directory) and so are documented negatives rather than more cards.
 ///     </para>
 ///     <para>
 ///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
@@ -144,9 +145,14 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///     <para>
 ///         Two more pack rules have local twins for that same reason. <c>mcp/no-blocking-waits</c> stands
 ///         in for <c>async/no-sync-over-async</c>, whose ban list also covers <c>GetAwaiter</c> itself and
-///         whose prose is the general TAP one; the local rule names the deadlock that actually happens
-///         here, a single blocked call on the JSON-RPC pipeline, and sanctions <c>ServerShutdown</c>'s
-///         drain by name. <c>mcp/tools-accept-cancellation</c> stands in for
+///         whose prose is the general TAP one; the local rule names what a block actually costs here — a
+///         thread-pool thread held for a child process's whole lifetime, and a tool call's
+///         <c>CancellationToken</c> dropped, so a client cancel becomes a zombie — and sanctions
+///         <c>ServerShutdown</c>'s drain by name. Its subject is the union of the two host-shaped layers
+///         rather than the MCP namespace, because the code the server blocks in mostly is not in that
+///         namespace: the git and vswhere launchers that could wedge a <c>--diff-base</c> tool call live in
+///         the CLI's diff plumbing and in the extraction host.
+///         <c>mcp/tools-accept-cancellation</c> stands in for
 ///         <c>async/accept-cancellation</c> on the same grounds: the stake here is a tool method holding
 ///         the idle watchdog open for the life of the server, not cancellation in general. Both could
 ///         have been pack calls with a narrow subject, since every pack method takes one, so what keeps
@@ -203,8 +209,8 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         to this spec class. A rule whose subject sweeps the spec assembly must therefore anchor with
 ///         <c>typeof</c> + <c>nameof</c> (nameof operands mint nothing), as
 ///         <c>roslyn/no-msbuildlocator-query</c> does; expression anchors are safe only under subjects that
-///         exclude the spec assembly, as <c>mcp/no-blocking-waits</c> is — its subject is the MCP namespace,
-///         which the spec class is not in.
+///         exclude the spec assembly, as <c>mcp/no-blocking-waits</c> is — its subject is the Host and
+///         Extraction layers, and this spec class is in neither.
 ///     </para>
 /// </summary>
 public sealed class LoadBearingArchSpec : IArchitectureSpec
@@ -301,17 +307,22 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Go through MsBuildBootstrap / VsWhereLocator; never query the Locator for instances.");
 
         arch.Rule("mcp/no-blocking-waits")
-            .Enforce(arch.Namespace("Zphil.LoadBearing.Cli.Mcp.*")
+            .Enforce(arch.AnyOf(host, extraction)
                 .Except(arch.Types.WithNameMatching("ServerShutdown"))
                 .MustNotUse(
                     arch.Member<Task>(t => t.Wait()),
                     arch.Member<Task<object>>(t => t.Result),
                     arch.Member<TaskAwaiter>(a => a.GetResult()),
                     arch.Member<TaskAwaiter<object>>(a => a.GetResult())))
-            .Because("The MCP server multiplexes every tool call on one async JSON-RPC pipeline; a " +
-                     "synchronous block inside it deadlocks the transport. ServerShutdown is the one " +
-                     "sanctioned block — a bounded drain at process exit, with no pipeline left to starve.")
-            .Fix("Await the task and flow the CancellationToken; blocking belongs only in ServerShutdown's drain.");
+            .Because("The CLI and the extraction host are one long-lived MCP server as often as they are a " +
+                     "one-shot command, and a blocking wait there costs twice: it holds a thread-pool thread " +
+                     "for as long as the child process or workspace load it waits on, and it drops the " +
+                     "CancellationToken the tool call was handed, so a client cancel leaves a zombie running " +
+                     "the timeout out instead. ServerShutdown is the one sanctioned block — a bounded drain " +
+                     "at process exit, with nothing left to starve.")
+            .Fix("Await the task and flow the CancellationToken. Where a call chain genuinely cannot be " +
+                 "async — the MSBuild registration path is JIT-quarantined behind a synchronous seam — wait " +
+                 "on the resource itself, a process handle rather than a Task.");
 
         arch.Rule("naming/async-suffix")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)

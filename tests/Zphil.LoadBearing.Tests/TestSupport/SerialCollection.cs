@@ -20,8 +20,9 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         <see cref="Mcp.Infrastructure.ParentProcessWatcherTests" /> → <c>cmd</c>) deadlock when a
 ///         workspace-loading test concurrently spawns a long-lived Roslyn <c>BuildHost</c>: the BuildHost
 ///         (or a reused MSBuild node) inherits a duplicate of the child's stdout write handle, so the read
-///         never sees EOF and the whole run hangs. <see cref="ProcessRunner" /> bounds each read so the hang
-///         becomes a fast timeout; serializing here removes the race entirely so the timeout never trips.
+///         never sees EOF and the whole run hangs. <see cref="Zphil.LoadBearing.Roslyn.ChildProcess" /> bounds
+///         the wait and kills the tree, so the hang becomes a timeout instead; serializing here removes the
+///         race entirely so that ceiling never trips.
 ///     </para>
 ///     <para>
 ///         It also subsumes the former <c>WatchdogStatics</c> group:

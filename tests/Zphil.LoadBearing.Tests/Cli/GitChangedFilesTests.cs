@@ -53,13 +53,13 @@ public sealed class GitChangedFilesTests
     }
 
     [Fact]
-    public void Resolve_OutsideAnyRepo_ThrowsUserError()
+    public async Task ResolveAsync_OutsideAnyRepo_ThrowsUserError()
     {
         string dir = Path.Combine(Path.GetTempPath(), "loadbearing-git-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            Should.Throw<UserErrorException>(() => GitChangedFiles.Resolve("HEAD", dir));
+            await Should.ThrowAsync<UserErrorException>(() => GitChangedFiles.ResolveAsync("HEAD", dir, TestContext.Current.CancellationToken));
         }
         finally
         {

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
@@ -41,8 +42,8 @@ internal sealed class TempGitRepo : IDisposable
         return _workspace.PathOf(relativeSegments);
     }
 
-    // Runs `git -C <root> <args...>`; throws on non-zero exit. Streams drain through ProcessRunner so a
-    // git child whose pipe handle is inherited by a concurrently-spawned BuildHost cannot wedge the run.
+    // Runs `git -C <root> <args...>`; throws on non-zero exit. Launched through ChildProcess so this git
+    // gets the closed stdin, the bounded wait and the kill-tree every child in this repository gets.
     private void Git(params string[] args)
     {
         var startInfo = new ProcessStartInfo("git")
@@ -54,7 +55,7 @@ internal sealed class TempGitRepo : IDisposable
         startInfo.ArgumentList.Add(Root);
         foreach (string argument in args) startInfo.ArgumentList.Add(argument);
 
-        ProcessRunner.ProcessResult result = ProcessRunner.Run(startInfo);
+        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
         if (result.ExitCode != 0)
             throw new InvalidOperationException(
                 $"'git {string.Join(" ", args)}' failed with exit code {result.ExitCode}."

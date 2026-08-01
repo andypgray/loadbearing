@@ -100,7 +100,7 @@ public sealed class FrameworkBinlogReplayTests
         startInfo.ArgumentList.Add("-nodeReuse:false");
         DotnetCli.ApplyCleanSdkEnvironment(startInfo);
 
-        ProcessRunner.ProcessResult result = ProcessRunner.Run(startInfo);
+        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
         if (result.ExitCode != 0)
             throw new InvalidOperationException(
                 $"'{msBuildExe} {solutionPath}' failed with exit code {result.ExitCode}."

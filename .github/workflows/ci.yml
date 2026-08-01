@@ -40,10 +40,12 @@ jobs:
       - name: Test
         run: dotnet test Zphil.LoadBearing.slnx --no-build --logger "console;verbosity=normal"
 
-  # Packs on Linux and asserts the MCP manifest lands at exactly `.mcp/server.json` — the
-  # path nuget.org scans to generate the VS Code MCP config. A backslash PackagePath
-  # mis-packs only on non-Windows (the `.mcp//server.json` double-slash class of bug), so a
-  # single ubuntu job — not the 3-OS matrix — is the leg that catches it.
+  # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at
+  # exactly `.mcp/server.json` — the path nuget.org scans to generate the VS Code MCP config. A
+  # backslash PackagePath mis-packs only on non-Windows (the `.mcp//server.json` double-slash class
+  # of bug), so a single ubuntu job — not the 3-OS matrix — is the leg that catches it. Second,
+  # installs the packed tool and walks the README quickstart, which is the one shipped path this
+  # repository never took itself.
   pack-check:
     runs-on: ubuntu-latest
     steps:
@@ -69,6 +71,38 @@ jobs:
             printf '%s\n' "$entries" | grep -i 'server\.json' || true
             exit 1
           }
+
+      # The README quickstart is `dotnet tool install -g Zphil.LoadBearing.Cli` then `loadbearing
+      # check <solution>`, and nothing anywhere executed it: CI drives the CLI through `dotnet run`,
+      # the agent hook through `dotnet exec`, and there is no tool manifest. So the one path every
+      # new user takes was the one path this repository never took. This installs the nupkg packed
+      # above and walks the published lines.
+      #
+      # The version is read from Directory.Build.props rather than written out, so a release bump
+      # cannot quietly stop pinning. --add-source puts the local pack in front of nuget.org, which
+      # is still needed for the third-party dependencies, so the pin alone does not prove which
+      # build ran once this version is also published — the informational version does.
+      # `<version>+<commit>` is the format SECURITY.md documents as the source cross-check, and
+      # holding it to this commit's SHA is what makes this a test of the tool just packed rather
+      # than of whatever nuget.org happens to serve.
+      #
+      # Meridian.Quoting is the target because it is small, Enforce-only, and carries no baselines,
+      # so a green exit is the rules passing and nothing else.
+      - name: Install the packed tool and run the README quickstart
+        run: |
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
+          dotnet tool install -g Zphil.LoadBearing.Cli --add-source artifacts --version "$version"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          # Substring, not a whole-line match: the CLI's console writes CRLF on Windows, and a
+          # verification of this same line by hand there would fail on the trailing \r for no reason.
+          expected="$version+$(git rev-parse HEAD)"
+          loadbearing --version | grep -Fq "$expected" || {
+            echo "::error::loadbearing --version is not '$expected' — the tool that ran is not the one packed above"
+            loadbearing --version
+            exit 1
+          }
+          dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
+          loadbearing check examples/Meridian.Quoting/Meridian.Quoting.slnx
 
   # Self-scan: LoadBearing checks its own solution and publishes the result to GitHub code
   # scanning as SARIF. The self-spec exits 0 today, so the job is green; a future violation

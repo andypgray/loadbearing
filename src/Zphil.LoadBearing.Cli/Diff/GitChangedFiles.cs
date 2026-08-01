@@ -20,18 +20,23 @@ namespace Zphil.LoadBearing.Cli.Diff;
 /// </summary>
 internal static class GitChangedFiles
 {
-    private const int TimeoutMs = 30_000;
+    private const int TimeoutSeconds = 30;
 
     /// <summary>
     ///     Runs git and returns the union of tracked-since-<paramref name="baseRef" /> and untracked
     ///     files as a <see cref="DiffContext" /> (absolute, forward-slash paths).
     /// </summary>
-    public static DiffContext Resolve(string baseRef, string solutionDirectory)
+    public static async Task<DiffContext> ResolveAsync(string baseRef, string solutionDirectory, CancellationToken ct)
     {
-        string toplevel = Path.GetFullPath(RunGit(solutionDirectory, "rev-parse", "--show-toplevel").Trim());
+        string toplevelOutput = await RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
+        string toplevel = Path.GetFullPath(toplevelOutput.Trim());
 
-        var tracked = ParseZTerminated(RunGit(solutionDirectory, "diff", "--name-only", "-z", baseRef, "--"));
-        var untracked = ParseZTerminated(RunGit(solutionDirectory, "ls-files", "--others", "--exclude-standard", "--full-name", "-z"));
+        string trackedOutput = await RunGitAsync(solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "--");
+        string untrackedOutput = await RunGitAsync(
+            solutionDirectory, ct, "ls-files", "--others", "--exclude-standard", "--full-name", "-z");
+
+        var tracked = ParseZTerminated(trackedOutput);
+        var untracked = ParseZTerminated(untrackedOutput);
 
         var files = ComposeAbsolute(toplevel, tracked.Concat(untracked));
         return new DiffContext(baseRef, solutionDirectory, files);
@@ -61,13 +66,16 @@ internal static class GitChangedFiles
         return result;
     }
 
-    private static string RunGit(string solutionDirectory, params string[] arguments)
+    // Every launch goes through ChildProcess, whose closed stdin is what keeps git from wedging: without
+    // it the child inherits this process's stdin, which inside the MCP server is the client's live
+    // JSON-RPC pipe parked on a synchronous read — and Git for Windows' startup handle probe blocks
+    // forever against that. The 30s ceiling is a safety net behind it, linked with the caller's token so
+    // a cancelled tool call aborts the wait instead of leaving a zombie to run the clock out.
+    private static async Task<string> RunGitAsync(
+        string solutionDirectory, CancellationToken ct, params string[] arguments)
     {
         var psi = new ProcessStartInfo("git")
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
             CreateNoWindow = true,
             WorkingDirectory = solutionDirectory
         };
@@ -76,59 +84,33 @@ internal static class GitChangedFiles
         psi.ArgumentList.Add(solutionDirectory);
         foreach (string argument in arguments) psi.ArgumentList.Add(argument);
 
-        Process process;
+        ChildProcess.ProcessResult result;
         try
         {
-            process = Process.Start(psi) ?? throw Failure("git could not be started.");
+            result = await ChildProcess.RunAsync(psi, TimeSpan.FromSeconds(TimeoutSeconds), ct: ct);
         }
         catch (Win32Exception ex)
         {
             // git is not on PATH (or is not executable).
             throw Failure($"git could not be run ({ex.Message}); --diff-base needs git on PATH.");
         }
-
-        using (process)
+        catch (InvalidOperationException)
         {
-            using var timeout = new CancellationTokenSource(TimeoutMs);
-            // Drain both streams concurrently AND cancellably. The old code read stdout with a synchronous,
-            // unbounded ReadToEnd() *before* the WaitForExit timeout — so a git child whose stdout write
-            // handle was inherited by a concurrently-spawned long-lived process never reached EOF and wedged
-            // here forever, with the timeout below unreachable. The token now bounds every wait.
-            var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
-            try
-            {
-                process.WaitForExitAsync(timeout.Token).GetAwaiter().GetResult();
-                string output = outputTask.GetAwaiter().GetResult();
-
-                if (process.ExitCode != 0)
-                {
-                    string err = stderrTask.GetAwaiter().GetResult().Trim();
-                    string suffix = err.Length > 0 ? $": {err}" : ".";
-                    throw Failure($"'git {string.Join(" ", arguments)}' exited with code {process.ExitCode}{suffix}");
-                }
-
-                return output;
-            }
-            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-            {
-                TryKill(process);
-                throw Failure($"'git {string.Join(" ", arguments)}' did not complete within {TimeoutMs / 1000} seconds.");
-            }
+            throw Failure("git could not be started.");
         }
-    }
-
-    // Best-effort kill of a wedged git process (and any children) before we throw the timeout.
-    private static void TryKill(Process process)
-    {
-        try
+        catch (TimeoutException)
         {
-            if (!process.HasExited) process.Kill(true);
+            throw Failure($"'git {string.Join(" ", arguments)}' did not complete within {TimeoutSeconds} seconds.");
         }
-        catch
+
+        if (result.ExitCode != 0)
         {
-            // Already exited or inaccessible — nothing to clean up.
+            string err = result.StandardError.Trim();
+            string suffix = err.Length > 0 ? $": {err}" : ".";
+            throw Failure($"'git {string.Join(" ", arguments)}' exited with code {result.ExitCode}{suffix}");
         }
+
+        return result.StandardOutput;
     }
 
     private static UserErrorException Failure(string detail)

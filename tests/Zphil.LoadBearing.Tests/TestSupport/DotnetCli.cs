@@ -1,10 +1,11 @@
 using System.Diagnostics;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     Runs a <c>dotnet</c> CLI command in a clean SDK environment, draining and bounding it through
-///     <see cref="ProcessRunner" /> and throwing with captured output on a non-zero exit. Shared by
+///     <see cref="ChildProcess" /> and throwing with captured output on a non-zero exit. Shared by
 ///     <see cref="FixtureRestorer" /> (fixture restore) and <see cref="BinlogFixtureWorkspace" /> (the
 ///     one-shot <c>build -bl</c> that produces the replay binlog) so both get identical poisoned-env
 ///     stripping and node/server suppression rather than duplicating it. The env hygiene is exposed via
@@ -25,7 +26,7 @@ internal static class DotnetCli
         };
         ApplyCleanSdkEnvironment(startInfo);
 
-        ProcessRunner.ProcessResult result = ProcessRunner.Run(startInfo);
+        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
         if (result.ExitCode != 0)
             throw new InvalidOperationException(
                 $"'dotnet {arguments}' failed with exit code {result.ExitCode}."
@@ -41,8 +42,9 @@ internal static class DotnetCli
     /// <remarks>
     ///     Node-reuse + MSBuild-server off: otherwise a reused worker node (or, on newer SDKs, an MSBuild
     ///     server) lingers after the command exits, inherits the child's redirected stdout write-handle, and
-    ///     the pipe never reaches EOF — the <see cref="ProcessRunner" /> drain would then unblock only at its
-    ///     timeout. (Build callers additionally pass <c>--disable-build-servers</c> for the same reason.) The
+    ///     the pipe never reaches EOF — the <see cref="ChildProcess" /> drain would then unblock only once
+    ///     its ceiling elapsed and it killed the tree. (Build callers additionally pass
+    ///     <c>--disable-build-servers</c> for the same reason.) The
     ///     stripped vars matter because the test process has Visual Studio's MSBuild registered (MSBuildLocator
     ///     + <c>MsBuildBootstrap</c> set MSBUILD_EXE_PATH / VSINSTALLDIR / VSCMD_VER process-wide for the
     ///     Roslyn BuildHost); a child inheriting those resolves the wrong MSBuild and fails immediately.

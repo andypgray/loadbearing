@@ -25,9 +25,10 @@ The house stack is xUnit v3 + Shouldly. Beyond that, one convention carries this
 
 ## The dogfood invariant
 
-This repo governs itself: [`arch/Zphil.LoadBearing.ArchSpec`](arch/Zphil.LoadBearing.ArchSpec) is a real spec for this codebase, and the root [`AGENTS.md`](AGENTS.md) contains a block between `<!-- loadbearing:begin -->` / `<!-- loadbearing:end -->` markers that `loadbearing render` generated from it. A self-spec test keeps that block current, so:
+This repo governs itself: [`arch/Zphil.LoadBearing.ArchSpec`](arch/Zphil.LoadBearing.ArchSpec) is a real spec for this codebase, and `loadbearing render` generates nine committed artifacts from it. The root [`AGENTS.md`](AGENTS.md) carries the rule block, [`ARCHITECTURE.md`](ARCHITECTURE.md) carries the project diagram, and seven directories under `src/` carry a scoped rule card each. Every one of them is a block between `<!-- loadbearing:begin -->` / `<!-- loadbearing:end -->` markers. Self-spec tests keep the whole set current, and CI re-renders the repository and requires a zero diff, so:
 
-- Never hand-edit inside the markers. If your change alters what the spec renders, regenerate the block (`loadbearing render` against this solution) and commit the result with your change, or the suite goes red.
+- Never hand-edit inside the markers, in any of those files. If your change alters what the spec renders, regenerate (`loadbearing render` against this solution) and commit the result with your change, or the suite goes red.
+- Expect that set to move. A rule anchored to a new directory makes `render` write a card there, and a card whose rules have moved away has to be deleted: a test fails on a committed card that no rule placement produced, which is how an orphan gets caught rather than quietly read.
 - Content outside the markers is ordinary hand-written documentation; edit it freely.
 
 ## Pull request expectations

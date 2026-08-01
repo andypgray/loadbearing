@@ -27,7 +27,9 @@ internal static class CheckPipeline
 
         // Resolve the diff before extraction so a bad ref (or missing git) fails fast, mirroring the
         // baseline-before-extraction ordering.
-        DiffContext? diff = diffBase is null ? null : GitChangedFiles.Resolve(diffBase, source.SolutionDirectory);
+        DiffContext? diff = diffBase is null
+            ? null
+            : await GitChangedFiles.ResolveAsync(diffBase, source.SolutionDirectory, ct);
 
         CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
 

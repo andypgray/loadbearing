@@ -3,6 +3,7 @@ using System.Text;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -59,7 +60,7 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
         //     the fix this crashed here with "could not be replayed: Could not load file or assembly
         //     'Microsoft.Build.Framework …'"; the gate now registers MSBuildLocator up front, so the parser
         //     resolves the SDK's engine assemblies and the run completes clean.
-        ProcessRunner.ProcessResult replay = RunCliOutOfProcess(
+        ChildProcess.ProcessResult replay = RunCliOutOfProcess(
             cli, FreshCache(),
             "check", Fixture.SolutionPath, "--binlog", Fixture.BinlogPath, "--spec", CliRunner.CleanSpecDll);
 
@@ -69,18 +70,18 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
 
         // (b) the same check WITHOUT --binlog on its own fresh cache — a cold design-time build, the parity
         //     baseline. Byte-identical stdout at the deployment boundary is the headline guarantee.
-        ProcessRunner.ProcessResult cold = RunCliOutOfProcess(
+        ChildProcess.ProcessResult cold = RunCliOutOfProcess(
             cli, FreshCache(), "check", Fixture.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         cold.ExitCode.ShouldBe(0);
         replay.StandardOutput.ShouldBe(cold.StandardOutput);
     }
 
-    // Launches `dotnet <loadbearing.dll> <args>` through the drain-safe ProcessRunner, in the same cleaned SDK
+    // Launches `dotnet <loadbearing.dll> <args>` through the drain-safe ChildProcess, in the same cleaned SDK
     // environment DotnetCli uses (poison MSBuild/VS vars stripped, node/server reuse off) plus a throwaway
     // LOADBEARING_CACHE_DIR — a deployment-normal child with none of the test host's MSBuild registration
     // leaking in. UTF-8 decoding matches the CLI's own console encoding so the captured text is faithful.
-    private static ProcessRunner.ProcessResult RunCliOutOfProcess(string cliDll, string cacheDir, params string[] args)
+    private static ChildProcess.ProcessResult RunCliOutOfProcess(string cliDll, string cacheDir, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -94,7 +95,7 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
         DotnetCli.ApplyCleanSdkEnvironment(startInfo);
         startInfo.Environment[CodebaseSource.CacheDirectoryVariable] = cacheDir;
 
-        return ProcessRunner.Run(startInfo);
+        return ChildProcess.Run(startInfo);
     }
 
     private string FreshCache()
