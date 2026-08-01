@@ -343,6 +343,55 @@ public class VocabularyFragmentTests
             .ShouldBe(SentenceRenderer.Sentence(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)).MustBeSealed()));
     }
 
+    // ---- String hierarchy anchors (GRAMMAR §5.2–§5.3): the same escape hatch names an interface or a base
+    //      type by fully-qualified string, and renders byte-identically to its typeof twin above ----
+
+    [Fact]
+    public void MustImplement_StringAnchor_RendersTheTypeofSentence()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustImplement("Zphil.LoadBearing.Tests.Stubs.IBillingFacade"))
+            .ShouldBe("Types must implement `IBillingFacade`.");
+    }
+
+    [Fact]
+    public void MustDeriveFrom_StringAnchor_RendersTheTypeofSentence()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustDeriveFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase"))
+            .ShouldBe("Types must derive from `ControllerBase`.");
+    }
+
+    [Fact]
+    public void MustNotImplement_StringAnchors_RenderTheTypeofOrList()
+    {
+        // Byte-for-byte the MustNotImplement_OrList pin, reached without a typeof: the open generic's declared
+        // type-parameter name is in the string, because the string is what a report prints.
+        SentenceRenderer.Sentence(Arch.Types.MustNotImplement(
+                "Zphil.LoadBearing.Tests.Stubs.IBillingFacade", "Zphil.LoadBearing.Tests.Stubs.IHandler<T>"))
+            .ShouldBe("Types must not implement `IBillingFacade` or `IHandler<T>`.");
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_StringAnchor_RendersTheTypeofSentence()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustNotDeriveFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase"))
+            .ShouldBe("Types must not derive from `ControllerBase`.");
+    }
+
+    [Fact]
+    public void Implementing_StringAnchor_RendersTheTypeofFragment()
+    {
+        // The adjective arms of the same equivalence, asserted against the typeof forms directly.
+        SentenceRenderer.Sentence(Arch.Types.Implementing("Zphil.LoadBearing.Tests.Stubs.IHandler<T>").MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.Implementing(typeof(IHandler<>)).MustBeSealed()));
+    }
+
+    [Fact]
+    public void DerivedFrom_StringAnchor_RendersTheTypeofFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.DerivedFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase").MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.DerivedFrom(typeof(ControllerBase)).MustBeSealed()));
+    }
+
     // ---- The member attribute axis (GRAMMAR §5.7): one adjective and both verbs. The VERBS reuse the
     //      type-side phrases verbatim — verb position is unambiguous, so there is nothing to disambiguate.
     //      The ADJECTIVE does not: it premodifies the member head instead of trailing the type reference ----

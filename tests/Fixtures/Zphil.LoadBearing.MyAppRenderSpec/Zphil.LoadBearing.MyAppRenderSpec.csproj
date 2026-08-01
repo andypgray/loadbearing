@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <!-- The render e2e fixture: two layers, two holding Enforce rules, and one quarantined scope over
-         MyApp.Legacy.Billing (with a sanctioned facade surface and dragons). References only Core; its
-         DLL path is baked into the test assembly's metadata and loaded via the spec flag. The
-         BoundaryOnlyVia facade types are name-carrier stubs (Stubs.cs) — correspondence is by full
-         name, and this DLL is never a MyApp solution member, so the stubs never enter the universe. -->
+         MyApp.Legacy.Billing (with a sanctioned facade surface and dragons). References Core plus the MyApp
+         project whose facade types BoundaryOnlyVia names; its DLL path is baked into the test assembly's
+         metadata and loaded via the spec flag. That reference replaced name-carrier stubs: this DLL is never
+         a MyApp solution member, but it IS a member of the LoadBearing solution, where a stub declares a
+         MyApp FQN a second time and every check of this repo reports the conflation. -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
@@ -14,6 +15,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\..\Zphil.LoadBearing.Tests\Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
     </ItemGroup>
 
 </Project>

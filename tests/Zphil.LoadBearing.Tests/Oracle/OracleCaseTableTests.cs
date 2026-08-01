@@ -1,5 +1,4 @@
 using ArchUnitNET.Fluent;
-using MyApp.Web;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
@@ -139,12 +138,17 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // Row 6: types implementing IHandler<T> must be *Handler-suffixed. RefundProcessor implements
     // IHandler<InvoiceCreated> but lacks the suffix; InvoiceCreatedHandler has it. HIGHEST-RISK row:
     // open-generic / transitive interface matching across the two substrates.
+    //
+    // The LoadBearing side anchors by fully-qualified string (GRAMMAR §5.2), which is how this class holds the
+    // doctrine below without a stub: naming MyApp.Web.IHandler<T> is not referencing it, so the oracle still
+    // never sees MyApp by CLR identity, and nothing here declares a type MyApp already declares. A string
+    // names the DEFINITION, so it carries the open-generic typeof anchor's semantics exactly.
     [Fact]
     public void Row6_HandlerImplementorsMustHaveHandlerSuffix()
     {
         var loadBearing = LoadBearingShapeViolators(arch =>
             arch.Rule("oracle/handler-suffix")
-                .Enforce(arch.Types.Implementing(typeof(IHandler<>)).MustHaveSuffix("Handler"))
+                .Enforce(arch.Types.Implementing("MyApp.Web.IHandler<T>").MustHaveSuffix("Handler"))
                 .Because("Oracle row 6: handler implementors carry the Handler suffix."));
 
         IArchRule rule = ArchRuleDefinition.Types().That()

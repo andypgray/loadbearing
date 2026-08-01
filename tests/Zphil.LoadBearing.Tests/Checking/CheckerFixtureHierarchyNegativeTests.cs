@@ -1,4 +1,3 @@
-using MyApp.Web;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
@@ -10,9 +9,11 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     The negative hierarchy verbs over the real MyApp fixture (GRAMMAR §5.3), reusing the shared
 ///     <see cref="WorkspaceFixture.Model" /> (no extra MSBuild load). The reds already live in the committed
 ///     fixture, so each verb pins its known violator (red) and a scoped-out non-violator (green). The
-///     <c>typeof</c> anchors resolve to namespace-matched reflectable stubs — <c>MyApp.Web.IHandler&lt;T&gt;</c>
-///     in <c>Oracle/OracleStubs.cs</c> and <c>MyApp.Web.WebRouteAttribute</c> alongside — matched to the
-///     extracted model by full name. <c>System.Exception</c> is the one external (BCL) base anchor.
+///     interface and attribute anchors are fully-qualified strings (GRAMMAR §5.2), which is what lets this
+///     class name MyApp types without a reflectable stub declaring them: correspondence to the extracted
+///     model is by full name either way, and a string names the correspondence instead of impersonating it.
+///     <c>System.Exception</c> is the one external (BCL) base anchor, and the one that still wants a
+///     <c>typeof</c> — the spec side of this test compiles against the BCL already.
 /// </summary>
 public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixture)
 {
@@ -21,13 +22,13 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     {
         // InvoiceCreatedHandler : IHandler<InvoiceCreated> — the open-generic construction match reds it.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotImplement(typeof(IHandler<>)))
+                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
             .Single().ShapeSubjects().ShouldBe(["MyApp.Web.InvoiceCreatedHandler"]);
 
         // HomeController does not implement IHandler — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("HomeController").MustNotImplement(typeof(IHandler<>)))
+                .Enforce(arch.Types.WithPrefix("HomeController").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
             .Single().Status.ShouldBe(RuleStatus.Passed);
     }
@@ -53,13 +54,13 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     {
         // HomeController carries [WebRoute("/home")] — the declared attribute reds it.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
-                .Enforce(arch.Types.WithPrefix("HomeController").MustNotBeAttributedWith(typeof(WebRouteAttribute)))
+                .Enforce(arch.Types.WithPrefix("HomeController").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
                 .Because("b"))
             .Single().ShapeSubjects().ShouldBe(["MyApp.Web.HomeController"]);
 
         // InvoiceCreatedHandler carries no attribute — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
-                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotBeAttributedWith(typeof(WebRouteAttribute)))
+                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
                 .Because("b"))
             .Single().Status.ShouldBe(RuleStatus.Passed);
     }

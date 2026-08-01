@@ -285,26 +285,29 @@ internal static class SpecValidator
     // and a negative an always-pass — both silent slips; the error names the anchor's FQN and steers to the
     // right-category verb. Applies to the positives' single anchor and every anchor in a negative's list, all
     // reported in the same all-at-once pass at the rule's spec-source location (one shared code, item-18 precedent).
-    // A string attribute anchor carries no reflected type, so it is filtered out (TypedAnchors) rather than
-    // guessed at: there is no category to read off an FQN, and inventing one would refuse legal spellings.
+    // A string anchor carries no reflected type, so it is filtered out (TypedAnchors) rather than guessed
+    // at — in every family, hierarchy and attribute alike: there is no category to read off an FQN,
+    // extraction facts are the only authority on what a name names, and refusing a spelling the host cannot
+    // load would break the escape hatch's whole point. The cost is stated in the catalog: a wrong string is
+    // loud on a positive (always red) and silent on a negative.
     private static void CheckHierarchyAnchors(RuleRegistration rule, List<SpecValidationError> errors)
     {
         switch (rule.Constraint)
         {
             case MustImplementConstraint c:
-                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => !t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is not an interface; MustImplement requires an interface anchor — use MustDeriveFrom for a base class");
                 break;
             case MustNotImplementConstraint c:
-                CheckAnchorCategory(rule, errors, c.Types, t => !t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is not an interface; MustNotImplement requires an interface anchor — use MustNotDeriveFrom for a base class");
                 break;
             case MustDeriveFromConstraint c:
-                CheckAnchorCategory(rule, errors, new[] { c.Type }, t => t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustDeriveFrom requires a non-interface anchor — use MustImplement for an interface");
                 break;
             case MustNotDeriveFromConstraint c:
-                CheckAnchorCategory(rule, errors, c.Types, t => t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
                 break;
             case MustBeAttributedWithConstraint c:
@@ -346,10 +349,10 @@ internal static class SpecValidator
                     $"{message(anchor)} (used by '{rule.Id}').", rule.Location));
     }
 
-    // The reflected arm of an attribute anchor list — the only anchors item 21 can judge. A string anchor
-    // names a definition FQN and nothing more, so it is dropped here; the asymmetry is deliberate, and the
+    // The reflected arm of an anchor list — the only anchors item 21 can judge. A string anchor names a
+    // definition FQN and nothing more, so it is dropped here; the asymmetry is deliberate, and the
     // blank-name check (item 15, via RulePatterns) is the whole of what a string anchor is validated for.
-    private static IReadOnlyList<Type> TypedAnchors(IReadOnlyList<AttributeAnchor> anchors)
+    private static IReadOnlyList<Type> TypedAnchors(IReadOnlyList<TypeAnchor> anchors)
     {
         return anchors.Where(anchor => anchor.Type is not null).Select(anchor => anchor.Type!).ToList();
     }
@@ -622,9 +625,30 @@ internal static class SpecValidator
                 yield return (attributeName, false, "attribute name");
                 break;
             case MustNotBeAttributedWithConstraint c:
-                foreach (AttributeAnchor anchor in c.Anchors)
+                foreach (TypeAnchor anchor in c.Anchors)
                     if (anchor.DefinitionFullName is { } name)
                         yield return (name, false, "attribute name");
+
+                break;
+
+            // The hierarchy verbs' string anchors, on the same item-15 terms under their own labels, so the
+            // error names which kind of anchor was left blank ("Blank interface name on 'rule/id'.").
+            case MustImplementConstraint c when c.Anchor.DefinitionFullName is { } interfaceName:
+                yield return (interfaceName, false, "interface name");
+                break;
+            case MustNotImplementConstraint c:
+                foreach (TypeAnchor anchor in c.Anchors)
+                    if (anchor.DefinitionFullName is { } name)
+                        yield return (name, false, "interface name");
+
+                break;
+            case MustDeriveFromConstraint c when c.Anchor.DefinitionFullName is { } baseTypeName:
+                yield return (baseTypeName, false, "base type name");
+                break;
+            case MustNotDeriveFromConstraint c:
+                foreach (TypeAnchor anchor in c.Anchors)
+                    if (anchor.DefinitionFullName is { } name)
+                        yield return (name, false, "base type name");
 
                 break;
 
@@ -634,7 +658,7 @@ internal static class SpecValidator
                 yield return (memberAttributeName, false, "attribute name");
                 break;
             case MemberMustNotBeAttributedWithConstraint c:
-                foreach (AttributeAnchor anchor in c.Anchors)
+                foreach (TypeAnchor anchor in c.Anchors)
                     if (anchor.DefinitionFullName is { } name)
                         yield return (name, false, "attribute name");
 
@@ -687,6 +711,16 @@ internal static class SpecValidator
                 case AttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
                     // The adjective's string anchor, on the same terms as the two verbs' (item 15).
                     yield return (attributeName, false, "attribute name");
+                    break;
+                case ImplementingAdjective a when a.Anchor.DefinitionFullName is { } interfaceName:
+                    // The hierarchy adjectives' string anchors, likewise. Blankness is checked on an
+                    // adjective even though item 21's category rule deliberately is not: a blank name is a
+                    // spec-side slip either way, while a wrong CATEGORY on an adjective empties the subject
+                    // and the fail-on-empty gate reds it loudly (see CheckHierarchyAnchors).
+                    yield return (interfaceName, false, "interface name");
+                    break;
+                case DerivedFromAdjective a when a.Anchor.DefinitionFullName is { } baseTypeName:
+                    yield return (baseTypeName, false, "base type name");
                     break;
                 case ExceptAdjective a:
                     foreach ((string, bool, string) pattern in SelectionPatterns(a.Payload)) yield return pattern;

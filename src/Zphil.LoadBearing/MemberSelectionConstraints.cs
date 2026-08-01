@@ -71,7 +71,7 @@ public static class MemberSelectionConstraints
     /// <summary>The subject members must carry an attribute.</summary>
     public static Constraint MustBeAttributedWith(this MemberSelection subject, Type attributeType)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
         return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
     }
 
@@ -87,7 +87,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeAttributedWith(this MemberSelection subject, string attributeFullName)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
         return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
     }
 
@@ -152,12 +152,12 @@ public static class MemberSelectionConstraints
         return Guard.NotNull(subject, nameof(subject));
     }
 
-    // The raw-Type anchor list of the negative attribute verb, minted as typeof AttributeAnchors — the
+    // The raw-Type anchor list of the negative attribute verb, minted as typeof TypeAnchors — the
     // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10).
-    private static IReadOnlyList<AttributeAnchor> AnchorTypes(Type first, Type[] more)
+    private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
     {
-        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromType(NotNull(first, nameof(first))) };
-        foreach (Type type in more) list.Add(AttributeAnchor.FromType(NotNull(type, nameof(more))));
+        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromType(NotNull(first, nameof(first))) };
+        foreach (Type type in more) list.Add(TypeAnchor.FromType(NotNull(type, nameof(more))));
 
         return list;
     }
@@ -165,10 +165,10 @@ public static class MemberSelectionConstraints
     // The string twin of AnchorTypes: the same (first, params more) shape over attribute-definition names.
     // Only null is refused here — a blank name reaches the validation catalog (GRAMMAR §8 item 15) so it
     // reports with every other error rather than throwing first.
-    private static IReadOnlyList<AttributeAnchor> AnchorNames(string first, string[] more)
+    private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
     {
-        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromName(NotNull(first, nameof(first))) };
-        foreach (string name in more) list.Add(AttributeAnchor.FromName(NotNull(name, nameof(more))));
+        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromName(NotNull(first, nameof(first))) };
+        foreach (string name in more) list.Add(TypeAnchor.FromName(NotNull(name, nameof(more))));
 
         return list;
     }

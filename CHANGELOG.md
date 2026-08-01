@@ -92,6 +92,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of a real spec is about names, shapes, attributes and members instead. Those rules are listed
   by ID under the fence with a posture tag and an `explain` pointer, so the picture is never
   mistaken for the whole law.
+- Hierarchy anchors by string, completing the escape hatch the attribute positions already
+  had: `Implementing`, `DerivedFrom` and the four `Must[Not]Implement` / `Must[Not]DeriveFrom`
+  verbs now take an interface or base type's fully-qualified name beside the `typeof` form, so
+  a spec can govern a contract it cannot compile against — "types implementing
+  `MyApp.Web.IHandler<T>` must be named `*Handler`" with no reference to the assembly that
+  declares the interface. The string is the name a report prints, declared type-parameter
+  names included, and it matches any construction of that definition exactly as an
+  open-generic `typeof` anchor does; a constructed spelling never matches, which is the one
+  place the string form is deliberately weaker than its `typeof` twin. Rendering is
+  byte-identical to that twin, collision widening included, so which form a spec chose stays
+  invisible to its sentences. Only blankness is validated: the category check that refuses
+  `MustNotImplement(typeof(SomeClass))` cannot read a category off a name, so a wrong string
+  is loud on a positive rule and silent on a negative — stated, not discovered. Every
+  single-type anchor position now offers the same triple: the compile-checked `typeof`, the
+  no-reference string, and the generic twin.
 
 ### Changed
 

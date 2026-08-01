@@ -76,7 +76,7 @@ internal static class ProseFormat
     ///     simple display, so a <c>typeof</c> anchor and a string anchor naming the same attribute
     ///     render the same bracketed form.
     /// </summary>
-    internal static string AttributeName(AttributeAnchor anchor)
+    internal static string AttributeName(TypeAnchor anchor)
     {
         return BracketAttribute(anchor.SimpleDisplay);
     }
@@ -95,16 +95,43 @@ internal static class ProseFormat
     }
 
     /// <summary>
+    ///     A single type anchor's unbracketed display name — the hierarchy analog of
+    ///     <see cref="AttributeName" />, for the positions that name one type and never bracket it:
+    ///     the <c>Implementing</c> / <c>DerivedFrom</c> adjectives and the <c>MustImplement</c> /
+    ///     <c>MustDeriveFrom</c> verbs (GRAMMAR §5.2, §5.3). Reads the anchor's simple display, which
+    ///     for a <c>typeof</c> anchor is <see cref="TypeName.Simple" /> — so a string anchor naming the
+    ///     same type renders the same fragment, generic type-parameter names included.
+    /// </summary>
+    internal static string AnchorName(TypeAnchor anchor)
+    {
+        return anchor.SimpleDisplay;
+    }
+
+    /// <summary>
     ///     Joins backticked type names as an or-list — <c>`A` or `B`</c> (GRAMMAR §5.3, §6) — for the
     ///     <c>MustNotImplement</c> / <c>MustNotDeriveFrom</c> anchor lists. Each anchor renders its
     ///     simple name, widening to the minimal distinguishing trailing namespace segments when
-    ///     anchors collide (<see cref="ResolveTypeDisplays" />) — the same rule the dependency target
-    ///     lists use. An open generic renders declared type-parameter names (<c>IHandler&lt;T&gt;</c>).
+    ///     anchors collide (<see cref="ResolvePathDisplays" />) — the same rule the dependency target
+    ///     lists use. An open generic renders declared type-parameter names (<c>IHandler&lt;T&gt;</c>),
+    ///     and a string anchor widens exactly as its <c>typeof</c> twin does, because both supply the
+    ///     same path.
+    /// </summary>
+    internal static string AnchorList(IReadOnlyList<TypeAnchor> anchors)
+    {
+        var paths = anchors.Select(anchor => anchor.PathSegments).ToList();
+        var displays = ResolvePathDisplays(paths);
+        return JoinReferences(displays.Select(Backtick).ToList());
+    }
+
+    /// <summary>
+    ///     The reflected face of <see cref="AnchorList" />, for the union noun's collapsed type list
+    ///     (<see cref="TypeNoun" />) — the one type-list caller that holds <see cref="Type" />s rather
+    ///     than anchors. Wrapping rather than reimplementing is what keeps the two lists' widening
+    ///     behavior one function.
     /// </summary>
     internal static string TypeList(IReadOnlyList<Type> types)
     {
-        var display = ResolveTypeDisplays(types);
-        return JoinReferences(types.Select(t => Backtick(display[t])).ToList());
+        return AnchorList(types.Select(TypeAnchor.FromType).ToList());
     }
 
     /// <summary>
@@ -115,7 +142,7 @@ internal static class ProseFormat
     ///     <c>`[Billing.Audit]` or `[Sales.Audit]`</c>. A string anchor widens exactly as its
     ///     <c>typeof</c> twin does, because both supply the same path.
     /// </summary>
-    internal static string AttributeList(IReadOnlyList<AttributeAnchor> anchors)
+    internal static string AttributeList(IReadOnlyList<TypeAnchor> anchors)
     {
         // Anchors carry their own path, so a typeof and a string anchor widen through the identical
         // primitive. Collision keys on the anchor's simple name; a Foo/FooAttribute pair that shares a
@@ -159,9 +186,9 @@ internal static class ProseFormat
     ///     distinguishing trailing namespace segments (GRAMMAR §6): a lone simple name stays simple
     ///     (<c>Order</c>); a colliding set widens outward until distinct (<c>Billing.Order</c> /
     ///     <c>Sales.Order</c>). The <see cref="Type" />-keyed face of
-    ///     <see cref="ResolvePathDisplays" />, for the lists whose operands are reflected types — the
-    ///     dependency reference/target lists (through <see cref="SentenceRenderer" />) and the
-    ///     hierarchy anchor list (<see cref="TypeList" />).
+    ///     <see cref="ResolvePathDisplays" />, for the one caller that renders out of order and so needs
+    ///     a lookup rather than a positional list: the dependency reference/target lists, through
+    ///     <see cref="SentenceRenderer" />.
     /// </summary>
     internal static Dictionary<Type, string> ResolveTypeDisplays(IReadOnlyList<Type> types)
     {

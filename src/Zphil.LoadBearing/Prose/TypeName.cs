@@ -113,8 +113,8 @@ internal static class TypeName
     /// <summary>
     ///     The type's dot-separated path — namespace segments then the simple name — which the
     ///     colliding-simple-name rule widens outward along (GRAMMAR §6). This is the reflection arm of
-    ///     that rule's input; a string attribute anchor supplies the same shape from its own FQN
-    ///     (<see cref="Model.AttributeAnchor" />), so the widening algorithm itself
+    ///     that rule's input; a string anchor supplies the same shape from its own FQN
+    ///     (<see cref="Model.TypeAnchor" />), so the widening algorithm itself
     ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
     /// </summary>
     internal static IReadOnlyList<string> PathSegments(Type type)

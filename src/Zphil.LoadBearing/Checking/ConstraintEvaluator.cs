@@ -112,15 +112,15 @@ internal sealed class ConstraintEvaluator
                 var namePattern = new TypeNamePattern(c.Glob);
                 return Shape(subjects, t => namePattern.Matches(t.Name));
             case MustImplementConstraint c:
-                return Shape(subjects, SelectionEvaluator.InterfaceMatcher(c.Type));
+                return Shape(subjects, SelectionEvaluator.InterfaceMatcher(c.Anchor));
             case MustDeriveFromConstraint c:
-                return Shape(subjects, SelectionEvaluator.BaseTypeMatcher(c.Type));
+                return Shape(subjects, SelectionEvaluator.BaseTypeMatcher(c.Anchor));
             case MustBeAttributedWithConstraint c:
                 return Shape(subjects, SelectionEvaluator.AttributeMatcher(c.Anchor));
             case MustNotImplementConstraint c:
-                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.InterfaceMatcher));
+                return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.InterfaceMatcher));
             case MustNotDeriveFromConstraint c:
-                return Shape(subjects, NoneOf(c.Types, SelectionEvaluator.BaseTypeMatcher));
+                return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.BaseTypeMatcher));
             case MustNotBeAttributedWithConstraint c:
                 return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.AttributeMatcher));
             case MustBeSealedConstraint:
@@ -422,11 +422,11 @@ internal sealed class ConstraintEvaluator
     // so it PASSES iff NONE do — the per-subject negation over the anchor list. The matchers are the same ones
     // backing the positives (SelectionEvaluator / MemberSelectionEvaluator), built once eagerly per anchor so
     // an unrepresentable anchor throws (→ RuleError) before any subject is tested, exactly as the positive
-    // Shape arms do. Generic over the anchor kind because the attribute verbs anchor on an AttributeAnchor
-    // (typeof or definition name, GRAMMAR §5.2) while the two hierarchy verbs anchor on a bare Type; generic
-    // over the subject kind because the same negation serves a type subject and a member one.
-    private static Func<TSubject, bool> NoneOf<TAnchor, TSubject>(
-        IReadOnlyList<TAnchor> anchors, Func<TAnchor, Func<TSubject, bool>> matcher)
+    // Shape arms do. Every anchor in every family is a TypeAnchor (typeof or definition name, GRAMMAR §5.2),
+    // so the only axis left to be generic over is the subject kind: the same negation serves a type subject
+    // and a member one, whose matchers differ in what they read rather than in what they are anchored on.
+    private static Func<TSubject, bool> NoneOf<TSubject>(
+        IReadOnlyList<TypeAnchor> anchors, Func<TypeAnchor, Func<TSubject, bool>> matcher)
     {
         var matchers = anchors.Select(matcher).ToList();
         return subject => !matchers.Any(match => match(subject));

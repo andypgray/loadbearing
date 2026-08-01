@@ -1741,4 +1741,58 @@ public class SpecValidationTests
             arch.Rule("member/negative").Enforce(arch.Types.Methods.MustNotBeAttributedWith("N.MarkAttribute", " ")).Because("Reason.");
         }
     }
+
+    // ---- String hierarchy anchors (GRAMMAR §5.2–§5.3, §8 items 15 and 21). Appended at the very end, same
+    //      discipline as the member band above, so every caller-info golden keeps its authored line number.
+    //      Blankness is the whole of a string anchor's well-formedness, and it is checked on the adjectives as
+    //      well as the verbs; the item-21 CATEGORY check reaches neither, because a string carries no category
+    //      to read and refusing a spelling the host cannot load would break the hatch. ----
+
+    [Fact]
+    public void BlankPattern_BlankHierarchyNamesOnTheStringAnchors_AreReportedInOnePass()
+    {
+        // Six blanks across both families and all three positions each — adjective, positive verb, and the
+        // SECOND anchor of a negative's list — under two labels that name which kind of anchor was left empty.
+        SpecValidationException ex = BuildExpectingFailure(new BlankHierarchyNameSpec());
+
+        var blanks = ex.Errors.Where(e => e.Code == Code.BlankPattern).ToList();
+        blanks.Count.ShouldBe(6);
+        blanks.Count(e => e.Message.Contains("Blank interface name")).ShouldBe(3);
+        blanks.Count(e => e.Message.Contains("Blank base type name")).ShouldBe(3);
+        blanks[0].Message.ShouldBe("SpecValidationTests.cs:1779: Blank interface name on 'hierarchy/implementing'.");
+    }
+
+    [Fact]
+    public void ValidStringHierarchyAnchors_NonsenseNames_BuildWithoutError()
+    {
+        // No category check applies to a string, so the spellings item 21 refuses in typeof form all build: a
+        // class named where an interface belongs, an interface named where a base class belongs, a dotless
+        // name, and a constructed generic. Each names no declared type or the wrong one, so it matches
+        // nothing — loud on a positive (always red), silent on a negative. That is the hatch's stated cost.
+        Should.NotThrow(() => ArchModelBuilder.Build(new NonsenseStringHierarchyAnchorSpec()));
+    }
+
+    private sealed class BlankHierarchyNameSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("hierarchy/implementing").Enforce(arch.Types.Implementing("   ").MustBeSealed()).Because("Reason.");
+            arch.Rule("hierarchy/must-implement").Enforce(arch.Types.MustImplement("")).Because("Reason.");
+            arch.Rule("hierarchy/must-not-implement").Enforce(arch.Types.MustNotImplement("N.IThing", " ")).Because("Reason.");
+            arch.Rule("hierarchy/derived-from").Enforce(arch.Types.DerivedFrom("   ").MustBeSealed()).Because("Reason.");
+            arch.Rule("hierarchy/must-derive-from").Enforce(arch.Types.MustDeriveFrom("")).Because("Reason.");
+            arch.Rule("hierarchy/must-not-derive-from").Enforce(arch.Types.MustNotDeriveFrom("N.Base", " ")).Because("Reason.");
+        }
+    }
+
+    private sealed class NonsenseStringHierarchyAnchorSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/class-as-interface").Enforce(arch.Types.MustImplement("System.Exception")).Because("Reason.");
+            arch.Rule("area/interface-as-base").Enforce(arch.Types.MustNotDeriveFrom("System.IDisposable")).Because("Reason.");
+            arch.Rule("area/dotless").Enforce(arch.Types.Implementing("Nonsense").MustBeSealed()).Because("Reason.");
+            arch.Rule("area/constructed").Enforce(arch.Types.MustNotImplement("N.IHandler<System.Int32>")).Because("Reason.");
+        }
+    }
 }

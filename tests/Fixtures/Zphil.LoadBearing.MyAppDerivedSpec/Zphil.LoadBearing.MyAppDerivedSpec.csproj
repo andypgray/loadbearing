@@ -3,9 +3,11 @@
     <!-- The derive-flow golden fixture: the post-curation spec the derive_spec prompt produces against
          MyApp, all three postures, every baseline path conventional. On a virgin estate (arch/ deleted)
          check is red with the acknowledged debt, one baseline init captures it, and the re-check is
-         exit 0 — DeriveFlowE2ETests pins the sequence. References only Core; its DLL path is baked into
-         the test assembly's metadata and loaded via the spec flag. typeof() targets are name-carrier
-         stubs (Stubs.cs, IHandler.cs). -->
+         exit 0 — DeriveFlowE2ETests pins the sequence. References Core plus the two MyApp projects whose
+         types its typeof() anchors name; its DLL path is baked into the test assembly's metadata and loaded
+         via the spec flag. Those references replaced name-carrier stubs: a stub declares a MyApp FQN a
+         second time in THIS solution's universe, which every check of this repo then reports as an advisory
+         conflation note. -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
@@ -15,6 +17,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\..\Zphil.LoadBearing.Tests\Fixtures\TestSolutions\MyApp\MyApp.Web\MyApp.Web.csproj" />
+        <ProjectReference Include="..\..\Zphil.LoadBearing.Tests\Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
     </ItemGroup>
 
 </Project>

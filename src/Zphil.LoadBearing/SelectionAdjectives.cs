@@ -44,19 +44,51 @@ public static class SelectionAdjectives
     /// <summary>Narrows to types implementing an interface (open generic = any construction).</summary>
     public static Selection Implementing(this Selection selection, Type type)
     {
-        return Append(selection, new ImplementingAdjective(NotNull(type, nameof(type))));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return Append(selection, new ImplementingAdjective(anchor));
+    }
+
+    /// <summary>
+    ///     Narrows to types implementing the interface named by string — the escape hatch for an
+    ///     interface the spec project cannot compile against, so it need not take a package reference
+    ///     just to write the <c>typeof</c>. <paramref name="interfaceFullName" /> is the interface
+    ///     <em>definition</em>'s fully-qualified name as a report prints it, declared type-parameter
+    ///     names included (<c>"MyApp.Web.IHandler&lt;T&gt;"</c>); it matches any construction of that
+    ///     definition, and a constructed spelling matches nothing. Prefer
+    ///     <see cref="Implementing(Selection,Type)" /> whenever the interface is referenceable — the
+    ///     compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Selection Implementing(this Selection selection, string interfaceFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(interfaceFullName, nameof(interfaceFullName)));
+        return Append(selection, new ImplementingAdjective(anchor));
     }
 
     /// <summary>Narrows to types derived from a base type: " derived from `ControllerBase`".</summary>
     public static Selection DerivedFrom(this Selection selection, Type type)
     {
-        return Append(selection, new DerivedFromAdjective(NotNull(type, nameof(type))));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return Append(selection, new DerivedFromAdjective(anchor));
+    }
+
+    /// <summary>
+    ///     Narrows to types derived from the base type named by string — the escape hatch for a base
+    ///     type the spec project cannot compile against. <paramref name="baseTypeFullName" /> is the
+    ///     base type <em>definition</em>'s fully-qualified name as a report prints it
+    ///     (<c>"Microsoft.AspNetCore.Mvc.ControllerBase"</c>), matching any construction of that
+    ///     definition; a constructed spelling matches nothing. Prefer
+    ///     <see cref="DerivedFrom(Selection,Type)" /> whenever the base type is referenceable.
+    /// </summary>
+    public static Selection DerivedFrom(this Selection selection, string baseTypeFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(baseTypeFullName, nameof(baseTypeFullName)));
+        return Append(selection, new DerivedFromAdjective(anchor));
     }
 
     /// <summary>Narrows to types carrying an attribute: " attributed with `[ApiController]`".</summary>
     public static Selection AttributedWith(this Selection selection, Type type)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(type, nameof(type)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
         return Append(selection, new AttributedWithAdjective(anchor));
     }
 
@@ -72,7 +104,7 @@ public static class SelectionAdjectives
     /// </summary>
     public static Selection AttributedWith(this Selection selection, string attributeFullName)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
         return Append(selection, new AttributedWithAdjective(anchor));
     }
 

@@ -43,7 +43,7 @@ public static class MemberSelectionAdjectives
     public static TSelf AttributedWith<TSelf>(this TSelf selection, Type attributeType)
         where TSelf : MemberSelection
     {
-        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
         return Append(selection, new MemberAttributedWithAdjective(anchor));
     }
 
@@ -60,7 +60,7 @@ public static class MemberSelectionAdjectives
     public static TSelf AttributedWith<TSelf>(this TSelf selection, string attributeFullName)
         where TSelf : MemberSelection
     {
-        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
         return Append(selection, new MemberAttributedWithAdjective(anchor));
     }
 

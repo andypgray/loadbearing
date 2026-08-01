@@ -238,19 +238,50 @@ public static class SelectionConstraints
     /// <summary>The subject must implement an interface.</summary>
     public static Constraint MustImplement(this Selection subject, Type type)
     {
-        return new MustImplementConstraint(Subject(subject), NotNull(type, nameof(type)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return new MustImplementConstraint(Subject(subject), anchor);
+    }
+
+    /// <summary>
+    ///     The subject must implement the interface named by string — the escape hatch for an interface
+    ///     the spec project cannot compile against, so it need not take a package reference just to write
+    ///     the <c>typeof</c>. <paramref name="interfaceFullName" /> is the interface <em>definition</em>'s
+    ///     fully-qualified name as a report prints it, declared type-parameter names included
+    ///     (<c>"MyApp.Web.IHandler&lt;T&gt;"</c>); it matches any construction of that definition, and a
+    ///     constructed spelling matches nothing. Prefer <see cref="MustImplement(Selection,Type)" />
+    ///     whenever the interface is referenceable — the compiler checks a <c>typeof</c>, and nothing
+    ///     checks a string.
+    /// </summary>
+    public static Constraint MustImplement(this Selection subject, string interfaceFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(interfaceFullName, nameof(interfaceFullName)));
+        return new MustImplementConstraint(Subject(subject), anchor);
     }
 
     /// <summary>The subject must derive from a base type.</summary>
     public static Constraint MustDeriveFrom(this Selection subject, Type type)
     {
-        return new MustDeriveFromConstraint(Subject(subject), NotNull(type, nameof(type)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return new MustDeriveFromConstraint(Subject(subject), anchor);
+    }
+
+    /// <summary>
+    ///     The subject must derive from the base type named by string — the escape hatch for a base type
+    ///     the spec project cannot compile against. <paramref name="baseTypeFullName" /> is the base
+    ///     type <em>definition</em>'s fully-qualified name as a report prints it, matching any
+    ///     construction of that definition; a constructed spelling matches nothing. Prefer
+    ///     <see cref="MustDeriveFrom(Selection,Type)" /> whenever the base type is referenceable.
+    /// </summary>
+    public static Constraint MustDeriveFrom(this Selection subject, string baseTypeFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(baseTypeFullName, nameof(baseTypeFullName)));
+        return new MustDeriveFromConstraint(Subject(subject), anchor);
     }
 
     /// <summary>The subject must carry an attribute.</summary>
     public static Constraint MustBeAttributedWith(this Selection subject, Type type)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromType(NotNull(type, nameof(type)));
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
         return new MustBeAttributedWithConstraint(Subject(subject), anchor);
     }
 
@@ -266,7 +297,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeAttributedWith(this Selection subject, string attributeFullName)
     {
-        AttributeAnchor anchor = AttributeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
         return new MustBeAttributedWithConstraint(Subject(subject), anchor);
     }
 
@@ -305,17 +336,45 @@ public static class SelectionConstraints
         return new MustNotImplementConstraint(Subject(subject), AnchorTypes(first, more));
     }
 
+    /// <summary>
+    ///     The subject must not implement any of the interface anchors named by string — none-of
+    ///     semantics (GRAMMAR §5.3, §10) over the escape-hatch form, for interfaces the spec project
+    ///     cannot compile against. Each name is an interface <em>definition</em>'s fully-qualified name as
+    ///     a report prints it, declared type-parameter names included (<c>"MyApp.Web.IHandler&lt;T&gt;"</c>),
+    ///     matching any construction of that definition; a constructed spelling matches nothing. The
+    ///     overloads are homogeneous — one call is all <c>typeof</c> or all names; write a second rule to
+    ///     mix them. Prefer <see cref="MustNotImplement(Selection,Type,Type[])" /> whenever the interfaces
+    ///     are referenceable — the compiler checks a <c>typeof</c>, and nothing checks a string.
+    /// </summary>
+    public static Constraint MustNotImplement(this Selection subject, string first, params string[] more)
+    {
+        return new MustNotImplementConstraint(Subject(subject), AnchorNames(first, more));
+    }
+
     /// <summary>The subject must not derive from any of the base-type anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
     public static Constraint MustNotDeriveFrom(this Selection subject, Type first, params Type[] more)
     {
         return new MustNotDeriveFromConstraint(Subject(subject), AnchorTypes(first, more));
     }
 
+    /// <summary>
+    ///     The subject must not derive from any of the base-type anchors named by string — none-of
+    ///     semantics (GRAMMAR §5.3, §10) over the escape-hatch form, for base types the spec project
+    ///     cannot compile against. Each name is a base type <em>definition</em>'s fully-qualified name as
+    ///     a report prints it, matching any construction of that definition; a constructed spelling
+    ///     matches nothing. The overloads are homogeneous. Prefer
+    ///     <see cref="MustNotDeriveFrom(Selection,Type,Type[])" /> whenever the base types are
+    ///     referenceable.
+    /// </summary>
+    public static Constraint MustNotDeriveFrom(this Selection subject, string first, params string[] more)
+    {
+        return new MustNotDeriveFromConstraint(Subject(subject), AnchorNames(first, more));
+    }
+
     /// <summary>The subject must not be attributed with any of the attribute anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
     public static Constraint MustNotBeAttributedWith(this Selection subject, Type first, params Type[] more)
     {
-        var anchors = AnchorTypes(first, more).Select(AttributeAnchor.FromType).ToList();
-        return new MustNotBeAttributedWithConstraint(Subject(subject), anchors);
+        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
     }
 
     /// <summary>
@@ -417,24 +476,25 @@ public static class SelectionConstraints
         return list;
     }
 
-    // The raw-Type anchor list of a negative hierarchy verb (MustNotImplement / MustNotDeriveFrom /
-    // MustNotBeAttributedWith): stored directly on the node (the hierarchy-verb shape, GRAMMAR §10), never
-    // wrapped as selections. Null/empty-params edges mirror the WrappedTypes helper exactly.
-    private static IReadOnlyList<Type> AnchorTypes(Type first, Type[] more)
+    // The typeof anchor list of a negative hierarchy verb (MustNotImplement / MustNotDeriveFrom /
+    // MustNotBeAttributedWith): stored directly on the node as anchors (the hierarchy-verb shape,
+    // GRAMMAR §10), never wrapped as selections. Null/empty-params edges mirror the WrappedTypes helper
+    // exactly.
+    private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
     {
-        var list = new List<Type>(1 + more.Length) { NotNull(first, nameof(first)) };
-        foreach (Type type in more) list.Add(NotNull(type, nameof(more)));
+        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromType(NotNull(first, nameof(first))) };
+        foreach (Type type in more) list.Add(TypeAnchor.FromType(NotNull(type, nameof(more))));
 
         return list;
     }
 
-    // The string twin of AnchorTypes for MustNotBeAttributedWith: the same (first, params more) shape over
-    // attribute-definition names, each minted as a string AttributeAnchor. Only null is refused here — a
+    // The string twin of AnchorTypes, shared by all three negatives: the same (first, params more) shape
+    // over type-definition names, each minted as a string TypeAnchor. Only null is refused here — a
     // blank name reaches the validation catalog (GRAMMAR §8 item 15) so it reports with every other error.
-    private static IReadOnlyList<AttributeAnchor> AnchorNames(string first, string[] more)
+    private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
     {
-        var list = new List<AttributeAnchor>(1 + more.Length) { AttributeAnchor.FromName(NotNull(first, nameof(first))) };
-        foreach (string name in more) list.Add(AttributeAnchor.FromName(NotNull(name, nameof(more))));
+        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromName(NotNull(first, nameof(first))) };
+        foreach (string name in more) list.Add(TypeAnchor.FromName(NotNull(name, nameof(more))));
 
         return list;
     }

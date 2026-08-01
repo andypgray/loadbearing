@@ -319,4 +319,135 @@ public sealed class HierarchyVerbTests
                     .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute")).Because("b"))
             .Single().Status.ShouldBe(RuleStatus.Passed);
     }
+
+    // ── string hierarchy anchors (GRAMMAR §5.2–§5.3): the same escape hatch in interface and base-type
+    //    position, so a spec can govern a contract it cannot compile against. Parity band — each string
+    //    anchor selects and reds exactly what its typeof twin above does, and the name is the model's own
+    //    rendered FullName, which is what a report prints ──
+
+    [Fact]
+    public void Implementing_StringAnchor_SelectsEveryConstructionLikeTheOpenGenericTwin()
+    {
+        // A string names the DEFINITION, so it reads like typeof(IHandler<>) rather than a construction:
+        // the same two handlers Implementing_OpenGeneric_SelectsEveryConstruction picks out.
+        RuleResult result = Checker.Run(Model, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.Implementing($"{T}IHandler<T>").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.ShapeSubjects().ShouldBe([$"{T}OrderHandler", $"{T}TextHandler"]);
+    }
+
+    [Fact]
+    public void Implementing_StringConstructedSpelling_SelectsNothing()
+    {
+        // The stated honesty boundary, in interface position: a constructed spelling names no definition, so
+        // it matches nothing — and the empty subject fails the rule loudly (GRAMMAR §4.1). This is the one
+        // place the string form is deliberately WEAKER than its typeof twin, which can name a construction.
+        RuleResult result = Checker.Run(Model, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.Implementing($"{T}IHandler<{T}Order>").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+    }
+
+    [Fact]
+    public void DerivedFrom_StringAnchor_SelectsWhatTheTypeofTwinSelects()
+    {
+        RuleResult result = Checker.Run(Model, arch =>
+                arch.Rule("h/x")
+                    .Enforce(arch.Types.DerivedFrom($"{T}ThingBase").MustHavePrefix("ZZZ"))
+                    .Because("b"))
+            .Single();
+
+        result.ShapeSubjects().ShouldBe([$"{T}SubType"]);
+    }
+
+    [Fact]
+    public void MustImplement_StringAnchor_HoldsForImplementer_FailsForNonImplementer()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Widget").MustImplement($"{T}IThing")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement($"{T}IThing")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Gizmo"]);
+    }
+
+    [Fact]
+    public void MustNotImplement_StringAnchor_RedsImplementer_PassesForNonImplementer()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement($"{T}IThing")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Widget"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustDeriveFrom_StringAnchor_HoldsForDeriver_FailsForNonDeriver()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("SubType").MustDeriveFrom($"{T}ThingBase")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom($"{T}ThingBase")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}FreeType"]);
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_StringAnchor_RedsDeriver_PassesForNonDeriver()
+    {
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom($"{T}ThingBase")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}SubType"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom($"{T}ThingBase")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotImplement_StringAnchorList_RedsOnAnyAnchor()
+    {
+        // None-of over a homogeneous string list: Widget implements only IThing, and the list reds it
+        // through the first anchor; OrderHandler through the second.
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Widget")
+                    .MustNotImplement($"{T}IThing", $"{T}IHandler<T>")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}Widget"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("OrderHandler")
+                    .MustNotImplement($"{T}IThing", $"{T}IHandler<T>")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}OrderHandler"]);
+
+        Checker.Run(Model, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("Gizmo")
+                    .MustNotImplement($"{T}IThing", $"{T}IHandler<T>")).Because("b"))
+            .Single().Status.ShouldBe(RuleStatus.Passed);
+    }
+
+    [Fact]
+    public void MustNotImplement_StringAnchor_ReadsTheWholeInterfaceClosure()
+    {
+        // The string arm reads the same closure the typeof arm does, so the two hardest positive cases hold
+        // for it too: an interface reached through a base class (WidgetChild : Widget : IThing), and a
+        // type-argument substitution (SubstHandler : HandlerBase<Order> where HandlerBase<T> : IHandler<T>),
+        // which the definition-level anchor reaches because every construction matches its definition.
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement($"{T}IThing")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}WidgetChild"]);
+
+        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
+                .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement($"{T}IHandler<T>")).Because("b"))
+            .Single().ShapeSubjects().ShouldBe([$"{T}SubstHandler"]);
+    }
 }

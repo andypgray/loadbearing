@@ -725,6 +725,54 @@ public class SentenceAssemblyTests
             .ShouldBe("Types must be attributed with `[MarkAttribute<System.Int32>]`.");
     }
 
+    // ---- String hierarchy anchors (GRAMMAR §5.2–§5.3, §6): the same equivalence in interface and base-type
+    //      position — same fragment, same collision widening, no brackets ----
+
+    [Fact]
+    public void ImplementingStringSubjectHead_RendersTheTypeofHead()
+    {
+        // The subject-head twin, reached by string. An open generic renders declared type-parameter names on
+        // both arms, because the string IS the name a report prints.
+        SentenceRenderer.Subject(Arch.Types.Implementing("Zphil.LoadBearing.Tests.Stubs.IHandler<T>"))
+            .ShouldBe(SentenceRenderer.Subject(Arch.Types.Implementing(typeof(IHandler<>))));
+    }
+
+    [Fact]
+    public void DerivedFromStringSubjectHead_RendersTheTypeofHead()
+    {
+        SentenceRenderer.Subject(Arch.Types.DerivedFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase"))
+            .ShouldBe(SentenceRenderer.Subject(Arch.Types.DerivedFrom(typeof(ControllerBase))));
+    }
+
+    [Fact]
+    public void MustNotImplement_CollidingStringAnchors_QualifyWithMinimalTrailingSegments()
+    {
+        // Widening runs off the anchor's dot path, so string anchors collide and widen exactly as the typeof
+        // pair does in MustNotImplement_CollidingAnchors_QualifyWithMinimalTrailingSegments.
+        Constraint constraint = Arch.Types.MustNotImplement(
+            "Zphil.LoadBearing.Tests.Stubs.Billing.IReceipt", "Zphil.LoadBearing.Tests.Stubs.Sales.IReceipt");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not implement `Billing.IReceipt` or `Sales.IReceipt`.");
+    }
+
+    [Fact]
+    public void MustNotDeriveFrom_CollidingStringAnchors_QualifyWithMinimalTrailingSegments()
+    {
+        Constraint constraint = Arch.Types.MustNotDeriveFrom(
+            "Zphil.LoadBearing.Tests.Stubs.Billing.LedgerBase", "Zphil.LoadBearing.Tests.Stubs.Sales.LedgerBase");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not derive from `Billing.LedgerBase` or `Sales.LedgerBase`.");
+    }
+
+    [Fact]
+    public void MustImplement_ClosedGenericString_SplitsOnDotsOutsideTheAngleBrackets()
+    {
+        // The dots inside `<...>` belong to the argument's own path: a naive last-dot split would render
+        // `Int32>`. (The spelling names a construction, so it matches nothing — it still has to render.)
+        SentenceRenderer.Sentence(Arch.Types.MustImplement("N.IHandler<System.Int32>"))
+            .ShouldBe("Types must implement `IHandler<System.Int32>`.");
+    }
+
     // ---- The member attribute adjective (GRAMMAR §5.7, §6): a HEAD PREMODIFIER, so a member-attributed
     //      subject and a type-attributed one never render the same sentence ----
 

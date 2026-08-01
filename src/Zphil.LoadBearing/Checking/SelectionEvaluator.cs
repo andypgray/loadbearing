@@ -147,10 +147,10 @@ internal sealed class SelectionEvaluator
                 var namePattern = new TypeNamePattern(matching.Glob);
                 return current.Where(t => namePattern.Matches(t.Name));
             case ImplementingAdjective implementing:
-                var interfaceMatch = InterfaceMatcher(implementing.Type);
+                var interfaceMatch = InterfaceMatcher(implementing.Anchor);
                 return current.Where(interfaceMatch);
             case DerivedFromAdjective derivedFrom:
-                var baseMatch = BaseTypeMatcher(derivedFrom.Type);
+                var baseMatch = BaseTypeMatcher(derivedFrom.Anchor);
                 return current.Where(baseMatch);
             case AttributedWithAdjective attributedWith:
                 var attributeMatch = AttributeMatcher(attributedWith.Anchor);
@@ -170,41 +170,44 @@ internal sealed class SelectionEvaluator
         }
     }
 
-    // The three hierarchy matchers share one shape: an open generic definition matches on the
-    // definition FullName ("any construction"); a closed or non-generic type matches on the
-    // constructed FullName ("that construction exactly") — GRAMMAR §5.2. FullDisplay runs once,
-    // eagerly, so an unrepresentable type throws before any node is tested. Shared with the
-    // MustImplement/MustDeriveFrom/MustBeAttributedWith constraint verbs.
-    internal static Func<TypeNode, bool> InterfaceMatcher(Type type)
+    // The three hierarchy matchers share one shape over one construction list each — interfaces, bases,
+    // attributes. Every anchor form reduces to one of two comparisons (GRAMMAR §5.2):
+    //
+    //   * a STRING anchor names a definition, so it matches every construction of that definition and a
+    //     constructed spelling matches nothing;
+    //   * an open-generic typeof matches on the definition FullName ("any construction") and a closed or
+    //     non-generic typeof on the constructed FullName ("that construction exactly").
+    //
+    // FullDisplay runs once, eagerly, so an unrepresentable typeof throws before any node is tested; a
+    // string anchor needs no reflection at all, which is the whole point of the hatch. Shared with the
+    // MustImplement/MustDeriveFrom/MustBeAttributedWith constraint verbs and their MustNot* twins.
+    internal static Func<TypeNode, bool> InterfaceMatcher(TypeAnchor anchor)
     {
-        string key = TypeName.FullDisplay(type);
-        return type.IsGenericTypeDefinition
-            ? t => t.AllInterfaces.Any(c => c.Definition.FullName == key)
-            : t => t.AllInterfaces.Any(c => c.FullName == key);
+        return ConstructionMatcher(anchor, t => t.AllInterfaces);
     }
 
-    internal static Func<TypeNode, bool> BaseTypeMatcher(Type type)
+    internal static Func<TypeNode, bool> BaseTypeMatcher(TypeAnchor anchor)
     {
-        string key = TypeName.FullDisplay(type);
-        return type.IsGenericTypeDefinition
-            ? t => t.BaseTypeChain.Any(c => c.Definition.FullName == key)
-            : t => t.BaseTypeChain.Any(c => c.FullName == key);
+        return ConstructionMatcher(anchor, t => t.BaseTypeChain);
     }
 
-    // The attribute matcher takes an anchor rather than a Type, because an attribute can also be named by
-    // definition FQN string (GRAMMAR §5.2). The string arm is deliberately the open-definition arm: a name
-    // is a DEFINITION name, so it matches every construction of that definition and a constructed spelling
-    // matches nothing. The typeof arms are the shared open/closed shape above, unchanged.
-    internal static Func<TypeNode, bool> AttributeMatcher(AttributeAnchor anchor)
+    internal static Func<TypeNode, bool> AttributeMatcher(TypeAnchor anchor)
+    {
+        return ConstructionMatcher(anchor, t => t.AttributeConstructions);
+    }
+
+    // The one comparison the three matchers share, parameterized by which construction list to read.
+    private static Func<TypeNode, bool> ConstructionMatcher(
+        TypeAnchor anchor, Func<TypeNode, IReadOnlyList<TypeConstruction>> constructions)
     {
         if (anchor.DefinitionFullName is { } name)
-            return t => t.AttributeConstructions.Any(c => c.Definition.FullName == name);
+            return t => constructions(t).Any(c => c.Definition.FullName == name);
 
         Type type = anchor.Type!;
         string key = TypeName.FullDisplay(type);
         return type.IsGenericTypeDefinition
-            ? t => t.AttributeConstructions.Any(c => c.Definition.FullName == key)
-            : t => t.AttributeConstructions.Any(c => c.FullName == key);
+            ? t => constructions(t).Any(c => c.Definition.FullName == key)
+            : t => constructions(t).Any(c => c.FullName == key);
     }
 
     internal static bool InvokePredicate(Func<ITypeInfo, bool> predicate, TypeNode type, string hatch)

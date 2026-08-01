@@ -5,13 +5,14 @@ namespace Zphil.LoadBearing.Model;
 /// <summary>
 ///     <c>.MustNotDeriveFrom(typeof(Exception), …)</c> → "must not derive from `Exception`"
 ///     (GRAMMAR §5.3) — none-of over the anchor list: a subject violates iff it derives from ANY
-///     anchor. Anchors are stored as raw <see cref="Type" />s on the node, never selection operands
-///     (GRAMMAR §10).
+///     anchor. Anchors are stored as raw <see cref="TypeAnchor" />s on the node, never selection
+///     operands (GRAMMAR §10); one list mixes no forms, because the overloads are homogeneous —
+///     all <c>typeof</c> or all definition names.
 /// </summary>
-internal sealed class MustNotDeriveFromConstraint(Selection subject, IReadOnlyList<Type> types) : Constraint(subject)
+internal sealed class MustNotDeriveFromConstraint(Selection subject, IReadOnlyList<TypeAnchor> anchors) : Constraint(subject)
 {
     /// <summary>The base types the subject must not derive from (none-of).</summary>
-    internal IReadOnlyList<Type> Types { get; } = types;
+    internal IReadOnlyList<TypeAnchor> Anchors { get; } = anchors;
 
-    internal override string VerbPhrase => "must not derive from " + ProseFormat.TypeList(Types);
+    internal override string VerbPhrase => "must not derive from " + ProseFormat.AnchorList(Anchors);
 }

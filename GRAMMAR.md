@@ -807,9 +807,9 @@ consumes it.
 | `.WithSuffix("Controller")` | "named `*Controller`" |
 | `.WithPrefix("Legacy")` | "named `Legacy*`" |
 | `.WithNameMatching("*Repo*")` | "whose name matches `*Repo*`" |
-| `.Implementing(typeof(IHandler<>))` | "implementing `IHandler<T>`" |
-| `.DerivedFrom(typeof(ControllerBase))` | "derived from `ControllerBase`" |
-| `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string attribute anchors, below) |
+| `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` | "implementing `IHandler<T>`" — the string form renders byte-identically (string anchors, below) |
+| `.DerivedFrom(typeof(ControllerBase))` / `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` | "derived from `ControllerBase`" |
+| `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below) |
 | `.Except(selection)` | ", except {ref}" — canonicalized to sentence-final (§6) |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 | `.Authored()` | head premodifier: "authored types", "authored interfaces" (§6) |
@@ -825,7 +825,8 @@ inheritance matches) and the whole base-type chain, arguments substituted. A cla
 `HandlerBase<Order>` where `HandlerBase<T> : IHandler<T>` satisfies
 `Implementing(typeof(IHandler<Order>))`. An open definition matches any construction (on the
 definition name); a closed construction matches that construction exactly (on the constructed
-name). `AttributedWith` is **declared attributes only** — no inheritance. External (metadata)
+name); a **string** anchor is always the definition arm (string anchors, below). `AttributedWith`
+is **declared attributes only** — no inheritance. External (metadata)
 types carry a **shallow** hierarchy: extraction records their identity but not their
 bases/interfaces/attributes, so the hierarchy adjectives never match an external type (a
 documented boundary; pattern and name adjectives still work on externals). The same three
@@ -842,24 +843,31 @@ the identical adjective, changing nothing in the model. `arch.Type<X>()` ≡ `ar
 is the same idea on the noun. An **open** generic has no type-argument form, so it stays `typeof`
 (`Implementing(typeof(IHandler<>))`); the sugar is for the closed/non-generic single-type case.
 
-**String attribute anchors.** Every attribute anchor position — this adjective, the
-`Must[Not]BeAttributedWith` verbs (§5.3), and their member-side twins (§5.7) — carries a
-`string` overload beside the `typeof` form: the escape hatch for an attribute the spec
-project cannot compile against, so that naming someone else's attribute does not force a
-package reference on the spec just to write the `typeof`. The string names the attribute
-**definition**'s FQN in extraction format, `Attribute` suffix included
-(`"ModelContextProtocol.Server.McpServerToolAttribute"`), matched ordinal-exact; it matches
-**any construction** of that definition, exactly as an open-generic `typeof` anchor does. A
-**constructed** spelling (`"N.MarkAttribute<System.Int32>"`) names no definition and never
-matches — the hatch's stated honesty boundary, not a defect. Nothing is inferred from the
-string's shape: a dotless or suffix-less spelling is a legal name that simply never matches,
-and only blankness is validated (§8 item 15). A string anchor renders **byte-identically** to
-its `typeof` twin — the display name is the last dot-segment outside any `<...>`, the
-`Attribute` suffix strips, the brackets close over it, and colliding simple names widen by
-trailing dot-segments inside the brackets (§6) — so which form a spec chose is invisible to
-its sentences. Overloads are homogeneous: one call takes `typeof` anchors or strings, never a
-mix. The policy: `typeof` whenever the attribute is referenceable — the compiler checks a
-`typeof`, and nothing checks a string — and the string when it is not.
+**String anchors.** Every single-type anchor position carries a `string` overload beside the
+`typeof` form: the escape hatch for a type the spec project cannot compile against, so that
+naming someone else's attribute or contract does not force a package reference on the spec just
+to write the `typeof`. Two families carry them, on identical terms — **attribute** positions
+(this adjective's `AttributedWith`, the `Must[Not]BeAttributedWith` verbs of §5.3, and their
+member-side twins in §5.7) and **hierarchy** positions (the `Implementing` and `DerivedFrom`
+adjectives above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` verbs of §5.3).
+
+The string names the type **definition**'s FQN in extraction format — which is exactly what a
+report prints for it, `Attribute` suffix included for an attribute and declared type-parameter
+names for a generic (`"ModelContextProtocol.Server.McpServerToolAttribute"`,
+`"MyApp.Web.IHandler<T>"`) — matched ordinal-exact; it matches **any construction** of that
+definition, exactly as an open-generic `typeof` anchor does. A **constructed** spelling
+(`"N.MarkAttribute<System.Int32>"`, `"MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>"`) names no
+definition and never matches: the hatch's stated honesty boundary, not a defect, and the one
+place the string form is deliberately weaker than its `typeof` twin, which can name a
+construction. Nothing is inferred from the string's shape: a dotless or suffix-less spelling is
+a legal name that never matches, and only blankness is validated (§8 item 15). A string
+anchor renders **byte-identically** to its `typeof` twin — the display name is the last
+dot-segment outside any `<...>`, and colliding simple names widen by trailing dot-segments (§6);
+in attribute position the `Attribute` suffix then strips and the brackets close over the
+result — so which form a spec chose is invisible to its sentences. Overloads are homogeneous:
+one call takes `typeof` anchors or strings, never a mix. The policy: `typeof` whenever the type
+is referenceable — the compiler checks a `typeof`, and nothing checks a string — and the string
+when it is not.
 
 **`.Authored()`** narrows a selection to the types a person wrote — the opt-out from the §4.1
 boundary that puts generator output inside a project noun. A type counts as generated when
@@ -894,11 +902,11 @@ would be a worse lie than the one this adjective fixes.
 | `.MustHaveSuffix("Handler")` | "must be named `*Handler`" |
 | `.MustHavePrefix("I")` | "must be named `I*`" |
 | `.MustHaveNameMatching(glob)` | "must have a name matching `{glob}`" |
-| `.MustImplement(type)` | "must implement `{X}`" |
-| `.MustDeriveFrom(type)` | "must derive from `{X}`" |
+| `.MustImplement(type)` | "must implement `{X}`" — also anchors by string (§5.2's escape hatch): `MustImplement("MyApp.Web.IHandler<T>")` |
+| `.MustDeriveFrom(type)` | "must derive from `{X}`" — string form likewise |
 | `.MustBeAttributedWith(type)` | "must be attributed with `[{X}]`" — also anchors by string (§5.2's escape hatch): `MustBeAttributedWith("N.XAttribute")` |
-| `.MustNotImplement(type, ...)` | "must not implement {list}" — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10) |
-| `.MustNotDeriveFrom(type, ...)` | "must not derive from {list}" |
+| `.MustNotImplement(type, ...)` | "must not implement {list}" — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10), and `(string first, params string[] more)` (§5.2), each call's list homogeneous |
+| `.MustNotDeriveFrom(type, ...)` | "must not derive from {list}" — same two arities |
 | `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — anchors bracketed and `Attribute`-stripped like the positive; also `(string first, params string[] more)` (§5.2), each call's list homogeneous |
 | `.MustBeSealed()` | "must be sealed" |
 | `.MustBeStatic()` | "must be static" |
@@ -917,10 +925,10 @@ Generic sugar: the three type-taking hierarchy verbs carry generic twins —
 the same terms as the §5.2 adjective twins (open generics stay `typeof`).
 The negatives carry the same twins — `MustNotImplement<T>()` / `MustNotDeriveFrom<T>()` /
 `MustNotBeAttributedWith<T>()` (`where T : Attribute`) — each desugaring to its verb's
-single-anchor call. The attribute verbs additionally carry the §5.2 string form on both
-polarities and both sides (type and member, §5.7), so every attribute position offers the
-same triple: the compile-checked `typeof`, the no-reference string, and the generic sugar
-(§10).
+single-anchor call. Every one of these verbs additionally carries the §5.2 string form on both
+polarities — the attribute verbs on both sides too (type and member, §5.7) — so every anchor
+position in both families offers the same triple: the compile-checked `typeof`, the
+no-reference string, and the generic sugar (§10).
 
 ### 5.4 Posture verbs and options
 
@@ -992,10 +1000,12 @@ say). Neither is reachable by `typeof()` however the spec project is built. The 
 anything on that side of the line is a namespace pattern, `arch.Namespace("System.Data.*")`,
 which needs no assembly load. A name pattern is not a substitute: a `Selection` matches only
 types inside the checked codebase, so `arch.Types.WithNameMatching("SqlConnection")` goes inert
-against an external type (§8, the inert-rule warning). The string attribute anchor (§5.2) is
-the same no-load form in attribute position: it names an attribute **definition** the spec
+against an external type (§8, the inert-rule warning). The string anchors (§5.2) are the same
+no-load form in attribute and hierarchy position: each names a type **definition** the spec
 project never loads — `[McpServerTool]` on a codebase's methods is matchable without the spec
-referencing the SDK that declares the attribute, which no `typeof` spelling can offer.
+referencing the SDK that declares the attribute, and so is `IHandler<T>` on its types, which no
+`typeof` spelling can offer. A namespace pattern remains the anchor for everything the string
+form cannot reach, because a string anchor still names one definition rather than a set.
 
 ### 5.7 Member vocabulary (member subjects, §4.6)
 
@@ -1216,12 +1226,12 @@ matches the anchor's definition FQN.
 15. Blank/whitespace glob or affix — a namespace pattern, a type- or member-name pattern, or a
     suffix/prefix left empty. A blank affix is vacuously true and a blank glob throws at check
     time; both are almost always an authoring slip. Applies on the type and member sides alike,
-    and to layer globs (reported spec-wide, named by layer). String attribute anchors (§5.2)
-    report through this same family under the label "attribute name" (`Blank attribute name on
-    '{id}'.`) — no new code — on both sides and in every position, adjective and verbs alike.
-    Blankness is the whole of a string anchor's well-formedness: a dotless or suffix-less
-    spelling is a legal name that simply never matches (§5.2), and no other shape check
-    exists.
+    and to layer globs (reported spec-wide, named by layer). String anchors (§5.2) report
+    through this same family — no new code — in every position of both families, adjective and
+    verbs alike, under a label naming which kind of anchor was left empty: "attribute name"
+    (`Blank attribute name on '{id}'.`), "interface name", "base type name". Blankness is the
+    whole of a string anchor's well-formedness: a dotless or suffix-less spelling is a legal
+    name that never matches (§5.2), and no other shape check exists.
 16. Dead namespace subtree pattern — a trailing `.*` whose literal prefix carries a `*` (e.g.
     `MyApp.*.Controllers.*`). The subtree operator (§4.2) matches everything before the trailing
     `.*` literally, so the pattern never matches anything; the error names it and steers to a
@@ -1279,11 +1289,13 @@ matches the anchor's definition FQN.
     `MustDeriveFrom` requires a non-interface anchor — use `MustImplement` for an interface";
     "`System.Attribute` does not derive from `System.Attribute`; `MustNotBeAttributedWith`
     requires an attribute anchor"). The member-side `Must[Not]BeAttributedWith` verbs (§5.7)
-    carry the same check with the same messages. It applies to `typeof` anchors **only**: a
-    string anchor (§5.2) carries no category to check — the name is just a string, extraction
-    facts are the only authority on what it names, and refusing a spelling the host cannot
-    load would break the escape hatch's whole point — so a wrong string is loud on a positive
-    (always red) and silent on a negative, the honesty cost of the hatch. The **adjectives**
+    carry the same check with the same messages. It applies to `typeof` anchors **only**, in
+    both families: a string anchor (§5.2) carries no category to check — the name is just a
+    string, extraction facts are the only authority on what it names, and refusing a spelling
+    the host cannot load would break the escape hatch's whole point — so a wrong string is loud
+    on a positive (always red) and silent on a negative, the honesty cost of the hatch. Blankness
+    (item 15) is checked on a string anchor everywhere, including the adjectives; category is
+    checked nowhere on one. The **adjectives**
     stay unchecked on both sides and across every hierarchy family, deliberately: a
     wrong-category adjective empties the subject and the fail-on-empty default (§4.1, §4.6)
     reds it loudly, whereas the silent slip this item exists to catch is the always-passing
@@ -1391,10 +1403,14 @@ agent fixing a spec sees every problem in one pass.
   parameter type is a second rule. The same ambiguity keeps the positive hierarchy verbs
   single-`Type`, but it does not bite a negation, so their `MustNot*` twins take
   `(Type first, params Type[] more)` — "must not implement `A` or `B`" is unambiguous none-of.
-- **Anchor-form triples.** An attribute anchor position ships `Type` / `string` / `<T>`
+- **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
   generic sugar — all reifying to one internal anchor, so form choice is invisible to the
-  model and the sentence. The generic twin is `TSelf`-generic where inference allows and
+  model and the sentence. It holds for both families, attribute and hierarchy, and one union
+  serves them: what differs between the two is which extracted facts the matcher reads and
+  whether the prose brackets the name, neither of which is a property of the anchor. A new
+  anchor position ships the whole triple or it is not an anchor position.
+  The generic twin is `TSelf`-generic where inference allows and
   **receiver-typed where it does not**: C# has no partial type inference, so a
   `TSelf`-generic member adjective twin would force both type arguments at every call site
   (`AttributedWith<MethodSelection, MyAttribute>()`); it ships instead as an overload pair on
@@ -1419,18 +1435,20 @@ type sugar (`arch.Member<T>(x => x.M)` / `arch.Member(() => X.M)` and `arch.Type
 facts with the member attribute vocabulary (§4.6, §5.7). Still growth on the member axis: the
 `MustOnlyUse` / `MustNotBeUsedBy` verb twins; member-granular *source* attribution on the
 dependency verbs (today a violation names the using *type*, not the using member); string-FQN
-*member* anchoring — the anchoring residue that remains now that attribute anchors carry a
-string form (§5.2): the escape hatch for a member that neither `typeof` + `nameof` nor an
-expression lambda can name (a member on a type the spec project cannot reference);
+*member* anchoring — the last of the anchoring residue, now that both single-type anchor
+families carry a string form (§5.2): the escape hatch for a member that neither `typeof` +
+`nameof` nor an expression lambda can name (a member on a type the spec project cannot
+reference);
 indexer/operator bans (the syntax-walk boundary moves deliberately, §4.5); and subject-side
 member *shape* adjectives (`.Methods.ThatAreVirtual()`, …)
 — the member constraint-side verbs and the `IMemberInfo` flags shipped (§5.7, §5.6), only the
 adjective position remains, exactly mirroring the type-side gap below. One entry shipped off
-this list whole, and a second narrowed: member-level attribute facts landed with the
+this list whole, and a second narrowed twice: member-level attribute facts landed with the
 member-side `AttributedWith` / `MustNotBeAttributedWith` pair — carrying the positive
-`MustBeAttributedWith` the entry never promised, per the admission rule (§10) — and the
-*attribute* half of string-FQN anchoring shipped as §5.2's escape hatch, which is why the
-string-FQN entry above now names members alone.
+`MustBeAttributedWith` the entry never promised, per the admission rule (§10) — and string-FQN
+anchoring shipped as §5.2's escape hatch in two passes, the *attribute* positions first and the
+*hierarchy* positions after, each carrying its family's whole triple (§10). Members really are
+the only residue now.
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
 twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`
@@ -1474,6 +1492,16 @@ residue the dependency verbs carry above); laundering awareness — a signature 
 static-signature fact, and internal members are not surface), so a flow- or cast-aware form
 would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
 exposure data (exposure edges stay out of the graph).
+
+On the string anchors (§5.2): **constructed-generic** anchoring — a string naming a
+construction rather than a definition (`"MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>"`)
+renders, and matches nothing. Making it match that construction, the way a closed `typeof`
+anchor does, would be a new and explicitly named semantic on the exception axis's terms, never
+a widening of the definition-level-exact one pinned here: today's silence is what makes a
+string anchor's meaning independent of whether the spec author happened to spell type
+arguments. Also unbuilt: a string form for the *set*-valued anchor positions — the dependency
+verbs' `Type` sugar and `arch.Type(...)`, where a namespace pattern is already the no-load
+form (§5.6) and a string would only duplicate it.
 
 Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); an intersection
 or difference combinator (`arch.AnyOf` is union only — `Except` already covers difference);

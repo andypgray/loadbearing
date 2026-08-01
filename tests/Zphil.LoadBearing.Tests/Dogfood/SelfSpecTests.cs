@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.ArchSpec;
@@ -14,7 +15,8 @@ namespace Zphil.LoadBearing.Tests.Dogfood;
 /// <summary>
 ///     The dogfood gates. One class so the workspace-heavy runs serialize.
 ///     <see cref="SelfSpec_Check_ExitsZero" /> is the CI-equivalent self-spec gate: LoadBearing checks
-///     itself and passes. <see cref="AgentsMd_IsCurrent" /> is the provably-current gate, no workspace
+///     itself and passes, with the advisory channel beside the verdict asserted clean on the same run.
+///     <see cref="AgentsMd_IsCurrent" /> is the provably-current gate, no workspace
 ///     needed: it composes the root block in-process and asserts the committed <c>AGENTS.md</c>'s single
 ///     managed block equals it exactly — the product thesis in one test.
 ///     <see cref="ArchitectureMd_IsCurrent" /> is the same gate over the rendered diagram, and unlike its
@@ -58,15 +60,35 @@ public sealed class SelfSpecTests
         "Zphil.LoadBearing.ArchSpec"
     ];
 
+    /// <summary>
+    ///     The CI-equivalent self-spec gate, and — on the same run — the gate on the advisory channel
+    ///     beside it. <c>workspaceDiagnostics</c> is what every MCP consumer of this repo's own check
+    ///     reads, the arch hook included, so it is asserted <em>empty</em>: a channel that is never empty
+    ///     teaches its readers to skim, and the next real diagnostic would arrive inside noise nobody
+    ///     looks at. Getting here took removing causes rather than filtering reports — the spec fixtures
+    ///     reference the MyApp projects they govern, and the two anchors that only ever needed to
+    ///     <em>name</em> a MyApp type now name it by fully-qualified string instead of declaring a stub
+    ///     that impersonates it. Pinned as emptiness rather than a count, because the failure worth
+    ///     catching is a line nobody meant to add.
+    /// </summary>
     [Fact]
     public async Task SelfSpec_Check_ExitsZero()
     {
-        // Loads the whole solution through MSBuildWorkspace (several seconds — an accepted cost).
-        CliResult result = await CliRunner.InvokeAsync("check", RepoRoot.Solution, "--spec", RepoRoot.ArchSpecCsproj);
+        // Loads the whole solution through MSBuildWorkspace (several seconds — an accepted cost). --json so
+        // the same run answers both halves; the report goes to stdout, the human warnings still to stderr.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", RepoRoot.Solution, "--spec", RepoRoot.ArchSpecCsproj, "--json");
 
         // Surface the CLI's own output on failure — otherwise a red self-check (e.g. the Release-only
         // spec-resolution regression) shows only "2 != 0" with no clue why, as the release run did.
         result.Exit.ShouldBe(0, $"check exited {result.Exit}.\nstderr:\n{result.Err}\nstdout:\n{result.Out}");
+
+        using JsonDocument report = JsonDocument.Parse(result.Out);
+        report.RootElement.GetProperty("workspaceDiagnostics").EnumerateArray()
+            .Select(note => note.GetString())
+            .ShouldBeEmpty(
+                "this repo's own check must carry no advisory note at all — a duplicate declaration here is " +
+                "a layout mistake, not background noise, and this channel is the product's own front door.");
     }
 
     [Fact]

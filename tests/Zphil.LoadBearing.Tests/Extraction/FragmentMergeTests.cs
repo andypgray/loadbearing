@@ -371,9 +371,12 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_SameFqnLostByThreeProjects_RecordsOneNoteNamingEveryLoser()
     {
-        // The shape this repo's own fixture layout produces: one type shadowed by several sibling projects
-        // (name-carrier stubs so their specs' typeof() anchors compile). Grouping by FQN keeps that to one
-        // line naming every loser, rather than a line per loser — nothing dropped, the channel stays legible.
+        // The shape a spec-fixture layout produces when several sibling spec projects declare name-carrier
+        // stubs so their typeof() anchors compile: one type shadowed several times over. This repo used to
+        // be that consumer and no longer is — its fixtures reference the projects they govern — but the
+        // shape is what any real solution with stubbed anchors reports, so it stays pinned here. Grouping by
+        // FQN keeps it to one line naming every loser rather than a line per loser: nothing dropped, and the
+        // channel stays legible enough that a reader still notices a line arriving.
         CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """
                                                                                  namespace N;
                                                                                  public class Dup {}

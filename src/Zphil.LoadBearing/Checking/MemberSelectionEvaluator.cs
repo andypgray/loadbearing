@@ -101,7 +101,7 @@ internal sealed class MemberSelectionEvaluator
     ///     throws before any member is tested and <see cref="ArchChecker" /> contains it per-rule as a
     ///     <see cref="ViolationKind.RuleError" />. Shared with the two member attribute verbs.
     /// </summary>
-    internal static Func<IMemberInfo, bool> MemberAttributeMatcher(AttributeAnchor anchor)
+    internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {
         if (anchor.DefinitionFullName is { } name)
             return member => member.Attributes.Any(a => a.DefinitionFullName == name);
