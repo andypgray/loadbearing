@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
 ///     Checker semantics not tied to one verb: empty-subject failure, the inert-target warning scope
-///     (decision 3), RuleError paths, posture skipping (Migrate/Freeze), the Freeze containment
+///     (decision 3), RuleError paths, posture skipping (Migrate/Quarantine), the Quarantine containment
 ///     formula evaluated as an Enforce rule, and deterministic violation ordering.
 /// </summary>
 public sealed class CheckerSemanticsTests
@@ -122,8 +122,8 @@ public sealed class CheckerSemanticsTests
     [Fact]
     public void ContainmentFormula_AsEnforceRule_RedForInteriorReferenceGreenForFacade()
     {
-        // The Freeze desugaring shape (sel.Except(facade).MustOnlyBeReferencedBy(sel ∪ facade)),
-        // hand-built as Enforce so the containment logic is exercised while Freeze itself skips.
+        // The Quarantine desugaring shape (sel.Except(facade).MustOnlyBeReferencedBy(sel ∪ facade)),
+        // hand-built as Enforce so the containment logic is exercised while Quarantine itself skips.
         RuleResult result = Checker.Run(Sources.Containment, arch =>
                 arch.Rule("contain/x")
                     .Enforce(arch.Namespace("App.Legacy.*").Except(arch.Types.WithSuffix("Facade"))

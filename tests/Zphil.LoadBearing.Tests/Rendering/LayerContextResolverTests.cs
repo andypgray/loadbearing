@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     Migrate rule is anchored on it (subject noun head is that layer), and the card lands in the
 ///     deepest common ancestor directory of the whole layer's types. A refined subject (adjective /
 ///     <c>Except</c>) keeps its noun head, so it still anchors; a namespace-subject rule over the same
-///     types does not; a Freeze-posture rule never anchors (its story is the freeze card). A layer
+///     types does not; a Quarantine-posture rule never anchors (its story is the quarantine card). A layer
 ///     matching no types resolves to a null directory with a skip reason. No MSBuild — paths are
 ///     synthesized through <see cref="CompilationFactory" />.
 /// </summary>
@@ -59,15 +59,15 @@ public class LayerContextResolverTests
     }
 
     [Fact]
-    public void Resolve_FreezePostureRuleOnLayer_Excluded()
+    public void Resolve_QuarantinePostureRuleOnLayer_Excluded()
     {
         CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
             ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
 
-        // The layer is frozen (its desugared containment subject is layer-anchored) but carries no
-        // Enforce/Migrate rule — Freeze posture is excluded, so the layer earns no card and does not
-        // double-emit beside its freeze card.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(new FrozenLayerSpec()), codebase).ShouldBeEmpty();
+        // The layer is quarantined (its desugared containment subject is layer-anchored) but carries no
+        // Enforce/Migrate rule — Quarantine posture is excluded, so the layer earns no card and does not
+        // double-emit beside its quarantine card.
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(new QuarantinedLayerSpec()), codebase).ShouldBeEmpty();
     }
 
     [Fact]
@@ -143,15 +143,15 @@ public class LayerContextResolverTests
         }
     }
 
-    // A hermetically frozen Billing layer with no other rule — its only layer-anchored subject is the
-    // Freeze containment, which the resolver excludes.
-    private sealed class FrozenLayerSpec : IArchitectureSpec
+    // A hermetically quarantined Billing layer with no other rule — its only layer-anchored subject is the
+    // Quarantine containment, which the resolver excludes.
+    private sealed class QuarantinedLayerSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
             Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
             arch.Scope("legacy/billing")
-                .Freeze(billing)
+                .Quarantine(billing)
                 .Dragons("Banker's rounding is load-bearing.")
                 .Because("Replacement scheduled; not worth stabilizing.");
         }

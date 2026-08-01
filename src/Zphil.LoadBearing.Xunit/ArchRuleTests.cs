@@ -18,7 +18,7 @@ namespace Zphil.LoadBearing.Xunit;
 ///     <em>is</em> the test's display name, so a failing architecture rule reads as a failing test in the
 ///     test explorer.
 ///     A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
-///     a Freeze tripwire (no diff context in a test run) is reported as skipped, and everything else passes.
+///     a Quarantine tripwire (no diff context in a test run) is reported as skipped, and everything else passes.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -100,7 +100,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     One rule's verdict from the shared check run: a Freeze tripwire (no diff context) is skipped, a
+    ///     One rule's verdict from the shared check run: a Quarantine tripwire (no diff context) is skipped, a
     ///     violated rule fails with the CLI human block, everything else passes.
     /// </summary>
     [Theory]

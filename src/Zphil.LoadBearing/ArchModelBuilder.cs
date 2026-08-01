@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing;
 ///     Finalizes one or more specs into a walkable <see cref="ArchitectureModel" />: mint a fresh
 ///     <see cref="Arch" />, run each spec's <see cref="IArchitectureSpec.Define" />, run the whole
 ///     validation catalog (throwing an aggregate <see cref="SpecValidationException" /> on any
-///     error), then desugar Freeze scopes and project the read model (GRAMMAR §7, §8).
+///     error), then desugar Quarantine scopes and project the read model (GRAMMAR §7, §8).
 /// </summary>
 public static class ArchModelBuilder
 {
@@ -43,7 +43,7 @@ public static class ArchModelBuilder
                     rules.Add(ProjectRule(rule));
                     break;
                 case ScopeRegistration scope:
-                    rules.AddRange(FreezeDesugarer.Desugar(scope));
+                    rules.AddRange(QuarantineDesugarer.Desugar(scope));
                     break;
             }
 

@@ -19,11 +19,11 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 internal static class BaselineStore
 {
     /// <summary>
-    ///     Builds the <see cref="BaselineIndex" /> for a model's ratcheted rules — Migrate and Freeze
+    ///     Builds the <see cref="BaselineIndex" /> for a model's ratcheted rules — Migrate and Quarantine
     ///     containment (any rule with a <see cref="ArchRule.BaselinePath" />): resolves each rule's
     ///     baseline path against <paramref name="solutionDirectory" />, parses each distinct file once
     ///     (verifying its digest — tamper fails fast), and captures the matching section. A missing file
-    ///     or missing section leaves the rule uncaptured. A Freeze tripwire (no baseline path) is skipped.
+    ///     or missing section leaves the rule uncaptured. A Quarantine tripwire (no baseline path) is skipped.
     /// </summary>
     public static BaselineIndex LoadForModel(ArchitectureModel model, string solutionDirectory)
     {

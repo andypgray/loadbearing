@@ -12,10 +12,10 @@ public enum SpecValidationErrorCode
     /// <summary>A <c>Rule</c>/<c>Scope</c> anchor with no posture verb (§8 item 2).</summary>
     DanglingAnchor,
 
-    /// <summary>A rule or frozen scope missing its required <c>Because</c> (§8 item 3).</summary>
+    /// <summary>A rule or quarantined scope missing its required <c>Because</c> (§8 item 3).</summary>
     MissingBecause,
 
-    /// <summary>A frozen scope missing both <c>Dragons</c> and <c>DragonsDoc</c> (§8 item 4).</summary>
+    /// <summary>A quarantined scope missing both <c>Dragons</c> and <c>DragonsDoc</c> (§8 item 4).</summary>
     MissingDragons,
 
     /// <summary>Blank or whitespace prose anywhere, including escape-hatch descriptions (§8 item 5).</summary>
@@ -76,7 +76,7 @@ public enum SpecValidationErrorCode
     UnanchoredSubtreePattern,
 
     /// <summary>
-    ///     A rule given more than one posture verb, or a scope given <c>Freeze</c> more than once (§8
+    ///     A rule given more than one posture verb, or a scope given <c>Quarantine</c> more than once (§8
     ///     item 17). The stage machine (§3.2) makes the fluent double-call uncompilable, but a stored
     ///     <c>IRuleBuilder</c>/<c>IScopeBuilder</c> reference is mutable, and a second posture call
     ///     silently overwrites the first — this catches that stored-reference re-call.

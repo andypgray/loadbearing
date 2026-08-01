@@ -6,7 +6,7 @@ an architecture spec is written against. It is the one package a spec project re
 [LoadBearing](https://github.com/andypgray/loadbearing) is one C# architecture spec with two
 render targets: deterministic enforcement (CLI/CI/agent hooks) and generated AI-agent context
 (a managed `AGENTS.md` block, scoped rules, MCP tools). Every rule carries a posture: `Enforce`
-for the law, `Migrate` for ratcheted tech debt with a grandfathered baseline, `Freeze` for
+for the law, `Migrate` for ratcheted tech debt with a grandfathered baseline, `Quarantine` for
 "here be dragons" code that must be contained rather than touched.
 
 ## Writing a spec

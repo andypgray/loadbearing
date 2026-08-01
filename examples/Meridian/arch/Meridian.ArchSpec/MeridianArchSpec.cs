@@ -7,7 +7,7 @@ namespace Meridian.ArchSpec;
 /// <summary>
 ///     Meridian's architecture spec — the freight-forwarding monolith mid-migration, carrying all
 ///     three postures on one codebase: Enforce for the law it already keeps, Migrate for the two
-///     ratchets being worked off (inline SQL in controllers; ambient-clock reads), and Freeze for
+///     ratchets being worked off (inline SQL in controllers; ambient-clock reads), and Quarantine for
 ///     the ISO 6346 clearance engine, contained behind its gateway.
 /// </summary>
 public sealed class MeridianArchSpec : IArchitectureSpec
@@ -45,7 +45,7 @@ public sealed class MeridianArchSpec : IArchitectureSpec
             .Fix("Take IClock in the constructor; see BookingsController.");
 
         arch.Scope("clearance/engine")
-            .Freeze(arch.Namespace("Meridian.Clearance.*"))
+            .Quarantine(arch.Namespace("Meridian.Clearance.*"))
             .BoundaryOnlyVia(typeof(IClearanceGateway), typeof(ClearanceGateway))
             .Dragons("ISO 6346 check digit: the letter-value table skips every multiple of 11 " +
                      "(A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table " +

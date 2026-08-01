@@ -130,16 +130,16 @@ internal static class SpecValidator
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
     {
-        if (scope.Frozen == null)
+        if (scope.Quarantined == null)
         {
             errors.Add(new SpecValidationError(Code.DanglingAnchor, scope.Id,
-                $"Scope '{scope.Id}' has no posture; call .Freeze(...).", scope.Location));
+                $"Scope '{scope.Id}' has no posture; call .Quarantine(...).", scope.Location));
             return;
         }
 
-        if (scope.FreezeCount > 1)
+        if (scope.QuarantineCount > 1)
             errors.Add(new SpecValidationError(Code.RepeatedPosture, scope.Id,
-                $"Scope '{scope.Id}' has more than one posture; call .Freeze(...) exactly once.", scope.Location));
+                $"Scope '{scope.Id}' has more than one posture; call .Quarantine(...) exactly once.", scope.Location));
 
         CheckBecause(scope.Becauses, scope.Id, scope.Location, errors);
         CheckRepeated(scope.Dragons.Count, "Dragons", scope.Id, scope.Location, errors);
@@ -150,11 +150,11 @@ internal static class SpecValidator
             errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'.", scope.Location));
         else if (scope.BoundaryOnlyViaCount == 1 && scope.Boundary.Count == 0)
             errors.Add(new SpecValidationError(Code.EmptyBoundary, scope.Id,
-                $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic freeze.", scope.Location));
+                $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic quarantine.", scope.Location));
 
         if (scope.Dragons.Count == 0 && scope.DragonsDocs.Count == 0)
             errors.Add(new SpecValidationError(Code.MissingDragons, scope.Id,
-                $"Frozen scope '{scope.Id}' is missing .Dragons(...) or .DragonsDoc(...).", scope.Location));
+                $"Quarantined scope '{scope.Id}' is missing .Dragons(...) or .DragonsDoc(...).", scope.Location));
 
         foreach ((string label, string? value) in ScopeProse(scope)) CheckProse(value, label, scope.Id, scope.Location, errors);
 
@@ -464,8 +464,8 @@ internal static class SpecValidator
 
         foreach (string dragonsDoc in scope.DragonsDocs) yield return ("DragonsDoc", dragonsDoc);
 
-        if (scope.Frozen != null)
-            foreach ((string, string?) prose in SelectionProse(scope.Frozen))
+        if (scope.Quarantined != null)
+            foreach ((string, string?) prose in SelectionProse(scope.Quarantined))
                 yield return prose;
     }
 
@@ -526,7 +526,7 @@ internal static class SpecValidator
 
     private static IEnumerable<Selection> ScopeSelections(ScopeRegistration scope)
     {
-        return scope.Frozen == null ? Enumerable.Empty<Selection>() : ExpandSelection(scope.Frozen);
+        return scope.Quarantined == null ? Enumerable.Empty<Selection>() : ExpandSelection(scope.Quarantined);
     }
 
     private static IEnumerable<Selection> ExpandSelection(Selection selection)
@@ -561,9 +561,9 @@ internal static class SpecValidator
 
     private static IEnumerable<(string Value, bool Namespace, string Label)> ScopePatterns(ScopeRegistration scope)
     {
-        return scope.Frozen == null
+        return scope.Quarantined == null
             ? Enumerable.Empty<(string, bool, string)>()
-            : SelectionPatterns(scope.Frozen);
+            : SelectionPatterns(scope.Quarantined);
     }
 
     private static IEnumerable<(string Value, bool Namespace, string Label)> ConstraintPatterns(Constraint constraint)

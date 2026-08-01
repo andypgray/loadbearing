@@ -7,10 +7,10 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     The <c>render</c> pipeline: load the model → compose the root block into
-///     <c>&lt;solution-dir&gt;/AGENTS.md</c> → and, when the model has frozen scopes or layers carrying
+///     <c>&lt;solution-dir&gt;/AGENTS.md</c> → and, when the model has quarantined scopes or layers carrying
 ///     anchored rules, extract the codebase and place each layer's local-rules card and each scope's
 ///     card in its directory's <c>AGENTS.md</c>. Content units that land in the same directory merge
-///     into that file's one managed block (layer card before freeze card). Every target is spliced through
+///     into that file's one managed block (layer card before quarantine card). Every target is spliced through
 ///     the byte-level <see cref="ManagedBlockFile" /> adapter and reported as <c>wrote</c>/<c>unchanged</c>
 ///     with a solution-relative path. Render is a mutation, not a gate: it always exits 0 on success;
 ///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
@@ -32,11 +32,11 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
             new(solutionDirectory, AgentContextRenderer.RootBlock(workspace.Model, specName), true)
         };
 
-        // Extraction only earns its cost when there is something scoped to place — a frozen scope, or a
-        // layer carrying anchored rules. Layer cards precede freeze cards, so a directory holding both
+        // Extraction only earns its cost when there is something scoped to place — a quarantined scope, or a
+        // layer carrying anchored rules. Layer cards precede quarantine cards, so a directory holding both
         // merges the layer card first into its one managed block.
-        bool anyFreeze = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze);
-        if (anyFreeze || LayerContextResolver.HasAnchoredLayers(workspace.Model))
+        bool anyQuarantine = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Quarantine);
+        if (anyQuarantine || LayerContextResolver.HasAnchoredLayers(workspace.Model))
             units.AddRange(await ScopedUnitsAsync(workspace, ct));
 
         WriteGroups(units, specName, solutionDirectory);
@@ -44,8 +44,8 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
     }
 
     // The non-root content units: extract the codebase once, then the layer cards (declaration order)
-    // ahead of the freeze cards (model order). A directory that hosts a layer and a frozen scope thus
-    // receives its layer unit before its freeze unit, and WriteGroups merges them in that order.
+    // ahead of the quarantine cards (model order). A directory that hosts a layer and a quarantined scope thus
+    // receives its layer unit before its quarantine unit, and WriteGroups merges them in that order.
     private async Task<IEnumerable<ContentUnit>> ScopedUnitsAsync(WorkspaceModel workspace, CancellationToken ct)
     {
         IReadOnlyCollection<string>? exclude = workspace.Resolution.ExcludeProjectName is { } name ? [name] : null;

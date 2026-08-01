@@ -36,7 +36,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Return one rule's because, fix, posture payload, and linked prose as text.";
 
     private const string ContextDescription =
-        "Return the architecture scope card(s) covering a path — a frozen scope's dragons + sanctioned surface, " +
+        "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
         "or a layer's local rules — or a pointer line when none apply.";
 
     private const string GraphDescription =
@@ -53,7 +53,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         OpenWorld = false)]
     [Description(CheckDescription)]
     public async Task<string> CheckAsync(
-        [Description("Optional git ref; files changed since it that fall in a frozen scope raise a tripwire warning.")]
+        [Description("Optional git ref; files changed since it that fall in a quarantined scope raise a tripwire warning.")]
         string? diffBase = null,
         CancellationToken cancellationToken = default)
     {

@@ -1,9 +1,9 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A rule's lifecycle posture. A scope's <c>Freeze</c> is authored on the
+///     A rule's lifecycle posture. A scope's <c>Quarantine</c> is authored on the
 ///     surface but desugars into ordinary posture-bearing rule nodes carrying
-///     <see cref="Freeze" /> (GRAMMAR §7), so checker, renderer, and baseline all walk one model.
+///     <see cref="Quarantine" /> (GRAMMAR §7), so checker, renderer, and baseline all walk one model.
 /// </summary>
 public enum Posture
 {
@@ -14,5 +14,5 @@ public enum Posture
     Migrate,
 
     /// <summary>Here be dragons: an unenforceable interior with an enforceable boundary.</summary>
-    Freeze
+    Quarantine
 }

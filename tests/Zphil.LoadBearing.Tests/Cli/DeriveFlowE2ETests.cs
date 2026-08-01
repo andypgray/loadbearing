@@ -33,8 +33,8 @@ public sealed class DeriveFlowE2ETests
 
         // Check the derived proposal: red, with the survey's debt surfacing as evidence. 4 rules fail
         // (2 layering-migrate edges, 2 inline-SQL edges, 1 handler-naming shape, 2 containment edges = 7
-        // violations across the three Migrate rules and the Freeze containment); the 2 Enforce directions
-        // pass; the Freeze tripwire skips with no --diff-base.
+        // violations across the three Migrate rules and the Quarantine containment); the 2 Enforce directions
+        // pass; the Quarantine tripwire skips with no --diff-base.
         CliResult checkRed = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--json");
 
@@ -45,7 +45,7 @@ public sealed class DeriveFlowE2ETests
         checkRed.Out.ShouldContain("\"violations\": 7");
 
         // The human baselines the remainder: --init grandfathers every current violation into the
-        // conventional default path per failing rule (one per Migrate rule + the Freeze containment).
+        // conventional default path per failing rule (one per Migrate rule + the Quarantine containment).
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--init");
 
@@ -63,7 +63,7 @@ public sealed class DeriveFlowE2ETests
         checkGreen.Out.ShouldContain("\"rulesFailed\": 0");
         checkGreen.Out.ShouldContain("\"violations\": 0");
 
-        // Render the agent context: the root managed block and the frozen-scope card for legacy/billing.
+        // Render the agent context: the root managed block and the quarantined-scope card for legacy/billing.
         CliResult render = await CliRunner.InvokeAsync(
             "render", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll);
 
@@ -73,6 +73,6 @@ public sealed class DeriveFlowE2ETests
         File.Exists(rootAgents).ShouldBeTrue();
         File.ReadAllText(rootAgents).ShouldContain("<!-- loadbearing:begin -->");
         File.Exists(scopeAgents).ShouldBeTrue();
-        File.ReadAllText(scopeAgents).ShouldContain("## Frozen scope `legacy/billing`");
+        File.ReadAllText(scopeAgents).ShouldContain("## Quarantined scope `legacy/billing`");
     }
 }

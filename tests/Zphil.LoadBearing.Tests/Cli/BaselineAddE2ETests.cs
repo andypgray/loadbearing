@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     End-to-end <c>baseline --add</c> against a private, restored copy of the MyApp fixture
 ///     (<see cref="TempFixtureWorkspace" />, one per fact) — the ratchet's escape valve.
 ///     Pins the whole valve: a Migrate <c>--add</c> appends exactly one attributed entry as a one-line
-///     diff while same-rule and other-rule bystanders stay red; a Freeze-containment <c>--add</c>
+///     diff while same-rule and other-rule bystanders stay red; a Quarantine-containment <c>--add</c>
 ///     grandfathers a new inbound edge and turns the rule green; a present entry only has its attribution
 ///     updated; the attribution survives an <c>--init</c>/<c>--accept-reductions</c> round-trip
 ///     byte-for-byte; the four refusals exit 2 with their pinned messages; and — by design —
@@ -58,7 +58,7 @@ public sealed class BaselineAddE2ETests
     private const string DataSetMethod =
         "\n    public System.Data.DataSet ExportEverything()\n    {\n        return new System.Data.DataSet();\n    }\n";
 
-    // Exactly ONE new inbound edge into the frozen billing scope (HomeController -> BillingCalculator);
+    // Exactly ONE new inbound edge into the quarantined billing scope (HomeController -> BillingCalculator);
     // .ToString() is object's, so no RoundingMode edge tags along — the containment rule can go fully green.
     private const string DescribeBillingMethod =
         "\n    public string DescribeBilling()\n    {\n        BillingCalculator calculator = new BillingCalculator();\n        return calculator.ToString();\n    }\n";
@@ -69,7 +69,7 @@ public sealed class BaselineAddE2ETests
         "\n    public IHandler<InvoiceCreated> BuildHandler()\n    {\n        return new InvoiceCreatedHandler();\n    }\n";
 
     private static readonly string[] MigrateBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
-    private static readonly string[] FreezeBaselineFile = ["arch", "violated-freeze-baseline.json"];
+    private static readonly string[] QuarantineBaselineFile = ["arch", "violated-quarantine-baseline.json"];
     private static readonly string[] ClockBaselineFile = ["arch", "baselines", "time", "inject-clock.json"];
     private static readonly string[] AsyncBaselineFile = ["arch", "baselines", "naming", "async-suffix.json"];
     private static readonly string[] ConstructionBaselineFile = ["arch", "baselines", "di", "handlers-via-registry.json"];
@@ -132,13 +132,13 @@ public sealed class BaselineAddE2ETests
     }
 
     [Fact]
-    public async Task BaselineAdd_FreezeContainment_GrandfathersNewInboundEdge()
+    public async Task BaselineAdd_QuarantineContainment_GrandfathersNewInboundEdge()
     {
         using var workspace = new TempFixtureWorkspace();
         // Capture the uncaptured containment rule first — its two InvoiceController interior edges.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        // Now introduce exactly one new inbound edge into the frozen scope and grandfather it.
+        // Now introduce exactly one new inbound edge into the quarantined scope and grandfather it.
         InsertMember(workspace.PathOf(HomeControllerFile), DescribeBillingMethod);
 
         CliResult add = await CliRunner.InvokeAsync(
@@ -152,7 +152,7 @@ public sealed class BaselineAddE2ETests
         add.Out.ShouldContain(
             "legacy/billing/containment: added 1 grandfathered entry — MyApp.Web.HomeController -> MyApp.Legacy.Billing.BillingCalculator (because: hotfix INC-42).");
 
-        Normalize(File.ReadAllText(workspace.PathOf(FreezeBaselineFile))).ShouldBe(ComposeSections(
+        Normalize(File.ReadAllText(workspace.PathOf(QuarantineBaselineFile))).ShouldBe(ComposeSections(
             (ContainmentRule,
             [
                 BaselineEntry.ForEdge(HomeId, BillingCalculatorId).WithBecause("hotfix INC-42"),
@@ -689,7 +689,7 @@ public sealed class BaselineAddE2ETests
 
         nonRatcheted.Exit.ShouldBe(2);
         nonRatcheted.Err.ShouldContain(
-            "rule 'layering/domain-independent' is not ratcheted — only Migrate and Freeze containment rules carry baselines.");
+            "rule 'layering/domain-independent' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
         uncaptured.Exit.ShouldBe(2);
         uncaptured.Err.ShouldContain(

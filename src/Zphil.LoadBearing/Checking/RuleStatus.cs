@@ -9,6 +9,6 @@ public enum RuleStatus
     /// <summary>The rule is violated, has an empty subject, or errored during evaluation.</summary>
     Failed,
 
-    /// <summary>The rule was not evaluated on this run — a Freeze tripwire with no diff context (GRAMMAR §7).</summary>
+    /// <summary>The rule was not evaluated on this run — a Quarantine tripwire with no diff context (GRAMMAR §7).</summary>
     Skipped
 }

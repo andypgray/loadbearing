@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     Renders a <see cref="CheckReport" /> as the <c>--json</c> document (schemaVersion 3 — Freeze
-///     containment now evaluates and ratchets alongside Migrate, and a Freeze tripwire warns) — the only
+///     Renders a <see cref="CheckReport" /> as the <c>--json</c> document (schemaVersion 3 — Quarantine
+///     containment now evaluates and ratchets alongside Migrate, and a Quarantine tripwire warns) — the only
 ///     content on stdout in JSON mode, so hooks can parse it. The optional <c>diffBase</c> echoes the
 ///     <c>--diff-base</c> ref (omitted when absent). Machine-independent: <c>solution</c> and
 ///     <c>specAssembly</c> are file names, and every site path is solution-relative with forward slashes.
@@ -53,7 +53,7 @@ internal static class JsonReportRenderer
             result.Warnings.Select(w => new WarningJson(Camel(w.Kind.ToString()), w.Message)).ToList());
     }
 
-    // The baseline block is present for any ratcheted rule (Migrate or Freeze containment); the model's
+    // The baseline block is present for any ratcheted rule (Migrate or Quarantine containment); the model's
     // relative path string rides through verbatim.
     private static BaselineJson? ToBaseline(RuleResult result)
     {

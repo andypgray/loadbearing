@@ -8,7 +8,7 @@ namespace Meridian.Operations.ArchSpec;
 ///     module boundaries are drawn by namespace inside one project rather than by separate
 ///     assemblies. Each module keeps its internals to itself and is reached through a Contracts
 ///     surface; the module dependency graph is explicit and acyclic; and the demurrage engine is
-///     frozen behind its calculator facade.
+///     quarantined behind its calculator facade.
 /// </summary>
 public sealed class OperationsArchSpec : IArchitectureSpec
 {
@@ -33,7 +33,7 @@ public sealed class OperationsArchSpec : IArchitectureSpec
         arch.Rule("modules/tracking/internals")
             .Enforce(tracking.Except(arch.Namespace("Meridian.Operations.Tracking.Contracts.*"))
                          .MustOnlyBeReferencedBy(tracking))
-            .Because("Downstream modules read tracking only through its Contracts surface, so the milestone store and the log stay swappable; a reference into them from outside would freeze an internal into a contract the source-of-truth module can no longer revise.")
+            .Because("Downstream modules read tracking only through its Contracts surface, so the milestone store and the log stay swappable; a reference into them from outside would lock an internal into a contract the source-of-truth module can no longer revise.")
             .Fix("Depend on `ITrackingLog` or another `Tracking.Contracts` type instead of the internal store or log.");
 
         arch.Rule("modules/tracking/outbound")
@@ -53,7 +53,7 @@ public sealed class OperationsArchSpec : IArchitectureSpec
 
         // demurrage is listed here as the whole layer, not just its Contracts/facade surface: the
         // reconciler's grandfathered reach into FreeTimeCalendar is owned by the demurrage/engine
-        // freeze below, which baselines that one legacy edge. An Enforce rule cannot carry a
+        // quarantine below, which baselines that one legacy edge. An Enforce rule cannot carry a
         // baseline, so naming only the facade here would turn the same edge into an
         // un-grandfatherable red — two rules fighting over one reference.
         arch.Rule("modules/invoicing/outbound")
@@ -74,7 +74,7 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Because("The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.");
 
         arch.Scope("demurrage/engine")
-            .Freeze(demurrage)
+            .Quarantine(demurrage)
             .BoundaryOnlyVia(typeof(IDemurrageCalculator), typeof(DemurrageCalculator))
             .Dragons("Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.")
             .Because("The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.");

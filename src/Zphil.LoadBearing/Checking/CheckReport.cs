@@ -32,7 +32,7 @@ public sealed class CheckReport
     /// <summary>Rules that were violated or errored.</summary>
     public int RulesFailed { get; }
 
-    /// <summary>Rules not evaluated — a Freeze tripwire with no <c>--diff-base</c> diff context (GRAMMAR §7).</summary>
+    /// <summary>Rules not evaluated — a Quarantine tripwire with no <c>--diff-base</c> diff context (GRAMMAR §7).</summary>
     public int RulesSkipped { get; }
 
     /// <summary>Total <em>red</em> violations across all rules (grandfathered Migrate violations excluded).</summary>

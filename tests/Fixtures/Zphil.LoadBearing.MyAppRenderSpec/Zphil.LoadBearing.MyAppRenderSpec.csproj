@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <!-- The render e2e fixture: two layers, two holding Enforce rules, and one frozen scope over
+    <!-- The render e2e fixture: two layers, two holding Enforce rules, and one quarantined scope over
          MyApp.Legacy.Billing (with a sanctioned facade surface and dragons). References only Core; its
          DLL path is baked into the test assembly's metadata and loaded via the spec flag. The
          BoundaryOnlyVia facade types are name-carrier stubs (Stubs.cs) — correspondence is by full

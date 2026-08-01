@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     End-to-end <c>check</c> runs against the real MyApp fixture solution (each loads a fresh
 ///     workspace). The violated spec is the acceptance box — one failing rule showing ID, because,
-///     fix, and <c>file:line</c> together — plus the freeze containment (uncaptured hard red + facade
+///     fix, and <c>file:line</c> together — plus the quarantine containment (uncaptured hard red + facade
 ///     green + tripwire skip), the JSON golden pin, and the SARIF golden pin (with its <c>--json</c>
 ///     stdout-purity guard); the clean spec exits 0.
 /// </summary>
@@ -56,7 +56,7 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
-    public async Task Check_ViolatedSpec_FreezeContainmentRedInteriorGreenFacadeTripwireSkips()
+    public async Task Check_ViolatedSpec_QuarantineContainmentRedInteriorGreenFacadeTripwireSkips()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
@@ -73,7 +73,7 @@ public sealed class CheckCommandE2ETests
         // The tripwire skips without a --diff-base.
         result.Out.ShouldContain("skip legacy/billing/tripwire");
         result.Out.ShouldContain(
-            "skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.");
+            "skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.");
     }
 
     [Fact]

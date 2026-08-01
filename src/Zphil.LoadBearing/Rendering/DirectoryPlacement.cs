@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///         directory
 ///     </em>
 ///     — the directory whose <c>AGENTS.md</c> receives that selection's card. Both
-///     <see cref="ScopedContextResolver" /> (frozen scopes) and <see cref="LayerContextResolver" />
+///     <see cref="ScopedContextResolver" /> (quarantined scopes) and <see cref="LayerContextResolver" />
 ///     (layer local-rules cards) collapse their sites through this one helper, so the two emission
 ///     keys land a co-located card in exactly the same directory.
 /// </summary>

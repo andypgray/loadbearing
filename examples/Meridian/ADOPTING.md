@@ -172,9 +172,9 @@ In a source checkout like this repository, `dotnet sln add` follows the spec's p
 
 ## Step 3: draft candidate rules
 
-On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence that decides it. Write the already-true directions too, the ones the edge matrix showed clean, because a clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone: a boundary has no `Enforce` form, so you draft it as a `Freeze` scope directly.
+On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence that decides it. Write the already-true directions too, the ones the edge matrix showed clean, because a clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone: a boundary has no `Enforce` form, so you draft it as a `Quarantine` scope directly.
 
-Meridian's survey produced four direction-and-convention candidates plus one frozen scope:
+Meridian's survey produced four direction-and-convention candidates plus one quarantined scope:
 
 ```csharp
 using Meridian.Clearance;
@@ -210,7 +210,7 @@ public sealed class MeridianArchSpec : IArchitectureSpec
             .Because("Candidate: the Web layer looks like it reads the ambient clock directly.");
 
         arch.Scope("clearance/engine")
-            .Freeze(arch.Namespace("Meridian.Clearance.*"))
+            .Quarantine(arch.Namespace("Meridian.Clearance.*"))
             .BoundaryOnlyVia(typeof(IClearanceGateway), typeof(ClearanceGateway))
             .Dragons("ISO 6346 check digit: the letter-value table skips every multiple of 11 " +
                      "(A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks " +
@@ -220,7 +220,7 @@ public sealed class MeridianArchSpec : IArchitectureSpec
 }
 ```
 
-That is five candidate rules. The frozen scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report six. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
+That is five candidate rules. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report six. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
 
 The CLI never builds your code; it reads compiled assemblies. Build the spec before every check, or the check reads a stale build and reports stale results.
 
@@ -256,7 +256,7 @@ FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `I
   src/Meridian.Web/Controllers/CustomsController.cs:53 — Meridian.Web.Controllers.CustomsController references Meridian.Clearance.ContainerNumberValidator
   hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations
 skip clearance/engine/tripwire
-  skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.
+  skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.
 
 Checked 6 rules: 2 passed, 3 failed, 1 skipped (21 violations, 0 warnings).
 exit: 1
@@ -266,7 +266,7 @@ The two direction-and-naming rules pass with zero violations, which already tell
 
 ## Step 5: assign postures from the evidence
 
-On your solution, the violation count decides the honest posture for each rule. Zero violations means the code already obeys, so the rule becomes `Enforce` law that costs nothing. Violations plus a target state the team actually wants means `Migrate`: the current sites are grandfathered and new code goes red. A region with no target state, code no one will fix, means `Freeze`: hold the boundary and document what is dangerous inside it. A rule nothing on the team stands behind gets dropped, because an unratified rule is the stale doc this tool exists to kill.
+On your solution, the violation count decides the honest posture for each rule. Zero violations means the code already obeys, so the rule becomes `Enforce` law that costs nothing. Violations plus a target state the team actually wants means `Migrate`: the current sites are grandfathered and new code goes red. A region with no target state, code no one will fix, means `Quarantine`: hold the boundary and document what is dangerous inside it. A rule nothing on the team stands behind gets dropped, because an unratified rule is the stale doc this tool exists to kill.
 
 Meridian's evidence assigns cleanly:
 
@@ -276,9 +276,9 @@ Meridian's evidence assigns cleanly:
 | `naming/controllers` | 0 violations | Enforce |
 | `data-access/no-inline-sql` | 12 pairs, 6 controllers | Migrate |
 | `time/inject-clock` | 8 clock reads | Migrate |
-| `clearance/engine` | 1 non-facade inbound | Freeze |
+| `clearance/engine` | 1 non-facade inbound | Quarantine |
 
-The two zero-violation rules become law. The inline-SQL rule has twelve violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`: the majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is), so the scope is `Freeze`.
+The two zero-violation rules become law. The inline-SQL rule has twelve violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`: the majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is), so the scope is `Quarantine`.
 
 The refinement is where the evidence earns its keep. The draft flagged `SystemClock.cs:7` alongside the seven controller reads. But `SystemClock` implements `IClock`: it is the one sanctioned seam that must read the wall clock, so nothing else has to. The blunt draft rule surfaced the seam; the curated rule keeps it by adding `.Except(arch.Types.WithNameMatching("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, not code evidence: an empty subject or a glob that matched nothing would speak the same way, telling you to fix the rule rather than measure the code.
 
@@ -290,7 +290,7 @@ For Meridian the curation is a small set of edits against the draft (the finishe
 
 - The two data rules move from `Enforce` to `Migrate`, each gaining a factual `from:` line describing the old pattern ("Controllers open SqlConnection and run inline SQL directly"; "Code reads the ambient clock directly"), a real `Because`, and a `Fix` that names the exemplar to copy (`BookingRepository` for the SQL, `BookingsController` for the clock).
 - The clock rule gains the `.Except(SystemClock)` refinement from step 5.
-- The frozen scope keeps its dragons prose and gains its real `Because`.
+- The quarantined scope keeps its dragons prose and gains its real `Because`.
 
 With the curated spec built, `baseline --init` captures the debt:
 
@@ -315,7 +315,7 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
 skip clearance/engine/tripwire
-  skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.
+  skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.
 
 Checked 6 rules: 5 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
 exit: 0
@@ -325,7 +325,7 @@ Each of the three ratcheted passes also prints its grandfathered count (12, 7, a
 
 ## Step 7: render and commit
 
-On your solution, `render` turns the spec into agent-readable context. It writes one managed block into the root `AGENTS.md`, and drops a scoped card into each frozen scope's directory (the dragons) and each layer's directory (the local rules). Everything outside the managed markers is preserved byte for byte, so `render` is safe to run over hand-written files.
+On your solution, `render` turns the spec into agent-readable context. It writes one managed block into the root `AGENTS.md`, and drops a scoped card into each quarantined scope's directory (the dragons) and each layer's directory (the local rules). Everything outside the managed markers is preserved byte for byte, so `render` is safe to run over hand-written files.
 
 ```text
 $ loadbearing render examples/Meridian/Meridian.slnx

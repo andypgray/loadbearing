@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     Pins every <c>status</c> line shape (<see cref="StatusFormatter" />) over synthetic
 ///     <see cref="RuleResult" />s — no workspace: Enforce pass/FAIL with counts, the four Migrate states
-///     (captured-failing, promotable, interim-awaiting-acceptance, and uncaptured), the Freeze
+///     (captured-failing, promotable, interim-awaiting-acceptance, and uncaptured), the Quarantine
 ///     containment ratchet lines (which never promote) and the tripwire's diff-aware skip, plus the
 ///     burndown summary.
 /// </summary>
@@ -48,34 +48,34 @@ public sealed class StatusFormatterTests
     }
 
     [Fact]
-    public void FreezeContainment_Uncaptured_SuggestsInit()
+    public void QuarantineContainment_Uncaptured_SuggestsInit()
     {
         Line(Result(Rule("legacy/billing/containment"), RuleStatus.Failed, 2))
             .ShouldBe(
-                "FAIL legacy/billing/containment (freeze) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
+                "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
     }
 
     [Fact]
-    public void FreezeContainment_Grandfathered_ShowsBurndownAndNeverPromotes()
+    public void QuarantineContainment_Grandfathered_ShowsBurndownAndNeverPromotes()
     {
         string line = Line(Result(Rule("legacy/billing/containment"), RuleStatus.Failed, 1, grandfathered: 2, captured: true));
 
-        line.ShouldBe("FAIL legacy/billing/containment (freeze) — 2 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
+        line.ShouldBe("FAIL legacy/billing/containment (quarantine) — 2 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
         line.ShouldNotContain("promotable");
     }
 
     [Fact]
-    public void FreezeContainment_BurnedToZero_ReadsPlainNotPromotable()
+    public void QuarantineContainment_BurnedToZero_ReadsPlainNotPromotable()
     {
-        // Freeze→Migrate is a human decision; a burned-to-zero containment never suggests promotion.
+        // Quarantine→Migrate is a human decision; a burned-to-zero containment never suggests promotion.
         string line = Line(Result(Rule("legacy/billing/containment"), RuleStatus.Passed, captured: true));
 
-        line.ShouldBe("pass legacy/billing/containment (freeze) — 0 grandfathered remaining");
+        line.ShouldBe("pass legacy/billing/containment (quarantine) — 0 grandfathered remaining");
         line.ShouldNotContain("promotable");
     }
 
     [Fact]
-    public void FreezeTripwire_ReadsDiffAwareSkip()
+    public void QuarantineTripwire_ReadsDiffAwareSkip()
     {
         Line(Result(Rule("legacy/billing/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
             .ShouldBe("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
@@ -155,7 +155,7 @@ public sealed class StatusFormatterTests
             arch.Rule("layering/billing-independent").Enforce(arch.Types.MustHaveSuffix("X")).Because("b");
             arch.Rule("layering/domain-independent").Enforce(arch.Types.MustHaveSuffix("Y")).Because("b");
             arch.Rule("data-access/no-inline-sql").Migrate("old", arch.Types.MustHaveSuffix("Z")).Because("b");
-            arch.Scope("legacy/billing").Freeze(arch.Namespace("App.Legacy.*")).Dragons("d").Because("b");
+            arch.Scope("legacy/billing").Quarantine(arch.Namespace("App.Legacy.*")).Dragons("d").Because("b");
         }
     }
 }

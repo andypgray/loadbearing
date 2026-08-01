@@ -10,8 +10,8 @@ namespace Zphil.LoadBearing.Rendering;
 ///     <c>(model, specName)</c> (plus an optional grandfathered-count provider), a scope card a function
 ///     of one containment rule. Output is LF-internal always (never <c>Environment.NewLine</c>); the
 ///     splicer applies the target file's line ending. The always-on root block carries the module map,
-///     the Enforce "must" laws, the Migrate counter-prior paragraphs, and the Freeze containment laws
-///     (the frozen-scopes section — the containment law binds code <em>outside</em> the frozen directory,
+///     the Enforce "must" laws, the Migrate counter-prior paragraphs, and the Quarantine containment laws
+///     (the quarantined-scopes section — the containment law binds code <em>outside</em> the quarantined directory,
 ///     which the per-directory scope card never reaches); dragons prose stays scoped-only (progressive
 ///     disclosure). The Migrate voice explicitly counters the statistical prior — "most
 ///     code here follows the OLD pattern".
@@ -69,8 +69,8 @@ public static class AgentContextRenderer
     /// <summary>
     ///     The root managed-block body: provenance, the H2 heading, the glossary + drill-down pointer
     ///     (GRAMMAR §4.1, once), then — each omitted when empty — the module map (Layers), the Enforce
-    ///     laws (Rules), the Migrate counter-prior paragraphs (Migrations), and the Freeze containment
-    ///     laws (Frozen scopes — the containment law + sanctioned surface; dragons prose stays scoped).
+    ///     laws (Rules), the Migrate counter-prior paragraphs (Migrations), and the Quarantine containment
+    ///     laws (Quarantined scopes — the containment law + sanctioned surface; dragons prose stays scoped).
     ///     <paramref name="grandfatheredCounts" /> is an optional live-count provider: when it returns a
     ///     value for a Migrate rule, the "Grandfathered sites remaining: {n}." sentence is appended. The
     ///     default (null) renders no counts — the maintainer decision, where the burndown
@@ -107,8 +107,8 @@ public static class AgentContextRenderer
         var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
         if (migrateRules.Count > 0) sections.Add(MigrationsSection(migrateRules, grandfatheredCounts));
 
-        var containmentRules = model.Rules.Where(rule => rule.Freeze is { Role: FreezeRole.Containment }).ToList();
-        if (containmentRules.Count > 0) sections.Add(FrozenScopesSection(containmentRules));
+        var containmentRules = model.Rules.Where(rule => rule.Quarantine is { Role: QuarantineRole.Containment }).ToList();
+        if (containmentRules.Count > 0) sections.Add(QuarantinedScopesSection(containmentRules));
 
         return string.Join("\n\n", sections);
     }
@@ -131,7 +131,7 @@ public static class AgentContextRenderer
     }
 
     // True when a rule's subject or any operand carries a Registered noun (GRAMMAR §10) — descending through
-    // Except payloads and the internal Freeze union, since a Registered noun in any of those still renders the
+    // Except payloads and the internal Quarantine union, since a Registered noun in any of those still renders the
     // word "registered" in the block's prose and so must gate the glossary line.
     private static bool CarriesRegisteredNoun(Constraint constraint)
     {
@@ -147,38 +147,38 @@ public static class AgentContextRenderer
     }
 
     /// <summary>
-    ///     A frozen scope's context card (without the provenance line, which the splice pipeline adds
+    ///     A quarantined scope's context card (without the provenance line, which the splice pipeline adds
     ///     once per file): the scope heading, the containment law and rationale, the load-bearing-
     ///     weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a linked <c>Dragons doc</c>
     ///     bullet — one of the two is spec-guaranteed), the sanctioned surface (omitted for
-    ///     a hermetic freeze), and the <c>explain</c> pointer. This is the scoped, per-directory story the
+    ///     a hermetic quarantine), and the <c>explain</c> pointer. This is the scoped, per-directory story the
     ///     agents editing dragon territory read.
     /// </summary>
     public static string ScopeCard(ArchRule containmentRule)
     {
         Guard.NotNull(containmentRule, nameof(containmentRule));
-        if (containmentRule.Freeze is not { Role: FreezeRole.Containment } freeze)
-            throw new ArgumentException("ScopeCard requires a Freeze containment rule.", nameof(containmentRule));
+        if (containmentRule.Quarantine is not { Role: QuarantineRole.Containment } quarantine)
+            throw new ArgumentException("ScopeCard requires a Quarantine containment rule.", nameof(containmentRule));
 
-        string scopeId = freeze.ScopeId;
+        string scopeId = quarantine.ScopeId;
 
         var bullets = new List<string>
         {
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
-        if (freeze.Boundary.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(freeze.Boundary)}.");
+        if (quarantine.Boundary.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(quarantine.Boundary)}.");
         // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
         // not a rebased markdown link.
-        if (freeze.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
+        if (quarantine.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
         bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {containmentRule.Id}")}.");
 
         var sections = new List<string>
         {
-            $"## Frozen scope {ProseFormat.Backtick(scopeId)}",
-            $"This directory holds the frozen {ProseFormat.Backtick(scopeId)} scope. " +
+            $"## Quarantined scope {ProseFormat.Backtick(scopeId)}",
+            $"This directory holds the quarantined {ProseFormat.Backtick(scopeId)} scope. " +
             "Here be dragons — do not spread references into it."
         };
-        if (freeze.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
+        if (quarantine.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
         sections.Add(string.Join("\n", bullets));
 
         return string.Join("\n\n", sections);
@@ -255,21 +255,21 @@ public static class AgentContextRenderer
         return bullet;
     }
 
-    // The Freeze containment section (GRAMMAR §7): one bullet per frozen scope stating the
+    // The Quarantine containment section (GRAMMAR §7): one bullet per quarantined scope stating the
     // containment law + rationale + sanctioned surface, in the always-on root block because containment
-    // binds code OUTSIDE the frozen directory — those agents never see the per-directory scope card.
+    // binds code OUTSIDE the quarantined directory — those agents never see the per-directory scope card.
     // Dragons prose stays scoped-only (progressive disclosure) and prints in the scope card + explain.
-    private static string FrozenScopesSection(IReadOnlyList<ArchRule> containmentRules)
+    private static string QuarantinedScopesSection(IReadOnlyList<ArchRule> containmentRules)
     {
-        var bullets = containmentRules.Select(FrozenScopeBullet);
-        return "### Frozen scopes\n" + string.Join("\n", bullets);
+        var bullets = containmentRules.Select(QuarantinedScopeBullet);
+        return "### Quarantined scopes\n" + string.Join("\n", bullets);
     }
 
-    private static string FrozenScopeBullet(ArchRule rule)
+    private static string QuarantinedScopeBullet(ArchRule rule)
     {
-        FreezeData freeze = rule.Freeze!;
-        var bullet = $"- {ProseFormat.Backtick(freeze.ScopeId)} — {rule.Sentence} {rule.Because}";
-        if (freeze.Boundary.Count > 0) bullet += $" Sanctioned surface: {SurfaceList(freeze.Boundary)}.";
+        QuarantineData quarantine = rule.Quarantine!;
+        var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence} {rule.Because}";
+        if (quarantine.Boundary.Count > 0) bullet += $" Sanctioned surface: {SurfaceList(quarantine.Boundary)}.";
         return bullet;
     }
 

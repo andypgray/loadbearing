@@ -19,11 +19,11 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 [Collection("Serial")]
 public sealed class CliMcpParityTests
 {
-    // The AgentContextRenderer.ScopeCard body arch_context returns for the frozen legacy/billing scope —
+    // The AgentContextRenderer.ScopeCard body arch_context returns for the quarantined legacy/billing scope —
     // the RenderCommandE2ETests.ScopeBody card without its provenance line (moves with that pin).
     private const string ExpectedScopeCard =
-        "## Frozen scope `legacy/billing`\n\n" +
-        "This directory holds the frozen `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
+        "## Quarantined scope `legacy/billing`\n\n" +
+        "This directory holds the quarantined `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
@@ -33,7 +33,7 @@ public sealed class CliMcpParityTests
         "- Expand: `loadbearing explain legacy/billing/containment`.";
 
     // The AgentContextRenderer.LayerCard body arch_context returns for the Web layer of MyAppLayerSpec —
-    // no provenance line (that is a render file-splice concern), mirroring the frozen-scope card above.
+    // no provenance line (that is a render file-splice concern), mirroring the quarantined-scope card above.
     private const string ExpectedWebLayerCard =
         "## Layer `Web`\n\n" +
         "This directory holds the `Web` layer. Its architecture rules:\n\n" +
@@ -107,7 +107,7 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(CliRunner.MyAppSolution, CliRunner.RenderSpecDll), Ct);
 
-        // A path inside the frozen scope → that scope's card body.
+        // A path inside the quarantined scope → that scope's card body.
         CallToolResult inScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing/BillingCalculator.cs" }, cancellationToken: Ct);
         Normalize(TextOf(inScope)).ShouldBe(ExpectedScopeCard);
@@ -122,7 +122,7 @@ public sealed class CliMcpParityTests
     }
 
     [Fact]
-    public async Task HarnessD_FrozenSpec_CheckDiffBase_MatchesCliAndWarnsTripwire()
+    public async Task HarnessD_QuarantinedSpec_CheckDiffBase_MatchesCliAndWarnsTripwire()
     {
         using var repo = new TempGitRepo();
         // A brand-new untracked file in dragon territory — the tripwire's agent-hook case.
@@ -131,16 +131,16 @@ public sealed class CliMcpParityTests
             "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(repo.SolutionPath, CliRunner.FrozenSpecDll), Ct);
+            Binding(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
 
         CliResult cliCheck = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.FrozenSpecDll, "--json", "--diff-base", "HEAD");
+            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--diff-base", "HEAD");
         CallToolResult mcpCheck = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["diffBase"] = "HEAD" }, cancellationToken: Ct);
 
         string mcpText = Normalize(TextOf(mcpCheck));
         mcpText.ShouldBe(Normalize(cliCheck.Out));
-        mcpText.ShouldContain("frozenScopeTouched");
+        mcpText.ShouldContain("quarantinedScopeTouched");
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public sealed class CliMcpParityTests
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         Normalize(TextOf(inLayer)).ShouldBe(ExpectedWebLayerCard);
 
-        // A path no layer or frozen scope covers → the reworded pointer line (echoing the query path).
+        // A path no layer or quarantined scope covers → the reworded pointer line (echoing the query path).
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/Order.cs" }, cancellationToken: Ct);
         Normalize(TextOf(outScope)).ShouldBe(

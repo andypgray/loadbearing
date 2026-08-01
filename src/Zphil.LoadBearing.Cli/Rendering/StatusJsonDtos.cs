@@ -12,7 +12,7 @@ internal sealed record StatusJson(
     StatusSummaryJson Summary);
 
 /// <summary>
-///     One rule's status. <see cref="Ratchet" /> is populated for ratcheted rules (Migrate and Freeze
+///     One rule's status. <see cref="Ratchet" /> is populated for ratcheted rules (Migrate and Quarantine
 ///     containment).
 /// </summary>
 internal sealed record StatusRuleJson(
@@ -25,7 +25,7 @@ internal sealed record StatusRuleJson(
 
 /// <summary>
 ///     A ratcheted rule's state: the baseline path, capture flag, and burndown counts. <see cref="Promotable" />
-///     is populated for Migrate only (omitted for Freeze containment — its promotion is a human decision).
+///     is populated for Migrate only (omitted for Quarantine containment — its promotion is a human decision).
 /// </summary>
 internal sealed record RatchetStatusJson(
     string BaselinePath,

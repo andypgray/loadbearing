@@ -71,16 +71,16 @@ public sealed class OracleArchitecture
     }
 
     /// <summary>
-    ///     The frozen scope's interior: MyApp.Legacy.Billing types minus the two facade types
+    ///     The quarantined scope's interior: MyApp.Legacy.Billing types minus the two facade types
     ///     (<c>BillingFacade</c>, <c>IBillingFacade</c>) — the ArchUnitNET analog of LoadBearing's
-    ///     <c>frozen.Except(facadeImpl).Except(facadeIface)</c>. Concretely
+    ///     <c>quarantined.Except(facadeImpl).Except(facadeIface)</c>. Concretely
     ///     <c>
     ///         { BillingCalculator,
     ///         RoundingMode }
     ///     </c>
     ///     .
     /// </summary>
-    public IType[] FrozenInterior()
+    public IType[] QuarantinedInterior()
     {
         return MyAppTypes
             .Where(t => t.FullName.StartsWith("MyApp.Legacy.Billing.", StringComparison.Ordinal))

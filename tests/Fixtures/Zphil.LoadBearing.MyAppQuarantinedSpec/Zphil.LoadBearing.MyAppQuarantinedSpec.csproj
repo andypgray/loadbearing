@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <!-- The frozen-scope e2e fixture: one Freeze scope over MyApp.Legacy.Billing with NO explicit
+    <!-- The quarantined-scope e2e fixture: one Quarantine scope over MyApp.Legacy.Billing with NO explicit
          .Baseline, so its containment resolves to the conventional default
          arch/baselines/legacy/billing/containment.json (committed alongside the MyApp fixture). Against
          that grandfather baseline the whole run is exit 0 — the containment passes, the tripwire skips.

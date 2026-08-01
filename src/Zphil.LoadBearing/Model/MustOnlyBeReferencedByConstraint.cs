@@ -5,7 +5,7 @@ namespace Zphil.LoadBearing.Model;
 /// <summary>
 ///     <c>.MustOnlyBeReferencedBy(source, …)</c> → "must be referenced only by {list}" (GRAMMAR
 ///     §5.3). No external-packages caveat is needed: only solution types can be observed
-///     referencing (GRAMMAR §4.1). This is the containment verb Freeze desugars to (GRAMMAR §7).
+///     referencing (GRAMMAR §4.1). This is the containment verb Quarantine desugars to (GRAMMAR §7).
 /// </summary>
 internal sealed class MustOnlyBeReferencedByConstraint : Constraint
 {

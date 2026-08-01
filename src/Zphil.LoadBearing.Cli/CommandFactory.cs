@@ -36,7 +36,7 @@ internal static class CommandFactory
         Option<string?> diffBase = new("--diff-base")
         {
             Description =
-                "A git ref; files changed since it are checked against frozen scopes (Freeze tripwire) — warnings only, never failures."
+                "A git ref; files changed since it are checked against quarantined scopes (Quarantine tripwire) — warnings only, never failures."
         };
         Option<bool> allowWorkspaceDiagnostics = new("--allow-workspace-diagnostics")
         {

@@ -166,7 +166,7 @@ dotnet build examples/Meridian/src/Meridian.Web/Meridian.Web.csproj
 loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD   # exit 1: the Beat 3 board
 ```
 
-That `--diff-base HEAD` is what the wrapper adds; it only evaluates the frozen-scope tripwire (the
+That `--diff-base HEAD` is what the wrapper adds; it only evaluates the quarantined-scope tripwire (the
 extra `pass clearance/engine/tripwire` line) and does not change the failing rule. To drive the
 wrapper the way the hook does, install the [global tool](../README.md#run-it-yourself) so
 `loadbearing` resolves, then run `sh hooks/arch-hook.sh` (or `arch-hook.ps1`): it runs that same

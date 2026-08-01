@@ -11,8 +11,8 @@ public enum CheckWarningKind
     InertTarget,
 
     /// <summary>
-    ///     A changed file (from <c>check --diff-base</c>) declares a type in a frozen scope — the Freeze
+    ///     A changed file (from <c>check --diff-base</c>) declares a type in a quarantined scope — the Quarantine
     ///     tripwire (GRAMMAR §7). The rule still passes; warnings never affect the exit code.
     /// </summary>
-    FrozenScopeTouched
+    QuarantinedScopeTouched
 }

@@ -33,7 +33,7 @@ public sealed class ArchSpec : IArchitectureSpec
             .Fix("Inject the repository; see OrdersRepository for the pattern.");
 
         arch.Scope("legacy/billing")
-            .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
             .Baseline("arch/baseline.json")
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +

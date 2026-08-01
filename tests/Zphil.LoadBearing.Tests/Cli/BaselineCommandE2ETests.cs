@@ -48,9 +48,9 @@ public sealed class BaselineCommandE2ETests
         init.Out.ShouldContain("wrote");
         // --init grandfathers the current state: both controllers' DataTable sites.
         Normalize(File.ReadAllText(file)).ShouldBe(BothPairsComposed());
-        // --init also grandfathers the freeze containment rule into its explicit (uncommitted) baseline —
-        // InvoiceController's two interior references into the frozen billing scope. (The freeze --init e2e.)
-        Normalize(File.ReadAllText(workspace.PathOf("arch", "violated-freeze-baseline.json")))
+        // --init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
+        // InvoiceController's two interior references into the quarantined billing scope. (The quarantine --init e2e.)
+        Normalize(File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json")))
             .ShouldBe(ContainmentPairsComposed());
 
         // check now sees the Migrate rule fully grandfathered.
@@ -128,7 +128,7 @@ public sealed class BaselineCommandE2ETests
         return Compose();
     }
 
-    // The freeze containment section captured by --init: InvoiceController's two interior references.
+    // The quarantine containment section captured by --init: InvoiceController's two interior references.
     private static string ContainmentPairsComposed()
     {
         return Compose(

@@ -48,7 +48,7 @@ internal static class Checker
         return report.Results.Single();
     }
 
-    /// <summary>The rule result for a given ID (for multi-rule specs, e.g. a desugared Freeze scope).</summary>
+    /// <summary>The rule result for a given ID (for multi-rule specs, e.g. a desugared Quarantine scope).</summary>
     public static RuleResult ForRule(this CheckReport report, string ruleId)
     {
         return report.Results.Single(r => r.Rule.Id == ruleId);

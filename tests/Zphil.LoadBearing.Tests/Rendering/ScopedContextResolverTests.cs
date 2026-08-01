@@ -8,7 +8,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     Scoped placement: the frozen selection is evaluated in Subject position and its
+///     Scoped placement: the quarantined selection is evaluated in Subject position and its
 ///     types' declaration sites collapse to a deepest-common-ancestor directory — the right dir for a
 ///     co-located scope, the containing dir for a single file, the common root for a cross-project
 ///     scope. A scope matching no types resolves to a null directory with a skip reason. No MSBuild —
@@ -18,7 +18,7 @@ public class ScopedContextResolverTests
 {
     private static ArchitectureModel Model()
     {
-        return ArchModelBuilder.Build(new BillingFreezeSpec());
+        return ArchModelBuilder.Build(new BillingQuarantineSpec());
     }
 
     [Fact]
@@ -79,13 +79,13 @@ public class ScopedContextResolverTests
         placement.SkipReason.ShouldBe("scope 'legacy/billing' matched no types; no scoped context emitted");
     }
 
-    // A hermetic frozen scope over the billing namespace (no BoundaryOnlyVia needed to place it).
-    private sealed class BillingFreezeSpec : IArchitectureSpec
+    // A hermetic quarantined scope over the billing namespace (no BoundaryOnlyVia needed to place it).
+    private sealed class BillingQuarantineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
             arch.Scope("legacy/billing")
-                .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .Dragons("Banker's rounding is load-bearing.")
                 .Because("Replacement scheduled; not worth stabilizing.");
         }

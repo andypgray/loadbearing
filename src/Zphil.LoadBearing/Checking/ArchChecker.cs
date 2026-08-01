@@ -9,9 +9,9 @@ namespace Zphil.LoadBearing.Checking;
 ///     Evaluates a finalized <see cref="ArchitectureModel" /> against an extracted
 ///     <see cref="CodebaseModel" /> — the pure-Core heart of <c>loadbearing check</c> and
 ///     <c>status</c>. One <see cref="RuleResult" /> per rule, in model order: Enforce rules are
-///     evaluated; ratcheted rules — Migrate and Freeze containment — are evaluated the same way and
+///     evaluated; ratcheted rules — Migrate and Quarantine containment — are evaluated the same way and
 ///     then <em>partitioned</em> against a <see cref="BaselineIndex" /> (in-baseline =
-///     grandfathered/pass, not-in-baseline = red, including new code in the old pattern); a Freeze
+///     grandfathered/pass, not-in-baseline = red, including new code in the old pattern); a Quarantine
 ///     tripwire runs the diff-aware touch check (GRAMMAR §7), warning per changed file
 ///     inside the scope and passing, or skipping when no <see cref="DiffContext" /> was supplied. Any
 ///     evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather than aborting
@@ -19,9 +19,9 @@ namespace Zphil.LoadBearing.Checking;
 /// </summary>
 public static class ArchChecker
 {
-    /// <summary>Pinned skip reason for a Freeze tripwire when no <c>--diff-base</c> diff context is present.</summary>
+    /// <summary>Pinned skip reason for a Quarantine tripwire when no <c>--diff-base</c> diff context is present.</summary>
     internal const string TripwireSkipReason =
-        "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.";
+        "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.";
 
     /// <summary>Checks every rule with no baselines (every ratchet violation red). See the four-arg overload.</summary>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase)
@@ -36,11 +36,11 @@ public static class ArchChecker
     }
 
     /// <summary>
-    ///     Checks every rule and returns the aggregate report. Ratchet violations (Migrate, Freeze
+    ///     Checks every rule and returns the aggregate report. Ratchet violations (Migrate, Quarantine
     ///     containment) are partitioned against <paramref name="baselines" />: a violation whose
     ///     identity (GRAMMAR §4.3) is in the rule's captured section is grandfathered (it passes);
-    ///     anything else is red. A Freeze tripwire warns for each changed file in
-    ///     <paramref name="diff" /> that declares a type in the frozen scope, or skips when
+    ///     anything else is red. A Quarantine tripwire warns for each changed file in
+    ///     <paramref name="diff" /> that declares a type in the quarantined scope, or skips when
     ///     <paramref name="diff" /> is null.
     /// </summary>
     public static CheckReport Check(
@@ -61,12 +61,12 @@ public static class ArchChecker
     {
         // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never
         // reach the evaluator); it is a diff-aware warning check, not a red-producing rule (GRAMMAR §7).
-        if (rule.Freeze is { Role: FreezeRole.Tripwire }) return Tripwire(rule, selections, diff);
+        if (rule.Quarantine is { Role: QuarantineRole.Tripwire }) return Tripwire(rule, selections, diff);
 
         try
         {
             var (violations, warnings) = evaluator.Evaluate(rule.Constraint!);
-            // A ratcheted rule — Migrate, or Freeze containment (which reifies a real
+            // A ratcheted rule — Migrate, or Quarantine containment (which reifies a real
             // MustOnlyBeReferencedBy constraint and so evaluates exactly like Enforce) — partitions
             // against its baseline; everything else is plain Enforce law (GRAMMAR §7).
             return rule.BaselinePath is not null
@@ -95,7 +95,7 @@ public static class ArchChecker
         return new RuleResult(rule, status, ordered, warnings, null, Array.Empty<Violation>(), 0, false);
     }
 
-    // The ratchet, shared by Migrate and Freeze containment: a violation whose identity
+    // The ratchet, shared by Migrate and Quarantine containment: a violation whose identity
     // is grandfathered by the rule's captured baseline section passes; everything else — including a new
     // forbidden target from a grandfathered source (pair identity, GRAMMAR §4.3) and every
     // EmptySubject/RuleError (never baselinable) — is red.
@@ -134,18 +134,18 @@ public static class ArchChecker
             orderedGrandfathered.Select(p => p.Entry).ToList());
     }
 
-    // The Freeze tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
-    // changed file that declares a type in the frozen selection and always passes (warnings never gate).
-    // An empty frozen selection yields zero warnings and passes silently — containment's EmptySubject is
+    // The Quarantine tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
+    // changed file that declares a type in the quarantined selection and always passes (warnings never gate).
+    // An empty quarantined selection yields zero warnings and passes silently — containment's EmptySubject is
     // the loud misconfiguration channel.
     private static RuleResult Tripwire(ArchRule rule, SelectionEvaluator selections, DiffContext? diff)
     {
         if (diff is null) return Skipped(rule, TripwireSkipReason);
 
-        string scopeId = rule.Freeze!.ScopeId;
-        var frozen = selections.Evaluate(rule.Freeze.Frozen!, SelectionPosition.Subject);
+        string scopeId = rule.Quarantine!.ScopeId;
+        var quarantined = selections.Evaluate(rule.Quarantine.Quarantined!, SelectionPosition.Subject);
 
-        var touched = frozen
+        var touched = quarantined
             .Where(type => !type.IsExternal)
             .SelectMany(type => type.DeclarationSites)
             .Select(site => site.FilePath)
@@ -153,7 +153,7 @@ public static class ArchChecker
             .Where(diff.Contains)
             .Select(diff.SolutionRelative)
             .OrderBy(path => path, StringComparer.Ordinal)
-            .Select(path => new CheckWarning(CheckWarningKind.FrozenScopeTouched, TripwireMessage(path, scopeId)))
+            .Select(path => new CheckWarning(CheckWarningKind.QuarantinedScopeTouched, TripwireMessage(path, scopeId)))
             .ToList();
 
         return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched, null, Array.Empty<Violation>(), 0, false);
@@ -161,7 +161,7 @@ public static class ArchChecker
 
     private static string TripwireMessage(string relativePath, string scopeId)
     {
-        return $"Changed file '{relativePath}' is inside frozen scope '{scopeId}' — does the task actually " +
+        return $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
                $"require editing dragon territory? Dragons: loadbearing explain {scopeId}/tripwire.";
     }
 

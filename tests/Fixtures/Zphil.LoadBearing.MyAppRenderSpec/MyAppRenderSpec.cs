@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.MyAppRenderSpec;
 ///     The render fixture spec: a module map (Domain/Web layers), two Enforce laws that hold on the
 ///     MyApp fixture, one Migrate rule (so the rendered root block carries a <c>### Migrations</c>
 ///     counter-prior paragraph — no <c>.Baseline</c> needed, since render reads no baseline in v1), and
-///     one frozen scope over <c>MyApp.Legacy.Billing</c>. Rendering it against the MyApp solution
+///     one quarantined scope over <c>MyApp.Legacy.Billing</c>. Rendering it against the MyApp solution
 ///     produces the root block plus a scope card placed in the billing directory — the render e2e
 ///     acceptance surface.
 /// </summary>
@@ -32,7 +32,7 @@ public sealed class MyAppRenderSpec : IArchitectureSpec
             .Because("Repository pattern for testability.");
 
         arch.Scope("legacy/billing")
-            .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
                      "Nightly reconciliation depends on this. Do not normalize.")

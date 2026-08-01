@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing;
 
-/// <summary>Which half of a desugared Freeze scope an <see cref="ArchRule" /> is (GRAMMAR §7).</summary>
-public enum FreezeRole
+/// <summary>Which half of a desugared Quarantine scope an <see cref="ArchRule" /> is (GRAMMAR §7).</summary>
+public enum QuarantineRole
 {
     /// <summary>The hard-red boundary rule: nothing new may reference the scope except via the surface.</summary>
     Containment,

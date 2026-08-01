@@ -108,12 +108,12 @@
     },
     {
       "id": "legacy/billing/containment",
-      "posture": "freeze",
+      "posture": "quarantine",
       "status": "failed",
       "violations": 2,
       "warnings": 0,
       "ratchet": {
-        "baselinePath": "arch/violated-freeze-baseline.json",
+        "baselinePath": "arch/violated-quarantine-baseline.json",
         "captured": false,
         "remaining": 0,
         "newViolations": 2,
@@ -122,7 +122,7 @@
     },
     {
       "id": "legacy/billing/tripwire",
-      "posture": "freeze",
+      "posture": "quarantine",
       "status": "skipped",
       "violations": 0,
       "warnings": 0

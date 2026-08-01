@@ -159,7 +159,7 @@ public sealed class Arch
         return new RuleBuilder(registration);
     }
 
-    /// <summary>Registers a scope anchor immediately and returns its freeze-stage builder.</summary>
+    /// <summary>Registers a scope anchor immediately and returns its quarantine-stage builder.</summary>
     public IScopeBuilder Scope(string id,
         [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {

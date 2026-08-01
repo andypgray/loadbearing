@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-24
+
+Pre-alpha. One breaking rename: the containment posture sheds a false friend.
+
+### Changed
+
+- **Breaking:** `Scope(id).Freeze(selection)` is now `Scope(id).Quarantine(selection)`, and every
+  rendered surface (agent context, status/check JSON, SARIF, explain output, validation messages)
+  says "quarantined", never "frozen". In the surrounding ecosystem "freeze" means "snapshot current
+  violations as an accepted baseline" (ArchUnit's `FreezingArchRule`, `pip freeze`) — which is
+  LoadBearing's `Migrate(...).Baseline(...)`, not its containment posture, so the old name pointed
+  readers at the wrong sibling. No alias or compat shim. Machine-readable posture values change from
+  `"freeze"` to `"quarantine"`; desugared rule ids (`{id}/containment`, `{id}/tripwire`), the clause
+  names (`BoundaryOnlyVia`, `Dragons`, `DragonsDoc`, `Baseline`), and `Migrate` are unchanged.
+
 ## [0.2.0] - 2026-07-23
 
 Pre-alpha. The verb vocabulary grows past dependency bans — member access, construction, DI
@@ -163,6 +178,7 @@ deterministic enforcement and generated AI-agent context.
 - xUnit adapter (`Zphil.LoadBearing.Xunit`): every rule in the spec as an individually named
   xUnit test, failure text identical to the CLI.
 
-[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/andypgray/loadbearing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/andypgray/loadbearing/releases/tag/v0.1.0

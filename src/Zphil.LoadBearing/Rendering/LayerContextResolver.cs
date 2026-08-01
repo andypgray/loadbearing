@@ -7,12 +7,12 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     Places each declared layer's "local rules" context card — the second, additive
-///     emission key beside frozen scopes. A layer earns a card iff at least one Enforce or Migrate
+///     emission key beside quarantined scopes. A layer earns a card iff at least one Enforce or Migrate
 ///     rule is <em>anchored</em> on it: the rule's subject <see cref="Selection" /> has that layer's
 ///     <see cref="Model.LayerNoun" /> as its noun head (adjectives and <c>Except</c> refinements keep
-///     the noun head, so a refined subject still anchors). Freeze-posture rules are excluded — a
-///     frozen layer's desugared containment subject is layer-anchored, but its story belongs to the
-///     freeze card, and the two keys must not double-emit. The card lands in the deepest common
+///     the noun head, so a refined subject still anchors). Quarantine-posture rules are excluded — a
+///     quarantined layer's desugared containment subject is layer-anchored, but its story belongs to the
+///     quarantine card, and the two keys must not double-emit. The card lands in the deepest common
 ///     ancestor directory of the layer's matched types, shared with
 ///     <see cref="ScopedContextResolver" /> through <see cref="DirectoryPlacement" />. Like scoped
 ///     placement, this is the one concern that needs the codebase, so it stays in Core to use the
@@ -61,8 +61,8 @@ public static class LayerContextResolver
         return model.Layers.Any(layer => AnchoredRules(model, layer).Any());
     }
 
-    // The Enforce/Migrate rules whose subject noun head is this layer, in model order. Freeze rules
-    // are excluded by the posture filter — a frozen layer's containment story is the freeze card's.
+    // The Enforce/Migrate rules whose subject noun head is this layer, in model order. Quarantine rules
+    // are excluded by the posture filter — a quarantined layer's containment story is the quarantine card's.
     private static IEnumerable<ArchRule> AnchoredRules(ArchitectureModel model, LayerDefinition layer)
     {
         return model.Rules.Where(rule =>

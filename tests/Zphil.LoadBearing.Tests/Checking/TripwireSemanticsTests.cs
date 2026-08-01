@@ -8,7 +8,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     Freeze tripwire semantics (GRAMMAR §7): a diff-aware touch check over a fabricated
+///     Quarantine tripwire semantics (GRAMMAR §7): a diff-aware touch check over a fabricated
 ///     <see cref="DiffContext" />. No diff context skips with the pinned reason; a changed file inside
 ///     the scope warns and the run stays clean (warnings never gate); an outside-scope change is
 ///     silent; matching is separator- and case-insensitive; multiple touched files order ordinal.
@@ -19,7 +19,7 @@ public sealed class TripwireSemanticsTests
     // Match case sensitivity follows the OS file system (the shared PathComparison rule).
     private static readonly bool CaseInsensitiveFileSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
-    // Alpha and Beta live in the frozen scope; User is outside it and references nothing (so the
+    // Alpha and Beta live in the quarantined scope; User is outside it and references nothing (so the
     // sibling containment rule stays green and the run's exit signal is tripwire-independent).
     private static readonly CodebaseModel Codebase = CompilationFactory.Extract(
         "App",
@@ -27,23 +27,23 @@ public sealed class TripwireSemanticsTests
         ("App.Legacy/Beta.cs", "namespace App.Legacy { public class Beta {} }"),
         ("App.Client/User.cs", "namespace App.Client { public class User {} }"));
 
-    private static void FrozenScope(Arch arch)
+    private static void QuarantinedScope(Arch arch)
     {
-        arch.Scope("legacy/frozen")
-            .Freeze(arch.Namespace("App.Legacy.*"))
+        arch.Scope("legacy/quarantined")
+            .Quarantine(arch.Namespace("App.Legacy.*"))
             .Dragons("Alpha and Beta are load-bearing.")
             .Because("Replacement scheduled.");
     }
 
     private static string ExpectedWarning(string relativePath)
     {
-        return $"Changed file '{relativePath}' is inside frozen scope 'legacy/frozen' — does the task actually " +
-               "require editing dragon territory? Dragons: loadbearing explain legacy/frozen/tripwire.";
+        return $"Changed file '{relativePath}' is inside quarantined scope 'legacy/quarantined' — does the task actually " +
+               "require editing dragon territory? Dragons: loadbearing explain legacy/quarantined/tripwire.";
     }
 
     private static RuleResult Tripwire(DiffContext? diff)
     {
-        return Checker.Run(Codebase, BaselineIndex.Empty, diff, FrozenScope).ForRule("legacy/frozen/tripwire");
+        return Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope).ForRule("legacy/quarantined/tripwire");
     }
 
     [Fact]
@@ -53,19 +53,19 @@ public sealed class TripwireSemanticsTests
 
         tripwire.Status.ShouldBe(RuleStatus.Skipped);
         tripwire.SkipReason.ShouldBe(
-            "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.");
+            "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.");
     }
 
     [Fact]
     public void ChangedFileInsideScope_WarnsAndPassesWithoutGating()
     {
         var diff = new DiffContext("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
-        CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, FrozenScope);
-        RuleResult tripwire = report.ForRule("legacy/frozen/tripwire");
+        CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope);
+        RuleResult tripwire = report.ForRule("legacy/quarantined/tripwire");
 
         tripwire.Status.ShouldBe(RuleStatus.Passed);
         CheckWarning warning = tripwire.Warnings.Single();
-        warning.Kind.ShouldBe(CheckWarningKind.FrozenScopeTouched);
+        warning.Kind.ShouldBe(CheckWarningKind.QuarantinedScopeTouched);
         warning.Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
         report.HasViolations.ShouldBeFalse();
     }

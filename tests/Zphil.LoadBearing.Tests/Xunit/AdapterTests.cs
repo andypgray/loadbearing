@@ -12,7 +12,7 @@ namespace Zphil.LoadBearing.Tests.Xunit;
 /// <summary>
 ///     The adapter's mechanics, isolated from the dogfood run: discovery uses rule IDs as display names, a
 ///     failed rule's <c>Assert.Fail</c> body is byte-identical (after normalization) to the CLI human
-///     block, and a Freeze tripwire without a diff is reported as skipped with the pinned reason. The two
+///     block, and a Quarantine tripwire without a diff is reported as skipped with the pinned reason. The two
 ///     inline specs replicate fixture rules verbatim because tests cannot reference the fixture spec
 ///     assemblies by design (<c>ReferenceOutputAssembly=false</c>); their driver classes are non-public, so
 ///     the test runner never discovers them — they are invoked directly.
@@ -24,7 +24,7 @@ public sealed class AdapterTests
     public void RuleRows_UsesRuleIdsAsDisplayNames()
     {
         // The dogfood spec exercises all three postures, so discovery must surface each post-desugar rule
-        // ID as its own display name — including the Freeze scope's containment + tripwire children.
+        // ID as its own display name — including the Quarantine scope's containment + tripwire children.
         IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows().ToList();
 
         rows.Select(row => row.TestDisplayName).ShouldBe(
@@ -66,7 +66,7 @@ public sealed class AdapterTests
     [Fact]
     public async Task Tripwire_WithoutDiff_Skips()
     {
-        Exception? exception = await Record.ExceptionAsync(() => new InlineFrozenArchTests().Rule_Holds("legacy/billing/tripwire"));
+        Exception? exception = await Record.ExceptionAsync(() => new InlineQuarantinedArchTests().Rule_Holds("legacy/billing/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
@@ -140,19 +140,19 @@ public sealed class AdapterTests
         }
     }
 
-    // A frozen scope over MyApp.Legacy.Billing — its desugared tripwire skips without a --diff-base.
-    private sealed class MyAppFrozenInlineSpec : IArchitectureSpec
+    // A quarantined scope over MyApp.Legacy.Billing — its desugared tripwire skips without a --diff-base.
+    private sealed class MyAppQuarantinedInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
             arch.Scope("legacy/billing")
-                .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
                 .Because("Replacement scheduled; not worth stabilizing.");
         }
     }
 
-    private sealed class InlineFrozenArchTests : ArchRuleTests<MyAppFrozenInlineSpec>
+    private sealed class InlineQuarantinedArchTests : ArchRuleTests<MyAppQuarantinedInlineSpec>
     {
         protected override string SolutionPath => CliRunner.MyAppSolution;
         protected override string? ExcludeProjectName => null;

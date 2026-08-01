@@ -6,7 +6,7 @@
       "tool": {
         "driver": {
           "name": "LoadBearing",
-          "version": "0.2.0",
+          "version": "0.3.0",
           "informationUri": "https://github.com/andypgray/loadbearing",
           "rules": [
             {
@@ -177,7 +177,7 @@
                 "level": "error"
               },
               "properties": {
-                "posture": "freeze"
+                "posture": "quarantine"
               }
             },
             {
@@ -189,7 +189,7 @@
                 "level": "error"
               },
               "properties": {
-                "posture": "freeze"
+                "posture": "quarantine"
               }
             },
             {

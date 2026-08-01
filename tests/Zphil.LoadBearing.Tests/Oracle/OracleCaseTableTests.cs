@@ -30,9 +30,9 @@ namespace Zphil.LoadBearing.Tests.Oracle;
 ///             ArchUnitNET cannot see, so there is no analog to compare against.
 ///         </item>
 ///         <item>
-///             <b>Posture machinery</b>: Migrate/Freeze baselines, ratchet grandfathering, and the Freeze
+///             <b>Posture machinery</b>: Migrate/Quarantine baselines, ratchet grandfathering, and the Quarantine
 ///             tripwire's diff-aware touch check. ArchUnitNET has no posture concept; only the raw
-///             constraint a posture reduces to (e.g. Freeze → <c>MustOnlyBeReferencedBy</c>, row 7) is
+///             constraint a posture reduces to (e.g. Quarantine → <c>MustOnlyBeReferencedBy</c>, row 7) is
 ///             compared.
 ///         </item>
 ///         <item>
@@ -155,32 +155,32 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.RefundProcessor");
     }
 
-    // Row 7: raw frozen-containment (what a Freeze scope desugars to). The frozen interior
+    // Row 7: raw quarantined-containment (what a Quarantine scope desugars to). The quarantined interior
     // {BillingCalculator, RoundingMode} may be referenced only from within Billing or via the facade;
     // InvoiceController reaches the interior directly, HomeController rides the IBillingFacade facade.
     [Fact]
-    public void Row7_FrozenInteriorContainment()
+    public void Row7_QuarantinedInteriorContainment()
     {
         var loadBearing = LoadBearingReferenceViolators(arch =>
         {
-            Selection frozen = arch.Namespace("MyApp.Legacy.Billing.*");
+            Selection quarantined = arch.Namespace("MyApp.Legacy.Billing.*");
             Selection facadeImpl = arch.Types.WithNameMatching("BillingFacade");
             Selection facadeIface = arch.Types.WithNameMatching("IBillingFacade");
-            arch.Rule("oracle/frozen-containment")
-                .Enforce(frozen.Except(facadeImpl).Except(facadeIface)
-                    .MustOnlyBeReferencedBy(frozen, facadeImpl, facadeIface))
-                .Because("Oracle row 7: frozen billing interior is facade-only.");
+            arch.Rule("oracle/quarantined-containment")
+                .Enforce(quarantined.Except(facadeImpl).Except(facadeIface)
+                    .MustOnlyBeReferencedBy(quarantined, facadeImpl, facadeIface))
+                .Because("Oracle row 7: quarantined billing interior is facade-only.");
         });
 
-        // The interior is the ArchUnitNET analog of frozen.Except(facadeImpl).Except(facadeIface).
-        oracle.FrozenInterior().Select(type => type.FullName).ShouldBe(
+        // The interior is the ArchUnitNET analog of quarantined.Except(facadeImpl).Except(facadeIface).
+        oracle.QuarantinedInterior().Select(type => type.FullName).ShouldBe(
             ["MyApp.Legacy.Billing.BillingCalculator", "MyApp.Legacy.Billing.RoundingMode"], true);
 
         // Equivalent to inbound containment: no outsider (a MyApp type outside Billing) may depend on
         // the interior. Only MyApp.Web.InvoiceController does.
         IArchRule rule = ArchRuleDefinition.Types().That()
             .ResideInAssembly(oracle.Domain, oracle.Web)
-            .Should().NotDependOnAny(oracle.FrozenInterior());
+            .Should().NotDependOnAny(oracle.QuarantinedInterior());
         var archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.InvoiceController");

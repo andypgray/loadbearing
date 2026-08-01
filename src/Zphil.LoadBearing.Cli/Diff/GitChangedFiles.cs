@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.Diff;
 
 /// <summary>
-///     Resolves the files changed since a git ref into a <see cref="DiffContext" /> for the Freeze
+///     Resolves the files changed since a git ref into a <see cref="DiffContext" /> for the Quarantine
 ///     tripwire (GRAMMAR §7). Runs three git commands rooted at the solution directory (<c>git -C</c>):
 ///     <c>rev-parse --show-toplevel</c> (the repo root the paths are relative to),
 ///     <c>diff --name-only -z &lt;ref&gt; --</c> (tracked changes — committed since the ref, staged, and

@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.MyAppDerivedSpec;
 ///     post-curation spec a derive flow produces, exercising all three postures with evidence-assigned
 ///     roles. Enforce carries the two directions the survey showed already clean; Migrate carries the
 ///     three observed debts (2 layering edges, 2 inline-SQL edges, 1 handler-naming shape — the shape
-///     entry matters: it pins a <c>subject</c> baseline line); Freeze contains the billing dragons with
+///     entry matters: it pins a <c>subject</c> baseline line); Quarantine contains the billing dragons with
 ///     2 grandfatherable interior references. Every baseline path is the conventional default, so on a
 ///     virgin estate (no <c>arch/</c>) <c>check</c> is red with 7 violations across 4 rules, one
 ///     <c>baseline --init</c> captures them all, and the re-check is exit 0 —
@@ -59,7 +59,7 @@ public sealed class MyAppDerivedSpec : IArchitectureSpec
         // (InvoiceController -> BillingCalculator, InvoiceController -> RoundingMode) grandfather at init;
         // HomeController -> IBillingFacade is the sanctioned surface and never reds.
         arch.Scope("legacy/billing")
-            .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
                      "Nightly reconciliation depends on this. Do not normalize.")

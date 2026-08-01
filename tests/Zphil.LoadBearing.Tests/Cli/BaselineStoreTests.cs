@@ -281,7 +281,7 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_UnknownRuleSection_IsPreserved()
     {
-        // A shared file may carry a Freeze section for a rule not in this model — kept, not rejected.
+        // A shared file may carry a Quarantine section for a rule not in this model — kept, not rejected.
         string path = WriteComposed(
             "shared.json",
             ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]),

@@ -77,7 +77,7 @@ internal static class SarifReportRenderer
     }
 
     // Every rule, in model order — passed and skipped rules included (metadata carries the whole spec, not
-    // just what failed). shortDescription is the law Sentence, omitted when empty (a Freeze tripwire);
+    // just what failed). shortDescription is the law Sentence, omitted when empty (a Quarantine tripwire);
     // fullDescription is the Because; help is the Fix, omitted when absent.
     private static IReadOnlyList<SarifReportingDescriptor> BuildRules(CheckReport report)
     {

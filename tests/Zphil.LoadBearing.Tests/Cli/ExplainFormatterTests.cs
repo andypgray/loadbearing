@@ -6,8 +6,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The <c>explain</c> field dump, pinned over the canonical sample's rule shapes in-process:
-///     the <c>&lt;id&gt; (&lt;posture&gt;)</c> header (with the Freeze role), each present field once,
-///     the posture payloads (Migrate <c>from</c>/<c>policy</c>/<c>baseline</c>; Freeze scope/boundary/
+///     the <c>&lt;id&gt; (&lt;posture&gt;)</c> header (with the Quarantine role), each present field once,
+///     the posture payloads (Migrate <c>from</c>/<c>policy</c>/<c>baseline</c>; Quarantine scope/boundary/
 ///     baseline/dragons), and the tripwire's sentence-less, boundary-less form. <c>Fix</c> renders here
 ///     even though it stays out of the always-on block.
 /// </summary>
@@ -53,10 +53,10 @@ public sealed class ExplainFormatterTests
     }
 
     [Fact]
-    public void FreezeContainment_DumpsRoleScopeBoundaryBaselineAndDragons()
+    public void QuarantineContainment_DumpsRoleScopeBoundaryBaselineAndDragons()
     {
         Dump("legacy/billing/containment").ShouldBe(
-            "legacy/billing/containment (freeze/containment)\n" +
+            "legacy/billing/containment (quarantine/containment)\n" +
             "  sentence: Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
             "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.\n" +
             "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
@@ -69,10 +69,10 @@ public sealed class ExplainFormatterTests
     }
 
     [Fact]
-    public void FreezeTripwire_DumpsRoleScopeAndDragons_NoSentenceOrBoundary()
+    public void QuarantineTripwire_DumpsRoleScopeAndDragons_NoSentenceOrBoundary()
     {
         Dump("legacy/billing/tripwire").ShouldBe(
-            "legacy/billing/tripwire (freeze/tripwire)\n" +
+            "legacy/billing/tripwire (quarantine/tripwire)\n" +
             "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
             "  scope: legacy/billing\n" +
             "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
@@ -80,23 +80,23 @@ public sealed class ExplainFormatterTests
     }
 
     [Fact]
-    public void FreezeWithDragonsDoc_PrintsThePathOnly_NotDragonsOrBoundary()
+    public void QuarantineWithDragonsDoc_PrintsThePathOnly_NotDragonsOrBoundary()
     {
         ArchitectureModel model = ArchModelBuilder.Build(new DragonsDocSpec());
         string dump = string.Join("\n", ExplainFormatter.Lines(model.Rules.Single(rule => rule.Id == "legacy/billing/containment")));
 
         dump.ShouldContain("  dragons-doc: arch/billing-dragons.md");
         dump.ShouldNotContain("  dragons:");
-        dump.ShouldNotContain("  boundary:"); // hermetic freeze — no sanctioned surface
+        dump.ShouldNotContain("  boundary:"); // hermetic quarantine — no sanctioned surface
     }
 
-    // A hermetic frozen scope documented via a linked file rather than inline dragons prose.
+    // A hermetic quarantined scope documented via a linked file rather than inline dragons prose.
     private sealed class DragonsDocSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
             arch.Scope("legacy/billing")
-                .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .DragonsDoc("arch/billing-dragons.md")
                 .Because("Replacement scheduled; see the linked doc.");
         }

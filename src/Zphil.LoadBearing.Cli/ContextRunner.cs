@@ -6,9 +6,9 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     The <c>arch_context</c> pipeline (the MCP <c>arch_context</c> tool's core): load the model → if no
-///     frozen scope and no anchored layer exist, emit the pointer line and stop (no extraction —
-///     <see cref="RenderRunner" />'s cost gate) → otherwise extract, resolve each layer's and each frozen
-///     scope's directory placement, and write the covering cards (layer card(s) before freeze card(s)) for
+///     quarantined scope and no anchored layer exist, emit the pointer line and stop (no extraction —
+///     <see cref="RenderRunner" />'s cost gate) → otherwise extract, resolve each layer's and each quarantined
+///     scope's directory placement, and write the covering cards (layer card(s) before quarantine card(s)) for
 ///     every placement whose resolved directory contains the query path. No placement covers the path ⇒ the
 ///     same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The card body carries
 ///     no provenance line (that is a <c>render</c> file-splice concern).
@@ -22,10 +22,10 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
-        // Nothing scoped to place — no frozen scope and no anchored layer — ⇒ skip the extraction cost
+        // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost
         // and point at the root block.
-        bool anyFreeze = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Freeze);
-        if (!anyFreeze && !LayerContextResolver.HasAnchoredLayers(workspace.Model))
+        bool anyQuarantine = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Quarantine);
+        if (!anyQuarantine && !LayerContextResolver.HasAnchoredLayers(workspace.Model))
         {
             output.WriteLine(PointerLine(request.Path));
             return 0;
@@ -36,7 +36,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
 
         string queryFullPath = ResolveQueryPath(request.Path, workspace.SolutionDirectory);
 
-        // Layer local-rules card(s) first, then frozen-scope card(s) — the same order render merges them.
+        // Layer local-rules card(s) first, then quarantined-scope card(s) — the same order render merges them.
         var cards = new List<string>();
         cards.AddRange(LayerContextResolver.Resolve(workspace.Model, codebase)
             .Where(placement => placement.DirectoryPath is not null && Covers(placement.DirectoryPath, queryFullPath))
@@ -55,7 +55,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         return 0;
     }
 
-    // Each matching card — layer cards before freeze cards — blank line between cards. The card body is
+    // Each matching card — layer cards before quarantine cards — blank line between cards. The card body is
     // LF-internal; write it line by line so it adopts the output writer's newline (parity with the CLI).
     private void WriteCards(IReadOnlyList<string> cards)
     {

@@ -1,9 +1,9 @@
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Where a frozen scope's directory context file lands: the scope ID, its containment rule
+///     Where a quarantined scope's directory context file lands: the scope ID, its containment rule
 ///     (the <see cref="AgentContextRenderer.ScopeCard" /> source), and either the resolved
-///     <see cref="DirectoryPath" /> — the deepest common ancestor of the frozen types' declaration
+///     <see cref="DirectoryPath" /> — the deepest common ancestor of the quarantined types' declaration
 ///     sites — or a null path with a <see cref="SkipReason" /> when the scope matched no types.
 /// </summary>
 public sealed class ScopePlacement

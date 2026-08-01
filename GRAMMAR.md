@@ -20,7 +20,7 @@ as part of the change (house test culture).
    description:)` in constraint position; the mandatory-description semantics are locked.
 3. **`Because` is required** (spec-build error when missing); `Fix` is optional.
 4. **Posture granularity: dual surface, single model** —
-   `Rule().Enforce/Migrate(...)` and `Scope().Freeze(...)` on the surface; Freeze desugars to
+   `Rule().Enforce/Migrate(...)` and `Scope().Quarantine(...)` on the surface; Quarantine desugars to
    ordinary posture-bearing rule nodes (§7); checker/renderer/baseline walk ONE rule model.
 
 ## 2. Design principles
@@ -61,7 +61,7 @@ definition :=  var x = arch.Layer(name, glob, globs...) | arch.Namespace(glob)
              | arch.Member(typeof(X), nameof(X.M))
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
 rule       :=  arch.Rule(id) . posture-verb . trailer*
-scope      :=  arch.Scope(id) . Freeze(selection) . freeze-clause* . trailer*
+scope      :=  arch.Scope(id) . Quarantine(selection) . quarantine-clause* . trailer*
 
 posture-verb :=  Enforce(constraint)
               |  Migrate(from: prose, to: constraint) [.Baseline(path)] [.WhileYoureThere(policy)]
@@ -73,7 +73,7 @@ projection   :=  Members | Methods | Properties | Fields | Events
 member       :=  arch.Member(typeof(X), nameof(X.M))        — a leaf value, NOT a selection (§4.5)
              |   arch.Member<T>(x => x.M)                   — a typed instance-member anchor (§4.5)
              |   arch.Member(() => X.M)                     — a static-member anchor (§4.5)
-freeze-clause:=  BoundaryOnlyVia(types...) | Dragons(prose) | DragonsDoc(path) | Baseline(path)
+quarantine-clause :=  BoundaryOnlyVia(types...) | Dragons(prose) | DragonsDoc(path) | Baseline(path)
 trailer      :=  Because(prose) | Fix(prose)
 ```
 
@@ -121,8 +121,8 @@ MethodSelection — a MemberSelection minted by .Methods that additionally offer
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
 IEnforceRule — .Because / .Fix
 IMigrateRule — .Because / .Fix / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
-IScopeBuilder — ONLY .Freeze(Selection) → IFrozenScope
-IFrozenScope — .BoundaryOnlyVia(params Type[]) / .Dragons(prose) / .DragonsDoc(path)
+IScopeBuilder — ONLY .Quarantine(Selection) → IQuarantinedScope
+IQuarantinedScope — .BoundaryOnlyVia(params Type[]) / .Dragons(prose) / .DragonsDoc(path)
                / .Baseline(path) / .Because
 ```
 
@@ -239,8 +239,8 @@ lands only where the whole list is static and one form:
   fragment carries no caveat (§4.8).
 - **`MustOnly*` is strict — no implicit self-allowance.** A subject's reference to another
   member of its own selection is a violation unless that selection is itself among the allowed
-  targets; authors list their own layer when they mean it. Internal precedent: the Freeze
-  `{id}/containment` desugaring explicitly lists the frozen selection in its own allowed set
+  targets; authors list their own layer when they mean it. Internal precedent: the Quarantine
+  `{id}/containment` desugaring explicitly lists the quarantined selection in its own allowed set
   (§7). (Self-edges never arise — extraction drops them.)
 - `MustOnlyBeReferencedBy` needs no caveat: only solution types can be observed referencing.
 - Checker behavior: an empty *subject* selection **fails** the rule by default
@@ -271,7 +271,7 @@ aware and case-sensitive:
 
 - **Trailing `.*` is the subtree operator and is self-inclusive**: `MyApp.Domain.*` matches
   the namespace `MyApp.Domain` itself and all descendants. (Otherwise a facade declared
-  directly in `MyApp.Legacy.Billing` falls outside its own freeze — the silent-hole bug.)
+  directly in `MyApp.Legacy.Billing` falls outside its own quarantine — the silent-hole bug.)
 - An interior standalone `*` segment matches exactly one segment.
 - A partial-segment `*` (e.g. `Legacy*`) matches within the segment and never crosses a dot.
 - A lone `*` matches everything.
@@ -446,7 +446,7 @@ with member modal verbs. The flagship is `naming/async-suffix` — *"Methods of 
 `MyApp.Web.*` returning `Task` must be named `*Async`."* The named structural decision:
 `MemberConstraint : Constraint` carries the `MemberSelection`, but its inherited `Subject` is
 the underlying **type** selection (`Subject => MemberSubject.Source`), so every existing walk
-that reaches through `Constraint.Subject` — foreign-`Arch` detection (§8 item 10) and Freeze
+that reaches through `Constraint.Subject` — foreign-`Arch` detection (§8 item 10) and Quarantine
 desugaring (§7) — keeps working unchanged on the type side.
 
 - **The inventory universe** is the **declared members of solution-declared types** — the same
@@ -792,18 +792,18 @@ single-anchor call.
 |---|---|
 | `.Enforce(constraint)` | the law; violation = red |
 | `.Migrate(from: prose, to: constraint)` | `from` is descriptive prose (the OLD pattern); `to` is the checkable target constraint |
-| `.Freeze(selection)` | scope statement; desugars per §7 |
-| `.Baseline(path)` | Migrate **and** Freeze; ratcheted grandfather store |
+| `.Quarantine(selection)` | scope statement; desugars per §7 |
+| `.Baseline(path)` | Migrate **and** Quarantine; ratcheted grandfather store |
 | `.WhileYoureThere(MigrationPolicy)` | `MigrateIfSmall` (default) \| `AlwaysMigrate` \| `NeverExpand` |
-| `.BoundaryOnlyVia(params Type[])` | the sanctioned surface; omit entirely for a hermetic freeze |
+| `.BoundaryOnlyVia(params Type[])` | the sanctioned surface; omit entirely for a hermetic quarantine |
 | `.Dragons(prose)` / `.DragonsDoc(path)` | load-bearing-weirdness prose / linked long-form doc |
 
 ### 5.5 Trailers
 
 | Member | Notes |
 |---|---|
-| `.Because(prose)` | **required** on every rule and frozen scope (§8 item 3) |
-| `.Fix(prose)` | optional; for Freeze containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IFrozenScope` carries no `.Fix` |
+| `.Because(prose)` | **required** on every rule and quarantined scope (§8 item 3) |
+| `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IQuarantinedScope` carries no `.Fix` |
 
 ### 5.6 Escape hatches
 
@@ -929,41 +929,41 @@ matches the anchor's definition FQN.
   `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
   `*Async`."*
 - Posture voices consume these same fragments: Enforce renders as law; Migrate renders the
-  counter-prior paragraph (slots: from-prose, to-sentence, policy, baseline burndown); Freeze
+  counter-prior paragraph (slots: from-prose, to-sentence, policy, baseline burndown); Quarantine
   renders dragons + sanctioned surface. Full paragraph templates are pinned by the renderer's
   tests; the grammar carries every slot they need.
 
-## 7. Freeze desugaring (the single rule model, constructively)
+## 7. Quarantine desugaring (the single rule model, constructively)
 
-`arch.Scope(id).Freeze(sel).BoundaryOnlyVia(F).Baseline(p)` reifies to ordinary rule nodes:
+`arch.Scope(id).Quarantine(sel).BoundaryOnlyVia(F).Baseline(p)` reifies to ordinary rule nodes:
 
 - **`{id}/containment`** — internally `sel.Except(F).MustOnlyBeReferencedBy(sel ∪ F)`.
   (Model-level union exists internally; there is no surface union combinator in v1.) The
-  formula holds whether the facade types live inside or outside the frozen selection.
+  formula holds whether the facade types live inside or outside the quarantined selection.
   **`.Baseline(p)` grandfathers existing inbound references** with the same ratchet semantics
   as Migrate — day-one adoption on a real legacy codebase must not be a wall of red; only
-  *new* references into the scope are violations ("nothing **new** may reference the frozen
+  *new* references into the scope are violations ("nothing **new** may reference the quarantined
   scope"). Burndown shows up in `loadbearing status` for free. An omitted
   `.Baseline(p)` fills the conventional default `arch/baselines/{scope-id}/containment.json` at
   build time, exactly like the Migrate default (§4.4) — the containment baseline path is never
   null post-build.
 - **`{id}/tripwire`** — warning-severity, diff-aware touch check. With
-  `loadbearing check --diff-base <ref>`, each changed file that declares a type in the frozen
+  `loadbearing check --diff-base <ref>`, each changed file that declares a type in the quarantined
   selection yields one warning ("does the task actually require editing dragon territory?"); the
   rule itself passes and warnings never affect the exit code. Without diff context the rule is
-  skipped, with a pointer at `--diff-base`. It carries the frozen selection (not the boundary or a
-  baseline) so it can map changed files to frozen types.
+  skipped, with a pointer at `--diff-base`. It carries the quarantined selection (not the boundary or a
+  baseline) so it can map changed files to quarantined types.
 - Scope children occupy the rule-ID namespace: duplicate detection runs over the
   **post-desugar** ID set, and a declared ID may not extend a scope ID — `{scope-id}/…` is
   reserved. Reserved suffixes today: `containment`, `tripwire`.
-- Omitting `BoundaryOnlyVia` = hermetic freeze (nothing outside may reference the scope).
+- Omitting `BoundaryOnlyVia` = hermetic quarantine (nothing outside may reference the scope).
   Because omission is legal, the verb deliberately stays plain `params` (not `(first, more)`)
   so that a zero-arg call reaches spec-build validation and gets the designed hint — "omit
-  the call for a hermetic freeze" (§8 item 8) — instead of an opaque compiler error. It grows
+  the call for a hermetic quarantine" (§8 item 8) — instead of an opaque compiler error. It grows
   **no** generic twin (decided against): a boundary is a variadic facade-plus-
   implementation list, which has no type-argument form; a single facade type is
   `BoundaryOnlyVia(typeof(IFacade))`.
-- Nested/overlapping freezes compose as independent conjuncts; there is no scope precedence.
+- Nested/overlapping quarantines compose as independent conjuncts; there is no scope precedence.
 - **Practical note** (also for the derive prompt): `BoundaryOnlyVia` usually needs
   the facade *implementation* type(s) listed alongside the interface, or the composition
   root's DI registration of the concrete facade goes red on day one:
@@ -974,13 +974,13 @@ matches the anchor's definition FQN.
 1. Duplicate ID over the **post-desugar** set (rules + scopes + generated children), across
    all spec classes; a declared ID may not extend a scope ID.
 2. Dangling anchor — `Rule()`/`Scope()` without a posture verb.
-3. Missing `Because` on any rule or frozen scope.
-4. Missing both `Dragons` and `DragonsDoc` on a frozen scope.
+3. Missing `Because` on any rule or quarantined scope.
+4. Missing both `Dragons` and `DragonsDoc` on a quarantined scope.
 5. Blank/whitespace prose anywhere; prose fields are single-line (no `\r`/`\n`, no leading
    markdown-structural characters — long-form prose links out via `DragonsDoc`).
 6. Repeated trailer/option (`Because` twice, two `Baseline`s, …).
 7. Malformed ID — must match `^[a-z0-9-]+(/[a-z0-9-]+)*$` (convention: `area/rule-name`).
-8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic freeze).
+8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic quarantine).
 9. Duplicate layer name.
 10. Selection minted on a different `Arch` instance ("selection not registered with this
     model").
@@ -1011,13 +1011,13 @@ matches the anchor's definition FQN.
     never applies to them — only the blank check (item 15) does. `NamespacePattern.Validate` owns
     the verdict, so the matcher and its build-time gate cannot drift.
 17. Repeated posture — a rule given more than one posture verb (`.Enforce`/`.Migrate`), or a scope
-    given `.Freeze` more than once. The stage machine (§3.2) makes the *fluent* double-call
+    given `.Quarantine` more than once. The stage machine (§3.2) makes the *fluent* double-call
     uncompilable: the posture verbs live only on `IRuleBuilder`/`IScopeBuilder`, and the first call
     hands back a stage type without them. But those builders are mutable, so a **stored** builder
     reference (`var b = arch.Rule(id); b.Enforce(...); b.Migrate(...);`) can call a posture verb
     twice, and the second silently overwrites the first — the model keeps only the last posture.
     This item catches that stored-reference re-call: the count rides on the registration
-    (`RuleRegistration.PostureCount` / `ScopeRegistration.FreezeCount`) and a count > 1 is the error.
+    (`RuleRegistration.PostureCount` / `ScopeRegistration.QuarantineCount`) and a count > 1 is the error.
 18. Unresolvable member-anchor expression (§4.5) — an `arch.Member<T>(x => ...)` /
     `arch.Member(() => ...)` lambda the resolver cannot reduce to a declared `(type, name)`. One
     code (`MemberExpressionUnresolvable`) carrying eight messages, each steering to the cure: a
@@ -1089,6 +1089,7 @@ agent fixing a spec sees every problem in one pass.
 | Divergence | Prior-art contrast | Rationale |
 |---|---|---|
 | No `Check()`/`GetResult()` terminal | ArchUnit `check()`, NetArchTest `GetResult()` | rules are data; the CLI/adapter walks the finalized model |
+| No violation-snapshot "freeze" | ArchUnit `FreezingArchRule` | "freeze" there means accept current violations as a baseline — that is `Migrate(...).Baseline(...)` here; `Quarantine` contains a scope, it does not accept its violations |
 | No `noClasses()`, no `ShouldNot()` | Java ArchUnit, NetArchTest | lexical polarity; NetArchTest's gate+verb coexistence permits `.ShouldNot().NotBeSealed()` — ArchUnitNET already went negation-in-verb, we follow it |
 | No `.As(...)` description override | ArchUnit/ArchUnitNET | free text never replaces structured prose; the ID names the rule, `Because` carries rationale |
 | No constraint-level or whole-rule `And`/`Or` | `andShould()`, `IArchRule.And()` | one sentence per rule; compound requirements = multiple rules (atomic IDs for baselining/burndown); ArchUnit documents its own left-to-right precedence as a gotcha |
@@ -1137,7 +1138,7 @@ agent fixing a spec sees every problem in one pass.
   (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
   `AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or
   framework defaults are not seen."*
-- **Posture verbs**: imperative (`Enforce`, `Migrate`, `Freeze`). **Options**: nouns
+- **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule).
   **Trailers**: conjunctions (`Because`) / nouns (`Fix`).
 - `(first, params more)` signatures wherever an empty list would be meaningless.
@@ -1255,7 +1256,7 @@ public sealed class ArchSpec : IArchitectureSpec
             .Fix("Inject the repository; see OrdersRepository for the pattern.");
 
         arch.Scope("legacy/billing")
-            .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
             .Baseline("arch/baseline.json")
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
@@ -1282,8 +1283,8 @@ public sealed class ArchSpec : IArchitectureSpec
 
 Refinements vs the founding-session sketch: `Layer` is itself a selection (no `.Types` hop);
 `Implementing` auto-detects open generics (no `ImplementingOpenInterface`); naming rules use
-closed vocabulary; escape hatches are `Where`/`Must`; Freeze shows facade-implementation
+closed vocabulary; escape hatches are `Where`/`Must`; Quarantine shows facade-implementation
 listing and the grandfathering baseline. The founding dogfood rule was one line —
 `arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn"))` —
 since grown into the three-posture self-spec (`LoadBearingArchSpec`: three Enforce rules plus a
-Migrate and a Freeze).
+Migrate and a Quarantine).

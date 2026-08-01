@@ -19,9 +19,9 @@ public sealed class StatusCommandE2ETests
         result.Exit.ShouldBe(0);
         result.Out.ShouldContain(
             "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
-        // Freeze containment ratchets like Migrate (uncaptured here) but never suggests promotion.
+        // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
         result.Out.ShouldContain(
-            "FAIL legacy/billing/containment (freeze) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
+            "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
         result.Out.ShouldContain("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
         result.Out.ShouldContain("Burndown: 1 grandfathered remaining, 0 fixed awaiting acceptance.");
     }

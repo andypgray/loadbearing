@@ -5,19 +5,19 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     End-to-end freeze containment against the real MyApp fixture (GRAMMAR §7).
-///     The MyAppFrozenSpec resolves its containment to the committed conventional baseline that
+///     End-to-end quarantine containment against the real MyApp fixture (GRAMMAR §7).
+///     The MyAppQuarantinedSpec resolves its containment to the committed conventional baseline that
 ///     grandfathers InvoiceController's pre-existing interior references — so a clean run is exit 0 —
 ///     while a new inbound reference (HomeController → BillingCalculator, added to a private copy) is
 ///     hard red, with the grandfathered Invoice edges staying green.
 /// </summary>
 [Collection("Serial")]
-public sealed class FreezeContainmentE2ETests
+public sealed class QuarantineContainmentE2ETests
 {
     [Fact]
-    public async Task Check_FrozenSpec_GrandfatheredInboundPasses_ExitsZero()
+    public async Task Check_QuarantinedSpec_GrandfatheredInboundPasses_ExitsZero()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.FrozenSpecDll);
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll);
 
         result.Exit.ShouldBe(0);
         result.Out.ShouldContain("pass legacy/billing/containment");
@@ -27,14 +27,14 @@ public sealed class FreezeContainmentE2ETests
     }
 
     [Fact]
-    public async Task Check_FrozenSpec_NewInboundReference_FailsRed()
+    public async Task Check_QuarantinedSpec_NewInboundReference_FailsRed()
     {
         using var workspace = new TempFixtureWorkspace();
-        // Add a NEW inbound reference into the frozen scope — not in the grandfather baseline → hard red.
+        // Add a NEW inbound reference into the quarantined scope — not in the grandfather baseline → hard red.
         string homeController = workspace.PathOf("MyApp.Web", "HomeController.cs");
         InsertMember(homeController, "    public BillingCalculator NewCalculator() => new BillingCalculator();");
 
-        CliResult result = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.FrozenSpecDll);
+        CliResult result = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll);
 
         result.Exit.ShouldBe(1);
         result.Out.ShouldContain("FAIL legacy/billing/containment");

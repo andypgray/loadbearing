@@ -53,7 +53,7 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void MissingBecause_OnFrozenScope_IsReported()
+    public void MissingBecause_OnQuarantinedScope_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new MissingBecauseScopeSpec());
 
@@ -61,7 +61,7 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void MissingDragons_OnFrozenScope_IsReported()
+    public void MissingDragons_OnQuarantinedScope_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new MissingDragonsSpec());
 
@@ -112,13 +112,13 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void RepeatedPosture_FreezeTwiceViaStoredScopeBuilder_IsReported()
+    public void RepeatedPosture_QuarantineTwiceViaStoredScopeBuilder_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DoubleFreezeScopeSpec());
+        SpecValidationException ex = BuildExpectingFailure(new DoubleQuarantineScopeSpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.RepeatedPosture && e.RuleId == "legacy/billing");
         ex.Errors.First(e => e.Code == Code.RepeatedPosture).Message
-            .ShouldBe("SpecValidationTests.cs:654: Scope 'legacy/billing' has more than one posture; call .Freeze(...) exactly once.");
+            .ShouldBe("SpecValidationTests.cs:654: Scope 'legacy/billing' has more than one posture; call .Quarantine(...) exactly once.");
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new EmptyBoundarySpec());
 
         ex.Errors.ShouldContain(e => e.Code == Code.EmptyBoundary && e.RuleId == "legacy/billing");
-        ex.Errors.First(e => e.Code == Code.EmptyBoundary).Message.ShouldContain("omit the call for a hermetic freeze");
+        ex.Errors.First(e => e.Code == Code.EmptyBoundary).Message.ShouldContain("omit the call for a hermetic quarantine");
     }
 
     [Fact]
@@ -562,8 +562,8 @@ public class SpecValidationTests
     {
         public void Define(Arch arch)
         {
-            arch.Scope("legacy/billing").Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .Dragons("Dragons.").Because("Frozen.");
+            arch.Scope("legacy/billing").Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Dragons("Dragons.").Because("Quarantined.");
             arch.Rule("legacy/billing/foo").Enforce(arch.Types.MustHavePrefix("I")).Because("Reason.");
         }
     }
@@ -588,7 +588,7 @@ public class SpecValidationTests
     {
         public void Define(Arch arch)
         {
-            arch.Scope("legacy/billing").Freeze(arch.Namespace("MyApp.Legacy.Billing.*")).Dragons("Dragons.");
+            arch.Scope("legacy/billing").Quarantine(arch.Namespace("MyApp.Legacy.Billing.*")).Dragons("Dragons.");
         }
     }
 
@@ -596,7 +596,7 @@ public class SpecValidationTests
     {
         public void Define(Arch arch)
         {
-            arch.Scope("legacy/billing").Freeze(arch.Namespace("MyApp.Legacy.Billing.*")).Because("Frozen.");
+            arch.Scope("legacy/billing").Quarantine(arch.Namespace("MyApp.Legacy.Billing.*")).Because("Quarantined.");
         }
     }
 
@@ -646,14 +646,14 @@ public class SpecValidationTests
         }
     }
 
-    private sealed class DoubleFreezeScopeSpec : IArchitectureSpec
+    private sealed class DoubleQuarantineScopeSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
-            // A stored IScopeBuilder re-called with .Freeze silently overwrites the frozen selection (§8 item 17).
+            // A stored IScopeBuilder re-called with .Quarantine silently overwrites the quarantined selection (§8 item 17).
             IScopeBuilder scope = arch.Scope("legacy/billing");
-            scope.Freeze(arch.Namespace("MyApp.Legacy.Billing.*"));
-            scope.Freeze(arch.Namespace("MyApp.Legacy.Other.*")).Dragons("Dragons.").Because("Frozen.");
+            scope.Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"));
+            scope.Quarantine(arch.Namespace("MyApp.Legacy.Other.*")).Dragons("Dragons.").Because("Quarantined.");
         }
     }
 
@@ -661,8 +661,8 @@ public class SpecValidationTests
     {
         public void Define(Arch arch)
         {
-            arch.Scope("legacy/billing").Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .BoundaryOnlyVia().Dragons("Dragons.").Because("Frozen.");
+            arch.Scope("legacy/billing").Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .BoundaryOnlyVia().Dragons("Dragons.").Because("Quarantined.");
         }
     }
 

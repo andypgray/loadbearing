@@ -8,13 +8,13 @@ An agent dropped into a repository reads the files around its task and copies wh
 
 Meridian handles bookings, rating, customs, invoicing, and dispatch. Eight controllers sit at the front of it. Six of them (Shipments, Rates, Invoices, Customs, Drivers, and Manifests) open a `SqlConnection`, run inline SQL, and read the wall clock straight from `DateTime.Now` or `DateTime.UtcNow` for cutoffs, demurrage days, and ETA stamps. Two of them (Bookings and Quotes) have already moved to constructor-injected repositories and an `IClock`. That six-to-two split is the whole point: the majority pattern is the one being retired, which is exactly the arrangement an agent reads as house style.
 
-Behind `IClearanceGateway`, the `Meridian.Clearance` module validates container numbers. Its `ContainerCheckDigit` computes the ISO 6346 check digit, the calculation that decides whether `CSQU3054383` is a real container number or a typo. That module is frozen.
+Behind `IClearanceGateway`, the `Meridian.Clearance` module validates container numbers. Its `ContainerCheckDigit` computes the ISO 6346 check digit, the calculation that decides whether `CSQU3054383` is a real container number or a typo. That module is quarantined.
 
-Twenty current violations are grandfathered: twelve inline-SQL references, seven wall-clock reads, and one reach into the frozen module. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems the tool is built for: long-lived, business-critical, too important to rewrite on a whim.
+Twenty current violations are grandfathered: twelve inline-SQL references, seven wall-clock reads, and one reach into the quarantined module. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems the tool is built for: long-lived, business-critical, too important to rewrite on a whim.
 
 ## The spec
 
-The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Each one carries a posture, a reason, and a fix. (The frozen scope desugars into two checked rules, so `check` reports six.)
+The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Each one carries a posture, a reason, and a fix. (The quarantined scope desugars into two checked rules, so `check` reports six.)
 
 | Rule | Posture | What it says |
 |---|---|---|
@@ -22,9 +22,9 @@ The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/Me
 | `naming/controllers` | Enforce | controllers are named `*Controller` |
 | `data-access/no-inline-sql` | Migrate | controllers must not open `SqlConnection` |
 | `time/inject-clock` | Migrate | Web must not read `DateTime.Now` / `UtcNow` |
-| `clearance/engine` | Freeze | reach the module only via `IClearanceGateway` |
+| `clearance/engine` | Quarantine | reach the module only via `IClearanceGateway` |
 
-Two rules are already true, so they are law (`Enforce`). Two describe debt with a target, so they ratchet (`Migrate`): the current violations are grandfathered, and anything new is red. One walls off a module with no target state (`Freeze`).
+Two rules are already true, so they are law (`Enforce`). Two describe debt with a target, so they ratchet (`Migrate`): the current violations are grandfathered, and anything new is red. One walls off a module with no target state (`Quarantine`).
 
 ## What the agent reads
 
@@ -39,7 +39,7 @@ Two rules are already true, so they are law (`Enforce`). Two describe debt with 
 - `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: Controllers open SqlConnection and run inline SQL directly. That is grandfathered debt, not house style. New code must follow: Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`. Data access behind a repository can be tested and swapped; SQL in the request path cannot. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 - `time/inject-clock` — Most existing code here follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
-### Frozen scopes
+### Quarantined scopes
 - `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
 ```
 
@@ -66,7 +66,7 @@ The message carries the rule ID, the reason, the fix, and the exact `file:line`.
 
 ### The helpful refactor
 
-`ContainerNumberValidator` is public, so an agent tidying the code can call it directly and delete an "unnecessary" hop through `IClearanceGateway`. The frozen scope's containment rule stops that: the only sanctioned way into `Meridian.Clearance` is the gateway. Reach past it and the reference is red, with the fix naming the surface to use:
+`ContainerNumberValidator` is public, so an agent tidying the code can call it directly and delete an "unnecessary" hop through `IClearanceGateway`. The quarantined scope's containment rule stops that: the only sanctioned way into `Meridian.Clearance` is the gateway. Reach past it and the reference is red, with the fix naming the surface to use:
 
 ```text
 FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
@@ -80,12 +80,12 @@ One reach into the module already exists (`CustomsController` news up the valida
 
 ### Misreading load-bearing weirdness
 
-The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and skips a value every so often, so K=21 is followed by L=23. An agent that "corrects" the gap to make the table contiguous breaks the check digit for every real container number in the system. This is the weirdness a `Freeze` scope documents rather than defends against, because agents still have to call into the code. `render` drops this card into the module's own directory, next to the file:
+The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and skips a value every so often, so K=21 is followed by L=23. An agent that "corrects" the gap to make the table contiguous breaks the check digit for every real container number in the system. This is the weirdness a `Quarantine` scope documents rather than defends against, because agents still have to call into the code. `render` drops this card into the module's own directory, next to the file:
 
 ```markdown
-## Frozen scope `clearance/engine`
+## Quarantined scope `clearance/engine`
 
-This directory holds the frozen `clearance/engine` scope. Here be dragons — do not spread references into it.
+This directory holds the quarantined `clearance/engine` scope. Here be dragons — do not spread references into it.
 
 Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
 ```
@@ -94,14 +94,14 @@ The gaps are the standard: the letter values skip every multiple of 11 (11, 22, 
 
 ## The burndown
 
-Because the Migrate and Freeze baselines are counted, `loadbearing status` reports what is left to work off:
+Because the Migrate and Quarantine baselines are counted, `loadbearing status` reports what is left to work off:
 
 ```text
 pass layering/domain-independent
 pass naming/controllers
 pass data-access/no-inline-sql (migrate) — 12 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass time/inject-clock (migrate) — 7 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
-pass clearance/engine/containment (freeze) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass clearance/engine/containment (quarantine) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 skip clearance/engine/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'
 Checked 6 rules: 5 passed, 0 failed, 1 skipped. Burndown: 20 grandfathered remaining, 0 fixed awaiting acceptance.
 ```

@@ -254,13 +254,13 @@
     },
     {
       "id": "legacy/billing/containment",
-      "posture": "freeze",
+      "posture": "quarantine",
       "status": "failed",
       "sentence": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.",
       "because": "Replacement scheduled; not worth stabilizing.",
       "fix": "use `IBillingFacade`",
       "baseline": {
-        "path": "arch/violated-freeze-baseline.json",
+        "path": "arch/violated-quarantine-baseline.json",
         "grandfathered": 0,
         "stale": 0
       },
@@ -296,11 +296,11 @@
     },
     {
       "id": "legacy/billing/tripwire",
-      "posture": "freeze",
+      "posture": "quarantine",
       "status": "skipped",
       "sentence": "",
       "because": "Replacement scheduled; not worth stabilizing.",
-      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this frozen scope.",
+      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.",
       "violations": [],
       "warnings": []
     },

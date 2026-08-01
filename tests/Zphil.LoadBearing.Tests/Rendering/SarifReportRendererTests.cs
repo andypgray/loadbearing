@@ -13,7 +13,7 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     free seam), driven over in-memory reports: a red reference emits an <c>error</c> /
 ///     <c>baselineState: new</c> result with no suppressions; a violation touched at several sites in one
 ///     file gets consecutive per-file fingerprint ordinals; site-less EmptySubject/RuleError violations
-///     contribute no results (metadata only); a Freeze tripwire's empty law sentence omits
+///     contribute no results (metadata only); a Quarantine tripwire's empty law sentence omits
 ///     <c>shortDescription</c>; and a grandfathered violation suppresses as a <c>note</c> whose
 ///     justification is the baseline entry's <c>because</c> when present, else the generic
 ///     <c>grandfathered in {path}</c> fallback — the latter exercising the checker's baseline-attribution
@@ -176,14 +176,14 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_TripwireEmptySentence_OmitsShortDescription()
     {
-        // A Freeze tripwire carries no law sentence (empty string), so its reportingDescriptor omits
+        // A Quarantine tripwire carries no law sentence (empty string), so its reportingDescriptor omits
         // shortDescription entirely rather than emitting an empty one, while still carrying its Because as
-        // fullDescription. This is the freeze-tripwire pin the golden's last rule also holds.
+        // fullDescription. This is the quarantine-tripwire pin the golden's last rule also holds.
         var report = new CheckReport(
         [
             new RuleResult(
                 new ArchRule(
-                    "legacy/tripwire", Posture.Freeze, "Replacement scheduled; not worth stabilizing.", null, "",
+                    "legacy/tripwire", Posture.Quarantine, "Replacement scheduled; not worth stabilizing.", null, "",
                     null, null, null),
                 RuleStatus.Skipped, [], [], "no diff context", [], 0, false)
         ]);
@@ -260,7 +260,7 @@ public sealed class SarifReportRendererTests
         });
     }
 
-    // A metadata-only ArchRule (no constraint/migrate/freeze payload) for hand-built reports — the renderer's
+    // A metadata-only ArchRule (no constraint/migrate/quarantine payload) for hand-built reports — the renderer's
     // rule catalog reads only Id, Sentence, Because, Fix, and Posture.
     private static ArchRule Rule(string id, Posture posture)
     {

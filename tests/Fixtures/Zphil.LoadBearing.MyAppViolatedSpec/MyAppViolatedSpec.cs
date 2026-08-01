@@ -19,7 +19,7 @@ namespace Zphil.LoadBearing.MyAppViolatedSpec;
 ///     (uncaptured — the captive-dependency flagship, the singleton ReportScheduler injects a scoped
 ///     <c>IOrderFeed</c> and a transient <c>IOrderFormatter</c>, exercising the <c>injection</c> kind), an
 ///     inert-target warning rule, a
-///     failing empty-subject rule, a frozen billing scope whose containment is uncaptured (an explicit,
+///     failing empty-subject rule, a quarantined billing scope whose containment is uncaptured (an explicit,
 ///     deliberately-uncommitted
 ///     baseline path — hard red) and whose tripwire skips without a <c>--diff-base</c>, a ratcheted Migrate
 ///     catch rule (uncaptured — ReportEndpoint's blanket <c>catch (Exception)</c> is red, exercising the
@@ -120,15 +120,15 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Enforce(arch.Namespace("MyApp.Nowhere.*").MustHaveSuffix("Service"))
             .Because("A subject that matches nothing must fail loudly.");
 
-        // Freeze (uncaptured): the explicit baseline path is deliberately never committed, so the
+        // Quarantine (uncaptured): the explicit baseline path is deliberately never committed, so the
         // containment rule is uncaptured — InvoiceController's interior references to BillingCalculator
         // and RoundingMode are hard red. The divergent path (NOT the conventional default) keeps the
-        // committed conventional baseline — which MyAppFrozenSpec grandfathers against — from capturing
+        // committed conventional baseline — which MyAppQuarantinedSpec grandfathers against — from capturing
         // this run. The tripwire skips without a --diff-base.
         arch.Scope("legacy/billing")
-            .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
-            .Baseline("arch/violated-freeze-baseline.json")
+            .Baseline("arch/violated-quarantine-baseline.json")
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
             .Because("Replacement scheduled; not worth stabilizing.");
 

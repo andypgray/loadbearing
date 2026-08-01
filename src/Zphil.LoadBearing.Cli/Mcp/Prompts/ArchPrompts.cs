@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Cli.Mcp.Prompts;
 ///     The MCP prompt surface. One prompt, <c>derive_spec</c>, whose body is the embedded
 ///     <c>derive-spec.md</c> recipe: an honest, tool-backed walkthrough for deriving a LoadBearing
 ///     architecture spec — the target (<c>Enforce</c>), the debt (<c>Migrate</c>), and the dragons
-///     (<c>Freeze</c>) — from an existing codebase, validating every claim with <c>arch_graph</c> and
+///     (<c>Quarantine</c>) — from an existing codebase, validating every claim with <c>arch_graph</c> and
 ///     <c>arch_check</c>. The server does not infer the spec: the recipe has the executing agent derive a
 ///     proposal from evidence, and the human curate and baseline it.
 /// </summary>
@@ -24,7 +24,7 @@ internal sealed class ArchPrompts
     internal const string DeriveSpecName = "derive_spec";
 
     private const string DeriveSpecDescription =
-        "Derive an architecture spec (Enforce/Migrate/Freeze postures) from an existing codebase. The server "
+        "Derive an architecture spec (Enforce/Migrate/Quarantine postures) from an existing codebase. The server "
         + "does not infer the spec; this recipe guides you: survey with arch_graph, draft candidate rules, "
         + "validate with arch_check, the human curates and baselines.";
 

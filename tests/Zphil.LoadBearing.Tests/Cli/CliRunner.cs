@@ -26,7 +26,7 @@ internal static class CliRunner
 
     public static string LayerSpecDll => Metadata("LayerSpecPath");
 
-    public static string FrozenSpecDll => Metadata("FrozenSpecPath");
+    public static string QuarantinedSpecDll => Metadata("QuarantinedSpecPath");
 
     public static string DerivedSpecDll => Metadata("DerivedSpecPath");
 

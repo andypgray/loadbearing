@@ -70,9 +70,9 @@
                           ReferenceOutputAssembly="false"
                           OutputItemType="LayerSpecAssembly"
                           Private="false" />
-        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppFrozenSpec\Zphil.LoadBearing.MyAppFrozenSpec.csproj"
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppQuarantinedSpec\Zphil.LoadBearing.MyAppQuarantinedSpec.csproj"
                           ReferenceOutputAssembly="false"
-                          OutputItemType="FrozenSpecAssembly"
+                          OutputItemType="QuarantinedSpecAssembly"
                           Private="false" />
         <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.MyAppDerivedSpec\Zphil.LoadBearing.MyAppDerivedSpec.csproj"
                           ReferenceOutputAssembly="false"
@@ -129,8 +129,8 @@
                 <_Parameter2>@(LayerSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-                <_Parameter1>FrozenSpecPath</_Parameter1>
-                <_Parameter2>@(FrozenSpecAssembly->'%(FullPath)')</_Parameter2>
+                <_Parameter1>QuarantinedSpecPath</_Parameter1>
+                <_Parameter2>@(QuarantinedSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>DerivedSpecPath</_Parameter1>

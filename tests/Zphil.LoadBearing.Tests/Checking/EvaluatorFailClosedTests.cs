@@ -102,7 +102,7 @@ public sealed class EvaluatorFailClosedTests
     [Fact]
     public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
     {
-        // A UnionSelection is the internal, Freeze-only union (GRAMMAR §7): rendered only in reference
+        // A UnionSelection is the internal, Quarantine-only union (GRAMMAR §7): rendered only in reference
         // position, never as a sentence subject, so it exposes no single noun — reading .Noun throws
         // rather than inventing one.
         var arch = new Arch();

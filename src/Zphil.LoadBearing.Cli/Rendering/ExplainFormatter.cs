@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
 ///     Formats one rule as the <c>explain</c> field dump: a <c>&lt;id&gt; (&lt;posture&gt;)</c>
-///     header — the posture carries the Freeze role, e.g. <c>(freeze/containment)</c> — then each
+///     header — the posture carries the Quarantine role, e.g. <c>(quarantine/containment)</c> — then each
 ///     present field once under check's lowercase-label style (<c>sentence:</c> / <c>because:</c> /
 ///     <c>fix:</c>) plus the posture payload. This is a data dump, not the voice templates:
 ///     <c>dragons:</c> and <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path
@@ -25,12 +25,12 @@ internal static class ExplainFormatter
                 lines.Add($"  policy: {migrate.Policy}");
                 lines.Add($"  baseline: {migrate.BaselinePath}"); // never null post-build (GRAMMAR §4.4)
                 break;
-            case Posture.Freeze when rule.Freeze is { } freeze:
-                lines.Add($"  scope: {freeze.ScopeId}");
-                if (freeze.Boundary.Count > 0) lines.Add($"  boundary: {BoundaryList(freeze.Boundary)}");
-                if (freeze.BaselinePath is { } freezeBaseline) lines.Add($"  baseline: {freezeBaseline}");
-                if (freeze.Dragons is { } dragons) lines.Add($"  dragons: {dragons}");
-                if (freeze.DragonsDoc is { } dragonsDoc) lines.Add($"  dragons-doc: {dragonsDoc}");
+            case Posture.Quarantine when rule.Quarantine is { } quarantine:
+                lines.Add($"  scope: {quarantine.ScopeId}");
+                if (quarantine.Boundary.Count > 0) lines.Add($"  boundary: {BoundaryList(quarantine.Boundary)}");
+                if (quarantine.BaselinePath is { } quarantineBaseline) lines.Add($"  baseline: {quarantineBaseline}");
+                if (quarantine.Dragons is { } dragons) lines.Add($"  dragons: {dragons}");
+                if (quarantine.DragonsDoc is { } dragonsDoc) lines.Add($"  dragons-doc: {dragonsDoc}");
                 break;
         }
 
@@ -41,7 +41,7 @@ internal static class ExplainFormatter
     {
         string posture = rule.Posture switch
         {
-            Posture.Freeze when rule.Freeze is { } freeze => $"freeze/{freeze.Role.ToString().ToLowerInvariant()}",
+            Posture.Quarantine when rule.Quarantine is { } quarantine => $"quarantine/{quarantine.Role.ToString().ToLowerInvariant()}",
             _ => rule.Posture.ToString().ToLowerInvariant()
         };
         return $"{rule.Id} ({posture})";

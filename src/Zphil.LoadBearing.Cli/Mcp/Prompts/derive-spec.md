@@ -2,7 +2,7 @@
 
 Your goal is a **compiling LoadBearing spec that states this codebase's architecture honestly,
 as it is today**: the target rules new code must follow (`Enforce`), the known debt being
-worked off (`Migrate`), and the untouchable dragons (`Freeze`). A legacy codebase's
+worked off (`Migrate`), and the untouchable dragons (`Quarantine`). A legacy codebase's
 architecture is partly descriptive, not prescriptive — a spec that only states the ideal is
 useless on day one, and a spec that launders the mess into law is worse. The postures exist so
 you never have to choose between the two.
@@ -215,7 +215,7 @@ arch.Rule("data-access/no-inline-sql")
   subject — the glob-spelled twin emits no card in that layer's directory, so agents editing
   there never see the rule locally.
 - Dragon-zone candidates are the one exception to "all as Enforce": a boundary has no Enforce
-  form, so draft them as `arch.Scope(id).Freeze(...)` directly (step 5 shows the full shape).
+  form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape).
   The scope's containment violations arrive in step 4 alongside every other rule's evidence.
 
 Build the spec. Spec-build validation reports **every** error at once (missing `Because`,
@@ -271,12 +271,12 @@ For each surviving rule, the violation count decides the honest posture:
   `MigrateIfSmall` (override with `.WhileYoureThere(...)`), and the baseline path defaults to
   `arch/baselines/<rule-id>.json` — omit `.Baseline(...)` unless the team wants it elsewhere.
 
-- **A region with no target state → `Freeze`.** No one will fix it; the enforceable thing is
+- **A region with no target state → `Quarantine`.** No one will fix it; the enforceable thing is
   the boundary:
 
   ```csharp
   arch.Scope("legacy/billing")
-      .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+      .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
       .BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))
       .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
                "Nightly reconciliation depends on this. Do not normalize.")
@@ -285,12 +285,12 @@ For each surviving rule, the violation count decides the honest posture:
 
   **List the facade implementation type(s) in `BoundaryOnlyVia` alongside the interface** —
   the composition root's DI registration references the concrete type, and forgetting it puts
-  that registration red on day one. Omit `BoundaryOnlyVia` entirely for a hermetic freeze.
+  that registration red on day one. Omit `BoundaryOnlyVia` entirely for a hermetic quarantine.
   `Dragons` must carry three things: what the code does, **which weirdness is load-bearing**
   (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch,
   it's bad" is not dragons prose — agents still have to call into this code.
 
-  A Freeze desugars to two checkable rules under the scope ID: `{id}/containment` (red on any
+  A Quarantine desugars to two checkable rules under the scope ID: `{id}/containment` (red on any
   new reference into the scope not via the facade; existing inbound references get
   grandfathered in step 7) and `{id}/tripwire` (a diff-aware warning; it reports as *skipped*
   in `check` runs without `--diff-base` — expected, not a bug).
@@ -312,7 +312,7 @@ violation message as the team's stated rationale.
 ## 7. The human baselines the remainder
 
 With the curated spec built and checked, the remaining reds are exactly the acknowledged debt:
-each Migrate rule's current violations and each frozen scope's existing inbound references.
+each Migrate rule's current violations and each quarantined scope's existing inbound references.
 Grandfather them:
 
 ```
@@ -338,7 +338,7 @@ Re-run `arch_check`: expect exit 0, `rulesFailed: 0`, with the grandfathered cou
 
 Have the human run `loadbearing render MyApp.sln`: it writes the managed block into the root `AGENTS.md`
 (everything outside the markers is preserved byte-for-byte) and drops a second managed
-`AGENTS.md` into each frozen scope's directory (the dragons card) and into each layer's
+`AGENTS.md` into each quarantined scope's directory (the dragons card) and into each layer's
 directory when rules are anchored on that layer (the local-rules card). Then commit —
 spec project, `arch/baselines/**`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
@@ -432,7 +432,7 @@ matches every construction, and a closed generic is refused) ·
 
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |
-NeverExpand)`] · `arch.Scope(id).Freeze(selection)` [`.BoundaryOnlyVia(types...)`]
+NeverExpand)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(types...)`]
 [`.Dragons(prose)` / `.DragonsDoc(path)`] [`.Baseline(path)`].
 
 **Trailers** — `.Because(prose)` required everywhere; `.Fix(prose)` optional (for containment
@@ -488,7 +488,7 @@ subject fails the rule; an inert target warns; both are authoring signals, not c
 
 - `arch_explain <rule-id>` (CLI: `loadbearing explain`) — any rule's because / fix / posture
   payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
-- `arch_context <path>` — the architecture scope cards covering a directory (a frozen
+- `arch_context <path>` — the architecture scope cards covering a directory (a quarantined
   scope's dragons, a layer's local rules).
 - `loadbearing status` — the burndown after baselining.
 - The generated `AGENTS.md` block is the always-on summary; this recipe's output is what

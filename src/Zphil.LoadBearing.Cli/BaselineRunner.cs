@@ -9,7 +9,7 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     The <c>baseline</c> pipeline: grandfather, shrink, or deliberately grow the
-///     ratcheted baselines — both Migrate rules and Freeze containment (GRAMMAR §7). Mode validation
+///     ratcheted baselines — both Migrate rules and Quarantine containment (GRAMMAR §7). Mode validation
 ///     runs first (before the workspace cost). <c>--init</c> captures each <em>uncaptured</em>
 ///     ratcheted rule's current violations (an empty section for a clean rule — "captured, zero
 ///     debt"). <c>--accept-reductions</c> removes captured entries whose violation no longer occurs
@@ -43,7 +43,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error)
         var ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
         if (ratchetResults.Count == 0)
         {
-            output.WriteLine("no ratcheted rules (Migrate or Freeze containment) in the spec; nothing to do.");
+            output.WriteLine("no ratcheted rules (Migrate or Quarantine containment) in the spec; nothing to do.");
             return 0;
         }
 
@@ -92,7 +92,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error)
             throw new UserErrorException($"rule '{ruleId}' is not in the spec.");
         if (result.Rule.BaselinePath is null)
             throw new UserErrorException(
-                $"rule '{ruleId}' is not ratcheted — only Migrate and Freeze containment rules carry baselines.");
+                $"rule '{ruleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
         (_, bool baselinable) = CurrentEntries(result);
         if (!baselinable)

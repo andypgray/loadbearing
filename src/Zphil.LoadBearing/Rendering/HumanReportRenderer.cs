@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     Renders a <see cref="CheckReport" /> as human-readable text (stdout): one block per rule in
 ///     model order, an ASCII status marker (no ANSI), the rule ID and its sentence, then — for a
 ///     failed rule — its <c>because</c>/<c>fix</c> and each red violation site (solution-relative,
-///     forward-slash paths, ordered by file then line). A ratcheted rule (Migrate or Freeze containment)
+///     forward-slash paths, ordered by file then line). A ratcheted rule (Migrate or Quarantine containment)
 ///     also gets a grandfathered count (baselined violations pass, so they are not listed as red) and,
 ///     when it fails uncaptured, the <c>baseline --init</c> bootstrap hint. Ends with a one-line summary.
 ///     This is the acceptance surface: a failing rule shows ID, because, fix, and <c>file:line</c> together.
@@ -63,7 +63,7 @@ public static class HumanReportRenderer
         foreach (CheckWarning warning in result.Warnings) output.WriteLine($"  warning: {warning.Message}");
     }
 
-    // The ratchet's human lines (Migrate and Freeze containment): a grandfathered count (baselined
+    // The ratchet's human lines (Migrate and Quarantine containment): a grandfathered count (baselined
     // violations pass, so they are not listed as red sites) and, when a failed rule has no captured
     // baseline, the bootstrap hint.
     private static void RenderRatchetLines(TextWriter output, RuleResult result)

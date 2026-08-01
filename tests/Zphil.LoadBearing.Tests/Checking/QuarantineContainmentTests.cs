@@ -9,24 +9,24 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     Freeze containment semantics (GRAMMAR §7): the desugared <c>{id}/containment</c>
+///     Quarantine containment semantics (GRAMMAR §7): the desugared <c>{id}/containment</c>
 ///     rule evaluated as an ordinary ratcheted rule. Over <c>Sources.Containment</c> —
 ///     <c>App.Client.User</c> references the interior (<c>Internal</c>, red) and the facade
 ///     (<c>IFacade</c>, sanctioned green). Uncaptured is a wall of red; a grandfathered inbound edge
 ///     passes; a new edge from a grandfathered source stays red (pair identity); a stale entry counts
 ///     without failing; a hermetic scope reds every outside reference.
 /// </summary>
-public sealed class FreezeContainmentTests
+public sealed class QuarantineContainmentTests
 {
-    private const string ContainmentId = "legacy/frozen/containment";
+    private const string ContainmentId = "legacy/quarantined/containment";
     private static readonly CodebaseModel Codebase = CompilationFactory.Extract(Sources.Containment);
 
     // Boundary variant: IFacade is the sanctioned surface, resolved by full name via the name-carrier
     // App.Legacy.IFacade (ContainmentFacadeStub.cs).
     private static void BoundaryScope(Arch arch)
     {
-        arch.Scope("legacy/frozen")
-            .Freeze(arch.Namespace("App.Legacy.*"))
+        arch.Scope("legacy/quarantined")
+            .Quarantine(arch.Namespace("App.Legacy.*"))
             .BoundaryOnlyVia(typeof(IFacade))
             .Dragons("Internal is load-bearing.")
             .Because("Replacement scheduled.");
@@ -35,8 +35,8 @@ public sealed class FreezeContainmentTests
     // Hermetic variant: no sanctioned surface, so every inbound reference (including to IFacade) is red.
     private static void HermeticScope(Arch arch)
     {
-        arch.Scope("legacy/frozen")
-            .Freeze(arch.Namespace("App.Legacy.*"))
+        arch.Scope("legacy/quarantined")
+            .Quarantine(arch.Namespace("App.Legacy.*"))
             .Dragons("Internal is load-bearing.")
             .Because("Replacement scheduled.");
     }

@@ -6,7 +6,7 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
 ///     Golden pins for the agent-context composition: the full root block for the canonical
-///     sample (module map + the four Enforce laws + Migrations + the Frozen scopes section, and the
+///     sample (module map + the four Enforce laws + Migrations + the Quarantined scopes section, and the
 ///     §4.1 glossary line once), the no-layer single-rule root block (the dogfood shape), and the
 ///     canonical <c>legacy/billing</c> scope card (containment law + rationale + dragons prose +
 ///     sanctioned surface), plus the DragonsDoc-only card variant. Output is LF-only.
@@ -50,7 +50,7 @@ public class AgentContextRendererTests
             "Repository pattern for testability — ADR-012. " +
             "If you are already editing a grandfathered site and the migration is small, migrate it; " +
             "otherwise do not grow the debt.\n\n" +
-            "### Frozen scopes\n" +
+            "### Quarantined scopes\n" +
             "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
             "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`. " +
             "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
@@ -79,13 +79,13 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void ScopeCard_CanonicalFrozenScope_MatchesGolden()
+    public void ScopeCard_CanonicalQuarantinedScope_MatchesGolden()
     {
         ArchRule containment = Canonical().Rules.Single(rule => rule.Id == "legacy/billing/containment");
 
         const string expected =
-            "## Frozen scope `legacy/billing`\n\n" +
-            "This directory holds the frozen `legacy/billing` scope. " +
+            "## Quarantined scope `legacy/billing`\n\n" +
+            "This directory holds the quarantined `legacy/billing` scope. " +
             "Here be dragons — do not spread references into it.\n\n" +
             "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
             "Nightly reconciliation depends on this. Do not normalize.\n\n" +
@@ -117,12 +117,12 @@ public class AgentContextRendererTests
     [Fact]
     public void ScopeCard_NonContainmentRule_Throws()
     {
-        // ScopeCard requires a Freeze containment rule; any other rule (here an Enforce rule with no Freeze
+        // ScopeCard requires a Quarantine containment rule; any other rule (here an Enforce rule with no Quarantine
         // payload) is rejected before rendering (AgentContextRenderer.cs:92-93).
         var enforceRule = new ArchRule("naming/x", Posture.Enforce, "b", null, "s", null, null, null);
 
         Should.Throw<ArgumentException>(() => AgentContextRenderer.ScopeCard(enforceRule))
-            .Message.ShouldContain("ScopeCard requires a Freeze containment rule.");
+            .Message.ShouldContain("ScopeCard requires a Quarantine containment rule.");
     }
 
     [Fact]
@@ -177,11 +177,11 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void RootBlock_WithFrozenScope_EmitsFrozenScopesSectionWithContainmentLawAndSurface()
+    public void RootBlock_WithQuarantinedScope_EmitsQuarantinedScopesSectionWithContainmentLawAndSurface()
     {
         string block = AgentContextRenderer.RootBlock(Canonical(), "Spec");
 
-        block.ShouldContain("### Frozen scopes");
+        block.ShouldContain("### Quarantined scopes");
         block.ShouldContain("- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`");
         block.ShouldContain("Sanctioned surface: `IBillingFacade`, `BillingFacade`.");
         // Dragons prose stays scoped-only — it is not in the always-on root block.
@@ -231,7 +231,7 @@ public class AgentContextRendererTests
         block.ShouldContain("### Migrations");
         block.ShouldNotContain("### Rules");
         block.ShouldNotContain("### Layers");
-        block.ShouldNotContain("### Frozen scopes"); // a spec with no freeze omits the section entirely
+        block.ShouldNotContain("### Quarantined scopes"); // a spec with no quarantine omits the section entirely
     }
 
     [Fact]
@@ -413,13 +413,13 @@ public class AgentContextRendererTests
         }
     }
 
-    // A hermetic frozen scope documented via a linked doc rather than inline dragons prose.
+    // A hermetic quarantined scope documented via a linked doc rather than inline dragons prose.
     private sealed class DragonsDocScopeSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
             arch.Scope("legacy/billing")
-                .Freeze(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .DragonsDoc("arch/billing-dragons.md")
                 .Because("Replacement scheduled; see the linked doc.");
         }

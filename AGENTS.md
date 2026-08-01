@@ -19,6 +19,6 @@ registered = named in a source-level container registration (`AddSingleton`/`Add
 ### Migrations
 - `mcp/env-through-seam` — Most existing code here follows the OLD pattern: MCP infrastructure reads process env vars via System.Environment directly. That is grandfathered debt, not house style. New code must follow: Types in `Zphil.LoadBearing.Cli.Mcp.Infrastructure.*`, except types whose name matches `SystemEnvironment` must not reference `Environment`. A single IEnvironment seam keeps the MCP pipeline testable without mutating real process state. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
-### Frozen scopes
+### Quarantined scopes
 - `roslyn/msbuild-bootstrap` — Types in `Zphil.LoadBearing.Roslyn.MsBuild.*`, except `MsBuildBootstrap` must be referenced only by types in `Zphil.LoadBearing.Roslyn.MsBuild.*` or `MsBuildBootstrap`. Fragile host bootstrap; contain it behind MsBuildBootstrap. Sanctioned surface: `MsBuildBootstrap`.
 <!-- loadbearing:end -->

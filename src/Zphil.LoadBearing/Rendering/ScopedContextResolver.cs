@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Places each frozen scope's directory context file. For every containment rule it
-///     evaluates the raw frozen selection in <see cref="SelectionPosition.Subject" /> position (so it
+///     Places each quarantined scope's directory context file. For every containment rule it
+///     evaluates the raw quarantined selection in <see cref="SelectionPosition.Subject" /> position (so it
 ///     ranges over solution-declared types), collects those types' declaration-site file paths, and
 ///     picks their <em>deepest common ancestor directory</em> — the directory whose <c>AGENTS.md</c>
 ///     receives the scope card. A scope that matches no types resolves to a null directory with a
@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Rendering;
 /// </summary>
 public static class ScopedContextResolver
 {
-    /// <summary>Resolves a placement for every frozen scope in the model, in model order.</summary>
+    /// <summary>Resolves a placement for every quarantined scope in the model, in model order.</summary>
     public static IReadOnlyList<ScopePlacement> Resolve(ArchitectureModel model, CodebaseModel codebase)
     {
         Guard.NotNull(model, nameof(model));
@@ -26,9 +26,9 @@ public static class ScopedContextResolver
 
         foreach (ArchRule rule in model.Rules)
         {
-            if (rule.Freeze is not { Role: FreezeRole.Containment, Frozen: { } frozen } freeze) continue;
+            if (rule.Quarantine is not { Role: QuarantineRole.Containment, Quarantined: { } quarantined } quarantine) continue;
 
-            var sites = evaluator.Evaluate(frozen, SelectionPosition.Subject)
+            var sites = evaluator.Evaluate(quarantined, SelectionPosition.Subject)
                 .Where(type => !type.IsExternal)
                 .SelectMany(type => type.DeclarationSites)
                 .Select(site => site.FilePath)
@@ -36,9 +36,9 @@ public static class ScopedContextResolver
                 .ToList();
 
             placements.Add(sites.Count == 0
-                ? new ScopePlacement(freeze.ScopeId, rule, null,
-                    $"scope '{freeze.ScopeId}' matched no types; no scoped context emitted")
-                : new ScopePlacement(freeze.ScopeId, rule, DirectoryPlacement.DeepestCommonDirectory(sites), null));
+                ? new ScopePlacement(quarantine.ScopeId, rule, null,
+                    $"scope '{quarantine.ScopeId}' matched no types; no scoped context emitted")
+                : new ScopePlacement(quarantine.ScopeId, rule, DirectoryPlacement.DeepestCommonDirectory(sites), null));
         }
 
         return placements;

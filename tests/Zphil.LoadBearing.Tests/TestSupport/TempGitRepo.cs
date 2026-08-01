@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
 ///     A <see cref="TempFixtureWorkspace" /> that is also an initialized git repository with the fixture
-///     committed at HEAD — the substrate for the Freeze tripwire git e2e (<c>check --diff-base</c>). A
+///     committed at HEAD — the substrate for the Quarantine tripwire git e2e (<c>check --diff-base</c>). A
 ///     <c>.gitignore</c> excluding <c>bin/</c> and <c>obj/</c> is written <em>before</em> <c>git init</c>
 ///     so restored build artifacts never enter the index; identity is set locally and commit signing is
 ///     disabled, so the commit succeeds regardless of the host's global git config. Rooted in <c>%TEMP%</c>

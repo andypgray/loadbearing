@@ -23,7 +23,7 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///             the ratchet keeps any new infra type reaching for the static red.
 ///         </item>
 ///         <item>
-///             <b>Freeze</b> (<c>roslyn/msbuild-bootstrap</c>): the preview-VS MSBuild bootstrap is the
+///             <b>Quarantine</b> (<c>roslyn/msbuild-bootstrap</c>): the preview-VS MSBuild bootstrap is the
 ///             gnarliest code in the repo. Its interior is contained behind
 ///             <see cref="MsBuildBootstrap" />; the dragons prose records the load-bearing weirdness.
 ///         </item>
@@ -80,7 +80,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Inject IEnvironment (see SystemEnvironment); read via GetVariable.");
 
         arch.Scope("roslyn/msbuild-bootstrap")
-            .Freeze(arch.Namespace("Zphil.LoadBearing.Roslyn.MsBuild.*"))
+            .Quarantine(arch.Namespace("Zphil.LoadBearing.Roslyn.MsBuild.*"))
             .BoundaryOnlyVia(typeof(MsBuildBootstrap))
             .Dragons("Preview VS MSBuild throws TypeInitializationException (XMakeElements) on " +
                      "legacy-namespace projects. We pick a stable VS 16/17 via vswhere and hand it to " +

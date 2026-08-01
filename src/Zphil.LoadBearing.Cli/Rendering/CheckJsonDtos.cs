@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Cli.Rendering;
 
-// The wire shape of `check --json` (schemaVersion 3 — Freeze containment evaluates and ratchets, and a
-// Freeze tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
+// The wire shape of `check --json` (schemaVersion 3 — Quarantine containment evaluates and ratchets, and a
+// Quarantine tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
 // Clustered in one file: these records are one cohesive DTO, not product types.
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
@@ -19,7 +19,7 @@ internal sealed record CheckJson(
     SummaryJson Summary);
 
 /// <summary>
-///     One rule's result. <see cref="Baseline" /> is populated for ratcheted rules (Migrate and Freeze
+///     One rule's result. <see cref="Baseline" /> is populated for ratcheted rules (Migrate and Quarantine
 ///     containment).
 /// </summary>
 internal sealed record RuleJson(

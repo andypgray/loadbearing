@@ -63,12 +63,12 @@ public sealed class WarmWorkspaceMcpTests
     [Fact]
     public async Task ArchCheck_SourceFileEditedOnDisk_ReflectsEditAndMatchesColdCli()
     {
-        // Arrange — a warm server bound to a private fixture copy + the frozen spec, whose containment turns
-        // a NEW inbound reference into the frozen scope hard-red, so an on-disk edit visibly changes the
+        // Arrange — a warm server bound to a private fixture copy + the quarantined spec, whose containment turns
+        // a NEW inbound reference into the quarantined scope hard-red, so an on-disk edit visibly changes the
         // check report.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.FrozenSpecDll), Ct);
+            Binding(fixture.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
@@ -79,7 +79,7 @@ public sealed class WarmWorkspaceMcpTests
         EditOnDisk(homeController, InsertNewCalculatorMember);
         string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
         CliResult coldEdited = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", CliRunner.FrozenSpecDll, "--json");
+            "check", fixture.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the edit (the new red edge appears, and the payload changed)
         // and is byte-identical to the cold run on the edited tree.
@@ -413,8 +413,8 @@ public sealed class WarmWorkspaceMcpTests
         return new McpServerBinding(solution, spec, workingDirectory);
     }
 
-    // Inserts a member referencing the frozen scope's interior just before the class's final closing brace —
-    // the FreezeContainmentE2ETests edit, so the resulting red edge is the same one that suite pins.
+    // Inserts a member referencing the quarantined scope's interior just before the class's final closing brace —
+    // the QuarantineContainmentE2ETests edit, so the resulting red edge is the same one that suite pins.
     private static string InsertNewCalculatorMember(string source)
     {
         int lastBrace = source.LastIndexOf('}');

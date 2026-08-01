@@ -27,7 +27,7 @@ internal static class Sources
                                   """;
 
     /// <summary>
-    ///     A frozen legacy scope with a facade: <c>App.Client.User</c> references both the facade
+    ///     A quarantined legacy scope with a facade: <c>App.Client.User</c> references both the facade
     ///     (<c>IFacade</c>, sanctioned) and an interior type (<c>Internal</c>, not sanctioned).
     /// </summary>
     public const string Containment = """

@@ -4,7 +4,7 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     The set of files changed relative to a git ref — the substrate the Freeze tripwire checks
+///     The set of files changed relative to a git ref — the substrate the Quarantine tripwire checks
 ///     against (GRAMMAR §7). Paths are normalized to forward slashes on the way in and compared with the
 ///     platform's file-name comparison (<see cref="PathComparison" />: case-insensitive on Windows and
 ///     macOS, ordinal on Linux); <see cref="Contains" /> answers "was this declaration-site file

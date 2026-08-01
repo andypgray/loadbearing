@@ -46,7 +46,7 @@ public sealed class ExplainCommandTests
             "explain", "no/such/rule", "--spec", CliRunner.ViolatedSpecDll);
 
         result.Exit.ShouldBe(2);
-        // The post-desugar ID set includes the frozen scope's containment + tripwire children (GRAMMAR §7).
+        // The post-desugar ID set includes the quarantined scope's containment + tripwire children (GRAMMAR §7).
         Normalize(result.Err).ShouldContain(
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
             "  api/return-dtos\n" +
