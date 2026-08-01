@@ -12,4 +12,10 @@ internal sealed class NamespaceNoun(string glob) : SelectionNoun
     internal string Glob { get; } = glob;
 
     internal override string Locative => $" in {ProseFormat.Backtick(Glob)}";
+
+    internal override string? CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    {
+        var globs = group.Select(noun => ProseFormat.Backtick(((NamespaceNoun)noun).Glob)).ToList();
+        return $" in {ProseFormat.JoinReferences(globs)}";
+    }
 }

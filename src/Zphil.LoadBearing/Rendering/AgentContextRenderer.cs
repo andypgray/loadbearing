@@ -140,8 +140,13 @@ public static class AgentContextRenderer
 
     private static bool SelectionCarriesRegisteredNoun(Selection selection)
     {
-        if (selection is UnionSelection union) return union.Parts.Any(SelectionCarriesRegisteredNoun);
-        if (selection.Noun is RegisteredNoun) return true;
+        // A union has no noun of its own, so its operands answer for it; either way the selection's own
+        // Except payloads are walked after — a union carries adjectives too (AnyOf(a, b).Except(registered)
+        // still renders the word "registered").
+        if (selection is UnionSelection union
+                ? union.Parts.Any(SelectionCarriesRegisteredNoun)
+                : selection.Noun is RegisteredNoun)
+            return true;
 
         return selection.Adjectives.OfType<ExceptAdjective>().Any(except => SelectionCarriesRegisteredNoun(except.Payload));
     }

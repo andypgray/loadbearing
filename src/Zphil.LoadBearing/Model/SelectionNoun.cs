@@ -21,4 +21,30 @@ internal abstract class SelectionNoun
     ///     head survives adjectives (the <c>OfKind</c> head-substitution mechanic, applied from the noun).
     /// </summary>
     internal virtual string SubjectHead => "types";
+
+    /// <summary>
+    ///     The hoisted locative of a homogeneous union — the phrase that follows the one shared head when
+    ///     every operand of an <c>arch.AnyOf</c> is this kind of noun, with the operand names or-joined
+    ///     (GRAMMAR §6): four project nouns collapse to " in projects `A`, `B`, `C` or `D`" rather than
+    ///     or-joining four full phrases. <c>null</c> — the default — means this noun declares no collapse,
+    ///     so the union falls back to or-joining each operand. Kept separate from
+    ///     <see cref="CollapsedReference" /> so the head stays substitutable (<c>OfKind</c>) and union-level
+    ///     adjectives still attach to a head.
+    /// </summary>
+    /// <param name="group">The nouns of the union's operands, in operand order; all of this noun's type.</param>
+    internal virtual string? CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    {
+        return null;
+    }
+
+    /// <summary>
+    ///     How a collapsed homogeneous union reads in reference position; the collapsed twin of
+    ///     <see cref="ReferenceFragment" />. Defaults to the shared head plus the hoisted locative — a noun
+    ///     whose fragment IS its whole phrase (layers, single types) overrides it. Only reached when
+    ///     <see cref="CollapsedLocative" /> is non-null.
+    /// </summary>
+    internal virtual string CollapsedReference(IReadOnlyList<SelectionNoun> group)
+    {
+        return "types" + CollapsedLocative(group);
+    }
 }

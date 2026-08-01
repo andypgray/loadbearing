@@ -72,12 +72,22 @@ public sealed class TopLevelProgramExtractionTests
     public void TopLevelStatements_SynthesizedProgram_HasEmptyDeclarationSites()
     {
         // Current behavior, pinned so a future change is deliberate: Program's declaring syntax
-        // is the CompilationUnitSyntax, which carries no type identifier, so no declaration site is recorded
-        // (unlike the synthesized <Main>$ member, which falls back to the compilation-unit location). The
-        // hypothesized fix was not applied — Program already extracts, and re-siting it would perturb the
+        // is the CompilationUnitSyntax, which carries no type identifier, so no declaration site is recorded.
+        // The hypothesized fix was not applied — Program already extracts, and re-siting it would perturb the
         // already-green dogfood model and the MyApp goldens.
         TypeNode program = Model.Type("Program");
         program.DeclarationSites.ShouldBeEmpty();
         program.FilePaths.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TopLevelStatements_SynthesizedEntryPoint_IsNotInventoried()
+    {
+        // `<Main>$` has no source-writable name, so it is not authored surface and no member subject may
+        // reach it (GRAMMAR §4.6) — otherwise a naming law over a project noun goes red on a name no author
+        // can change. The enclosing Program type stays inventoried: its name IS writable.
+        TypeNode program = Model.Type("Program");
+
+        program.Members.ShouldBeEmpty();
     }
 }

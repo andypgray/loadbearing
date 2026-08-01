@@ -136,7 +136,10 @@ Test projects need the same subject-scoping care in ANY setup: a test project sh
 product root namespace (`MyApp.Tests.*` inside `MyApp.*`) is solution-declared, so
 `.InNamespace("MyApp.*")` subjects include its types — fakes and test helpers then pollute
 naming, member, and hierarchy rules. Anchor product-wide subjects on `arch.Project("MyApp")`
-instead; a project noun never crosses project boundaries.
+instead; a project noun never crosses project boundaries. When the product is several projects,
+name them as one union — `arch.AnyOf(arch.Project("MyApp"), arch.Project("MyApp.Data"))` — rather
+than a namespace cone minus an `.Except`: the union names exactly what you mean, while the cone
+also sweeps every other solution member that happens to sit inside it.
 
 Errors you may see, verbatim, and what they mean:
 
@@ -356,7 +359,11 @@ three statement forms: definitions, rules, scopes.
 
 **Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` ·
 `arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
-`arch.Type<X>()`) · `arch.Registered(Lifetime.Singleton)` (types named in a source-visible
+`arch.Type<X>()`) · `arch.AnyOf(a, b, ...)` (the union of any selections — the way to say "these
+four projects" in one subject; `arch.AnyOf(typeof(X), typeof(Y), ...)` is the multi-type sugar.
+Adjectives apply to the union, not through it: `AnyOf(a, b).Except(c)` is (a ∪ b) − c. Every
+operand must match at least one type in subject position, so a typo'd operand fails loudly
+rather than hiding behind its siblings) · `arch.Registered(Lifetime.Singleton)` (types named in a source-visible
 container registration at that lifetime — service and implementation alike; `arch.Registered()`
 = any lifetime) · `arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the
 `MustNotUse` target form; matching is by declaring type + member name, so one ban covers every

@@ -493,14 +493,12 @@ internal static class SpecValidator
 
     private static IEnumerable<(string Label, string? Value)> SelectionProse(Selection selection)
     {
+        // A union's operands answer for its noun; its own adjective list is walked after, like any other
+        // selection's — AnyOf(a, b).Where(p, "") must still reach the blank-prose check (§8 item 5).
         if (selection is UnionSelection union)
-        {
             foreach (Selection member in union.Parts)
             foreach ((string, string?) prose in SelectionProse(member))
                 yield return prose;
-
-            yield break;
-        }
 
         foreach (SelectionAdjective adjective in selection.Adjectives)
             if (adjective is WhereAdjective where)
@@ -533,14 +531,12 @@ internal static class SpecValidator
     {
         yield return selection;
 
+        // As in SelectionProse: the operands, then this selection's own Except payloads — a union carries
+        // adjectives of its own, so AnyOf(a, b).Except(bad) must reach the payload walk.
         if (selection is UnionSelection union)
-        {
             foreach (Selection member in union.Parts)
             foreach (Selection nested in ExpandSelection(member))
                 yield return nested;
-
-            yield break;
-        }
 
         foreach (SelectionAdjective adjective in selection.Adjectives)
             if (adjective is ExceptAdjective except)
@@ -612,19 +608,15 @@ internal static class SpecValidator
 
     private static IEnumerable<(string Value, bool Namespace, string Label)> SelectionPatterns(Selection selection)
     {
+        // A NamespaceNoun carries a glob; a LayerNoun's globs are validated once in ValidateLayers (their
+        // use-independent home), so they are not re-checked here. A UnionSelection has no single noun, so
+        // its operands answer for it — and either way the adjective loop below runs, because a union
+        // carries adjectives of its own (AnyOf(a, b).InNamespace("") must reach the blank-pattern check).
         if (selection is UnionSelection union)
-        {
             foreach (Selection member in union.Parts)
             foreach ((string, bool, string) pattern in SelectionPatterns(member))
                 yield return pattern;
-
-            yield break;
-        }
-
-        // A NamespaceNoun carries a glob; a LayerNoun's globs are validated once in ValidateLayers (their
-        // use-independent home), so they are not re-checked here. Access Noun only after the union guard
-        // above — a UnionSelection has no single noun.
-        if (selection.Noun is NamespaceNoun ns) yield return (ns.Glob, true, "namespace pattern");
+        else if (selection.Noun is NamespaceNoun ns) yield return (ns.Glob, true, "namespace pattern");
 
         foreach (SelectionAdjective adjective in selection.Adjectives)
             switch (adjective)

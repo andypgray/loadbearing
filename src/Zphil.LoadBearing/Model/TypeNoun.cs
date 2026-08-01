@@ -15,4 +15,16 @@ internal sealed class TypeNoun(Type type) : SelectionNoun
     internal override string Locative => string.Empty;
 
     internal override string ReferenceFragment => ProseFormat.Backtick(TypeName.Simple(Type));
+
+    internal override string? CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    {
+        return string.Empty;
+    }
+
+    // The shared anchor-list composer, so a union of type nouns disambiguates colliding simple names by
+    // exactly the rule every other multi-operand list uses (GRAMMAR §6).
+    internal override string CollapsedReference(IReadOnlyList<SelectionNoun> group)
+    {
+        return ProseFormat.TypeList(group.Select(noun => ((TypeNoun)noun).Type).ToList());
+    }
 }

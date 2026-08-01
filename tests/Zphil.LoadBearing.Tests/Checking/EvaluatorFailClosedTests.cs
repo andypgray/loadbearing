@@ -102,9 +102,9 @@ public sealed class EvaluatorFailClosedTests
     [Fact]
     public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
     {
-        // A UnionSelection is the internal, Quarantine-only union (GRAMMAR §7): rendered only in reference
-        // position, never as a sentence subject, so it exposes no single noun — reading .Noun throws
-        // rather than inventing one.
+        // A UnionSelection is a union of selections (GRAMMAR §5.1), so it has no single noun: it renders
+        // through its own §6 arm, collapsed or or-joined. Reading .Noun still throws rather than inventing
+        // one — a subject union is admitted by the renderer's union arm, not by minting a fake head.
         var arch = new Arch();
         var union = new UnionSelection(arch, new[] { arch.Types });
 

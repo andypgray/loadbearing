@@ -156,15 +156,22 @@ internal static class FragmentExtractor
 
     // The ratified exclusion filter (GRAMMAR §4.6): drop every compiler-generated/implicitly-declared member
     // (auto-property and field-like-event backing fields, the record equality/clone/deconstruct surface),
-    // every non-Ordinary method (which is exactly accessors, constructors incl. static, operators,
-    // conversions, finalizers, and explicit interface METHOD implementations), indexers, and anything that
-    // is not a method/property/field/event. Explicit interface implementations are excluded uniformly across
-    // all three member kinds: a METHOD impl falls out via the non-Ordinary MethodKind screen, a PROPERTY or
-    // EVENT impl via its non-empty ExplicitInterfaceImplementations. An explicit impl is interface plumbing
-    // (Private, its name fixed by the interface), never authored surface — so no member subject ever sees one.
+    // every member with no source-writable name, every non-Ordinary method (which is exactly accessors,
+    // constructors incl. static, operators, conversions, finalizers, and explicit interface METHOD
+    // implementations), indexers, and anything that is not a method/property/field/event. Explicit interface
+    // implementations are excluded uniformly across all three member kinds: a METHOD impl falls out via the
+    // non-Ordinary MethodKind screen, a PROPERTY or EVENT impl via its non-empty
+    // ExplicitInterfaceImplementations. An explicit impl is interface plumbing (Private, its name fixed by
+    // the interface), never authored surface — so no member subject ever sees one.
     private static bool IsInventoried(ISymbol member)
     {
         if (member.IsImplicitlyDeclared) return false;
+
+        // The member-side twin of the type-side screen in Declare: a member source cannot name is not
+        // authored surface, so no rule can be about it. Subtracts exactly the synthesized top-level-statements
+        // entry point `<Main>$` — every other unwritable member is already gone on the screens below — which a
+        // project-noun subject reaches (the enclosing Program type IS authored surface and stays inventoried).
+        if (!member.CanBeReferencedByName) return false;
 
         return member switch
         {

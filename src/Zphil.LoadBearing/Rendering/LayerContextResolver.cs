@@ -71,10 +71,14 @@ public static class LayerContextResolver
 
     // Anchored: the subject selection's noun head is a LayerNoun naming this layer. A refinement
     // (adjective / Except) produces a RefinedSelection that keeps the same noun, so a refined subject
-    // still anchors on its layer.
+    // still anchors on its layer. A union subject anchors nothing — it has no single home directory even
+    // when a Layer is one of its operands, so its rule renders into the root block only (GRAMMAR §6); the
+    // guard also keeps this off UnionSelection.Noun, which throws.
     private static bool IsAnchoredOn(ArchRule rule, LayerDefinition layer)
     {
-        return rule.Constraint?.Subject.Noun is LayerNoun noun
+        return rule.Constraint?.Subject is { } subject
+               && subject is not UnionSelection
+               && subject.Noun is LayerNoun noun
                && string.Equals(noun.Name, layer.Name, StringComparison.Ordinal);
     }
 

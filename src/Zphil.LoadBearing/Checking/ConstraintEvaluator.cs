@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Checking;
 
@@ -48,8 +49,24 @@ internal sealed class ConstraintEvaluator
         _memberSelections = new MemberSelectionEvaluator(_selections);
     }
 
+    /// <summary>
+    ///     The pinned message on an empty union <em>operand</em> in subject position (GRAMMAR §9): a typo'd
+    ///     project name inside a four-way union must not be masked by its siblings, so the operand that
+    ///     matched nothing is named in its own right.
+    /// </summary>
+    internal static string EmptyOperandMessage(string operandReference)
+    {
+        return $"The subject selection operand \"{operandReference}\" matched no solution-declared types.";
+    }
+
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) Evaluate(Constraint constraint)
     {
+        // Loud per-operand emptiness for a union subject (GRAMMAR §9), ahead of the member dispatch because
+        // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
+        // member-subject paths alike.
+        var emptyOperands = EmptySubjectOperands(constraint.Subject);
+        if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings);
+
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
         // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
         // types none of whose members survive the kind filter is the ordinary way to fail empty).
@@ -317,6 +334,23 @@ internal sealed class ConstraintEvaluator
                 violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         return (violations, NoWarnings);
+    }
+
+    // Every operand of a union subject must match at least one type (GRAMMAR §9): law must load
+    // predictably, so a typo'd project name inside a four-way union fails the rule in its own right
+    // instead of being silently absorbed by its siblings. One never-baselinable EmptySubject violation per
+    // empty operand, in operand order; a non-union subject has no operands and passes straight through.
+    // Target position keeps the softer per-rule inert-target warning instead.
+    private IReadOnlyList<Violation> EmptySubjectOperands(Selection subject)
+    {
+        if (subject is not UnionSelection union) return Array.Empty<Violation>();
+
+        var violations = new List<Violation>();
+        foreach (Selection operand in union.Parts)
+            if (_selections.Evaluate(operand, SelectionPosition.Subject).Count == 0)
+                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
+
+        return violations;
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)

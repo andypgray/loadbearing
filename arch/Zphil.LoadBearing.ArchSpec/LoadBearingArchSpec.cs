@@ -47,8 +47,8 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                 </item>
 ///                 <item>
 ///                     <c>naming/async-suffix</c>: <c>Task</c>- and <c>ValueTask</c>-returning methods
-///                     carry the <c>Async</c> suffix repo-wide, with two named method exceptions and the
-///                     test namespace excluded.
+///                     carry the <c>Async</c> suffix across the union of the four shipping projects, with
+///                     two named method exceptions.
 ///                 </item>
 ///                 <item>
 ///                     <c>mcp/warm-state-constructed-once</c>: only the server composition root constructs
@@ -161,8 +161,10 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Await the task and flow the CancellationToken; blocking belongs only in ServerShutdown's drain.");
 
         arch.Rule("naming/async-suffix")
-            .Enforce(arch.Types.InNamespace("Zphil.LoadBearing.*")
-                .Except(arch.Types.InNamespace("Zphil.LoadBearing.Tests.*"))
+            .Enforce(arch.AnyOf(arch.Project("Zphil.LoadBearing"),
+                    arch.Project("Zphil.LoadBearing.Roslyn"),
+                    arch.Project("Zphil.LoadBearing.Cli"),
+                    arch.Project("Zphil.LoadBearing.Xunit"))
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .Where(m => m.Name != "Rule_Holds" && m.Name != "WhenAllCallsComplete",
                        description: "whose name is not Rule_Holds (a consumer-facing test display name) " +

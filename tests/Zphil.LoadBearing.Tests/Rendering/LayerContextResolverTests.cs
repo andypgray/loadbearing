@@ -84,6 +84,19 @@ public class LayerContextResolverTests
     }
 
     [Fact]
+    public void Resolve_UnionSubjectContainingTheLayer_AnchorsNothing()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
+
+        // A union has no single home directory even when a Layer is one of its operands, so it anchors no
+        // scoped card and the rule renders into the root block only (GRAMMAR §6). Previously a throw —
+        // IsAnchoredOn read the subject's noun, which a union has none of.
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(new UnionSubjectSpec()), codebase).ShouldBeEmpty();
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(new UnionSubjectSpec())).ShouldBeFalse();
+    }
+
+    [Fact]
     public void HasAnchoredLayers_LayerButNoAnchoringRule_False()
     {
         LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(new NamespaceSubjectSpec())).ShouldBeFalse();
@@ -128,6 +141,20 @@ public class LayerContextResolverTests
             arch.Rule("layering/web-namespace")
                 .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.*")))
                 .Because("A namespace-subject rule, deliberately not layer-anchored.");
+        }
+    }
+
+    // A Web layer whose only rule has a union subject the layer is an operand of — the union owns the
+    // subject, so nothing anchors on the layer.
+    private sealed class UnionSubjectSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            arch.Rule("layering/web-or-domain-not-legacy")
+                .Enforce(arch.AnyOf(web, arch.Namespace("MyApp.Domain.*"))
+                    .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+                .Because("Neither the web layer nor the domain touches legacy.");
         }
     }
 

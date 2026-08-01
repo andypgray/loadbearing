@@ -1467,4 +1467,84 @@ public class SpecValidationTests
             arch.Rule("area/attributed-pos").Enforce(arch.Types.MustBeAttributedWith(typeof(SerializableAttribute))).Because("Reason.");
         }
     }
+
+    // ---- Surface union: a union carries adjectives of its own (GRAMMAR §5.1), so every §8 walk must
+    //      reach them and not stop at the operands ----
+
+    [Fact]
+    public void BlankProse_BlankWhereDescriptionOnAUnion_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new UnionBlankWhereSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankProse && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankNamespaceGlobOnAUnion_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new UnionBlankPatternSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ForeignSelection_InsideAUnionExceptPayload_IsReported()
+    {
+        // The union's own Except payload is walked, not just its operands.
+        SpecValidationException ex = BuildExpectingFailure(new UnionForeignExceptPayloadSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.ForeignSelection && e.RuleId == "area/rule");
+    }
+
+    [Fact]
+    public void ForeignSelection_AsAUnionOperand_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new UnionForeignOperandSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.ForeignSelection && e.RuleId == "area/rule");
+    }
+
+    private sealed class UnionBlankWhereSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.AnyOf(arch.Project("A"), arch.Project("B"))
+                    .Where(t => t.Name.Length > 0, "  ")
+                    .MustHavePrefix("I"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class UnionBlankPatternSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule("area/rule")
+                .Enforce(arch.AnyOf(arch.Project("A"), arch.Project("B")).InNamespace("").MustHavePrefix("I"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class UnionForeignExceptPayloadSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            var other = new Arch();
+            arch.Rule("area/rule")
+                .Enforce(arch.AnyOf(arch.Project("A"), arch.Project("B")).Except(other.Types).MustHavePrefix("I"))
+                .Because("Reason.");
+        }
+    }
+
+    private sealed class UnionForeignOperandSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            var other = new Arch();
+            arch.Rule("area/rule")
+                .Enforce(arch.AnyOf(arch.Project("A"), other.Project("B")).MustHavePrefix("I"))
+                .Because("Reason.");
+        }
+    }
 }

@@ -36,7 +36,15 @@ internal sealed class SelectionEvaluator
         {
             var members = new HashSet<TypeNode>();
             foreach (Selection member in union.Parts) members.UnionWith(Evaluate(member, position));
-            return members;
+
+            // Union adjectives apply to the unioned set, never through each operand (GRAMMAR §5.1):
+            // AnyOf(a, b).Except(c) is (a ∪ b) − c.
+            if (union.Adjectives.Count == 0) return members;
+
+            IEnumerable<TypeNode> unioned = members;
+            foreach (SelectionAdjective adjective in union.Adjectives) unioned = ApplyAdjective(unioned, adjective);
+
+            return new HashSet<TypeNode>(unioned);
         }
 
         IEnumerable<TypeNode> universe = position == SelectionPosition.Subject ? _solutionDeclared : _model.Types;

@@ -74,6 +74,37 @@ public sealed class Arch
     }
 
     /// <summary>
+    ///     The union of the given selections — <c>arch.AnyOf(arch.Project("A"), arch.Project("B"))</c>
+    ///     names every type either operand names (GRAMMAR §5.1). Operands may be any selection: a
+    ///     <see cref="Layer" />, a <see cref="Registered()" /> noun, an already-refined selection, or another
+    ///     union (nested unions flatten at mint). One operand is legal and is an identity. Adjectives apply
+    ///     to the union, not through it — <c>AnyOf(a, b).Except(c)</c> is <c>(a ∪ b) − c</c>.
+    /// </summary>
+    public Selection AnyOf(Selection first, params Selection[] more)
+    {
+        Guard.NotNull(more, nameof(more));
+        var parts = new List<Selection>(1 + more.Length) { Guard.NotNull(first, nameof(first)) };
+        foreach (Selection part in more) parts.Add(Guard.NotNull(part, nameof(more)));
+
+        return UnionSelection.Create(this, parts);
+    }
+
+    /// <summary>
+    ///     The union of the given types — <c>arch.AnyOf(typeof(A), typeof(B))</c> ≡
+    ///     <c>arch.AnyOf(arch.Type(a), arch.Type(b))</c> (GRAMMAR §5.1). Pure authoring sugar on the
+    ///     selection overload: identical model, identical prose. This is the multi-type noun; a
+    ///     <c>Types(params Type[])</c> method cannot coexist with the <see cref="Types" /> property.
+    /// </summary>
+    public Selection AnyOf(Type first, params Type[] more)
+    {
+        Guard.NotNull(more, nameof(more));
+        var parts = new List<Selection>(1 + more.Length) { Type(Guard.NotNull(first, nameof(first))) };
+        foreach (Type part in more) parts.Add(Type(Guard.NotNull(part, nameof(more))));
+
+        return UnionSelection.Create(this, parts);
+    }
+
+    /// <summary>
     ///     Types named in a source-visible container registration with the given lifetime — service and
     ///     implementation types alike (GRAMMAR §4.7). The natural operand of the <c>MustNotInject</c> verb.
     /// </summary>

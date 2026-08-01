@@ -385,6 +385,59 @@ public class ModelReificationTests
         sugar.Targets[0].Adjectives.ShouldBeEmpty();
     }
 
+    // ---- Surface union: arch.AnyOf reification (GRAMMAR §5.1) ----
+
+    [Fact]
+    public void AnyOf_NestedUnion_FlattensAtMint()
+    {
+        // Prose and evaluation both read one leaf list: AnyOf(AnyOf(a, b), c) ≡ AnyOf(a, b, c), operand
+        // order preserved.
+        var arch = new Arch();
+        var union = arch.AnyOf(arch.AnyOf(arch.Project("A"), arch.Project("B")), arch.Project("C"))
+            .ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Select(part => part.Noun.ShouldBeOfType<ProjectNoun>().Name).ShouldBe(["A", "B", "C"]);
+    }
+
+    [Fact]
+    public void AnyOf_NestedUnionCarryingAdjectives_StaysALeaf()
+    {
+        // An inner union with adjectives is a narrowed set of its own — flattening it would lose the
+        // narrowing, so it survives as one operand.
+        var arch = new Arch();
+        Selection inner = arch.AnyOf(arch.Project("A"), arch.Project("B")).Except(arch.Type(typeof(SqlConnection)));
+        var outer = arch.AnyOf(inner, arch.Project("C")).ShouldBeOfType<UnionSelection>();
+
+        outer.Parts.Count.ShouldBe(2);
+        outer.Parts[0].ShouldBeOfType<UnionSelection>().Parts.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void AnyOf_Adjective_IsOwnedByTheUnionNotDistributedThroughIt()
+    {
+        // (a ∪ b) − c, not (a − c) ∪ (b − c): the union keeps its two operands and grows its own adjective.
+        var arch = new Arch();
+        var union = arch.AnyOf(arch.Project("A"), arch.Project("B"))
+            .Except(arch.Type(typeof(SqlConnection)))
+            .ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Count.ShouldBe(2);
+        union.Adjectives.Count.ShouldBe(1);
+        union.Adjectives[0].ShouldBeOfType<ExceptAdjective>();
+    }
+
+    [Fact]
+    public void AnyOf_SingleOperand_StaysAUnionInTheModel()
+    {
+        // Legal and an identity (§2 principle 5): a loop that yields one operand must not become an error,
+        // and the node stays a union so the shape does not depend on how many times the loop ran.
+        var arch = new Arch();
+        var union = arch.AnyOf(arch.Project("A")).ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Count.ShouldBe(1);
+        union.Adjectives.ShouldBeEmpty();
+    }
+
     // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
     private sealed class MemberUseSpec : IArchitectureSpec
     {

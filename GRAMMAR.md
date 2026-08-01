@@ -58,6 +58,7 @@ Inside it there are exactly three statement forms:
 definition :=  var x = arch.Layer(name, glob, globs...) | arch.Namespace(glob)
              | arch.Project(name) | arch.Type(typeof(X)) | arch.Type<X>()
              | arch.Registered(lifetime) | arch.Registered()
+             | arch.AnyOf(selection, selections...) | arch.AnyOf(typeof(X), types...)
              | arch.Member(typeof(X), nameof(X.M))
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
 rule       :=  arch.Rule(id) . posture-verb . trailer*
@@ -93,9 +94,14 @@ Arch
  ├─ .Project(name)    → Selection
  ├─ .Type(Type)       → Selection      (single type; there is deliberately no
  │                                      arch.Types(params Type[]) — it cannot coexist with
- │                                      the arch.Types property (CS0102); multi-type nouns
- │                                      arrive with the future AnyOf union, §11)
+ │                                      the arch.Types property (CS0102); the multi-type noun
+ │                                      is .AnyOf(Type, params Type[]) below)
  ├─ .Type<T>()        → Selection      (generic sugar: ≡ .Type(typeof(T)); §5.2 note)
+ ├─ .AnyOf(Selection first, params Selection[] more) → Selection
+ │                                     (the union of its operands; §5.1)
+ ├─ .AnyOf(Type first, params Type[] more) → Selection
+ │                                     (sugar: ≡ .AnyOf(.Type(a), .Type(b), …) — the
+ │                                      multi-type noun)
  ├─ .Registered(Lifetime) → Selection  (types named in a source-visible container
  │                                      registration with that lifetime — service and
  │                                      implementation alike; §4.7)
@@ -244,7 +250,10 @@ lands only where the whole list is static and one form:
   (§7). (Self-edges never arise — extraction drops them.)
 - `MustOnlyBeReferencedBy` needs no caveat: only solution types can be observed referencing.
 - Checker behavior: an empty *subject* selection **fails** the rule by default
-  (ArchUnit and ArchUnitNET precedent, with a pinned message). An empty resolved *operand* set
+  (ArchUnit and ArchUnitNET precedent, with a pinned message). For a **union** subject the
+  default sharpens per operand: every operand must match at least one type, and each empty one
+  fails the rule in its own right with the operand named, so a typo'd operand is never masked by
+  its siblings (§5.1, §9). An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
   `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch` / `MustNotExpose`) whose operand is a
   **pattern selection**
@@ -455,8 +464,12 @@ desugaring (§7) — keeps working unchanged on the type side.
   property/event accessors (they fold into the property/event, matching the §4.5 member-use
   normalization), constructors including static constructors, operators and conversions,
   finalizers, **explicit interface implementations of every kind** — method (`void IFoo.Bar()`),
-  property (`int IFoo.P`), and event (`event Action IFoo.E`) alike — indexers, and any
-  compiler-generated or implicitly-declared member. An explicit interface implementation is
+  property (`int IFoo.P`), and event (`event Action IFoo.E`) alike — indexers, any
+  compiler-generated or implicitly-declared member, and **any member with no source-writable
+  name** — the member-side twin of the type-side screen, which is what keeps the synthesized
+  top-level-statements entry point `<Main>$` out of a naming law's reach while leaving its
+  enclosing `Program` type (whose name *is* writable, and which carries real reference, catch and
+  throw edges) fully inventoried. An explicit interface implementation is
   interface plumbing, not authored surface: its accessibility is `Private` and its name is fixed
   by the interface, so a naming or shape verb could never sensibly apply. The *method* impl is
   dropped by the non-`Ordinary` `MethodKind` screen, the *property* and *event* impls by their
@@ -698,7 +711,31 @@ consumes it.
 | `arch.Project("MyApp.Web")` | "types in project `MyApp.Web`" |
 | `arch.Type(typeof(SqlConnection))` / `arch.Type<SqlConnection>()` | "`SqlConnection`" — simple name; FQN retained in the model |
 | `arch.Registered(Lifetime.Singleton)` / `arch.Registered()` | "singleton-registered types" (per lifetime: "scoped-registered types", "transient-registered types") / "registered types" — types named in a source-visible container registration (§4.7). The fragment is the noun's **head** and survives adjectives ("Singleton-registered types must not inject scoped-registered types, except `X`." — never a false bare "Types, …"); the §5.2 `OfKind` head-substitution mechanic, pinned by an adjective-bearing-subject test. |
+| `arch.AnyOf(a, b, …)` / `arch.AnyOf(typeof(X), typeof(Y), …)` | the union of its operands: "types in projects `A` or `B`" when they collapse, "types in project `A` or types in `B.*`" when they do not (§6). A union has no single noun — it is the one noun-position node that renders through its own assembly arm. |
 | `arch.Member(typeof(DateTime), nameof(DateTime.Now))` / `arch.Member(() => DateTime.Now)` | "`DateTime.Now`" — member leaf, target-only (§4.5); parens iff method: "`Task.Wait()`" (`arch.Member<Task>(t => t.Wait())`) |
+
+**The union noun (`arch.AnyOf`)** names every type any operand names. Pinned semantics:
+
+- **Operands may be any selection** — a `Layer`, a `Registered` noun, an already-refined
+  selection, or another union.
+- **Nested unions flatten at mint**: `AnyOf(AnyOf(a, b), c)` ≡ `AnyOf(a, b, c)`, so prose and
+  evaluation both read one leaf list. Only an *adjective-free* union operand flattens — an inner
+  union carrying adjectives is a narrowed set of its own, so it stays a leaf.
+- **One operand is legal and is an identity**: same model shape, and it renders exactly as the
+  bare operand would in the same position. Selections are loop-buildable (§2 principle 5), so a
+  loop that happens to yield one operand must not become an error.
+- **Adjectives apply to the union, not through it**: `AnyOf(a, b).Except(c)` = (a ∪ b) − c, and
+  `.Methods` projects over the union. The evaluator applies union adjectives *after* the set union.
+- **The multi-type sugar** `AnyOf(Type first, params Type[] more)` desugars to
+  `AnyOf(arch.Type(a), arch.Type(b), …)` — identical model, identical prose. It is the multi-type
+  noun `arch.Types(params Type[])` cannot be (§3.2).
+- **In subject position every operand must match at least one type** — an empty operand fails the
+  rule with the empty-subject violation naming that operand, so a typo'd project name inside a
+  four-way union is never masked by its siblings (§9). This is check-time behavior, not a §8
+  spec-build error: whether an operand matches depends on the codebase, not on the spec. Target
+  position keeps the softer per-rule inert-target warning unchanged.
+- **A union subject anchors no scoped card**: even when a `Layer` is an operand, a union has no
+  single home directory, so its rule renders into the root block only (§6).
 
 ### 5.2 Adjectives (reduced relative clauses)
 
@@ -906,6 +943,25 @@ matches the anchor's definition FQN.
 - **Canonicalization**: `Except` and `Where` clauses render sentence-final regardless of
   chain position. Safe because selection algebra commutes — (T∖X)∩S = (T∩S)∖X — and it
   prevents garden-path sentences ("types, except `Foo`, named `*Service`").
+- **Union collapse** (§5.1): a union of two or more operands, each adjective-free and all of the
+  same noun kind, hoists one head and one locative and or-joins the operand names — *"Types in
+  projects `A`, `B`, `C` or `D`"*, *"Types in `A.*` or `B.*`"*, *"The Domain or Web layers"*,
+  *"`X` or `Y`"* — through the same no-Oxford-comma composer every other list uses. A union of
+  type nouns joins through the shared anchor-list composer, so colliding simple names widen
+  identically. **Otherwise the union falls back** to or-joining its operands' own phrases —
+  *"Types in project `A` or types in `B.*`"* — which is what a heterogeneous union, a union with
+  an adjective-carrying operand, and a single-operand union all render as. The fallback is a
+  pinned decision in both directions, not an accident. A union's own adjectives then assemble
+  against the hoisted head exactly as a single selection's do (head substitution, inline,
+  sentence-final): *"Interfaces in projects `A` or `B`"*, *"Types in projects `A` or `B`, except
+  `X`"*. On a union that does not collapse, a head adjective distributes across the operands —
+  *"Interfaces in project `A` or interfaces in `B.*`"* — so the kind filter the checker applies
+  always reaches the sentence. A bare (adjective-free) union reads as its own reference in both
+  positions, which is what makes the single-operand identity hold in subject position too.
+- **Scoped placement**: a rule earns a layer's per-directory card only when its subject's noun
+  head *is* that layer, so a refinement (adjective / `Except`) still anchors. A union subject
+  never does (§5.1) — it has no single home directory even when a `Layer` is one of its
+  operands — so a union rule renders into the root block only.
 - **Colliding simple names**: when two targets in one sentence share a simple name, both are
   qualified with the minimal distinguishing trailing namespace segments
   ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
@@ -938,7 +994,8 @@ matches the anchor's definition FQN.
 `arch.Scope(id).Quarantine(sel).BoundaryOnlyVia(F).Baseline(p)` reifies to ordinary rule nodes:
 
 - **`{id}/containment`** — internally `sel.Except(F).MustOnlyBeReferencedBy(sel ∪ F)`.
-  (Model-level union exists internally; there is no surface union combinator in v1.) The
+  (The `sel ∪ F` payload is the same union node `arch.AnyOf` mints, §5.1 — the desugaring
+  predates the surface noun and is unchanged by it.) The
   formula holds whether the facade types live inside or outside the quarantined selection.
   **`.Baseline(p)` grandfathers existing inbound references** with the same ratchet semantics
   as Migrate — day-one adoption on a real legacy codebase must not be a wall of red; only
@@ -1063,6 +1120,13 @@ matches the anchor's definition FQN.
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
 extended to descend through a `MemberConstraint`'s member subject and verb (§4.6).
+
+Every walk in this catalog descends through a union (§5.1) on both axes — its operands *and* its
+own adjectives — so `AnyOf(a, b).Where(p, "")` reaches item 5, `AnyOf(a, b).InNamespace("")`
+reaches items 15–16, and a foreign operand or a foreign `Except` payload inside a union reaches
+item 10. **Per-operand emptiness is not a §8 error**: whether an operand matches any type is a
+fact about the codebase, not the spec, so it is check-time — one empty-subject violation naming
+the operand (§5.1, §9).
 
 Enforced at compile time instead (no catalog entry): zero-target dependency verbs,
 zero-member `MustNotUse`, and zero-glob layers (`(first, more)` signatures); missing
@@ -1216,8 +1280,10 @@ static-signature fact, and internal members are not surface), so a flow- or cast
 would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
 exposure data (exposure edges stay out of the graph).
 
-Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); surface union
-`arch.AnyOf(...)` (also the future multi-type noun); a layered-architecture macro (deferred:
+Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); an intersection
+or difference combinator (`arch.AnyOf` is union only — `Except` already covers difference);
+unions of *member* selections (the projections compose over a union subject already); a
+layered-architecture macro (deferred:
 it would mint N rules under one ID, muddying baselines); assembly-anchored layers;
 subject-side shape adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the
 constraint-side verbs and the `ITypeInfo` flags shipped (§5.3, §5.6); only the adjective

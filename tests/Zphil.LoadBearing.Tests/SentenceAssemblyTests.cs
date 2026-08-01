@@ -452,4 +452,111 @@ public class SentenceAssemblyTests
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Singleton-registered types, except `SqlConnection` must not inject scoped-registered types.");
     }
+
+    // ---- Surface union: arch.AnyOf (GRAMMAR §5.1, §6). A homogeneous union hoists one head and locative
+    //      and or-joins the operand names; anything else or-joins the operands' own phrases ----
+
+    [Fact]
+    public void UnionOfProjects_CollapsesToOneHeadAndLocative()
+    {
+        // The flagship shape: four project operands read as one locative, not four repeated phrases.
+        Selection union = Arch.AnyOf(
+            Arch.Project("A"), Arch.Project("B"), Arch.Project("C"), Arch.Project("D"));
+        SentenceRenderer.Subject(union).ShouldBe("Types in projects `A`, `B`, `C` or `D`");
+    }
+
+    [Fact]
+    public void UnionOfNamespaces_CollapsesToTheSharedLocative()
+    {
+        SentenceRenderer.Subject(Arch.AnyOf(Arch.Namespace("A.*"), Arch.Namespace("B.*")))
+            .ShouldBe("Types in `A.*` or `B.*`");
+    }
+
+    [Fact]
+    public void UnionOfTypes_InReferencePosition_IsTheBareBacktickedList()
+    {
+        Selection union = Arch.AnyOf(Arch.Type(typeof(SqlConnection)), Arch.Type(typeof(ControllerBase)));
+        SentenceRenderer.Reference(union).ShouldBe("`SqlConnection` or `ControllerBase`");
+    }
+
+    [Fact]
+    public void UnionOfTypes_CollidingSimpleNames_QualifyWithMinimalTrailingSegments()
+    {
+        // The collapsed type list reuses ProseFormat.TypeList, so a union disambiguates by exactly the rule
+        // every other multi-operand list uses (§6).
+        SentenceRenderer.Reference(Arch.AnyOf(typeof(Order), typeof(Stubs.Sales.Order)))
+            .ShouldBe("`Billing.Order` or `Sales.Order`");
+    }
+
+    [Fact]
+    public void UnionOfBareLayers_SpeaksCollectivelyInThePlural()
+    {
+        Selection union = Arch.AnyOf(Arch.Layer("UnionDomain", "MyApp.Domain.*"), Arch.Layer("UnionWeb", "MyApp.Web.*"));
+        SentenceRenderer.Subject(union).ShouldBe("The UnionDomain or UnionWeb layers");
+    }
+
+    [Fact]
+    public void UnionMemberSubject_TakesTheCollapsedReference()
+    {
+        // The path the dogfood rule actually takes: a member subject renders "methods of {reference}".
+        SentenceRenderer.MemberSubject(Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Methods)
+            .ShouldBe("Methods of types in projects `A` or `B`");
+    }
+
+    [Fact]
+    public void UnionExcept_CanonicalizesSentenceFinalAfterTheCollapsedLocative()
+    {
+        // Adjectives attach to the union, not through it: (a ∪ b) − c, rendered against the hoisted head.
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Except(Arch.Type(typeof(SqlConnection)));
+        SentenceRenderer.Subject(union).ShouldBe("Types in projects `A` or `B`, except `SqlConnection`");
+    }
+
+    [Fact]
+    public void UnionOfKind_SubstitutesTheHoistedHead()
+    {
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).OfKind(TypeKind.Interface);
+        SentenceRenderer.Subject(union).ShouldBe("Interfaces in projects `A` or `B`");
+    }
+
+    [Fact]
+    public void UnionOfMixedNounKinds_FallsBackToOrJoinedPhrases()
+    {
+        // The fallback is a decision, not an accident: mixed noun kinds have no shared locative to hoist.
+        SentenceRenderer.Subject(Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*")))
+            .ShouldBe("Types in project `A` or types in `B.*`");
+    }
+
+    [Fact]
+    public void UnionWithAnAdjectiveBearingOperand_FallsBackToOrJoinedPhrases()
+    {
+        // An operand carrying its own adjective cannot fold into a shared locative, so the whole union falls back.
+        Selection union = Arch.AnyOf(Arch.Project("A").WithSuffix("Controller"), Arch.Project("B"));
+        SentenceRenderer.Subject(union).ShouldBe("Types in project `A` named `*Controller` or types in project `B`");
+    }
+
+    [Fact]
+    public void UnionOfKind_OverAFallbackUnion_DistributesTheHeadAcrossOperands()
+    {
+        // A head adjective on a union that does not collapse still reaches the prose — the checker applies
+        // the kind filter, so the sentence must say so rather than silently reading "types".
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*")).OfKind(TypeKind.Interface);
+        SentenceRenderer.Subject(union).ShouldBe("Interfaces in project `A` or interfaces in `B.*`");
+    }
+
+    [Fact]
+    public void SingleOperandUnion_RendersExactlyAsTheBareOperand()
+    {
+        // Selections are loop-buildable (§2 principle 5), so a loop yielding one operand is legal — and an
+        // identity in both positions, not a degenerate "or" list.
+        SentenceRenderer.Subject(Arch.AnyOf(Arch.Project("A"))).ShouldBe("Types in project `A`");
+        SentenceRenderer.Reference(Arch.AnyOf(Arch.Project("A"))).ShouldBe("types in project `A`");
+    }
+
+    [Fact]
+    public void UnionSubject_RendersThroughTheFullSentence()
+    {
+        // End to end: the union reaches the law sentence like any other subject.
+        Constraint constraint = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).MustBeSealed();
+        SentenceRenderer.Sentence(constraint).ShouldBe("Types in projects `A` or `B` must be sealed.");
+    }
 }

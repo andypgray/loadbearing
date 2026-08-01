@@ -104,7 +104,13 @@ public static class SelectionAdjectives
     {
         Guard.NotNull(selection, nameof(selection));
         var adjectives = new List<SelectionAdjective>(selection.Adjectives) { adjective };
-        return new RefinedSelection(selection.Owner, selection.Noun, adjectives);
+
+        // A union owns its adjectives rather than distributing them through its operands (GRAMMAR §5.1):
+        // AnyOf(a, b).Except(c) is (a ∪ b) − c. Rebuilding it as a RefinedSelection would read the union's
+        // Noun, which throws — the wall this arm removes.
+        return selection is UnionSelection union
+            ? union.WithAdjectives(adjectives)
+            : new RefinedSelection(selection.Owner, selection.Noun, adjectives);
     }
 
     private static T NotNull<T>(T value, string paramName)

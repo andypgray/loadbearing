@@ -85,6 +85,15 @@ public class GenericSugarTests
             .ShouldBe(Sentence(arch => arch.Types.MustNotBeAttributedWith(typeof(SugarAttribute))));
     }
 
+    [Fact]
+    public void AnyOf_MultiTypeSugar_ReifiesIdenticallyToWrappedSelections()
+    {
+        // arch.AnyOf(typeof(A), typeof(B)) ≡ arch.AnyOf(arch.Type(a), arch.Type(b)) — the multi-type noun
+        // that arch.Types(params Type[]) cannot be (CS0102 against the arch.Types property).
+        Sentence(arch => arch.AnyOf(typeof(SugarType), typeof(SugarBase)).MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.AnyOf(arch.Type<SugarType>(), arch.Type<SugarBase>()).MustBeSealed()));
+    }
+
     private static string Sentence(Func<Arch, Constraint> constraint)
     {
         return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule").Enforce(constraint(arch)).Because("b")))
