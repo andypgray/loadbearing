@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-01
+
+Pre-alpha. Five new verbs across the exception and attribute axes, a canonical rule pack a spec
+can compose from instead of writing the same rules again, string anchors that need no package
+reference, two committed diagrams, a .NET Framework envelope — and one breaking rename: the
+containment posture sheds a false friend.
+
 ### Added
 
 - This repository's own spec now declares layers, which is what the module map, the per-directory
@@ -125,6 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `Scope(id).Freeze(selection)` is now `Scope(id).Quarantine(selection)`, and every
+  rendered surface (agent context, status/check JSON, SARIF, explain output, validation messages)
+  says "quarantined", never "frozen". In the surrounding ecosystem "freeze" means "snapshot current
+  violations as an accepted baseline" (ArchUnit's `FreezingArchRule`, `pip freeze`) — which is
+  LoadBearing's `Migrate(...).Baseline(...)`, not its containment posture, so the old name pointed
+  readers at the wrong sibling. No alias or compat shim. Machine-readable posture values change from
+  `"freeze"` to `"quarantine"`; desugared rule ids (`{id}/containment`, `{id}/tripwire`), the clause
+  names (`BoundaryOnlyVia`, `Dragons`, `DragonsDoc`, `Baseline`), and `Migrate` are unchanged.
 - The self-spec's own documentation no longer claims to exercise "the full posture and verb range",
   which was true of the postures and false of the verbs. It now says what it exercises, and carries
   a ledger naming every unused verb family with its reason — including the rules that were tried
@@ -151,6 +166,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   approximations of that attribute, and keeping either would have silently exempted a future
   synchronous tool method, or one declared outside the tools namespace, from the rule meant
   to catch it.
+- The CLI's four JSON documents (`check`, `status`, `graph`, and the SARIF report) now serialize
+  through a source-generated context rather than by reflection. Output is byte-identical — the
+  goldens are unchanged — so this matters only if you trim or AOT-compile the tool, where
+  reflection-based serialization is what breaks.
 
 ### Fixed
 
@@ -177,21 +196,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server pinned the spec DLL and everything staged beside it for its whole lifetime. Every build
   then failed with `MSB3021`/`MSB3027` until the server was stopped — and stopping a stdio server
   is unrecoverable for its client, which silently disarmed every hook armed against it.
-
-## [0.3.0] - 2026-07-24
-
-Pre-alpha. One breaking rename: the containment posture sheds a false friend.
-
-### Changed
-
-- **Breaking:** `Scope(id).Freeze(selection)` is now `Scope(id).Quarantine(selection)`, and every
-  rendered surface (agent context, status/check JSON, SARIF, explain output, validation messages)
-  says "quarantined", never "frozen". In the surrounding ecosystem "freeze" means "snapshot current
-  violations as an accepted baseline" (ArchUnit's `FreezingArchRule`, `pip freeze`) — which is
-  LoadBearing's `Migrate(...).Baseline(...)`, not its containment posture, so the old name pointed
-  readers at the wrong sibling. No alias or compat shim. Machine-readable posture values change from
-  `"freeze"` to `"quarantine"`; desugared rule ids (`{id}/containment`, `{id}/tripwire`), the clause
-  names (`BoundaryOnlyVia`, `Dragons`, `DragonsDoc`, `Baseline`), and `Migrate` are unchanged.
 
 ## [0.2.0] - 2026-07-23
 
