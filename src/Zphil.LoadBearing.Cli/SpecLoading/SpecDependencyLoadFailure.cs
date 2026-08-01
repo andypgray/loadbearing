@@ -3,12 +3,26 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.SpecLoading;
 
 /// <summary>
-///     Maps a common spec-load failure — a spec that <c>typeof()</c>s a NuGet-packaged type whose assembly a
-///     plain framework-dependent class-library build never stages into <c>bin</c>, so JIT-compiling
-///     <c>Define()</c> throws <see cref="FileNotFoundException" /> for the missing package — into an
-///     actionable <see cref="UserErrorException" /> naming the spec, the unresolved dependency, the
-///     cause, and both remedies. Both host surfaces render the result message-only (the CLI top-level
-///     handler to stderr, the MCP <c>GlobalCallToolFilter</c> to the client) and exit 2 either way.
+///     Maps the two ways a <c>typeof()</c> anchor can fail to resolve while <c>Define()</c> runs into an
+///     actionable <see cref="UserErrorException" /> naming the spec, what could not be loaded, the cause,
+///     and the remedy that applies.
+///     <list type="bullet">
+///         <item>
+///             <see cref="FileNotFoundException" /> — the anchored type's <em>assembly</em> is not beside
+///             the spec DLL. Either a NuGet-packaged assembly a plain class-library build never stages into
+///             <c>bin</c> (where <c>CopyLocalLockFileAssemblies</c> is the fix), or a .NET Framework
+///             reference assembly that resolves from the targeting pack or the GAC and is never staged at
+///             all (where it is not).
+///         </item>
+///         <item>
+///             <see cref="TypeLoadException" /> — the assembly loaded but the <em>type</em> did not,
+///             because its closure reaches an assembly with no counterpart on .NET
+///             (<c>System.Web.IHttpHandler</c> as a base interface, say). No build setting reaches this
+///             one; the pattern anchor is the only route.
+///         </item>
+///     </list>
+///     Both host surfaces render the result message-only (the CLI top-level handler to stderr, the MCP
+///     <c>GlobalCallToolFilter</c> to the client) and exit 2 either way.
 /// </summary>
 internal static class SpecDependencyLoadFailure
 {
@@ -29,14 +43,37 @@ internal static class SpecDependencyLoadFailure
     ///     the inner exception. Call only when <see cref="IsAssemblyLoadFailure" /> holds, so
     ///     <see cref="FileNotFoundException.FileName" /> is the assembly identity to report.
     /// </summary>
+    /// <remarks>
+    ///     The remedy line names both worlds because the host cannot tell them apart from the identity
+    ///     alone, and offering only the packaging fix sends a .NET Framework spec author down a route that
+    ///     can never work: a framework reference resolves from the targeting pack or the GAC, so
+    ///     <c>CopyLocalLockFileAssemblies</c> has nothing to copy.
+    /// </remarks>
     internal static UserErrorException Map(FileNotFoundException exception, string specDllPath)
     {
         string spec = Path.GetFileNameWithoutExtension(specDllPath);
         string? identity = exception.FileName;
         string message =
             $"The spec assembly '{spec}' failed to load its dependency '{identity}' while running Define().\n" +
-            "A class-library build does not stage NuGet package assemblies into its output, so a spec that names a packaged type via typeof() builds clean but cannot run.\n" +
-            "Add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj and rebuild, or target the type with a namespace pattern (arch.Namespace(...)), which needs no assembly load.";
+            "A typeof() anchor loads its type's assembly, and this one is not beside the spec DLL: a class-library build does not stage NuGet package assemblies into its output, and a .NET Framework reference assembly resolves from the targeting pack or the GAC and is never staged at all.\n" +
+            "If it is a package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj and rebuild; if it is a .NET Framework assembly, no build setting can help — target the type with a namespace pattern (arch.Namespace(...)), which needs no assembly load.";
+        return new UserErrorException(message, exception);
+    }
+
+    /// <summary>
+    ///     Renders the actionable message for a type that could not be loaded at all, keeping the original
+    ///     <see cref="TypeLoadException" /> as the inner exception. Unlike the assembly case there is no
+    ///     packaging remedy to offer: the type exists only on .NET Framework, so the pattern anchor is the
+    ///     whole answer.
+    /// </summary>
+    internal static UserErrorException Map(TypeLoadException exception, string specDllPath)
+    {
+        string spec = Path.GetFileNameWithoutExtension(specDllPath);
+        string type = string.IsNullOrWhiteSpace(exception.TypeName) ? "a type" : $"the type '{exception.TypeName}'";
+        string message =
+            $"The spec assembly '{spec}' could not load {type} while running Define().\n" +
+            "A typeof() anchor loads its type's whole closure, base types and implemented interfaces included, and this one reaches an assembly that does not exist on .NET — so the anchor cannot resolve however the spec project is built.\n" +
+            "Target the type with a namespace pattern (arch.Namespace(...)) instead, which needs no assembly load.";
         return new UserErrorException(message, exception);
     }
 }

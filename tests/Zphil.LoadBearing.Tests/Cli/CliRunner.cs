@@ -30,6 +30,19 @@ internal static class CliRunner
 
     public static string DerivedSpecDll => Metadata("DerivedSpecPath");
 
+    /// <summary>The net48 product assembly the legacy spec <c>typeof()</c>s.</summary>
+    public static string LegacyProductDll => Metadata("LegacyProductPath");
+
+    /// <summary>The net48 spec DLL, built at the C# 7.3 default.</summary>
+    public static string LegacySpecDll => Metadata("LegacySpecPath");
+
+    /// <summary>The net48 pattern-only spec that drives <c>check</c> against the ClassicApp solution.</summary>
+    public static string ClassicAppSpecDll => Metadata("ClassicAppSpecPath");
+
+    /// <summary>The non-SDK-style .NET Framework fixture solution, copied to the test output as content.</summary>
+    public static string ClassicAppSolution =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "LegacySolutions", "ClassicApp", "ClassicApp.sln");
+
     public static async Task<CliResult> InvokeAsync(params string[] args)
     {
         var output = new StringWriter();

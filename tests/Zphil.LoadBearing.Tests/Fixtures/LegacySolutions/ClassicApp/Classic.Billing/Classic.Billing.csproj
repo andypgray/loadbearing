@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A non-SDK-style .NET Framework project in the 2003 MSBuild XML namespace: the shape MSBuildWorkspace
+  loads through the net472 BuildHost rather than the .NET one.
+
+  TWO SITING CONSTRAINTS, both measured. Do not "tidy" either of them away.
+
+  1. This project is NOT a member of Zphil.LoadBearing.slnx and is NOT ProjectReference'd from the tests
+     csproj (unlike the MyApp fixture projects, which are, for the ArchUnitNET oracle). A non-SDK net48
+     project cannot build on the ubuntu and macos legs of the 3-OS CI matrix. It is a pure content
+     fixture, copied to the test output by the tests csproj's Fixtures/** glob and driven only by
+     Windows-gated tests.
+
+  2. It lives under Fixtures/LegacySolutions/, NOT Fixtures/TestSolutions/. FixtureRestorer treats a
+     missing obj/project.assets.json as "unrestored", and a non-SDK project never writes one — so siting
+     it under TestSolutions/ would make every test process believe the tree is unrestored and re-restore
+     MyApp along with it, once per run, forever.
+-->
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{44444444-4444-4444-4444-444444444444}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Classic.Billing</RootNamespace>
+    <AssemblyName>Classic.Billing</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BillingCalculator.cs" />
+    <Compile Include="BillingGateway.cs" />
+    <Compile Include="IBillingGateway.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

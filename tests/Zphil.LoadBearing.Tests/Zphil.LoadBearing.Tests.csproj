@@ -7,7 +7,13 @@
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <OutputType>Exe</OutputType>
-        <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+        <!-- NU1702: the three net48 fixture references below. MSBuild negotiates a target framework per
+             ProjectReference and warns that net48 was resolved for this net10.0 consumer — which is the
+             whole arrangement, and harmless, because ReferenceOutputAssembly=false means nothing from
+             them is ever compiled against. Suppressed at project level because per-item NoWarn does not
+             reach this warning and SkipGetTargetFrameworkProperties, which does, also stops the resolved
+             output paths reaching the baked metadata attributes the tests read. -->
+        <NoWarn>$(NoWarn);xUnit1051;NU1702</NoWarn>
         <!-- Lock-file policy inline here (rather than a tests/Directory.Build.props) so it applies to
              this project alone. A directory-level policy would also catch the deliberately-unlocked
              fixtures below it: the spec-fixture projects under tests/Fixtures/ (slnx members, so a CI
@@ -82,6 +88,21 @@
                           ReferenceOutputAssembly="false"
                           OutputItemType="DerivedSpecAssembly"
                           Private="false" />
+        <!-- The net48 legacy trio, same discipline. LegacyProduct is the Framework product assembly the
+             legacy spec typeof()s; the tests need its path to assert which load context resolved it.
+             These are why NU1702 is suppressed above. -->
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.LegacyProduct\Zphil.LoadBearing.LegacyProduct.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="LegacyProductAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.LegacySpec\Zphil.LoadBearing.LegacySpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="LegacySpecAssembly"
+                          Private="false" />
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.ClassicAppSpec\Zphil.LoadBearing.ClassicAppSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="ClassicAppSpecAssembly"
+                          Private="false" />
     </ItemGroup>
 
     <!-- The MyApp fixture solution's three projects, pulled into the build graph so their IL exists for
@@ -140,6 +161,19 @@
                 <_Parameter1>DerivedSpecPath</_Parameter1>
                 <_Parameter2>@(DerivedSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
+            <!-- The net48 legacy trio's DLL paths. -->
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>LegacyProductPath</_Parameter1>
+                <_Parameter2>@(LegacyProductAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>LegacySpecPath</_Parameter1>
+                <_Parameter2>@(LegacySpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>ClassicAppSpecPath</_Parameter1>
+                <_Parameter2>@(ClassicAppSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
             <!-- The three MyApp fixture DLL paths, for the ArchUnitNET oracle to load by path. -->
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>MyAppDomainPath</_Parameter1>
@@ -157,7 +191,11 @@
     </Target>
 
     <!-- Test fixtures (e.g. the fixture solutions) are copied to output, not compiled.
-         An empty Fixtures glob is not an error, so this stays safe while no fixtures exist. -->
+         An empty Fixtures glob is not an error, so this stays safe while no fixtures exist.
+         This glob is the ONLY thing that carries Fixtures/LegacySolutions/ClassicApp into the output:
+         it is a non-SDK .NET Framework project that cannot build on the ubuntu and macos CI legs, so it
+         is never a solution member and never a ProjectReference. Its csproj comment has the full reason,
+         including why it sits under LegacySolutions/ rather than TestSolutions/. -->
     <ItemGroup>
         <Compile Remove="Fixtures/**/*.cs" />
         <Content Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />

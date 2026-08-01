@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     the adapter class that runs them all as tests — and this gate holds each quote to the file it was
 ///     cut from: every non-blank line of the excerpt's fence must appear, in order, as a verbatim
 ///     substring of its source, so an edit to the source that the README does not follow fails the suite
-///     instead of publishing a stale quote. Three excerpts are captured tool output with no committed
+///     instead of publishing a stale quote. Four excerpts are captured tool output with no committed
 ///     source; they are demonstration-exempt, held only to the requirement that their fences still exist,
 ///     so an exemption cannot silently go dead.
 /// </summary>
@@ -48,12 +48,14 @@ public sealed class RootReadmeQuoteSyncTests
             "arch.Rule(\"mcp/env-through-seam\")",
             SelfSpec),
 
-        // The three entries below quote output captured from a run rather than a committed file, so there
+        // The four entries below quote output captured from a run rather than a committed file, so there
         // is nothing to sync them against and they are demonstration-exempt — the exactly-one-fence guard
         // still holds each fence in place. hook-report is the stderr a red self-check feeds an agent
         // through the wrapper in hooks/; sarif-result is one result object from `check --sarif`;
-        // graph-survey is a slice of the `graph` project roster. If a committed capture of any of them
-        // ever lands, give that entry its source path and it graduates to a synced excerpt.
+        // graph-survey is a slice of the `graph` project roster; legacy-check is a stanza from a check
+        // over the non-SDK-style ClassicApp test fixture, whose lines ClassicProjectCheckTests pins. If a
+        // committed capture of any of them ever lands, give that entry its source path and it graduates to
+        // a synced excerpt.
         new(
             "hook-report",
             "FAIL cli/no-stdout",
@@ -65,6 +67,10 @@ public sealed class RootReadmeQuoteSyncTests
         new(
             "graph-survey",
             "185 types; references: (none)",
+            null),
+        new(
+            "legacy-check",
+            "Classic.Billing/BillingCalculator.cs:10",
             null)
     ];
 

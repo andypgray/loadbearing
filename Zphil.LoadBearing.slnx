@@ -13,6 +13,9 @@
     <Project Path="tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Fixtures/">
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.ClassicAppSpec/Zphil.LoadBearing.ClassicAppSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.LegacyProduct/Zphil.LoadBearing.LegacyProduct.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.LegacySpec/Zphil.LoadBearing.LegacySpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppCleanSpec/Zphil.LoadBearing.MyAppCleanSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppDerivedSpec/Zphil.LoadBearing.MyAppDerivedSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppQuarantinedSpec/Zphil.LoadBearing.MyAppQuarantinedSpec.csproj" />

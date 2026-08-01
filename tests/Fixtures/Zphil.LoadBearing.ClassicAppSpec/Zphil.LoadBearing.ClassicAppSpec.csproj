@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The net48 spec that drives `check` against the non-SDK-style ClassicApp fixture solution. It
+         references Core and nothing else: every anchor is a namespace or name pattern, so nothing here
+         needs an assembly load and the spec never has to see the Framework types the target uses.
+
+         Kept separate from Zphil.LoadBearing.LegacySpec so neither spec's inert rules leak warnings into
+         the other's pinned output.
+
+         NO <LangVersion>: net48's default is C# 7.3, which is the point. -->
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+</Project>

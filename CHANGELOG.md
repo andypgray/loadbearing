@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Spec-load diagnostics now cover .NET Framework specs. A `typeof()` anchor whose type closure
+  reaches a Framework-only assembly (a base type or implemented interface in `System.Web`, say)
+  used to surface as a raw `TypeLoadException`; it is now a spec-load error naming the type that
+  could not be loaded and pointing at the namespace-pattern anchor, which needs no assembly load.
+  The missing-dependency message it sits beside was reworded for the same reason: its remedy used
+  to lead with `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`, which is the fix
+  for a NuGet-packaged dependency and a dead end for a .NET Framework reference assembly, because
+  such an assembly resolves from the targeting pack or the GAC and is never staged into `bin`.
+  Both remedies are now named, each with the case it applies to.
+
 ## [0.3.0] - 2026-07-24
 
 Pre-alpha. One breaking rename: the containment posture sheds a false friend.

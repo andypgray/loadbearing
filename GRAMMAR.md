@@ -878,6 +878,18 @@ Descriptions are spliced verbatim (never derived from lambda source — Shouldly
 `CallerArgumentExpression` is explicitly rejected; lambda source is not agent-consumable
 prose).
 
+**Which anchor forms survive a `net48` spec.** A spec project may target .NET Framework; the
+host loads its DLL in an isolated load context and runs `Define()` there. A `typeof()` anchor
+loads the anchored type's whole closure at that point, so it holds exactly while that closure
+stays inside netstandard2.0. Two boundaries lie past it, both reported as spec-load errors
+rather than crashes: an assembly that is not staged beside the spec DLL, and a type whose base
+type or implemented interface lives in a Framework-only assembly (`System.Web.IHttpHandler`,
+say). Neither is reachable by `typeof()` however the spec project is built. The anchor for
+anything on that side of the line is a namespace pattern, `arch.Namespace("System.Data.*")`,
+which needs no assembly load. A name pattern is not a substitute: a `Selection` matches only
+types inside the checked codebase, so `arch.Types.WithNameMatching("SqlConnection")` goes inert
+against an external type (§8, the inert-rule warning).
+
 ### 5.7 Member vocabulary (member subjects, §4.6)
 
 **Projections** (mint a `MemberSelection`; the fragment is the subject head, §6):

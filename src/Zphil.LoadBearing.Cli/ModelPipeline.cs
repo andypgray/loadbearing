@@ -109,6 +109,12 @@ internal static class ModelPipeline
             {
                 throw SpecDependencyLoadFailure.Map(ex, specDllPath);
             }
+            catch (TypeLoadException ex)
+            {
+                // A typeof() anchor whose base type or implemented interface lives in a .NET Framework-only
+                // assembly: the dependency resolved, the type did not. Without this arm it surfaces raw.
+                throw SpecDependencyLoadFailure.Map(ex, specDllPath);
+            }
         }
         finally
         {

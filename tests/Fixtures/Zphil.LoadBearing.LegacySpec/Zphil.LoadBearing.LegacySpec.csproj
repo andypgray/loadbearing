@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A spec project targeting net48 — the cross-platform half of the legacy proof. It references Core
+         (netstandard2.0) and the net48 product assembly it typeof()s, and its DLL is loaded by the net10
+         host through the collectible spec ALC.
+
+         NO <LangVersion>: net48's default is C# 7.3. The spec below compiles at that default, which is
+         what makes the claim "a legacy spec project can stay on its own language level" measurable. -->
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <!-- SpecLoadContext resolves dependencies through an AssemblyDependencyResolver rooted at the spec
+             DLL. A net48 build writes no .deps.json, so resolution falls back to the spec's own output
+             directory — which is exactly where this stages the product DLL. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\Zphil.LoadBearing.LegacyProduct\Zphil.LoadBearing.LegacyProduct.csproj" />
+    </ItemGroup>
+
+</Project>

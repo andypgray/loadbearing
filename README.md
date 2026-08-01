@@ -150,17 +150,17 @@ CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.gith
 
 ## The graph
 
-`loadbearing graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, every external dependency by root. Five of the sixteen project lines for this solution:
+`loadbearing graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, every external dependency by root. Five of the twenty project lines for this solution:
 
 ```text
   Zphil.LoadBearing — 185 types; references: (none)
-  Zphil.LoadBearing.ArchSpec — 1 type; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
+  Zphil.LoadBearing.ArchSpec — 1 type; references: Zphil.LoadBearing, Zphil.LoadBearing.Packs.DotNet, Zphil.LoadBearing.Roslyn
   Zphil.LoadBearing.Cli — 122 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
-  Zphil.LoadBearing.Roslyn — 76 types; references: Zphil.LoadBearing
+  Zphil.LoadBearing.Roslyn — 78 types; references: Zphil.LoadBearing
   Zphil.LoadBearing.Xunit — 2 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
 ```
 
-The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The lines not shown here are the test project and the fixture projects it checks against. Rendering the same graph as a Mermaid diagram is the next surface.
+The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The lines not shown here are the test project, the rule pack, and the fixture projects the tests check against. Rendering the same graph as a Mermaid diagram is the next surface.
 
 ## This page is tested
 
@@ -205,6 +205,23 @@ LoadBearing is built for long-lived, business-critical .NET codebases: systems t
 5. At zero, promote the rule to `Enforce`.
 
 [The Meridian adoption walkthrough](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md) is this flow on a committed example codebase, one real command at a time.
+
+## .NET Framework
+
+The tool runs on .NET 10. The codebase it checks does not have to, and neither does the spec that governs it.
+
+A spec project can target `net48` and compile at that framework's default language level, C# 7.3. It references the same netstandard2.0 `Zphil.LoadBearing` package every other spec does, and the CLI loads the built DLL in an isolated load context. A `typeof()` anchor works from there while the anchored type's own closure stays inside netstandard2.0; past that line, including .NET Framework types with no counterpart on .NET, a namespace pattern is the anchor, and it needs no assembly load at all.
+
+Old project files load too. A non-SDK-style Framework project, the kind in the 2003 MSBuild XML namespace with explicit `<Reference>` items and a hand-maintained `AssemblyInfo.cs`, loads through the .NET Framework build host Roslyn ships and reports at `file:line` like anything else:
+
+```text
+FAIL data-access/no-inline-sql — Types in `Classic.*` must not reference types in `System.Data.*`.
+  Classic.Billing/BillingCalculator.cs:10 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlConnection
+```
+
+And the build server can stay where it is. `check --binlog` replays a binary log from a real build, including one produced by .NET Framework `MSBuild.exe`, so the machine that builds needs no .NET 10; only the machine that analyses does. Replaying that log and opening the workspace directly produce byte-identical output, which is what makes the replay a shortcut rather than a lesser reading.
+
+The last two both need Windows with Visual Studio or Build Tools installed, because that is where the Framework build host and `MSBuild.exe` come from. A net48 spec project carries no such requirement and builds anywhere.
 
 ## Examples
 

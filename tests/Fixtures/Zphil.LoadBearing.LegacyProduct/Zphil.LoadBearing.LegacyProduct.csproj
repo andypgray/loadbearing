@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The .NET Framework product assembly a legacy spec typeof()s. SDK-style but net48, so it builds
+         on every leg of the CI matrix from Microsoft.NETFramework.ReferenceAssemblies rather than an
+         installed targeting pack.
+
+         NO <LangVersion>: net48's default is C# 7.3, and compiling at that default is part of the claim
+         this fixture exists to prove. The braced namespaces below are the language rather than drift —
+         file-scoped namespaces need C# 10. Do not modernize them.
+
+         RootNamespace is the fictional legacy namespace the spec's `Legacy.*` patterns target, not the
+         project name. -->
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <RootNamespace>Legacy.Product</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    </ItemGroup>
+
+    <!-- System.Web is not in the SDK's default net48 reference set, so LegacyHandler's Framework-only
+         base interface needs this explicit reference. It is the envelope boundary the ALC tests pin:
+         the type compiles here and is unloadable on .NET, by design. -->
+    <ItemGroup>
+        <Reference Include="System.Web" />
+    </ItemGroup>
+
+</Project>
