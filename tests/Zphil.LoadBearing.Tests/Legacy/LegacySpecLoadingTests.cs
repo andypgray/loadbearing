@@ -51,12 +51,19 @@ public sealed class LegacySpecLoadingTests
             // has nothing to consult and falls back to the spec's own output directory — where
             // CopyLocalLockFileAssemblies staged the product DLL. It lands in the spec ALC, not Default.
             File.Exists(Path.ChangeExtension(specPath, ".deps.json")).ShouldBeFalse();
+            File.Exists(Path.Combine(Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll"))
+                .ShouldBeTrue();
             Assembly product = context.Assemblies.Single(loaded => loaded.GetName().Name == ProductAssemblyName);
-            Path.GetDirectoryName(product.Location).ShouldBe(Path.GetDirectoryName(specPath));
-            product.Location.ShouldNotBe(CliRunner.LegacyProductDll);
             AssemblyLoadContext.Default.Assemblies
                 .Select(loaded => loaded.GetName().Name)
                 .ShouldNotContain(ProductAssemblyName);
+
+            // App-local resolution used to be pinned by product.Location's directory. The context now loads
+            // dependencies from their bytes so a warm host leaves the spec's build output replaceable
+            // (SpecLoadNoLockTests), and a stream-loaded assembly reports no location — so the two facts
+            // above carry the claim instead: the file exists only beside the spec, and the resolver is the
+            // context's one route to it.
+            product.Location.ShouldBeEmpty();
         }
         finally
         {

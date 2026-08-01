@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using System.Text.Json;
 using Shouldly;
 using Xunit;
@@ -31,18 +30,13 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         <em>is</em> the pipe: stdin is written, flushed, and deliberately never closed until the
 ///         assertions are done. The generous budgets cover a cold child — MSBuild registration, the
 ///         vswhere probe, and a full workspace load of the fixture solution — and a wedge shows up as the
-///         id:2 response never arriving rather than as an indefinite hang.
+///         id:2 response never arriving rather than as an indefinite hang. The plumbing itself lives in
+///         <see cref="McpChildHarness" />, shared with <c>McpChildServerRepoHandleTests</c>.
 ///     </para>
 /// </remarks>
 [Collection("Serial")]
 public sealed class McpStdioChildServerTests
 {
-    private const string InitializeRequest =
-        """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"loadbearing-stdio-regression","version":"1.0.0"}}}""";
-
-    private const string InitializedNotification =
-        """{"jsonrpc":"2.0","method":"notifications/initialized"}""";
-
     private const string CheckWithDiffBaseRequest =
         """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_check","arguments":{"diffBase":"HEAD"}}}""";
 
@@ -51,8 +45,6 @@ public sealed class McpStdioChildServerTests
 
     /// <summary>Budget for the call itself: a cold workspace load plus extraction plus the git diff.</summary>
     private static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(5);
-
-    private static readonly TimeSpan DrainBudget = TimeSpan.FromSeconds(30);
 
     [Fact]
     public async Task ArchCheckWithDiffBase_OverRealStdio_ReturnsTheReport()
@@ -64,7 +56,11 @@ public sealed class McpStdioChildServerTests
             repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
             "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
 
-        ProcessStartInfo startInfo = ServerStartInfo(repo);
+        ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(
+            McpChildHarness.TestsBinCliDll(),
+            repo.SolutionPath,
+            CliRunner.QuarantinedSpecDll,
+            repo.Root);
 
         string? handshake = null;
         string? response = null;
@@ -77,14 +73,14 @@ public sealed class McpStdioChildServerTests
             var errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
             try
             {
-                await SendAsync(server, InitializeRequest);
-                handshake = await ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
+                await McpChildHarness.SendAsync(server, McpChildHarness.InitializeRequest);
+                handshake = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
 
                 if (handshake is not null)
                 {
-                    await SendAsync(server, InitializedNotification);
-                    await SendAsync(server, CheckWithDiffBaseRequest);
-                    response = await ReadResponseAsync(server.StandardOutput, id: 2, CallBudget);
+                    await McpChildHarness.SendAsync(server, McpChildHarness.InitializedNotification);
+                    await McpChildHarness.SendAsync(server, CheckWithDiffBaseRequest);
+                    response = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 2, CallBudget);
                 }
             }
             catch (IOException)
@@ -95,12 +91,12 @@ public sealed class McpStdioChildServerTests
             finally
             {
                 // stdin stays open until here: an open client pipe is the condition under test.
-                TryKillTree(server);
+                McpChildHarness.TryKillTree(server);
             }
 
             // Drained while the process object is still alive, so disposal cannot fault the read out from
             // under it. Asserted afterwards, so a failure message can carry the server's own diagnostics.
-            diagnostics = await DrainAsync(errorDrain);
+            diagnostics = await McpChildHarness.DrainAsync(errorDrain);
         }
 
         handshake.ShouldNotBeNull(
@@ -124,119 +120,5 @@ public sealed class McpStdioChildServerTests
         // The tripwire proves the whole diff path ran: git resolved the toplevel, listed the untracked
         // file, and the checker matched it against the quarantined scope.
         text.ShouldContain("quarantinedScopeTouched");
-    }
-
-    private static ProcessStartInfo ServerStartInfo(TempGitRepo repo)
-    {
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = repo.Root,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardInputEncoding = new UTF8Encoding(false),
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
-        startInfo.ArgumentList.Add(ResolveCliDll());
-        startInfo.ArgumentList.Add("mcp");
-        startInfo.ArgumentList.Add(repo.SolutionPath);
-        startInfo.ArgumentList.Add("--spec");
-        startInfo.ArgumentList.Add(CliRunner.QuarantinedSpecDll);
-
-        // The same deployment-normal environment the out-of-process replay smoke test uses: the test host's
-        // MSBuild/VS registration stripped, so the child discovers MSBuild through its own vswhere probe.
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
-
-        return startInfo;
-    }
-
-    // The tests project references the CLI project, so its build output lands beside the test assembly.
-    private static string ResolveCliDll()
-    {
-        string path = Path.Combine(AppContext.BaseDirectory, "loadbearing.dll");
-        if (!File.Exists(path))
-            throw new InvalidOperationException(
-                $"The CLI build output 'loadbearing.dll' was not found beside the test assembly at '{path}'.");
-
-        return path;
-    }
-
-    private static async Task SendAsync(Process server, string frame)
-    {
-        await server.StandardInput.WriteAsync(frame + "\n");
-        await server.StandardInput.FlushAsync(TestContext.Current.CancellationToken);
-    }
-
-    // Reads newline-delimited frames until the response carrying <paramref name="id" /> arrives, or the
-    // budget runs out. Null means "never arrived" — a wedge, an EOF, or a crash — which is what the
-    // assertions turn into a named failure.
-    private static async Task<string?> ReadResponseAsync(StreamReader stdout, int id, TimeSpan budget)
-    {
-        long start = Stopwatch.GetTimestamp();
-        while (true)
-        {
-            TimeSpan remaining = budget - Stopwatch.GetElapsedTime(start);
-            if (remaining <= TimeSpan.Zero) return null;
-
-            string? line = await ReadLineWithinAsync(stdout, remaining);
-            if (line is null) return null;
-            if (line.Length > 0 && ResponseId(line) == id) return line;
-        }
-    }
-
-    private static int? ResponseId(string line)
-    {
-        try
-        {
-            using JsonDocument document = JsonDocument.Parse(line);
-            return document.RootElement.TryGetProperty("id", out JsonElement id)
-                   && id.ValueKind == JsonValueKind.Number
-                ? id.GetInt32()
-                : null;
-        }
-        catch (JsonException)
-        {
-            // Not a JSON-RPC frame — a stray diagnostic line. Keep reading.
-            return null;
-        }
-    }
-
-    private static async Task<string> DrainAsync(Task<string> drain)
-    {
-        try
-        {
-            Task first = await Task.WhenAny(drain, Task.Delay(DrainBudget, TestContext.Current.CancellationToken));
-            return first == drain ? await drain : "(stderr did not drain)";
-        }
-        catch (Exception ex)
-        {
-            // Diagnostics only: a drain that fails must not replace the assertion's failure with its own.
-            return $"(stderr drain failed: {ex.GetType().Name})";
-        }
-    }
-
-    // Races the read against a wall clock rather than cancelling it: on Windows these streams are
-    // synchronous underneath, so a token cannot interrupt a read already in flight — the caller's kill is
-    // what ends it. Null means the budget won.
-    private static async Task<string?> ReadLineWithinAsync(StreamReader stdout, TimeSpan budget)
-    {
-        var pending = stdout.ReadLineAsync();
-        Task first = await Task.WhenAny(pending, Task.Delay(budget, TestContext.Current.CancellationToken));
-        return first == pending ? await pending : null;
-    }
-
-    private static void TryKillTree(Process process)
-    {
-        try
-        {
-            if (!process.HasExited) process.Kill(true);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
-        {
-            // Already gone — nothing left to clean up.
-        }
     }
 }

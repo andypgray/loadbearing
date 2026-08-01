@@ -155,6 +155,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `${CLAUDE_PROJECT_DIR}` and the wrappers change to that directory before checking. The
   snippet also sets an explicit 120-second hook timeout: the 60-second default sits too close to
   a cold check.
+- A warm MCP server no longer holds the spec project's build output open, so `dotnet build` of a
+  spec project succeeds while a client is connected. Spec assemblies and their dependencies load
+  from their bytes rather than their paths: the load context is collectible, but the model it
+  returns roots the spec's `Type` references, so it was never actually collected and a long-lived
+  server pinned the spec DLL and everything staged beside it for its whole lifetime. Every build
+  then failed with `MSB3021`/`MSB3027` until the server was stopped — and stopping a stdio server
+  is unrecoverable for its client, which silently disarmed every hook armed against it.
 
 ## [0.3.0] - 2026-07-24
 

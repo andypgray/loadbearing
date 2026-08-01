@@ -41,6 +41,7 @@ public sealed class AdapterTests
             "mcp/tool-types-attributed",
             "roslyn/no-msbuildlocator-query",
             "mcp/no-blocking-waits",
+            "mcp/no-path-assembly-loads",
             "naming/async-suffix",
             "mcp/warm-state-constructed-once",
             "roslyn/no-engine-types-on-seam",

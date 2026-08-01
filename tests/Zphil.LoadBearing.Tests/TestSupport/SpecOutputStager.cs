@@ -19,6 +19,14 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         <c>.deps.json</c>) falls back to the spec's own directory — so what is absent from the staged
 ///         directory is genuinely absent from resolution.
 ///     </para>
+///     <para>
+///         <b>Staging intact and then deleting is a different case, not a longer way to withhold.</b> A net10
+///         spec carries a <c>.deps.json</c>, and the resolver reads it once when the load context is
+///         constructed while re-checking the disk on every resolve. Withholding therefore means "never
+///         staged", which the resolver sees from the first call; deleting from the staged copy afterwards
+///         means "was there, and a rebuild took it away underneath a running host", which it sees only on the
+///         next one. <c>SpecLoadContextFallbackTests</c> needs the second and stages intact to get it.
+///     </para>
 /// </remarks>
 internal static class SpecOutputStager
 {

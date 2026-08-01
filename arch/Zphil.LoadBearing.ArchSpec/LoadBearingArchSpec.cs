@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using Microsoft.Build.Locator;
 using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Roslyn;
@@ -75,6 +76,12 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                     task (<c>Wait</c>/<c>Result</c>/<c>GetResult</c>) — a block there holds a thread-pool
 ///                     thread and drops the tool call's cancellation; the shutdown drain is the one
 ///                     sanctioned block.
+///                 </item>
+///                 <item>
+///                     <c>mcp/no-path-assembly-loads</c>: nothing in the CLI loads an assembly from a path.
+///                     A path load pins that file for the whole life of a long-lived host, so a warm server
+///                     blocks every rebuild of what it loaded; <c>SpecLoadContext</c> is the one sanctioned
+///                     caller, and it reads bytes.
 ///                 </item>
 ///                 <item>
 ///                     <c>naming/async-suffix</c>: <c>Task</c>- and <c>ValueTask</c>-returning methods
@@ -397,6 +404,21 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Await the task and flow the CancellationToken. Where a call chain genuinely cannot be " +
                  "async — the MSBuild registration path is JIT-quarantined behind a synchronous seam — wait " +
                  "on the resource itself, a process handle rather than a Task.");
+
+        arch.Rule("mcp/no-path-assembly-loads")
+            .Enforce(host
+                .Except(arch.Types.WithNameMatching("SpecLoadContext"))
+                .MustNotUse(arch.Member(typeof(AssemblyLoadContext), nameof(AssemblyLoadContext.LoadFromAssemblyPath))))
+            .Because("A host that loads an assembly from its path pins that file for as long as the host " +
+                     "lives, and this host lives for a whole session: the model roots the spec's Types, so " +
+                     "the collectible context never collects and the operating system never releases the " +
+                     "build output. Every rebuild of what was loaded then fails, and the only cure is killing " +
+                     "the server — which for a stdio server is terminal, because the client never reconnects " +
+                     "one, so the per-edit check that was the reason to run it goes quietly dead. " +
+                     "SpecLoadContext is the single sanctioned caller: it reads bytes, and reaches for the " +
+                     "loader only when the file is already gone.")
+            .Fix("Read the assembly's bytes and load from the stream, the way " +
+                 "SpecLoadContext.LoadWithoutLocking does; never hand a path to the loader from the CLI.");
 
         arch.Rule("naming/async-suffix")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)

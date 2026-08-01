@@ -84,7 +84,7 @@ internal static class ModelPipeline
         var context = new SpecLoadContext(specDllPath);
         try
         {
-            Assembly assembly = context.LoadFromAssemblyPath(specDllPath);
+            Assembly assembly = context.LoadWithoutLocking(specDllPath);
             IReadOnlyList<IArchitectureSpec> specs;
             try
             {

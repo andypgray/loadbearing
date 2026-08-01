@@ -34,8 +34,8 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 /// </remarks>
 public sealed class HookWrapperTests
 {
-    private const string Sh = "sh";
-    private const string Pwsh = "pwsh";
+    private const string Sh = ShellInterpreter.Sh;
+    private const string Pwsh = ShellInterpreter.Pwsh;
 
     /// <summary>The stub's canned report — two lines, so the multi-line path through each wrapper is covered.</summary>
     private const string CannedReport =
@@ -281,60 +281,18 @@ public sealed class HookWrapperTests
     }
 
     /// <summary>
-    ///     Resolves <paramref name="interpreter" /> on <c>PATH</c>, falling back to Git for Windows' two
-    ///     usual homes for <c>sh.exe</c> (which ship a POSIX shell without necessarily putting it on the
-    ///     machine <c>PATH</c>), and skips the test with a named reason when it is nowhere.
+    ///     Resolves <paramref name="interpreter" />, and skips the test with a named reason where it is not
+    ///     installed.
     /// </summary>
     private static string RequireInterpreter(string interpreter)
     {
-        string path = SearchPath(interpreter) ?? GitForWindowsShell(interpreter) ?? string.Empty;
+        string path = ShellInterpreter.Locate(interpreter) ?? string.Empty;
         Assert.SkipWhen(
             path.Length == 0,
             $"'{interpreter}' is not available on this machine, so the {interpreter} wrapper arm cannot run "
             + "here. It runs wherever the interpreter is installed, which for sh is every CI OS.");
 
         return path;
-    }
-
-    private static string? SearchPath(string command)
-    {
-        string[] candidates = OperatingSystem.IsWindows()
-            ? [command + ".exe", command + ".cmd", command + ".bat"]
-            : [command];
-
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            if (string.IsNullOrWhiteSpace(directory)) continue;
-
-            try
-            {
-                foreach (string candidate in candidates)
-                {
-                    string full = Path.Combine(directory.Trim('"'), candidate);
-                    if (File.Exists(full)) return full;
-                }
-            }
-            catch (ArgumentException)
-            {
-                // A PATH entry with invalid path characters — skip it, as the OS loader does.
-            }
-        }
-
-        return null;
-    }
-
-    private static string? GitForWindowsShell(string command)
-    {
-        if (command != Sh || !OperatingSystem.IsWindows()) return null;
-
-        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        string[] candidates =
-        [
-            Path.Combine(programFiles, "Git", "usr", "bin", "sh.exe"),
-            Path.Combine(programFiles, "Git", "bin", "sh.exe")
-        ];
-
-        return candidates.FirstOrDefault(File.Exists);
     }
 
     /// <summary>Line endings only: the wrappers write LF, the Windows shells that host them write CRLF.</summary>
