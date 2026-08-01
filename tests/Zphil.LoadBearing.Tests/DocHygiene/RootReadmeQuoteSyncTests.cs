@@ -8,12 +8,12 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     The quote-sync gate over the root README's fenced excerpts. The landing page walks this
 ///     repository's own spec across surface after surface, quoting committed sources inside fenced code
 ///     blocks — two rules of the self-spec, the rendered <c>AGENTS.md</c> bullet one of them generates,
-///     the adapter class that runs them all as tests — and this gate holds each quote to the file it was
-///     cut from: every non-blank line of the excerpt's fence must appear, in order, as a verbatim
-///     substring of its source, so an edit to the source that the README does not follow fails the suite
-///     instead of publishing a stale quote. Four excerpts are captured tool output with no committed
-///     source; they are demonstration-exempt, held only to the requirement that their fences still exist,
-///     so an exemption cannot silently go dead.
+///     the adapter class that runs them all as tests, the rendered Mermaid diagram of this solution — and
+///     this gate holds each quote to the file it was cut from: every non-blank line of the excerpt's fence
+///     must appear, in order, as a verbatim substring of its source, so an edit to the source that the
+///     README does not follow fails the suite instead of publishing a stale quote. Four excerpts are
+///     captured tool output with no committed source; they are demonstration-exempt, held only to the
+///     requirement that their fences still exist, so an exemption cannot silently go dead.
 /// </summary>
 public sealed class RootReadmeQuoteSyncTests
 {
@@ -47,6 +47,12 @@ public sealed class RootReadmeQuoteSyncTests
             "migrate-rule",
             "arch.Rule(\"mcp/env-through-seam\")",
             SelfSpec),
+        new(
+            // The one tool-output fence with a committed counterpart: `render --diagram` writes the block
+            // into ARCHITECTURE.md, so the README quote is synced rather than demonstration-exempt.
+            "graph-diagram",
+            "flowchart LR",
+            "ARCHITECTURE.md"),
 
         // The four entries below quote output captured from a run rather than a committed file, so there
         // is nothing to sync them against and they are demonstration-exempt — the exactly-one-fence guard

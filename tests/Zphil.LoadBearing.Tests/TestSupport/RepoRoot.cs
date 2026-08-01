@@ -23,6 +23,9 @@ internal static class RepoRoot
     /// <summary>The absolute path to the committed root <c>AGENTS.md</c>.</summary>
     public static string AgentsMd => Path.Combine(Directory, "AGENTS.md");
 
+    /// <summary>The absolute path to the committed root <c>ARCHITECTURE.md</c> (the rendered diagram).</summary>
+    public static string ArchitectureMd => Path.Combine(Directory, "ARCHITECTURE.md");
+
     private static string Find()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

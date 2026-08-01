@@ -124,11 +124,30 @@ internal static class CommandFactory
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
+        Option<string?> diagram = new("--diagram")
+        {
+            Description =
+                "Also render the codebase graph as a Mermaid diagram into <path>'s managed block "
+                + "(projects and their cross-project references; solid = observed, dotted = declared but unobserved)."
+        };
+        Option<string?> diagramOnly = new("--diagram-only")
+        {
+            Description =
+                "Draw only the projects matching these name globs (semicolon-separated, '*' allowed); with --diagram."
+        };
+        Option<string?> diagramExclude = new("--diagram-exclude")
+        {
+            Description =
+                "Drop the projects matching these name globs (semicolon-separated, '*' allowed); with --diagram."
+        };
 
         Command render = new("render", "Render the managed AGENTS.md block(s) from the spec.")
         {
             solution,
-            spec
+            spec,
+            diagram,
+            diagramOnly,
+            diagramExclude
         };
 
         render.SetAction((parseResult, ct) =>
@@ -136,7 +155,10 @@ internal static class CommandFactory
             var request = new RenderRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
-                Directory.GetCurrentDirectory());
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(diagram),
+                parseResult.GetValue(diagramOnly),
+                parseResult.GetValue(diagramExclude));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;

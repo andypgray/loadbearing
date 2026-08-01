@@ -20,12 +20,14 @@ public sealed class DocHygieneTests
     [
         "GRAMMAR.md",
         "README.md",
+        "ARCHITECTURE.md",
         "CHANGELOG.md"
     ];
 
     private static readonly string[] BudgetDocs =
     [
         "README.md",
+        "ARCHITECTURE.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
         "src/Zphil.LoadBearing/README.md",

@@ -160,11 +160,38 @@ CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.gith
   Zphil.LoadBearing.Xunit — 2 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
 ```
 
-The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The lines not shown here are the test project, the rule pack, and the fixture projects the tests check against. Rendering the same graph as a Mermaid diagram is the next surface.
+The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The lines not shown here are the test project, the rule pack, and the fixture projects the tests check against.
+
+`render --diagram <path>` draws that same survey as a Mermaid diagram inside a committed file's managed block. Pointed at this repository and scoped to its six shipping projects, it writes [`ARCHITECTURE.md`](https://github.com/andypgray/loadbearing/blob/main/ARCHITECTURE.md):
+
+```mermaid
+flowchart LR
+    accTitle: Codebase survey: Zphil.LoadBearing.slnx
+    accDescr: Projects in this solution and their cross-project references.
+
+    p_Zphil_LoadBearing["Zphil.LoadBearing"]
+    p_Zphil_LoadBearing_ArchSpec["Zphil.LoadBearing.ArchSpec"]
+    p_Zphil_LoadBearing_Cli["Zphil.LoadBearing.Cli"]
+    p_Zphil_LoadBearing_Packs_DotNet["Zphil.LoadBearing.Packs.DotNet"]
+    p_Zphil_LoadBearing_Roslyn["Zphil.LoadBearing.Roslyn"]
+    p_Zphil_LoadBearing_Xunit["Zphil.LoadBearing.Xunit"]
+
+    p_Zphil_LoadBearing_ArchSpec --> p_Zphil_LoadBearing
+    p_Zphil_LoadBearing_ArchSpec --> p_Zphil_LoadBearing_Packs_DotNet
+    p_Zphil_LoadBearing_ArchSpec --> p_Zphil_LoadBearing_Roslyn
+    p_Zphil_LoadBearing_Cli --> p_Zphil_LoadBearing
+    p_Zphil_LoadBearing_Cli --> p_Zphil_LoadBearing_Roslyn
+    p_Zphil_LoadBearing_Packs_DotNet --> p_Zphil_LoadBearing
+    p_Zphil_LoadBearing_Roslyn --> p_Zphil_LoadBearing
+    p_Zphil_LoadBearing_Xunit --> p_Zphil_LoadBearing
+    p_Zphil_LoadBearing_Xunit --> p_Zphil_LoadBearing_Roslyn
+```
+
+A solid arrow is a reference some type actually makes; a dotted arrow is a project reference that is declared and never exercised, which the text survey leaves you to work out by reading two of its sections against each other. There are no dotted arrows above, which is itself the report: no project here declares a reference it never uses. Nobody drew that diagram, and nobody can let it rot: [`SelfSpecTests.ArchitectureMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. A hand-drawn architecture diagram is the artifact that rots first; this one is held to the code the same way the rules are.
 
 ## This page is tested
 
-The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The three fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the graph survey, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
+The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The four fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
 
 The page is the tool's output, and the [CI badge](https://github.com/andypgray/loadbearing/actions/workflows/ci.yml) at the top is what keeps it that way.
 

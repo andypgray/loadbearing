@@ -12,13 +12,17 @@ namespace Zphil.LoadBearing.Cli;
 ///     card in its directory's <c>AGENTS.md</c>. Content units that land in the same directory merge
 ///     into that file's one managed block (layer card before quarantine card). Every target is spliced through
 ///     the byte-level <see cref="ManagedBlockFile" /> adapter and reported as <c>wrote</c>/<c>unchanged</c>
-///     with a solution-relative path. Render is a mutation, not a gate: it always exits 0 on success;
+///     with a solution-relative path. <c>--diagram &lt;path&gt;</c> adds a second, independent target: the
+///     codebase graph as a Mermaid diagram in its own file's own managed block, reported on the same
+///     wrote/unchanged stream. Render is a mutation, not a gate: it always exits 0 on success;
 ///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
 internal sealed class RenderRunner(TextWriter output, TextWriter error)
 {
     public async Task<int> RunAsync(RenderRequest request, CancellationToken ct)
     {
+        ValidateDiagramOptions(request);
+
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             request.Solution, request.Spec, request.WorkingDirectory, ct);
 
@@ -40,7 +44,51 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error)
             units.AddRange(await ScopedUnitsAsync(workspace, ct));
 
         WriteGroups(units, specName, solutionDirectory);
+
+        if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, workspace, diagramPath, ct);
+
         return 0;
+    }
+
+    // The scope options are meaningless without a target file, and silently ignoring them would let a
+    // mistyped --diagram render the whole solution. Validated before the workspace cost, like baseline's
+    // mode check.
+    private static void ValidateDiagramOptions(RenderRequest request)
+    {
+        if (request.Diagram is null && (request.DiagramOnly is not null || request.DiagramExclude is not null))
+            throw new UserErrorException("--diagram-only and --diagram-exclude apply only with --diagram <path>.");
+    }
+
+    // The diagram target. It runs its own extraction, with no project exclusions, which is the same call
+    // `graph` makes: the scoped-card extraction above passes the spec resolution's excluded projects (the
+    // spec project plus the private plumbing only it references), and reusing it would draw a diagram that
+    // disagrees with the survey it is supposed to be. Both feed one GraphSummarizer, so there is still one
+    // summary shape; the second extraction is the cost, and only when --diagram and scoped cards coincide.
+    private async Task WriteDiagramAsync(
+        RenderRequest request, WorkspaceModel workspace, string diagramPath, CancellationToken ct)
+    {
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, [], ct);
+        GraphSummary summary = GraphSummarizer.Summarize(codebase);
+        string body = GraphDiagramRenderer.Block(
+            summary, Path.GetFileName(workspace.SolutionPath), DiagramScopeFrom(request));
+
+        WriteOutcome outcome = ManagedBlockFile.Splice(diagramPath, body);
+        string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";
+        output.WriteLine($"{label} {PathFormat.Relative(workspace.SolutionDirectory, diagramPath)}");
+    }
+
+    private static DiagramScope DiagramScopeFrom(RenderRequest request)
+    {
+        return new DiagramScope(Globs(request.DiagramOnly), Globs(request.DiagramExclude));
+    }
+
+    // Semicolon-separated globs, the MSBuild list idiom; blanks are dropped so a trailing separator is not
+    // a pattern that matches nothing.
+    private static IReadOnlyList<string> Globs(string? value)
+    {
+        return value is null
+            ? []
+            : value.Split(';').Select(glob => glob.Trim()).Where(glob => glob.Length > 0).ToList();
     }
 
     // The non-root content units: extract the codebase once, then the layer cards (declaration order)

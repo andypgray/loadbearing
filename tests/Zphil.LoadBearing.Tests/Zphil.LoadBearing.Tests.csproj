@@ -206,6 +206,7 @@
         <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Cli/Golden/*.json" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="Cli/Golden/*.sarif" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="Cli/Golden/*.md" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>
