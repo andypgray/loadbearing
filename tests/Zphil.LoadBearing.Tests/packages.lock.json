@@ -77,16 +77,16 @@
       },
       "Basic.CompilerLog.Util": {
         "type": "Transitive",
-        "resolved": "0.9.47",
-        "contentHash": "t/kTUCiHcqSuR1oDvALKBeXXX7vQI1VSnVFW5JqWRSXeb3S2D62qQqxUV6VWp/Wzac/xK6jvgs3epa7MvqRnWw==",
+        "resolved": "0.9.49",
+        "contentHash": "UJGwJSJhypjss1OWPrMPNwG9A3ZD0sweChTjtNGHKHP/CohbVRK/SbjfG42+tMSYd9FrUn49JWYVvPhyHA3oJQ==",
         "dependencies": {
-          "MSBuild.StructuredLogger": "2.3.204",
-          "MessagePack": "3.1.7",
-          "Microsoft.Bcl.Memory": "10.0.9",
+          "MSBuild.StructuredLogger": "2.3.213",
+          "MessagePack": "3.1.8",
+          "Microsoft.Bcl.Memory": "10.0.10",
           "Microsoft.CodeAnalysis": "4.8.0",
           "Microsoft.CodeAnalysis.CSharp": "4.8.0",
           "Microsoft.CodeAnalysis.VisualBasic": "4.8.0",
-          "Microsoft.Extensions.ObjectPool": "10.0.9"
+          "Microsoft.Extensions.ObjectPool": "10.0.10"
         }
       },
       "CycleDetection": {
@@ -120,23 +120,23 @@
       },
       "MessagePack": {
         "type": "Transitive",
-        "resolved": "3.1.7",
-        "contentHash": "gXpifaxbhfBqh8bVToQn9j+OgCnhXWMbRCV7RQIbCVa9CNJG1fY6oHAYYl+ER3Tb9uUIHiQ5QbGiGwwFhoagbA==",
+        "resolved": "3.1.8",
+        "contentHash": "Qk2q+9FVxnMSp+NQ9y3SLz3HqWe7Rg3KRMHhBX28FkKUoOeP9YIU86mA4pFOxDDjUIRA9e7Ssbxs/LwWUcAzPw==",
         "dependencies": {
-          "MessagePack.Annotations": "3.1.7",
-          "MessagePackAnalyzer": "3.1.7",
+          "MessagePack.Annotations": "3.1.8",
+          "MessagePackAnalyzer": "3.1.8",
           "Microsoft.NET.StringTools": "17.11.4"
         }
       },
       "MessagePack.Annotations": {
         "type": "Transitive",
-        "resolved": "3.1.7",
-        "contentHash": "IW1yX9viarFl/Dsio5G+pM90JkOSW4xhAiJcKxPPF5rzyp2/yCpieWju8G99QLEmaQeze2uQMEskUBA59YZmkw=="
+        "resolved": "3.1.8",
+        "contentHash": "SitOtZ4tOlAZZPF7p52M7143F+Cuz7o/aU0MrtAXX0+ZkPXzDNroOFhzzE2ogMFThsoEW/E6akXVVcBFM9ZKaw=="
       },
       "MessagePackAnalyzer": {
         "type": "Transitive",
-        "resolved": "3.1.7",
-        "contentHash": "ZF+OOJTRS7Ogzb4gG36hPKVQk3kEbp6kkUcdRjhddDq/uSGcV4BKIdYiyJipExXyE/zsqYb0ic215O9kI+fjPA=="
+        "resolved": "3.1.8",
+        "contentHash": "Vm4g0cR4YRKRchEOmMJ0uVFU6yxdg7cJa2KHv3SUAHEsdYKvMpHMF5A1hZfsix89ymD5cmuzRnw9a6dKMcvq+Q=="
       },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
@@ -150,8 +150,8 @@
       },
       "Microsoft.Bcl.Memory": {
         "type": "Transitive",
-        "resolved": "10.0.9",
-        "contentHash": "Ot6xtHSjibECjp8mP41wch9GUSeGTXtUUc7M2MthKtiFmvPBMpvp6d8RwBJOtg/ia5PE0iR05PRy1ZVBAOmaeQ=="
+        "resolved": "10.0.10",
+        "contentHash": "/PxGfVdy8P15x9TUyAyWfzR92DcRVRCMs4nMnVS6bldRaDTJJPG9ECJPlF0lbkeZdqwM5eSkOQ214YwvcimAWQ=="
       },
       "Microsoft.Build.Locator": {
         "type": "Transitive",
@@ -519,8 +519,8 @@
       },
       "Microsoft.Extensions.ObjectPool": {
         "type": "Transitive",
-        "resolved": "10.0.9",
-        "contentHash": "KZENCkfqO7Ciax6goUWQHDSxKH+x763hkBWMz9KpE87EyKW+EKEas9EFe9i1KgtQShG8KwKxaeJ5gd9sj6TuTQ=="
+        "resolved": "10.0.10",
+        "contentHash": "Tx0R6PY9MNSh0mDKSxbpHLuuec93IxF1cel+1ithQnMNr/vbfLSSHOQHGHIppAJCGfPcEo/wO1Ylj+QpXtzo3A=="
       },
       "Microsoft.Extensions.Options": {
         "type": "Transitive",
@@ -627,8 +627,8 @@
       },
       "MSBuild.StructuredLogger": {
         "type": "Transitive",
-        "resolved": "2.3.204",
-        "contentHash": "jdp9zBMKBQU7xNV4FrvVVchASLUn0plE0cIqK3X7kwjvqyCp559IT8xfTldoG5tm4xMqR4VhVsKkDT9MCktobg==",
+        "resolved": "2.3.213",
+        "contentHash": "YGzaGta+8rgy2vnC14ZCdXIhXCbYNMYHoYldguY4+siZpJPgRJbGwtsg4+RjxVdEe7u28KA8Urv/ObNaYLWP0Q==",
         "dependencies": {
           "Microsoft.Build.Framework": "17.5.0",
           "Microsoft.Build.Utilities.Core": "17.5.0"
@@ -850,7 +850,7 @@
       "zphil.loadbearing.roslyn": {
         "type": "Project",
         "dependencies": {
-          "Basic.CompilerLog.Util": "[0.9.47, )",
+          "Basic.CompilerLog.Util": "[0.9.49, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis": "[5.6.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.6.0, )",
