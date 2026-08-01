@@ -72,7 +72,7 @@ FAIL cli/no-stdout — Types in project `Zphil.LoadBearing.Cli` must not use `Co
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:15 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the fourteen-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
+That stanza is one rule's worth of the sixteen-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
 
 ## In xUnit
 
@@ -180,7 +180,7 @@ The page is the tool's output, and the [CI badge](https://github.com/andypgray/l
 
 The grammar comes from surveying that prior art, and [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) records each divergence. Constraints negate in the verb (`MustNotReference`), following ArchUnitNET. If you know ArchUnit's `FreezingArchRule`: what freezing does (accept a rule's current violations as a baseline) is `Migrate` with its counted baseline here. `Quarantine` contains a scope; it does not accept the scope's violations.
 
-`Because` is mandatory. A rule without one is an invalid spec: `check` refuses to run it and reports every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Every reason ships to your agents in the rendered context, and in the [Interchange example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange) each of the twelve rules' `Because` cites the learn.microsoft.com page it enforces.
+`Because` is mandatory. A rule without one is an invalid spec: `check` refuses to run it and reports every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Every reason ships to your agents in the rendered context, and in the [Interchange example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange) each of the twelve rules' `Because` cites the learn.microsoft.com page it enforces. Nine of those twelve come from a shared rule pack, which is an ordinary class library of static methods: the pack owns the citation, the spec picks the posture.
 
 ## The three postures
 
@@ -211,7 +211,7 @@ LoadBearing is built for long-lived, business-critical .NET codebases: systems t
 Six worked examples in [`examples/`](https://github.com/andypgray/loadbearing/tree/main/examples) share one fictional freight-forwarding company; CI builds each one and holds `check` green against the committed tree. Three are whole codebases:
 
 - [Enforce-only clean architecture](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): the greenfield quoting subsystem. Nine rules hold a four-layer clean architecture, and every rule runs as a named xUnit test.
-- [All three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a mid-migration monolith where six of eight controllers still run inline SQL. The law, two ratchets and their burndown, one quarantined scope.
+- [All three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a mid-migration monolith where six of eight controllers still run inline SQL. The law, three ratchets and their burndown, one quarantined scope.
 - [Module isolation as law](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): a modular monolith. Every module directory carries its own rendered rule card, and one module is quarantined behind its facade.
 
 Three go deeper on one surface each:

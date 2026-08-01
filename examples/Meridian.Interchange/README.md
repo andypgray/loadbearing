@@ -38,19 +38,21 @@ Twelve rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeAr
 | `persistence/no-mapping-attributes` | Enforce | no `[Table]`/`[ComplexType]` on a persisted type |
 | `contracts/no-entity-exposure` | Enforce | do not expose `OutboxMessage` outside the `Outbox` cone |
 
-Eleven rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red. Two of the rules read like this in the spec, the citation URL sitting at the end of each `Because`:
+Eleven rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red.
+
+Nine of the twelve say nothing this worker makes special, so they are not written here at all. They come from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. The pack owns each rule's citation-bearing `Because`, since the reason to reuse an `HttpClient` is the same in every codebase; this spec picks the posture, the selections, and the `Fix` where remediation names a real type. The three rules that name Meridian's own types are written out in full. Both forms sit in the same `Define`:
 
 ```csharp
-arch.Rule("http/reuse-httpclient")
-    .Enforce(arch.Types.Except(host).MustNotConstruct(typeof(HttpClient)))
-    .Because("A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines")
-    .Fix("Take a typed or named client from IHttpClientFactory; see how CarrierClient receives its HttpClient.");
+DotNetGuidance.ReuseHttpClient(arch, arch.Types, host, PackPosture.Enforce,
+    "Take a typed or named client from IHttpClientFactory; see how CarrierClient receives its HttpClient.");
 
 arch.Rule("di/hosted-services-scope-their-work")
     .Enforce(arch.Types.DerivedFrom<BackgroundService>().MustNotReference(typeof(IOptionsSnapshot<>), typeof(IOutboxStore)))
     .Because("A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope — resolve per work item from an IServiceScopeFactory scope — https://learn.microsoft.com/dotnet/core/extensions/scoped-service")
     .Fix("Inject IServiceScopeFactory, create a scope per iteration, resolve scoped services inside it; see OutboxDispatcher and ScopedDispatchRunner.");
 ```
+
+They reify to the same kind of rule. Nothing downstream can tell you which came from where: the rendered context, the violation message, and the citation URL read identically either way.
 
 `loadbearing render` writes those into the managed block in [AGENTS.md](AGENTS.md), citation and all. CI re-renders on every push and fails on any diff, so the context an agent reads is provably the spec the build enforces:
 
@@ -106,12 +108,11 @@ The four blocking calls are recorded, not accepted. New blocking anywhere in the
 
 `di/no-captive-dependencies` reads two facts the other rules don't: which types are registered with which lifetime, and which types inject which. It states the general captive-dependency antipattern (a singleton must not inject a scoped or transient service), the case `di/hosted-services-scope-their-work` reaches only where the type hierarchy already reveals it.
 
+It is a pack rule, so the spec says only which singletons it governs and how to fix a capture here:
+
 ```csharp
-arch.Rule("di/no-captive-dependencies")
-    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(
-        arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
-    .Because("A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
-    .Fix("Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
+DotNetGuidance.NoCaptiveDependencies(arch, arch.Registered(Lifetime.Singleton), PackPosture.Enforce,
+    "Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
 ```
 
 The worker is green under it. Both singletons take only singleton-safe dependencies: `ScopedDispatchRunner` injects `IServiceScopeFactory`, and `OutboxDispatcher` injects that runner and an `IOptions<InterchangeOptions>` (`IOptions<T>` is a singleton, unlike the scoped `IOptionsSnapshot<T>` its processor uses). The scoped work stays behind the scope seam.
@@ -166,11 +167,11 @@ The match is exact: `MustNotCatch(typeof(Exception))` flags a catch of base `Exc
 `async/accept-cancellation` is green over a worker that carries a token the whole way down. Every `Task`-returning method in `Meridian.Interchange.*` accepts a `CancellationToken`: `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make, and the partner clients and the outbox store take it at the leaf. The rule requires the parameter on every one of them.
 
 ```csharp
-arch.Rule("async/accept-cancellation")
-    .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
-    .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
-    .Fix("Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
+DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
+    "Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
 ```
+
+The pack applies the method projection, so the spec passes the types and the rule narrows to their `Task`-returning methods.
 
 The rule reads the declared parameter list. A method satisfies it by declaring a `CancellationToken` parameter; whether the body then forwards that token to the calls it makes is a separate question of flow this presence rule does not answer. What it guarantees is that the token is on the surface for a caller to pass.
 
@@ -204,12 +205,10 @@ The violation is keyed to the method at its declaration site, `ScopedDispatchRun
 
 `persistence/no-mapping-attributes` is green over a worker whose persisted type stays a plain record. `OutboxMessage` is a POCO (three properties, no base class, no mapping attribute), and the outbox that holds it is an in-memory list a real deployment would back with a table. The rule encodes persistence ignorance, which Microsoft defines as "types that need to be persisted, but whose code is unaffected by the choice of persistence technology"; the same page lists "persistence-specific required attributes" among the couplings that violate it. The rule bans the two type-level mapping attributes, `[Table]` and `[ComplexType]`, across `Meridian.Interchange.*`.
 
+Another pack rule, and one where the pack's own `Fix` says everything worth saying, so the spec takes it as it comes:
+
 ```csharp
-arch.Rule("persistence/no-mapping-attributes")
-    .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
-        .MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute)))
-    .Because("A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles")
-    .Fix("Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.");
+DotNetGuidance.NoMappingAttributes(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
 ```
 
 The rule reads the type's own declared attributes. It names `[Table]` and `[ComplexType]` rather than banning the `DataAnnotations` namespace wholesale, because that namespace also carries the validation attributes a domain may legitimately want; the two persistence markers live in its `Schema` sub-namespace and tag the type itself as a mapped entity. A mapping attribute on a property (a `[Column]` or `[Key]`) sits below the type surface this rule reads, so v1 does not see it; keeping that mapping out of the domain type is the same discipline the `Fix` names, fluent configuration in the persistence layer.

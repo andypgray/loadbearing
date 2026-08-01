@@ -132,6 +132,7 @@ Here is Meridian's spec project, exactly as committed:
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\..\..\..\src\Zphil.LoadBearing.Packs.DotNet\Zphil.LoadBearing.Packs.DotNet.csproj" />
         <ProjectReference Include="..\..\src\Meridian.Clearance\Meridian.Clearance.csproj" />
     </ItemGroup>
 
@@ -142,7 +143,9 @@ Here is Meridian's spec project, exactly as committed:
 </Project>
 ```
 
-The one line worth calling out is `CopyLocalLockFileAssemblies`: it stages NuGet package assemblies (here SqlClient) into the spec's build output, so `check` can load the `typeof()` targets that live in those packages. It is harmless when every target is a project type or a namespace pattern.
+The one line worth calling out is `CopyLocalLockFileAssemblies`: it stages NuGet package assemblies (here SqlClient) into the spec's build output, so `check` can load the `typeof()` targets that live in those packages. It is harmless when every target is a project type or a namespace pattern, and it becomes necessary again the moment a rule pack brings packages of its own.
+
+The second `ProjectReference` is that rule pack, `DotNetGuidance`. A pack is an ordinary class library of static methods that declare rules onto your `Arch`; you reference it and call the ones you want. Nothing is discovered and nothing is implicit, so this reference on its own adds no rules. Step 3 is where the calls go in.
 
 The class starts empty and grows in step 3:
 
@@ -159,27 +162,31 @@ public sealed class MeridianArchSpec : IArchitectureSpec
 }
 ```
 
-Add it to the solution, then build it before you check. In a source checkout the add step prints two lines rather than one:
+Add it to the solution, then build it before you check. In a source checkout the add step prints three lines rather than one:
 
 ```text
 $ dotnet sln examples/Meridian/Meridian.slnx add examples/Meridian/arch/Meridian.ArchSpec/Meridian.ArchSpec.csproj --solution-folder arch
 Project `arch\Meridian.ArchSpec\Meridian.ArchSpec.csproj` added to the solution.
 Project `..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj` added to the solution.
+Project `..\..\src\Zphil.LoadBearing.Packs.DotNet\Zphil.LoadBearing.Packs.DotNet.csproj` added to the solution.
 exit: 0
 ```
 
-In a source checkout like this repository, `dotnet sln add` follows the spec's project references and also adds the LoadBearing contract library (the second `added` line above). The recipe's step 2 lists the errors you may see in that setup, verbatim; [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references LoadBearing as a `PackageReference` and sees none of this.
+In a source checkout like this repository, `dotnet sln add` follows the spec's project references transitively and also adds the LoadBearing contract library and the rule pack (the second and third `added` lines above). The recipe's step 2 lists the errors you may see in that setup, verbatim; [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references LoadBearing as a `PackageReference` and sees none of this.
 
 ## Step 3: draft candidate rules
 
 On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence that decides it. Write the already-true directions too, the ones the edge matrix showed clean, because a clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone: a boundary has no `Enforce` form, so you draft it as a `Quarantine` scope directly.
 
-Meridian's survey produced four direction-and-convention candidates plus one quarantined scope:
+Before you write any of them, check what you can take instead. Canonical .NET guidance is the same in every codebase, so a rule pack ships those rules with their reasons already written and their citations attached, and calling one costs a line. Take the ones that could plausibly apply to your estate and leave the rest: opting out is not calling the method. Draft the taken rules as `Enforce` too, for the same reason as the ones you write, and let step 4 tell you which of them your code already obeys.
+
+Meridian's survey produced four direction-and-convention candidates plus one quarantined scope, and two rules come from the pack: the `Async` naming convention, because Web and Domain are full of `Task`-returning methods, and the `BuildServiceProvider` antipattern, because the app has a composition root worth guarding.
 
 ```csharp
 using Meridian.Clearance;
 using Microsoft.Data.SqlClient;
 using Zphil.LoadBearing;
+using Zphil.LoadBearing.Packs.DotNet;
 
 namespace Meridian.ArchSpec;
 
@@ -209,6 +216,10 @@ public sealed class MeridianArchSpec : IArchitectureSpec
                 arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
             .Because("Candidate: the Web layer looks like it reads the ambient clock directly.");
 
+        DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web), PackPosture.Enforce);
+
+        DotNetGuidance.NoBuildServiceProvider(arch, arch.Types, PackPosture.Enforce);
+
         arch.Scope("clearance/engine")
             .Quarantine(arch.Namespace("Meridian.Clearance.*"))
             .BoundaryOnlyVia(typeof(IClearanceGateway), typeof(ClearanceGateway))
@@ -220,7 +231,9 @@ public sealed class MeridianArchSpec : IArchitectureSpec
 }
 ```
 
-That is five candidate rules. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report six. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
+That is five candidate rules you wrote plus two you took. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report eight. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
+
+The two pack calls carry no `Because` here because they do not need one: the pack wrote it, with the learn.microsoft.com citation attached, and it reads the same in every codebase that takes the rule. What you choose is the posture and the selections. The naming rule takes the two layers rather than a project so it reaches Domain's interfaces without sweeping `Program.cs`'s top-level statements.
 
 The CLI never builds your code; it reads compiled assemblies. Build the spec before every check, or the check reads a stale build and reports stale results.
 
@@ -249,6 +262,23 @@ FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTim
   src/Meridian.Web/Controllers/RatesController.cs:15 — Meridian.Web.Controllers.RatesController uses System.DateTime.UtcNow
   src/Meridian.Web/Controllers/ShipmentsController.cs:15 — Meridian.Web.Controllers.ShipmentsController uses System.DateTime.UtcNow
   src/Meridian.Web/Data/SystemClock.cs:7 — Meridian.Web.Data.SystemClock uses System.DateTime.UtcNow
+FAIL naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+  because: Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
+  fix: Rename the method to end in Async.
+  src/Meridian.Domain/IBookingRepository.cs:5 — Meridian.Domain.IBookingRepository.Add()
+  src/Meridian.Domain/IBookingRepository.cs:7 — Meridian.Domain.IBookingRepository.Get()
+  src/Meridian.Domain/IQuoteRepository.cs:5 — Meridian.Domain.IQuoteRepository.Add()
+  src/Meridian.Domain/IQuoteRepository.cs:7 — Meridian.Domain.IQuoteRepository.Get()
+  src/Meridian.Domain/IRateCardRepository.cs:5 — Meridian.Domain.IRateCardRepository.GetForLane()
+  src/Meridian.Web/Controllers/BookingsController.cs:18 — Meridian.Web.Controllers.BookingsController.Create()
+  src/Meridian.Web/Controllers/QuotesController.cs:15 — Meridian.Web.Controllers.QuotesController.Create()
+  src/Meridian.Web/Controllers/QuotesController.cs:39 — Meridian.Web.Controllers.QuotesController.Get()
+  src/Meridian.Web/Data/BookingRepository.cs:8 — Meridian.Web.Data.BookingRepository.Add()
+  src/Meridian.Web/Data/BookingRepository.cs:29 — Meridian.Web.Data.BookingRepository.Get()
+  src/Meridian.Web/Data/QuoteRepository.cs:8 — Meridian.Web.Data.QuoteRepository.Add()
+  src/Meridian.Web/Data/QuoteRepository.cs:30 — Meridian.Web.Data.QuoteRepository.Get()
+  src/Meridian.Web/Data/RateCardRepository.cs:8 — Meridian.Web.Data.RateCardRepository.GetForLane()
+pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   because: Candidate: a self-contained clearance module already sits behind a gateway facade.
   fix: use `IClearanceGateway`
@@ -258,11 +288,13 @@ FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `I
 skip clearance/engine/tripwire
   skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.
 
-Checked 6 rules: 2 passed, 3 failed, 1 skipped (21 violations, 0 warnings).
+Checked 8 rules: 3 passed, 4 failed, 1 skipped (34 violations, 0 warnings).
 exit: 1
 ```
 
-The two direction-and-naming rules pass with zero violations, which already tells you their posture. The three that fail are the evidence. `data-access/no-inline-sql` reports twelve violations across six controllers (thirty-one reference sites in the full output; the capture above shows CustomsController's five and drops the other five controllers). That answers the survey's open question: the `Microsoft.Data` references do land in controllers, and in six of the eight. `time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup: `src/Meridian.Web/Data/SystemClock.cs:7`, a type whose job is to read the clock. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, which is expected: it is diff-aware and does nothing without `--diff-base`. Twenty-one located, named violations, ready to price.
+The two direction-and-naming rules pass with zero violations, which already tells you their posture, and so does one of the two pack rules: `di/no-buildserviceprovider` is green on the first run. The four that fail are the evidence. `data-access/no-inline-sql` reports twelve violations across six controllers (thirty-one reference sites in the full output; the capture above shows CustomsController's five and drops the other five controllers). That answers the survey's open question: the `Microsoft.Data` references do land in controllers, and in six of the eight. `time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup: `src/Meridian.Web/Data/SystemClock.cs:7`, a type whose job is to read the clock. `naming/async-suffix` reports thirteen, shown in full: five interface declarations in Domain and eight implementations and actions in Web, which is the shape of a convention the codebase never adopted rather than one it drifted from. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, which is expected: it is diff-aware and does nothing without `--diff-base`. Thirty-four located, named violations, ready to price.
+
+Notice that the pack rule was measured exactly like the ones written by hand. A pack ships a rule and the reason for it; it has no opinion on whether your code obeys yet, and the check is what tells you.
 
 ## Step 5: assign postures from the evidence
 
@@ -276,9 +308,13 @@ Meridian's evidence assigns cleanly:
 | `naming/controllers` | 0 violations | Enforce |
 | `data-access/no-inline-sql` | 12 pairs, 6 controllers | Migrate |
 | `time/inject-clock` | 8 clock reads | Migrate |
+| `naming/async-suffix` | 13 unsuffixed methods | Migrate |
+| `di/no-buildserviceprovider` | 0 violations | Enforce |
 | `clearance/engine` | 1 non-facade inbound | Quarantine |
 
-The two zero-violation rules become law. The inline-SQL rule has twelve violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`: the majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is), so the scope is `Quarantine`.
+The three zero-violation rules become law. The inline-SQL rule has twelve violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`: the majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The naming rule has thirteen and the team wants the convention, so `Migrate` as well. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is), so the scope is `Quarantine`.
+
+The two pack rules land on opposite sides of that line, from the same source, on the same run. In the [Interchange example](../Meridian.Interchange/) the identical `naming/async-suffix` is `Enforce`, because that codebase already keeps it. Nothing about the rule changed; the evidence did. This is why a pack hands you the rule and its reason and leaves the posture alone: only your check knows what your code does.
 
 The refinement is where the evidence earns its keep. The draft flagged `SystemClock.cs:7` alongside the seven controller reads. But `SystemClock` implements `IClock`: it is the one sanctioned seam that must read the wall clock, so nothing else has to. The blunt draft rule surfaced the seam; the curated rule keeps it by adding `.Except(arch.Types.WithNameMatching("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, not code evidence: an empty subject or a glob that matched nothing would speak the same way, telling you to fix the rule rather than measure the code.
 
@@ -290,7 +326,11 @@ For Meridian the curation is a small set of edits against the draft (the finishe
 
 - The two data rules move from `Enforce` to `Migrate`, each gaining a factual `from:` line describing the old pattern ("Controllers open SqlConnection and run inline SQL directly"; "Code reads the ambient clock directly"), a real `Because`, and a `Fix` that names the exemplar to copy (`BookingRepository` for the SQL, `BookingsController` for the clock).
 - The clock rule gains the `.Except(SystemClock)` refinement from step 5.
+- The naming rule moves from `PackPosture.Enforce` to `PackPosture.Migrate` with its own `from:` line ("Repository and controller methods return Task without the Async suffix"), plus a `Fix` override, because renaming an interface method means moving its implementations with it and the pack's generic hint does not say so. Its `Because` is untouched: that reason was never Meridian's to write.
+- `di/no-buildserviceprovider` is left exactly as drafted. It was green on the evidence pass and the pack's own prose says everything worth saying, so there is nothing to curate.
 - The quarantined scope keeps its dragons prose and gains its real `Because`.
+
+Curating a taken rule is the same job as curating one you wrote, minus the part the pack already did. That asymmetry is the point: the reason is universal, so it ships; the posture and the remediation are local, so they stay yours.
 
 With the curated spec built, `baseline --init` captures the debt:
 
@@ -300,12 +340,14 @@ data-access/no-inline-sql: captured 12 grandfathered violations.
 wrote arch/baselines/data-access/no-inline-sql.json
 time/inject-clock: captured 7 grandfathered violations.
 wrote arch/baselines/time/inject-clock.json
+naming/async-suffix: captured 13 grandfathered violations.
+wrote arch/baselines/naming/async-suffix.json
 clearance/engine/containment: captured 1 grandfathered violation.
 wrote arch/baselines/clearance/engine/containment.json
 exit: 0
 ```
 
-Three baselines, one per ratcheted rule, holding twelve inline-SQL references, seven clock reads, and one inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
+Four baselines, one per ratcheted rule, holding twelve inline-SQL references, seven clock reads, thirteen unsuffixed methods, and one inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
 
 ```text
 $ loadbearing check examples/Meridian/Meridian.slnx
@@ -313,15 +355,17 @@ pass layering/domain-independent — The Domain layer must not reference the Web
 pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
+pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
 skip clearance/engine/tripwire
   skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.
 
-Checked 6 rules: 5 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
+Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
 exit: 0
 ```
 
-Each of the three ratcheted passes also prints its grandfathered count (12, 7, and 1); those sub-lines are dropped above. Exit 0, zero live violations, and the debt is on the record rather than in the way. These are the only two `check` fences on this page, the draft red and the post-baseline green; the curated-but-unbaselined run in between is the one `--init` captured. From here `loadbearing status` prints the per-rule burndown, and the [README's status board](README.md#the-burndown) shows what it reports as the numbers fall.
+Each of the four ratcheted passes also prints its grandfathered count (12, 7, 13, and 1); those sub-lines are dropped above. Exit 0, zero live violations, and the debt is on the record rather than in the way. These are the only two `check` fences on this page, the draft red and the post-baseline green; the curated-but-unbaselined run in between is the one `--init` captured. From here `loadbearing status` prints the per-rule burndown, and the [README's status board](README.md#the-burndown) shows what it reports as the numbers fall.
 
 ## Step 7: render and commit
 

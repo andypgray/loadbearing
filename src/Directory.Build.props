@@ -5,8 +5,9 @@
          re-importing this one. -->
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
-    <!-- Supply-chain lock-file policy, scoped to src/ (the four shipping projects) — plus an inline
-         copy in the tests csproj, since tests live outside this directory. It is deliberately NOT at
+    <!-- Supply-chain lock-file policy, scoped to src/ (the four shipping projects plus the rule
+         pack) — plus an inline copy in the tests csproj, since tests live outside this directory.
+         It is deliberately NOT at
          the repo root: FixtureRestorer restores throwaway fixture-solution copies under a project's
          bin/ mid-test-run without stripping $(CI), and those copies walk up to whatever props file
          sits above them — a root-level policy would demand lock files for the fixtures and fail their

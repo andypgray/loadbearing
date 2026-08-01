@@ -10,11 +10,11 @@ Meridian handles bookings, rating, customs, invoicing, and dispatch. Eight contr
 
 Behind `IClearanceGateway`, the `Meridian.Clearance` module validates container numbers. Its `ContainerCheckDigit` computes the ISO 6346 check digit, the calculation that decides whether `CSQU3054383` is a real container number or a typo. That module is quarantined.
 
-Twenty current violations are grandfathered: twelve inline-SQL references, seven wall-clock reads, and one reach into the quarantined module. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems the tool is built for: long-lived, business-critical, too important to rewrite on a whim.
+Thirty-three current violations are grandfathered: twelve inline-SQL references, seven wall-clock reads, thirteen `Task`-returning methods missing the `Async` suffix, and one reach into the quarantined module. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems the tool is built for: long-lived, business-critical, too important to rewrite on a whim.
 
 ## The spec
 
-The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Each one carries a posture, a reason, and a fix. (The quarantined scope desugars into two checked rules, so `check` reports six.)
+The architecture is seven statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Five are written there; two are taken from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. Each statement carries a posture, a reason, and a fix. (The quarantined scope desugars into two checked rules, so `check` reports eight.)
 
 | Rule | Posture | What it says |
 |---|---|---|
@@ -22,9 +22,23 @@ The architecture is five statements of ordinary C# in [arch/Meridian.ArchSpec/Me
 | `naming/controllers` | Enforce | controllers are named `*Controller` |
 | `data-access/no-inline-sql` | Migrate | controllers must not open `SqlConnection` |
 | `time/inject-clock` | Migrate | Web must not read `DateTime.Now` / `UtcNow` |
+| `naming/async-suffix` | Migrate | `Task`-returning methods end in `Async` (from the pack) |
+| `di/no-buildserviceprovider` | Enforce | no `BuildServiceProvider` while configuring (from the pack) |
 | `clearance/engine` | Quarantine | reach the module only via `IClearanceGateway` |
 
-Two rules are already true, so they are law (`Enforce`). Two describe debt with a target, so they ratchet (`Migrate`): the current violations are grandfathered, and anything new is red. One walls off a module with no target state (`Quarantine`).
+Three rules are already true, so they are law (`Enforce`). Three describe debt with a target, so they ratchet (`Migrate`): the current violations are grandfathered, and anything new is red. One walls off a module with no target state (`Quarantine`).
+
+The two pack rules show the two halves of that split from one source. Both are canonical .NET guidance; the posture is Meridian's call, and the calls sit beside the local rules in the same `Define`:
+
+```csharp
+DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web),
+    PackPosture.Migrate("Repository and controller methods return Task without the Async suffix."),
+    "Rename the method to end in Async and update its callers; see the interface and its implementation together.");
+
+DotNetGuidance.NoBuildServiceProvider(arch, arch.Types, PackPosture.Enforce);
+```
+
+The same `naming/async-suffix` is `Enforce` in the [Interchange example](../Meridian.Interchange/), where the codebase already keeps it. A pack ships the rule and its reason; a codebase decides whether it is law yet.
 
 ## What the agent reads
 
@@ -34,10 +48,12 @@ Two rules are already true, so they are law (`Enforce`). Two describe debt with 
 ### Rules
 - `layering/domain-independent` — The Domain layer must not reference the Web layer. Domain holds the booking and rate model the rest of the system depends on; it must not reach up into the web tier.
 - `naming/controllers` — Types in `Meridian.Web.Controllers.*` must be named `*Controller`. Request handlers are found by their `*Controller` name — by routing and by agents reading the code; keep the convention total.
+- `di/no-buildserviceprovider` — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`. Calling BuildServiceProvider while configuring services builds a second container with its own singletons — a duplicate-instance trap — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
 
 ### Migrations
 - `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: Controllers open SqlConnection and run inline SQL directly. That is grandfathered debt, not house style. New code must follow: Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`. Data access behind a repository can be tested and swapped; SQL in the request path cannot. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 - `time/inject-clock` — Most existing code here follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
+- `naming/async-suffix` — Most existing code here follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`. Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
 ### Quarantined scopes
 - `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
@@ -101,9 +117,11 @@ pass layering/domain-independent
 pass naming/controllers
 pass data-access/no-inline-sql (migrate) — 12 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass time/inject-clock (migrate) — 7 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass naming/async-suffix (migrate) — 13 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass di/no-buildserviceprovider
 pass clearance/engine/containment (quarantine) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 skip clearance/engine/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'
-Checked 6 rules: 5 passed, 0 failed, 1 skipped. Burndown: 20 grandfathered remaining, 0 fixed awaiting acceptance.
+Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining, 0 fixed awaiting acceptance.
 ```
 
 Move a controller onto a repository and its grandfathered count drops. When a Migrate rule reaches zero, the tool suggests promoting it to `Enforce`.

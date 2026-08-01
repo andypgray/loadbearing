@@ -117,12 +117,14 @@ public sealed class ReadmeAnchorGateTests
         (MeridianReadme, BookingsController, 77),
         (MeridianReadme, BookingsController, 78),
 
-        // Beat 2 of the storyboard writes the same hypothetical inline-SQL method into BookingsController.
-        (Storyboard, BookingsController, 72),
-        (Storyboard, BookingsController, 73),
-        (Storyboard, BookingsController, 74),
-        (Storyboard, BookingsController, 75),
-        (Storyboard, BookingsController, 77),
+        // Beat 2 of the storyboard writes a hypothetical inline-SQL method into BookingsController,
+        // along with the using and constructor parameter it needs; the quoted lines are that method's
+        // check output, captured by following the storyboard's own reproduce steps.
+        (Storyboard, BookingsController, 85),
+        (Storyboard, BookingsController, 86),
+        (Storyboard, BookingsController, 87),
+        (Storyboard, BookingsController, 88),
+        (Storyboard, BookingsController, 90),
 
         // The root README's hook beat quotes the block a red self-check feeds an agent: the hypothetical
         // edit is a whole new ProgressPrinter file dropped into the CLI's Rendering directory, which is

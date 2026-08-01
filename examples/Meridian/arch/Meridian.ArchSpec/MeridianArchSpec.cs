@@ -1,14 +1,17 @@
 using Meridian.Clearance;
 using Microsoft.Data.SqlClient;
 using Zphil.LoadBearing;
+using Zphil.LoadBearing.Packs.DotNet;
 
 namespace Meridian.ArchSpec;
 
 /// <summary>
 ///     Meridian's architecture spec — the freight-forwarding monolith mid-migration, carrying all
-///     three postures on one codebase: Enforce for the law it already keeps, Migrate for the two
-///     ratchets being worked off (inline SQL in controllers; ambient-clock reads), and Quarantine for
-///     the ISO 6346 clearance engine, contained behind its gateway.
+///     three postures on one codebase: Enforce for the law it already keeps, Migrate for the three
+///     ratchets being worked off (inline SQL in controllers; ambient-clock reads; Task-returning
+///     methods without the Async suffix), and Quarantine for the ISO 6346 clearance engine, contained
+///     behind its gateway. Five rules are Meridian's own; two come from the shared
+///     <c>DotNetGuidance</c> pack, taken a la carte at the postures this codebase warrants.
 /// </summary>
 public sealed class MeridianArchSpec : IArchitectureSpec
 {
@@ -43,6 +46,18 @@ public sealed class MeridianArchSpec : IArchitectureSpec
                         () => DateTime.UtcNow))
             .Because("Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input.")
             .Fix("Take IClock in the constructor; see BookingsController.");
+
+        // Two rules taken from the shared DotNetGuidance pack rather than written again. The posture is
+        // Meridian's to choose, and the two differ: the naming convention is genuinely behind here, so it
+        // ratchets against a baseline, while nothing builds a second container, so that one is law from
+        // the start. The subject for the naming rule is the two layers rather than a project, so the rule
+        // anchors on no single project and stays in the root context rather than churning the per-project
+        // cards; it also keeps Program.cs's top-level statements out of the subject.
+        DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web),
+            PackPosture.Migrate("Repository and controller methods return Task without the Async suffix."),
+            "Rename the method to end in Async and update its callers; see the interface and its implementation together.");
+
+        DotNetGuidance.NoBuildServiceProvider(arch, arch.Types, PackPosture.Enforce);
 
         arch.Scope("clearance/engine")
             .Quarantine(arch.Namespace("Meridian.Clearance.*"))

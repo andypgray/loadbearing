@@ -8,7 +8,7 @@ updates:
     schedule:
       interval: weekly
 
-  # Only the five projects with committed packages.lock.json are listed. The fixture and
+  # Only the six projects with committed packages.lock.json are listed. The fixture and
   # arch projects are deliberately absent — they carry no lock files by design.
   - package-ecosystem: nuget
     directories:
@@ -16,6 +16,7 @@ updates:
       - /src/Zphil.LoadBearing.Roslyn
       - /src/Zphil.LoadBearing.Xunit
       - /src/Zphil.LoadBearing.Cli
+      - /src/Zphil.LoadBearing.Packs.DotNet
       - /tests/Zphil.LoadBearing.Tests
     schedule:
       interval: weekly

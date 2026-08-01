@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- A rule pack: an ordinary class library of static methods that declare rules on a caller's
+             Arch. Nothing in the product loads it — a consuming spec project takes a ProjectReference
+             and calls the methods it wants. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- IsPackable=false: this is the demonstrator that rule packs are just C# libraries, not a
+             fifth published package. It also keeps `dotnet pack` on the solution at exactly four
+             nupkgs, which ci.yml and release.yml both count. -->
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The two DI packages the pack's own anchors need: ServiceProviderServiceExtensions comes
+             from the abstractions, ServiceCollectionContainerBuilderExtensions from the container
+             itself. HttpClient, Task, CancellationToken, and the [Table]/[ComplexType] attributes all
+             resolve from the shared framework, so there is nothing else to reference. Pinned at the
+             newest in-repo version; the example spec projects sit at 10.0.9 and unify upward. -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    </ItemGroup>
+
+</Project>

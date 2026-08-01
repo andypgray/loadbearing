@@ -39,6 +39,10 @@
         <ProjectReference Include="..\..\src\Zphil.LoadBearing.Cli\Zphil.LoadBearing.Cli.csproj" />
         <ProjectReference Include="..\..\src\Zphil.LoadBearing.Roslyn\Zphil.LoadBearing.Roslyn.csproj" />
         <ProjectReference Include="..\..\src\Zphil.LoadBearing.Xunit\Zphil.LoadBearing.Xunit.csproj" />
+        <!-- The rule pack, so its nine rules can be pinned against the hand-written equivalents. It
+             brings Microsoft.Extensions.DependencyInjection (the container, not just the abstractions)
+             in transitively — hence the lock-file churn that lands with this reference. -->
+        <ProjectReference Include="..\..\src\Zphil.LoadBearing.Packs.DotNet\Zphil.LoadBearing.Packs.DotNet.csproj" />
         <!-- Normal reference (ReferenceOutputAssembly=true): AgentsMd_IsCurrent consumes the dogfood
              spec type directly to compose the block in-process. Unlike the fixture specs, using this
              type is legitimate. -->

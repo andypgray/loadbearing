@@ -90,19 +90,22 @@ pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named 
 FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
   because: Data access behind a repository can be tested and swapped; SQL in the request path cannot.
   fix: Move the SQL into a repository; see BookingRepository.
-  src/Meridian.Web/Controllers/BookingsController.cs:72 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
-  src/Meridian.Web/Controllers/BookingsController.cs:73 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
-  src/Meridian.Web/Controllers/BookingsController.cs:74 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
-  src/Meridian.Web/Controllers/BookingsController.cs:75 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
-  src/Meridian.Web/Controllers/BookingsController.cs:77 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  src/Meridian.Web/Controllers/BookingsController.cs:85 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
+  src/Meridian.Web/Controllers/BookingsController.cs:86 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  src/Meridian.Web/Controllers/BookingsController.cs:87 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
+  src/Meridian.Web/Controllers/BookingsController.cs:88 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
+  src/Meridian.Web/Controllers/BookingsController.cs:90 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
+pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+  grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
+pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 pass clearance/engine/tripwire
 
-Checked 6 rules: 5 passed, 1 failed, 0 skipped (2 violations, 0 warnings).
+Checked 8 rules: 7 passed, 1 failed, 0 skipped (2 violations, 0 warnings).
 ```
 
 The report carries the four things an agent needs to act: the rule ID (`data-access/no-inline-sql`),
@@ -119,12 +122,18 @@ repository:
 
 ```csharp
 [HttpGet("lookup/{reference}")]
-public async Task<IActionResult> Lookup(string reference)
+public async Task<IActionResult> LookupAsync(string reference)
 {
     Booking? booking = await bookings.Get(reference);
     return booking is null ? NotFound() : Ok(booking);
 }
 ```
+
+The `Async` suffix on the new method is the second ratchet doing the same job as the first. Write it
+as `Lookup` and `naming/async-suffix` goes red on that one method while its thirteen grandfathered
+sites stay quiet, with the same shape of report: a rule ID, a reason, a fix, and one `file:line`. The
+repository method it calls is one of those thirteen, so the old name and the new one sit a line
+apart, and only the new one is blocked.
 
 The next `Edit` runs the hook again. The check is green, the wrapper exits 0, and the edit proceeds:
 
@@ -135,11 +144,14 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
+pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+  grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
+pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 pass clearance/engine/tripwire
 
-Checked 6 rules: 6 passed, 0 failed, 0 skipped (0 violations, 0 warnings).
+Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 0 warnings).
 ```
 
 The endpoint is done, the retired pattern never reached the tree, and the correction was the tool's

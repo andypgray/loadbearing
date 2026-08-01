@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Build.Locator;
+using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
@@ -29,6 +30,19 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///                     <c>di/no-captive-dependencies</c>: the all-singleton MCP host must not inject a
 ///                     scoped or transient service into a singleton (a forward ratchet — no such
 ///                     registration exists yet).
+///                 </item>
+///                 <item>
+///                     <c>di/no-service-locator</c> (from the <c>DotNetGuidance</c> pack): nothing in the
+///                     CLI resolves a service from an <c>IServiceProvider</c> outside two sanctioned
+///                     seams. <c>McpServerCommand</c> is the composition root. <c>GlobalCallToolFilter</c>
+///                     is the second: <c>AddCallToolFilter</c> registers a delegate, so there is no
+///                     constructor to inject into, and the request context is the only DI handle the SDK
+///                     hands it. Both are named in the <c>Fix</c>, so a reader of a violation learns where
+///                     resolving is allowed and why.
+///                 </item>
+///                 <item>
+///                     <c>di/no-buildserviceprovider</c> (from the pack): a forward ratchet — nothing
+///                     builds a second container while configuring services, and nothing does today.
 ///                 </item>
 ///                 <item>
 ///                     <c>mcp/tools-accept-cancellation</c>: every <c>Task</c>-returning MCP tool method
@@ -84,6 +98,17 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         </item>
 ///     </list>
 ///     <para>
+///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
+///         purpose — a pack is a menu, and not calling a method is the whole opt-out mechanism.
+///         <c>exceptions/no-general-catch</c> is red here at around twenty sites that are deliberate
+///         best-effort catches (a failed cache write is disposable derived data), so taking it at Migrate
+///         would record debt that does not exist. <c>naming/async-suffix</c> and
+///         <c>di/no-captive-dependencies</c> stay local, and the second is the finding worth keeping: the
+///         pack cannot express this spec's two named method exceptions or its <c>ValueTask</c> return set,
+///         and the MCP-specific rationale below names the actual singletons, which reads better than the
+///         pack's general one. A rule's <c>Because</c> is not always universal.
+///     </para>
+///     <para>
 ///         Anchor doctrine: in a self-spec, an expression member anchor (e.g.
 ///         <c>arch.Member&lt;Task&gt;(t =&gt; t.Wait())</c>) is real syntax — it mints a use edge attributed
 ///         to this spec class. A rule whose subject sweeps the spec assembly must therefore anchor with
@@ -131,6 +156,13 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Keep singletons depending only on singletons; resolve any scoped or transient work per call " +
                  "inside an IServiceScopeFactory scope instead of injecting it into the singleton.");
 
+        DotNetGuidance.NoServiceLocator(arch, arch.Project("Zphil.LoadBearing.Cli"),
+            arch.AnyOf(arch.Types.WithNameMatching("McpServerCommand"), arch.Types.WithNameMatching("GlobalCallToolFilter")),
+            PackPosture.Enforce,
+            "Take the dependency in the constructor; McpServerCommand's composition root and GlobalCallToolFilter's request context are the only sanctioned resolve sites.");
+
+        DotNetGuidance.NoBuildServiceProvider(arch, arch.Types.InNamespace("Zphil.LoadBearing.*"), PackPosture.Enforce);
+
         arch.Rule("mcp/tools-accept-cancellation")
             .Enforce(arch.Namespace("Zphil.LoadBearing.Cli.Mcp.Tools.*")
                 .Methods.Returning(typeof(Task), typeof(Task<>))
@@ -164,7 +196,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Enforce(arch.AnyOf(arch.Project("Zphil.LoadBearing"),
                     arch.Project("Zphil.LoadBearing.Roslyn"),
                     arch.Project("Zphil.LoadBearing.Cli"),
-                    arch.Project("Zphil.LoadBearing.Xunit"))
+                    arch.Project("Zphil.LoadBearing.Xunit"),
+                    arch.Project("Zphil.LoadBearing.Packs.DotNet"))
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .Where(m => m.Name != "Rule_Holds" && m.Name != "WhenAllCallsComplete",
                        description: "whose name is not Rule_Holds (a consumer-facing test display name) " +
@@ -198,7 +231,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                 .MustNotBeReferencedBy(
                     arch.Project("Zphil.LoadBearing"),
                     arch.Project("Zphil.LoadBearing.Roslyn"),
-                    arch.Project("Zphil.LoadBearing.Cli")))
+                    arch.Project("Zphil.LoadBearing.Cli"),
+                    arch.Project("Zphil.LoadBearing.Packs.DotNet")))
             .Because("The adapter rides xunit.v3; a product reference would ship a test framework to " +
                      "every consumer of the referencing package.")
             .Fix("Keep the dependency one-way: the adapter consumes Core and Roslyn, never the reverse.");

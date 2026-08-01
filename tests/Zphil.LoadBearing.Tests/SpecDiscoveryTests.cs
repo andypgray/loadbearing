@@ -1,5 +1,7 @@
+using System.Reflection;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.ArchSpec;
 using Zphil.LoadBearing.Discovery;
 
 namespace Zphil.LoadBearing.Tests;
@@ -41,6 +43,20 @@ public class SpecDiscoveryTests
     {
         // The Core assembly declares no IArchitectureSpec — discovery must be loud, not silent.
         Should.Throw<SpecDiscoveryException>(() => SpecDiscovery.FindSpecs(typeof(Arch).Assembly));
+    }
+
+    [Fact]
+    public void FindSpecs_NeverReachesIntoReferencedAssemblies()
+    {
+        Assembly assembly = typeof(ArchSpec).Assembly;
+
+        // This project references the repo's own arch-spec project, which declares a public
+        // IArchitectureSpec — and a rule pack, whose whole point is contributing rules. Discovery stays
+        // inside the assembly it was handed either way: nothing a spec references can inject a rule the
+        // spec did not ask for, which is what keeps rule packs plain libraries rather than a
+        // conventions layer.
+        SpecDiscovery.FindSpecs(assembly).ShouldAllBe(spec => spec.GetType().Assembly == assembly);
+        typeof(LoadBearingArchSpec).Assembly.ShouldNotBe(assembly);
     }
 
     public static class PublicOuter

@@ -822,8 +822,9 @@
       "zphil.loadbearing.archspec": {
         "type": "Project",
         "dependencies": {
-          "Zphil.LoadBearing": "[0.1.0, )",
-          "Zphil.LoadBearing.Roslyn": "[0.1.0, )"
+          "Zphil.LoadBearing": "[0.3.0, )",
+          "Zphil.LoadBearing.Packs.DotNet": "[0.3.0, )",
+          "Zphil.LoadBearing.Roslyn": "[0.3.0, )"
         }
       },
       "zphil.loadbearing.cli": {
@@ -834,8 +835,16 @@
           "Serilog.Extensions.Hosting": "[10.0.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
           "System.CommandLine": "[2.0.10, )",
-          "Zphil.LoadBearing": "[0.1.0, )",
-          "Zphil.LoadBearing.Roslyn": "[0.1.0, )"
+          "Zphil.LoadBearing": "[0.3.0, )",
+          "Zphil.LoadBearing.Roslyn": "[0.3.0, )"
+        }
+      },
+      "zphil.loadbearing.packs.dotnet": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "[10.0.10, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.10, )",
+          "Zphil.LoadBearing": "[0.3.0, )"
         }
       },
       "zphil.loadbearing.roslyn": {
@@ -847,14 +856,14 @@
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.6.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.6.0, )",
           "Microsoft.Extensions.FileSystemGlobbing": "[10.0.10, )",
-          "Zphil.LoadBearing": "[0.1.0, )"
+          "Zphil.LoadBearing": "[0.3.0, )"
         }
       },
       "zphil.loadbearing.xunit": {
         "type": "Project",
         "dependencies": {
-          "Zphil.LoadBearing": "[0.1.0, )",
-          "Zphil.LoadBearing.Roslyn": "[0.1.0, )",
+          "Zphil.LoadBearing": "[0.3.0, )",
+          "Zphil.LoadBearing.Roslyn": "[0.3.0, )",
           "xunit.v3.assert": "[3.2.2, )",
           "xunit.v3.extensibility.core": "[3.2.2, )"
         }

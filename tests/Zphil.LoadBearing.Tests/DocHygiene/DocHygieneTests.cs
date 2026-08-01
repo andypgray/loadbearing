@@ -29,6 +29,7 @@ public sealed class DocHygieneTests
         "CONTRIBUTING.md",
         "SECURITY.md",
         "src/Zphil.LoadBearing/README.md",
+        "src/Zphil.LoadBearing.Packs.DotNet/README.md",
         "src/Zphil.LoadBearing.Roslyn/README.md",
         "src/Zphil.LoadBearing.Xunit/README.md",
         "examples/README.md",

@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Zphil.LoadBearing/Zphil.LoadBearing.csproj" />
     <Project Path="src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj" />
+    <Project Path="src/Zphil.LoadBearing.Packs.DotNet/Zphil.LoadBearing.Packs.DotNet.csproj" />
     <Project Path="src/Zphil.LoadBearing.Roslyn/Zphil.LoadBearing.Roslyn.csproj" />
     <Project Path="src/Zphil.LoadBearing.Xunit/Zphil.LoadBearing.Xunit.csproj" />
   </Folder>

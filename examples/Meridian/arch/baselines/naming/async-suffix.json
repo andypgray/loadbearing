@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "digest": "9947aa54ef300f1ad2fce4aca938e67c378a30e3c6d0343cca8b9cf2fe79ff25",
+  "rules": {
+    "naming/async-suffix": {
+      "entries": [
+        { "subject": "M:Meridian.Domain.IBookingRepository.Add(Meridian.Domain.Booking)" },
+        { "subject": "M:Meridian.Domain.IBookingRepository.Get(System.String)" },
+        { "subject": "M:Meridian.Domain.IQuoteRepository.Add(Meridian.Domain.Quote)" },
+        { "subject": "M:Meridian.Domain.IQuoteRepository.Get(System.String)" },
+        { "subject": "M:Meridian.Domain.IRateCardRepository.GetForLane(System.String,System.DateTime)" },
+        { "subject": "M:Meridian.Web.Controllers.BookingsController.Create(Meridian.Web.Models.CreateBookingRequest)" },
+        { "subject": "M:Meridian.Web.Controllers.QuotesController.Create(Meridian.Web.Models.CreateQuoteRequest)" },
+        { "subject": "M:Meridian.Web.Controllers.QuotesController.Get(System.String)" },
+        { "subject": "M:Meridian.Web.Data.BookingRepository.Add(Meridian.Domain.Booking)" },
+        { "subject": "M:Meridian.Web.Data.BookingRepository.Get(System.String)" },
+        { "subject": "M:Meridian.Web.Data.QuoteRepository.Add(Meridian.Domain.Quote)" },
+        { "subject": "M:Meridian.Web.Data.QuoteRepository.Get(System.String)" },
+        { "subject": "M:Meridian.Web.Data.RateCardRepository.GetForLane(System.String,System.DateTime)" }
+      ]
+    }
+  }
+}

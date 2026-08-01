@@ -1354,3 +1354,53 @@ listing and the grandfathering baseline. The founding dogfood rule was one line 
 `arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn"))` —
 since grown into the three-posture self-spec (`LoadBearingArchSpec`: three Enforce rules plus a
 Migrate and a Quarantine).
+
+## 13. Composition: rule packs
+
+A rule pack is an ordinary class library. It exports static methods that take a caller's `Arch`
+and declare rules on it, and a consuming spec project references it and calls the ones it wants.
+There is no plugin host, no manifest, no include directive, and no discovery: a rule lands only
+where a spec calls for it. Every claim below is pinned by a test.
+
+**Many spec classes, one `Arch`.** A build runs every discovered spec's `Define` against a single
+`Arch` instance, and rules land in the order the specs ran (§3.2). A pack call inside one spec and
+a hand-written rule inside another compose into one model with no coordination between them.
+
+**IDs dedupe across every source.** The duplicate-ID check (§8 item 1) runs over the whole
+post-desugar ID set, so taking a rule from a pack and also writing it locally is a spec-build
+error rather than two silent reports of the same law. This is why packs need no ID-prefix scheme:
+a prefix would trade one loud duplicate for two quiet near-duplicates, which is the failure the
+check exists to prevent.
+
+**A pack composes with the public vocabulary only.** `Selection` and `Constraint` are closed
+hierarchies (§3), so a pack has nothing private to build with. A pack-declared rule and the
+hand-written equivalent therefore reify to the same nodes and render the same sentence; a pack
+cannot produce a rule an inline spec could not.
+
+**Invocation is always explicit.** Referencing a pack adds no rules. Spec discovery runs over one
+assembly and never reaches into what that assembly references (§9, "no conventions layer"), so a
+referenced pack contributes exactly what the spec asked for. Opting out of a pack rule is not
+calling its method; there is no suppression mechanism because none is needed.
+
+**Provenance is free.** Rule anchors capture `[CallerFilePath]`/`[CallerLineNumber]` at the call
+site (§8), and inside a pack that site is the pack's own source. A pack forwards nothing and
+declares nothing extra, and its rules still report at a `file:line` a reader can open. Where an ID
+collides, the report lands at the *first authored* occurrence, so which file is named follows the
+order the specs ran.
+
+**Posture belongs to the consumer.** The same pack rule is `Enforce` in a codebase that already
+keeps it and `Migrate`, against its own baseline, in one that does not. A pack that shipped a
+posture would be asserting a fact about code it has never seen. Baseline paths stay conventional
+(§4.4), so a pack never names a path either.
+
+**The pack owns `Because`; the consumer may override `Fix`.** The reason a rule exists is the same
+everywhere, so it ships with the rule. Remediation names local types, so it does not. The
+override is a parameter rather than a trailer: a pack method returns `void`, which makes exactly
+one `Because` and one `Fix` reach the rule and a second trailer uncompilable rather than a
+repeated-trailer error (§8 item 6).
+
+**Anchor doctrine for a self-hosting pack.** A pack that ships inside a codebase it governs writes
+its member anchors as `arch.Member(typeof(X), nameof(X.M))`, never the expression form. An
+expression anchor is real syntax: it mints a use edge attributed to the pack's own type, which
+then appears as a violation of the pack's own rule. `nameof` operands mint nothing, and the two
+forms reify identically (§4.5), so the doctrine costs nothing but has to be deliberate.

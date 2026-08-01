@@ -29,7 +29,7 @@ jobs:
       # Restore/build/test the whole solution, not just the test project: the self-spec
       # tests open the real Zphil.LoadBearing.slnx through MSBuildWorkspace, so building the
       # entire solution is what guarantees the workspace resolves at test time. CI=true (set
-      # by GitHub Actions) also puts NuGet restore in locked mode for the five lock-file
+      # by GitHub Actions) also puts NuGet restore in locked mode for the six lock-file
       # projects, while the throwaway fixture projects restore unlocked by design.
       - name: Restore
         run: dotnet restore Zphil.LoadBearing.slnx

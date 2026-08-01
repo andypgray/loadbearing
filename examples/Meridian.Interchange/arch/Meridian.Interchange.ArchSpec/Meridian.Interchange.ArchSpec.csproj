@@ -9,14 +9,17 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+        <ProjectReference Include="..\..\..\..\src\Zphil.LoadBearing.Packs.DotNet\Zphil.LoadBearing.Packs.DotNet.csproj" />
         <ProjectReference Include="..\..\src\Meridian.Interchange\Meridian.Interchange.csproj" />
     </ItemGroup>
 
     <ItemGroup>
+        <!-- What the three local rules name: BackgroundService and IOptionsSnapshot. The DI packages are
+             deliberately absent — the nine canonical rules moved to the DotNetGuidance pack, which brings
+             Microsoft.Extensions.DependencyInjection[.Abstractions] with it. Naming them here as well
+             would pin this project to its own version and turn the pack's newer one into a downgrade. -->
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     </ItemGroup>
 
 </Project>

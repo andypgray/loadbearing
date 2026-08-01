@@ -24,7 +24,9 @@ public sealed class AdapterTests
     public void RuleRows_UsesRuleIdsAsDisplayNames()
     {
         // The dogfood spec exercises all three postures, so discovery must surface each post-desugar rule
-        // ID as its own display name — including the Quarantine scope's containment + tripwire children.
+        // ID as its own display name — including the Quarantine scope's containment + tripwire children,
+        // and the two rules the spec takes from the DotNetGuidance pack (a pack-declared rule is an
+        // ordinary rule by the time the adapter sees it).
         IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows().ToList();
 
         rows.Select(row => row.TestDisplayName).ShouldBe(
@@ -32,6 +34,8 @@ public sealed class AdapterTests
             "layering/core-no-roslyn",
             "cli/no-stdout",
             "di/no-captive-dependencies",
+            "di/no-service-locator",
+            "di/no-buildserviceprovider",
             "mcp/tools-accept-cancellation",
             "roslyn/no-msbuildlocator-query",
             "mcp/no-blocking-waits",
