@@ -193,7 +193,7 @@ public sealed class HumanReportRendererTests
     {
         var node = new TypeNode(
             fullName, "T:" + fullName, fullName, string.Empty, TypeKind.Class, Accessibility.Public,
-            false, false, false, false, "TestProject", false);
+            false, false, false, false, false, "TestProject", false);
         node.DeclarationSites = sites;
         return node;
     }

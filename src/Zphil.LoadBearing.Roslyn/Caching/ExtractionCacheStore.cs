@@ -130,16 +130,19 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v10 reshapes SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
+    // v11 adds the per-type generated flag (TypeFacts.IsGenerated, GRAMMAR §5.2), the fact `.Authored()`
+    // filters on: a v10 record has no such field, so every type would deserialize as authored and a rule
+    // narrowed to authored types would silently widen on a cache hit. It degrades to a clean Miss instead.
+    // (v10 reshaped SpecResolutionRecord: a spec resolution now excludes a *set* of projects (the spec project
     // plus the private plumbing only it references), and the hit path replays that set rather than one name.
     // A v9 record carries the old single name, so it degrades to a clean Miss and is rebuilt — the cache is
-    // disposable derived data, never a loud error. (v9 added signature-exposure edges (a FragmentExposureEdge
+    // disposable derived data, never a loud error. v9 added signature-exposure edges (a FragmentExposureEdge
     // list per fragment, GRAMMAR §4.9); v8 added parameter facts to the member inventory (a ParameterFacts list
     // per method member, §4.6/§5.6); v7 added catch edges and throw edges; v6 added constructor-injection edges
     // and container-registration facts; v5 added construction-use edges; v4 aligned CaptureFingerprint's
     // cone-adds with validation's, so a cone-stray no longer validates dirty forever; v3 added the member
     // inventory; v2 added member-use edges over v1's type-only fragments — every prior version likewise misses.)
-    private const int CurrentSchemaVersion = 10;
+    private const int CurrentSchemaVersion = 11;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as

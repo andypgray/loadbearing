@@ -18,7 +18,7 @@ public sealed class TypeNode : ITypeInfo
     internal TypeNode(
         string fullName, string symbolId, string name, string @namespace, TypeKind kind,
         Accessibility accessibility, bool isSealed, bool isStatic, bool isAbstract, bool isRecord,
-        string projectName, bool isExternal)
+        bool isGenerated, string projectName, bool isExternal)
     {
         FullName = fullName;
         SymbolId = symbolId;
@@ -30,6 +30,7 @@ public sealed class TypeNode : ITypeInfo
         IsStatic = isStatic;
         IsAbstract = isAbstract;
         IsRecord = isRecord;
+        IsGenerated = isGenerated;
         ProjectName = projectName;
         IsExternal = isExternal;
         DeclarationSites = Array.Empty<SourceLocation>();
@@ -132,6 +133,9 @@ public sealed class TypeNode : ITypeInfo
 
     /// <inheritdoc />
     public bool IsRecord { get; }
+
+    /// <inheritdoc />
+    public bool IsGenerated { get; }
 
     /// <inheritdoc />
     public ITypeInfo? BaseType { get; internal set; }

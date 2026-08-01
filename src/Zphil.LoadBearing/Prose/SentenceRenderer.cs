@@ -96,27 +96,30 @@ internal static class SentenceRenderer
 
     private static string Phrase(Selection selection)
     {
-        return Phrase(selection, null);
+        return Phrase(selection, null, null);
     }
 
-    // The types-voice phrase. headOverride carries a union's head adjective down into an operand of a
-    // union that does not collapse, so the kind filter reaches the prose instead of being silently
-    // dropped from a sentence the checker still applies it to (GRAMMAR §6).
-    private static string Phrase(Selection selection, string? headOverride)
+    // The types-voice phrase. headOverride and headPrefixOverride carry a union's head and head-prefix
+    // adjectives down into an operand of a union that does not collapse, so the kind and authored filters
+    // reach the prose instead of being silently dropped from a sentence the checker still applies them to
+    // (GRAMMAR §6).
+    private static string Phrase(Selection selection, string? headOverride, string? headPrefixOverride)
     {
-        if (selection is UnionSelection union) return UnionPhrase(union, headOverride);
+        if (selection is UnionSelection union) return UnionPhrase(union, headOverride, headPrefixOverride);
 
         SelectionNoun noun = selection.Noun;
         var adjectives = selection.Adjectives;
 
         // Collective voice: a bare layer with no adjectives ("the Domain layer"). Any adjective
         // switches to types voice — the switch is structural, hence deterministic (GRAMMAR §6).
-        if (noun is LayerNoun && adjectives.Count == 0 && headOverride is null) return noun.ReferenceFragment;
+        if (noun is LayerNoun && adjectives.Count == 0 && headOverride is null && headPrefixOverride is null)
+            return noun.ReferenceFragment;
 
         // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
         // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
         // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
         string head = headOverride ?? noun.SubjectHead;
+        string headPrefix = headPrefixOverride ?? string.Empty;
         var inline = string.Empty;
         var subjectFinal = string.Empty;
         foreach (SelectionAdjective adjective in adjectives)
@@ -124,6 +127,9 @@ internal static class SentenceRenderer
             {
                 case AdjectivePlacement.Head:
                     head = adjective.Fragment;
+                    break;
+                case AdjectivePlacement.HeadPrefix:
+                    headPrefix = adjective.Fragment;
                     break;
                 case AdjectivePlacement.Inline:
                     inline += adjective.Fragment;
@@ -133,7 +139,7 @@ internal static class SentenceRenderer
                     break;
             }
 
-        return head + noun.Locative + inline + subjectFinal;
+        return headPrefix + head + noun.Locative + inline + subjectFinal;
     }
 
     // A union in reference position (GRAMMAR §6). A bare union reads as its collapsed reference when its
@@ -142,7 +148,7 @@ internal static class SentenceRenderer
     // falls through to the phrase.
     private static string UnionReference(UnionSelection union)
     {
-        if (union.Adjectives.Count > 0) return UnionPhrase(union, null);
+        if (union.Adjectives.Count > 0) return UnionPhrase(union, null, null);
 
         var nouns = CollapsibleNouns(union);
         return nouns is null
@@ -153,14 +159,15 @@ internal static class SentenceRenderer
     // A union in subject (types-voice) position (GRAMMAR §6). A bare union is its reference, so the
     // single-operand identity holds in both positions. Otherwise the union's own adjectives assemble
     // against the collapsed head and locative exactly as they do for a single selection — head
-    // substitution, inline, sentence-final — or, when the union does not collapse, against the
-    // or-joined operand phrases with the head distributed into each.
-    private static string UnionPhrase(UnionSelection union, string? headOverride)
+    // substitution, head premodification, inline, sentence-final — or, when the union does not collapse,
+    // against the or-joined operand phrases with the head and its prefix distributed into each.
+    private static string UnionPhrase(UnionSelection union, string? headOverride, string? headPrefixOverride)
     {
         var adjectives = union.Adjectives;
-        if (adjectives.Count == 0 && headOverride is null) return UnionReference(union);
+        if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
         string? head = headOverride;
+        string? headPrefix = headPrefixOverride;
         var inline = string.Empty;
         var subjectFinal = string.Empty;
         foreach (SelectionAdjective adjective in adjectives)
@@ -168,6 +175,9 @@ internal static class SentenceRenderer
             {
                 case AdjectivePlacement.Head:
                     head = adjective.Fragment;
+                    break;
+                case AdjectivePlacement.HeadPrefix:
+                    headPrefix = adjective.Fragment;
                     break;
                 case AdjectivePlacement.Inline:
                     inline += adjective.Fragment;
@@ -178,9 +188,11 @@ internal static class SentenceRenderer
             }
 
         var nouns = CollapsibleNouns(union);
-        if (nouns is not null) return (head ?? nouns[0].SubjectHead) + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
+        if (nouns is not null)
+            return (headPrefix ?? string.Empty) + (head ?? nouns[0].SubjectHead)
+                                                + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
 
-        var parts = union.Parts.Select(part => Phrase(part, head)).ToList();
+        var parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
         return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
     }
 

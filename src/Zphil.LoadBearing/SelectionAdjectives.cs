@@ -100,6 +100,17 @@ public static class SelectionAdjectives
         return Append(selection, new WhereAdjective(NotNull(predicate, nameof(predicate)), description));
     }
 
+    /// <summary>
+    ///     Narrows to the types no source generator emitted, premodifying the subject head:
+    ///     "authored types", "authored interfaces" (GRAMMAR §5.2, §6). This is the opt-out from the
+    ///     §4.1 boundary that puts generator output inside a project noun — reach for it when a law a
+    ///     generator's output cannot satisfy would otherwise fail on code nobody wrote.
+    /// </summary>
+    public static Selection Authored(this Selection selection)
+    {
+        return Append(selection, new AuthoredAdjective());
+    }
+
     private static Selection Append(Selection selection, SelectionAdjective adjective)
     {
         Guard.NotNull(selection, nameof(selection));

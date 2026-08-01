@@ -113,7 +113,8 @@ internal static class ModelDump
         builder.Append("  name=").Append(type.Name).Append(" ns=").AppendLine(type.Namespace);
         builder.Append("  kind=").Append(type.Kind).Append(" acc=").Append(type.Accessibility)
             .Append(" sealed=").Append(type.IsSealed).Append(" static=").Append(type.IsStatic)
-            .Append(" abstract=").Append(type.IsAbstract).Append(" record=").Append(type.IsRecord).AppendLine();
+            .Append(" abstract=").Append(type.IsAbstract).Append(" record=").Append(type.IsRecord)
+            .Append(" generated=").Append(type.IsGenerated).AppendLine();
         builder.Append("  project=").Append(type.ProjectName).Append(" external=").Append(type.IsExternal).AppendLine();
         builder.Append("  declSites=[").Append(RenderSites(type.DeclarationSites)).AppendLine("]");
         builder.Append("  filePaths=[").Append(string.Join(", ", type.FilePaths)).AppendLine("]");

@@ -94,6 +94,39 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void Authored_RendersTheHeadPremodifier()
+    {
+        // Arrange
+        Selection namespaced = Arch.Types.InNamespace("MyApp.*").Authored();
+        Selection layer = Arch.Layer("Domain", "MyApp.Domain.*").Authored();
+
+        // Act
+        string namespacedSubject = SentenceRenderer.Subject(namespaced);
+        string layerSubject = SentenceRenderer.Subject(layer);
+
+        // Assert — the prefix rides in front of the head, and (like any adjective) it switches a bare
+        // layer out of collective voice.
+        namespacedSubject.ShouldBe("Authored types in `MyApp.*`");
+        layerSubject.ShouldBe("Authored types in the Domain layer");
+    }
+
+    [Fact]
+    public void Authored_ComposesWithOfKind_RegardlessOfChainPosition()
+    {
+        // Arrange — a premodifier composes with the head OfKind substitutes rather than clobbering it.
+        Selection kindFirst = Arch.Types.InNamespace("MyApp.*").OfKind(TypeKind.Interface).Authored();
+        Selection authoredFirst = Arch.Types.InNamespace("MyApp.*").Authored().OfKind(TypeKind.Interface);
+
+        // Act
+        string kindFirstSubject = SentenceRenderer.Subject(kindFirst);
+        string authoredFirstSubject = SentenceRenderer.Subject(authoredFirst);
+
+        // Assert
+        kindFirstSubject.ShouldBe("Authored interfaces in `MyApp.*`");
+        authoredFirstSubject.ShouldBe(kindFirstSubject);
+    }
+
+    [Fact]
     public void Where_RendersDescriptionAsSentenceFinalRelativeClause()
     {
         Selection selection = Arch.Types.InNamespace("MyApp.*")
@@ -516,6 +549,25 @@ public class SentenceAssemblyTests
     {
         Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).OfKind(TypeKind.Interface);
         SentenceRenderer.Subject(union).ShouldBe("Interfaces in projects `A` or `B`");
+    }
+
+    [Fact]
+    public void UnionAuthored_PrefixesTheCollapsedHead()
+    {
+        // The premodifier assembles against the hoisted head exactly as a substitution does — and in
+        // reference position too, which is the shape a member subject renders its type selection in.
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Authored();
+        SentenceRenderer.Subject(union).ShouldBe("Authored types in projects `A` or `B`");
+        SentenceRenderer.Reference(union).ShouldBe("authored types in projects `A` or `B`");
+    }
+
+    [Fact]
+    public void UnionAuthored_OverAFallbackUnion_DistributesThePrefixAcrossOperands()
+    {
+        // Same contract as the head adjective: a union that does not collapse distributes the prefix into
+        // its operands, so the filter the checker applies always reaches the sentence.
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*")).Authored();
+        SentenceRenderer.Subject(union).ShouldBe("Authored types in project `A` or authored types in `B.*`");
     }
 
     [Fact]

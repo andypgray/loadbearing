@@ -326,6 +326,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("naming/async-suffix")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
+                .Authored()
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .Where(m => m.Name != "Rule_Holds" && m.Name != "WhenAllCallsComplete",
                     description: "whose name is not Rule_Holds (a consumer-facing test display name) " +

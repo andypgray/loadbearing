@@ -381,7 +381,8 @@ anchor those with the `typeof`/`nameof` form.)
 Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
 `.WithNameMatching(glob)` · `.Implementing(type)` / `.Implementing<T>()` · `.DerivedFrom(type)` /
 `.DerivedFrom<T>()` · `.AttributedWith(attributeType)` / `.AttributedWith<T>()` ·
-`.Except(selection)` · `.Where(pred, description:)`.
+`.Except(selection)` · `.Where(pred, description:)` · `.Authored()` (drops source-generated
+types — `[GeneratedCode]` on the type or its container; a project noun otherwise names them).
 
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes

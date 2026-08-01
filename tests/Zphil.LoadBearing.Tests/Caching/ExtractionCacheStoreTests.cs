@@ -33,10 +33,11 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_PriorSchemaVersion9_ReturnsMiss()
+    public void ReadAndValidate_PriorSchemaVersion10_ReturnsMiss()
     {
-        // Arrange — a v9 cache predates the plural spec exclusion (schema bumped 9→10): its spec resolutions
-        // record one project name where v10 records the whole excluded set, so it must degrade cleanly.
+        // Arrange — a v10 cache predates the per-type generated flag (schema bumped 10→11): its type facts
+        // carry no IsGenerated, so every type would replay as authored and an `.Authored()` subject would
+        // silently widen on a hit. It must degrade cleanly instead.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
@@ -44,7 +45,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 9);
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 10);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

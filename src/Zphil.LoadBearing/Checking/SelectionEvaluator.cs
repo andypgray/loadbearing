@@ -160,6 +160,8 @@ internal sealed class SelectionEvaluator
                 return current.Where(t => !excluded.Contains(t));
             case WhereAdjective where:
                 return current.Where(t => InvokePredicate(where.Predicate, t, "Where"));
+            case AuthoredAdjective:
+                return current.Where(t => !t.IsGenerated);
             default:
                 // Fail closed (M4): an unknown adjective would silently widen the selection — and in a
                 // MustOnly* target position a silently-widened allow-set is fail-open enforcement. A missing

@@ -427,6 +427,19 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void Authored_AppendsOneAuthoredAdjective()
+    {
+        // The adjective carries no payload — the whole statement is the placement and the fragment — so
+        // the model pin is that one lands, on the union as well as on a plain selection.
+        var arch = new Arch();
+        var union = arch.AnyOf(arch.Project("A"), arch.Project("B")).Authored().ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Count.ShouldBe(2);
+        union.Adjectives.Count.ShouldBe(1);
+        union.Adjectives[0].ShouldBeOfType<AuthoredAdjective>();
+    }
+
+    [Fact]
     public void AnyOf_SingleOperand_StaysAUnionInTheModel()
     {
         // Legal and an identity (§2 principle 5): a loop that yields one operand must not become an error,

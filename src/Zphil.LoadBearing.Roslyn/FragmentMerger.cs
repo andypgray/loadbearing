@@ -376,7 +376,7 @@ internal static class FragmentMerger
             return new TypeNode(
                 facts.FullName, facts.SymbolId, facts.Name, facts.Namespace, facts.Kind,
                 facts.Accessibility, facts.IsSealed, facts.IsStatic, facts.IsAbstract, facts.IsRecord,
-                projectName, isExternal);
+                facts.IsGenerated, projectName, isExternal);
         }
 
         private CodebaseModel Materialize(IReadOnlyList<CodebaseFragment> fragments)

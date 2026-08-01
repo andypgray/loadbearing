@@ -2,7 +2,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
 ///     The scalar shape facts of one type, extracted from a Roslyn symbol but holding no Roslyn types —
-///     the pure-data payload shared by a fragment's declared types and its externals, and the first ten
+///     the pure-data payload shared by a fragment's declared types and its externals, and the first eleven
 ///     constructor arguments of a <see cref="Zphil.LoadBearing.Codebase.TypeNode" />. These are read once
 ///     per input from the symbol's <c>OriginalDefinition</c> so a persisted fragment can
 ///     rebuild the node without re-binding.
@@ -22,4 +22,5 @@ internal sealed record TypeFacts(
     bool IsSealed,
     bool IsStatic,
     bool IsAbstract,
-    bool IsRecord);
+    bool IsRecord,
+    bool IsGenerated);

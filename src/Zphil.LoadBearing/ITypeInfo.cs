@@ -59,6 +59,20 @@ public interface ITypeInfo
     bool IsRecord { get; }
 
     /// <summary>
+    ///     Whether a source generator emitted the type — the fact <c>.Authored()</c> filters on
+    ///     (GRAMMAR §5.2, §5.6). True when <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> sits on
+    ///     the type or on any type containing it, so the nested types a generator emits inside an
+    ///     attributed container ride along without carrying their own attribute.
+    /// </summary>
+    /// <remarks>
+    ///     The attribute is the whole boundary: a generator that emits no <c>[GeneratedCode]</c> is
+    ///     invisible here, and a hand-written type that carries it is reported generated. Nothing is
+    ///     inferred from a file path, an <c>obj/</c> directory, or a naming convention — those vary per
+    ///     generator and per build.
+    /// </remarks>
+    bool IsGenerated { get; }
+
+    /// <summary>
     ///     The distinct file paths declaring the type (several for a partial type), verbatim as
     ///     compiled, in declaration-site (file, line) order. Empty for external (metadata) types.
     /// </summary>

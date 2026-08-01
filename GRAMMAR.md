@@ -231,7 +231,17 @@ lands only where the whole list is static and one form:
 
 ### 4.1 Reference universe (per position)
 
-- **Subjects** range over **solution-declared types** — the set extraction walks.
+- **Subjects** range over **solution-declared types** — the set extraction walks. That walk applies
+  a **type-side screen**, the twin of the member inventory's (§4.6): out go the implicitly declared,
+  the types no C# source can name, and anything outside the v1 `TypeKind` set. Generator output
+  stays in. A generated partial is explicitly declared and its name is writable, so
+  `arch.Project("MyApp.Cli")` names the regex types a `[GeneratedRegex]` method puts in that
+  assembly, and a top-level-statements `Program` is a subject like any other (its name is writable
+  and it carries real reference, catch and throw edges). **A project noun names what the assembly
+  declares, generated types included** — a pinned boundary, not an oversight. Screening them here
+  would also strip them from target position and from the codebase graph, and they would come back
+  as *external* nodes the moment anything referenced them. `.Authored()` (§5.2) is the opt-in
+  narrowing for a law a generator's output cannot be expected to satisfy.
 - **Targets** range over **all referenced types, including metadata references** —
   `MustNotReference(typeof(SqlConnection))` and `arch.Namespace("System.Web.*")` as a target
   both work against BCL/NuGet types.
@@ -751,6 +761,7 @@ consumes it.
 | `.AttributedWith(typeof(ApiControllerAttribute))` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed |
 | `.Except(selection)` | ", except {ref}" — canonicalized to sentence-final (§6) |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
+| `.Authored()` | head premodifier: "authored types", "authored interfaces" (§6) |
 
 `Implementing` auto-detects open generics: `typeof(IHandler<>)` means *any* construction;
 `typeof(IHandler<Order>)` means that construction exactly. Generic rendering uses declared
@@ -780,7 +791,20 @@ the identical adjective, changing nothing in the model. `arch.Type<X>()` ≡ `ar
 is the same idea on the noun. An **open** generic has no type-argument form, so it stays `typeof`
 (`Implementing(typeof(IHandler<>))`); the sugar is for the closed/non-generic single-type case.
 
-### 5.3 Modal constraints (verb phrases)
+**`.Authored()`** narrows a selection to the types a person wrote — the opt-out from the §4.1
+boundary that puts generator output inside a project noun. A type counts as generated when
+`System.CodeDom.Compiler.GeneratedCodeAttribute` sits on it or on any type containing it, so the
+nested types a generator emits inside an attributed container ride along without carrying their
+own attribute. Detection reads the merged symbol, which is what decides the partial case:
+`[GeneratedRegex]` puts its attribute on the generated *method*, so the author's own partial class
+stays authored while the regex types the generator emits beside it do not. The fact is on
+`ITypeInfo` as `IsGenerated` (§5.6), so a `.Where` predicate can read it directly.
+
+The boundary is the attribute and nothing else. A generator that emits no `[GeneratedCode]` is
+invisible to `.Authored()`, and a hand-written type that carries the attribute is excluded by it.
+Nothing infers "generated" from a file path, an `obj/` directory, or a naming convention: those
+vary per generator and per build, and a spec whose subject set moved with the output directory
+would be a worse lie than the one this adjective fixes.
 
 | Combinator | Fragment |
 |---|---|
@@ -845,12 +869,14 @@ single-anchor call.
 ### 5.6 Escape hatches
 
 Predicate input contract (`ITypeInfo`): `Name`, `Namespace`, `Kind`, `ProjectName`,
-`Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord`, `FilePaths` (declaration
-file paths; empty for external types), attributes, base type, implemented interfaces. The
+`Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord`, `IsGenerated`, `FilePaths`
+(declaration file paths; empty for external types), attributes, base type, implemented
+interfaces. The
 contract grows additively as extraction learns new facts. The flags carry C# declaration
 semantics — a static class is neither sealed nor abstract, interfaces are abstract,
 structs/enums/delegates are sealed — and `IsRecord` is how record rules are written in v1
-(§5.2).
+(§5.2). `IsGenerated` is the fact `.Authored()` filters on (§5.2), readable here so a predicate
+can combine it with anything else the contract carries.
 
 Member-predicate input contract (`IMemberInfo`, the input to a member `.Where`/`.Must`, §4.6):
 `Name`, `Kind` (`MemberKind`: Method / Property / Field / Event), `DeclaringType` (an
@@ -955,6 +981,15 @@ matches the anchor's definition FQN.
 - **Canonicalization**: `Except` and `Where` clauses render sentence-final regardless of
   chain position. Safe because selection algebra commutes — (T∖X)∩S = (T∩S)∖X — and it
   prevents garden-path sentences ("types, except `Foo`, named `*Service`").
+- **Head premodification**: `.Authored()` prefixes the current head rather than replacing it or
+  trailing the phrase — "authored types in `MyApp.*`", and "authored interfaces in `MyApp.*`" where
+  `OfKind` has substituted the head. Chain position does not matter, and the prefix distributes
+  into the operands of a union that does not collapse exactly as a head substitution does, so the
+  filter the checker applies always reaches the sentence. Prefixing is what keeps the fact attached
+  to the noun it narrows. A member subject renders its type selection in *reference* position
+  (below), so a trailing clause would land between the types and the member's own adjectives —
+  "…layers, excluding source-generated types returning `Task`" reads as narrowing the generated
+  `Task`-returning types, which is not the set the checker uses.
 - **Union collapse** (§5.1): a union of two or more operands, each adjective-free and all of the
   same noun kind, hoists one head and one locative and or-joins the operand names — *"Types in
   projects `A`, `B`, `C` or `D`"*, *"Types in `A.*` or `B.*`"*, *"The Domain or Web layers"*,
@@ -1186,7 +1221,10 @@ agent fixing a spec sees every problem in one pass.
 - **Projections**: bare plurals naming the member kind (`Members`, `Methods`, `Properties`,
   `Fields`, `Events`) — they read as "{plural} of {selection}" (§4.6, §5.7).
 - **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`) or prepositional
-  phrases (`InNamespace`, `WithSuffix`, `OfKind`).
+  phrases (`InNamespace`, `WithSuffix`, `OfKind`). A bare past participle (`Authored`) names the
+  set by the fact that admits membership, the adjective twin of the `Registered` noun, and reads
+  attributively in front of the head (§6). A verb-plus-object compound is not licensed:
+  `ExceptGenerated` would both duplicate `Except` and stop reading as a modifier of the noun.
 - **Constraints**: `Must[Not]` + verb phrase; polarity lexical; the noun rides along where a
   bare preposition would be ambiguous (`MustResideInNamespace`). The member-access verb is
   *use* (`MustNotUse`), glossary-pinned as *"use = a source-level member access"* — the

@@ -151,6 +151,6 @@ public sealed class BaselineEntryTests
     {
         return new TypeNode(
             fullName, $"T:{fullName}", fullName, "N", TypeKind.Class, Accessibility.Public,
-            false, false, false, false, "Proj", false);
+            false, false, false, false, false, "Proj", false);
     }
 }

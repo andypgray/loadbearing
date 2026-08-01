@@ -58,6 +58,8 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </summary>
 internal static class FragmentExtractor
 {
+    private const string GeneratedCodeAttributeFullName = "System.CodeDom.Compiler.GeneratedCodeAttribute";
+
     private static readonly SymbolDisplayFormat FullNameFormat = new(
         SymbolDisplayGlobalNamespaceStyle.Omitted,
         SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
@@ -118,7 +120,28 @@ internal static class FragmentExtractor
             definition.IsSealed && !isStatic,
             isStatic,
             definition.IsAbstract && !isStatic,
-            definition.IsRecord);
+            definition.IsRecord,
+            IsGeneratedType(definition));
+    }
+
+    // The generated fact `.Authored()` filters on (GRAMMAR §5.2). A type is generated when
+    // [System.CodeDom.Compiler.GeneratedCode] sits on it or on any type containing it, so the nested types a
+    // generator emits inside an attributed container ride along without carrying their own attribute. The
+    // attribute is the whole boundary — nothing is inferred from a file path, an obj/ directory, or a naming
+    // convention. Reading the merged symbol is what decides the partial case: [GeneratedRegex] puts its
+    // attribute on the generated METHOD, so the author's own partial class stays authored.
+    private static bool IsGeneratedType(INamedTypeSymbol definition)
+    {
+        for (INamedTypeSymbol? current = definition; current is not null; current = current.ContainingType)
+            if (current.GetAttributes().Any(IsGeneratedCodeAttribute))
+                return true;
+
+        return false;
+    }
+
+    private static bool IsGeneratedCodeAttribute(AttributeData attribute)
+    {
+        return attribute.AttributeClass is { } attributeClass && FullNameOf(attributeClass) == GeneratedCodeAttributeFullName;
     }
 
     private static string NamespaceOf(INamedTypeSymbol symbol)

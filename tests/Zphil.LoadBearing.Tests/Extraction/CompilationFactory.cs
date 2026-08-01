@@ -81,6 +81,25 @@ internal static class CompilationFactory
         return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
     }
 
+    /// <summary>
+    ///     As <see cref="ExtractConsoleApp" />, but the sources are first run through
+    ///     <paramref name="generator" /> and the model is extracted from the <em>updated</em> compilation — so
+    ///     generator-emitted types enter extraction exactly as they do in a real build (GRAMMAR §4.1), beside
+    ///     the synthesized <c>Program</c> the console output kind brings.
+    /// </summary>
+    public static CodebaseModel ExtractConsoleAppWithGenerator(
+        IIncrementalGenerator generator, params (string Path, string Source)[] files)
+    {
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path)).ToArray();
+        var compilation = CSharpCompilation.Create(
+            "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out _);
+
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(generated, "TestProject", [])]);
+    }
+
     /// <summary>Multi-file convenience: extract a model from several files in one project.</summary>
     public static CodebaseModel Extract(string projectName, params (string Path, string Source)[] files)
     {

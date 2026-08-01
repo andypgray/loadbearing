@@ -351,7 +351,7 @@ public sealed class BaselineAddMatcherTests
     {
         return new TypeNode(
             fullName, symbolId, fullName, "N", TypeKind.Class,
-            Accessibility.Public, false, false, false, false, "Proj", false);
+            Accessibility.Public, false, false, false, false, false, "Proj", false);
     }
 
     private static MemberReference Member(string containingFullName, string name, string symbolId, MemberKind kind)
