@@ -6,10 +6,23 @@
 
 LoadBearing is a .NET tool that renders one C# architecture spec to two targets: enforcement and agent context.
 
+The architecture of a long-lived codebase is real: layers, boundaries, rules. It is also unenforced: it lives in a few heads, no build step checks it, and diagrams drift. Nothing fails when a change crosses a boundary, least of all when a coding agent wrote the change: fast, plausible, and blind to which walls are load-bearing. Architecture-as-code is LoadBearing's answer: the rules become one C# spec, and the spec becomes every surface on this page.
+
 1. **Enforcement**: one checker passes or fails the rules at the command line, in CI, as named xUnit tests, and in an agent hook after each edit.
 2. **Agent context**: the same rules render to a managed `AGENTS.md` block, per-directory rule cards, and MCP query tools for coding agents.
 
 Write your architecture once. Use it everywhere.
+
+A rule is one statement:
+
+```csharp
+arch.Rule("layering/domain-independent")
+    .Enforce(domain.MustNotReference(application, infrastructure, api))
+    .Because("The Domain holds the quote and rate model the rest of the subsystem is built on; it stays free of the layers that depend on it so it can be reasoned about and tested on its own.")
+    .Fix("Move the dependency out of Domain: define an interface here and implement it in the outer layer that needs it.");
+```
+
+That is the whole rule: an ID, a posture (`Enforce`), a constraint, a reason, a fix. It is committed in the [clean-architecture example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting), and CI holds `check` green against the codebase it governs.
 
 LoadBearing is pre-alpha and under construction; [Status](#status) holds the current inventory.
 
@@ -48,7 +61,7 @@ LoadBearing governs itself. Eighteen rules over this repository's real code, acr
                  "diagnostics to the logger or Console.Error.");
 ```
 
-A rule is a posture verb (`Enforce`), a modal constraint (`MustNotUse`), an ID, and a `Because`. Nothing in the build system stops the CLI writing to `Console`, and the MCP server on the other side of that stdout speaks JSON-RPC over it. This rule is the only thing standing between those two facts.
+Nothing in the build system stops the CLI writing to `Console`, and the MCP server on the other side of that stdout speaks JSON-RPC over it. This rule is the only thing standing between those two facts.
 
 ## The prose it generates
 
@@ -251,7 +264,7 @@ The page is the tool's output, and the [CI badge](https://github.com/andypgray/l
 
 ## Where this sits next to ArchUnitNET and NetArchTest
 
-[NetArchTest](https://github.com/BenMorris/NetArchTest) and [ArchUnitNET](https://github.com/TNG/ArchUnitNET) run architecture rules inside your unit tests, and they are good at it. LoadBearing moves the rules out of test code into one spec and renders every surface above from it.
+[NetArchTest](https://github.com/BenMorris/NetArchTest) and [ArchUnitNET](https://github.com/TNG/ArchUnitNET) run architecture rules inside your unit tests, and they are good at it. LoadBearing moves the rules out of test code into one spec (architecture-as-code rather than architecture tests) and renders every surface above from it.
 
 | Tool | What you write | Where it runs |
 |---|---|---|
@@ -285,7 +298,7 @@ LoadBearing is built for long-lived, business-critical .NET codebases: systems t
 4. Migrate recorded sites as you touch them.
 5. At zero, promote the rule to `Enforce`.
 
-[The Meridian adoption walkthrough](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md) is this flow on a committed example codebase, one real command at a time.
+The first draft is usually an agent's work, not a blank file. `loadbearing mcp` ships one prompt, `derive_spec`, the recipe that walks an agent from a solution with no spec to a reviewed proposal: survey the estate with `arch_graph`, scaffold the spec project, draft every hypothesis as a rule, and let `check` count the violations that assign each rule its posture. The tool does not infer the architecture and the agent does not ratify it: every proposed rule crosses a curation gate where you accept, edit, or drop it, and recording the baseline stays a human command. [The Meridian adoption walkthrough](https://github.com/andypgray/loadbearing/blob/main/examples/Meridian/ADOPTING.md) is that recipe replayed on a committed example codebase, one real command at a time.
 
 ## .NET Framework
 

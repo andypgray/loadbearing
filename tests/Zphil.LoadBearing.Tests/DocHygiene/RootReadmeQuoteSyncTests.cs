@@ -7,8 +7,9 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 /// <summary>
 ///     The quote-sync gate over the root README's fenced excerpts. The landing page walks this
 ///     repository's own spec across surface after surface, quoting committed sources inside fenced code
-///     blocks — two rules of the self-spec, the rendered <c>AGENTS.md</c> bullet one of them generates,
-///     the adapter class that runs them all as tests, the rendered Mermaid diagram of this solution — and
+///     blocks — a starter rule from the quoting example's spec, two rules of the self-spec, the rendered
+///     <c>AGENTS.md</c> bullet one of them generates, the adapter class that runs them all as tests, the
+///     rendered Mermaid diagram of this solution — and
 ///     this gate holds each quote to the file it was cut from: every non-blank line of the excerpt's fence
 ///     must appear, in order, as a verbatim substring of its source, so an edit to the source that the
 ///     README does not follow fails the suite instead of publishing a stale quote. Four excerpts are
@@ -28,6 +29,12 @@ public sealed class RootReadmeQuoteSyncTests
     /// </summary>
     private static readonly Excerpt[] Excerpts =
     [
+        new(
+            // The landing example: quoted dedented from the example spec, which the substring check
+            // permits because a dedented line is still contained in its indented source line.
+            "starter-rule",
+            "arch.Rule(\"layering/domain-independent\")",
+            "examples/Meridian.Quoting/arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs"),
         new(
             "self-spec-rule",
             "arch.Rule(\"cli/no-stdout\")",
