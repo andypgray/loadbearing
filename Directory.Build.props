@@ -21,20 +21,28 @@
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
-    <!-- ContinuousIntegrationBuild makes release builds deterministic (normalised paths, stable
-         SourceLink). $(CI) is set to 'true' by GitHub Actions, so this only bites in CI. -->
-    <PropertyGroup Condition="'$(CI)' == 'true'">
-        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    </PropertyGroup>
+    <!-- Deliberately NO $(CI)-conditioned build policy here — not the lock-file policy
+         (RestorePackagesWithLockFile / RestoreLockedMode) and not ContinuousIntegrationBuild. All of
+         it lives one level down in src/Directory.Build.props (plus an inline lock-file copy in the
+         tests csproj) instead.
 
-    <!-- Deliberately NO lock-file policy (RestorePackagesWithLockFile / RestoreLockedMode) here.
-         It lives one level down in src/Directory.Build.props (plus inline in the tests csproj)
-         instead. Reason: FixtureRestorer shells `dotnet restore` on fixture-solution copies staged
-         under a project's bin/ mid-test-run, and does not strip $(CI) from that child process. Those
-         throwaway copies walk up the directory tree and would import this file. A lock policy at the
-         repo root would therefore demand committed lock files for the temp fixture projects and, in
-         CI, fail their locked-mode restore outright — breaking the temp-copy contract. Scoping the
-         policy below the repo root keeps the four shipping projects (and the tests) locked while
+         Reason, shared by both: fixture solutions are staged under a project's bin/ and built there
+         mid-test-run — FixtureRestorer shells `dotnet restore` on them, and MSBuildWorkspace runs
+         design-time builds over them — all without stripping $(CI) from the child process. Those
+         throwaway copies sit inside the repo tree, so they walk up and import whatever props file is
+         above them, and this is that file. A repo-root policy therefore reaches code it was never
+         written for:
+
+         - A lock policy would demand committed lock files for the temp fixture projects and, in CI,
+           fail their locked-mode restore outright, breaking the temp-copy contract.
+         - ContinuousIntegrationBuild implies DeterministicSourcePaths, which requires SourceRoot
+           items. A non-SDK-style project in the 2003 MSBuild XML namespace has no SourceLink and so
+           no SourceRoot, and its design-time build fails with "SourceRoot items must include at least
+           one top-level (not nested) item" — a workspace-load diagnostic that reds `check` on the CI
+           legs only. That is a real bug this file shipped, found 2026-08-03 (see the ClassicApp
+           fixture and ClassicProjectCheckTests).
+
+         Scoping both below the repo root keeps the shipping projects deterministic and locked while
          leaving fixtures unencumbered. -->
 
 </Project>

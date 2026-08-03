@@ -22,4 +22,14 @@
         <RestoreLockedMode>true</RestoreLockedMode>
     </PropertyGroup>
 
+    <!-- ContinuousIntegrationBuild makes release builds deterministic (normalised paths, stable
+         SourceLink). $(CI) is set to 'true' by GitHub Actions, so it only bites in CI. Scoped here
+         rather than at the repo root for the same reason as the lock policy above, and the root file
+         spells out what went wrong when it was not: it implies DeterministicSourcePaths, which needs
+         SourceRoot items that a non-SDK-style fixture project cannot have — and the fixtures are
+         staged inside the repo tree, so they inherit whatever sits above them. -->
+    <PropertyGroup Condition="'$(CI)' == 'true'">
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
 </Project>

@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI gained a `windows-2022` leg. `windows-latest` is now the VS-2026-only image, which carries no
   VS 2022 and no Build Tools 17, so the .NET Framework legacy tests had no VS 17 machine anywhere in
   the matrix.
+- The non-SDK-style .NET Framework fixture no longer fails to load under CI. `ContinuousIntegrationBuild`
+  was set at the repo root under `$(CI)`, and it implies `DeterministicSourcePaths`, which requires
+  `SourceRoot` items that a project in the 2003 MSBuild XML namespace has no SourceLink to provide.
+  Fixture solutions are staged inside the repo tree and built there mid-test-run, so they inherited it
+  and their design-time build failed with "SourceRoot items must include at least one top-level (not
+  nested) item" — a workspace-load diagnostic, so `check` fell to the fail-closed exit 2 on the CI legs
+  only. The property is now scoped to `src/`, where the shipping projects that need deterministic paths
+  and stable SourceLink live, exactly as the lock-file policy already was and for the same documented
+  reason. Package determinism and SourceLink are unaffected.
 
 ## [0.3.0] - 2026-08-01
 
