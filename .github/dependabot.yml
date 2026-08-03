@@ -7,6 +7,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Dependabot treats each action path as its own dependency, so an ungrouped bump raises one PR
+    # for codeql-action/init and another for codeql-action/analyze — and analyze refuses a
+    # configuration written by a different version, so each half-move is red on arrival. Grouping
+    # moves the pair together. CodeQlActionPinTests holds the workflows to the same agreement.
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action*
 
   # Only the six projects with committed packages.lock.json are listed. The fixture and
   # arch projects are deliberately absent — they carry no lock files by design.
