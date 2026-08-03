@@ -39,6 +39,24 @@ This repo governs itself: [`arch/Zphil.LoadBearing.ArchSpec`](arch/Zphil.LoadBea
 - Fluent-surface changes ship together with their pinned-test moves in the same PR.
 - Cross-platform portability matters: goldens are forward-slash and CRLF-tolerant by design; a change that only passes on one OS is not done.
 
+## Dependency updates
+
+Every NuGet dependency of the shipped projects is pinned to a content hash in a committed `packages.lock.json`. There are six: one for each of the four packages, one for the rule pack, and one for the test project. Locked mode is CI-only, so your local restores stay unlocked and adding or bumping a package updates the affected lock files as a side effect of building. Commit them with the change and your PR arrives consistent.
+
+Dependabot cannot do that. It edits the `PackageReference` and leaves the lock files alone, so its NuGet PRs arrive with the two out of step. CI relocks them in place on those branches, which is what lets the bump be built, tested on three operating systems, packed, self-checked, and run against the examples. The relock is never pushed, so one check stays red on purpose: `lock-files` regenerates the lock files and requires that none of them move, and it goes green once the relock is a commit on the branch rather than a step in a job.
+
+To finish one:
+
+```bash
+gh pr checkout <number>
+dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+git add -- "*packages.lock.json"
+git commit -m "Regenerate NuGet lock files"
+git push
+```
+
+The restore is solution-wide because the staleness is. Bumping a package that one project references rewrites the lock file of every project downstream of it, which is more than the single directory Dependabot edited.
+
 ## Versioning and releases
 
 The four packages (`Zphil.LoadBearing`, `.Roslyn`, `.Xunit`, `.Cli`) version in lockstep from a single `<Version>` in the root `Directory.Build.props`. Releases are cut by tag; the workflow runs the version-consistency checks, trusted publishing (OIDC), attestation, and a check that `.mcp/server.json` is packed (the MCP registry picks the release up from nuget.org). Release notes live on GitHub Releases and in [CHANGELOG.md](CHANGELOG.md).

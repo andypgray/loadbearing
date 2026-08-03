@@ -10,6 +10,7 @@ updates:
 
   # Only the six projects with committed packages.lock.json are listed. The fixture and
   # arch projects are deliberately absent — they carry no lock files by design.
+  # DependabotCoverageTests holds this list and that set of lock files to each other.
   - package-ecosystem: nuget
     directories:
       - /src/Zphil.LoadBearing

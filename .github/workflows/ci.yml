@@ -33,6 +33,45 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Dependabot bumps a PackageReference and leaves packages.lock.json alone, so a NuGet update
+      # PR arrives failing NU1004 at Restore, before a single test runs — a red check that says
+      # nothing about the bump it was raised for. Relocking first means everything below tests what
+      # Dependabot actually proposed. The same step runs in pack-check, self-check and examples; the
+      # rationale lives here only, so the four copies cannot drift apart in wording.
+      #
+      # Solution-wide, because the staleness ripples: a version change in one project rewrites the
+      # lock file of every project that references it transitively, and Dependabot updates one
+      # directory at a time, so nothing scoped to the bumped project could be right. Four details
+      # carry weight:
+      #
+      #   - shell: bash, because this matrix includes Windows, where run: defaults to pwsh and the
+      #     `||` below would not parse.
+      #   - CI: '' is scoped to this step alone, so only this restore leaves locked mode; every
+      #     build, test and pack step after it still sees CI=true. RestorePackagesWithLockFile is
+      #     unconditional, so the lock files are rewritten rather than ignored.
+      #   - The commit is local and never pushed. A GITHUB_TOKEN push could not re-trigger the PR's
+      #     checks anyway, and a standing write credential is a poor trade for a weekly convenience
+      #     PR. It exists so the tree is clean for the unscoped `git diff --exit-code` gate in
+      #     self-check, so pack-check's `<version>+<commit>` assertion still names the commit
+      #     SourceLink embedded, and so nothing packs from a dirty tree.
+      #   - head_ref, not actor: head_ref is empty on push, so main is untouched; a maintainer
+      #     re-running the workflow gets the same answer; and a github-actions bump does not pay for
+      #     a restore it has no use for.
+      #
+      # The PR still cannot reach all-green by itself. The lock-files job below stays red until a
+      # human puts the relock commit on the branch, which is the one signal worth acting on.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+
       # Restore/build/test the whole solution, not just the test project: the self-spec
       # tests open the real Zphil.LoadBearing.slnx through MSBuildWorkspace, so building the
       # entire solution is what guarantees the workspace resolves at test time. CI=true (set
@@ -63,6 +102,20 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
+
+      # Relock for Dependabot NuGet PRs, so the pack below is of the bump rather than of a failed
+      # restore. Identical text in build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
 
       - name: Pack
         run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts
@@ -130,6 +183,19 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
+      # Relock for Dependabot NuGet PRs. Identical text in build-and-test, which carries the
+      # rationale; the local commit is what keeps the unscoped `git diff --exit-code` below honest.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
       # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
       # the real MSBuildWorkspace, exactly as build-and-test does. --spec is explicit: the
       # self-solution has many Core-referencing members, so the one-spec convention cannot
@@ -197,6 +263,19 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
+      # Relock for Dependabot NuGet PRs, so the CLI build below is of the bump. Identical text in
+      # build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
       # The CLI never builds the target; build the example solutions first. Examples restore
       # unlocked (no lock policy under examples/); CLI/src restore locked via committed lock files.
       - name: Build the Meridian example solution
@@ -228,3 +307,55 @@ jobs:
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx
           git diff --exit-code -- examples/
+
+  # The one check a Dependabot NuGet PR is meant to fail. Every job above relocks so it can test the
+  # bump; this one relocks and requires a zero diff, so the PR carries real signal about the update
+  # and exactly one red naming the command that closes it.
+  #
+  # It runs on every pull request, not only Dependabot's. Locked mode is CI-only, so an ordinary
+  # local restore keeps the lock files current by itself and a human PR arrives clean; one that does
+  # not is a lock file somebody forgot to commit, and NU1004 would otherwise be the first anyone
+  # heard of it on main.
+  lock-files:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # CI: '' for the same reason as the relock step in build-and-test: in locked mode this restore
+      # would fail rather than rewrite the files this job exists to compare. The remedy is a command
+      # rather than an artifact, so the summary carries the fix and nothing is uploaded.
+      #
+      # Two questions, because a diff answers only one of them. `git diff` names a committed lock
+      # file the projects have moved away from; `ls-files --others` names one that was never added
+      # at all, which is what a lock file for a newly locked project looks like and what a diff is
+      # structurally blind to. Both are "somebody forgot to commit this".
+      - name: Regenerate the lock files and require a zero diff
+        env:
+          CI: ''
+        run: |
+          dotnet restore Zphil.LoadBearing.slnx --force-evaluate
+          stale="$(git diff --name-only -- '*packages.lock.json'; git ls-files --others --exclude-standard -- '*packages.lock.json')"
+          if [ -z "$stale" ]; then exit 0; fi
+          {
+            echo '### NuGet lock files are out of date'
+            echo
+            echo 'These `packages.lock.json` no longer match the projects, or are not committed at all:'
+            echo
+            printf '%s\n' "$stale" | sed 's/^/- `/; s/$/`/'
+            echo
+            echo 'Regenerate them on this branch and push:'
+            echo
+            echo '```'
+            echo 'dotnet restore Zphil.LoadBearing.slnx --force-evaluate'
+            echo 'git add -- "*packages.lock.json"'
+            echo 'git commit -m "Regenerate NuGet lock files"'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo '::error::NuGet lock files are out of date — see the job summary for the fix'
+          git diff -- '*packages.lock.json'
+          exit 1
