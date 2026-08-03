@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- MSBuild selection is now reported instead of merely decided. Choosing the MSBuild everything
+  downstream depends on had four outcomes and no observer: two of them silently degraded to
+  `MSBuildLocator.RegisterDefaults()`, and a third — taking a Visual Studio outside the tested
+  VS 2019/2022 set because nothing inside it was installed — was not even describable, since the
+  selection read the same either way. `MsBuildBootstrap` now publishes what it chose and why, and
+  the five verbs that render workspace diagnostics (`check`, `status`, `graph`, `baseline`,
+  `render`) print it on stderr beside them, naming `LOADBEARING_VS_INSTALL_PATH` as the override.
+  Quiet runs stay quiet — the line appears only when something already failed to load. For a tool
+  whose job is analysing other people's legacy .NET, "which MSBuild did you pick, and why" should
+  not be unanswerable.
+- `LOADBEARING_VS_INSTALL_PATH`, the escape hatch the code has always offered, is documented for
+  the first time: the README's .NET Framework section now says what the tool actually looks for
+  rather than "Visual Studio or Build Tools installed".
+- CI gained a `windows-2022` leg. `windows-latest` is now the VS-2026-only image, which carries no
+  VS 2022 and no Build Tools 17, so the .NET Framework legacy tests had no VS 17 machine anywhere in
+  the matrix.
+
 ## [0.3.0] - 2026-08-01
 
 Pre-alpha. Five new verbs across the exception and attribute axes, a canonical rule pack a spec

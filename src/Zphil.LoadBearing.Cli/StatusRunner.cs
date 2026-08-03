@@ -39,17 +39,14 @@ internal sealed class StatusRunner(
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
 
+        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
+
         if (request.Json)
-        {
-            foreach (string diagnostic in source.Diagnostics) error.WriteLine(diagnostic);
             StatusJsonRenderer.Render(
                 output, report, Path.GetFileName(source.SolutionPath), Path.GetFileName(source.Resolution.DllPath));
-        }
         else
-        {
-            foreach (string diagnostic in source.Diagnostics) error.WriteLine($"warning: {diagnostic}");
-            foreach (string line in StatusFormatter.Lines(report)) output.WriteLine(line);
-        }
+            foreach (string line in StatusFormatter.Lines(report))
+                output.WriteLine(line);
 
         return 0;
     }

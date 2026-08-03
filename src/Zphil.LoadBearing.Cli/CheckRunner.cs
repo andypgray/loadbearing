@@ -87,18 +87,14 @@ internal sealed class CheckRunner(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
         IReadOnlyList<string> diagnostics, bool executionSuccessful)
     {
+        // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
+        // inside the document's workspaceDiagnostics array.
+        WorkspaceDiagnosticsRenderer.Render(error, diagnostics, request.Json);
+
         if (request.Json)
-        {
-            // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
-            // inside the document's workspaceDiagnostics array.
-            foreach (string diagnostic in diagnostics) error.WriteLine(diagnostic);
             JsonReportRenderer.Render(output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics);
-        }
         else
-        {
-            foreach (string diagnostic in diagnostics) error.WriteLine($"warning: {diagnostic}");
             HumanReportRenderer.Render(output, report, solutionDirectory);
-        }
 
         // The optional third render target: a SARIF file alongside stdout. The wrote line is human-mode only
         // (it would break --json stdout purity); the SARIF itself carries the same result model either way.

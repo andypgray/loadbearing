@@ -35,9 +35,13 @@ public sealed class FrameworkBinlogReplayTests
         Assert.SkipUnless(
             OperatingSystem.IsWindows(), "Framework MSBuild.exe and the non-SDK project shape are Windows-only.");
         string? msBuildExe = FindFrameworkMsBuild();
+        // The skip reason carries the selection, not just its absence: "no Framework MSBuild was found" and
+        // "MSBuild resolved to the MSBuildLocator default because vswhere found no Visual Studio" are the
+        // same line in a CI log otherwise, and only the second one names the cause.
         Assert.SkipWhen(
             msBuildExe is null,
-            "No Visual Studio or Build Tools install carrying MSBuild\\Current\\Bin\\MSBuild.exe was found.");
+            "No Visual Studio or Build Tools install carrying MSBuild\\Current\\Bin\\MSBuild.exe was found. "
+            + $"MSBuild for this process: {LegacyRunContext.MsBuildSelection}.");
 
         // Arrange: a private copy of the ClassicApp fixture. No restore — a non-SDK project with only
         // framework references has no project.assets.json to produce, so restoring it only costs a process.
@@ -61,14 +65,18 @@ public sealed class FrameworkBinlogReplayTests
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--no-cache");
         long coldLoads = WorkspaceLoader.LoadCount - loaderBeforeCold;
 
-        // Assert: byte parity across the two paths, and the replay leg never opened a workspace.
-        replay.Out.ShouldBe(cold.Out);
-        replay.Err.ShouldBe(cold.Err);
-        replay.Exit.ShouldBe(cold.Exit);
-        replay.Exit.ShouldBe(1);
-        replayGate.ShouldBe(GateAcquisition.ExplicitReplay);
-        replayLoads.ShouldBe(0);
-        coldLoads.ShouldBe(1);
+        // Assert: byte parity across the two paths, and the replay leg never opened a workspace. Both runs
+        // ride every assertion message — a parity break or a wrong exit code is a question about what the
+        // two legs actually printed, and on a machine with a different MSBuild that is the only evidence.
+        string context = $"{LegacyRunContext.Describe(replay, "replay")}{Environment.NewLine}"
+                         + LegacyRunContext.Describe(cold, "cold");
+        replay.Out.ShouldBe(cold.Out, context);
+        replay.Err.ShouldBe(cold.Err, context);
+        replay.Exit.ShouldBe(cold.Exit, context);
+        replay.Exit.ShouldBe(1, context);
+        replayGate.ShouldBe(GateAcquisition.ExplicitReplay, context);
+        replayLoads.ShouldBe(0, context);
+        coldLoads.ShouldBe(1, context);
     }
 
     // The tool's own MSBuild choice, read back rather than re-derived. MsBuildBootstrap publishes the

@@ -30,27 +30,40 @@ public sealed class ClassicProjectCheckTests
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.ClassicAppSolution, "--spec", CliRunner.ClassicAppSpecDll, "--no-cache");
 
+        // Every assertion carries the whole run. In human mode the workspace-load diagnostic goes only to
+        // stderr, so a bare `Exit.ShouldBe(1)` on a machine where the project did not load reports the exit
+        // code and discards the runner's own explanation of why — which is exactly the failure that reached
+        // CI as an unexplained 2.
+        string context = LegacyRunContext.Describe(result);
+
         // Assert
-        result.Exit.ShouldBe(1);
+        result.Exit.ShouldBe(1, context);
 
         // The naming rule, red at the unprefixed interface's own line.
-        result.Out.ShouldContain("FAIL naming/interfaces — Interfaces in `Classic.*` must be named `I*`.");
-        result.Out.ShouldContain("Classic.Billing/IBillingGateway.cs:9 — Classic.Billing.BillingSink");
+        result.Out.ShouldContain(
+            "FAIL naming/interfaces — Interfaces in `Classic.*` must be named `I*`.", customMessage: context);
+        result.Out.ShouldContain(
+            "Classic.Billing/IBillingGateway.cs:9 — Classic.Billing.BillingSink", customMessage: context);
 
         // The namespace-target rule, red at every inline ADO.NET site. A namespace target needs no
         // assembly load, which is why it works from a spec that cannot see System.Data at all.
         result.Out.ShouldContain(
-            "FAIL data-access/no-inline-sql — Types in `Classic.*` must not reference types in `System.Data.*`.");
+            "FAIL data-access/no-inline-sql — Types in `Classic.*` must not reference types in `System.Data.*`.",
+            customMessage: context);
         result.Out.ShouldContain(
-            "Classic.Billing/BillingCalculator.cs:10 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlConnection");
+            "Classic.Billing/BillingCalculator.cs:10 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlConnection",
+            customMessage: context);
         result.Out.ShouldContain(
-            "Classic.Billing/BillingCalculator.cs:13 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlCommand");
+            "Classic.Billing/BillingCalculator.cs:13 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlCommand",
+            customMessage: context);
 
         // The green rule, so the run is a verdict rather than a blanket failure.
         result.Out.ShouldContain(
             "pass billing/no-direct-calculator — Types in `Classic.*`, except types whose name matches "
-            + "`BillingGateway` must not reference types whose name matches `BillingCalculator`.");
-        result.Out.ShouldContain("Checked 3 rules: 1 passed, 2 failed, 0 skipped (4 violations, 0 warnings).");
+            + "`BillingGateway` must not reference types whose name matches `BillingCalculator`.",
+            customMessage: context);
+        result.Out.ShouldContain(
+            "Checked 3 rules: 1 passed, 2 failed, 0 skipped (4 violations, 0 warnings).", customMessage: context);
     }
 
     [Fact]

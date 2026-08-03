@@ -11,10 +11,14 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 ///         Roslyn's <c>MSBuildWorkspace</c> spawns a separate <c>BuildHost</c> process to load
 ///         project files. The BuildHost's <c>FindMSBuild</c> calls
 ///         <see cref="MSBuildLocator.QueryVisualStudioInstances()" /> and picks the highest-version
-///         instance. Preview Visual Studio installs (e.g. VS 18+ at time of writing) ship MSBuild
-///         assemblies that crash with a <c>TypeInitializationException</c> for
+///         instance. An early VS 18 preview (observed 2026-07) shipped MSBuild assemblies that
+///         crashed with a <c>TypeInitializationException</c> for
 ///         <c>Microsoft.Build.Shared.XMakeElements</c> when loading legacy projects (those using
 ///         the old MSBuild XML namespace <c>http://schemas.microsoft.com/developer/msbuild/2003</c>).
+///         That crash no longer reproduces — VS 18.6 loads such a project cleanly — so the 16/17
+///         preference in <see cref="SelectBestInstance" /> is caution about a moving target rather
+///         than a workaround for a known break, and <see cref="LastSelection" /> exists so a machine
+///         that ends up somewhere else says so instead of failing as a bare exit code.
 ///     </para>
 ///     <para>
 ///         Workaround: select a stable VS instance ourselves (via <see cref="VsWhereLocator" />)
@@ -36,6 +40,24 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 public static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
+
+    // The tail an instance taken outside the preferred VS 16/17 set carries in its description. The
+    // preferred arm needs no counterpart: an ordinary pick is the unremarkable case, and a note on every
+    // line would stop the exceptional one from reading as exceptional.
+    private const string OutsideEnvelopeNote = " — outside the tested VS 2019/2022 envelope";
+
+    /// <summary>
+    ///     The <see cref="MsBuildSelection.Source" /> of the most recent registration: which MSBuild this
+    ///     process is running on and why that one, on one line. <see langword="null" /> until something
+    ///     registers. The CLI reads it back and prints it beside workspace-load diagnostics, so "which
+    ///     MSBuild did you pick" is answerable on a machine nobody can attach a debugger to.
+    /// </summary>
+    /// <remarks>
+    ///     A <see langword="string" /> rather than the <see cref="MsBuildSelection" /> itself, deliberately:
+    ///     this namespace is quarantined behind <see cref="MsBuildBootstrap" />, so a caller outside it may
+    ///     name this type and nothing else here.
+    /// </remarks>
+    internal static string? LastSelection { get; private set; }
 
     /// <summary>
     ///     Registers an MSBuild instance and propagates the choice to subprocesses.
@@ -71,8 +93,12 @@ public static class MsBuildBootstrap
     /// <remarks>
     ///     The preference for 16/17 is conservative: those are the widely-tested LTS-era versions
     ///     that load both legacy <c>http://schemas.microsoft.com/developer/msbuild/2003</c> projects
-    ///     and modern SDK-style ones. Higher major versions (preview/upcoming) have been observed to
-    ///     break legacy projects. Users who actually want a newer MSBuild can opt in with
+    ///     and modern SDK-style ones. A newer major is taken only when no 16/17 is installed — the
+    ///     shape of a runner image that ships VS 2026 alone — and the selection then says so rather
+    ///     than reading as an ordinary pick (see <see cref="DescribeSelection" /> and
+    ///     <see cref="LastSelection" />). The one crash that motivated the preference was an early
+    ///     VS 18 preview and does not reproduce on VS 18.6, so what is kept here is caution, not a
+    ///     workaround. Users who actually want a newer MSBuild can opt in with
     ///     <see cref="LoadBearingEnvVars.VsInstallPath" />.
     /// </remarks>
     internal static VsInstance? SelectBestInstance(IReadOnlyList<VsInstance> instances)
@@ -80,14 +106,42 @@ public static class MsBuildBootstrap
         if (instances.Count == 0) return null;
 
         VsInstance? stable = instances
-            .Where(i => i.Version.Major is 16 or 17)
+            .Where(IsPreferredMajor)
             .OrderByDescending(i => i.Version)
             .FirstOrDefault();
 
         return stable ?? instances.OrderByDescending(i => i.Version).First();
     }
 
+    /// <summary>
+    ///     The one-line description of a chosen instance, naming the version and — when the instance came
+    ///     from outside the preferred set — that it did. Pure: this is the reporting half of
+    ///     <see cref="RegisterFromVsInstance" />, split out so it can be pinned on a machine with no
+    ///     Visual Studio installed.
+    /// </summary>
+    internal static string DescribeSelection(VsInstance instance)
+    {
+        string envelope = IsPreferredMajor(instance) ? string.Empty : OutsideEnvelopeNote;
+        return $"{instance.Name} ({instance.Version.Major}.{instance.Version.Minor}, via vswhere){envelope}";
+    }
+
+    // The tested envelope: VS 2019 and VS 2022. Shared by the selection and its description so the two
+    // cannot drift into describing an instance as preferred that the selection took as a fallback.
+    private static bool IsPreferredMajor(VsInstance instance)
+    {
+        return instance.Version.Major is 16 or 17;
+    }
+
+    // Registration, plus the publication of what it chose. Every arm below returns a selection, so
+    // recording it once here is what keeps LastSelection total rather than a thing each arm remembers.
     private static MsBuildSelection SelectAndRegister()
+    {
+        MsBuildSelection selection = SelectAndRegisterCore();
+        LastSelection = selection.Source;
+        return selection;
+    }
+
+    private static MsBuildSelection SelectAndRegisterCore()
     {
         string? overridePath = Environment.GetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath);
         if (!string.IsNullOrWhiteSpace(overridePath)) return RegisterFromOverride(overridePath);
@@ -121,7 +175,7 @@ public static class MsBuildBootstrap
         ApplyDevConsoleEnv(vsRoot);
         MSBuildLocator.RegisterMSBuildPath(msBuildBin);
 
-        return new MsBuildSelection(msBuildBin, null, $"{LoadBearingEnvVars.VsInstallPath} override");
+        return new MsBuildSelection(msBuildBin, null, $"{LoadBearingEnvVars.VsInstallPath} override ('{vsRoot}')");
     }
 
     private static MsBuildSelection RegisterFromVsInstance(VsInstance instance)
@@ -131,16 +185,14 @@ public static class MsBuildBootstrap
         {
             // VS install missing MSBuild — extremely unusual but degrade gracefully.
             MSBuildLocator.RegisterDefaults();
-            return new MsBuildSelection(null, null, $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild)");
+            return new MsBuildSelection(
+                null, null, $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild at '{msBuildBin}')");
         }
 
         ApplyDevConsoleEnv(instance.InstallationPath);
         MSBuildLocator.RegisterMSBuildPath(msBuildBin);
 
-        return new MsBuildSelection(
-            msBuildBin,
-            instance.Version.ToString(),
-            $"{instance.Name} ({instance.Version.Major}.{instance.Version.Minor}, via vswhere)");
+        return new MsBuildSelection(msBuildBin, instance.Version.ToString(), DescribeSelection(instance));
     }
 
     /// <summary>

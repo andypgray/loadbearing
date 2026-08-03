@@ -9,11 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  # Two Windows legs, because the .NET Framework fixtures make the Visual Studio on the image
+  # load-bearing rather than incidental. `windows-latest` is now the VS-2026-only image (VS
+  # Enterprise 18.x, no VS 2022 and no Build Tools 17 anywhere on it), and a non-SDK-style project in
+  # the 2003 MSBuild XML namespace is exactly what MsBuildBootstrap's VS 16/17 preference has nothing
+  # to prefer on there. `windows-2022` is the leg that gives the suite a VS 17 machine, so the
+  # README's legacy claim stays proven under CI — and keeping `windows-latest` in the matrix is what
+  # keeps the VS 2026 gap exposed rather than hidden.
   build-and-test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, windows-2022, macos-latest]
 
     runs-on: ${{ matrix.os }}
 

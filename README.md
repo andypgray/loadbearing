@@ -315,7 +315,7 @@ FAIL data-access/no-inline-sql — Types in `Classic.*` must not reference types
 
 And the build server can stay where it is. `check --binlog` replays a binary log from a real build, including one produced by .NET Framework `MSBuild.exe`, so the machine that builds needs no .NET 10; only the machine that analyses does. Replaying that log and opening the workspace directly produce byte-identical output, which is what makes the replay a shortcut rather than a lesser reading.
 
-The last two both need Windows with Visual Studio or Build Tools installed, because that is where the Framework build host and `MSBuild.exe` come from. A net48 spec project carries no such requirement and builds anywhere.
+The last two both need Windows, because that is where the Framework build host and `MSBuild.exe` come from. What the tool looks for is a `vswhere`-discoverable Visual Studio or Build Tools install carrying `MSBuild\Current\Bin\MSBuild.exe`; where several are installed it prefers VS 2019 or 2022, and when it has to take something outside that pair it names what it took, on stderr, beside any load failure. Set `LOADBEARING_VS_INSTALL_PATH` to an install root — the parent of `MSBuild\Current\Bin` — to choose one yourself. A net48 spec project carries no such requirement and builds anywhere.
 
 ## Examples
 

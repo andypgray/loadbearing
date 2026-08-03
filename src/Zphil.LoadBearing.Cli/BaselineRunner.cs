@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
@@ -30,7 +31,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
 
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
-        foreach (string diagnostic in workspace.Diagnostics) error.WriteLine($"warning: {diagnostic}");
+        WorkspaceDiagnosticsRenderer.Render(error, workspace.Diagnostics);
 
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
             workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);

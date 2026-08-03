@@ -43,17 +43,14 @@ internal sealed class GraphRunner(
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string solutionName = Path.GetFileName(source.SolutionPath);
 
+        // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr.
+        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
+
         if (request.Json)
-        {
-            // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr.
-            foreach (string diagnostic in source.Diagnostics) error.WriteLine(diagnostic);
             GraphJsonRenderer.Render(output, summary, solutionName);
-        }
         else
-        {
-            foreach (string diagnostic in source.Diagnostics) error.WriteLine($"warning: {diagnostic}");
-            foreach (string line in GraphFormatter.Lines(summary, solutionName)) output.WriteLine(line);
-        }
+            foreach (string line in GraphFormatter.Lines(summary, solutionName))
+                output.WriteLine(line);
 
         return 0;
     }

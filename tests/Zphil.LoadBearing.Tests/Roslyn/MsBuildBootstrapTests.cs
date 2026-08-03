@@ -63,6 +63,45 @@ public sealed class MsBuildBootstrapTests
     }
 
     [Fact]
+    public void DescribeSelection_PreferredMajor_ReportsAnOrdinaryPickWithNoCaveat()
+    {
+        // Arrange — a VS 2022, which is inside the tested envelope.
+        VsInstance vs2022 = new(@"C:\VS\2022", new Version(17, 14, 100), "Visual Studio Professional 2022");
+
+        // Act
+        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs2022])!);
+
+        // Assert — no caveat: an ordinary pick has to read as unremarkable, or the fallback below stops
+        // reading as remarkable.
+        description.ShouldBe("Visual Studio Professional 2022 (17.14, via vswhere)");
+    }
+
+    [Fact]
+    public void DescribeSelection_NothingInsideTheEnvelope_NamesTheVersionAndSaysItFellOutside()
+    {
+        // Arrange — the shape of a CI image that ships VS 2026 alone: nothing for the 16/17 preference to
+        // pick, so the highest available is taken.
+        VsInstance vs2026 = new(@"C:\VS\18", new Version(18, 7, 11925), "Visual Studio Enterprise 2026");
+
+        // Act
+        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs2026])!);
+
+        // Assert — the arm that used to be indistinguishable from a preferred pick now names itself, and
+        // names the version it fell back to, which is the fact a load failure on such a machine turns on.
+        description.ShouldBe(
+            "Visual Studio Enterprise 2026 (18.7, via vswhere) — outside the tested VS 2019/2022 envelope");
+    }
+
+    [Fact]
+    public void LastSelection_AfterRegistration_IsPublished()
+    {
+        // The module initializer registered MSBuild through MsBuildBootstrap before any test ran, so the
+        // published selection is the one this process is actually running on. This is the pin that keeps
+        // the description reachable: DescribeSelection could be perfect and still never leave the class.
+        MsBuildBootstrap.LastSelection.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
     public void Initialize_OverrideEnvVar_NonExistentDir_Throws()
     {
         string? original = Environment.GetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath);

@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -124,6 +125,36 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         {
             File.Delete(sarifPath);
         }
+    }
+
+    // ── The MSBuild selection rides the same stream, but only when something failed ────────────────────
+
+    [Fact]
+    public async Task Check_WorkspaceLoadDiagnostic_NamesTheMsBuildSelectionAndTheOverrideVariable()
+    {
+        // "A project failed to load" is nearly always a question about which MSBuild opened it, and until
+        // this line existed the answer was unobtainable: MsBuildBootstrap described its choice in four
+        // places and printed it in none, so a load failure arrived as a bare exit code.
+        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
+
+        result.Err.ShouldContain(
+            $"warning: MSBuild for this run: {MsBuildBootstrap.LastSelection}.",
+            customMessage: result.Err);
+        result.Err.ShouldContain(
+            "Set LOADBEARING_VS_INSTALL_PATH to a Visual Studio install root", customMessage: result.Err);
+    }
+
+    [Fact]
+    public async Task Check_NoWorkspaceDiagnostics_LeavesTheMsBuildNoteUnprinted()
+    {
+        // The negative control, and the reason the note is acceptable at all: it is diagnostic context, not
+        // a banner. A clean run says nothing about MSBuild on any stream.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
+
+        result.Exit.ShouldBe(0, result.Err);
+        result.Err.ShouldNotContain("MSBuild for this run");
+        result.Out.ShouldNotContain("MSBuild for this run");
     }
 
     // ── Same-FQN merge notes render but never gate ────────────────────────────────────────────────────

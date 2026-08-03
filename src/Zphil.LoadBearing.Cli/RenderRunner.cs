@@ -30,7 +30,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
-        foreach (string diagnostic in workspace.Diagnostics) error.WriteLine($"warning: {diagnostic}");
+        WorkspaceDiagnosticsRenderer.Render(error, workspace.Diagnostics);
 
         string specName = Path.GetFileNameWithoutExtension(workspace.Resolution.DllPath);
         string solutionDirectory = workspace.SolutionDirectory;
