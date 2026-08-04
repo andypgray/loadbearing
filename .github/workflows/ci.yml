@@ -244,7 +244,7 @@ jobs:
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- explain layering/model-independent Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj
       - name: Upload SARIF to code scanning
         if: always() && (github.event_name != 'pull_request' || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:
           sarif_file: loadbearing.sarif
           category: loadbearing
