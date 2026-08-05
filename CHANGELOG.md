@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-05
+
+Pre-alpha. The first release to carry the 0.3.0 changes: 0.3.0 was never published to NuGet, so
+0.3.1 is the version that follows 0.2.0 on the registry and the one an MCP client resolves from
+`.mcp/server.json`. On top of that, the three fixes below — two of which made the tool refuse a
+solution it should have checked, and one of which crashed it outright.
+
 ### Changed
 
 - **A partially-loaded workspace now gets one answer instead of four.** `check` has failed closed on
@@ -416,7 +423,8 @@ deterministic enforcement and generated AI-agent context.
 - xUnit adapter (`Zphil.LoadBearing.Xunit`): every rule in the spec as an individually named
   xUnit test, failure text identical to the CLI.
 
-[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.0
+[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
+[0.3.0]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/andypgray/loadbearing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/andypgray/loadbearing/releases/tag/v0.1.0
