@@ -28,8 +28,9 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             exit stays 0: the advisory notes are kept out of the fail-closed gate by construction.
 ///         </item>
 ///         <item>
-///             <b>NuGetAudit advisories never gate.</b> An injected NU19xx advisory — external publication
-///             timing, not a broken model — renders on the same stream (the <c>warning:</c> line, the
+///             <b>NuGetAudit advisories never gate.</b> An injected advisory in the codeless shape Roslyn
+///             delivers — external publication timing, not a broken model — renders on the same stream (the
+///             <c>warning:</c> line, the
 ///             <c>workspaceDiagnostics</c> array, a SARIF notification) while the exit stays 0/1:
 ///             <see cref="NuGetAuditDiagnostics" /> carves the family out of the gate input, yet a genuine
 ///             load failure riding alongside it still fails closed.
@@ -41,12 +42,18 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 {
     private const string LoadDiagnostic = "Project 'MyApp.Broken' failed to load: simulated workspace-load failure.";
 
-    // A synthetic NuGetAudit advisory in the shape MSBuildWorkspace re-raises: code, package + version,
-    // severity, GHSA URL. Modelled on the real System.Security.Cryptography.Xml incident; the GHSA slug is
-    // invented. The word-bounded NU1903 token is what NuGetAuditDiagnostics.IsAudit keys on.
+    // A NuGetAudit advisory in the shape MSBuildWorkspace actually delivers one, captured from a run over a
+    // solution referencing System.Security.Cryptography.Xml 4.7.0: Roslyn's project-load frame, package +
+    // version, severity, GHSA URL — and no NU1902 anywhere, because Roslyn records BuildEventArgs.Message
+    // and never .Code. This constant used to carry the code, which is why the gate could pass this test and
+    // still red every real solution with a vulnerable package (issue #19).
+    // The project path is written with forward slashes — the shape a non-Windows load produces — so the
+    // constant can be asserted against JSON and SARIF payloads verbatim, without backslash escaping
+    // standing between the test and the advisory text that is the actual subject.
     private const string AuditDiagnostic =
-        "NU1903: Package 'System.Security.Cryptography.Xml' 4.7.0 has a known high severity vulnerability, "
-        + "https://github.com/advisories/GHSA-7h4f-3q2m-9xrv";
+        "Msbuild failed when processing the file '/src/App/App.csproj' with message: Package "
+        + "'System.Security.Cryptography.Xml' 4.7.0 has a known moderate severity vulnerability, "
+        + "https://github.com/advisories/GHSA-vh55-786g-wjwj";
 
     private const string GateLine =
         "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "

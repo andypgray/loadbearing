@@ -304,17 +304,20 @@ public sealed class SelfSpecTests
     ///     The live oracle for <c>.Authored()</c>'s detection contract (GRAMMAR §5.2). The CLI runs two source
     ///     generators, and between them they work both arms of the partial-type rule, so the difference between
     ///     the CLI project noun and the same selection narrowed to authored types is knowable exactly.
-    ///     <c>[GeneratedRegex]</c> carries its attribute on the generated method, so the four types that
-    ///     generator emits show up here while the author's own partial class does not — two of the four are
-    ///     nested and carry no attribute of their own, which is what makes the containing-type walk
-    ///     load-bearing rather than incidental. The JSON generator carries its attribute on the generated
+    ///     <c>[GeneratedRegex]</c> carries its attribute on the generated method, so the three types each
+    ///     one emits — plus the single <c>Utilities</c> class they share — show up here while the author's
+    ///     own partial class does not; two of every three are nested and carry no attribute of their own,
+    ///     which is what makes the containing-type walk load-bearing rather than incidental. The
+    ///     <c>_N</c> suffix is the generator's declaration index within the file, so reordering the partial
+    ///     methods in <c>NuGetAuditDiagnostics</c> renumbers them and moves this pin with them. The JSON
+    ///     generator carries its attribute on the generated
     ///     class instead, and partial declarations merge onto one symbol, so <c>LoadBearingJsonContext</c>
     ///     lands on the generated side even though its declaration is hand-written. Asserted as an equality
     ///     rather than a containment, because a contract that quietly took one authored type with it would be
     ///     a worse failure than one that missed a generated one.
     /// </summary>
     [Fact]
-    public async Task CliProject_MinusAuthored_IsExactlyTheGeneratedRegexQuartet()
+    public async Task CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes()
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, TestContext.Current.CancellationToken);
@@ -330,9 +333,12 @@ public sealed class SelfSpecTests
 
         declared.Except(authored).ShouldBe(
         [
-            "System.Text.RegularExpressions.Generated.AuditCode_0",
-            "System.Text.RegularExpressions.Generated.AuditCode_0.RunnerFactory",
-            "System.Text.RegularExpressions.Generated.AuditCode_0.RunnerFactory.Runner",
+            "System.Text.RegularExpressions.Generated.AuditText_0",
+            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
+            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
+            "System.Text.RegularExpressions.Generated.AuditCode_1",
+            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory",
+            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory.Runner",
             "System.Text.RegularExpressions.Generated.Utilities",
             "Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"
         ], ignoreOrder: true);
