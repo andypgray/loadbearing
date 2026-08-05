@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
+using CoreAccessibility = Zphil.LoadBearing.Accessibility;
 using CoreTypeKind = Zphil.LoadBearing.TypeKind;
 using RoslynAccessibility = Microsoft.CodeAnalysis.Accessibility;
 
@@ -80,14 +81,21 @@ internal static class FragmentExtractor
 
     // Scalar shape + identity facts read once from the original definition. Shape facts are normalized to
     // C# declaration semantics: a static class is encoded abstract+sealed in metadata (and may be so from
-    // source), and the `&& !isStatic` mask converges both paths so a static class reports neither. The
-    // TryMap fallback to Class matches the external-mint path (declared types always map, so it is a no-op
-    // for them). The baseline key (GRAMMAR §4.3) is the definition's DocumentationCommentId (T: form), or
-    // an unresolved:{fqn} fallback when the symbol has no DocID (error/unnamed types).
+    // source), and the `&& !isStatic` mask converges both paths so a static class reports neither. All three
+    // facts a symbol can fail to answer are total here, because the external-mint path reaches symbols the
+    // compiler never resolved (a partially-loaded workspace yields error symbols through base types,
+    // interfaces, and attribute classes): TypeKind falls back to Class, the baseline key (GRAMMAR §4.3) to
+    // an unresolved:{fqn} form when the symbol has no DocumentationCommentId at all (an error symbol does
+    // have one — Roslyn's "!:" form — so this covers unnamed types), and accessibility to Public — an
+    // unresolved external is not a rule subject (§4.1), its accessibility is informational, and a type
+    // reached across an assembly boundary is visibly-public surface. Declared types always map, so all
+    // three fallbacks are no-ops for them.
     private static TypeFacts ExtractFacts(INamedTypeSymbol definition)
     {
         string fqn = FullNameOf(definition);
         CoreTypeKind kind = TypeKindMapper.TryMap(definition, out CoreTypeKind mapped) ? mapped : CoreTypeKind.Class;
+        CoreAccessibility accessibility =
+            AccessibilityMapper.TryMap(definition, out CoreAccessibility declared) ? declared : CoreAccessibility.Public;
         bool isStatic = definition.IsStatic;
         return new TypeFacts(
             fqn,
@@ -95,7 +103,7 @@ internal static class FragmentExtractor
             definition.Name,
             NamespaceOf(definition),
             kind,
-            AccessibilityMapper.Map(definition),
+            accessibility,
             definition.IsSealed && !isStatic,
             isStatic,
             definition.IsAbstract && !isStatic,
