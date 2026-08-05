@@ -53,10 +53,8 @@ public sealed class BaselineAddMatcherTests
         // code change from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
         var edge = Violation.Construction(Node("N.Factory", "T:N.Factory"), Node("N.Widget", "T:N.Widget"), Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Factory", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.Factory -> N.Widget");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Factory", "N.Other"), "N.Factory -> N.Widget");
     }
 
     [Fact]
@@ -79,10 +77,8 @@ public sealed class BaselineAddMatcherTests
         // change from the reference/construction form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
         Violation edge = Violation.Injection(Node("N.Svc", "T:N.Svc"), Node("N.Dep", "T:N.Dep"), Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Svc", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.Svc -> N.Dep");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Svc", "N.Other"), "N.Svc -> N.Dep");
     }
 
     [Fact]
@@ -105,10 +101,8 @@ public sealed class BaselineAddMatcherTests
         // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
         Violation edge = Violation.Catch(Node("N.Handler", "T:N.Handler"), Node("N.Err", "T:N.Err"), Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Handler", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.Handler -> N.Err");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Handler", "N.Other"), "N.Handler -> N.Err");
     }
 
     [Fact]
@@ -131,10 +125,8 @@ public sealed class BaselineAddMatcherTests
         // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
         Violation edge = Violation.Expose(Node("N.Facade", "T:N.Facade"), Node("N.Secret", "T:N.Secret"), Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Facade", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.Facade -> N.Secret");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Facade", "N.Other"), "N.Facade -> N.Secret");
     }
 
     [Fact]
@@ -157,10 +149,8 @@ public sealed class BaselineAddMatcherTests
         // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
         Violation edge = Violation.Throw(Node("N.Service", "T:N.Service"), Node("N.Boom", "T:N.Boom"), Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Service", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.Service -> N.Boom");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Service", "N.Other"), "N.Service -> N.Boom");
     }
 
     [Fact]
@@ -170,11 +160,10 @@ public sealed class BaselineAddMatcherTests
         Violation cd = Violation.Reference(Node("N.C", "T:N.C"), Node("N.D", "T:N.D"), Array.Empty<SourceLocation>());
         Violation[] violations = [ab, cd];
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "N.D"));
+        UserErrorException error = ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "N.D"), "N.A -> N.B");
 
         error.Message.ShouldContain("no current violation of 'r' matches --source 'N.A' --target 'N.D'");
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  N.A -> N.B");
         error.Message.ShouldContain("  N.C -> N.D");
     }
 
@@ -196,11 +185,9 @@ public sealed class BaselineAddMatcherTests
     {
         Violation shape = Violation.Shape(Node("N.S", "T:N.S"), Array.Empty<SourceLocation>());
 
-        var withCandidates = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", [shape], "N.Other"));
-        var noViolations = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", Array.Empty<Violation>(), "N.Other"));
+        ShouldRefuseListing(() => BaselineAddMatcher.ResolveSubject("r", [shape], "N.Other"), "N.S");
 
-        withCandidates.Message.ShouldContain("the baseline records observed reality");
-        withCandidates.Message.ShouldContain("  N.S");
+        var noViolations = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", Array.Empty<Violation>(), "N.Other"));
         noViolations.Message.ShouldContain("the baseline records observed reality; the rule currently has no violations.");
     }
 
@@ -291,10 +278,8 @@ public sealed class BaselineAddMatcherTests
             Member("System.DateTime", "Now", "P:System.DateTime.Now", MemberKind.Property),
             Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", [use], "App.Home", "N.Other"));
-
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  App.Home -> System.DateTime.Now");
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveEdge("r", [use], "App.Home", "N.Other"), "App.Home -> System.DateTime.Now");
     }
 
     [Fact]
@@ -341,10 +326,23 @@ public sealed class BaselineAddMatcherTests
             MemberSubject("MyApp.Web.HomeController", "Save", "M:MyApp.Web.HomeController.Save", MemberKind.Method),
             Array.Empty<SourceLocation>());
 
-        var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", [shape], "MyApp.Web.HomeController.Other"));
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveSubject("r", [shape], "MyApp.Web.HomeController.Other"), "MyApp.Web.HomeController.Save()");
+    }
 
-        error.Message.ShouldContain("the baseline records observed reality");
-        error.Message.ShouldContain("  MyApp.Web.HomeController.Save()");
+    /// <summary>
+    ///     The no-match refusal a resolve throws: the sentence every one of them opens with, plus
+    ///     <paramref name="candidate" /> among the identities the rule does currently have.
+    /// </summary>
+    private static UserErrorException ShouldRefuseListing(Action resolve, string candidate)
+    {
+        var error = Should.Throw<UserErrorException>(resolve);
+
+        error.ShouldSatisfyAllConditions(
+            () => error.Message.ShouldContain("the baseline records observed reality"),
+            () => error.Message.ShouldContain($"  {candidate}"));
+
+        return error;
     }
 
     private static TypeNode Node(string fullName, string symbolId)

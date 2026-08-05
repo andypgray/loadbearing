@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -64,14 +63,9 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Injection);
-        violation.Source!.FullName.ShouldBe("App.CaptiveSingleton");
-        violation.Target!.FullName.ShouldBe("App.IScopedDep");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.CaptiveSingleton injects App.IScopedDep");
         block.ShouldContain("Scene.cs:"); // the injected parameter's file:line
     }
@@ -89,9 +83,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -127,9 +119,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -210,7 +200,7 @@ public sealed class MustNotInjectVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.InjectionPairs().ShouldBe(["App.Svc -> App.IScopedB"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -247,7 +237,7 @@ public sealed class MustNotInjectVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.InjectionPairs().ShouldBe(["App.NewSvc -> App.IScopedDep"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -276,9 +266,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]

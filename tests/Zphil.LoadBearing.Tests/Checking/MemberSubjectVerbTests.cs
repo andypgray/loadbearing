@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Checking.Targets;
 using Zphil.LoadBearing.Tests.Extraction;
 
@@ -403,10 +402,7 @@ public sealed class MemberSubjectVerbTests
                 .Enforce(arch.Types.Methods.AttributedWith($"{T}MrakAttribute").MustBePublic()).Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptyMemberSubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 
     [Fact]
@@ -557,10 +553,8 @@ public sealed class MemberSubjectVerbTests
                 arch.Rule("member/x").Enforce(arch.Namespace("App.NoFields.*").Fields.MustBePublic()).Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptyMemberSubjectMessage);
+        Violation violation = result.ShouldHaveFailedWithDetail(
+            ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
         violation.Detail.ShouldBe("The subject selection matched no solution-declared members.");
     }
 
@@ -573,8 +567,7 @@ public sealed class MemberSubjectVerbTests
                 arch.Rule("member/x").Enforce(arch.Namespace("Nowhere.*").Methods.MustBePublic()).Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.Single().Detail.ShouldBe(ConstraintEvaluator.EmptyMemberSubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 
     // ── ratchet round-trip ────────────────────────────────────────────────────────────────────────────
@@ -601,8 +594,8 @@ public sealed class MemberSubjectVerbTests
             ["naming/async-suffix"] = new([identity.WithBecause("INC-1")])
         });
         RuleResult grandfathered = ArchChecker.Check(model, AsyncModel, index).Single();
-        grandfathered.Status.ShouldBe(RuleStatus.Passed);
-        grandfathered.Grandfathered.Count.ShouldBe(1);
+        grandfathered.ShouldHavePassed();
+        grandfathered.ShouldHaveGrandfathered(1);
 
         // Add a NEW unsuffixed Task method: identity is the member's own DocId, so the grandfathered
         // blessing does not cover it — a NEW red.
@@ -622,7 +615,7 @@ public sealed class MemberSubjectVerbTests
                              """;
         RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index).Single();
         regressed.Status.ShouldBe(RuleStatus.Failed);
-        regressed.Grandfathered.Count.ShouldBe(1);
+        regressed.ShouldHaveGrandfathered(1);
         FailedMemberIds(regressed).ShouldBe(["M:App.Async.HomeController.Delete"]);
     }
 
@@ -663,8 +656,8 @@ public sealed class MemberSubjectVerbTests
             ["async/accept-cancellation"] = new([identity.WithBecause("INC-1")])
         });
         RuleResult grandfathered = ArchChecker.Check(model, beforeModel, index).Single();
-        grandfathered.Status.ShouldBe(RuleStatus.Passed);
-        grandfathered.Grandfathered.Count.ShouldBe(1);
+        grandfathered.ShouldHavePassed();
+        grandfathered.ShouldHaveGrandfathered(1);
         grandfathered.GrandfatheredEntries.Single().Because.ShouldBe("INC-1"); // --because attribution round-trips
 
         // Add a NEW tokenless Task method: its identity is its own DocId, so the grandfathered blessing does
@@ -684,7 +677,7 @@ public sealed class MemberSubjectVerbTests
                              """;
         RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index).Single();
         regressed.Status.ShouldBe(RuleStatus.Failed);
-        regressed.Grandfathered.Count.ShouldBe(1);
+        regressed.ShouldHaveGrandfathered(1);
         FailedMemberIds(regressed).ShouldBe(["M:App.Cancel.Api.Purge"]);
     }
 
@@ -703,10 +696,8 @@ public sealed class MemberSubjectVerbTests
 
         RuleResult result = ArchChecker.Check(model, AsyncModel).Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldBe(
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.RuleError,
             "`Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
             "Anchor on the open definition instead.");
     }
@@ -725,10 +716,8 @@ public sealed class MemberSubjectVerbTests
 
         RuleResult result = ArchChecker.Check(model, ParametersModel).Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldBe(
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.RuleError,
             "`IProgress<Int32>` is a closed generic construction; member parameter matching is definition-level. " +
             "Anchor on the open definition instead.");
     }
@@ -744,7 +733,7 @@ public sealed class MemberSubjectVerbTests
                     .Because("Async discovery is suffix-based."))
             .Single();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.Async.HomeController.Save()");
         block.ShouldContain("Test.cs:");
     }
@@ -789,7 +778,7 @@ public sealed class MemberSubjectVerbTests
     private static void Pass(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
         Checker.Run(codebase, arch => arch.Rule("member/x").Enforce(constraint(arch)).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     private static IReadOnlyList<string> FailedMemberIds(CodebaseModel codebase, Func<Arch, Constraint> constraint)

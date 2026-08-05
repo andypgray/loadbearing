@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -62,14 +61,9 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Catch);
-        violation.Source!.FullName.ShouldBe("App.DataHandler");
-        violation.Target!.FullName.ShouldBe("Errors.DbError");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.DataHandler catches Errors.DbError");
         block.ShouldContain("Test.cs:");
     }
@@ -86,9 +80,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -164,11 +156,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
-        warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
-        warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
+        result.ShouldHaveWarnedInertTarget();
     }
 
     [Fact]
@@ -183,9 +171,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -199,10 +185,7 @@ public sealed class MustNotCatchVerbTests
                 .Enforce(arch.Namespace("Nowhere.*").MustNotCatch(arch.Namespace("App.*")))
                 .Because("b")).Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptySubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -234,7 +217,7 @@ public sealed class MustNotCatchVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.CatchPairs().ShouldBe(["App.Handler -> Errors.BErr"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -260,7 +243,7 @@ public sealed class MustNotCatchVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.CatchPairs().ShouldBe(["App.NewHandler -> Errors.Err"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]

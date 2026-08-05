@@ -58,12 +58,11 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         File.Delete(baselineFile); // uncaptured, so a run that reached the write would create it
 
         CliResult check = await RunCheckAsync(workspace, [LoadDiagnostic], false);
-        check.Exit.ShouldBe(2);
-        check.Err.ShouldContain(CheckGateLine);
+        check.ShouldRefuseWith(CheckGateLine);
 
         CliResult init = await RunBaselineAsync(workspace, [LoadDiagnostic], InitRequest, false);
 
-        init.Exit.ShouldBe(2, init.Err);
+        init.ShouldRefuseWith();
         init.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
         init.Err.ShouldContain(GateLine);
         init.Out.ShouldBeEmpty(); // it refused before the ratchet survey, so it reported no per-rule outcome
@@ -81,7 +80,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult init = await RunBaselineAsync(workspace, [LoadDiagnostic], InitRequest, true);
 
-        init.Exit.ShouldBe(0, init.Err);
+        init.ShouldSucceed();
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");
         init.Err.ShouldNotContain("error: the model is incomplete");
         init.Out.ShouldContain("wrote");
@@ -101,7 +100,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult accept = await RunBaselineAsync(workspace, [LoadDiagnostic], AcceptReductionsRequest, false);
 
-        accept.Exit.ShouldBe(2, accept.Err);
+        accept.ShouldRefuseWith();
         accept.Err.ShouldContain(GateLine);
         File.ReadAllBytes(baselineFile).ShouldBe(before);
     }
@@ -118,7 +117,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult add = await RunBaselineAsync(workspace, [LoadDiagnostic], AddRequest, false);
 
-        add.Exit.ShouldBe(2, add.Err);
+        add.ShouldRefuseWith();
         add.Err.ShouldContain(GateLine);
         File.ReadAllBytes(baselineFile).ShouldBe(before);
     }
@@ -135,7 +134,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult init = await RunBaselineAsync(workspace, [AuditDiagnostic], InitRequest, false);
 
-        init.Exit.ShouldBe(0, init.Err);
+        init.ShouldSucceed();
         init.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory still renders
         init.Err.ShouldNotContain("error: the model is incomplete");
         File.Exists(baselineFile).ShouldBeTrue();
@@ -151,7 +150,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult init = await RunBaselineAsync(workspace, [AuditDiagnostic, LoadDiagnostic], InitRequest, false);
 
-        init.Exit.ShouldBe(2, init.Err);
+        init.ShouldRefuseWith();
         init.Err.ShouldContain(GateLine);
         init.Err.ShouldContain($"warning: {AuditDiagnostic}");
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");

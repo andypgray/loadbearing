@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -19,8 +18,7 @@ public sealed class BaselineCommandTests
         // A nonexistent solution: if mode validation did not run first this would be "solution not found".
         CliResult result = await CliRunner.InvokeAsync("baseline", "does-not-exist.sln");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("Specify exactly one of --init, --accept-reductions, or --add.");
+        result.ShouldRefuseWith("Specify exactly one of --init, --accept-reductions, or --add.");
         result.Err.ShouldNotContain("does-not-exist");
     }
 
@@ -29,8 +27,7 @@ public sealed class BaselineCommandTests
     {
         CliResult result = await CliRunner.InvokeAsync("baseline", "--init", "--accept-reductions");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("Specify exactly one of --init, --accept-reductions, or --add.");
+        result.ShouldRefuseWith("Specify exactly one of --init, --accept-reductions, or --add.");
     }
 
     [Fact]
@@ -39,8 +36,7 @@ public sealed class BaselineCommandTests
         CliResult result = await CliRunner.InvokeAsync(
             "baseline", "does-not-exist.sln", "--init", "--accept-reductions", "--add");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("Specify exactly one of --init, --accept-reductions, or --add.");
+        result.ShouldRefuseWith("Specify exactly one of --init, --accept-reductions, or --add.");
         result.Err.ShouldNotContain("does-not-exist");
     }
 
@@ -49,8 +45,7 @@ public sealed class BaselineCommandTests
     {
         CliResult result = await CliRunner.InvokeAsync("baseline", "does-not-exist.sln", "--init", "--rule", "some/rule");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("--rule, --because, --source, --target, and --subject apply only with --add.");
+        result.ShouldRefuseWith("--rule, --because, --source, --target, and --subject apply only with --add.");
     }
 
     [Fact]
@@ -59,8 +54,7 @@ public sealed class BaselineCommandTests
         CliResult result = await CliRunner.InvokeAsync(
             "baseline", "does-not-exist.sln", "--add", "--because", "b", "--subject", "S");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("--add requires --rule <id>.");
+        result.ShouldRefuseWith("--add requires --rule <id>.");
     }
 
     [Fact]
@@ -75,12 +69,9 @@ public sealed class BaselineCommandTests
             "baseline", "does-not-exist.sln", "--add", "--rule", "r", "--subject", "S", "--because", "a\nb");
 
         const string expected = "--add requires a non-blank, single-line --because.";
-        missing.Exit.ShouldBe(2);
-        missing.Err.ShouldContain(expected);
-        blank.Exit.ShouldBe(2);
-        blank.Err.ShouldContain(expected);
-        multiline.Exit.ShouldBe(2);
-        multiline.Err.ShouldContain(expected);
+        missing.ShouldRefuseWith(expected);
+        blank.ShouldRefuseWith(expected);
+        multiline.ShouldRefuseWith(expected);
     }
 
     [Fact]
@@ -96,11 +87,8 @@ public sealed class BaselineCommandTests
 
         const string expected =
             "--add requires exactly one entry form: --source with --target (an edge), or --subject (a shape).";
-        halfEdge.Exit.ShouldBe(2);
-        halfEdge.Err.ShouldContain(expected);
-        mixed.Exit.ShouldBe(2);
-        mixed.Err.ShouldContain(expected);
-        neither.Exit.ShouldBe(2);
-        neither.Err.ShouldContain(expected);
+        halfEdge.ShouldRefuseWith(expected);
+        mixed.ShouldRefuseWith(expected);
+        neither.ShouldRefuseWith(expected);
     }
 }

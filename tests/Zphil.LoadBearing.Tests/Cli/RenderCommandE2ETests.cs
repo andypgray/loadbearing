@@ -170,7 +170,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllText(RootAgents).ShouldBe(Wrap(RootBody, "\n"));
         File.ReadAllText(ScopeAgents).ShouldBe(Wrap(ScopeBody, "\n"));
@@ -186,7 +186,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult second = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
-        second.Exit.ShouldBe(0);
+        second.ShouldSucceed();
         Normalize(second.Out).ShouldBe("unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllBytes(RootAgents).ShouldBe(rootFirst);
         File.ReadAllBytes(ScopeAgents).ShouldBe(scopeFirst);
@@ -221,7 +221,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe("wrote AGENTS.md");
         File.Exists(ScopeAgents).ShouldBeFalse();
     }
@@ -233,7 +233,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.LayerSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         // Root first, then the layer files (declaration order: Web before Billing), then the Billing
         // directory whose layer + quarantine units merged into one wrote-line.
         Normalize(result.Out).ShouldBe(
@@ -251,7 +251,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult second = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.LayerSpecDll);
 
-        second.Exit.ShouldBe(0);
+        second.ShouldSucceed();
         Normalize(second.Out).ShouldBe(
             "unchanged AGENTS.md\nunchanged MyApp.Web/AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
     }
@@ -265,7 +265,7 @@ public sealed class RenderCommandE2ETests
 
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.Exists(WebAgents).ShouldBeFalse();
         File.Exists(DomainAgents).ShouldBeFalse();
@@ -281,14 +281,14 @@ public sealed class RenderCommandE2ETests
         CliResult first = await CliRunner.InvokeAsync(
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
-        first.Exit.ShouldBe(0);
+        first.ShouldSucceed();
         Normalize(first.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote ARCHITECTURE.md");
         Normalize(File.ReadAllText(Architecture)).ShouldBe(Normalize(GoldenDiagram()));
 
         CliResult second = await CliRunner.InvokeAsync(
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
-        second.Exit.ShouldBe(0);
+        second.ShouldSucceed();
         Normalize(second.Out).ShouldBe(
             "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\nunchanged ARCHITECTURE.md");
     }
@@ -302,7 +302,7 @@ public sealed class RenderCommandE2ETests
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll,
             "--diagram", Architecture, "--diagram-only", "MyApp.Web;MyApp.Legacy.Billing");
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         ManagedBlock.ExtractBody(File.ReadAllText(Architecture)).ShouldBe(ScopedDiagramBody);
     }
 
@@ -314,8 +314,7 @@ public sealed class RenderCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, "--diagram-only", "MyApp.Web");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("--diagram-only and --diagram-exclude apply only with --diagram <path>.");
+        result.ShouldRefuseWith("--diagram-only and --diagram-exclude apply only with --diagram <path>.");
     }
 
     private static string GoldenDiagram()

@@ -48,7 +48,7 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.Violations.ShouldBeEmpty();
     }
 
@@ -135,6 +135,8 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
+        // Spelled out rather than asserted through ShouldHaveWarnedInertTarget, so the pinned wording keeps
+        // a literal that does not run through the helper holding it.
         result.Status.ShouldBe(RuleStatus.Passed);
         result.Violations.ShouldBeEmpty();
         CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
@@ -168,7 +170,7 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.Violations.ShouldBeEmpty();
     }
 }

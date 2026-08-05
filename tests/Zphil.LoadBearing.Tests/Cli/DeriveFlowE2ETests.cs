@@ -38,8 +38,7 @@ public sealed class DeriveFlowE2ETests
         CliResult checkRed = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--json");
 
-        checkRed.Exit.ShouldBe(1);
-        checkRed.Out.ShouldContain("\"rulesFailed\": 4");
+        checkRed.ShouldReportViolations("\"rulesFailed\": 4");
         checkRed.Out.ShouldContain("\"rulesPassed\": 2");
         checkRed.Out.ShouldContain("\"rulesSkipped\": 1");
         checkRed.Out.ShouldContain("\"violations\": 7");
@@ -49,7 +48,7 @@ public sealed class DeriveFlowE2ETests
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--init");
 
-        init.Exit.ShouldBe(0);
+        init.ShouldSucceed();
         File.Exists(workspace.PathOf("arch", "baselines", "layering", "domain-independent.json")).ShouldBeTrue();
         File.Exists(workspace.PathOf("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBeTrue();
         File.Exists(workspace.PathOf("arch", "baselines", "naming", "handlers.json")).ShouldBeTrue();
@@ -59,15 +58,14 @@ public sealed class DeriveFlowE2ETests
         CliResult checkGreen = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--json");
 
-        checkGreen.Exit.ShouldBe(0);
-        checkGreen.Out.ShouldContain("\"rulesFailed\": 0");
+        checkGreen.ShouldSucceed("\"rulesFailed\": 0");
         checkGreen.Out.ShouldContain("\"violations\": 0");
 
         // Render the agent context: the root managed block and the quarantined-scope card for legacy/billing.
         CliResult render = await CliRunner.InvokeAsync(
             "render", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll);
 
-        render.Exit.ShouldBe(0);
+        render.ShouldSucceed();
         string rootAgents = workspace.PathOf("AGENTS.md");
         string scopeAgents = workspace.PathOf("MyApp.Legacy.Billing", "AGENTS.md");
         File.Exists(rootAgents).ShouldBeTrue();

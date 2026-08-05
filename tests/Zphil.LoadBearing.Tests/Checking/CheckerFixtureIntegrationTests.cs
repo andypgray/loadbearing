@@ -39,7 +39,7 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
                 arch.Rule("layering/billing-independent")
                     .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("Billing must not reach up into the web layer."))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -49,6 +49,6 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
                 arch.Rule("naming/interfaces")
                     .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*").MustHavePrefix("I"))
                     .Because("House naming convention; agents grep by I-prefix."))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 }

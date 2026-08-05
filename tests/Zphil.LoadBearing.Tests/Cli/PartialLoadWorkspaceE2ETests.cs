@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
@@ -60,7 +61,7 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult graph = await CliRunner.InvokeColdAsync("graph", workspace.SolutionPath, "--no-cache");
 
-        graph.Exit.ShouldBe(2, graph.Err);
+        graph.ShouldRefuseWith();
         graph.Err.ShouldContain("the model is incomplete");
         graph.Err.ShouldContain("graph cannot survey the codebase");
         // It names what failed, inline — the MCP surface discards the error writer, so a refusal that
@@ -89,7 +90,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult human = await CliRunner.InvokeColdAsync(
             "graph", workspace.SolutionPath, "--no-cache", "--allow-workspace-diagnostics");
 
-        human.Exit.ShouldBe(0, human.Err);
+        human.ShouldSucceed();
         human.Out.ShouldContain("Codebase survey: BrokenApp.sln");
         human.Out.ShouldContain("BrokenApp.Core");
         human.Err.ShouldContain("warning: Project file not found:"); // the diagnostics still render
@@ -98,8 +99,8 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult json = await CliRunner.InvokeColdAsync(
             "graph", workspace.SolutionPath, "--no-cache", "--json", "--allow-workspace-diagnostics");
 
-        json.Exit.ShouldBe(0, json.Err);
-        json.Out.Trim().ShouldStartWith("{");
+        json.ShouldSucceed();
+        using JsonDocument _ = json.ShouldHaveJsonStdout();
         // The survey is a partial map, and says so in the document — the only channel an MCP client has.
         json.Out.ShouldContain("\"workspaceDiagnostics\"");
         json.Out.ShouldContain("BrokenApp.Contracts.csproj");
@@ -116,7 +117,7 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult check = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
-        check.Exit.ShouldBe(2, check.Err);
+        check.ShouldRefuseWith();
         check.Err.ShouldContain(CheckGateLine);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
@@ -128,14 +129,14 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult status = await CliRunner.InvokeColdAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
-        status.Exit.ShouldBe(2, status.Err);
+        status.ShouldRefuseWith();
         status.Err.ShouldContain(StatusGateLine);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
         CliResult statusAllowed = await CliRunner.InvokeColdAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json",
             "--allow-workspace-diagnostics");
-        statusAllowed.Exit.ShouldBe(0, statusAllowed.Err);
+        statusAllowed.ShouldSucceed();
         statusAllowed.Out.ShouldContain("\"workspaceDiagnostics\"");
         statusAllowed.Out.ShouldContain("\"modelIncomplete\": true");
     }
@@ -150,7 +151,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult baseline = await CliRunner.InvokeColdAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--init");
 
-        baseline.Exit.ShouldBe(2, baseline.Err);
+        baseline.ShouldRefuseWith();
         baseline.Err.ShouldContain(BaselineGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         FilesUnder(workspace).ShouldBe(before);

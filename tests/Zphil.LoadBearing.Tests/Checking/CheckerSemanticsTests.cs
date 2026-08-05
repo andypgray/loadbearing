@@ -21,10 +21,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe("The subject selection matched no solution-declared types.");
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, "The subject selection matched no solution-declared types.");
     }
 
     [Fact]
@@ -36,8 +33,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Warnings.Single().Kind.ShouldBe(CheckWarningKind.InertTarget);
+        result.ShouldHaveWarnedInertTarget();
     }
 
     [Fact]
@@ -49,7 +45,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.Warnings.ShouldBeEmpty();
     }
 
@@ -75,10 +71,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail!.ShouldContain("closed generic construction");
+        result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "closed generic construction");
     }
 
     [Fact]
@@ -90,7 +83,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -102,7 +95,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -114,7 +107,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        Violation violation = result.Violations.Single();
+        Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.RuleError);
         violation.Detail!.ShouldContain("predicate threw");
     }

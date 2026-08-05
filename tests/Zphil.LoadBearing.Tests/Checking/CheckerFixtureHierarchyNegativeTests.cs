@@ -1,6 +1,5 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -30,7 +29,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
                 .Enforce(arch.Types.WithPrefix("HomeController").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -46,7 +45,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
                 .Enforce(arch.Types.WithPrefix("OrderApproval").MustNotDeriveFrom(typeof(Exception)))
                 .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -62,6 +61,6 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
                 .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
                 .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 }

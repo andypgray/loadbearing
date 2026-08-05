@@ -1,4 +1,4 @@
-using Shouldly;
+using System.Text.Json;
 using Xunit;
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Roslyn.MsBuild;
@@ -69,7 +69,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The clean spec would exit 0, but a project failed to load — the gate overrides that verdict.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
         result.Err.ShouldContain(GateLine);
     }
@@ -80,7 +80,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The escape hatch: the operator opts into the partial model, so the clean spec exits 0 as before.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, true, false);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the warning still renders
         result.Err.ShouldNotContain("error: the model is incomplete"); // but the gate did not fire
     }
@@ -91,8 +91,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The violated spec would exit 1; the incomplete-model gate takes precedence and exits 2.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.ViolatedSpecDll, false, false);
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain(GateLine);
+        result.ShouldRefuseWith(GateLine);
     }
 
     [Fact]
@@ -100,10 +99,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
         // stdout is pure JSON: the diagnostic rides in the workspaceDiagnostics array and the gate line
         // never leaks onto stdout, so a hook can still parse the document.
-        result.Out.Trim().ShouldStartWith("{");
+        using JsonDocument _ = result.ShouldHaveJsonStdout();
         result.Out.ShouldContain("\"workspaceDiagnostics\"");
         result.Out.ShouldContain(LoadDiagnostic);
         result.Out.ShouldNotContain("error: the model is incomplete");
@@ -122,7 +121,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         {
             CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
 
-            result.Exit.ShouldBe(2);
+            result.ShouldRefuseWith();
             string sarif = File.ReadAllText(sarifPath);
             sarif.ShouldContain("\"executionSuccessful\": false");
             sarif.ShouldContain("\"toolExecutionNotifications\"");
@@ -159,7 +158,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
 
-        result.Exit.ShouldBe(0, result.Err);
+        result.ShouldSucceed();
         result.Err.ShouldNotContain("MSBuild for this run");
         result.Out.ShouldNotContain("MSBuild for this run");
     }
@@ -175,7 +174,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
 
-        result.Exit.ShouldBe(0); // merge notes are advisory — the gate never fires on them
+        result.ShouldSucceed(); // merge notes are advisory — the gate never fires on them
         result.Err.ShouldContain(
             "warning: Type 'Shared.Widget' is declared by projects 'MyApp.Domain' and 'MyApp.Legacy.Billing'");
         result.Err.ShouldContain("arch.Project('MyApp.Legacy.Billing') selections will not include it.");
@@ -191,8 +190,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json");
 
-        result.Exit.ShouldBe(0);
-        result.Out.ShouldContain("\"workspaceDiagnostics\"");
+        result.ShouldSucceed("\"workspaceDiagnostics\"");
         result.Out.ShouldContain(
             "Type 'Shared.Widget' is declared by projects 'MyApp.Domain' and 'MyApp.Legacy.Billing'");
         result.Out.ShouldNotContain("error: the model is incomplete");
@@ -206,7 +204,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // A NuGetAudit advisory is external-timing noise, not a broken model — the clean spec still exits 0.
         CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         result.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory still renders as a warning
         result.Err.ShouldNotContain("error: the model is incomplete"); // but the gate never fired
     }
@@ -217,7 +215,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // Filtering the advisory out of the gate must not mask a real violation — the violated spec exits 1.
         CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.ViolatedSpecDll, false, false);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         result.Err.ShouldNotContain("error: the model is incomplete"); // the fail-closed gate did NOT fire
     }
 
@@ -228,8 +226,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await RunWithInjectedDiagnosticAsync(
             [AuditDiagnostic, LoadDiagnostic], CliRunner.CleanSpecDll, false, false);
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain(GateLine);
+        result.ShouldRefuseWith(GateLine);
         result.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory renders
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and so does the load failure — no over-filtering
     }
@@ -239,9 +236,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         // stdout stays pure JSON: the advisory rides the workspaceDiagnostics array and no gate line leaks.
-        result.Out.Trim().ShouldStartWith("{");
+        using JsonDocument _ = result.ShouldHaveJsonStdout();
         result.Out.ShouldContain("\"workspaceDiagnostics\"");
         result.Out.ShouldContain(AuditDiagnostic);
         result.Out.ShouldNotContain("error: the model is incomplete");
@@ -258,7 +255,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         {
             CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false, sarifPath);
 
-            result.Exit.ShouldBe(0);
+            result.ShouldSucceed();
             string sarif = File.ReadAllText(sarifPath);
             sarif.ShouldContain("\"executionSuccessful\": true");
             sarif.ShouldContain("\"toolExecutionNotifications\"");

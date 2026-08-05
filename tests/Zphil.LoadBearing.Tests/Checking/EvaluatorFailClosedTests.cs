@@ -66,11 +66,7 @@ public sealed class EvaluatorFailClosedTests
 
         RuleResult result = ArchChecker.Check(model, EmptyCodebase).Results.Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldNotBeNull();
-        violation.Detail.ShouldContain("Unhandled selection adjective 'UnknownAdjective'.");
+        result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled selection adjective 'UnknownAdjective'.");
     }
 
     [Fact]
@@ -92,11 +88,7 @@ public sealed class EvaluatorFailClosedTests
 
         RuleResult result = ArchChecker.Check(model, EmptyCodebase).Results.Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldNotBeNull();
-        violation.Detail.ShouldContain("Unhandled member adjective 'UnknownMemberAdjective'.");
+        result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled member adjective 'UnknownMemberAdjective'.");
     }
 
     [Fact]

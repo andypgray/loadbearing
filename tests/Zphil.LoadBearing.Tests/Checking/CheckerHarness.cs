@@ -1,6 +1,7 @@
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -115,5 +116,14 @@ internal static class Checker
             .Where(v => v.Kind == ViolationKind.Shape)
             .Select(v => v.Subject!.FullName)
             .ToList();
+    }
+
+    /// <summary>
+    ///     This result rendered as the human failure block, relative to the current directory — the text a
+    ///     developer reads from the CLI or the xUnit adapter.
+    /// </summary>
+    public static string HumanBlock(this RuleResult result)
+    {
+        return HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
     }
 }

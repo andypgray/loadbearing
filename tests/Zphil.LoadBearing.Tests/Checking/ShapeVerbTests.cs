@@ -68,7 +68,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("naming/repo")
                     .Enforce(arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("style/short")
                     .Enforce(arch.Types.WithPrefix("X").Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Naming, arch =>
                 arch.Rule("style/short")
@@ -127,7 +127,7 @@ public sealed class ShapeVerbTests
                         .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal), "whose name ends with Handler")
                         .MustHaveSuffix("Handler"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("proj/x")
                     .Enforce(arch.Project("TestProject").MustHaveNameMatching("*"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("shape/sealed")
                     .Enforce(arch.Types.WithPrefix("Sealed").MustBeSealed())
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/sealed")
@@ -164,7 +164,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("shape/static")
                     .Enforce(arch.Types.WithPrefix("Static").MustBeStatic())
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/static")
@@ -180,7 +180,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("shape/abstract")
                     .Enforce(arch.Types.WithPrefix("Abstract").MustBeAbstract())
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/abstract")
@@ -196,7 +196,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("shape/public")
                     .Enforce(arch.Types.WithPrefix("Public").MustBePublic())
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/public")
@@ -212,7 +212,7 @@ public sealed class ShapeVerbTests
                 arch.Rule("shape/internal")
                     .Enforce(arch.Types.WithPrefix("Internal").MustBeInternal())
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/internal")
@@ -275,7 +275,7 @@ public sealed class ShapeVerbTests
                             "declared in `Special.cs`")
                         .MustHaveSuffix("Thing"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -289,11 +289,7 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldNotBeNull();
-        violation.Detail!.ShouldContain("the `Where` predicate threw Exception");
-        violation.Detail!.ShouldContain("boom");
+        result.ShouldHaveFailedWithDetailContaining(
+            ViolationKind.RuleError, "the `Where` predicate threw Exception", "boom");
     }
 }

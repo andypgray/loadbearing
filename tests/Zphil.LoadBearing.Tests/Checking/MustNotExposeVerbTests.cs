@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -60,14 +59,9 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Expose);
-        violation.Source!.FullName.ShouldBe("App.Facade");
-        violation.Target!.FullName.ShouldBe("Secrets.Secret");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithEdge(ViolationKind.Expose, "App.Facade", "Secrets.Secret");
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.Facade exposes Secrets.Secret");
         block.ShouldContain("Test.cs:");
     }
@@ -84,9 +78,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -159,11 +151,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
-        warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
-        warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
+        result.ShouldHaveWarnedInertTarget();
     }
 
     [Fact]
@@ -178,9 +166,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -194,10 +180,7 @@ public sealed class MustNotExposeVerbTests
                 .Enforce(arch.Namespace("Nowhere.*").MustNotExpose(arch.Namespace("App.*")))
                 .Because("b")).Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptySubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -226,7 +209,7 @@ public sealed class MustNotExposeVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ExposurePairs().ShouldBe(["App.Facade -> Secrets.B"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -252,7 +235,7 @@ public sealed class MustNotExposeVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ExposurePairs().ShouldBe(["App.NewFacade -> Secrets.Data"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]

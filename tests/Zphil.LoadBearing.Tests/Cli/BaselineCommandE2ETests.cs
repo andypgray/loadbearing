@@ -44,8 +44,7 @@ public sealed class BaselineCommandE2ETests
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
 
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("wrote");
+        init.ShouldSucceed("wrote");
         // --init grandfathers the current state: both controllers' DataTable sites.
         Normalize(File.ReadAllText(file)).ShouldBe(BothPairsComposed());
         // --init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
@@ -78,15 +77,14 @@ public sealed class BaselineCommandE2ETests
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
 
-        accept.Exit.ShouldBe(0);
-        accept.Out.ShouldContain("accepted 1 reduction");
+        accept.ShouldSucceed("accepted 1 reduction");
         accept.Out.ShouldContain("refused 1 addition");
         // The Invoice entry is gone; the section is empty (with a fresh digest).
         Normalize(File.ReadAllText(workspace.PathOf(ConventionalFile))).ShouldBe(EmptySectionComposed());
 
         // The ratchet never gated: HomeController is still red, so check still fails.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        check.Exit.ShouldBe(1);
+        check.ShouldReportViolations();
     }
 
     [Fact]
@@ -101,19 +99,16 @@ public sealed class BaselineCommandE2ETests
             "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n"));
 
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        check.Exit.ShouldBe(2);
-        check.Err.ShouldContain("failed its integrity check");
+        check.ShouldRefuseWith("failed its integrity check");
 
         // status reads the same baselines, so it refuses identically (it never silently passes tamper).
         CliResult status = await CliRunner.InvokeAsync("status", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        status.Exit.ShouldBe(2);
-        status.Err.ShouldContain("failed its integrity check");
+        status.ShouldRefuseWith("failed its integrity check");
 
         // --init cannot distinguish tamper from corruption, so it refuses identically.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(2);
-        init.Err.ShouldContain("failed its integrity check");
+        init.ShouldRefuseWith("failed its integrity check");
     }
 
     private static string BothPairsComposed()

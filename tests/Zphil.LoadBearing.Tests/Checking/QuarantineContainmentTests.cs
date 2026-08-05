@@ -75,9 +75,9 @@ public sealed class QuarantineContainmentTests
 
         RuleResult containment = Containment(baselines, BoundaryScope);
 
-        containment.Status.ShouldBe(RuleStatus.Passed);
+        containment.ShouldHavePassed();
         containment.BaselineCaptured.ShouldBeTrue();
-        containment.Grandfathered.Count.ShouldBe(1);
+        containment.ShouldHaveGrandfathered(1);
         containment.Violations.ShouldBeEmpty();
     }
 
@@ -92,7 +92,7 @@ public sealed class QuarantineContainmentTests
 
         containment.Status.ShouldBe(RuleStatus.Failed);
         containment.ReferencePairs().ShouldBe(["App.Client.User -> App.Legacy.IFacade"]);
-        containment.Grandfathered.Count.ShouldBe(1);
+        containment.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -106,8 +106,8 @@ public sealed class QuarantineContainmentTests
 
         RuleResult containment = Containment(baselines, BoundaryScope);
 
-        containment.Status.ShouldBe(RuleStatus.Passed);
-        containment.Grandfathered.Count.ShouldBe(1);
+        containment.ShouldHavePassed();
+        containment.ShouldHaveGrandfathered(1);
         containment.StaleBaselineEntries.ShouldBe(1);
     }
 

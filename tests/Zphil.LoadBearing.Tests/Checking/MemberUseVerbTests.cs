@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Baselines;
 using Zphil.LoadBearing.Tests.Checking.MemberTargets;
@@ -71,14 +70,14 @@ public sealed class MemberUseVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
+        Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Source!.FullName.ShouldBe("App.Dashboard");
         violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
         violation.Member.ContainingType.FullName.ShouldBe($"{T}Clock");
         violation.Sites.ShouldNotBeEmpty();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain($"App.Dashboard uses {T}Clock.Ticks");
         block.ShouldContain("Test.cs:");
     }
@@ -86,14 +85,18 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_HumanLine_AppendsParensForMethodNotForProperty()
     {
-        string methodBlock = Block(arch => arch.Rule("member/no-advance")
-            .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
-            .Because("b"));
+        string methodBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-advance")
+                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
+                .Because("b"))
+            .Single()
+            .HumanBlock();
         methodBlock.ShouldContain($"uses {T}Clock.Advance()");
 
-        string propertyBlock = Block(arch => arch.Rule("member/no-ticks")
-            .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
-            .Because("b"));
+        string propertyBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-ticks")
+                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
+                .Because("b"))
+            .Single()
+            .HumanBlock();
         propertyBlock.ShouldContain($"uses {T}Clock.Ticks");
         propertyBlock.ShouldNotContain("Ticks()");
     }
@@ -109,9 +112,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -159,10 +160,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptySubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -177,10 +175,8 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail.ShouldBe(
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.RuleError,
             "`Task<Int32>` is a closed generic construction; member-use edges are definition-level. " +
             "Anchor the member on the open definition instead.");
     }
@@ -222,7 +218,7 @@ public sealed class MemberUseVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
+        Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Source!.FullName.ShouldBe("App.Calc");
         violation.Member!.SymbolId.ShouldBe("M:System.Math.Sqrt(System.Double)");
     }
@@ -258,8 +254,8 @@ public sealed class MemberUseVerbTests
 
             BaselineIndex loaded = BaselineStore.LoadForModel(model, dir);
             RuleResult grandfathered = ArchChecker.Check(model, before, loaded).Single();
-            grandfathered.Status.ShouldBe(RuleStatus.Passed);
-            grandfathered.Grandfathered.Count.ShouldBe(1);
+            grandfathered.ShouldHavePassed();
+            grandfathered.ShouldHaveGrandfathered(1);
 
             // Change the used overload Wait() → Wait(timeout): identity is the specific member id, so the
             // grandfathered blessing does not cover it — NEW red.
@@ -327,7 +323,7 @@ public sealed class MemberUseVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
+        Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
     }
@@ -372,15 +368,9 @@ public sealed class MemberUseVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.Single();
+        Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Member!.SymbolId.ShouldBe("P:System.DateTime.Now");
-    }
-
-    private static string Block(Action<Arch> define)
-    {
-        RuleResult result = Checker.Run(SceneModel, define).Single();
-        return HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
     }
 
     private static IReadOnlyList<string> MemberIds(RuleResult result)

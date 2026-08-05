@@ -63,7 +63,7 @@ public sealed class TripwireSemanticsTests
         CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope);
         RuleResult tripwire = report.ForRule("legacy/quarantined/tripwire");
 
-        tripwire.Status.ShouldBe(RuleStatus.Passed);
+        tripwire.ShouldHavePassed();
         CheckWarning warning = tripwire.Warnings.Single();
         warning.Kind.ShouldBe(CheckWarningKind.QuarantinedScopeTouched);
         warning.Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
@@ -75,7 +75,7 @@ public sealed class TripwireSemanticsTests
     {
         RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", ["App.Client/User.cs"]));
 
-        tripwire.Status.ShouldBe(RuleStatus.Passed);
+        tripwire.ShouldHavePassed();
         tripwire.Warnings.ShouldBeEmpty();
     }
 

@@ -67,11 +67,11 @@ public sealed class SelfSpecTests
         CliResult result = await CliRunner.InvokeAsync(
             "check", RepoRoot.Solution, "--spec", RepoRoot.ArchSpecCsproj, "--json");
 
-        // Surface the CLI's own output on failure — otherwise a red self-check (e.g. the Release-only
-        // spec-resolution regression) shows only "2 != 0" with no clue why, as the release run did.
-        result.Exit.ShouldBe(0, $"check exited {result.Exit}.\nstderr:\n{result.Err}\nstdout:\n{result.Out}");
+        // The assertion surfaces the CLI's own output on failure — otherwise a red self-check (e.g. the
+        // Release-only spec-resolution regression) shows only "2 != 0" with no clue why, as the release run did.
+        result.ShouldSucceed();
 
-        using JsonDocument report = JsonDocument.Parse(result.Out);
+        using JsonDocument report = result.ShouldHaveJsonStdout();
         report.RootElement.GetProperty("workspaceDiagnostics").EnumerateArray()
             .Select(note => note.GetString())
             .ShouldBeEmpty(

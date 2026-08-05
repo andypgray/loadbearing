@@ -98,8 +98,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", MigrateRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "data-access/no-inline-sql: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -126,8 +125,7 @@ public sealed class BaselineAddE2ETests
         // The bystanders are untouched: the same-rule DataSet red and the other-rule uncaptured containment
         // reds both still fail check.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        check.Exit.ShouldBe(1);
-        check.Out.ShouldContain("MyApp.Web.HomeController references System.Data.DataSet");
+        check.ShouldReportViolations("MyApp.Web.HomeController references System.Data.DataSet");
         check.Out.ShouldContain("FAIL legacy/billing/containment");
     }
 
@@ -147,9 +145,8 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.HomeController", "--target", "MyApp.Legacy.Billing.BillingCalculator",
             "--because", "hotfix INC-42");
 
-        init.Exit.ShouldBe(0);
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        init.ShouldSucceed();
+        add.ShouldSucceed(
             "legacy/billing/containment: added 1 grandfathered entry — MyApp.Web.HomeController -> MyApp.Legacy.Billing.BillingCalculator (because: hotfix INC-42).");
 
         Normalize(File.ReadAllText(workspace.PathOf(QuarantineBaselineFile))).ShouldBe(ComposeSections(
@@ -164,8 +161,8 @@ public sealed class BaselineAddE2ETests
         // untouched HomeController -> DataTable Migrate red.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Exit.ShouldBe(1);
-        using JsonDocument document = JsonDocument.Parse(check.Out);
+        check.ShouldReportViolations();
+        using JsonDocument document = check.ShouldHaveJsonStdout();
         JsonElement containment = document.RootElement.GetProperty("rules").EnumerateArray()
             .Single(rule => rule.GetProperty("id").GetString() == ContainmentRule);
         containment.GetProperty("status").GetString().ShouldBe("passed");
@@ -190,8 +187,7 @@ public sealed class BaselineAddE2ETests
         // re-check sees the rule green with both reads riding the baseline.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("time/inject-clock: captured 2 grandfathered violations.");
+        init.ShouldSucceed("time/inject-clock: captured 2 grandfathered violations.");
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
@@ -211,8 +207,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", ClockRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.DateTime.Now", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -239,11 +234,11 @@ public sealed class BaselineAddE2ETests
         byte[] snapshot = File.ReadAllBytes(clockPath);
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(clockPath).ShouldBe(snapshot);
         CliResult reinit = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.Exit.ShouldBe(0);
+        reinit.ShouldSucceed();
         File.ReadAllBytes(clockPath).ShouldBe(snapshot);
     }
 
@@ -267,8 +262,7 @@ public sealed class BaselineAddE2ETests
         // re-check sees the rule green with both methods riding the baseline.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("naming/async-suffix: captured 2 grandfathered violations.");
+        init.ShouldSucceed("naming/async-suffix: captured 2 grandfathered violations.");
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
@@ -288,8 +282,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", AsyncRule,
             "--subject", "MyApp.Web.HomeController.Save", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "naming/async-suffix: added 1 grandfathered entry — MyApp.Web.HomeController.Save() (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -313,11 +306,11 @@ public sealed class BaselineAddE2ETests
         byte[] snapshot = File.ReadAllBytes(asyncPath);
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(asyncPath).ShouldBe(snapshot);
         CliResult reinit = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.Exit.ShouldBe(0);
+        reinit.ShouldSucceed();
         File.ReadAllBytes(asyncPath).ShouldBe(snapshot);
     }
 
@@ -334,8 +327,7 @@ public sealed class BaselineAddE2ETests
         // live again on a captured rule — the state the valve exists for.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("di/handlers-via-registry: captured 2 grandfathered violations.");
+        init.ShouldSucceed("di/handlers-via-registry: captured 2 grandfathered violations.");
         string diPath = workspace.PathOf(ConstructionBaselineFile);
         File.WriteAllText(diPath, ComposeSections((ConstructionRule, [])));
 
@@ -346,8 +338,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", ConstructionRule,
             "--source", "MyApp.Web.InvoiceService", "--target", "MyApp.Web.InvoiceCreatedHandler", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "di/handlers-via-registry: added 1 grandfathered entry — MyApp.Web.InvoiceService -> MyApp.Web.InvoiceCreatedHandler (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -359,7 +350,7 @@ public sealed class BaselineAddE2ETests
         // The bystander pin: the OTHER construction (HomeController) is still red; only InvoiceService is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Exit.ShouldBe(1);
+        check.ShouldReportViolations();
         JsonElement diRule = RuleElement(check.Out, ConstructionRule);
         diRule.GetProperty("status").GetString().ShouldBe("failed");
         diRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
@@ -389,8 +380,7 @@ public sealed class BaselineAddE2ETests
         // the re-check sees the rule green with both captive edges riding the baseline.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("di/no-captive-dependencies: captured 2 grandfathered violations.");
+        init.ShouldSucceed("di/no-captive-dependencies: captured 2 grandfathered violations.");
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
@@ -410,8 +400,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", CaptiveRule,
             "--source", "MyApp.Web.ReportScheduler", "--target", "MyApp.Web.IOrderFeed", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "di/no-captive-dependencies: added 1 grandfathered entry — MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -423,7 +412,7 @@ public sealed class BaselineAddE2ETests
         // The bystander pin: the OTHER captive edge (IOrderFormatter) is still red; only IOrderFeed is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Exit.ShouldBe(1);
+        check.ShouldReportViolations();
         JsonElement captiveRule = RuleElement(check.Out, CaptiveRule);
         captiveRule.GetProperty("status").GetString().ShouldBe("failed");
         captiveRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
@@ -437,11 +426,11 @@ public sealed class BaselineAddE2ETests
         byte[] snapshot = File.ReadAllBytes(captivePath);
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(captivePath).ShouldBe(snapshot);
         CliResult reinit = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.Exit.ShouldBe(0);
+        reinit.ShouldSucceed();
         File.ReadAllBytes(captivePath).ShouldBe(snapshot);
     }
 
@@ -466,8 +455,7 @@ public sealed class BaselineAddE2ETests
         // arch/baselines/exceptions/ directory), and the re-check sees the rule green with both baselined.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("exceptions/no-general-catch: captured 2 grandfathered");
+        init.ShouldSucceed("exceptions/no-general-catch: captured 2 grandfathered");
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
@@ -487,8 +475,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", CatchRule,
             "--source", "MyApp.Web.ReportEndpoint", "--target", "System.Exception", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "exceptions/no-general-catch: added 1 grandfathered entry — MyApp.Web.ReportEndpoint -> System.Exception (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -503,7 +490,7 @@ public sealed class BaselineAddE2ETests
         // strict Enforce throw rule's BCL throw, which is never ratcheted and so can never be grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Exit.ShouldBe(1);
+        check.ShouldReportViolations();
         JsonElement catchRule = RuleElement(check.Out, CatchRule);
         catchRule.GetProperty("status").GetString().ShouldBe("failed");
         catchRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
@@ -523,11 +510,11 @@ public sealed class BaselineAddE2ETests
         byte[] snapshot = File.ReadAllBytes(catchPath);
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(catchPath).ShouldBe(snapshot);
         CliResult catchReinit = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        catchReinit.Exit.ShouldBe(0);
+        catchReinit.ShouldSucceed();
         File.ReadAllBytes(catchPath).ShouldBe(snapshot);
     }
 
@@ -553,8 +540,7 @@ public sealed class BaselineAddE2ETests
         // the arch/baselines/api/ directory), and the re-check sees the rule green with both surfaces baselined.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
-        init.Out.ShouldContain("api/return-dtos: captured 2 grandfathered violations.");
+        init.ShouldSucceed("api/return-dtos: captured 2 grandfathered violations.");
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
@@ -574,8 +560,7 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", ExposeRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "INC-1234");
 
-        add.Exit.ShouldBe(0);
-        add.Out.ShouldContain(
+        add.ShouldSucceed(
             "api/return-dtos: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
@@ -588,7 +573,7 @@ public sealed class BaselineAddE2ETests
         // grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Exit.ShouldBe(1);
+        check.ShouldReportViolations();
         JsonElement exposeRule = RuleElement(check.Out, ExposeRule);
         exposeRule.GetProperty("status").GetString().ShouldBe("failed");
         exposeRule.GetProperty("baseline").GetProperty("grandfathered").GetInt32().ShouldBe(1);
@@ -602,11 +587,11 @@ public sealed class BaselineAddE2ETests
         byte[] snapshot = File.ReadAllBytes(exposePath);
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(exposePath).ShouldBe(snapshot);
         CliResult reinit = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.Exit.ShouldBe(0);
+        reinit.ShouldSucceed();
         File.ReadAllBytes(exposePath).ShouldBe(snapshot);
     }
 
@@ -629,8 +614,7 @@ public sealed class BaselineAddE2ETests
         string afterSecond = File.ReadAllText(migratePath);
 
         first.Out.ShouldContain("added 1 grandfathered entry");
-        second.Exit.ShouldBe(0);
-        second.Out.ShouldContain("data-access/no-inline-sql: entry already baselined — attribution updated.");
+        second.ShouldSucceed("data-access/no-inline-sql: entry already baselined — attribution updated.");
         second.Out.ShouldContain("wrote");
         // No second entry — the count is unchanged and only the attribution (and its digest) moved.
         Normalize(afterSecond).ShouldBe(ComposeSections(
@@ -652,19 +636,19 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll,
             "--add", "--rule", MigrateRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "keep");
-        add.Exit.ShouldBe(0);
+        add.ShouldSucceed();
         byte[] snapshot = File.ReadAllBytes(migratePath);
 
         // Both entries are still observed, so accept-reductions removes nothing and preserves the attribution.
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.Exit.ShouldBe(0);
+        accept.ShouldSucceed();
         File.ReadAllBytes(migratePath).ShouldBe(snapshot);
 
         // The Migrate rule is already captured, so --init leaves the attributed entry (and digest) byte-identical.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        init.Exit.ShouldBe(0);
+        init.ShouldSucceed();
         File.ReadAllBytes(migratePath).ShouldBe(snapshot);
     }
 
@@ -692,19 +676,15 @@ public sealed class BaselineAddE2ETests
             "--add", "--rule", MigrateRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataSet", "--because", "b");
 
-        unknown.Exit.ShouldBe(2);
-        unknown.Err.ShouldContain("rule 'nope/nothing' is not in the spec.");
+        unknown.ShouldRefuseWith("rule 'nope/nothing' is not in the spec.");
 
-        nonRatcheted.Exit.ShouldBe(2);
-        nonRatcheted.Err.ShouldContain(
+        nonRatcheted.ShouldRefuseWith(
             "rule 'layering/domain-independent' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
-        uncaptured.Exit.ShouldBe(2);
-        uncaptured.Err.ShouldContain(
+        uncaptured.ShouldRefuseWith(
             "no baseline section for 'legacy/billing/containment' — run 'loadbearing baseline --init' first.");
 
-        noMatch.Exit.ShouldBe(2);
-        noMatch.Err.ShouldContain(
+        noMatch.ShouldRefuseWith(
             "no current violation of 'data-access/no-inline-sql' matches --source 'MyApp.Web.HomeController' --target 'System.Data.DataSet'");
         noMatch.Err.ShouldContain("the baseline records observed reality");
         noMatch.Err.ShouldContain("MyApp.Web.HomeController -> System.Data.DataTable");

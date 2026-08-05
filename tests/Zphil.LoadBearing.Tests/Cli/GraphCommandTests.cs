@@ -53,7 +53,7 @@ public sealed class GraphCommandTests
         CliResult result = await CliRunner.InvokeAsync("graph", CliRunner.MyAppSolution);
 
         // Assert
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe(Normalize(ExpectedHuman));
     }
 
@@ -64,7 +64,7 @@ public sealed class GraphCommandTests
         CliResult result = await CliRunner.InvokeAsync("graph", CliRunner.MyAppSolution, "--json");
 
         // Assert
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe(Normalize(Golden()));
     }
 

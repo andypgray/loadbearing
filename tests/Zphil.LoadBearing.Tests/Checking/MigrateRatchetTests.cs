@@ -47,9 +47,9 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess).Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.Violations.ShouldBeEmpty();
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
         result.BaselineCaptured.ShouldBeTrue();
     }
 
@@ -86,7 +86,7 @@ public sealed class MigrateRatchetTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ReferencePairs().ShouldBe(["App.Web.OldController -> App.Data.Cache"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -105,9 +105,9 @@ public sealed class MigrateRatchetTests
                     .Because("Resolve via DI for testability."))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.Violations.ShouldBeEmpty();
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
         result.BaselineCaptured.ShouldBeTrue();
     }
 
@@ -123,8 +123,8 @@ public sealed class MigrateRatchetTests
                     .Because("Handler discovery is convention-based."))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
         result.Violations.ShouldBeEmpty();
     }
 
@@ -139,8 +139,8 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess).Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
         result.StaleBaselineEntries.ShouldBe(1);
     }
 
@@ -165,7 +165,7 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(source, Index("data/x"), NoDataAccess).Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
         result.BaselineCaptured.ShouldBeTrue();
         result.Grandfathered.ShouldBeEmpty();
         result.StaleBaselineEntries.ShouldBe(0);
@@ -183,7 +183,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
         result.Grandfathered.ShouldBeEmpty();
     }
 
@@ -197,7 +197,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
         result.Grandfathered.ShouldBeEmpty();
     }
 
@@ -212,8 +212,7 @@ public sealed class MigrateRatchetTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Warnings.Single().Kind.ShouldBe(CheckWarningKind.InertTarget);
+        result.ShouldHaveWarnedInertTarget();
     }
 
     [Fact]

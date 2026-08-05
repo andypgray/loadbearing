@@ -16,8 +16,7 @@ public sealed class StatusCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(0);
-        result.Out.ShouldContain(
+        result.ShouldSucceed(
             "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
         // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
         result.Out.ShouldContain(
@@ -32,7 +31,7 @@ public sealed class StatusCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe(Normalize(Golden()));
     }
 

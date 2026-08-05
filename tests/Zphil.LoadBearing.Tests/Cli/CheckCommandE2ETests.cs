@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 
@@ -18,8 +19,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
-        result.Out.ShouldContain("FAIL layering/domain-independent");
+        result.ShouldReportViolations("FAIL layering/domain-independent");
         result.Out.ShouldContain("because: Domain is UI-agnostic; transaction boundaries live in services.");
         result.Out.ShouldContain("fix: Define an abstraction in Domain and implement it in Web.");
         result.Out.ShouldContain(
@@ -31,7 +31,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // HomeController's DataTable is new code in the old pattern — red.
         result.Out.ShouldContain("FAIL data-access/no-inline-sql");
         result.Out.ShouldContain("MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController references System.Data.DataTable");
@@ -45,7 +45,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
         // read at its file:line, and — uncaptured member-level Migrate — the same --init hint as any ratcheted rule.
         result.Out.ShouldContain("FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.");
@@ -60,7 +60,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // Uncaptured containment (its baseline path is deliberately uncommitted) → interior refs are hard red.
         result.Out.ShouldContain("FAIL legacy/billing/containment");
         result.Out.ShouldContain(
@@ -81,7 +81,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
         // catch site's file:line, and — uncaptured catch-level Migrate — the same --init hint as any ratcheted rule.
         result.Out.ShouldContain("FAIL exceptions/no-general-catch — The Web layer must not catch `Exception`.");
@@ -96,7 +96,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
         // is red at its site; its sanctioned OrderRuleViolation throw is green — allowed, so never listed.
         result.Out.ShouldContain("FAIL exceptions/domain-throws-domain — The Domain layer must throw only `OrderRuleViolation`.");
@@ -110,7 +110,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
         // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's and ReportPublisher's
         // blanket catches spell no `when` filter, so both are red at the very sites exceptions/no-general-catch
@@ -131,7 +131,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The rethrow-aware catch half of the report (GRAMMAR §4.8), and the axis differentiator end to end.
         // ReportPublisher's catch is red under BOTH rules above — same type, same lack of filter — and green
         // here, because its clause ends in `throw;` and suppresses nothing. Its absence from this one block is
@@ -147,7 +147,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
         // its own identity. The 'throws' evidence line is shared text with exceptions/domain-throws-domain, so
         // what tells the two blocks apart is the prose — this rule names the one type it bans, not the set it
@@ -166,7 +166,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
         // signature that surfaces the banned type, and — uncaptured Migrate — the same --init hint as any ratcheted
         // rule. Both controllers red: InvoiceController is grandfathered for its DataTable *reference* under
@@ -185,7 +185,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
-        result.Exit.ShouldBe(1);
+        result.ShouldReportViolations();
         Normalize(result.Out).ShouldBe(Normalize(Golden()));
     }
 
@@ -209,7 +209,7 @@ public sealed class CheckCommandE2ETests
             CliResult result = await CliRunner.InvokeAsync(
                 "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
 
-            result.Exit.ShouldBe(1);
+            result.ShouldReportViolations();
             Normalize(File.ReadAllText(sarifPath)).ShouldBe(Normalize(GoldenSarif()));
         }
         finally
@@ -229,8 +229,8 @@ public sealed class CheckCommandE2ETests
             CliResult result = await CliRunner.InvokeAsync(
                 "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--sarif", sarifPath);
 
-            result.Exit.ShouldBe(1);
-            result.Out.Trim().ShouldStartWith("{");
+            result.ShouldReportViolations();
+            using JsonDocument _ = result.ShouldHaveJsonStdout();
             result.Out.ShouldNotContain("wrote");
             File.Exists(sarifPath).ShouldBeTrue();
             File.ReadAllText(sarifPath).ShouldContain("\"$schema\"");
@@ -246,8 +246,7 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", "does-not-exist.dll");
 
-        result.Exit.ShouldBe(2);
-        result.Err.ShouldContain("was not found");
+        result.ShouldRefuseWith("was not found");
     }
 
     private static string Golden()

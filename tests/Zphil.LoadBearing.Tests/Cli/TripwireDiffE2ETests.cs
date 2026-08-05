@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -26,8 +25,7 @@ public sealed class TripwireDiffE2ETests
         CliResult result = await CliRunner.InvokeAsync(
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
 
-        result.Exit.ShouldBe(0);
-        result.Out.ShouldContain("warn legacy/billing/tripwire");
+        result.ShouldSucceed("warn legacy/billing/tripwire");
         result.Out.ShouldContain(
             "warning: Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing' — " +
             "does the task actually require editing dragon territory? Dragons: loadbearing explain legacy/billing/tripwire.");
@@ -46,8 +44,7 @@ public sealed class TripwireDiffE2ETests
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
 
         // Exit code is containment-driven only; the tripwire warning rides alongside.
-        result.Exit.ShouldBe(1);
-        result.Out.ShouldContain("FAIL legacy/billing/containment");
+        result.ShouldReportViolations("FAIL legacy/billing/containment");
         result.Out.ShouldContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
         result.Out.ShouldContain("warn legacy/billing/tripwire");
         result.Out.ShouldContain("Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside quarantined scope 'legacy/billing'");
@@ -75,8 +72,7 @@ public sealed class TripwireDiffE2ETests
             CliResult result = await CliRunner.InvokeAsync(
                 "check", Path.Combine(linkRoot, "MyApp.sln"), "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
 
-            result.Exit.ShouldBe(0);
-            result.Out.ShouldContain("warn legacy/billing/tripwire");
+            result.ShouldSucceed("warn legacy/billing/tripwire");
             result.Out.ShouldContain(
                 "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'");
         }

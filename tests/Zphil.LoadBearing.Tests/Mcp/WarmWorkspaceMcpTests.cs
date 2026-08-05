@@ -439,7 +439,7 @@ public sealed class WarmWorkspaceMcpTests
             CallToolResult check = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
             CliResult coldCheck = await CliRunner.InvokeColdAsync(
                 "check", CliRunner.MyAppSolution, "--spec", tempSpec, "--json");
-            coldCheck.Exit.ShouldBe(2);
+            coldCheck.ShouldRefuseWith();
 
             // Assert — the tool errors with exactly the text the cold CLI wrote to stderr in the same state.
             check.IsError.ShouldBe(true);

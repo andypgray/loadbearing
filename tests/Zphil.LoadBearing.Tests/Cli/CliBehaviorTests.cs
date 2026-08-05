@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -18,7 +17,7 @@ public sealed class CliBehaviorTests
     {
         CliResult result = await CliRunner.InvokeAsync("frobnicate");
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
     }
 
     [Fact]
@@ -26,7 +25,7 @@ public sealed class CliBehaviorTests
     {
         CliResult result = await CliRunner.InvokeAsync("check", "--bogus");
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
     }
 
     [Fact]
@@ -37,6 +36,6 @@ public sealed class CliBehaviorTests
         // ever starts the server here, stdin never closes under the test host and the whole suite hangs.
         CliResult result = await CliRunner.InvokeAsync("mcp", "--bogus");
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
     }
 }

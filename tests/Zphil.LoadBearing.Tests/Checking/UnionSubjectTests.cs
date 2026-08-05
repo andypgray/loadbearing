@@ -22,7 +22,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Legacy.Billing"))
                         .MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                         .Except(arch.Types.WithNameMatching("OrderService"))
                         .MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                         .OfKind(TypeKind.Interface)
                         .MustHavePrefix("I"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -80,10 +80,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.EmptySubject,
             "The subject selection operand \"types in project `MyApp.Domian`\" matched no solution-declared types.");
     }
 
@@ -116,8 +114,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.ShouldHaveSingleItem().Detail.ShouldBe(
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.EmptySubject,
             "The subject selection operand \"types in project `MyApp.Domian`\" matched no solution-declared types.");
     }
 
@@ -130,6 +128,6 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Domain"), arch.Project("MyApp.Legacy.Billing"))
                         .Methods.MustHaveNameMatching("*"))
                     .Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 }

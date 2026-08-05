@@ -54,7 +54,7 @@ public sealed class HierarchyVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
+        result.ShouldHavePassed();
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Widget").MustImplement(typeof(IThing))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         RuleResult failing = Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement(typeof(IThing))).Because("b"))
@@ -99,7 +99,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("SubType").MustDeriveFrom(typeof(ThingBase))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom(typeof(ThingBase))).Because("b"))
@@ -111,7 +111,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Tagged").MustBeAttributedWith(typeof(MarkAttribute))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith(typeof(MarkAttribute))).Because("b"))
@@ -129,7 +129,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement(typeof(IThing))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom(typeof(ThingBase))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     // ── open-vs-closed generic anchors, negated (GRAMMAR §5.2) ──
@@ -168,7 +168,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<Order>))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("AttrDerived").MustNotBeAttributedWith(typeof(MarkAttribute))).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     // ── string attribute anchors (GRAMMAR §5.2–§5.3): the escape hatch names the attribute DEFINITION by
@@ -243,7 +243,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Tagged").MustBeAttributedWith($"{T}MarkAttribute")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith($"{T}MarkAttribute")).Because("b"))
@@ -259,7 +259,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith($"{T}MarkAttribute")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -287,7 +287,7 @@ public sealed class HierarchyVerbTests
                     .Because("b"))
             .Single();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
     }
 
     [Fact]
@@ -301,7 +301,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<System.Int32>")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -317,7 +317,7 @@ public sealed class HierarchyVerbTests
         Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Untagged")
                     .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     // ── string hierarchy anchors (GRAMMAR §5.2–§5.3): the same escape hatch in interface and base-type
@@ -351,7 +351,7 @@ public sealed class HierarchyVerbTests
                     .Because("b"))
             .Single();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
     }
 
     [Fact]
@@ -371,7 +371,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Widget").MustImplement($"{T}IThing")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement($"{T}IThing")).Because("b"))
@@ -387,7 +387,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -395,7 +395,7 @@ public sealed class HierarchyVerbTests
     {
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("SubType").MustDeriveFrom($"{T}ThingBase")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom($"{T}ThingBase")).Because("b"))
@@ -411,7 +411,7 @@ public sealed class HierarchyVerbTests
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom($"{T}ThingBase")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]
@@ -432,7 +432,7 @@ public sealed class HierarchyVerbTests
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo")
                     .MustNotImplement($"{T}IThing", $"{T}IHandler<T>")).Because("b"))
-            .Single().Status.ShouldBe(RuleStatus.Passed);
+            .Single().ShouldHavePassed();
     }
 
     [Fact]

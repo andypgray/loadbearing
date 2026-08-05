@@ -40,9 +40,9 @@ public sealed class HumanReportRendererTests
             [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
         RuleResult result = ArchChecker.Check(model, AsyncModel).Single();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
         block.ShouldContain(
             "error: `Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
             "Anchor on the open definition instead.");
@@ -57,9 +57,9 @@ public sealed class HumanReportRendererTests
                 .Enforce(arch.Namespace("Nowhere.*").MustHavePrefix("I"))
                 .Because("b")).Single();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
         block.ShouldContain("The subject selection matched no solution-declared types.");
     }
 
@@ -72,7 +72,7 @@ public sealed class HumanReportRendererTests
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
         block.ShouldContain("App.Orphan");
         block.ShouldEndWith("App.Orphan"); // unlocated — no trailing `:line`
@@ -88,9 +88,9 @@ public sealed class HumanReportRendererTests
         var result = new RuleResult(
             EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Construction);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Construction);
         block.ShouldContain("App.Factory constructs Widgets.Widget");
         block.ShouldContain(":12 — App.Factory constructs Widgets.Widget");
     }
@@ -105,9 +105,9 @@ public sealed class HumanReportRendererTests
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Catch);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Catch);
         block.ShouldContain("App.Handler catches Errors.DbError");
         block.ShouldContain(":9 — App.Handler catches Errors.DbError");
     }
@@ -122,9 +122,9 @@ public sealed class HumanReportRendererTests
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Expose);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Expose);
         block.ShouldContain("App.Facade exposes Secrets.Secret");
         block.ShouldContain(":5 — App.Facade exposes Secrets.Secret");
     }
@@ -139,9 +139,9 @@ public sealed class HumanReportRendererTests
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Throw);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Throw);
         block.ShouldContain("App.Service throws Errors.InfraError");
         block.ShouldContain(":14 — App.Service throws Errors.InfraError");
     }
@@ -174,9 +174,9 @@ public sealed class HumanReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                 .Because("A broad catch names what it expects.")).Single();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Catch);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Catch);
         block.ShouldContain("Test.cs:11 — App.Handler catches Errors.DbError");
         block.ShouldNotContain("Test.cs:9");
     }
@@ -200,9 +200,9 @@ public sealed class HumanReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
                 .Because("Throw a type a caller can dispatch on.")).Single();
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
-        result.Violations.Single().Kind.ShouldBe(ViolationKind.Throw);
+        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Throw);
         block.ShouldContain("Test.cs:5 — App.Service throws System.Exception");
     }
 
@@ -216,7 +216,7 @@ public sealed class HumanReportRendererTests
             EnforceRule("shape/x"), RuleStatus.Failed,
             [Violation.Shape(located, []), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, [], 0, false);
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
 
         // The unlocated EmptySubject detail precedes the located Shape's `path:line — App.Located`, though the
         // located violation was listed first.

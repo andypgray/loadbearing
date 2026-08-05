@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -72,14 +71,9 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Throw);
-        violation.Source!.FullName.ShouldBe("App.Service");
-        violation.Target!.FullName.ShouldBe("Errors.InfraError");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithEdge(ViolationKind.Throw, "App.Service", "Errors.InfraError");
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.Service throws Errors.InfraError");
         block.ShouldContain("Test.cs:");
     }
@@ -133,9 +127,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -181,10 +173,7 @@ public sealed class MustOnlyThrowVerbTests
                 .Enforce(arch.Namespace("Nowhere.*").MustOnlyThrow(arch.Namespace("App.*")))
                 .Because("b")).Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.EmptySubject);
-        violation.Detail.ShouldBe(ConstraintEvaluator.EmptySubjectMessage);
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -218,7 +207,7 @@ public sealed class MustOnlyThrowVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ThrowPairs().ShouldBe(["N.Worker -> N.Beta"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -244,7 +233,7 @@ public sealed class MustOnlyThrowVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ThrowPairs().ShouldBe(["N.NewWorker -> N.Boom"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]

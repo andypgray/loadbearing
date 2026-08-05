@@ -60,7 +60,7 @@ public sealed class CliMcpParityTests
         // (memberShape / subjectMember, GRAMMAR §4.6), so this byte-parity covers member subjects too.
         CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        cliCheck.Exit.ShouldBe(1);
+        cliCheck.ShouldReportViolations();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         mcpCheck.IsError.ShouldNotBe(true);
         Normalize(TextOf(mcpCheck)).ShouldBe(Normalize(cliCheck.Out));
@@ -86,7 +86,7 @@ public sealed class CliMcpParityTests
         // arch_explain <unknown> IsError text ≡ explain <unknown> stderr (CLI exit 2).
         CliResult cliUnknown = await CliRunner.InvokeColdAsync(
             "explain", "unknown/id", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
-        cliUnknown.Exit.ShouldBe(2);
+        cliUnknown.ShouldRefuseWith();
         CallToolResult mcpUnknown = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "unknown/id" }, cancellationToken: Ct);
         mcpUnknown.IsError.ShouldBe(true);
@@ -101,7 +101,7 @@ public sealed class CliMcpParityTests
 
         CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll, "--json");
-        cliCheck.Exit.ShouldBe(0);
+        cliCheck.ShouldSucceed();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
 
         Normalize(TextOf(mcpCheck)).ShouldBe(Normalize(cliCheck.Out));

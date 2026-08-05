@@ -193,7 +193,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _dir)).Single();
         ratcheted.Status.ShouldBe(RuleStatus.Failed);
         ratcheted.CatchPairs().ShouldBe(["App.ImportHandler -> Errors.DbError"]);
-        ratcheted.Grandfathered.Count.ShouldBe(1);
+        ratcheted.ShouldHaveGrandfathered(1);
     }
 
     private static string Compose(BaselineEntry[] entries)

@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -30,7 +29,7 @@ public sealed class MigrateRenameE2ETests
         // The clean spec grandfathers both DataTable sites via arch/clean-baseline.json. The DocID
         // survived the move, so the Migrate rule stays fully grandfathered and the whole spec is clean.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
-        check.Exit.ShouldBe(0);
+        check.ShouldSucceed();
 
         // Belt-and-braces: the burndown confirms both remain grandfathered and none went stale.
         CliResult status = await CliRunner.InvokeAsync(

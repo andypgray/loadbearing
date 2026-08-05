@@ -17,7 +17,7 @@ public sealed class ExplainCommandTests
         CliResult result = await CliRunner.InvokeAsync(
             "explain", "layering/domain-independent", "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         Normalize(result.Out).ShouldBe(Normalize(
             "layering/domain-independent (enforce)\n" +
             "  sentence: The Domain layer must not reference the Web layer.\n" +
@@ -31,8 +31,7 @@ public sealed class ExplainCommandTests
         CliResult result = await CliRunner.InvokeAsync(
             "explain", "data-access/no-inline-sql", "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(0);
-        result.Out.ShouldContain("data-access/no-inline-sql (migrate)");
+        result.ShouldSucceed("data-access/no-inline-sql (migrate)");
         result.Out.ShouldContain("  from: Some controllers open database connections directly.");
         result.Out.ShouldContain("  policy: MigrateIfSmall");
         // .Baseline omitted ⇒ the conventional default path is filled at model build (GRAMMAR §4.4).
@@ -45,7 +44,7 @@ public sealed class ExplainCommandTests
         CliResult result = await CliRunner.InvokeAsync(
             "explain", "no/such/rule", "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
         // The post-desugar ID set includes the quarantined scope's containment + tripwire children (GRAMMAR §7).
         Normalize(result.Err).ShouldContain(
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
@@ -73,7 +72,7 @@ public sealed class ExplainCommandTests
     {
         CliResult result = await CliRunner.InvokeAsync("explain", "--spec", CliRunner.ViolatedSpecDll);
 
-        result.Exit.ShouldBe(2);
+        result.ShouldRefuseWith();
     }
 
     private static string Normalize(string value)

@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -55,14 +54,9 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Construction);
-        violation.Source!.FullName.ShouldBe("App.WidgetFactory");
-        violation.Target!.FullName.ShouldBe("Widgets.Widget");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithEdge(ViolationKind.Construction, "App.WidgetFactory", "Widgets.Widget");
 
-        string block = HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
+        string block = result.HumanBlock();
         block.ShouldContain("App.WidgetFactory constructs Widgets.Widget");
         block.ShouldContain("Test.cs:");
     }
@@ -79,9 +73,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -108,11 +100,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.Construction);
-        violation.Source!.FullName.ShouldBe("App.Factory");
-        violation.Target!.FullName.ShouldBe("Widgets.Widget");
+        result.ShouldHaveFailedWithEdge(ViolationKind.Construction, "App.Factory", "Widgets.Widget");
     }
 
     [Fact]
@@ -165,7 +153,7 @@ public sealed class MustNotConstructVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ConstructionPairs().ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -192,7 +180,7 @@ public sealed class MustNotConstructVerbTests
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ConstructionPairs().ShouldBe(["App.NewFactory -> Widgets.Widget"]);
-        result.Grandfathered.Count.ShouldBe(1);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -206,11 +194,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
-        warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
-        warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
+        result.ShouldHaveWarnedInertTarget();
     }
 
     [Fact]
