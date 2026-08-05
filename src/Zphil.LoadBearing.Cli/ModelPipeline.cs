@@ -74,8 +74,9 @@ internal static class ModelPipeline
     }
 
     /// <summary>
-    ///     Loads the spec DLL in a collectible ALC (the <c>Zphil.LoadBearing</c> contract resolves from
-    ///     Default so type identity holds), discovers and builds the model, then best-effort unloads.
+    ///     Loads the spec DLL in a collectible ALC (the <c>Zphil.LoadBearing</c> contract resolves to this
+    ///     host's own copy, whatever version the spec was compiled against, so type identity holds),
+    ///     discovers and builds the model, then best-effort unloads.
     ///     The returned model roots the spec's <c>Type</c> references, so it stays usable after
     ///     <c>Unload()</c> in this one-shot process.
     /// </summary>
@@ -108,6 +109,12 @@ internal static class ModelPipeline
             catch (FileNotFoundException ex) when (SpecDependencyLoadFailure.IsAssemblyLoadFailure(ex))
             {
                 throw SpecDependencyLoadFailure.Map(ex, specDllPath);
+            }
+            catch (MissingMemberException ex)
+            {
+                // A spec built against a newer contract than this host carries. The bind is version-agnostic
+                // by design, so it got this far; the member it reached for is the one thing that cannot work.
+                throw SpecContractMismatch.Map(assembly, specDllPath, ex);
             }
             catch (TypeLoadException ex)
             {
@@ -143,6 +150,8 @@ internal static class ModelPipeline
 
         return $"Could not load spec assembly '{Path.GetFileName(specDllPath)}'; one or more types failed to load:\n"
                + detail
-               + "\nBuild the spec project and restore its dependencies, then retry.";
+               + "\nBuild the spec project and restore its dependencies, then retry. If it is already built, the"
+               + " assembly named above is a dependency a class-library build does not stage beside the spec DLL:"
+               + " add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.";
     }
 }

@@ -6,9 +6,9 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 /// <summary>
 ///     A collectible <see cref="AssemblyLoadContext" /> that isolates a prebuilt spec DLL — the
 ///     host-side half of loading a spec in isolation. The type-identity fix is the shared-contract
-///     short-circuit:
-///     <c>Zphil.LoadBearing</c> resolves from the Default context so <c>spec is IArchitectureSpec</c>
-///     holds across the boundary; everything else resolves through the dependency resolver.
+///     short-circuit: <c>Zphil.LoadBearing</c> resolves to the copy this host already carries so
+///     <c>spec is IArchitectureSpec</c> holds across the boundary; everything else resolves through
+///     the dependency resolver.
 /// </summary>
 /// <remarks>
 ///     Every assembly this context loads is loaded from its <em>bytes</em>, never its path — see
@@ -18,6 +18,12 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 /// </remarks>
 internal sealed class SpecLoadContext : AssemblyLoadContext
 {
+    /// <summary>The spec contract's simple name — the one assembly identity shared across the boundary.</summary>
+    internal const string ContractAssemblyName = "Zphil.LoadBearing";
+
+    /// <summary>The contract this host carries, whatever version a spec was compiled against.</summary>
+    private static readonly Assembly Contract = typeof(IArchitectureSpec).Assembly;
+
     private readonly AssemblyDependencyResolver _resolver;
 
     internal SpecLoadContext(string mainAssemblyPath)
@@ -54,11 +60,27 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
         return LoadFromStream(stream);
     }
 
+    /// <summary>
+    ///     Resolves the contract to this host's own copy by simple name, and everything else through the
+    ///     spec's dependency manifest.
+    /// </summary>
+    /// <remarks>
+    ///     Returning the contract assembly here rather than null is what makes the bind
+    ///     <em>version-agnostic</em>, and that is the whole point. Falling through to the Default context
+    ///     looks equivalent — the same assembly comes back — but the default binder also enforces
+    ///     requested-version ≤ available-version, and a host carries exactly one contract version. A spec
+    ///     compiled against a newer one (a vendored or source-built contract identifies as 1.0.0.0, and a
+    ///     packaged one tracked <c>&lt;Version&gt;</c> until it was pinned) then failed to bind at all, and
+    ///     the loader reported it as a plain missing file — the shape reported in issue #19, where the
+    ///     rendered remedy was to build a spec that was already built, beside a contract DLL already on
+    ///     disk. Version is not what makes the contract type identical on both sides; the assembly is, so
+    ///     the version is the wrong thing to bind on. A spec that turns out to need contract API this copy
+    ///     does not have fails later, in <c>Define()</c>, where <see cref="SpecContractMismatch" /> can name
+    ///     both versions and the remedy.
+    /// </remarks>
     protected override Assembly? Load(AssemblyName assemblyName)
     {
-        if (assemblyName.Name == "Zphil.LoadBearing")
-            // Fall back to the Default context so the shared contract type is identical on both sides.
-            return null;
+        if (assemblyName.Name == ContractAssemblyName) return Contract;
 
         string? path = _resolver.ResolveAssemblyToPath(assemblyName);
         return path != null ? LoadWithoutLocking(path) : null;

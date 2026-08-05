@@ -7,7 +7,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     When spec discovery's <c>GetTypes()</c> raises a <see cref="ReflectionTypeLoadException" />
-///     (a missing or version-mismatched dependency of the spec assembly), the pipeline surfaces the
+///     (a dependency of the spec assembly that is missing or the wrong version — never the contract, which
+///     binds on the assembly rather than its version), the pipeline surfaces the
 ///     <em>distinct</em> loader messages — deduped and ordinal-sorted so the output is deterministic —
 ///     under a naming/fix frame, not a raw reflection failure. Pinned with a fabricated exception.
 /// </summary>
@@ -36,7 +37,9 @@ public sealed class ModelPipelineLoaderFailureTests
             "Could not load spec assembly 'Meridian.ArchSpec.dll'; one or more types failed to load:\n"
             + "  Could not load file or assembly 'Acme'.\n"
             + "  Could not load type 'Zebra'.\n"
-            + "Build the spec project and restore its dependencies, then retry.");
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, the "
+            + "assembly named above is a dependency a class-library build does not stage beside the spec "
+            + "DLL: add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
     }
 
     [Fact]
@@ -49,6 +52,8 @@ public sealed class ModelPipelineLoaderFailureTests
         message.ShouldBe(
             "Could not load spec assembly 'Spec.dll'; one or more types failed to load:\n"
             + "  (the runtime reported no loader detail)\n"
-            + "Build the spec project and restore its dependencies, then retry.");
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, the "
+            + "assembly named above is a dependency a class-library build does not stage beside the spec "
+            + "DLL: add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
     }
 }

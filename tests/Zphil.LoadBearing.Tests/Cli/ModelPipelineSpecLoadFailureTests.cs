@@ -62,7 +62,8 @@ public sealed class ModelPipelineSpecLoadFailureTests
             "Could not load spec assembly 'Zphil.LoadBearing.LegacyBrokenSpec.dll'; "
             + "one or more types failed to load:\n");
         thrown.Message.ShouldContain("Zphil.LoadBearing.LegacyProduct");
-        thrown.Message.ShouldEndWith("Build the spec project and restore its dependencies, then retry.");
+        thrown.Message.ShouldEndWith(
+            "add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
     }
 
     [Fact]

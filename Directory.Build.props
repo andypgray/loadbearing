@@ -7,8 +7,22 @@
          The nuget metadata below (authors, licence, project/repo URLs, SourceLink
          knobs, symbol packages) is identical across the four, so it lives here rather than being
          copy-pasted into each csproj. -->
+    <!-- The binding identity is pinned and deliberately does NOT track <Version>. AssemblyVersion is what
+         a spec project's compiled reference to Zphil.LoadBearing carries, and the default binder rejects a
+         host whose copy is older than that reference — so letting it track the package version meant every
+         release minted a new identity and broke specs built against a newer contract than the tool running
+         them (issue #19). FileVersion and InformationalVersion still track <Version>, so "which build is
+         this" stays answerable; nothing reads AssemblyVersion (ServerVersion and the SARIF driver both go
+         through InformationalVersion). 1.0.0.0 is the value to pin to because it is what the SDK assigns a
+         source-built or vendored contract, which puts packaged and source builds on one identity, and it
+         outranks every version shipped before the pin (0.1.0.0, 0.2.0.0) so their specs still bind. -->
     <PropertyGroup>
         <Version>0.3.0</Version>
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <!-- FileVersion defaults to AssemblyVersion, not to Version (Microsoft.NET.GenerateAssemblyInfo
+             .targets), so pinning one would silently pin both. Restated from Version, with any prerelease
+             suffix trimmed because a file version must be four numeric parts. -->
+        <FileVersion>$([System.Text.RegularExpressions.Regex]::Match($(Version), '^[0-9]+\.[0-9]+\.[0-9]+')).0</FileVersion>
         <Authors>Andrew Gray</Authors>
         <Copyright>Copyright (c) 2026 Andrew Gray</Copyright>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
