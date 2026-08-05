@@ -1,14 +1,27 @@
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `status --json` — its own document with its own schemaVersion (2), distinct from
-// `check --json`. Serialized camelCase, indented, nulls omitted. A burndown view, not a gate.
+// `check --json`. Serialized camelCase, indented, nulls omitted. The two workspace slots below are additive
+// and null (omitted) on every run whose workspace loaded, so the schema stays version 2 and a clean document
+// is byte-identical.
 
 /// <summary>The root <c>status --json</c> document.</summary>
+/// <param name="WorkspaceDiagnostics">
+///     The workspace-load diagnostics, or null (omitted) when there were none — the same array
+///     <c>check --json</c> carries, so <c>arch_status</c> stops being a surface where they are destroyed.
+/// </param>
+/// <param name="ModelIncomplete">
+///     <see langword="true" /> when a project failed to load, so the burndown below counts only what did
+///     load; null (omitted) otherwise. Stamped whether or not <c>--allow-workspace-diagnostics</c> opted out
+///     of failing closed — it states the fact about the model, not the exit code.
+/// </param>
 internal sealed record StatusJson(
     int SchemaVersion,
     string Solution,
     string SpecAssembly,
     IReadOnlyList<StatusRuleJson> Rules,
+    IReadOnlyList<string>? WorkspaceDiagnostics,
+    bool? ModelIncomplete,
     StatusSummaryJson Summary);
 
 /// <summary>

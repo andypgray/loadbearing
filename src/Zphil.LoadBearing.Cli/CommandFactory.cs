@@ -44,12 +44,9 @@ internal static class CommandFactory
             Description =
                 "A git ref; files changed since it are checked against quarantined scopes (Quarantine tripwire) — warnings only, never failures."
         };
-        Option<bool> allowWorkspaceDiagnostics = new("--allow-workspace-diagnostics")
-        {
-            Description =
-                "Check against the partial model even when some projects fail to load, instead of failing the run "
-                + "with exit 2."
-        };
+        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Check against the partial model even when some projects fail to load, instead of failing the run "
+            + "with exit 2.");
         Option<string?> sarif = new("--sarif")
         {
             Description =
@@ -215,8 +212,14 @@ internal static class CommandFactory
         {
             Description = "The offending type of the shape violation to grandfather — a full type name or 'T:' symbol ID (with --add)."
         };
+        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Write baselines from the partial model even when some projects fail to load, instead of refusing "
+            + "the command with exit 2.");
 
-        Command baseline = new("baseline", "Grandfather, shrink, or add one attributed exception to the ratcheted baselines.")
+        Command baseline = new(
+            "baseline",
+            "Grandfather, shrink, or add one attributed exception to the ratcheted baselines; a project that fails "
+            + "to load refuses the command (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
@@ -227,7 +230,8 @@ internal static class CommandFactory
             because,
             source,
             target,
-            subject
+            subject,
+            allowWorkspaceDiagnostics
         };
 
         baseline.SetAction((parseResult, ct) =>
@@ -243,7 +247,8 @@ internal static class CommandFactory
                 parseResult.GetValue(source),
                 parseResult.GetValue(target),
                 parseResult.GetValue(subject),
-                Directory.GetCurrentDirectory());
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(allowWorkspaceDiagnostics));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -261,14 +266,21 @@ internal static class CommandFactory
         {
             Description = "Emit the machine-readable JSON burndown document instead of human-readable output."
         };
+        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Report the burndown from the partial model even when some projects fail to load, instead of "
+            + "exiting 2 after rendering it.");
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
-        Command status = new("status", "Report per-rule burndown and promotion suggestions; always exits 0.")
+        Command status = new(
+            "status",
+            "Report per-rule burndown and promotion suggestions; red rules never fail the run, but a project that "
+            + "fails to load does (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
             json,
+            allowWorkspaceDiagnostics,
             noCache,
             binlog
         };
@@ -281,7 +293,8 @@ internal static class CommandFactory
                 parseResult.GetValue(json),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
-                parseResult.GetValue(binlog));
+                parseResult.GetValue(binlog),
+                parseResult.GetValue(allowWorkspaceDiagnostics));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -298,6 +311,8 @@ internal static class CommandFactory
         {
             Description = "Emit the machine-readable JSON survey document instead of human-readable output."
         };
+        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Survey the partial model even when some projects fail to load, instead of refusing with exit 2.");
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
@@ -305,10 +320,13 @@ internal static class CommandFactory
         // spec exists (a spec project, once present, appears here as an ordinary project).
         Command graph = new(
             "graph",
-            "Summarize the codebase: projects, declared vs observed project references, namespace inventory, and grouped external references. Needs no spec.")
+            "Summarize the codebase: projects, declared vs observed project references, namespace inventory, and "
+            + "grouped external references. Needs no spec; a project that fails to load refuses the survey (exit 2) "
+            + "unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             json,
+            allowWorkspaceDiagnostics,
             noCache,
             binlog
         };
@@ -320,7 +338,8 @@ internal static class CommandFactory
                 parseResult.GetValue(json),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
-                parseResult.GetValue(binlog));
+                parseResult.GetValue(binlog),
+                parseResult.GetValue(allowWorkspaceDiagnostics));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -380,6 +399,13 @@ internal static class CommandFactory
                 "Bypass the persisted caches (extraction fragments and the build capture): always load and extract "
                 + "fresh, and write nothing back."
         };
+    }
+
+    // The one opt-out out of the incomplete-model gate, worded per verb but always the same flag name: the
+    // four verbs that consume the model answer a partial load the same way, so an operator learns one flag.
+    private static Option<bool> AllowWorkspaceDiagnosticsOption(string description)
+    {
+        return new Option<bool>("--allow-workspace-diagnostics") { Description = description };
     }
 
     private static Option<string?> BinlogOption()

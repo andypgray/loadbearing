@@ -7,6 +7,12 @@ namespace Zphil.LoadBearing.Cli;
 ///     <see cref="Subject" />) ride along and are validated together with the mode — all before any
 ///     workspace cost.
 /// </summary>
+/// <param name="AllowWorkspaceDiagnostics">
+///     Whether to write baselines from the partial model when a project fails to load. Default
+///     (<c>false</c>): any workspace-load failure refuses the whole command with exit 2 and writes nothing,
+///     because a baseline is the team's signature on its debt and a partial model has no idea what that debt
+///     is. Keys on exactly what <c>check</c> keys on (<see cref="IncompleteModelGate" />).
+/// </param>
 internal sealed record BaselineRequest(
     string? Solution,
     string? Spec,
@@ -18,4 +24,5 @@ internal sealed record BaselineRequest(
     string? Source,
     string? Target,
     string? Subject,
-    string WorkingDirectory);
+    string WorkingDirectory,
+    bool AllowWorkspaceDiagnostics);

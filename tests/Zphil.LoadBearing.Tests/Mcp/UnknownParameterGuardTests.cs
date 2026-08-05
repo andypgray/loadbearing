@@ -82,6 +82,18 @@ public sealed class UnknownParameterGuardTests
     }
 
     [Fact]
+    public void Validate_KnownKeyOnGraph_ReturnsNull()
+    {
+        // Act — arch_graph's real optional parameter: the opt-out into surveying a partially-loaded model.
+        string? message = UnknownParameterGuard.Validate(
+            "arch_graph",
+            new Dictionary<string, JsonElement> { ["allowWorkspaceDiagnostics"] = DummyValue });
+
+        // Assert
+        message.ShouldBeNull();
+    }
+
+    [Fact]
     public void Validate_UnknownToolName_ReturnsNull()
     {
         // Act — unknown-tool dispatch is the SDK's concern; the guard never blocks it.

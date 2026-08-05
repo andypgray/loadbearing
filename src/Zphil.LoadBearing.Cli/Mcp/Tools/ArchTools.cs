@@ -42,7 +42,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects with namespace inventories, declared vs " +
         "observed project references, and external references grouped by namespace root. Needs no spec — call " +
-        "it before one exists to plan layers and rules.";
+        "it before one exists to plan layers and rules. Needs the solution restored and built: if projects " +
+        "fail to load it returns an error naming them rather than a survey missing them.";
 
     [McpServerTool(
         Name = CheckToolName,
@@ -58,14 +59,16 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        // Exit code deliberately ignored — violations ride in the JSON; stderr diagnostics ride in the
-        // document's workspaceDiagnostics, so the error writer is discarded. NoCache: the warm workspace and
-        // the persisted cache keep independent lifetimes — a tool call never reads or writes the cache file.
-        // Binlog null: the warm path never uses the build capture (latency-critical callers ride the session).
-        // AllowWorkspaceDiagnostics false: the fail-closed gate would fire on a load failure, but it writes only to the
-        // discarded error writer and returns an ignored exit code — it cannot touch the JSON this tool returns.
+        // Exit code and error writer deliberately discarded — everything they would carry is in the document.
+        // Violations ride in rules[]; the load failures ride in workspaceDiagnostics; and the gate verdict the
+        // exit code would have expressed rides in modelIncomplete, so a client learns the answer was reached
+        // against a partial model without needing an exit code this surface does not have.
+        // AllowWorkspaceDiagnostics true says exactly that: the document reports the incompleteness rather
+        // than the run refusing to produce one. NoCache: the warm workspace and the persisted cache keep
+        // independent lifetimes — a tool call never reads or writes the cache file. Binlog null: the warm
+        // path never uses the build capture (latency-critical callers ride the session).
         await new CheckRunner(output, TextWriter.Null, source).RunAsync(
-            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, false, null),
+            new CheckRequest(binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, true, null),
             cancellationToken);
         return output.ToString();
     }
@@ -81,9 +84,11 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        // Binlog null: the warm path never uses the build capture.
+        // Binlog null: the warm path never uses the build capture. AllowWorkspaceDiagnostics true for the same
+        // reason as arch_check: the burndown document now carries workspaceDiagnostics and modelIncomplete, so
+        // the incompleteness reaches the client as data rather than as an exit code this surface discards.
         await new StatusRunner(output, TextWriter.Null, source).RunAsync(
-            new StatusRequest(binding.Solution, binding.Spec, true, binding.WorkingDirectory, true, null),
+            new StatusRequest(binding.Solution, binding.Spec, true, binding.WorkingDirectory, true, null, true),
             cancellationToken);
         return output.ToString();
     }
@@ -134,14 +139,22 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         Idempotent = true,
         OpenWorld = false)]
     [Description(GraphDescription)]
-    public async Task<string> GraphAsync(CancellationToken cancellationToken = default)
+    public async Task<string> GraphAsync(
+        [Description(
+            "Survey the partial model even when some projects fail to load. Default false: the call returns an "
+            + "error naming what failed, because a survey missing whole projects is a wrong map, not a smaller one.")]
+        bool allowWorkspaceDiagnostics = false,
+        CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
         // binding.Spec is deliberately unused: the survey is a property of the codebase, and derive runs
         // before any spec exists (a spec project would appear here as an ordinary project). Binlog null: the
-        // warm path never uses the build capture.
+        // warm path never uses the build capture. Unlike arch_check and arch_status, the incomplete-model
+        // verdict cannot ride this document by default — graph refuses before there is one — so the refusal
+        // throws and GlobalCallToolFilter returns it as a clean un-logged error result.
         await new GraphRunner(output, TextWriter.Null, source).RunAsync(
-            new GraphRequest(binding.Solution, true, binding.WorkingDirectory, true, null), cancellationToken);
+            new GraphRequest(binding.Solution, true, binding.WorkingDirectory, true, null, allowWorkspaceDiagnostics),
+            cancellationToken);
         return output.ToString();
     }
 }

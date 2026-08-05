@@ -22,7 +22,8 @@ internal static class JsonReportRenderer
         string solutionName,
         string specAssembly,
         string? diffBase,
-        IReadOnlyList<string> workspaceDiagnostics)
+        IReadOnlyList<string> workspaceDiagnostics,
+        bool modelIncomplete)
     {
         var document = new CheckJson(
             3,
@@ -31,6 +32,7 @@ internal static class JsonReportRenderer
             diffBase,
             report.Results.Select(r => ToRule(r, solutionDirectory)).ToList(),
             workspaceDiagnostics,
+            modelIncomplete ? true : null,
             new SummaryJson(
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.ViolationCount, report.WarningCount));

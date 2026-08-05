@@ -236,7 +236,7 @@ public sealed class CheckCacheE2ETests
         var runner = new GraphRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null), Ct);
+            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

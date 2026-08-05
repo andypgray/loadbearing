@@ -45,7 +45,13 @@ describes the target; the code is the debt).
 ## 1. Survey the estate
 
 Call `arch_graph` (CLI: `loadbearing graph MyApp.sln --json`). It needs no spec — it is the
-one tool that works before any spec exists — and returns the codebase as extraction sees it:
+one tool that works before any spec exists — and returns the codebase as extraction sees it.
+
+It does need the solution **restored and built**. If a project fails to load, the call returns an
+error naming it instead of a survey: a map missing whole projects would send the whole derivation
+down a wrong path, and there is no later step that would catch it. Restore and build, then retry.
+Survey the partial model deliberately (`allowWorkspaceDiagnostics: true`) only if some project
+genuinely cannot be made to load, and then treat every conclusion below as provisional.
 
 - `projects[]` — each project's declared `projectReferences`, type count, and exact namespace
   inventory with type counts. The namespace inventory is your raw material for layer globs.

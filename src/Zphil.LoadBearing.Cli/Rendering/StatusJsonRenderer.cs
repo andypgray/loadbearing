@@ -11,13 +11,21 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </summary>
 internal static class StatusJsonRenderer
 {
-    public static void Render(TextWriter output, CheckReport report, string solutionName, string specAssembly)
+    public static void Render(
+        TextWriter output,
+        CheckReport report,
+        string solutionName,
+        string specAssembly,
+        IReadOnlyList<string> workspaceDiagnostics,
+        bool modelIncomplete)
     {
         var document = new StatusJson(
             2,
             solutionName,
             specAssembly,
             report.Results.Select(ToRule).ToList(),
+            workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
+            modelIncomplete ? true : null,
             new StatusSummaryJson(
                 report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
                 report.GrandfatheredCount, report.StaleBaselineEntryCount));

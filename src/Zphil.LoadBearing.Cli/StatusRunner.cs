@@ -8,7 +8,11 @@ namespace Zphil.LoadBearing.Cli;
 ///     The <c>status</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) → run
 ///     the shared <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render the burndown
 ///     (human or JSON). Unlike <c>check</c>, status <em>reports</em> — it exits 0 even with red rules; only an
-///     error (a tampered baseline, an unresolvable spec) exits 2 via the top-level handler. Output/error
+///     error (a tampered baseline, an unresolvable spec) exits 2 via the top-level handler. The one thing it
+///     does gate on is the model not being the codebase: a project that failed to load declares no types, so
+///     every burndown count reads low and a ratchet read against it looks like progress that never happened.
+///     That fails closed on <c>check</c>'s terms — the burndown still renders, then exit 2, opt-out
+///     <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />). Output/error
 ///     writers are injected for the in-process e2e tests, and the <see cref="IEnvironment" /> seam supplies
 ///     the cache-root override.
 /// </summary>
@@ -41,12 +45,22 @@ internal sealed class StatusRunner(
 
         WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
 
+        // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
+        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
+
         if (request.Json)
             StatusJsonRenderer.Render(
-                output, report, Path.GetFileName(source.SolutionPath), Path.GetFileName(source.Resolution.DllPath));
+                output, report, Path.GetFileName(source.SolutionPath), Path.GetFileName(source.Resolution.DllPath),
+                source.Diagnostics, modelIncomplete);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);
+
+        if (IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics))
+        {
+            error.WriteLine(IncompleteModelGate.StatusMessage);
+            return 2;
+        }
 
         return 0;
     }

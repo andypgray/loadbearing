@@ -12,12 +12,10 @@ namespace Zphil.LoadBearing.Cli;
 ///     or JSON) → exit code (0 clean / 1 red violations; grandfathered Migrate violations do not fail
 ///     the run). A workspace-load failure overrides that verdict: the model is incomplete, so <c>check</c>
 ///     fails closed with exit 2 unless <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed —
-///     a rule that "passes" only because a project did not load is worse than no answer. The gate keys
-///     strictly on the workspace-load diagnostics (<see cref="CodebaseSource.Diagnostics" />); the advisory
-///     merge notes (<see cref="CodebaseSource.MergeNotes" />) render into the same diagnostics stream
-///     but never gate. NuGetAudit advisories (NU19xx) also ride that stream but are carved out of the gate
-///     the same way — external advisory-publication timing must not flip a deterministic verdict
-///     (<see cref="NuGetAuditDiagnostics" />). Expected failures surface as <see cref="UserErrorException" />;
+///     a rule that "passes" only because a project did not load is worse than no answer. That decision, its
+///     NuGetAudit carve-out, and the messages the other verbs use for the same condition all live in
+///     <see cref="IncompleteModelGate" />; <c>check</c> renders before it fires, so the verdict also rides
+///     the JSON document and the SARIF stamp. Expected failures surface as <see cref="UserErrorException" />;
 ///     the top-level handler maps them to exit 2. Output/error writers are injected so the in-process e2e
 ///     tests can capture them, and the <see cref="IEnvironment" /> seam supplies the cache-root override.
 /// </summary>
@@ -27,14 +25,6 @@ internal sealed class CheckRunner(
     ISolutionSource? source = null,
     IEnvironment? environment = null)
 {
-    /// <summary>
-    ///     The stderr line the workspace-diagnostics gate emits before exit 2. Kept as one line, printed
-    ///     after the per-project load warnings it refers to, and naming the opt-out flag.
-    /// </summary>
-    internal const string IncompleteModelGateMessage =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
-        + "cannot pass. Pass --allow-workspace-diagnostics to check against the partial model anyway.";
-
     private readonly IEnvironment environment = environment ?? new SystemEnvironment();
     private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
 
@@ -60,23 +50,21 @@ internal sealed class CheckRunner(
 
         // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
         // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Merge notes
-        // never reach this gate by construction (they ride source.MergeNotes); NuGetAudit advisories (NU19xx)
-        // do land in source.Diagnostics, so they are filtered out here — external advisory-publication timing
-        // is time-varying noise that must not flip a deterministic gate, and it still renders above. Hoisted
-        // above Render so the SARIF renderer stamps the same verdict the gate below returns.
-        IReadOnlyList<string> gatingDiagnostics =
-            [.. source.Diagnostics.Where(d => !NuGetAuditDiagnostics.IsAudit(d))];
-        bool executionSuccessful = !(gatingDiagnostics.Count > 0 && !request.AllowWorkspaceDiagnostics);
+        // never reach the gate by construction (they ride source.MergeNotes); the NuGetAudit carve-out lives
+        // in IncompleteModelGate with the rest of the shared answer. Both computed above Render so the
+        // document and the SARIF stamp carry the same verdict the gate below returns.
+        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
+        bool gated = IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics);
 
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
-            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, executionSuccessful);
+            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
-        if (!executionSuccessful)
+        if (gated)
         {
-            error.WriteLine(IncompleteModelGateMessage);
+            error.WriteLine(IncompleteModelGate.CheckMessage);
             return 2;
         }
 
@@ -85,14 +73,15 @@ internal sealed class CheckRunner(
 
     private void Render(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
-        IReadOnlyList<string> diagnostics, bool executionSuccessful)
+        IReadOnlyList<string> diagnostics, bool executionSuccessful, bool modelIncomplete)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
         WorkspaceDiagnosticsRenderer.Render(error, diagnostics, request.Json);
 
         if (request.Json)
-            JsonReportRenderer.Render(output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics);
+            JsonReportRenderer.Render(
+                output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics, modelIncomplete);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 

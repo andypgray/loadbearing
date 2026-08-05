@@ -3,14 +3,27 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
+// The two workspace slots below are additive and null (omitted) on every run whose workspace loaded — and a
+// run whose workspace did not load reaches this document only under --allow-workspace-diagnostics, since
+// graph otherwise refuses before extraction — so the schema stays version 1 and a clean survey is
+// byte-identical.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
+/// <param name="WorkspaceDiagnostics">
+///     The workspace-load diagnostics, or null (omitted) when there were none.
+/// </param>
+/// <param name="ModelIncomplete">
+///     <see langword="true" /> when a project failed to load, so the survey below covers only what did load
+///     — projects, types, and edges are all missing, not merely fewer; null (omitted) otherwise.
+/// </param>
 internal sealed record GraphJson(
     int SchemaVersion,
     string Solution,
     IReadOnlyList<GraphProjectJson> Projects,
     IReadOnlyList<GraphProjectEdgeJson> ProjectEdges,
-    IReadOnlyList<GraphExternalEdgeJson> ExternalEdges);
+    IReadOnlyList<GraphExternalEdgeJson> ExternalEdges,
+    IReadOnlyList<string>? WorkspaceDiagnostics,
+    bool? ModelIncomplete);
 
 /// <summary>One project: its declared references, solution-declared type count, and namespace inventory.</summary>
 internal sealed record GraphProjectJson(

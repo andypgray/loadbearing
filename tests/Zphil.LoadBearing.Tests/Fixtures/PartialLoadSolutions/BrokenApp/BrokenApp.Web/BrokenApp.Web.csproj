@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BrokenApp: a solution that loads only PARTIALLY, and must stay that way.
+
+  BrokenApp.sln names three projects and this tree contains two. BrokenApp.Contracts is absent by
+  design, and this project both lists it as a ProjectReference below and derives from, implements and
+  is attributed with types it would have declared. Loading the solution therefore produces the exact
+  field shape no other fixture here can:
+
+    - a workspace-LOAD FAILURE — the project file the solution names is not on disk — so the model is
+      missing a whole project rather than being merely small; and
+    - Roslyn ERROR SYMBOLS inside the project that did load, because its reference to the missing one
+      resolves to nothing. Those reach extraction's external-mint path through the base type, the
+      interface and the attribute class, which is where a survey over such a tree used to die with an
+      invariant violation naming a symbol nobody wrote.
+
+  WHY NOT SIMPLY LEAVE IT UNRESTORED. Measured, and it does not work: an SDK-style project with no
+  obj/project.assets.json still completes MSBuildWorkspace's design-time build and loads with ZERO
+  workspace diagnostics. Neither does a missing MSBuild <Import> — Roslyn's build host evaluates
+  projects with missing imports ignored, so that produces no diagnostic either. A project file the
+  solution names but the tree does not contain is the failure the loader actually reports.
+
+  THREE SITING CONSTRAINTS. Do not "tidy" any of them away.
+
+  1. It lives under Fixtures/PartialLoadSolutions/, NOT Fixtures/TestSolutions/. FixtureRestorer
+     restores every .sln under TestSolutions/** unconditionally at pipeline startup, keyed on "any
+     csproj missing obj/project.assets.json". A solution that can never restore cleanly, sited there,
+     would make every test process believe the tree is unrestored and re-restore MyApp along with it,
+     once per run, forever.
+
+  2. It is NOT a member of Zphil.LoadBearing.slnx and is NOT ProjectReference'd from the tests csproj.
+     Either would try to build it, and a ProjectReference would additionally bake its resolved path
+     into assembly metadata. It is a pure content fixture, copied to the test output by the tests
+     csproj's Fixtures/** glob.
+
+  3. Source only — no bin/, no obj/, no committed DLL, and above all NO BrokenApp.Contracts/
+     DIRECTORY. Creating one is the single edit that silently disarms every test in
+     PartialLoadWorkspaceE2ETests, which is why that class asserts its absence at arrange time and
+     fails loudly rather than passing vacuously.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <!-- No audit: an unreachable feed's NU1900 warnings would ride the same diagnostics stream as the
+             load failure this fixture is about, and the gate's audit carve-out would then be doing the work
+             the load failure is supposed to do. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\BrokenApp.Contracts\BrokenApp.Contracts.csproj" />
+        <ProjectReference Include="..\BrokenApp.Core\BrokenApp.Core.csproj" />
+    </ItemGroup>
+</Project>

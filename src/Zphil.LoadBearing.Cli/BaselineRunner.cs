@@ -16,10 +16,20 @@ namespace Zphil.LoadBearing.Cli;
 ///     debt"). <c>--accept-reductions</c> removes captured entries whose violation no longer occurs
 ///     and <em>refuses</em> new ones. <c>--add</c> is the ratchet's escape valve:
 ///     it grandfathers exactly one currently observed violation of a captured rule, with mandatory
-///     attribution — growth is never silent, never bulk. The command never gates — it always exits 0
-///     on success. Tamper (a hand-edited digest) refuses loudly with the restore hint, the same as
-///     <c>check</c>. Output/error writers are injected so the e2e tests can capture them.
+///     attribution — growth is never silent, never bulk. Tamper (a hand-edited digest) refuses loudly with
+///     the restore hint, the same as <c>check</c>. Output/error writers are injected so the e2e tests can
+///     capture them.
 /// </summary>
+/// <remarks>
+///     <b>What it refuses.</b> A workspace-load failure refuses the whole command on <c>check</c>'s terms —
+///     exit 2, nothing written, opt-out <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />
+///     (<see cref="IncompleteModelGate" />). The gate fires before extraction and so before any mode does
+///     its work, because every mode is dangerous against a partial model: <c>--init</c> would capture "zero
+///     debt" for rules whose subjects live in projects that did not load, and <c>--accept-reductions</c>
+///     would delete real entries as violations that "no longer occur" when the only thing that stopped is a
+///     project loading. Short of that the command reports rather than gates — a red rule is the state to
+///     capture, not a failure, so it exits 0 on success.
+/// </remarks>
 internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
 {
     private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
@@ -32,6 +42,15 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
         WorkspaceDiagnosticsRenderer.Render(error, workspace.Diagnostics);
+
+        // Fail closed before extraction, and so before any mode writes a byte: the workspace's own load
+        // failures are the whole gate input here (merge notes are minted later, inside extraction, and never
+        // reach this stream), filtered for NuGetAudit advisories exactly as check filters them.
+        if (IncompleteModelGate.Gates(workspace.Diagnostics, request.AllowWorkspaceDiagnostics))
+        {
+            error.WriteLine(IncompleteModelGate.BaselineMessage);
+            return 2;
+        }
 
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
             workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
@@ -186,7 +205,9 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plural(current.Count, "violation")}.");
     }
 
-    // --accept-reductions: section := section ∩ current. Never adds; reports refused growth. Never gates.
+    // --accept-reductions: section := section ∩ current. Never adds; reports refused growth. A violation that
+    // no longer occurs is the whole point of the mode — which is why the incomplete-model gate fires long
+    // before this runs, since a project that stopped loading looks exactly like a violation that stopped.
     private void AcceptReductions(
         string ruleId, IReadOnlyList<BaselineEntry> current, bool captured,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)

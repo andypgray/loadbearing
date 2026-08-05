@@ -95,7 +95,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, RuleId, "INC-1234",
-            "MyApp.Web.HomeController", "System.DateTime.Now", null, _dir);
+            "MyApp.Web.HomeController", "System.DateTime.Now", null, _dir, false);
 
         // Act — the MemberUse violation reaches the added-entry echo with a null Target slot.
         int exit = runner.AddEntry(request, report, _dir);
@@ -133,7 +133,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, CtorRuleId, "INC-9",
-            "MyApp.Web.OrderController", "MyApp.Data.Db", null, _dir);
+            "MyApp.Web.OrderController", "MyApp.Data.Db", null, _dir, false);
 
         // Act — the Construction violation reaches the added-entry echo; the constructed type rides the Target slot.
         int exit = runner.AddEntry(request, report, _dir);
@@ -175,7 +175,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, UnfilteredCatchRuleId, "INC-77",
-            "App.LegacyHandler", "Errors.DbError", null, _dir);
+            "App.LegacyHandler", "Errors.DbError", null, _dir, false);
 
         // Act — the valve resolves the unfiltered-catch violation by its (source, caught) type pair.
         int exit = runner.AddEntry(request, report, _dir);

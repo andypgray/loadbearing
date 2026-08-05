@@ -10,14 +10,21 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </summary>
 internal static class GraphJsonRenderer
 {
-    public static void Render(TextWriter output, GraphSummary summary, string solutionName)
+    public static void Render(
+        TextWriter output,
+        GraphSummary summary,
+        string solutionName,
+        IReadOnlyList<string> workspaceDiagnostics,
+        bool modelIncomplete)
     {
         var document = new GraphJson(
             1,
             solutionName,
             summary.Projects.Select(ToProject).ToList(),
             summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
-            summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList());
+            summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
+            workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
+            modelIncomplete ? true : null);
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson));
     }

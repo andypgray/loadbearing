@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The healthy half of a solution that loads only PARTIALLY. Its presence is what makes the survey look
+  plausible: a partial model is not empty, it is quietly short of a project. See BrokenApp.Web.csproj's
+  header for what is missing, why "just leave it unrestored" does not reproduce it, and the three
+  siting constraints that govern this whole directory.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+</Project>

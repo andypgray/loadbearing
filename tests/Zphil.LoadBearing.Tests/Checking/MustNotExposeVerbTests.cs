@@ -266,7 +266,7 @@ public sealed class MustNotExposeVerbTests
                 .Because("b"));
 
         var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, []);
+        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false);
 
         using JsonDocument document = JsonDocument.Parse(writer.ToString());
         document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);

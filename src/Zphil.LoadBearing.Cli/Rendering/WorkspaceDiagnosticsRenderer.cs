@@ -51,9 +51,15 @@ internal static class WorkspaceDiagnosticsRenderer
         return json ? text : $"warning: {text}";
     }
 
+    /// <summary>
+    ///     The MSBuild-selection line that follows a non-empty diagnostics list. Internal because the
+    ///     <c>graph</c> refusal carries its diagnostics inside a thrown message rather than through
+    ///     <see cref="Render" />, and must not lose the one line that says which MSBuild opened the projects
+    ///     that failed.
+    /// </summary>
     // Reads the selection back through the quarantine's sanctioned boundary type. Null only if nothing
     // registered MSBuild at all, which for a verb that just opened a workspace is itself worth saying.
-    private static string MsBuildNote()
+    internal static string MsBuildNote()
     {
         string selection = MsBuildBootstrap.LastSelection ?? "not registered by this process";
         return $"MSBuild for this run: {selection}. Set {LoadBearingEnvVars.VsInstallPath} to a Visual Studio "

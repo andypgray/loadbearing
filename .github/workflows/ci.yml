@@ -235,8 +235,10 @@ jobs:
       # repository under any gate; a shipped verb nobody points at its own codebase is a verb whose first
       # real consumer is a stranger. With render above, that leaves only `baseline`, which stays out
       # deliberately — it is the human escape valve, and a gate that ran it would be moving the ratchet.
-      # Exit 0 is the whole assertion — `status` always exits 0 by design, and `explain` needs no
-      # workspace — so this is a smoke test, not a second check.
+      # Exit 0 is the whole assertion — red rules never fail `status` or `graph`, and `explain` needs no
+      # workspace — so this is a smoke test, not a second check. Since 2026-08-04 it does carry one real
+      # assertion beyond "the command ran": `status` and `graph` exit 2 on a workspace that loaded only
+      # partially, so exit 0 here says this solution loads completely on the runner.
       - name: Read verbs against this solution (status, graph, explain)
         run: |
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- status Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj

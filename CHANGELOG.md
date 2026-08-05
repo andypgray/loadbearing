@@ -7,8 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A partially-loaded workspace now gets one answer instead of four.** `check` has failed closed on
+  a project that would not load since the gate existed; the other verbs each answered differently.
+  `baseline` rendered the warnings, wrote a baseline from the partial model, and exited 0 — the worst
+  of the four, because a baseline is the team's signature on its debt, `--init` captures "zero debt"
+  for rules whose subjects live in projects that did not load, and `--accept-reductions` cannot tell
+  a violation that stopped from a project that stopped loading. `status` reported a burndown counted
+  low and exited 0. `graph` surveyed a map that was silently missing whole projects. All three now
+  fail closed on `check`'s terms — exit 2, and the same `--allow-workspace-diagnostics` opt-out — and
+  `baseline` refuses before any mode writes a byte. NuGet-audit advisories still never gate, on every
+  verb. `render` remains deliberately ungated.
+- `graph` refuses before extraction rather than after, and its refusal names the projects that failed
+  inline, says which MSBuild opened them, and gives the fix in both dialects. It is the verb that
+  needs no spec — a stranger's first command on an unfamiliar codebase — so it is the one whose
+  refusal has to explain itself on whichever surface asked.
+- The JSON documents now carry the verdict the MCP surface used to discard. `status --json` gains
+  `workspaceDiagnostics` (which `check --json` already had), and both plus `graph --json` gain
+  `modelIncomplete`, set when a project failed to load whether or not the run opted into the partial
+  model. `arch_check` and `arch_status` computed the fail-closed gate and threw it away; they now
+  return it as data, because a surface with no exit code needs the verdict in the document. All three
+  fields are omitted when the workspace loaded cleanly, so every schemaVersion is unchanged and a
+  clean document is byte-identical.
+- `arch_graph` takes an optional `allowWorkspaceDiagnostics` parameter, the MCP twin of the CLI flag.
+
 ### Fixed
 
+- **`graph` no longer crashes on a solution that has not been built.** Extraction mints a record for
+  every type a compilation mentions, including ones the compiler could not resolve — and a
+  partially-loaded workspace produces plenty, reaching extraction through base types, interfaces and
+  attribute classes. Two of the three facts minted from such a symbol already tolerated it; the third,
+  accessibility, threw. So the first command a stranger runs on an unbuilt solution answered
+  with an internal invariant violation naming a symbol nobody wrote, ~two minutes in. Accessibility is
+  now total on the external path (falling back to public — an unresolved external is not a rule
+  subject, and a type reached across an assembly boundary is visibly-public surface) while the member
+  inventory keeps the hard invariant GRAMMAR §4.6 actually underwrites. The crash was reachable from
+  every extracting verb, `check` included, where it beat `check`'s own refusal to the punch.
 - MSBuild selection is now reported instead of merely decided. Choosing the MSBuild everything
   downstream depends on had four outcomes and no observer: two of them silently degraded to
   `MSBuildLocator.RegisterDefaults()`, and a third — taking a Visual Studio outside the tested

@@ -11,11 +11,16 @@ namespace Zphil.LoadBearing.Cli;
 ///     survey (human or JSON). Deliberately spec-free: the survey is a property of the codebase, and derive
 ///     runs before any spec exists — so unlike the other verbs there is no spec resolution here, only the
 ///     shared solution discovery and workspace acquisition through an <see cref="ISolutionSource" /> (cold by
-///     default), fronted by the persisted extraction cache. Reports rather than gates: it exits 0 on success
-///     regardless of what the codebase contains; a discovery/workspace failure surfaces as a
-///     <see cref="UserErrorException" /> the top-level handler maps to exit 2. Output/error writers are
-///     injected so the in-process e2e tests can capture them, and the <see cref="IEnvironment" /> seam
-///     supplies the cache-root override.
+///     default), fronted by the persisted extraction cache. What the codebase <em>contains</em> never gates
+///     — the survey exits 0 however alarming the graph is. What gates is the survey not being of the
+///     codebase: a project that failed to load is missing from the map entirely, so the run refuses before
+///     extraction on <c>check</c>'s terms, opt-out <see cref="GraphRequest.AllowWorkspaceDiagnostics" />
+///     (<see cref="IncompleteModelGate" />). That refusal, like a discovery/workspace failure, surfaces as a
+///     <see cref="UserErrorException" /> — exit 2 on the CLI, an error result on MCP — which is why it is
+///     thrown rather than written: this is the one verb with no spec to resolve, so it is the first command
+///     a stranger runs and the first that must explain itself on whichever surface asked. Output/error
+///     writers are injected so the in-process e2e tests can capture them, and the
+///     <see cref="IEnvironment" /> seam supplies the cache-root override.
 /// </summary>
 internal sealed class GraphRunner(
     TextWriter output,
@@ -37,6 +42,14 @@ internal sealed class GraphRunner(
         using var source = await CodebaseSource.CreateSpeclessAsync(
             solutionSource, environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
 
+        // Refuse before extraction, not after: a survey of a partial model is a wrong map, not a smaller one.
+        // The refusal carries the diagnostics in its own text rather than leaving them to the stderr render
+        // below, so the MCP surface — which discards this error writer — gets the same actionable message.
+        // A cache hit refuses identically: diagnostics persist into the extraction cache and replay with it.
+        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
+        if (IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics))
+            throw new UserErrorException(IncompleteModelGate.GraphRefusal(source.Diagnostics));
+
         CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
@@ -47,7 +60,7 @@ internal sealed class GraphRunner(
         WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
 
         if (request.Json)
-            GraphJsonRenderer.Render(output, summary, solutionName);
+            GraphJsonRenderer.Render(output, summary, solutionName, source.Diagnostics, modelIncomplete);
         else
             foreach (string line in GraphFormatter.Lines(summary, solutionName))
                 output.WriteLine(line);
