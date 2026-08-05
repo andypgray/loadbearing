@@ -38,6 +38,7 @@ public sealed class DocHygieneTests
         "examples/README.md",
         "examples/Meridian/README.md",
         "examples/Meridian/ADOPTING.md",
+        "examples/Meridian/hooks/README.md",
         "examples/Meridian.Quoting/README.md",
         "examples/Meridian.Operations/README.md",
         "examples/Meridian.Interchange/README.md",

@@ -333,14 +333,15 @@ Three go deeper on one surface each:
 
 ## Installing
 
-The CLI ships as a .NET global tool:
+The CLI ships as a .NET global tool. The checker never builds the code it checks, so restore and build the solution first; a stale build gives stale verdicts:
 
 ```bash
 dotnet tool install -g Zphil.LoadBearing.Cli
+dotnet build MyApp.sln
 loadbearing check MyApp.sln
 ```
 
-The machine running it needs a .NET 10 SDK: commands that load a solution (`check`, `render`, `status`, `graph`, `baseline`, `mcp`) do so through MSBuildWorkspace via MSBuildLocator, and a runtime-only environment cannot host that load. The codebase under check has no version requirement of its own: LoadBearing never builds or retargets it (restore and build it first; the checker never builds, and stale builds give stale verdicts), and it can target .NET Framework 4.8 or anything newer. The spec project compiles against one package, `Zphil.LoadBearing`, which is netstandard2.0.
+The machine running it needs a .NET 10 SDK: commands that load a solution (`check`, `render`, `status`, `graph`, `baseline`, `mcp`) do so through MSBuildWorkspace via MSBuildLocator, and a runtime-only environment cannot host that load. The codebase under check has no version requirement of its own: LoadBearing never builds or retargets it, and it can target .NET Framework 4.8 or anything newer. The spec project compiles against one package, `Zphil.LoadBearing`, which is netstandard2.0.
 
 A project that fails to load is treated as a wrong model rather than a smaller one: `check`, `baseline`, `graph` and `status` all exit 2 and say which projects failed, and `--allow-workspace-diagnostics` opts into the partial model.
 
@@ -353,9 +354,43 @@ The command is `loadbearing`. Four lockstep-versioned packages make up a release
 | [`Zphil.LoadBearing.Xunit`](https://www.nuget.org/packages/Zphil.LoadBearing.Xunit) | The xUnit adapter: every rule as an individually named test. |
 | [`Zphil.LoadBearing.Roslyn`](https://www.nuget.org/packages/Zphil.LoadBearing.Roslyn) | Extraction/workspace infrastructure; a dependency of the above, not for direct reference. |
 
-MCP clients can also launch the server straight from nuget.org without a global install:
-`dnx Zphil.LoadBearing.Cli -- mcp <solution>` (how MCP-registry clients run it; note the
-`mcp` subcommand).
+## Connecting an MCP client
+
+An MCP client launches the same tool with the `mcp` verb; the server speaks stdio. The
+`.mcp.json` shape:
+
+```json
+{
+  "mcpServers": {
+    "loadbearing": {
+      "command": "loadbearing",
+      "args": ["mcp", "MyApp.sln"]
+    }
+  }
+}
+```
+
+For Claude Code, one command writes that same entry into the project's `.mcp.json`:
+
+```bash
+claude mcp add --scope project loadbearing -- loadbearing mcp MyApp.sln
+```
+
+The solution argument is optional. Without it the server reads `LOADBEARING_SOLUTION_PATH`,
+and when that is unset too it walks up from its working directory to the first ancestor
+holding exactly one `.sln`, `.slnf` or `.slnx`. A solution file passed as the argument beats
+both. However the server is launched, the rule from Installing still applies: restore and
+build the solution first; the checker never builds, and a stale build gives stale verdicts.
+
+`dnx` launches the server straight from nuget.org without the global install, and it ships
+with the same .NET 10 SDK the tool already requires; the `--` hands everything after it to
+the tool:
+
+```bash
+dnx Zphil.LoadBearing.Cli -- mcp MyApp.sln
+```
+
+This is how MCP-registry clients run the server; note the `mcp` subcommand.
 
 ## Building
 

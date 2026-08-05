@@ -21,6 +21,21 @@
         {
           "type": "positional",
           "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "valueHint": "solution",
+          "description": "The solution to check. Optional: when omitted the server reads LOADBEARING_SOLUTION_PATH, then walks up from its working directory to the first ancestor holding exactly one .sln, .slnf or .slnx. A solution file passed here beats both.",
+          "isRequired": false,
+          "format": "filepath"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "LOADBEARING_SOLUTION_PATH",
+          "description": "Path to the solution to check when no solution argument is passed.",
+          "isRequired": false,
+          "format": "filepath"
         }
       ]
     }

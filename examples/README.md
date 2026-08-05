@@ -1,12 +1,13 @@
 # Examples
 
-Four worked codebases demonstrate one spec model with two render targets: deterministic
-enforcement and generated agent context. The three postures are spread across the set:
-`Enforce` law, ratcheted `Migrate` debt, and `Quarantine` containment. CI builds each example,
-runs `check` against its committed baselines, and re-runs `render` to prove the committed
-agent context matches the code.
+Six worked examples demonstrate one spec model with two render targets: deterministic
+enforcement and generated agent context. Four are solutions: CI builds each one, runs
+`check` against its committed baselines, and re-runs `render` to prove the committed agent
+context matches the code. The other two walk a flow with captured output. The three
+postures are spread across the set: `Enforce` law, ratcheted `Migrate` debt, and
+`Quarantine` containment.
 
-All four share one fiction: Meridian, a freight-forwarding company, so the examples can
+All six share one fiction: Meridian, a freight-forwarding company, so the examples can
 cross-reference one another as parts of one business.
 
 - [All three postures on one codebase](Meridian/): the `Meridian` monolith mid-migration.
