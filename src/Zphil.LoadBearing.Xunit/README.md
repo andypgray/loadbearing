@@ -54,7 +54,8 @@ The spec itself is authored against the
 its README for the fluent surface. The
 [`Zphil.LoadBearing.Cli`](https://www.nuget.org/packages/Zphil.LoadBearing.Cli) global tool
 runs the same rules at the command line, in CI, and as an MCP server for coding agents; the
-adapter and the CLI produce identical failure text by construction.
+adapter and the CLI produce identical failure text by construction. All four LoadBearing
+packages ship one version in lockstep; reference the adapter and the contract at the same one.
 
 ## License
 

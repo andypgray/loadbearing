@@ -10,7 +10,8 @@ namespace Zphil.LoadBearing.Cli.Mcp.Prompts;
 ///     architecture spec — the target (<c>Enforce</c>), the debt (<c>Migrate</c>), and the dragons
 ///     (<c>Quarantine</c>) — from an existing codebase, validating every claim with <c>arch_graph</c> and
 ///     <c>arch_check</c>. The server does not infer the spec: the recipe has the executing agent derive a
-///     proposal from evidence, and the human curate and baseline it.
+///     proposal from evidence, and the human curate and baseline it. Serving replaces the scaffold's
+///     <c>Version="..."</c> placeholder with the running build's version.
 /// </summary>
 /// <remarks>
 ///     The class is deliberately non-static: <c>WithPrompts&lt;ArchPrompts&gt;()</c> takes it as a type
@@ -28,10 +29,19 @@ internal sealed class ArchPrompts
         + "does not infer the spec; this recipe guides you: survey with arch_graph, draft candidate rules, "
         + "validate with arch_check, the human curates and baselines.";
 
+    /// <summary>
+    ///     The version placeholder as the raw scaffold spells it. The embedded markdown stays a
+    ///     readable template; serving replaces this token with the running build's version, which
+    ///     lockstep package versioning and the CI version pin make the right contract version to
+    ///     reference.
+    /// </summary>
+    internal const string ScaffoldVersionPlaceholder = "Version=\"...\"";
+
     [McpServerPrompt(Name = DeriveSpecName, Title = "Derive an architecture spec")]
     [Description(DeriveSpecDescription)]
     internal static string DeriveSpec()
     {
-        return EmbeddedResourceText.Load("derive-spec.md");
+        string template = EmbeddedResourceText.Load("derive-spec.md");
+        return template.Replace(ScaffoldVersionPlaceholder, $"Version=\"{ServerVersion.SemVer}\"");
     }
 }

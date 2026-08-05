@@ -2,6 +2,7 @@ using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Prompts;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -77,6 +78,23 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("This rule is inert: its target selection matched no types.");
         text.ShouldContain("trailing `.*`");
         text.ShouldContain("^[a-z0-9-]+(/[a-z0-9-]+)*$");
+    }
+
+    [Fact]
+    public async Task GetPrompt_DeriveSpec_SubstitutesRunningVersionIntoScaffold()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert
+        string text = ((TextContentBlock)result.Messages[0].Content).Text;
+        text.ShouldContain($"<PackageReference Include=\"Zphil.LoadBearing\" Version=\"{ServerVersion.SemVer}\" />");
+        text.ShouldNotContain(ArchPrompts.ScaffoldVersionPlaceholder);
+        text.ShouldContain("`loadbearing --version` prints");
     }
 
     [Fact]

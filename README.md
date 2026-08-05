@@ -349,7 +349,7 @@ The command is `loadbearing`. Four lockstep-versioned packages make up a release
 | Package | What it is |
 |---|---|
 | [`Zphil.LoadBearing.Cli`](https://www.nuget.org/packages/Zphil.LoadBearing.Cli) | The `loadbearing` global tool: `check`, `render`, `explain`, `status`, `graph`, `baseline`, and the MCP server (`loadbearing mcp`). |
-| [`Zphil.LoadBearing`](https://www.nuget.org/packages/Zphil.LoadBearing) | The spec contract, zero dependencies; the one package a spec project references. |
+| [`Zphil.LoadBearing`](https://www.nuget.org/packages/Zphil.LoadBearing) | The spec contract, zero dependencies; the one package a spec project references. Reference the version `loadbearing --version` prints. |
 | [`Zphil.LoadBearing.Xunit`](https://www.nuget.org/packages/Zphil.LoadBearing.Xunit) | The xUnit adapter: every rule as an individually named test. |
 | [`Zphil.LoadBearing.Roslyn`](https://www.nuget.org/packages/Zphil.LoadBearing.Roslyn) | Extraction/workspace infrastructure; a dependency of the above, not for direct reference. |
 

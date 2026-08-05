@@ -98,6 +98,9 @@ solution):
 </Project>
 ```
 
+The four LoadBearing packages ship one version in lockstep: reference the version
+`loadbearing --version` prints.
+
 **Pick the TFM by one rule: the spec project must be able to reference the product projects
 it will `typeof()`.** On a `net48` estate, the spec targets `net48` — the LoadBearing contract
 library is `netstandard2.0` precisely so that works. Where referencing a product project is

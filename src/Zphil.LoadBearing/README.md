@@ -36,6 +36,9 @@ and the tooling discovers it by convention: the unique solution project that ref
 package. The spec project itself is excluded from the checked universe, along with anything
 only it pulls in: a library the spec references that the solution does not declare.
 
+The four LoadBearing packages ship one version in lockstep: reference the version your
+installed `loadbearing` tool prints from `loadbearing --version`.
+
 Pick the spec project's target framework by one rule: it must be able to reference the product
 projects it will `typeof()`. This package is `netstandard2.0` with zero dependencies, so a spec
 project can target anything from `net48` up.
