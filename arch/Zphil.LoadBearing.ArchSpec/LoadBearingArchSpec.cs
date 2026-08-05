@@ -67,20 +67,34 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
     ///     <c>exceptions/no-swallowed-broad-catches</c>. One kind of handler belongs here and nothing else:
     ///     a boundary whose job is to absorb whatever arrives and carry on down a sanctioned degraded path.
     ///     <list type="bullet">
-    ///         <item><c>CommandEntryPoint</c> — the process boundary: every CLI failure becomes an exit code
-    ///         and a message rather than a stack trace.</item>
-    ///         <item><c>ArchChecker</c> — the per-rule boundary: a fault evaluating one rule becomes that
-    ///         rule's errored result, so the others still report.</item>
-    ///         <item><c>ArchRuleTests</c> — the discovery boundary: a spec that fails to build becomes one
-    ///         failing test row rather than a silently empty theory.</item>
-    ///         <item><c>IdleTimeoutWatchdog</c> — a background loop: a poll fault logs and disables the
-    ///         watchdog rather than taking the server down.</item>
-    ///         <item><c>ParentProcessWatcher</c> — a probe plus a background loop: both fail toward the safe
-    ///         direction for a leak guard.</item>
-    ///         <item><c>ServerShutdown</c> — the drain: a faulting disposer must not stop the remaining
-    ///         disposers, or the process exits holding a lock.</item>
-    ///         <item><c>VsWhereLocator</c> — a quarantined probe: any vswhere failure degrades to an empty
-    ///         instance list and the <c>MSBuildLocator.RegisterDefaults()</c> fallback.</item>
+    ///         <item>
+    ///             <c>CommandEntryPoint</c> — the process boundary: every CLI failure becomes an exit code
+    ///             and a message rather than a stack trace.
+    ///         </item>
+    ///         <item>
+    ///             <c>ArchChecker</c> — the per-rule boundary: a fault evaluating one rule becomes that
+    ///             rule's errored result, so the others still report.
+    ///         </item>
+    ///         <item>
+    ///             <c>ArchRuleTests</c> — the discovery boundary: a spec that fails to build becomes one
+    ///             failing test row rather than a silently empty theory.
+    ///         </item>
+    ///         <item>
+    ///             <c>IdleTimeoutWatchdog</c> — a background loop: a poll fault logs and disables the
+    ///             watchdog rather than taking the server down.
+    ///         </item>
+    ///         <item>
+    ///             <c>ParentProcessWatcher</c> — a probe plus a background loop: both fail toward the safe
+    ///             direction for a leak guard.
+    ///         </item>
+    ///         <item>
+    ///             <c>ServerShutdown</c> — the drain: a faulting disposer must not stop the remaining
+    ///             disposers, or the process exits holding a lock.
+    ///         </item>
+    ///         <item>
+    ///             <c>VsWhereLocator</c> — a quarantined probe: any vswhere failure degrades to an empty
+    ///             instance list and the <c>MSBuildLocator.RegisterDefaults()</c> fallback.
+    ///         </item>
     ///     </list>
     ///     The exemption is by type name, so it covers a type's future catches as well as today's — the
     ///     granularity a baseline entry would have, kept in the spec where it is read.

@@ -1,0 +1,12 @@
+# House style for this repo is declared in Zphil.LoadBearing.slnx.DotSettings, not here. That file
+# is the place to change it.
+#
+# This file exists for one setting .DotSettings has no equivalent for: the trailing newline at end
+# of file. Declaring it here is what keeps every C# source ending in one.
+#
+# Resist growing this file. A style rule .DotSettings can carry belongs there.
+
+root = true
+
+[*.cs]
+insert_final_newline = true

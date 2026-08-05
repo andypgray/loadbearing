@@ -5,7 +5,13 @@ namespace Zphil.LoadBearing.Tests;
 // The canonical sample spec, byte-identical to GRAMMAR §12, compiling as pinned
 // test code. Its rendered sentences and reified model are the spec. The layout is load-bearing:
 // the named-argument documentation style (GRAMMAR §10) and the alignment below must survive
-// verbatim, so this file is deliberately kept out of automated formatting — do not reformat it.
+// verbatim, and nothing here reds if they do not — the model this file reifies is identical either
+// way, so a reformat would ship a sample that no longer matches the published grammar, silently.
+// The marker below is what prevents that: it holds ReSharper cleanup off everything after it, so
+// this file can go through the cleanup gate with all the others instead of being remembered as an
+// exception. It sits above the class declaration on purpose — GRAMMAR §12's fence starts there, so
+// an unbalanced marker is the only kind that keeps the quoted region byte-identical to the doc.
+// @formatter:off
 public sealed class ArchSpec : IArchitectureSpec
 {
     public void Define(Arch arch)
