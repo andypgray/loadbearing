@@ -43,7 +43,11 @@ internal sealed class StatusRunner(
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
 
-        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
+        // Composed once and handed to both surfaces, so the MSBuild-selection note rides the burndown
+        // document as well as stderr. The gate below reads source.Diagnostics — never this list, whose extra
+        // line is informational and would mark every run incomplete.
+        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(source.Diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
         bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
@@ -51,7 +55,7 @@ internal sealed class StatusRunner(
         if (request.Json)
             StatusJsonRenderer.Render(
                 output, report, Path.GetFileName(source.SolutionPath), Path.GetFileName(source.Resolution.DllPath),
-                source.Diagnostics, modelIncomplete);
+                renderedDiagnostics, modelIncomplete);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);

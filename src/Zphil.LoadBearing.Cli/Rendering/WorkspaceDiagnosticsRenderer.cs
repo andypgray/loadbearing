@@ -21,29 +21,48 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         Quiet runs stay quiet — the note is diagnostic context, not a banner.
 ///     </para>
 ///     <para>
+///         <b>The note rides the composed list, not the write.</b> <see cref="Compose" /> appends it once,
+///         and callers hand that one list to <em>both</em> renderers — stderr and the JSON document. That is
+///         what makes it reachable from MCP, where the tools pass <see cref="TextWriter.Null" /> as the
+///         error writer: the note was the single line the MCP surface lost, and it now arrives inside
+///         <c>workspaceDiagnostics</c> like everything else. Appending at write time reached stderr only.
+///     </para>
+///     <para>
 ///         The note is <em>not</em> a workspace diagnostic. It never enters
 ///         <see cref="CodebaseSource.Diagnostics" />, which is the fail-closed gate's input: an
-///         informational line there would flip <c>check</c>'s exit code to 2 on every run.
+///         informational line there would flip <c>check</c>'s exit code to 2 on every run. Callers therefore
+///         gate on the source's own list and render the composed one — two visibly different variables in
+///         the same method.
 ///     </para>
 /// </remarks>
 internal static class WorkspaceDiagnosticsRenderer
 {
     /// <summary>
-    ///     Writes <paramref name="diagnostics" /> to <paramref name="error" />, followed by the MSBuild
-    ///     selection note when the list is non-empty. A no-op for an empty list.
+    ///     The list both surfaces read: <paramref name="diagnostics" /> with the MSBuild selection note
+    ///     appended, or empty for an empty input — a clean run says nothing about MSBuild anywhere.
+    /// </summary>
+    /// <param name="diagnostics">
+    ///     The workspace-load diagnostics (and, for <c>check</c>, the merge notes). Never the fail-closed
+    ///     gate's input: pass the source's own list there, not this one.
+    /// </param>
+    internal static IReadOnlyList<string> Compose(IReadOnlyList<string> diagnostics)
+    {
+        return diagnostics.Count == 0 ? [] : [.. diagnostics, MsBuildNote()];
+    }
+
+    /// <summary>
+    ///     Writes <paramref name="diagnostics" /> to <paramref name="error" />, one line each. A no-op for
+    ///     an empty list. Callers pass a <see cref="Compose" />d list, so the MSBuild note is already in it.
     /// </summary>
     /// <param name="error">The stderr writer; never stdout.</param>
-    /// <param name="diagnostics">The workspace-load diagnostics (and, for <c>check</c>, the merge notes).</param>
+    /// <param name="diagnostics">The composed diagnostics to echo.</param>
     /// <param name="json">
     ///     <see langword="true" /> under <c>--json</c>, which drops the <c>warning:</c> prefix — the
     ///     diagnostics are structured data in the document, and stderr is their unadorned echo.
     /// </param>
     internal static void Render(TextWriter error, IReadOnlyList<string> diagnostics, bool json = false)
     {
-        if (diagnostics.Count == 0) return;
-
         foreach (string diagnostic in diagnostics) error.WriteLine(Line(diagnostic, json));
-        error.WriteLine(Line(MsBuildNote(), json));
     }
 
     private static string Line(string text, bool json)
@@ -52,10 +71,10 @@ internal static class WorkspaceDiagnosticsRenderer
     }
 
     /// <summary>
-    ///     The MSBuild-selection line that follows a non-empty diagnostics list. Internal because the
-    ///     <c>graph</c> refusal carries its diagnostics inside a thrown message rather than through
-    ///     <see cref="Render" />, and must not lose the one line that says which MSBuild opened the projects
-    ///     that failed.
+    ///     The MSBuild-selection line <see cref="Compose" /> appends to a non-empty diagnostics list.
+    ///     Internal because the <c>graph</c> refusal carries its diagnostics inside a thrown message rather
+    ///     than through a composed list, and must not lose the one line that says which MSBuild opened the
+    ///     projects that failed.
     /// </summary>
     // Reads the selection back through the quarantine's sanctioned boundary type. Null only if nothing
     // registered MSBuild at all, which for a verb that just opened a workspace is itself worth saying.

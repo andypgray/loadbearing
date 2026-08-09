@@ -25,7 +25,7 @@
         {
           "type": "positional",
           "valueHint": "solution",
-          "description": "The solution to check. Optional: when omitted the server reads LOADBEARING_SOLUTION_PATH, then walks up from its working directory to the first ancestor holding exactly one .sln, .slnf or .slnx. A solution file passed here beats both.",
+          "description": "The solution to check. Optional, but supply it for most repositories: when omitted the server reads LOADBEARING_SOLUTION_PATH, then walks up from its working directory, which resolves only where exactly one .sln, .slnf or .slnx sits at or above that directory. It finds nothing where the solution is under src/, and refuses as ambiguous where several sit side by side. A solution file passed here beats both; a server that cannot bind still starts and returns the reason from every tool call.",
           "isRequired": false,
           "format": "filepath"
         }

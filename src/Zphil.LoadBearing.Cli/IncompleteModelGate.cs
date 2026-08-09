@@ -66,7 +66,11 @@ internal static class IncompleteModelGate
     ///     no opt-out. The verbs that render before gating call this twice-over — once for the verdict they
     ///     stamp into their document, once for the exit code — so it stays a pure predicate.
     /// </summary>
-    /// <param name="diagnostics">The workspace-load diagnostics; merge notes must never be passed here.</param>
+    /// <param name="diagnostics">
+    ///     The workspace-load diagnostics, and only those: never merge notes, and never a
+    ///     <see cref="WorkspaceDiagnosticsRenderer.Compose" />d list. Its trailing MSBuild-selection note is
+    ///     not an advisory, so <see cref="IsIncomplete" /> would read it as a load failure and gate every run.
+    /// </param>
     /// <param name="allowWorkspaceDiagnostics">Whether the operator opted into the partial model.</param>
     internal static bool Gates(IReadOnlyList<string> diagnostics, bool allowWorkspaceDiagnostics)
     {

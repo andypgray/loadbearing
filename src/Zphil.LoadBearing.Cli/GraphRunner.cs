@@ -56,11 +56,14 @@ internal sealed class GraphRunner(
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string solutionName = Path.GetFileName(source.SolutionPath);
 
-        // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr.
-        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics, request.Json);
+        // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr. Composed
+        // once for both, so the survey document carries the MSBuild-selection note the refusal above already
+        // carries. The gate read source.Diagnostics, not this list.
+        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(source.Diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         if (request.Json)
-            GraphJsonRenderer.Render(output, summary, solutionName, source.Diagnostics, modelIncomplete);
+            GraphJsonRenderer.Render(output, summary, solutionName, renderedDiagnostics, modelIncomplete);
         else
             foreach (string line in GraphFormatter.Lines(summary, solutionName))
                 output.WriteLine(line);

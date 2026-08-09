@@ -60,7 +60,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     {
         var output = new StringWriter();
         // Exit code and error writer deliberately discarded — everything they would carry is in the document.
-        // Violations ride in rules[]; the load failures ride in workspaceDiagnostics; and the gate verdict the
+        // Violations ride in rules[]; the load failures ride in workspaceDiagnostics, and so does the
+        // MSBuild-selection note, which WorkspaceDiagnosticsRenderer.Compose puts in the list both surfaces
+        // read rather than appending it at write time (it was the one line TextWriter.Null used to swallow,
+        // and "which MSBuild opened it" is the next question after any load failure). The gate verdict the
         // exit code would have expressed rides in modelIncomplete, so a client learns the answer was reached
         // against a partial model without needing an exit code this surface does not have.
         // AllowWorkspaceDiagnostics true says exactly that: the document reports the incompleteness rather

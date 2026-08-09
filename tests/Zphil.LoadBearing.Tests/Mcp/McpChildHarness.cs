@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Xunit;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -37,21 +38,40 @@ internal static class McpChildHarness
     private static readonly TimeSpan DrainBudget = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    ///     A start-info for <c>dotnet &lt;cliDllPath&gt; mcp &lt;solutionPath&gt; --spec &lt;specDllPath&gt;</c>
-    ///     with all three streams redirected in UTF-8 and no BOM on stdin.
+    ///     A start-info for <c>dotnet &lt;cliDllPath&gt; mcp &lt;solutionPath&gt; --spec &lt;specDllPath&gt;</c>,
+    ///     over the bare-<c>mcp</c> overload below.
     /// </summary>
-    /// <remarks>
-    ///     The working directory is a parameter rather than a default because it is a subject in its own
-    ///     right: a process holds an OS handle on its own working directory for as long as it lives, so a
-    ///     test asserting on where the server holds handles has to choose it deliberately. The environment is
-    ///     the same deployment-normal one the out-of-process replay smoke test uses — the test host's
-    ///     MSBuild/VS registration stripped, so the child discovers MSBuild through its own vswhere probe.
-    /// </remarks>
     internal static ProcessStartInfo ServerStartInfo(
         string cliDllPath,
         string solutionPath,
         string specDllPath,
         string workingDirectory)
+    {
+        ProcessStartInfo startInfo = ServerStartInfo(cliDllPath, workingDirectory);
+        startInfo.ArgumentList.Add(solutionPath);
+        startInfo.ArgumentList.Add("--spec");
+        startInfo.ArgumentList.Add(specDllPath);
+
+        return startInfo;
+    }
+
+    /// <summary>
+    ///     A start-info for the bare <c>dotnet &lt;cliDllPath&gt; mcp</c> — no solution, no <c>--spec</c>:
+    ///     the launch shape <c>.mcp/server.json</c> prescribes, where discovery happens inside the server
+    ///     against <paramref name="workingDirectory" />. All three streams are redirected in UTF-8 with no
+    ///     BOM on stdin.
+    /// </summary>
+    /// <remarks>
+    ///     The working directory is a parameter rather than a default because it is a subject in its own
+    ///     right: a process holds an OS handle on its own working directory for as long as it lives, and it
+    ///     is also what the solution walk-up starts from, so a test asserting on either has to choose it
+    ///     deliberately. The environment is the same deployment-normal one the out-of-process replay smoke
+    ///     test uses — the test host's MSBuild/VS registration stripped, so the child discovers MSBuild
+    ///     through its own vswhere probe — plus <see cref="LoadBearingEnvVars.SolutionPath" /> removed,
+    ///     because it beats the walk-up: a developer machine that happens to have it set would silently bind
+    ///     a server a test meant to leave unbound.
+    /// </remarks>
+    internal static ProcessStartInfo ServerStartInfo(string cliDllPath, string workingDirectory)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -67,11 +87,9 @@ internal static class McpChildHarness
         };
         startInfo.ArgumentList.Add(cliDllPath);
         startInfo.ArgumentList.Add("mcp");
-        startInfo.ArgumentList.Add(solutionPath);
-        startInfo.ArgumentList.Add("--spec");
-        startInfo.ArgumentList.Add(specDllPath);
 
         DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        startInfo.Environment.Remove(LoadBearingEnvVars.SolutionPath);
 
         return startInfo;
     }

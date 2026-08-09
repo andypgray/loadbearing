@@ -44,9 +44,12 @@ internal sealed class CheckRunner(
         LastReExtractedProjects = source.ReExtractedProjects;
 
         // Workspace-load failures and merge notes ride the one rendered diagnostics stream (stderr warning:
-        // lines + the JSON workspaceDiagnostics array), load failures first. Only the load failures gate,
-        // so the two are combined for display but kept separate for the exit decision below.
-        IReadOnlyList<string> renderedDiagnostics = [.. source.Diagnostics, .. source.MergeNotes];
+        // lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures first, with the
+        // MSBuild-selection note composed onto the end so all three surfaces carry it. Only the load failures
+        // gate, so the two are combined for display but kept separate for the exit decision below — which is
+        // why every gate call below reads source.Diagnostics and never this list.
+        var renderedDiagnostics =
+            WorkspaceDiagnosticsRenderer.Compose([.. source.Diagnostics, .. source.MergeNotes]);
 
         // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
         // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Merge notes

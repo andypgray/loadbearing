@@ -41,7 +41,11 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
 
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
-        WorkspaceDiagnosticsRenderer.Render(error, workspace.Diagnostics);
+
+        // Composed for the render, so the MSBuild-selection note goes out with the load failures; the gate
+        // below reads workspace.Diagnostics, which is the only list it may ever see.
+        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
 
         // Fail closed before extraction, and so before any mode writes a byte: the workspace's own load
         // failures are the whole gate input here (merge notes are minted later, inside extraction, and never

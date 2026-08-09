@@ -376,11 +376,16 @@ For Claude Code, one command writes that same entry into the project's `.mcp.jso
 claude mcp add --scope project loadbearing -- loadbearing mcp MyApp.sln
 ```
 
-The solution argument is optional. Without it the server reads `LOADBEARING_SOLUTION_PATH`,
-and when that is unset too it walks up from its working directory to the first ancestor
-holding exactly one `.sln`, `.slnf` or `.slnx`. A solution file passed as the argument beats
-both. However the server is launched, the rule from Installing still applies: restore and
-build the solution first; the checker never builds, and a stale build gives stale verdicts.
+The solution argument is optional, and most repositories should still pass it. Without it the
+server reads `LOADBEARING_SOLUTION_PATH`, and when that is unset too it walks up from its
+working directory to the first ancestor holding exactly one `.sln`, `.slnf` or `.slnx`. That
+resolves nothing where the solution sits under `src/`, and refuses as ambiguous where several
+sit side by side, which between them covers most real repositories. A solution file passed as
+the argument beats both. When it cannot bind, the server starts anyway and every tool call
+returns the reason, naming any solution it saw one level down; the failure is readable in the
+client rather than arriving as a server that would not start. However the server is launched,
+the rule from Installing still applies: restore and build the solution first; the checker
+never builds, and a stale build gives stale verdicts.
 
 `dnx` launches the server straight from nuget.org without the global install, and it ships
 with the same .NET 10 SDK the tool already requires; the `--` hands everything after it to

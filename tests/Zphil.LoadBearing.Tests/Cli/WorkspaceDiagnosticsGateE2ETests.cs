@@ -1,6 +1,8 @@
 using System.Text.Json;
+using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -133,7 +135,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         }
     }
 
-    // ── The MSBuild selection rides the same stream, but only when something failed ────────────────────
+    // ── The MSBuild selection rides both surfaces, but only when something failed ──────────────────────
 
     [Fact]
     public async Task Check_WorkspaceLoadDiagnostic_NamesTheMsBuildSelectionAndTheOverrideVariable()
@@ -148,6 +150,36 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             customMessage: result.Err);
         result.Err.ShouldContain(
             "Set LOADBEARING_VS_INSTALL_PATH to a Visual Studio install root", customMessage: result.Err);
+    }
+
+    [Fact]
+    public async Task Check_WorkspaceLoadDiagnosticJson_LandsTheMsBuildNoteInTheDocumentBesideStderr()
+    {
+        // stderr is the CLI's channel and the MCP surface discards it, so the note only reaches a client if
+        // it rides the document. It does, because it is composed into the one list both renderers read
+        // rather than appended at write time — the whole of the MCP-side fix, seen from the CLI.
+        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
+
+        result.ShouldRefuseWith();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        WorkspaceDiagnosticsOf(document).ShouldBe([LoadDiagnostic, WorkspaceDiagnosticsRenderer.MsBuildNote()]);
+        result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
+    }
+
+    [Fact]
+    public async Task Check_NuGetAuditDiagnosticJson_ComposesTheNoteWithoutFlippingTheGateVerdict()
+    {
+        // The regression composition could introduce, pinned shut. The composed list carries the MSBuild
+        // note, which is not a NuGetAudit advisory — so a composed list reaching IncompleteModelGate would
+        // read as a load failure, mark every run incomplete, and exit 2 always. The gate reads
+        // source.Diagnostics; only the renderers read the composition.
+        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true);
+
+        result.ShouldSucceed();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        WorkspaceDiagnosticsOf(document).ShouldBe([AuditDiagnostic, WorkspaceDiagnosticsRenderer.MsBuildNote()]);
+        document.RootElement.TryGetProperty("modelIncomplete", out _).ShouldBeFalse();
+        result.Err.ShouldNotContain("error: the model is incomplete");
     }
 
     [Fact]
@@ -268,6 +300,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
+
+    private static string[] WorkspaceDiagnosticsOf(JsonDocument document)
+    {
+        return document.RootElement.GetProperty("workspaceDiagnostics")
+            .EnumerateArray()
+            .Select(element => element.GetString() ?? string.Empty)
+            .ToArray();
+    }
 
     private static Task<CliResult> RunWithInjectedDiagnosticAsync(
         string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)

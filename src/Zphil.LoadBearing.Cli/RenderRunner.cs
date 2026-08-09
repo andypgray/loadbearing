@@ -30,7 +30,10 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
-        WorkspaceDiagnosticsRenderer.Render(error, workspace.Diagnostics);
+        // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
+        // render has no gate of its own — it is a mutation, not a verdict — so there is no second list here.
+        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
 
         string specName = Path.GetFileNameWithoutExtension(workspace.Resolution.DllPath);
         string solutionDirectory = workspace.SolutionDirectory;

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A registry launch that cannot find a solution now starts and says why, instead of dying during
+  `initialize`.** The manifest's `dnx` entry passes the bare `mcp` verb with no solution argument, so
+  the server walks up from its working directory. That resolves nothing where the solution sits under
+  `src/`, and refuses as ambiguous where several sit side by side at the root, which between them
+  covers most real repositories. Both refusals named a fix and neither reached a client: the process
+  was gone before there was a tool call whose result could carry the message, and the walk-up's reason
+  went to a stderr channel the MCP surface discards by construction. An argument that does not resolve
+  is still fatal, because `mcp --bogus` must not start a server that could only repeat that error. A
+  launch with no argument is the documented-optional path, so its walk-up failing now records the
+  reason and starts the server unbound, announcing it on the two channels a client reads: a banner
+  above the `initialize` instructions, and every tool call's error result. The refusals themselves now
+  name the solution argument ahead of `LOADBEARING_SOLUTION_PATH`, since in an MCP client config the
+  server's `args` array is the fix a reader can apply where they are reading, and the "nothing
+  anywhere" arm lists the solutions it found one level down. Naming `src\Storefront.sln` turns a dead
+  end into one copy-paste. The README and the registry manifest say the same thing now: the argument
+  is optional, and most repositories should pass it.
+- The MSBuild-selection note rides the documents now, not stderr alone. It was appended at write time,
+  which made it the one line the MCP tools lost when they pass a null error writer, and "which MSBuild
+  opened it" is the next question after any load failure. Composing it into the list both renderers
+  read puts it in `workspaceDiagnostics` beside the failures it explains, and in SARIF. Gating is
+  unchanged: every caller still gates on the source's own diagnostics, so an informational line cannot
+  mark a run incomplete.
+
 ## [0.3.1] - 2026-08-05
 
 Pre-alpha. The first release to carry the 0.3.0 changes: 0.3.0 was never published to NuGet, so

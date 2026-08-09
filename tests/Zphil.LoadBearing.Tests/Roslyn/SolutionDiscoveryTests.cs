@@ -46,6 +46,33 @@ public sealed class SolutionDiscoveryTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    ///     The precondition every "the walk-up finds nothing" test rests on: discovery walks parents to the
+    ///     drive root, so a stray solution file in <em>any</em> ancestor of the temp root would make it find
+    ///     one and not throw. Fail loudly on a polluted environment rather than passing — or throwing — for
+    ///     the wrong reason.
+    /// </summary>
+    private static void AssertNoSolutionInAnyAncestor(string directory)
+    {
+        for (DirectoryInfo? dir = new(directory); dir is not null; dir = dir.Parent)
+        {
+            string[] solutionFiles;
+            try
+            {
+                solutionFiles = Directory.EnumerateFiles(dir.FullName, "*.sln")
+                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnf"))
+                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnx"))
+                    .ToArray();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            solutionFiles.ShouldBeEmpty($"Stray solution file under ancestor '{dir.FullName}' makes this test meaningless — clean it.");
+        }
+    }
+
     [Fact]
     public void DiscoverSolution_ExplicitPath_ReturnsFullPath()
     {
@@ -116,38 +143,73 @@ public sealed class SolutionDiscoveryTests : IDisposable
         ex.Message.ShouldContain("Multiple solution files found");
         ex.Message.ShouldContain("Alpha.sln");
         ex.Message.ShouldContain("Beta.slnx");
+        // The argument comes first, and the MCP client config is named beside it: on that surface the
+        // environment variable would have to be set for whatever process launches the client, so the args
+        // array is the only fix the reader can actually apply where they are reading.
+        ex.Message.ShouldContain("Pass the solution as the argument");
+        ex.Message.ShouldContain("MCP client");
+        ex.Message.ShouldContain(LoadBearingEnvVars.SolutionPath);
     }
 
     [Fact]
-    public void DiscoverSolution_NoSolutionAnywhere_ThrowsWithEnvVarHint()
+    public void DiscoverSolution_NoSolutionAnywhere_ThrowsNamingBothFixes()
     {
         string cwdDir = CreateDir("empty", "deep", "nested");
-
-        // Guard: discovery walks parents to the drive root, so a stray solution file in ANY ancestor
-        // of the temp dir would make this find one (and not throw). Fail loudly on a polluted
-        // environment rather than passing — or throwing — for the wrong reason.
-        for (DirectoryInfo? dir = new(cwdDir); dir is not null; dir = dir.Parent)
-        {
-            string[] solutionFiles;
-            try
-            {
-                solutionFiles = Directory.EnumerateFiles(dir.FullName, "*.sln")
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnf"))
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnx"))
-                    .ToArray();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-
-            solutionFiles.ShouldBeEmpty($"Stray solution file under ancestor '{dir.FullName}' makes this test meaningless — clean it.");
-        }
+        AssertNoSolutionInAnyAncestor(cwdDir);
 
         var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir));
 
         ex.Message.ShouldContain("No .sln, .slnf or .slnx file found");
+        ex.Message.ShouldContain("Pass the solution as the argument");
         ex.Message.ShouldContain(LoadBearingEnvVars.SolutionPath);
+        ex.Message.ShouldNotContain("Solution files one level down"); // nothing was seen, so nothing is listed
+    }
+
+    [Fact]
+    public void DiscoverSolution_SolutionOnlyOneLevelDown_RefusesButNamesIt()
+    {
+        // The shape a repository whose solution lives under src\ presents: nothing at the root, so the
+        // walk-up climbs past the repository entirely. Discovery still refuses — it never widens the
+        // search into a guess — but naming the file turns a dead end into one copy-paste.
+        string root = CreateDir("repo");
+        AssertNoSolutionInAnyAncestor(root);
+        CreateSln(CreateDir("repo", "src"), "Storefront.sln");
+        CreateSln(CreateDir("repo", "bin"), "StaleBuildOutput.sln");
+
+        var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: root));
+
+        ex.Message.ShouldContain("No .sln, .slnf or .slnx file found");
+        ex.Message.ShouldContain("Solution files one level down:");
+        ex.Message.ShouldContain(Path.Combine("src", "Storefront.sln"));
+        // Build output is skipped: a solution there is an artefact or a copy, and naming it would send the
+        // reader somewhere wrong.
+        ex.Message.ShouldNotContain("StaleBuildOutput.sln");
+    }
+
+    [Fact]
+    public void NearMisses_UnreadableStartDirectory_YieldsNothingRatherThanThrowing()
+    {
+        // The scan is a courtesy on a path that has already failed, so an I/O error in it must not replace
+        // the refusal with an unhandled exception: the reader would lose the message the whole change exists
+        // to deliver. A directory that does not exist is the reachable form of that failure.
+        string vanished = Path.Combine(_tempRoot, "was-deleted-underneath-us");
+
+        SolutionDiscovery.NearMisses(vanished).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void NotFoundMessage_MoreNearMissesThanTheCap_ListsTheCapThenCountsTheRest()
+    {
+        // Pure over the message static, so the cap and its tail pin without a filesystem to build first.
+        string[] nearMisses = Enumerable.Range(1, 7)
+            .Select(n => Path.Combine(_tempRoot, "src", $"App{n}.sln"))
+            .ToArray();
+
+        string message = SolutionDiscovery.NotFoundMessage(_tempRoot, nearMisses);
+
+        message.ShouldContain(Path.Combine("src", "App5.sln"));
+        message.ShouldNotContain("App6.sln");
+        message.ShouldContain("... and 2 more");
     }
 
     [Fact]

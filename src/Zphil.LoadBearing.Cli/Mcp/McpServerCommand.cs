@@ -17,6 +17,9 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///     A human who runs it at a terminal gets a hint and exit 2 rather than a hung silent server; a real
 ///     MCP client over piped stdio gets the file logger, the orphan-server watchdogs, MSBuild
 ///     registration (JIT-quarantined behind <see cref="EnsureMsBuildRegistered" />), and the host.
+///     A launch whose optional solution argument was omitted and whose walk-up then found nothing still
+///     starts — unbound, announcing the reason in its <c>initialize</c> instructions and returning it from
+///     every tool call (<see cref="ResolveBoundSolution" />).
 /// </summary>
 internal static class McpServerCommand
 {
@@ -36,12 +39,9 @@ internal static class McpServerCommand
             return 2;
         }
 
-        // Fail fast on a bound solution that cannot be discovered — including a mistyped option that
-        // System.CommandLine swallowed as the positional `solution` argument (e.g. `mcp --bogus`). Without
-        // this, such a launch would start a server that errors on every tool call, and — because stdin is
-        // redirected but never closed under a test host — hang the whole run. The UserErrorException maps to
-        // exit 2 at CommandEntryPoint.
-        ResolveBoundSolution(binding);
+        // Fail fast on an argument that cannot be discovered; keep the reason and start anyway when there was
+        // no argument to be wrong about. See ResolveBoundSolution for why the two halves differ.
+        string? bindingFailure = ResolveBoundSolution(binding);
 
         // A real MCP client launched us over piped stdio. Bring up the file logger and crash handlers
         // before host building so a catastrophic startup failure still lands in the post-mortem log.
@@ -64,7 +64,7 @@ internal static class McpServerCommand
         builder.Services
             .AddMcpServer(options =>
             {
-                options.ServerInstructions = ServerInstructions.Text;
+                options.ServerInstructions = ServerInstructions.For(bindingFailure);
                 options.ServerInfo = new Implementation
                 {
                     Name = "loadbearing",
@@ -123,13 +123,45 @@ internal static class McpServerCommand
             environment.GetVariable(DisableWarmWorkspaceVariable), "true", StringComparison.OrdinalIgnoreCase);
     }
 
-    // Discovers the bound solution (an explicit path, a directory, or a walk-up), throwing a
-    // UserErrorException when none resolves. NoInlining keeps it consistent with the quarantine style below;
-    // SolutionDiscovery is pure file I/O with no MSBuildWorkspace touch, so it is safe before registration.
+    /// <summary>
+    ///     Discovers the bound solution (an explicit path, a directory, or a walk-up), returning null on
+    ///     success and the refusal text when a walk-up with no argument found nothing.
+    /// </summary>
+    /// <remarks>
+    ///     The two halves differ, and the difference is the point. <b>An argument that does not resolve is fatal</b> —
+    ///     including a mistyped option System.CommandLine swallowed as the positional <c>solution</c> (e.g.
+    ///     <c>mcp --bogus</c>): the operator named something and it is wrong, so the
+    ///     <see cref="UserErrorException" /> propagates to exit 2 at <c>CommandEntryPoint</c>. Starting
+    ///     instead would give a server that errors on every tool call and, with stdin redirected but never
+    ///     closed under a test host, hang the whole run. <b>No argument is the documented-optional path</b>,
+    ///     so its walk-up failing is a condition to report, not a launch to abort: dying here reaches the
+    ///     client as "the server failed to start" and no reason at all, since the process is gone before
+    ///     <c>initialize</c> can answer. The server starts unbound instead and says why through
+    ///     <see cref="ServerInstructions.For" /> and through every tool call, which re-runs the identical
+    ///     discovery and gets the identical message.
+    ///     Whitespace splits with null because <see cref="ModelPipeline.DiscoverSolution" /> already treats
+    ///     the two alike: what makes an argument fatal is discovery actually honouring it.
+    ///     NoInlining keeps it consistent with the quarantine style below; SolutionDiscovery is pure file I/O
+    ///     with no MSBuildWorkspace touch, so it is safe before registration.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ResolveBoundSolution(McpServerBinding binding)
+    private static string? ResolveBoundSolution(McpServerBinding binding)
     {
-        ModelPipeline.DiscoverSolution(binding.Solution, binding.WorkingDirectory);
+        if (!string.IsNullOrWhiteSpace(binding.Solution))
+        {
+            ModelPipeline.DiscoverSolution(binding.Solution, binding.WorkingDirectory);
+            return null;
+        }
+
+        try
+        {
+            ModelPipeline.DiscoverSolution(null, binding.WorkingDirectory);
+            return null;
+        }
+        catch (UserErrorException ex)
+        {
+            return ex.Message;
+        }
     }
 
     // JIT quarantine: this NoInlining wrapper is the one sanctioned touch of a Roslyn/MSBuild type in the
