@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `baseline --init` and `--accept-reductions` now name the rules that are failing with no baseline
+  to capture — the Enforce reds a baseline cannot grandfather — instead of reporting only the
+  ratchet work, or "nothing to do" on a spec with no ratcheted rules at all. The command already
+  knew both facts at that moment; now it says the second one: each failing rule with its violation
+  count, and that the red survives until fixed at the source — in the code, in the rule, or by
+  re-posturing the debt as Migrate or Quarantine. The `derive_spec` recipe stops promising an
+  unconditionally green re-check to match: the handoff now has two honest endings — green when
+  every violating rule was ratcheted, or red with every remaining rule named as chosen work. Exit
+  codes are unchanged; the command still reports rather than gates. Without this, a newcomer
+  running the handoff steps on a long-lived codebase could land on dozens of violations with
+  nothing saying whether red was expected or their own mistake.
+
 ### Fixed
 
 - **A registry launch that cannot find a solution now starts and says why, instead of dying during

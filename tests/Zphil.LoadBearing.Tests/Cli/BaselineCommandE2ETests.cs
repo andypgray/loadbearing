@@ -52,6 +52,19 @@ public sealed class BaselineCommandE2ETests
         Normalize(File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json")))
             .ShouldBe(ContainmentPairsComposed());
 
+        // The survey ends by naming every failing Enforce rule, after the per-file lines, so a first --init
+        // explains why check will stay red.
+        init.Out.ShouldContain("failing with no baseline to capture");
+        init.Out.ShouldContain("layering/domain-independent");
+        init.Out.ShouldContain("naming/nonexistent");
+        init.Out.ShouldContain("exceptions/domain-throws-domain");
+        init.Out.ShouldContain("async/accept-cancellation");
+        init.Out.ShouldContain("exceptions/no-unfiltered-catch");
+        init.Out.ShouldContain("exceptions/no-swallowed-catch");
+        init.Out.ShouldContain("exceptions/no-bare-bcl-throw");
+        init.Out.IndexOf("wrote", StringComparison.Ordinal)
+            .ShouldBeLessThan(init.Out.IndexOf("failing with no baseline to capture", StringComparison.Ordinal));
+
         // check now sees the Migrate rule fully grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");

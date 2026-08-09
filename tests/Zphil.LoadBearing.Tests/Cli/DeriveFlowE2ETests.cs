@@ -49,6 +49,8 @@ public sealed class DeriveFlowE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--init");
 
         init.ShouldSucceed();
+        // A fully-ratcheted derive leaves nothing unratcheted to warn about — the happy path stays clean.
+        init.Out.ShouldNotContain("failing with no baseline to capture");
         File.Exists(workspace.PathOf("arch", "baselines", "layering", "domain-independent.json")).ShouldBeTrue();
         File.Exists(workspace.PathOf("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBeTrue();
         File.Exists(workspace.PathOf("arch", "baselines", "naming", "handlers.json")).ShouldBeTrue();

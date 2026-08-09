@@ -313,6 +313,13 @@ For each surviving rule, the violation count decides the honest posture:
 - **Nothing the team will stand behind → drop the rule.** An unratified rule in the spec is
   exactly the stale-doc problem this tool exists to kill.
 
+Before moving on, check the invariant those four bullets exist to leave true: **`Enforce`
+carries no baseline**, so `baseline --init` cannot grandfather it and a red Enforce rule
+stays red for good. Every rule that still has violations must leave this step re-postured to
+`Migrate`, fenced inside a `Quarantine`, dropped, or named in the handoff as work the team is
+choosing to do now. An unexplained red is the one outcome the flow cannot recover from,
+because the reader cannot tell it from a mistake they made.
+
 ## 6. The curation gate — **do not guess**
 
 Stop. Present every proposed rule to the human with its evidence, one row per rule: ID,
@@ -346,8 +353,19 @@ subject×target pairs, not sites — every reference site between one pair rides
 entry, `status` counts pairs, and a new site inside an already-grandfathered pair does not go
 red (a new pair does).
 
-Re-run `arch_check`: expect exit 0, `rulesFailed: 0`, with the grandfathered counts visible.
-`arch_status` now shows the per-rule burndown — the numbers the team watches shrink.
+When a failing rule was left `Enforce`, `--init` says so rather than staying quiet: a notice
+names each rule failing with no baseline to capture, with its violation count (on a spec with
+no ratcheted rules at all, it leads with `nothing to capture`). Enforce is the one posture a
+baseline cannot absorb, so every rule in that list is either a step-5 miss — go back and
+re-posture, fence, or drop it — or work the team is choosing to do now, which the handoff
+must say.
+
+Re-run `arch_check`. If step 5 ratcheted every violating rule, expect exit 0,
+`rulesFailed: 0`, with the grandfathered counts visible. If reds were left deliberately, the
+re-check still exits 1 and those rules — and only those — are what remains: state each one
+with its violation count in the outcome report, so the reader can tell a chosen red from a
+mistake they made. `arch_status` now shows the per-rule burndown — the numbers the team
+watches shrink.
 
 ## 8. Render and commit
 
@@ -359,8 +377,9 @@ spec project, `arch/baselines/**`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
 acknowledged debt, and the generated context in a single change.
 
-Report the outcome: rules by posture, debt counts per Migrate rule, dragons documented, and
-anything you dropped at curation (with why) so it is on the record.
+Report the outcome: rules by posture, debt counts per Migrate rule, any rule left
+deliberately red with its violation count, dragons documented, and anything you dropped at
+curation (with why) so it is on the record.
 
 ---
 

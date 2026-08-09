@@ -14,7 +14,8 @@ namespace Zphil.LoadBearing.Cli;
 ///     runs first (before the workspace cost). <c>--init</c> captures each <em>uncaptured</em>
 ///     ratcheted rule's current violations (an empty section for a clean rule — "captured, zero
 ///     debt"). <c>--accept-reductions</c> removes captured entries whose violation no longer occurs
-///     and <em>refuses</em> new ones. <c>--add</c> is the ratchet's escape valve:
+///     and <em>refuses</em> new ones. Both modes end by naming any rules failing with no baseline to
+///     capture — the reds the ratchet cannot absorb. <c>--add</c> is the ratchet's escape valve:
 ///     it grandfathers exactly one currently observed violation of a captured rule, with mandatory
 ///     attribution — growth is never silent, never bulk. Tamper (a hand-edited digest) refuses loudly with
 ///     the restore hint, the same as <c>check</c>. Output/error writers are injected so the e2e tests can
@@ -69,12 +70,17 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         var ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
         if (ratchetResults.Count == 0)
         {
-            output.WriteLine("no ratcheted rules (Migrate or Quarantine containment) in the spec; nothing to do.");
+            foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: false))
+                output.WriteLine(line);
             return 0;
         }
 
         foreach (FileGroup group in GroupByFile(ratchetResults, workspace.SolutionDirectory))
             ApplyFile(request, group, workspace.SolutionDirectory);
+
+        // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
+        foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
+            output.WriteLine(line);
 
         return 0;
     }
