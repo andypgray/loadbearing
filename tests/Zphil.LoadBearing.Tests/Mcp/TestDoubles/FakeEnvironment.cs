@@ -3,9 +3,11 @@ using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 namespace Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 
 /// <summary>
-///     A hand-rolled <see cref="IEnvironment" /> for tests: dictionary-backed variables (the LoadBearing
-///     seam reads only <c>MAX_MCP_OUTPUT_TOKENS</c>). Using this instead of mutating real process
-///     environment variables keeps the parallel test run free of shared-state races.
+///     A hand-rolled <see cref="IEnvironment" /> for tests: dictionary-backed variables, whichever ones the
+///     subject reads — <c>MAX_MCP_OUTPUT_TOKENS</c> for the MCP pipeline, <c>LOADBEARING_CACHE_DIR</c> for
+///     the cache-fronted verbs, whether those are driven runner-first or through the whole command tree.
+///     Using this instead of mutating real process environment variables keeps the parallel test run free of
+///     shared-state races.
 /// </summary>
 internal sealed class FakeEnvironment : IEnvironment
 {

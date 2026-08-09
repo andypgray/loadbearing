@@ -2,11 +2,13 @@ using System.CommandLine;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Replay;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Roslyn.Replay;
 using Zphil.LoadBearing.Tests.Cli;
+using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Replay;
@@ -17,8 +19,9 @@ namespace Zphil.LoadBearing.Tests.Replay;
 ///     ingest refusals, and the <c>--no-cache</c> composition. Each scenario drives the <em>real</em> command
 ///     tree in-process through <see cref="CliRunner" /> against the shared <see cref="BinlogFixtureWorkspace" />
 ///     binlog, isolating the persisted caches by pointing <c>LOADBEARING_CACHE_DIR</c> at a throwaway
-///     directory per run (the same isolation knob the fragment-cache e2e suite uses, here through the real
-///     process env since the real tree reads it via its own <c>SystemEnvironment</c> seam).
+///     directory per run — the same isolation knob the fragment-cache e2e suite uses, and through the same
+///     <see cref="IEnvironment" /> seam, which <see cref="CliRunner.InvokeColdAsync(IEnvironment,string[])" />
+///     threads into the real command tree so no process-wide variable is written.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -299,15 +302,15 @@ public sealed class BinlogCliE2ETests : IDisposable
     // internal observables.
     private static async Task<GateRun> RunAsync(string cacheDir, params string[] args)
     {
-        // The serial collection makes the transient env-var write and the static observable reads race-free;
-        // the scope restores (not clears) the variable, so the run-wide default the module initializer set
-        // survives for the next serial test.
-        using var cacheDirectory = new ScopedEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, cacheDir);
+        // The cache root rides the invocation's own IEnvironment, so this class isolates its caches without
+        // writing a variable the rest of the process can see. What still needs the serial collection is the
+        // pair of static observables read below (and the shared fixture tree), not the cache root.
+        FakeEnvironment environment = new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheDir);
         long loaderBefore = WorkspaceLoader.LoadCount;
 
         // Cold, deliberately: every fact here reads the LoadCount delta to tell "replayed" from "built",
         // so each invocation has to open (or decline to open) its own workspace.
-        CliResult result = await CliRunner.InvokeColdAsync(args);
+        CliResult result = await CliRunner.InvokeColdAsync(environment, args);
         return new GateRun(
             result.Exit, result.Out, result.Err, MsBuildGate.LastAcquisition, WorkspaceLoader.LoadCount - loaderBefore);
     }

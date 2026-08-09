@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 
 namespace Zphil.LoadBearing.Cli;
 
@@ -17,10 +18,18 @@ internal static class CliEntry
     ///     <c>null</c> — what <c>Program</c> passes — for <see cref="ColdSolutionSource" />. The e2e harness
     ///     supplies a warm one so a test class's many invocations share one loaded workspace.
     /// </param>
+    /// <param name="environment">
+    ///     The environment seam the cache-fronted verbs read their cache-root override through, or
+    ///     <c>null</c> — what <c>Program</c> passes — for real process state. The e2e harness supplies a fake
+    ///     one so a test can isolate its caches without mutating the process environment its neighbours share.
+    /// </param>
     public static async Task<int> InvokeAsync(
-        string[] args, InvocationConfiguration configuration, ISolutionSource? hostSource = null)
+        string[] args,
+        InvocationConfiguration configuration,
+        ISolutionSource? hostSource = null,
+        IEnvironment? environment = null)
     {
-        ParseResult parseResult = CommandFactory.BuildRootCommand(hostSource).Parse(args);
+        ParseResult parseResult = CommandFactory.BuildRootCommand(hostSource, environment).Parse(args);
 
         // Remap System.CommandLine's default parse-error exit code (1) to 2; 1 means "violations found".
         if (parseResult.Errors.Count > 0)

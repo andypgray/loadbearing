@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Zphil.LoadBearing.Cli.Mcp;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Rendering;
 
 namespace Zphil.LoadBearing.Cli;
@@ -18,21 +19,27 @@ internal static class CommandFactory
     ///     workspace command's action; see <see cref="MsBuildGate" /> for what a host source does and does
     ///     not displace.
     /// </param>
-    public static RootCommand BuildRootCommand(ISolutionSource? hostSource = null)
+    /// <param name="environment">
+    ///     The environment seam the cache-root override is read through, or <c>null</c> (the real entry point)
+    ///     for real process state. Carried only into the three cache-fronted commands — <c>check</c>,
+    ///     <c>status</c>, <c>graph</c> — because they are the only ones that read a variable at all.
+    /// </param>
+    public static RootCommand BuildRootCommand(
+        ISolutionSource? hostSource = null, IEnvironment? environment = null)
     {
         return new RootCommand("LoadBearing — a fluent architecture spec with deterministic enforcement.")
         {
-            BuildCheckCommand(hostSource),
+            BuildCheckCommand(hostSource, environment),
             BuildExplainCommand(hostSource),
             BuildRenderCommand(hostSource),
             BuildBaselineCommand(hostSource),
-            BuildStatusCommand(hostSource),
-            BuildGraphCommand(hostSource),
+            BuildStatusCommand(hostSource, environment),
+            BuildGraphCommand(hostSource, environment),
             BuildMcpCommand()
         };
     }
 
-    private static Command BuildCheckCommand(ISolutionSource? hostSource)
+    private static Command BuildCheckCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -92,7 +99,8 @@ internal static class CommandFactory
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(sarif),
                 parseResult.GetValue(rules)),
-            (request, output, error, ct) => MsBuildGate.RunCheckAsync(request, output, error, hostSource, ct));
+            (request, output, error, ct) =>
+                MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
 
         return check;
     }
@@ -260,7 +268,7 @@ internal static class CommandFactory
         return baseline;
     }
 
-    private static Command BuildStatusCommand(ISolutionSource? hostSource)
+    private static Command BuildStatusCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
@@ -297,12 +305,13 @@ internal static class CommandFactory
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics)),
-            (request, output, error, ct) => MsBuildGate.RunStatusAsync(request, output, error, hostSource, ct));
+            (request, output, error, ct) =>
+                MsBuildGate.RunStatusAsync(request, output, error, hostSource, environment, ct));
 
         return status;
     }
 
-    private static Command BuildGraphCommand(ISolutionSource? hostSource)
+    private static Command BuildGraphCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         var solution = SolutionArgument();
         Option<bool> json = new("--json")
@@ -372,7 +381,8 @@ internal static class CommandFactory
                 // named here so its absence reads as a decision rather than an omission.
                 // ReSharper disable once ArgumentsStyleNamedExpression
                 ResponseBudgetChars: null),
-            (request, output, error, ct) => MsBuildGate.RunGraphAsync(request, output, error, hostSource, ct));
+            (request, output, error, ct) =>
+                MsBuildGate.RunGraphAsync(request, output, error, hostSource, environment, ct));
 
         return graph;
     }

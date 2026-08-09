@@ -27,6 +27,14 @@ namespace Zphil.LoadBearing.Cli;
 ///         source only ever replaces the <em>cold</em> branch it names.
 ///     </para>
 ///     <para>
+///         <b>The environment seam.</b> The three cache-fronted verbs also take an optional
+///         <see cref="IEnvironment" />, threaded from <see cref="CliEntry" /> so a host can supply the
+///         cache-root override without touching real process state. <c>null</c> — what <c>Program</c> passes —
+///         means <see cref="SystemEnvironment" />, so production reads the real variable exactly as before.
+///         The gate resolves the root through the same seam it hands the runner, which is what keeps the
+///         capture store and the fragment cache pointed at one location for the run.
+///     </para>
+///     <para>
 ///         <b>The replay branch.</b> <c>check</c>/<c>status</c>/<c>graph</c> route through
 ///         <see cref="SelectSourceAndRunAsync" />, which registers MSBuildLocator once up front and then
 ///         decides the source over only <c>Replay</c>-namespace + BCL types (capture validation, option
@@ -53,29 +61,32 @@ internal static class MsBuildGate
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunCheckAsync(
-        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
-            source => InvokeCheckAsync(request, output, error, source, ct), ct);
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource, environment,
+            source => InvokeCheckAsync(request, output, error, source, environment, ct), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunStatusAsync(
-        StatusRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        StatusRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
-            source => InvokeStatusAsync(request, output, error, source, ct), ct);
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource, environment,
+            source => InvokeStatusAsync(request, output, error, source, environment, ct), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunGraphAsync(
-        GraphRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        GraphRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         return SelectSourceAndRunAsync(
-            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource,
-            source => InvokeGraphAsync(request, output, error, source, ct), ct);
+            request.Solution, request.WorkingDirectory, request.Binlog, request.NoCache, error, hostSource, environment,
+            source => InvokeGraphAsync(request, output, error, source, environment, ct), ct);
     }
 
     // ── explain / render / baseline: the plain cold path (no --binlog) ───────────────────────────────────
@@ -114,11 +125,12 @@ internal static class MsBuildGate
     // here), and the runner types stay quarantined behind the NoInlining stepping stones until after it.
     private static async Task<int> SelectSourceAndRunAsync(
         string? solutionArgument, string workingDirectory, string? binlog, bool noCache,
-        TextWriter error, ISolutionSource? hostSource, Func<ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
+        TextWriter error, ISolutionSource? hostSource, IEnvironment? environment,
+        Func<ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
 
-        string? cacheRoot = CacheRootOverride();
+        string? cacheRoot = CacheRootOverride(environment);
 
         if (!string.IsNullOrWhiteSpace(binlog))
             return await RunExplicitBinlogAsync(
@@ -251,10 +263,11 @@ internal static class MsBuildGate
         }
     }
 
-    private static string? CacheRootOverride()
+    // The gate resolves the cache root through the same seam the runners it dispatches to use, so a caller
+    // that supplies one gets a run whose capture store and whose fragment cache agree on where the cache is.
+    private static string? CacheRootOverride(IEnvironment? environment)
     {
-        IEnvironment environment = new SystemEnvironment();
-        string? cacheRoot = environment.GetVariable(LoadBearingEnvVars.CacheDirectory);
+        string? cacheRoot = (environment ?? new SystemEnvironment()).GetVariable(LoadBearingEnvVars.CacheDirectory);
         return string.IsNullOrWhiteSpace(cacheRoot) ? null : cacheRoot;
     }
 
@@ -268,23 +281,26 @@ internal static class MsBuildGate
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeCheckAsync(
-        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new CheckRunner(output, error, source).RunAsync(request, ct);
+        return new CheckRunner(output, error, source, environment).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeStatusAsync(
-        StatusRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        StatusRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new StatusRunner(output, error, source).RunAsync(request, ct);
+        return new StatusRunner(output, error, source, environment).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeGraphAsync(
-        GraphRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        GraphRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new GraphRunner(output, error, source).RunAsync(request, ct);
+        return new GraphRunner(output, error, source, environment).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

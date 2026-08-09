@@ -22,7 +22,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     net (it now runs warm by default); this suite pins the warm-specific behaviour that parity cannot see.
 /// </summary>
 /// <remarks>
-///     Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync" />, never the warm-by-default
+///     Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync(string[])" />, never the warm-by-default
 ///     <see cref="CliRunner.InvokeAsync" />. The oracle in each case is a <em>freshly loaded</em> run over the
 ///     edited tree: warm-equals-cold is the claim, so the reference side has to be genuinely cold or the
 ///     comparison proves nothing.

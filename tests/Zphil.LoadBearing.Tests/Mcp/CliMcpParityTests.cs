@@ -27,7 +27,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     </para>
 /// </summary>
 /// <remarks>
-///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync" />, not the warm-by-default
+///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync(string[])" />, not the warm-by-default
 ///     <see cref="CliRunner.InvokeAsync" />. The harness these rows compare against is warm, so this is the
 ///     suite's warm-against-cold net; serving both sides from one pooled workspace would make it compare
 ///     the warm path with itself.

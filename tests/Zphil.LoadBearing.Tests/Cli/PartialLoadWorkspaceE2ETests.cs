@@ -24,7 +24,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         not reproduce this, and for the siting constraints that keep the fixture broken.
 ///     </para>
 ///     <para>
-///         Cold invocations throughout (<see cref="CliRunner.InvokeColdAsync" />), never the warm pool: a
+///         Cold invocations throughout (<see cref="CliRunner.InvokeColdAsync(string[])" />), never the warm pool: a
 ///         pooled session keyed on a shared workspace must never be handed a broken one. The MCP leg gets
 ///         its own harness, which composes its own session.
 ///     </para>

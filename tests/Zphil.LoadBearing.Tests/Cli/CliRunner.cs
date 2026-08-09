@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Reflection;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -20,7 +21,7 @@ internal sealed record CliResult(int Exit, string Out, string Err);
 ///     workspace (reconciled against disk on every call) instead of opening one each. Nothing else about
 ///     the run changes: the same command tree, the same runners, the same full extraction, the same
 ///     stdout/stderr. A test whose subject <em>is</em> the loading — a load-count pin, a
-///     workspace-acquisition count — calls <see cref="InvokeColdAsync" /> instead and gets today's fresh
+///     workspace-acquisition count — calls <see cref="InvokeColdAsync(string[])" /> instead and gets today's fresh
 ///     one-shot workspace per invocation.
 /// </remarks>
 internal static class CliRunner
@@ -62,7 +63,7 @@ internal static class CliRunner
     /// <summary>Runs the CLI over the shared warm workspace pool — the default; see the type's remarks.</summary>
     public static Task<CliResult> InvokeAsync(params string[] args)
     {
-        return RunAsync(WarmWorkspacePool.Source, args);
+        return RunAsync(WarmWorkspacePool.Source, null, args);
     }
 
     /// <summary>
@@ -72,16 +73,30 @@ internal static class CliRunner
     /// </summary>
     public static Task<CliResult> InvokeColdAsync(params string[] args)
     {
-        return RunAsync(null, args);
+        return RunAsync(null, null, args);
     }
 
-    private static async Task<CliResult> RunAsync(ISolutionSource? hostSource, string[] args)
+    /// <summary>
+    ///     <see cref="InvokeColdAsync(string[])" />, with the cache-fronted verbs reading their cache-root
+    ///     override from <paramref name="environment" /> instead of real process state — so a class can
+    ///     isolate its persisted caches per invocation without a variable write the whole process can see.
+    /// </summary>
+    /// <remarks>
+    ///     Cold only, because the tests that need per-invocation cache isolation are the ones measuring
+    ///     acquisition; a warm overload is one line away if a caller ever wants both.
+    /// </remarks>
+    public static Task<CliResult> InvokeColdAsync(IEnvironment environment, params string[] args)
+    {
+        return RunAsync(null, environment, args);
+    }
+
+    private static async Task<CliResult> RunAsync(ISolutionSource? hostSource, IEnvironment? environment, string[] args)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var configuration = new InvocationConfiguration { Output = output, Error = error };
 
-        int exit = await CliEntry.InvokeAsync(args, configuration, hostSource);
+        int exit = await CliEntry.InvokeAsync(args, configuration, hostSource, environment);
         return new CliResult(exit, output.ToString(), error.ToString());
     }
 
