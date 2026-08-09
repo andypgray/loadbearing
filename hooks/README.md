@@ -60,6 +60,27 @@ Register the MCP server, if you also want the `arch_*` query tools in the sessio
 }
 ```
 
+On Windows, the same registration with the shell named by where it lives:
+
+```json
+{
+  "mcpServers": {
+    "loadbearing": {
+      "command": "C:\\Program Files\\Git\\bin\\sh.exe",
+      "args": [
+        "hooks/mcp-launch.sh",
+        "Zphil.LoadBearing.slnx",
+        "--spec", "arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj"
+      ]
+    }
+  }
+}
+```
+
+A bare `sh` cannot resolve there. Stdio servers are spawned through `cmd.exe` with the PATH a desktop process inherits, and a default Git for Windows install contributes only `Git\cmd` to it: `git.exe` and its siblings, no shell. The shells git does install, under `Git\bin` and `Git\usr\bin`, sit on no PATH outside a Git Bash session, so the bare spelling fails every connect before the handshake with `'sh' is not recognized`.
+
+Naming the path buys a loud failure and pays for it in generality: with Git installed anywhere else, the connect fails on the spot and the error says which path it wanted. The portable alternative, a committed `.cmd` shim that finds the shell itself, would relay the stdio channel faithfully (the relay fault is PowerShell's, not cmd's), but it stands between the client and the server for the life of the session as one more process a kill has to reach through, which is the very thing the launcher's closing `exec` exists to remove.
+
 ## Why a source checkout needs the launcher
 
 A connected server holds open every assembly it loaded, and in a source checkout those are exactly the files the next build has to overwrite: `dotnet build` fails with `MSB3021`/`MSB3027` copy errors for as long as a client is connected. Every connected session runs its own server, so stopping one process may not be enough.
@@ -70,7 +91,7 @@ Stopping them is the obvious way out and a bad one. A stdio server whose connect
 
 **It fixes the server's own binaries, and only those.** Spec assemblies are the other half, and they need nothing from you: the server loads spec DLLs and their dependencies from their bytes rather than their paths, so the spec project's output stays replaceable and builds of it succeed while a client is connected. The launcher's copy is the fix available on the server side, where the path is the launcher's to choose; the spec's path is yours.
 
-There is no PowerShell sibling here, unlike the wrapper pair. The launcher's last act is `exec`, which replaces the shell with the server and leaves nothing standing between the client and the stdio channel it speaks JSON-RPC over; PowerShell has no equivalent, and a wrapper that relays that channel instead of getting out of its way is a fault nobody wants to debug. A source checkout implies git, which on Windows brings a POSIX shell with it.
+There is no PowerShell sibling here, unlike the wrapper pair. The launcher's last act is `exec`, which replaces the shell with the server and leaves nothing standing between the client and the stdio channel it speaks JSON-RPC over; PowerShell has no equivalent, and a wrapper that relays that channel instead of getting out of its way is a fault nobody wants to debug. A source checkout implies git, and git on Windows installs the POSIX shell the launcher needs; what it does not do is put that shell on the PATH stdio servers are spawned with, which is why the Windows registration above names it by its full path.
 
 ## Lifting it into your own repository
 

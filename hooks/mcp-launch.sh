@@ -24,6 +24,10 @@
 #     "command": "sh",
 #     "args": ["hooks/mcp-launch.sh", "MyApp.sln", "--spec", "./arch/bin/Debug/net10.0/MyApp.ArchSpec.dll"]}}}
 #
+# On Windows, name the shell absolutely — "command": "C:\\Program Files\\Git\\bin\\sh.exe" — because
+# stdio servers are spawned through cmd.exe, whose PATH reaches git.exe but not the shell a Git
+# install brings with it.
+#
 # stdout is the JSON-RPC channel, so everything this script has to say goes to stderr instead.
 
 # Relative paths below resolve from the launcher's working directory, which is the client's to
