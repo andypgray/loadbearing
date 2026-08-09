@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,10 +17,10 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// <remarks>
 ///     <para>
 ///         Registering a custom <see cref="System.Text.Json.Serialization.JsonConverter" /> for a
-///         type makes STJ's schema exporter emit <c>{}</c> for that parameter — it can no longer
-///         infer the shape. Every converter-bound parameter is affected: a <c>string[]</c> parameter
-///         would collapse from an array-of-strings to <c>{}</c>, and (verified empirically) every
-///         scalar <c>string?</c> parameter erases too. <see cref="ReinjectErasedSchema" /> is the
+///         type makes STJ's schema exporter erase that parameter — it can no longer infer the shape.
+///         Every converter-bound parameter is affected: a <c>string[]</c> parameter would collapse
+///         from an array-of-strings to nothing at all, and (verified empirically) every scalar
+///         <c>string?</c> parameter erases too. <see cref="ReinjectErasedSchema" /> is the
 ///         <c>SchemaCreateOptions.TransformSchemaNode</c> hook that restores the erased shape from the
 ///         underlying CLR type.
 ///     </para>
@@ -32,7 +33,12 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// </remarks>
 internal static class CoercingToolRegistration
 {
-    private static readonly AIJsonSchemaCreateOptions SchemaOptions = new()
+    /// <summary>
+    ///     The schema hook every tool registered here is created with. Internal rather than private so a
+    ///     test can create a probe tool through it: the array and enum repairs below serve parameter
+    ///     shapes no <c>arch_*</c> tool has yet, so no real tool can reach them.
+    /// </summary>
+    internal static readonly AIJsonSchemaCreateOptions SchemaOptions = new()
     {
         TransformSchemaNode = ReinjectErasedSchema
     };
@@ -79,46 +85,72 @@ internal static class CoercingToolRegistration
     }
 
     /// <summary>
-    ///     Re-injects the shape the custom converters erased to <c>{}</c>, reading it back from the
-    ///     underlying CLR type: array + <c>items</c> for string/enum arrays, <c>string</c> for scalars,
-    ///     and — for enum parameters — the <c>enum</c> value list. The value list is otherwise lost
-    ///     entirely (the converter hides the enum from the exporter), so restoring it here is what lets
-    ///     the allowed values travel in the schema rather than being duplicated into the description
-    ///     prose. Every branch is guarded on <c>!ContainsKey</c>, so it is a no-op whenever the exporter
-    ///     already emitted the shape.
+    ///     Re-injects the shape the custom converters erased, reading it back from the underlying CLR
+    ///     type: array + <c>items</c> for string/enum arrays, <c>string</c> for scalars, and — for enum
+    ///     parameters — the <c>enum</c> value list. The value list is otherwise lost entirely (the
+    ///     converter hides the enum from the exporter), so restoring it here is what lets the allowed
+    ///     values travel in the schema rather than being duplicated into the description prose. Every
+    ///     branch is guarded on <c>!ContainsKey</c>, so it is a no-op whenever the exporter already
+    ///     emitted the shape, and a node no branch claims is handed back exactly as it arrived.
     /// </summary>
     private static JsonNode ReinjectErasedSchema(AIJsonSchemaCreateContext context, JsonNode node)
     {
-        if (node is JsonObject obj)
-        {
-            Type t = Nullable.GetUnderlyingType(context.TypeInfo.Type) ?? context.TypeInfo.Type;
-            if (t == typeof(string[]) || (t.IsArray && t.GetElementType() is { IsEnum: true }))
-            {
-                if (!obj.ContainsKey("type")) obj["type"] = "array";
+        JsonObject? obj = ErasureTarget(node);
+        if (obj is null) return node;
 
-                if (!obj.ContainsKey("items"))
-                {
-                    JsonObject items = new() { ["type"] = "string" };
-                    if (t.GetElementType() is { IsEnum: true } elementType) items["enum"] = EnumNames(elementType);
-                    obj["items"] = items;
-                }
-            }
-            else if (t.IsEnum && !obj.ContainsKey("type"))
+        Type t = Nullable.GetUnderlyingType(context.TypeInfo.Type) ?? context.TypeInfo.Type;
+        if (t == typeof(string[]) || (t.IsArray && t.GetElementType() is { IsEnum: true }))
+        {
+            if (!obj.ContainsKey("type")) obj["type"] = "array";
+
+            if (!obj.ContainsKey("items"))
             {
-                obj["type"] = "string";
-                obj["enum"] = EnumNames(t);
-            }
-            else if (t == typeof(string) && !obj.ContainsKey("type"))
-            {
-                // Load-bearing here: verified empirically that this project's exporter erases every
-                // scalar string?/string parameter to {} under StringCoercerFactory. Without this repair
-                // they would advertise no type at all. (The advertised shape is a plain "string"; no
-                // ["string","null"] union appears.)
-                obj["type"] = "string";
+                JsonObject items = new() { ["type"] = "string" };
+                if (t.GetElementType() is { IsEnum: true } elementType) items["enum"] = EnumNames(elementType);
+                obj["items"] = items;
             }
         }
+        else if (t.IsEnum && !obj.ContainsKey("type"))
+        {
+            obj["type"] = "string";
+            obj["enum"] = EnumNames(t);
+        }
+        else if (t == typeof(string) && !obj.ContainsKey("type"))
+        {
+            // Load-bearing here: verified empirically that this project's exporter erases every
+            // scalar string?/string parameter under StringCoercerFactory. Without this repair they
+            // would advertise no type at all. (The advertised shape is a plain "string"; no
+            // ["string","null"] union appears.)
+            obj["type"] = "string";
+        }
+        else
+        {
+            // No branch claims this type, so return the original node rather than the target: an
+            // erased `true` stays `true` instead of widening into an equivalent-but-different `{}`.
+            return node;
+        }
 
-        return node;
+        return obj;
+    }
+
+    /// <summary>
+    ///     The object <see cref="ReinjectErasedSchema" /> writes the recovered shape into, or
+    ///     <see langword="null" /> when the node is not something this repair may touch.
+    /// </summary>
+    /// <remarks>
+    ///     The exporter erases a converter-bound parameter two ways: to <c>{}</c> when the parameter has
+    ///     another keyword to carry (a <c>[Description]</c>, a default value), and to the bare <c>true</c>
+    ///     schema — "any value" — when it has neither. Both are the same loss, so <c>true</c> gets a fresh
+    ///     object to be rebuilt into. <c>false</c> is the opposite claim, "nothing valid", and is left
+    ///     alone: repairing it would widen a schema that admits no value into one that admits every value.
+    ///     Internal rather than private so a test can pin that, because no exporter path reaches this hook
+    ///     with <c>false</c>.
+    /// </remarks>
+    internal static JsonObject? ErasureTarget(JsonNode node)
+    {
+        if (node is JsonObject obj) return obj;
+
+        return node.GetValueKind() is JsonValueKind.True ? new JsonObject() : null;
     }
 
     /// <summary>The enum member names as a JSON string array, for a schema <c>enum</c> constraint.</summary>

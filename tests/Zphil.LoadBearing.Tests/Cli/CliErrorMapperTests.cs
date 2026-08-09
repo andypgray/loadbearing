@@ -52,6 +52,25 @@ public sealed class CliErrorMapperTests
         CliErrorMapper.UserFacingMessage(new InvalidCastException("bug")).ShouldBeNull();
     }
 
+    [Fact]
+    public void Write_UnexpectedError_DumpsTheStackTraceAndStillExitsTwo()
+    {
+        // The other half of "anything else is a bug": UserFacingMessage returning null is what routes an
+        // unexpected exception here, and what it must produce is the full ToString() — type, message and
+        // stack — because for a bug the stack is the report. Thrown rather than constructed so there is
+        // a real stack to lose.
+        Exception bug = Should.Throw<InvalidCastException>(() => throw new InvalidCastException("bug"));
+
+        var error = new StringWriter();
+        int exit = CliErrorMapper.Write(bug, error);
+
+        exit.ShouldBe(2);
+        var text = error.ToString();
+        text.ShouldContain("System.InvalidCastException");
+        text.ShouldContain("bug");
+        text.ShouldContain(nameof(CliErrorMapperTests));
+    }
+
     // The MCP GlobalCallToolFilter renders UserFacingMessage; the CLI renders Write. This pins them to
     // the identical multi-line body (after newline normalization) so the two surfaces stay in parity —
     // for a multi-line UserErrorException (the unknown-rule listing) and for spec validation.

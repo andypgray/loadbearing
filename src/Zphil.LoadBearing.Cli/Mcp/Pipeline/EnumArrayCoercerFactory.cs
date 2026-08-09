@@ -48,7 +48,8 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///             <description>
 ///                 Numbers, booleans, objects, or arrays containing non-string elements throw
 ///                 <see cref="UserErrorException" /> naming the offending token kind. Integer
-///                 elements are deliberately NOT admitted as enum values.
+///                 elements are deliberately NOT admitted as enum values, and neither are
+///                 comma-separated name lists — see <see cref="EnumStringHelper.ResolvesByArithmetic" />.
 ///             </description>
 ///         </item>
 ///     </list>
@@ -158,9 +159,9 @@ internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
 
         private static T ParseElement(string name)
         {
-            // A numeric string ("5", "+5", " 5 ") would bind to an ordinal via Enum.TryParse,
-            // violating the "integers not admitted" contract — reject before parsing.
-            if (EnumStringHelper.LooksNumeric(name)) throw new UserErrorException(BuildMessage(name));
+            // A numeric string ("5", "+5", " 5 ") or a comma-separated name list ("A, B") would bind
+            // to an ordinal, or to the OR of two, via Enum.TryParse — reject before parsing.
+            if (EnumStringHelper.ResolvesByArithmetic(name)) throw new UserErrorException(BuildMessage(name));
 
             if (Enum.TryParse(name, true, out T parsed) && Enum.IsDefined(typeof(T), parsed)) return parsed;
 

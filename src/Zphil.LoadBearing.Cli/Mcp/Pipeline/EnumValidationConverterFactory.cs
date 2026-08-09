@@ -21,6 +21,11 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         Generic over every <c>T : struct, Enum</c>, so any enum-typed tool parameter is validated
 ///         this way without a per-parameter registration.
 ///     </para>
+///     <para>
+///         One member name, or nothing: integers and comma-separated name lists are both refused, because
+///         each lets a caller reach a member by ordinal arithmetic rather than by naming it. See
+///         <see cref="EnumStringHelper.ResolvesByArithmetic" />.
+///     </para>
 /// </remarks>
 internal sealed class EnumValidationConverterFactory : JsonConverterFactory
 {
@@ -46,9 +51,9 @@ internal sealed class EnumValidationConverterFactory : JsonConverterFactory
 
             string? name = reader.GetString();
 
-            // A numeric string ("5", "+5", " 5 ") would bind to an ordinal via Enum.TryParse,
-            // violating the "integers not admitted" contract — reject before parsing.
-            if (name is not null && EnumStringHelper.LooksNumeric(name)) throw new UserErrorException(BuildMessage(name));
+            // A numeric string ("5", "+5", " 5 ") or a comma-separated name list ("A, B") would bind
+            // to an ordinal, or to the OR of two, via Enum.TryParse — reject before parsing.
+            if (name is not null && EnumStringHelper.ResolvesByArithmetic(name)) throw new UserErrorException(BuildMessage(name));
 
             if (name is not null && Enum.TryParse(name, true, out T parsed) && Enum.IsDefined(typeof(T), parsed)) return parsed;
 

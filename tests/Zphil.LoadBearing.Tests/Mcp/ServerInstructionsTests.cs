@@ -24,9 +24,60 @@ public sealed class ServerInstructionsTests
     /// <summary>The observed Claude Code cliff: instructions longer than this are cut mid-text.</summary>
     private const int ClientTruncationCliff = 2048;
 
+    /// <summary>
+    ///     Ceiling on the unbound banner itself. Everything it spends is spent ahead of the same cliff, so
+    ///     it is a direct deduction from how much of <see cref="ServerInstructions.Text" /> an unbound
+    ///     server's client ever sees.
+    /// </summary>
+    private const int BannerBudget = 400;
+
     [Fact]
     public void Text_FitsUnderTheClientTruncationCliff()
     {
         ServerInstructions.Text.Length.ShouldBeLessThanOrEqualTo(ClientTruncationCliff);
+    }
+
+    [Fact]
+    public void For_BoundServer_IsTheInstructionsUnchanged()
+    {
+        // Reference equality, not just equal text: a bound server must pay nothing at all for the
+        // unbound path existing.
+        ServerInstructions.For(null).ShouldBeSameAs(ServerInstructions.Text);
+    }
+
+    [Fact]
+    public void For_UnboundServer_LeadsWithTheReasonAndKeepsTheInstructionsWhole()
+    {
+        const string failure = "Multiple solution files found in C:\\repo: Alpha.sln, Beta.slnx.";
+
+        string instructions = ServerInstructions.For(failure);
+
+        instructions.ShouldStartWith("**This server is running but is not bound to a solution.**");
+        // Verbatim: the discovery message names the files and the fix, and re-wording it here would
+        // make the handshake and the per-call tool error disagree about what went wrong.
+        instructions.ShouldContain(failure);
+        // A prefix, never a replacement — the tool surface is described in the same words either way.
+        instructions.ShouldEndWith(ServerInstructions.Text);
+    }
+
+    [Fact]
+    public void For_UnboundServer_NamesBothWaysToNameTheSolution()
+    {
+        string instructions = ServerInstructions.For("No .sln, .slnf or .slnx file found.");
+
+        instructions.ShouldContain("`args`");
+        instructions.ShouldContain("LOADBEARING_SOLUTION_PATH");
+    }
+
+    [Fact]
+    public void For_UnboundServer_BannerStaysWithinItsBudget()
+    {
+        // The banner cannot fit under the cliff and leave Text whole — that trade is accepted, which is
+        // why the file keeps its most droppable lines last. What must not happen silently is the banner
+        // growing and pushing more of Text past the cut, so its own cost is pinned here.
+        const string failure = "x";
+        int bannerLength = ServerInstructions.For(failure).Length - ServerInstructions.Text.Length - failure.Length;
+
+        bannerLength.ShouldBeLessThanOrEqualTo(BannerBudget);
     }
 }
