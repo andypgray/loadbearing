@@ -16,6 +16,8 @@ public class NamespacePatternTests
     // MyApp.Domain — exact.
     [InlineData("MyApp.Domain", "MyApp.Domain", true)]
     [InlineData("MyApp.Domain", "MyApp.Domain.Orders", false)]
+    // Matching is case-sensitive.
+    [InlineData("MyApp.Domain", "myapp.domain", false)]
     // MyApp.*.Orders — interior single-segment wildcard.
     [InlineData("MyApp.*.Orders", "MyApp.Sales.Orders", true)]
     [InlineData("MyApp.*.Orders", "MyApp.Orders", false)]
@@ -24,6 +26,9 @@ public class NamespacePatternTests
     [InlineData("MyApp.Legacy*", "MyApp.Legacy", true)]
     [InlineData("MyApp.Legacy*", "MyApp.LegacyBilling", true)]
     [InlineData("MyApp.Legacy*", "MyApp.Legacy.Billing", false)]
+    // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
+    // (NamespacePattern.cs:108-110): `Legacy*` diverges from `Ledger` at the third character.
+    [InlineData("MyApp.Legacy*", "MyApp.Ledger", false)]
     // * — everything.
     [InlineData("*", "MyApp", true)]
     [InlineData("*", "MyApp.Domain.Orders", true)]
@@ -31,22 +36,6 @@ public class NamespacePatternTests
     {
         new NamespacePattern(pattern).Matches(@namespace)
             .ShouldBe(expected);
-    }
-
-    [Fact]
-    public void Matches_IsCaseSensitive()
-    {
-        new NamespacePattern("MyApp.Domain").Matches("myapp.domain")
-            .ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Matches_PartialSegmentWildcard_MismatchWithinSegment_ReturnsFalse()
-    {
-        // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
-        // (NamespacePattern.cs:108-110): `Legacy*` diverges from `Ledger` at the third character.
-        new NamespacePattern("MyApp.Legacy*").Matches("MyApp.Ledger")
-            .ShouldBeFalse();
     }
 
     [Theory]

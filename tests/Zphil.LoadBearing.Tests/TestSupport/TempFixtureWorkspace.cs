@@ -127,7 +127,7 @@ internal sealed class TempFixtureWorkspace : IDisposable
         WarmWorkspacePool.DropUnder(_root);
         try
         {
-            if (Directory.Exists(_root)) Directory.Delete(_root, true);
+            ReadOnlyTolerant.DeleteTree(_root);
         }
         catch
         {
@@ -265,7 +265,10 @@ internal sealed class TempFixtureWorkspace : IDisposable
         {
             if (IsBuildArtifact(file, destination) || expected.Contains(file)) continue;
 
-            File.Delete(file);
+            // Read-only-tolerant because a TempGitRepo consumer leaves a .git/ here and git writes its loose
+            // objects read-only: a plain File.Delete threw partway through the prune, failed the whole reset,
+            // and cost the caller a private copy and a restore.
+            ReadOnlyTolerant.Delete(file);
             projectsChanged |= IsProjectFile(file);
         }
 

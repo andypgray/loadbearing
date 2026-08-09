@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Reflection;
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.Cli;
@@ -61,12 +60,6 @@ public sealed class McpChildServerRepoHandleTests
             """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"arch_context","arguments":{"path":"MyApp.Legacy.Billing"}}}""")
     ];
 
-    /// <summary>Budget for the handshake: a cold child, MSBuild registration, and the vswhere probe.</summary>
-    private static readonly TimeSpan HandshakeBudget = TimeSpan.FromMinutes(2);
-
-    /// <summary>Budget for a call: a cold workspace load plus extraction plus the git diff.</summary>
-    private static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(5);
-
     /// <summary>
     ///     How long the footprint may take to settle. A clean server passes on the first scan and pays none
     ///     of this; the budget exists so a file still closing behind the last tool call is not read as a leak.
@@ -100,68 +93,32 @@ public sealed class McpChildServerRepoHandleTests
 
         var inherited = LauncherHandlesUnderRepo();
 
-        string? handshake = null;
-        var answers = new Dictionary<string, string?>();
-        var alive = false;
-        string diagnostics;
+        // The footprint assertion is the only one that has to run against a live process, so it rides the
+        // harness's whileComplete hook — which fires only on a conversation that actually completed, so a
+        // wedge is reported as a wedge below rather than as a footprint that never formed.
+        ChildConversation conversation = await McpChildHarness.ConverseAsync(
+            startInfo,
+            ReadToolCalls,
+            whileComplete: server =>
+                server.ShouldEventuallyHoldNoPathsUnder(RepoRoot.Directory, FootprintBudget, inherited));
 
-        using (Process server = Process.Start(startInfo)
-                                ?? throw new InvalidOperationException("Failed to start the MCP server child."))
-        {
-            var errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-            try
-            {
-                await McpChildHarness.SendAsync(server, McpChildHarness.InitializeRequest);
-                handshake = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
-
-                if (handshake is not null)
-                {
-                    await McpChildHarness.SendAsync(server, McpChildHarness.InitializedNotification);
-                    foreach ((string name, int id, string frame) in ReadToolCalls)
-                    {
-                        await McpChildHarness.SendAsync(server, frame);
-                        answers[name] = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id, CallBudget);
-                    }
-                }
-
-                alive = !server.HasExited;
-
-                // The assertion, and the only one that has to run against a live process. Gated on a complete
-                // conversation so a wedge is reported as a wedge below rather than as a footprint that never
-                // formed.
-                if (alive && answers.Count == ReadToolCalls.Length && answers.Values.All(a => a is not null))
-                    server.ShouldEventuallyHoldNoPathsUnder(RepoRoot.Directory, FootprintBudget, inherited);
-            }
-            catch (IOException)
-            {
-                // The child died mid-conversation and the pipe broke; the null results below say so.
-            }
-            finally
-            {
-                // stdin stays open until here: an open client pipe is the condition under test. The drain
-                // runs even when the footprint assertion throws, so disposal cannot fault the read.
-                McpChildHarness.TryKillTree(server);
-                diagnostics = await McpChildHarness.DrainAsync(errorDrain);
-            }
-        }
-
-        handshake.ShouldNotBeNull(
-            $"the staged MCP server never answered `initialize`.\nstderr:\n{diagnostics}");
+        conversation.Handshake.ShouldNotBeNull(
+            $"the staged MCP server never answered `initialize`.\nstderr:\n{conversation.Diagnostics}");
 
         foreach (string name in ReadToolCalls.Select(call => call.Name))
         {
-            string? answer = answers.GetValueOrDefault(name);
-            answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{diagnostics}");
-            ShouldHaveToolText(answer, name)
+            string? answer = conversation.Answers.GetValueOrDefault(name);
+            answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{conversation.Diagnostics}");
+            McpChildHarness.ShouldHaveToolText(answer, name)
                 .ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
         }
 
-        alive.ShouldBeTrue(
-            $"the server exited during the run, so its footprint proves nothing.\nstderr:\n{diagnostics}");
+        conversation.StillAlive.ShouldBeTrue(
+            $"the server exited during the run, so its footprint proves nothing.\nstderr:\n{conversation.Diagnostics}");
 
         // arch_check must have genuinely run the whole diff path, spec load included — otherwise a server
         // that answered five errors would hold nothing and pass.
-        ShouldHaveToolText(answers["arch_check"]!, "arch_check")
+        McpChildHarness.ShouldHaveToolText(conversation.Answers["arch_check"]!, "arch_check")
             .ShouldContain("quarantinedScopeTouched");
     }
 
@@ -181,37 +138,18 @@ public sealed class McpChildServerRepoHandleTests
 
         var inherited = LauncherHandlesUnderRepo();
 
-        string? handshake = null;
         IReadOnlyList<RetainedPath> retained = [];
-        string diagnostics;
 
-        using (Process server = Process.Start(startInfo)
-                                ?? throw new InvalidOperationException("Failed to start the MCP server child."))
-        {
-            var errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-            try
-            {
-                await McpChildHarness.SendAsync(server, McpChildHarness.InitializeRequest);
-                handshake = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
+        // No calls, so whileComplete fires on the handshake alone — and the scan is the only thing it has to
+        // do here, because a footprint can only be read from a process that is still up.
+        ChildConversation conversation = await McpChildHarness.ConverseAsync(
+            startInfo,
+            [],
+            whileComplete: server => retained = ProcessFileFootprint.ExceptInherited(
+                ProcessFileFootprint.PathsUnder(server, RepoRoot.Directory), inherited));
 
-                if (handshake is not null)
-                    retained = ProcessFileFootprint.ExceptInherited(
-                        ProcessFileFootprint.PathsUnder(server, RepoRoot.Directory), inherited);
-            }
-            catch (IOException)
-            {
-                // The child died mid-handshake; the null result below says so, with its stderr attached.
-            }
-            finally
-            {
-                McpChildHarness.TryKillTree(server);
-            }
-
-            diagnostics = await McpChildHarness.DrainAsync(errorDrain);
-        }
-
-        handshake.ShouldNotBeNull(
-            $"the MCP server never answered `initialize` over real stdio.\nstderr:\n{diagnostics}");
+        conversation.Handshake.ShouldNotBeNull(
+            $"the MCP server never answered `initialize` over real stdio.\nstderr:\n{conversation.Diagnostics}");
 
         retained.ShouldContain(
             path => path.Scan == FootprintScan.MappedView,
@@ -264,24 +202,6 @@ public sealed class McpChildServerRepoHandleTests
                 + $"'{configuration}' configuration and re-run.");
 
         return path;
-    }
-
-    /// <summary>
-    ///     The text payload of a <c>tools/call</c> response. A JSON-RPC error always fails — the tool did not
-    ///     run — but a tool-level <c>isError</c> does not: <c>arch_explain</c> and <c>arch_context</c> may
-    ///     legitimately report no such rule or no such scope against the fixture spec, and the spec still
-    ///     loaded, which is the part this test is about.
-    /// </summary>
-    private static string ShouldHaveToolText(string frame, string toolName)
-    {
-        using JsonDocument document = JsonDocument.Parse(frame);
-        document.RootElement.TryGetProperty("error", out JsonElement error)
-            .ShouldBeFalse($"{toolName} returned a JSON-RPC error: {error}");
-
-        JsonElement result = document.RootElement.GetProperty("result");
-        return result.GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
     }
 
     private static string Format(IReadOnlyList<RetainedPath> retained)

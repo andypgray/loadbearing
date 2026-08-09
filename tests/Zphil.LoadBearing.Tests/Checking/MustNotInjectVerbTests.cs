@@ -13,10 +13,11 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     as a constructor parameter (at the parameter's <c>file:line</c>); a mere reference without a
 ///     constructor parameter stays silent; membership discriminates by lifetime (a singleton injecting a
 ///     singleton is clean); the sanctioned-root exemption via <c>.Except</c>; the (source, injected) type-pair
-///     ratchet with a bystander; the <b>never-warns</b> pin (an empty <c>Registered</c> operand is the win
-///     condition, not an inert warning — the point of departure from <c>MustNotConstruct</c>); and the pinned
-///     human line + JSON kind. Violation identity is the (source, injected) type pair, constructor-overload-
-///     and parameter-name-indifferent, riding <see cref="BaselineEntry.ForEdge" /> unchanged.
+///     ratchet (one edge grandfathered, a new pair stays red); the <b>never-warns</b> pin (an empty
+///     <c>Registered</c> operand is the win condition, not an inert warning — the point of departure from
+///     <c>MustNotConstruct</c>); and the pinned human line + JSON kind. Violation identity is the
+///     (source, injected) type pair, constructor-overload- and parameter-name-indifferent, riding
+///     <see cref="BaselineEntry.ForEdge" /> unchanged.
 /// </summary>
 public sealed class MustNotInjectVerbTests
 {
@@ -205,45 +206,6 @@ public sealed class MustNotInjectVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.InjectionPairs()
             .ShouldBe(["App.Svc -> App.IScopedB"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotInject_BystanderInjection_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two singletons inject the same scoped IScopedDep; only OldSvc's edge is grandfathered. NewSvc
-        // injecting the identical type is a distinct (source, injected) identity — a bystander — so it stays red.
-        const string source = """
-                              using Microsoft.Extensions.DependencyInjection;
-                              namespace App
-                              {
-                                  public interface IScopedDep {}
-                                  public class ScopedDep : IScopedDep {}
-                                  public class OldSvc { public OldSvc(IScopedDep dep) { } }
-                                  public class NewSvc { public NewSvc(IScopedDep dep) { } }
-                                  public static class Wiring
-                                  {
-                                      public static void Configure(IServiceCollection services)
-                                      {
-                                          services.AddSingleton<OldSvc>();
-                                          services.AddSingleton<NewSvc>();
-                                          services.AddScoped<IScopedDep, ScopedDep>();
-                                      }
-                                  }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("di/no-captive", BaselineEntry.ForEdge("T:App.OldSvc", "T:App.IScopedDep"));
-
-        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), index, arch =>
-                arch.Rule("di/no-captive")
-                    .Migrate("legacy captive dependencies", arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("resolve scoped work through IServiceScopeFactory"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.InjectionPairs()
-            .ShouldBe(["App.NewSvc -> App.IScopedDep"]);
         result.ShouldHaveGrandfathered(1);
     }
 

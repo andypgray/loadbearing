@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
@@ -11,15 +12,24 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///     A <c>.gitignore</c> excluding <c>bin/</c> and <c>obj/</c> is written <em>before</em> <c>git init</c>
 ///     so restored build artifacts never enter the index; identity is set locally and commit signing is
 ///     disabled, so the commit succeeds regardless of the host's global git config. Rooted in
-///     <c>%TEMP%</c>, outside this repository, so <c>git init</c> is safe. Each instance costs a restore
-///     plus a commit.
+///     <c>%TEMP%</c>, outside this repository, so <c>git init</c> is safe. The lease underneath is the
+///     workspace's own — one leased tree per consuming test class, reset to pristine between facts, with
+///     the previous fact's <c>.git</c> pruned by the reset and a fresh one initialized here.
 /// </remarks>
 internal sealed class TempGitRepo : IDisposable
 {
-    private readonly TempFixtureWorkspace _workspace = new();
+    private readonly TempFixtureWorkspace _workspace;
 
-    public TempGitRepo()
+    /// <param name="callerFilePath">
+    ///     Compiler-supplied; never passed explicitly. Threaded through to <see cref="TempFixtureWorkspace" />
+    ///     so the lease is keyed on the <em>consumer's</em> source file rather than on this one. Six
+    ///     consumers across four classes used to collide on the single key <c>TempGitRepo.cs</c> minted, and
+    ///     since a lease is exclusive, five of the six silently fell through to a private copy — each paying
+    ///     a fresh <c>dotnet restore</c> and a permanently cold extraction cache.
+    /// </param>
+    public TempGitRepo([CallerFilePath] string callerFilePath = "")
     {
+        _workspace = new TempFixtureWorkspace(callerFilePath: callerFilePath);
         File.WriteAllText(Path.Combine(Root, ".gitignore"), "bin/\nobj/\n");
         Git("init");
         Git("config", "user.email", "loadbearing-test@example.invalid");

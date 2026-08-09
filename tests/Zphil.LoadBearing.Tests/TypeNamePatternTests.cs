@@ -27,6 +27,8 @@ public class TypeNamePatternTests
     [InlineData("*Repo*", "OrderRepository", true)]
     [InlineData("*Repo*", "RepoManager", true)]
     [InlineData("*Repo*", "Rep", false)]
+    // Matching is case-sensitive.
+    [InlineData("*Repo*", "orderrepository", false)]
     // Multiple interior wildcards.
     [InlineData("*Order*Service", "MyOrderXService", true)]
     [InlineData("*Order*Service", "OrderService", true)]
@@ -38,12 +40,5 @@ public class TypeNamePatternTests
     {
         new TypeNamePattern(pattern).Matches(name)
             .ShouldBe(expected);
-    }
-
-    [Fact]
-    public void Matches_IsCaseSensitive()
-    {
-        new TypeNamePattern("*Repo*").Matches("orderrepository")
-            .ShouldBeFalse();
     }
 }

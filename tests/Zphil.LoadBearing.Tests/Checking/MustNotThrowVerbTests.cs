@@ -16,9 +16,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     A throw edge trips only where a subject throws a forbidden
 ///     type, matched by exact definition-level FQN (banning <c>typeof(Exception)</c> never flags a derived
 ///     <c>throw new InvalidOperationException()</c> — the narrow throw is the good state); a hierarchy-adjective
-///     operand matches solution-declared exception types but never an external one; the type-pair ratchet with a
-///     bystander that stays red; the inert-target warning on an empty pattern operand vs. the silent win on an
-///     absent bare <c>typeof</c> — the departure from <c>MustOnlyThrow</c>, which never warns; and the pinned
+///     operand matches solution-declared exception types but never an external one; the type-pair ratchet
+///     (one edge grandfathered, a new pair stays red); the inert-target warning on an empty pattern operand
+///     vs. the silent win on an absent bare <c>typeof</c> — the departure from <c>MustOnlyThrow</c>, which
+///     never warns; and the pinned
 ///     human line + JSON kind. The verb reuses <see cref="ViolationKind.Throw" /> — the kind names the fact
 ///     family, not the verb — so identity is the (source, thrown) type pair riding
 ///     <see cref="BaselineEntry.ForEdge" /> unchanged.
@@ -235,34 +236,6 @@ public sealed class MustNotThrowVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ThrowPairs()
             .ShouldBe(["N.Worker -> N.Beta"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotThrow_BystanderThrow_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two workers throw the same banned Boom; only OldWorker's edge is grandfathered. NewWorker throwing the
-        // identical type is a distinct (source, thrown) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace N { public class Boom : System.Exception {} }
-                              namespace N
-                              {
-                                  public class OldWorker { public void Run() => throw new N.Boom(); }
-                                  public class NewWorker { public void Run() => throw new N.Boom(); }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("ex/no-throw", BaselineEntry.ForEdge("T:N.OldWorker", "T:N.Boom"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("ex/no-throw")
-                    .Migrate("legacy bare throws", arch.Namespace("N.*")
-                        .MustNotThrow(arch.Namespace("N.*")))
-                    .Because("throw types a caller can dispatch on"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.ThrowPairs()
-            .ShouldBe(["N.NewWorker -> N.Boom"]);
         result.ShouldHaveGrandfathered(1);
     }
 

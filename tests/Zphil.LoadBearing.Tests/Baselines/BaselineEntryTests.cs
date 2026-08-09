@@ -34,6 +34,17 @@ public sealed class BaselineEntryTests
     }
 
     [Fact]
+    public void ForEdge_DifferentSource_AreNotEqual()
+    {
+        // The source half of identity, on its own. Every other inequality row here varies the target — the
+        // swapped-pair row varies both at once — so an Equals that compared target and subject and ignored
+        // source would satisfy all of them. That is not a hypothetical slip: it is the whole of what keeps a
+        // second type's reference to an already-grandfathered target red instead of quietly baselined.
+        BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .ShouldNotBe(BaselineEntry.ForEdge("T:N.Other", "T:N.Tgt"));
+    }
+
+    [Fact]
     public void ForEdge_ConstructionViolationIdentity_IsAnOrdinaryEdgeEntry()
     {
         // A construction violation's identity is a plain (source, constructed) ForEdge entry (GRAMMAR §4.3) —

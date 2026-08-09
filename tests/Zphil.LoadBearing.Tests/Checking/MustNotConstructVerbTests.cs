@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     The construction verb <c>MustNotConstruct</c> over the fast path (GRAMMAR §4.5, §4.3, §5.3): a
 ///     construction edge trips only where a subject <c>new</c>s a forbidden type (explicit and target-typed),
 ///     the "you may use it; you may not create it" acceptance (bare references never trip), the sanctioned-root
-///     exemption via <c>.Except</c>, the type-pair ratchet (grandfather one edge, bystanders stay red), the
+///     exemption via <c>.Except</c>, the type-pair ratchet (one edge grandfathered, a new pair stays red), the
 ///     inert-target warning, and the pinned human line + JSON kind. Violation identity is the (source,
 ///     constructed) type pair, overload-indifferent, riding <see cref="BaselineEntry.ForEdge" /> unchanged.
 /// </summary>
@@ -159,35 +159,6 @@ public sealed class MustNotConstructVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ConstructionPairs()
             .ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotConstruct_BystanderConstruction_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two factories `new` the same Widget; only OldFactory's edge is grandfathered. NewFactory constructing
-        // the identical type is a distinct (source, constructed) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace Widgets { public class Widget {} }
-                              namespace App
-                              {
-                                  using Widgets;
-                                  public class OldFactory { public Widget A() => new Widget(); }
-                                  public class NewFactory { public Widget B() => new Widget(); }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("di/no-new", BaselineEntry.ForEdge("T:App.OldFactory", "T:Widgets.Widget"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("di/no-new")
-                    .Migrate("legacy direct construction", arch.Namespace("App.*")
-                        .MustNotConstruct(arch.Namespace("Widgets.*")))
-                    .Because("resolve via DI"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.ConstructionPairs()
-            .ShouldBe(["App.NewFactory -> Widgets.Widget"]);
         result.ShouldHaveGrandfathered(1);
     }
 

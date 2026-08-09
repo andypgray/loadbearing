@@ -14,7 +14,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     <c>IOException</c> exposure — no hierarchy-aware matching); a type that merely <em>references</em> the
 ///     banned type in a method body but never surfaces it on a signature stays green (the reference≠exposure
 ///     distinction that is the whole point of the fact family); a hierarchy-adjective operand matches
-///     solution-declared types; the type-pair ratchet (grandfather one edge, bystanders stay red); the
+///     solution-declared types; the type-pair ratchet (one edge grandfathered, a new pair stays red); the
 ///     inert-target warning on an empty pattern operand vs. the silent win on an absent bare <c>typeof</c>;
 ///     and the pinned human line + JSON kind. Violation identity is the (source, exposed) type pair, riding
 ///     <see cref="BaselineEntry.ForEdge" /> unchanged.
@@ -219,34 +219,6 @@ public sealed class MustNotExposeVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.ExposurePairs()
             .ShouldBe(["App.Facade -> Secrets.B"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotExpose_BystanderExposure_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two facades expose the same Secrets.Data; only OldFacade's edge is grandfathered. NewFacade exposing
-        // the identical type is a distinct (source, exposed) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace Secrets { public class Data {} }
-                              namespace App
-                              {
-                                  public class OldFacade { public void Take(Secrets.Data d) {} }
-                                  public class NewFacade { public void Take(Secrets.Data d) {} }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("api/no-expose", BaselineEntry.ForEdge("T:App.OldFacade", "T:Secrets.Data"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("api/no-expose")
-                    .Migrate("legacy leaked surface", arch.Namespace("App.*")
-                        .MustNotExpose(arch.Namespace("Secrets.*")))
-                    .Because("keep the internal types off the public API"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.ExposurePairs()
-            .ShouldBe(["App.NewFacade -> Secrets.Data"]);
         result.ShouldHaveGrandfathered(1);
     }
 

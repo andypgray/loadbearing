@@ -95,7 +95,7 @@ internal static class TestTempRoot
 
                 try
                 {
-                    Directory.Delete(runRoot, true);
+                    ReadOnlyTolerant.DeleteTree(runRoot);
                 }
                 catch
                 {
@@ -124,7 +124,7 @@ internal sealed class TempDirectory(string path) : IDisposable
     {
         try
         {
-            Directory.Delete(Path, true);
+            ReadOnlyTolerant.DeleteTree(Path);
         }
         catch
         {

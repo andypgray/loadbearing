@@ -193,22 +193,6 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
-    public void Inventory_PositionalRecord_IncludesPositionalPropertyOnly_PinnedEmpirically()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public record R(int X);
-                                                         """);
-
-        // EMPIRICAL PIN (GRAMMAR §4.6 compiler-generated boundary): the positional property X is present; the
-        // synthesized EqualityContract / <Clone>$ / PrintMembers / ToString / Equals / GetHashCode / copy-ctor
-        // / Deconstruct / == / != are all implicitly declared or non-Ordinary and excluded.
-        model.Type("N.R")
-            .MemberIds()
-            .ShouldBe(["P:N.R.X"]);
-    }
-
-    [Fact]
     public void Inventory_EnumType_ContributesNoInventory()
     {
         CodebaseModel model = CompilationFactory.Extract("""
@@ -549,13 +533,16 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
-    public void Inventory_PositionalRecord_PropertyCarriesNoParameters()
+    public void Inventory_PositionalRecord_PropertyCarriesNoParameters_PinnedEmpirically()
     {
         CodebaseModel model = CompilationFactory.Extract("""
                                                          namespace N;
                                                          public record R(int X);
                                                          """);
 
+        // EMPIRICAL PIN (GRAMMAR §4.6 compiler-generated boundary): the positional property X is present; the
+        // synthesized EqualityContract / <Clone>$ / PrintMembers / ToString / Equals / GetHashCode / copy-ctor
+        // / Deconstruct / == / != are all implicitly declared or non-Ordinary and excluded.
         // The positional list surfaces as the generated property X only; the primary constructor is outside the
         // member inventory, so nothing here carries parameter facts.
         TypeNode r = model.Type("N.R");

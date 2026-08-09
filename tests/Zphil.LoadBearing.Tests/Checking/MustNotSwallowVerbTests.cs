@@ -19,9 +19,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     <b>green</b> here, and the filtered one is green under both. Beside it the syntactic honesty boundary,
 ///     both ways: a terminal <c>throw</c> that is not on every path still reads as throwing, and a throw on some
 ///     path that is not the last statement still reads as swallowing. The rest clones the sibling: matching by
-///     exact definition-level FQN; a hierarchy-adjective operand; the type-pair ratchet with a bystander that
-///     stays red; the inert-target warning on an empty pattern operand vs. the silent win on an absent bare
-///     <c>typeof</c>; and the pinned human line + JSON kind. The verb reuses <see cref="ViolationKind.Catch" />
+///     exact definition-level FQN; a hierarchy-adjective operand; the type-pair ratchet (one edge
+///     grandfathered, a new pair stays red); the inert-target warning on an empty pattern operand vs. the
+///     silent win on an absent bare <c>typeof</c>; and the pinned human line + JSON kind. The verb reuses
+///     <see cref="ViolationKind.Catch" />
 ///     — the kind names the fact family, not the verb — so identity stays the (source, caught) type pair riding
 ///     <see cref="BaselineEntry.ForEdge" /> unchanged, and the swallowing sites are evidence, never identity.
 /// </remarks>
@@ -401,34 +402,6 @@ public sealed class MustNotSwallowVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.CatchPairs()
             .ShouldBe(["App.Handler -> Errors.BErr"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotSwallow_BystanderSwallow_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two handlers swallow the same Errors.Err; only OldHandler's edge is grandfathered. NewHandler swallowing
-        // the identical type is a distinct (source, caught) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace Errors { public class Err : System.Exception {} }
-                              namespace App
-                              {
-                                  public class OldHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                                  public class NewHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.OldHandler", "T:Errors.Err"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("ex/no-swallowed-errors")
-                    .Migrate("legacy swallowed catches", arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("a handler that holds a failure and continues hides it"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.CatchPairs()
-            .ShouldBe(["App.NewHandler -> Errors.Err"]);
         result.ShouldHaveGrandfathered(1);
     }
 

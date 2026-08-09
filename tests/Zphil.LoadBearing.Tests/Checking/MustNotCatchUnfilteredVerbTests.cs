@@ -18,9 +18,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     so no reader is ever pointed at a site the rule considers good. The rest clones the sibling: matching by
 ///     exact definition-level FQN (banning <c>typeof(Exception)</c> never flags a narrower
 ///     <c>catch (IOException)</c>); a hierarchy-adjective operand matching solution-declared exception types but
-///     never an external one; the type-pair ratchet with a bystander that stays red; the inert-target warning on
-///     an empty pattern operand vs. the silent win on an absent bare <c>typeof</c>; and the pinned human line +
-///     JSON kind. The verb reuses <see cref="ViolationKind.Catch" /> — the kind names the fact family, not the
+///     never an external one; the type-pair ratchet (one edge grandfathered, a new pair stays red); the
+///     inert-target warning on an empty pattern operand vs. the silent win on an absent bare <c>typeof</c>;
+///     and the pinned human line + JSON kind. The verb reuses <see cref="ViolationKind.Catch" /> — the kind
+///     names the fact family, not the
 ///     verb — so identity stays the (source, caught) type pair riding <see cref="BaselineEntry.ForEdge" />
 ///     unchanged, and the unfiltered sites are evidence, never identity.
 /// </remarks>
@@ -291,34 +292,6 @@ public sealed class MustNotCatchUnfilteredVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.CatchPairs()
             .ShouldBe(["App.Handler -> Errors.BErr"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotCatchUnfiltered_BystanderCatch_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two handlers catch the same Errors.Err unfiltered; only OldHandler's edge is grandfathered. NewHandler
-        // catching the identical type is a distinct (source, caught) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace Errors { public class Err : System.Exception {} }
-                              namespace App
-                              {
-                                  public class OldHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                                  public class NewHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("ex/filter-catches", BaselineEntry.ForEdge("T:App.OldHandler", "T:Errors.Err"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("ex/filter-catches")
-                    .Migrate("legacy unfiltered catches", arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("name what a broad catch expects"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.CatchPairs()
-            .ShouldBe(["App.NewHandler -> Errors.Err"]);
         result.ShouldHaveGrandfathered(1);
     }
 

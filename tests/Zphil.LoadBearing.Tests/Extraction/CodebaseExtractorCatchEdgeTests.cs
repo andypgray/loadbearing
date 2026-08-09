@@ -315,59 +315,16 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         // The filter leaves the edge and its sites untouched — it only keeps the site out of the unfiltered
-        // subset, which is the whole of the new fact.
+        // subset, which is the whole of the new fact. Its positive-polarity partners — the typed and bare
+        // catches that DO record a site unfiltered — are the swallowing rows further down
+        // (ExtractFromCompilations_UnfilteredCatchNotEndingInThrow_RecordsTheSiteSwallowing and
+        // ExtractFromCompilations_BareCatchNotEndingInThrow_RecordsSystemExceptionSwallowing), which assert
+        // the unfiltered subset on the way to the rethrow fact rather than repeating it in a row of their own.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
         edge.Lines()
             .ShouldBe([8]);
         edge.UnfilteredLines()
             .ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_UnfilteredTypedCatch_RecordsTheSiteUnfiltered()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class MyError : System.Exception {}
-                                                         public class Worker
-                                                         {
-                                                             public void Run()
-                                                             {
-                                                                 try { }
-                                                                 catch (MyError) { }
-                                                             }
-                                                         }
-                                                         """);
-
-        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
-            .ShouldBe([8]);
-        edge.UnfilteredLines()
-            .ShouldBe([8]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_BareCatch_RecordsSystemExceptionUnfiltered()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Worker
-                                                         {
-                                                             public void Run()
-                                                             {
-                                                                 try { }
-                                                                 catch { }
-                                                             }
-                                                         }
-                                                         """);
-
-        // A bare `catch` synthesizes System.Exception and spells no filter, so it is unfiltered — the shape a
-        // ban on unfiltered broad catches must reach.
-        CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
-        edge.Lines()
-            .ShouldBe([7]);
-        edge.UnfilteredLines()
-            .ShouldBe([7]);
     }
 
     [Fact]
@@ -672,7 +629,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          }
                                                          """);
 
+        // Self-contained down to the site list, deliberately: this is the only fact left carrying the
+        // unfiltered subset for a bare `catch`, so it may not lean on a sibling for `Lines()`.
         CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
+        edge.Lines()
+            .ShouldBe([7]);
         edge.UnfilteredLines()
             .ShouldBe([7]);
         edge.SwallowingLines()

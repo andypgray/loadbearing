@@ -12,7 +12,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     only where a subject <c>catch</c>es a forbidden type, matched by exact definition-level FQN (banning
 ///     <c>typeof(Exception)</c> never flags a narrower <c>catch (IOException)</c> — the narrow catch is the
 ///     good state); a hierarchy-adjective operand matches solution-declared exception types but never an
-///     external one; the type-pair ratchet (grandfather one edge, bystanders stay red); the inert-target
+///     external one; the type-pair ratchet (one edge grandfathered, a new pair stays red); the inert-target
 ///     warning on an empty pattern operand vs. the silent win on an absent bare <c>typeof</c>; and the pinned
 ///     human line + JSON kind. Violation identity is the (source, caught) type pair, riding
 ///     <see cref="BaselineEntry.ForEdge" /> unchanged.
@@ -227,34 +227,6 @@ public sealed class MustNotCatchVerbTests
         result.Status.ShouldBe(RuleStatus.Failed);
         result.CatchPairs()
             .ShouldBe(["App.Handler -> Errors.BErr"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void MustNotCatch_BystanderCatch_StaysRedWhenAnotherEdgeBaselined()
-    {
-        // Two handlers catch the same Errors.Err; only OldHandler's edge is grandfathered. NewHandler catching
-        // the identical type is a distinct (source, caught) identity — a bystander — so it stays red.
-        const string source = """
-                              namespace Errors { public class Err : System.Exception {} }
-                              namespace App
-                              {
-                                  public class OldHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                                  public class NewHandler { public void Run() { try { } catch (Errors.Err) { } } }
-                              }
-                              """;
-        BaselineIndex index = Checker.Baselines("ex/no-catch", BaselineEntry.ForEdge("T:App.OldHandler", "T:Errors.Err"));
-
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("ex/no-catch")
-                    .Migrate("legacy broad catches", arch.Namespace("App.*")
-                        .MustNotCatch(arch.Namespace("Errors.*")))
-                    .Because("catch specific exceptions"))
-            .Single();
-
-        result.Status.ShouldBe(RuleStatus.Failed);
-        result.CatchPairs()
-            .ShouldBe(["App.NewHandler -> Errors.Err"]);
         result.ShouldHaveGrandfathered(1);
     }
 

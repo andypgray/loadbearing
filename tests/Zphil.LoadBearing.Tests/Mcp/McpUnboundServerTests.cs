@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -35,11 +34,11 @@ public sealed class McpUnboundServerTests : IDisposable
     private const string GraphRequest =
         """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_graph","arguments":{}}}""";
 
-    /// <summary>Budget for the handshake: a cold child, MSBuild registration, and the vswhere probe.</summary>
-    private static readonly TimeSpan HandshakeBudget = TimeSpan.FromMinutes(2);
-
-    /// <summary>Budget for the call: discovery refuses before any workspace opens, so this is generous.</summary>
-    private static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(2);
+    /// <summary>
+    ///     Shorter than the harness default on purpose, and the only budget this suite names: discovery
+    ///     refuses before any workspace opens, so two minutes is already generous.
+    /// </summary>
+    private static readonly TimeSpan DiscoveryRefusalBudget = TimeSpan.FromMinutes(2);
 
     private readonly TempDirectory _temp = TestTempRoot.Fresh("unbound-server");
 
@@ -139,79 +138,20 @@ public sealed class McpUnboundServerTests : IDisposable
     {
         ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(McpChildHarness.TestsBinCliDll(), _temp.Path);
 
-        string? handshake = null;
-        string? response = null;
-        string diagnostics;
+        ChildConversation conversation = await McpChildHarness.ConverseAsync(
+            startInfo, [("arch_graph", 2, GraphRequest)], callBudget: DiscoveryRefusalBudget);
 
-        using (Process server = Process.Start(startInfo)
-                                ?? throw new InvalidOperationException("Failed to start the MCP server child."))
-        {
-            // Drained from the start so a chatty child cannot fill its stderr pipe and stall.
-            var errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-            try
-            {
-                await McpChildHarness.SendAsync(server, McpChildHarness.InitializeRequest);
-                handshake = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
-
-                if (handshake is not null)
-                {
-                    await McpChildHarness.SendAsync(server, McpChildHarness.InitializedNotification);
-                    await McpChildHarness.SendAsync(server, GraphRequest);
-                    response = await McpChildHarness.ReadResponseAsync(server.StandardOutput, id: 2, CallBudget);
-                }
-            }
-            catch (IOException)
-            {
-                // The child died mid-conversation and the pipe broke; the null results below say so, with
-                // its stderr attached — a better failure than an IOException stack.
-            }
-            finally
-            {
-                // stdin stays open until here: an open client pipe is what a real client holds.
-                McpChildHarness.TryKillTree(server);
-            }
-
-            diagnostics = await McpChildHarness.DrainAsync(errorDrain);
-        }
-
-        handshake.ShouldNotBeNull(
+        conversation.Handshake.ShouldNotBeNull(
             "the MCP server never answered `initialize`. An unresolvable walk-up must not kill the server: "
             + "a process that exits before the handshake reaches the client as \"failed to start\" and no "
-            + $"reason at all.\nstderr:\n{diagnostics}");
-        response.ShouldNotBeNull($"the arch_graph response never arrived.\nstderr:\n{diagnostics}");
+            + $"reason at all.\nstderr:\n{conversation.Diagnostics}");
+        string? response = conversation.Answers.GetValueOrDefault("arch_graph");
+        response.ShouldNotBeNull($"the arch_graph response never arrived.\nstderr:\n{conversation.Diagnostics}");
 
-        return new Conversation(ShouldHaveInstructions(handshake), ShouldHaveToolText(response), ToolIsErrorOf(response));
-    }
-
-    private static string ShouldHaveInstructions(string handshake)
-    {
-        using JsonDocument document = JsonDocument.Parse(handshake);
-        document.RootElement.TryGetProperty("error", out JsonElement error)
-            .ShouldBeFalse($"the server returned a JSON-RPC error to initialize: {error}");
-
-        return document.RootElement.GetProperty("result")
-            .GetProperty("instructions")
-            .GetString() ?? string.Empty;
-    }
-
-    private static string ShouldHaveToolText(string response)
-    {
-        using JsonDocument document = JsonDocument.Parse(response);
-        document.RootElement.TryGetProperty("error", out JsonElement error)
-            .ShouldBeFalse($"the server returned a JSON-RPC error rather than a tool error: {error}");
-
-        return document.RootElement.GetProperty("result")
-            .GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
-    }
-
-    private static bool ToolIsErrorOf(string response)
-    {
-        using JsonDocument document = JsonDocument.Parse(response);
-        return document.RootElement.GetProperty("result")
-                   .TryGetProperty("isError", out JsonElement flag)
-               && flag.ValueKind == JsonValueKind.True;
+        return new Conversation(
+            McpChildHarness.ShouldHaveInstructions(conversation.Handshake),
+            McpChildHarness.ShouldHaveToolText(response, "arch_graph"),
+            McpChildHarness.IsToolError(response));
     }
 
     private sealed record Conversation(string Instructions, string ToolText, bool ToolIsError);

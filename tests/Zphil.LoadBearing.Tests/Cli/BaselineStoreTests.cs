@@ -139,19 +139,7 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_EntryWithSourceAndSubject_Throws()
     {
-        string path = Write("mixed.json", """
-                                          {
-                                            "schemaVersion": 1,
-                                            "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                            "rules": {
-                                              "data/x": {
-                                                "entries": [
-                                                  { "source": "T:A", "subject": "T:B" }
-                                                ]
-                                              }
-                                            }
-                                          }
-                                          """);
+        string path = WriteEntryDoc("mixed.json", """{ "source": "T:A", "subject": "T:B" }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("neither {source, target} nor {subject}");
@@ -160,19 +148,7 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_BlankBecause_Throws()
     {
-        string path = Write("blank.json", """
-                                          {
-                                            "schemaVersion": 1,
-                                            "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                            "rules": {
-                                              "data/x": {
-                                                "entries": [
-                                                  { "subject": "T:A", "because": "   " }
-                                                ]
-                                              }
-                                            }
-                                          }
-                                          """);
+        string path = WriteEntryDoc("blank.json", """{ "subject": "T:A", "because": "   " }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("blank or multi-line 'because'");
@@ -181,19 +157,7 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_MultilineBecause_Throws()
     {
-        string path = Write("multiline.json", """
-                                              {
-                                                "schemaVersion": 1,
-                                                "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                                "rules": {
-                                                  "data/x": {
-                                                    "entries": [
-                                                      { "subject": "T:A", "because": "a\nb" }
-                                                    ]
-                                                  }
-                                                }
-                                              }
-                                              """);
+        string path = WriteEntryDoc("multiline.json", """{ "subject": "T:A", "because": "a\nb" }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("blank or multi-line 'because'");
@@ -238,20 +202,12 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_UnknownPropertyAlongsideBecause_Throws()
     {
-        string path = Write("typo.json", """
-                                         {
-                                           "schemaVersion": 1,
-                                           "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                           "rules": {
-                                             "data/x": {
-                                               "entries": [
-                                                 { "subject": "T:A", "becuase": "x" }
-                                               ]
-                                             }
-                                           }
-                                         }
-                                         """);
+        string path = WriteEntryDoc("typo.json", """{ "subject": "T:A", "becuase": "x" }""");
 
+        // The same message the source-and-subject entry gets, for a different reason: an entry is classified
+        // by the ID slots it carries, and a typo'd `becuase` is simply an unknown property beside a subject
+        // — so the entry never resolves to either shape. Keeping this a named fact of its own is what
+        // records that; a shared table row would leave only the message.
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("neither {source, target} nor {subject}");
     }
@@ -382,6 +338,29 @@ public sealed class BaselineStoreTests : IDisposable
         var input = rules.ToDictionary(
             r => r.RuleId, r => (IReadOnlyCollection<BaselineEntry>)r.Entries, StringComparer.Ordinal);
         return Write(relativePath, BaselineFormat.ComposeFile(input));
+    }
+
+    /// <summary>
+    ///     A document carrying <paramref name="entryJson" /> as the sole <c>data/x</c> entry, behind the
+    ///     schemaVersion/digest/rules envelope every malformed-entry refusal has to spell. The all-zero
+    ///     digest is never reached: an entry this malformed is refused while the file is being parsed, which
+    ///     is what the messages pinned below say.
+    /// </summary>
+    private string WriteEntryDoc(string relativePath, string entryJson)
+    {
+        return Write(relativePath, $$"""
+                                     {
+                                       "schemaVersion": 1,
+                                       "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+                                       "rules": {
+                                         "data/x": {
+                                           "entries": [
+                                             {{entryJson}}
+                                           ]
+                                         }
+                                       }
+                                     }
+                                     """);
     }
 
     private string Write(string relativePath, string content)

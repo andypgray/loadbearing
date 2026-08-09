@@ -315,16 +315,6 @@ public class VocabularyFragmentTests
             .ShouldBe("Types must throw only `InvalidOperationException`.");
     }
 
-    [Fact]
-    public void MustOnlyThrow_RendersNoParentheticalCaveat()
-    {
-        // Belt-and-braces beside the exact-equality pin: the absence of the "(external packages are not
-        // constrained by this rule)" caveat that MustOnlyReference carries IS the strictness rendering —
-        // MustOnlyThrow constrains external thrown types too, so no parenthetical exemption is emitted.
-        string sentence = SentenceRenderer.Sentence(Arch.Types.MustOnlyThrow(typeof(InvalidOperationException)));
-        sentence.ShouldNotContain("(");
-    }
-
     // ---- Signature-exposure verb (GRAMMAR §5.3): "must not expose {list}" ----
 
     [Fact]
