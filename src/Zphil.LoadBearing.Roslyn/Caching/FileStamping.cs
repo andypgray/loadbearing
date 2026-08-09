@@ -25,8 +25,14 @@ internal static class FileStamping
     ///     the build — stamped even when absent, so a newly-appearing one is an existence flip. Shared by both
     ///     cache stores and the warm <see cref="WorkspaceSession" /> reconcile sweep.
     /// </summary>
+    /// <remarks>
+    ///     <c>Directory.Packages.props</c> is here on the contract above rather than on a measured miss: a
+    ///     concrete central-package-management edit usually also rewrites <c>obj/project.assets.json</c>, which
+    ///     <see cref="AssetsPathOf" /> already stamps. That file is a proxy, and only after a restore — so the
+    ///     probe is what holds the invariant, not the coincidence.
+    /// </remarks>
     internal static readonly string[] StructuralProbeFileNames =
-        ["Directory.Build.props", "Directory.Build.targets", "global.json"];
+        ["Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "global.json"];
 
     /// <summary>
     ///     The tool version stamped into a manifest: this (Roslyn) assembly's informational version

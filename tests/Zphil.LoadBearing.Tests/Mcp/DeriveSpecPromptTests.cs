@@ -98,6 +98,23 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_ScaffoldOptsOutOfCentralPackageManagement()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — the scaffold pins its own version inline, which is NU1008 on a repository that manages
+        // package versions centrally. The opt-out is what makes one csproj valid either way, so it cannot
+        // drop out of the recipe quietly; CI executes the same commitment against a real central file.
+        string text = ((TextContentBlock)result.Messages[0].Content).Text;
+        text.ShouldContain("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>");
+    }
+
+    [Fact]
     public void DeriveSpec_LoadsEmbeddedRecipe_NonTrivial()
     {
         // A rename of the .md or its manifest id would otherwise surface only when a client calls

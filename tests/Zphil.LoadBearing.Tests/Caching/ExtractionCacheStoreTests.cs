@@ -151,19 +151,35 @@ public sealed class ExtractionCacheStoreTests
         Should.NotThrow(() => store.ReadAndValidate()).Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
-    [Fact]
-    public void ReadAndValidate_NewDirectoryBuildPropsAppearsInAncestor_ReturnsMiss()
+    /// <summary>
+    ///     One case per name in <see cref="FileStamping.StructuralProbeFileNames" />, read off the array
+    ///     itself rather than restated here, so a probe added later arrives with its coverage.
+    /// </summary>
+    public static TheoryData<string> StructuralProbeCases
     {
-        // Arrange — the probe chain records the solution-directory Directory.Build.props as absent at capture.
+        get
+        {
+            var cases = new TheoryData<string>();
+            foreach (string probeFileName in FileStamping.StructuralProbeFileNames) cases.Add(probeFileName);
+            return cases;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(StructuralProbeCases))]
+    public void ReadAndValidate_NewStructuralProbeFileAppearsInAncestor_ReturnsMiss(string probeFileName)
+    {
+        // Arrange — the probe chain records this solution-directory file as absent at capture.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Hit); // baseline: clean before the props appears
+        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Hit); // baseline: clean before the file appears
 
-        // Act — the recorded-absent probe file appears.
-        File.WriteAllText(Path.Combine(solution.Root, "Directory.Build.props"), "<Project />\n");
+        // Act — the recorded-absent probe file appears. The store stats and hashes rather than parsing, so
+        // the bytes carry no meaning here; the file existing is the whole signal.
+        File.WriteAllText(Path.Combine(solution.Root, probeFileName), "probe\n");
 
         // Assert — an existence flip on a structural probe is a full miss.
         store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);

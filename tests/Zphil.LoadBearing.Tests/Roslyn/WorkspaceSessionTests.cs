@@ -201,6 +201,10 @@ public sealed class WorkspaceSessionTests
     [Fact]
     public async Task GetCurrentAsync_DirectoryBuildPropsAppearsInAncestor_TriggersReload()
     {
+        // One representative probe rather than all of FileStamping.StructuralProbeFileNames, because every
+        // case here loads a real workspace. The array is exercised whole, name by name, against the same
+        // existence-flip rule by ExtractionCacheStoreTests.ReadAndValidate_NewStructuralProbeFileAppearsInAncestor_ReturnsMiss.
+
         // Arrange
         CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();

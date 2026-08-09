@@ -200,15 +200,26 @@ jobs:
       # into the product, it is rebuilt, and `check` must exit exactly 1. Not merely non-zero: exit 2
       # is an unresolved spec or a workspace that failed to load, which would satisfy a "non-zero"
       # test for precisely the reason this leg exists to rule out.
-      - name: Scaffold the documented PackageReference spec project and check it
+      #
+      # The whole thing then runs a second time against a repository that manages package versions
+      # centrally — a large and growing class of modern .NET repositories, and the shape the scaffold
+      # was invalid on until it carried `ManagePackageVersionsCentrally`: an inline version on a
+      # PackageReference is NU1008 there, an error whose text never mentions this tool. The recipe
+      # opts its one project out rather than telling the adopter to edit a central file they may
+      # treat as protected, and this leg is what stops that from being prose. Its own negative
+      # control strips the opt-out and requires NU1008 back — not merely a failure, since any other
+      # error would satisfy a bare non-zero test for the reason the control exists to rule out.
+      - name: Scaffold the documented PackageReference spec project — plain and CPM — and check it
         run: |
           version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
           export PATH="$PATH:$HOME/.dotnet/tools"
 
           recipe="src/Zphil.LoadBearing.Cli/Mcp/Prompts/derive-spec.md"
-          root="$RUNNER_TEMP/packageref"
-          export NUGET_PACKAGES="$root/.packages"
-          mkdir -p "$root/src/MyApp" "$root/arch/MyApp.ArchSpec"
+          plain="$RUNNER_TEMP/packageref"
+          cpm="$RUNNER_TEMP/packageref-cpm"
+          # One package folder for both legs: warm for the second, and still isolated from the machine
+          # cache and from nuget.org, which is what makes the restore assertion below name the pack.
+          export NUGET_PACKAGES="$plain/.packages"
 
           # The first fenced block in <lang> whose body carries <marker>. Content-anchored rather than
           # positional, so re-ordering the recipe's fences can never select the wrong one; a marker
@@ -232,20 +243,28 @@ jobs:
             exit 1
           }
 
-          printf '%s\n' "$csproj" | sed 's|Version="\.\.\."|Version="'"$version"'"|' \
-            > "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
-          printf '%s\n' "$spec" > "$root/arch/MyApp.ArchSpec/ArchSpec.cs"
+          # The Version="..." substitution ArchPrompts applies when it serves the prompt, done once so
+          # both legs scaffold the identical csproj an adopter is handed.
+          csproj="$(printf '%s\n' "$csproj" | sed 's|Version="\.\.\."|Version="'"$version"'"|')"
+
+          # scaffold <root> — the reader's tree, written under <root>. The body is deliberately not
+          # indented: these heredocs are quoted (<<'CS', never <<-), so every terminator has to reach
+          # column 0 once YAML strips this block's indentation.
+          scaffold() {
+          mkdir -p "$1/src/MyApp" "$1/arch/MyApp.ArchSpec"
+          printf '%s\n' "$csproj" > "$1/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
+          printf '%s\n' "$spec" > "$1/arch/MyApp.ArchSpec/ArchSpec.cs"
 
           # The same line DeriveSpecPromptTests pins the served prompt to, asserted from the other
           # side: the csproj under test is the one an adopter is handed, pinned to the pack above.
           grep -Fq "<PackageReference Include=\"Zphil.LoadBearing\" Version=\"$version\" />" \
-            "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj" || {
+            "$1/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj" || {
             echo "::error::The scaffold csproj did not come out pinned to $version — the Version=\"...\" placeholder ArchPrompts substitutes is no longer where the recipe spells it"
-            cat "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
+            cat "$1/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
             exit 1
           }
 
-          cat > "$root/arch/MyApp.ArchSpec/CheckedRule.cs" <<'CS'
+          cat > "$1/arch/MyApp.ArchSpec/CheckedRule.cs" <<'CS'
           using Zphil.LoadBearing;
 
           namespace MyApp.ArchSpec;
@@ -261,7 +280,7 @@ jobs:
           }
           CS
 
-          cat > "$root/src/MyApp/MyApp.csproj" <<'CSPROJ'
+          cat > "$1/src/MyApp/MyApp.csproj" <<'CSPROJ'
           <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                   <TargetFramework>net10.0</TargetFramework>
@@ -269,7 +288,7 @@ jobs:
           </Project>
           CSPROJ
 
-          cat > "$root/src/MyApp/Shipments.cs" <<'CS'
+          cat > "$1/src/MyApp/Shipments.cs" <<'CS'
           namespace MyApp;
 
           public interface IShipmentPort
@@ -283,7 +302,7 @@ jobs:
           }
           CS
 
-          cat > "$root/MyApp.slnx" <<'SLNX'
+          cat > "$1/MyApp.slnx" <<'SLNX'
           <Solution>
             <Folder Name="/src/">
               <Project Path="src/MyApp/MyApp.csproj" />
@@ -294,7 +313,7 @@ jobs:
           </Solution>
           SLNX
 
-          cat > "$root/nuget.config" <<CONFIG
+          cat > "$1/nuget.config" <<CONFIG
           <?xml version="1.0" encoding="utf-8"?>
           <configuration>
               <packageSources>
@@ -303,8 +322,11 @@ jobs:
               </packageSources>
           </configuration>
           CONFIG
+          }
 
-          dotnet build "$root/MyApp.slnx"
+          # ── Leg A: a repository that pins package versions per project ──────────────────────────
+          scaffold "$plain"
+          dotnet build "$plain/MyApp.slnx"
 
           # Restored from the pack, not resolved from a project: the path is the assertion.
           dll="$NUGET_PACKAGES/zphil.loadbearing/$version/lib/netstandard2.0/Zphil.LoadBearing.dll"
@@ -315,25 +337,54 @@ jobs:
           }
 
           # No --spec: convention discovery is the documented path and the thing under test.
-          loadbearing check "$root/MyApp.slnx" || {
+          loadbearing check "$plain/MyApp.slnx" || {
             echo "::error::A spec project consuming Zphil.LoadBearing as a PackageReference — the shape derive_spec publishes — was not discovered, or did not pass over conforming code"
             exit 1
           }
 
-          cat > "$root/src/MyApp/Broken.cs" <<'CS'
+          cat > "$plain/src/MyApp/Broken.cs" <<'CS'
           namespace MyApp;
 
           public interface ShipmentPortWithoutThePrefix
           {
           }
           CS
-          dotnet build "$root/MyApp.slnx"
+          dotnet build "$plain/MyApp.slnx"
           rc=0
-          loadbearing check "$root/MyApp.slnx" || rc=$?
+          loadbearing check "$plain/MyApp.slnx" || rc=$?
           [ "$rc" -eq 1 ] || {
             echo "::error::check exited $rc over a deliberate violation; 1 is the only right answer (2 means the spec or the workspace did not resolve, which would make the green above meaningless)"
             exit 1
           }
+
+          # ── Leg B: the same csproj on a repository that manages versions centrally ──────────────
+          scaffold "$cpm"
+          cat > "$cpm/Directory.Packages.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$cpm/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not restore or build on a repository carrying a Directory.Packages.props — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
+            exit 1
+          }
+          loadbearing check "$cpm/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under central package management but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # Leg B's negative control: strip the opt-out back out and the build must fail with NU1008.
+          sed -i '/<ManagePackageVersionsCentrally>/d' "$cpm/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
+          rc=0
+          dotnet build "$cpm/MyApp.slnx" > "$RUNNER_TEMP/cpm-without-opt-out.log" 2>&1 || rc=$?
+          if [ "$rc" -eq 0 ] || ! grep -q NU1008 "$RUNNER_TEMP/cpm-without-opt-out.log"; then
+            echo "::error::Removing ManagePackageVersionsCentrally from the scaffold csproj did not produce NU1008 (build exited $rc) — that line is no longer what makes the published scaffold valid under central package management, so the leg above proves nothing"
+            cat "$RUNNER_TEMP/cpm-without-opt-out.log"
+            exit 1
+          fi
 
   # The one thing release.yml structurally cannot check. It cross-checks the tag against
   # `Directory.Build.props` and both `.mcp/server.json` fields — but only at tag time, so nothing

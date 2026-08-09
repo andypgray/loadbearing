@@ -114,6 +114,10 @@ solution):
         <!-- Stages package assemblies into the build output so `check` can load typeof() targets
              that live in NuGet packages; harmless when every target is a project type or pattern. -->
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <!-- The spec pins its own LoadBearing version, so this project builds the same whether or not
+             the repository manages package versions centrally. Without it, a repository carrying a
+             Directory.Packages.props fails the restore with NU1008. -->
+        <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Zphil.LoadBearing" Version="..." />
@@ -124,7 +128,9 @@ solution):
 ```
 
 The four LoadBearing packages ship one version in lockstep: reference the version
-`loadbearing --version` prints.
+`loadbearing --version` prints. Where the repository manages package versions centrally, leave its
+`Directory.Packages.props` alone — the property above opts this one project out, so the spec keeps
+its own pin and the central file needs no entry for it.
 
 **Pick the TFM by one rule: the spec project must be able to reference the product projects
 it will `typeof()`.** On a `net48` estate, the spec targets `net48` — the LoadBearing contract
@@ -180,6 +186,14 @@ also sweeps every other solution member that happens to sit inside it.
 
 Errors you may see, verbatim, and what they mean:
 
+- `error NU1008: The following PackageReference items cannot define a value for Version:
+  Zphil.LoadBearing. Projects using Central Package Management must define a Version value on a
+  PackageVersion item.` — NuGet's, not this tool's, so nothing in it names LoadBearing as the cause.
+  The repository has a `Directory.Packages.props` at or above the spec project and the
+  `<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>` line is missing from the
+  spec csproj. Put it back rather than adding a `PackageVersion` entry to the central file: the
+  spec's pin belongs to LoadBearing and moves when the tool does, not with the repository's own
+  dependencies.
 - `No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec
   to name one.` — the spec project is not in the solution yet (`dotnet sln add`), or you need
   an explicit `--spec`.
