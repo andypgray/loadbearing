@@ -50,10 +50,13 @@ internal static class FragmentMerger
     /// <summary>
     ///     The merge inputs a caller keeps: <paramref name="fragments" /> minus
     ///     <paramref name="excludeProjectNames" /> (its spec project and the private plumbing only that
-    ///     references, or nothing for the spec-less survey). Dropping a project here is byte-identical to
-    ///     never extracting it — a referenced-but-dropped project survives as an external node — which is
-    ///     what lets one fragment set serve every caller whatever each excludes.
+    ///     references, or nothing for the spec-less survey).
     /// </summary>
+    /// <remarks>
+    ///     Dropping a project here is byte-identical to never extracting it — a referenced-but-dropped
+    ///     project survives as an external node — which is what lets one fragment set serve every caller
+    ///     whatever each excludes.
+    /// </remarks>
     internal static List<CodebaseFragment> Retain(
         IReadOnlyList<CodebaseFragment> fragments, IReadOnlyCollection<string> excludeProjectNames)
     {
@@ -165,7 +168,7 @@ internal static class FragmentMerger
             string fqn = declared.Facts.FullName;
             if (!_nodes.ContainsKey(fqn))
             {
-                _nodes[fqn] = NewNode(declared.Facts, projectName, false);
+                _nodes[fqn] = declared.Facts.ToTypeNode(projectName, isExternal: false);
                 _hierarchy[fqn] = declared; // the winning (first) declarer supplies the hierarchy
             }
             else
@@ -249,28 +252,8 @@ internal static class FragmentMerger
         private static void PopulateMembers(TypeNode node, FragmentType declared)
         {
             node.Members = declared.DeclaredMembers
-                .Select(member => NewMember(node, member))
+                .Select(member => member.ToMemberNode(node))
                 .ToList();
-        }
-
-        // The member's declaration sites are already (file, line) ordinal-ordered from extraction, so — as in
-        // Materialize's type FilePaths — Distinct preserves first-occurrence file order (the §5.6 contract). The
-        // parameter facts are already in declaration order and the attribute facts ordinal by constructed name,
-        // both winner-only (the winning fragment's inventory is taken whole), so each Select preserves order and
-        // no merge path duplicates or reorders them. Unlike the type-side attribute list, the member's stays
-        // string-side: no ResolveNode, so an attribute only a member wears mints no external node.
-        private static MemberNode NewMember(TypeNode declaringType, FragmentMember member)
-        {
-            MemberFacts facts = member.Facts;
-            return new MemberNode(
-                declaringType,
-                facts.SymbolId, facts.Name, facts.Kind, facts.Accessibility,
-                facts.IsStatic, facts.IsAbstract, facts.IsVirtual, facts.IsAsync,
-                facts.ReturnTypeFullName, facts.MemberTypeFullName,
-                member.DeclarationSites.Select(s => new SourceLocation(s.File, s.Line)).ToList(),
-                member.DeclarationSites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList(),
-                facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList(),
-                facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList());
         }
 
         // The one edge merge, stated once for every axis that keys on an endpoint pair: the ordinal self-edge
@@ -345,17 +328,9 @@ internal static class FragmentMerger
             if (_nodes.TryGetValue(fqn, out TypeNode? node)) return node;
 
             FragmentExternal external = _externalFacts[fqn];
-            node = NewNode(external.Facts, external.AssemblyName, true);
+            node = external.Facts.ToTypeNode(external.AssemblyName, isExternal: true);
             _nodes[fqn] = node;
             return node;
-        }
-
-        private static TypeNode NewNode(TypeFacts facts, string projectName, bool isExternal)
-        {
-            return new TypeNode(
-                facts.FullName, facts.SymbolId, facts.Name, facts.Namespace, facts.Kind,
-                facts.Accessibility, facts.IsSealed, facts.IsStatic, facts.IsAbstract, facts.IsRecord,
-                facts.IsGenerated, projectName, isExternal);
         }
 
         private CodebaseModel Materialize(IReadOnlyList<CodebaseFragment> fragments)

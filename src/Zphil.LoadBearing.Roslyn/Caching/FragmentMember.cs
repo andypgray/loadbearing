@@ -1,10 +1,12 @@
+using Zphil.LoadBearing.Codebase;
+
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
 ///     One declared member of a fragment's declared type (GRAMMAR §4.6), captured as pure data: its
 ///     <see cref="MemberFacts">scalar facts</see> and its declaration sites. The member analog of
-///     <see cref="FragmentType" />, held in <see cref="FragmentType.DeclaredMembers" /> and unioned into a
-///     <see cref="Zphil.LoadBearing.Codebase.MemberNode" /> at merge.
+///     <see cref="FragmentType" />, held in <see cref="FragmentType.DeclaredMembers" /> and minted into a
+///     <see cref="Zphil.LoadBearing.Codebase.MemberNode" /> by <see cref="ToMemberNode" />.
 /// </summary>
 /// <remarks>
 ///     <see cref="DeclarationSites" /> is in <see cref="FragmentSite" /> order (a partial method contributes
@@ -13,4 +15,42 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// </remarks>
 internal sealed record FragmentMember(
     MemberFacts Facts,
-    IReadOnlyList<FragmentSite> DeclarationSites);
+    IReadOnlyList<FragmentSite> DeclarationSites)
+{
+    /// <summary>
+    ///     Mints the merged model's node for this member (GRAMMAR §4.6) — the projection the merge applies
+    ///     to the winning fragment's member inventory, taken whole.
+    /// </summary>
+    /// <remarks>
+    ///     The declaration sites are already (file, line) ordinal-ordered from extraction, so — as in the
+    ///     merge's type-side FilePaths derivation — Distinct preserves first-occurrence file order (the §5.6
+    ///     contract). The parameter facts are already in declaration order and the attribute facts ordinal
+    ///     by constructed name, so each Select preserves order and no merge path duplicates or reorders
+    ///     them. Unlike the type-side attribute list, the member's stays string-side: no external node is
+    ///     minted for an attribute only a member wears.
+    /// </remarks>
+    public MemberNode ToMemberNode(TypeNode declaringType)
+    {
+        var declarationSites = DeclarationSites.Select(s => new SourceLocation(s.File, s.Line)).ToList();
+        var filePaths = DeclarationSites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList();
+        var parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
+        var attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
+
+        return new MemberNode(
+            declaringType,
+            symbolId: Facts.SymbolId,
+            name: Facts.Name,
+            kind: Facts.Kind,
+            accessibility: Facts.Accessibility,
+            isStatic: Facts.IsStatic,
+            isAbstract: Facts.IsAbstract,
+            isVirtual: Facts.IsVirtual,
+            isAsync: Facts.IsAsync,
+            returnTypeFullName: Facts.ReturnTypeFullName,
+            memberTypeFullName: Facts.MemberTypeFullName,
+            declarationSites,
+            filePaths,
+            parameters,
+            attributes);
+    }
+}
