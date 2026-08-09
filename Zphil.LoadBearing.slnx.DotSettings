@@ -47,12 +47,14 @@
 
 	<!-- ReSharper's "profile to use when nobody picks one".
 
-	     This key is only consulted by a runner that chooses to honour it, so a caller that needs the
-	     named arguments kept must name the profile itself rather than lean on this default — the
-	     profile above is what protects them, and a call without it silently gets Full Cleanup and
-	     strips them again.
+	     The MCP cleanup server resolves this key, so a cleanup call that names no profile gets
+	     the profile above and the deliberate named arguments survive. Omitting the profile
+	     argument is the intended path; naming it explicitly is merely harmless.
 
 	     Bare `jb cleanupcode` never reads this key: jb always defaults to Full Cleanup, so a direct
-	     CLI run needs --profile regardless. -->
+	     CLI run must still pass the profile by name. jb's switch for that is not spelled literally
+	     here: XML forbids adjacent hyphens inside a comment, and one such spelling once left this
+	     file unreadable to every conformant XML parser while jb itself carried on regardless.
+	     DotSettingsCleanupProfileTests pins the file well-formed. -->
 	<s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">LoadBearing: Full Cleanup (keep named arguments)</s:String>
 </wpf:ResourceDictionary>

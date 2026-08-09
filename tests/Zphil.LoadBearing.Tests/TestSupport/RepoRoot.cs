@@ -30,6 +30,12 @@ internal static class RepoRoot
     /// <summary>The absolute path to the committed root <c>ARCHITECTURE.md</c> (the rendered diagram).</summary>
     public static string ArchitectureMd => Path.Combine(Directory, "ARCHITECTURE.md");
 
+    /// <summary>
+    ///     The absolute path to the solution-level ReSharper settings file — the solution path plus the
+    ///     <c>.DotSettings</c> suffix, which is how ReSharper itself derives it.
+    /// </summary>
+    public static string SolutionDotSettings => Solution + ".DotSettings";
+
     private static string Find()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
