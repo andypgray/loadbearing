@@ -2,7 +2,7 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
-using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -162,7 +162,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document).ShouldBe([LoadDiagnostic, WorkspaceDiagnosticsRenderer.MsBuildNote()]);
+        WorkspaceDiagnosticsOf(document).ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
         result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
     }
 
@@ -177,7 +177,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document).ShouldBe([AuditDiagnostic, WorkspaceDiagnosticsRenderer.MsBuildNote()]);
+        WorkspaceDiagnosticsOf(document).ShouldBe([AuditDiagnostic, MsBuildBootstrap.SelectionNote()]);
         document.RootElement.TryGetProperty("modelIncomplete", out _).ShouldBeFalse();
         result.Err.ShouldNotContain("error: the model is incomplete");
     }

@@ -82,10 +82,10 @@ internal static class MsBuildGate
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<int> RunExplainAsync(
-        ExplainRequest request, TextWriter output, ISolutionSource? hostSource, CancellationToken ct)
+        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return await InvokeExplainAsync(request, output, SourceOrCold(hostSource), ct);
+        return await InvokeExplainAsync(request, output, error, SourceOrCold(hostSource), ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -289,9 +289,9 @@ internal static class MsBuildGate
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeExplainAsync(
-        ExplainRequest request, TextWriter output, ISolutionSource source, CancellationToken ct)
+        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
     {
-        return new ExplainRunner(output, source).RunAsync(request, ct);
+        return new ExplainRunner(output, error, source).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

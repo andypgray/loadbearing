@@ -40,7 +40,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
 
     private const string ContextDescription =
         "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
-        "or a layer's local rules — or a pointer line when none apply.";
+        "or a layer's local rules — or a pointer line when none apply. If projects fail to load, the answer opens " +
+        "with a caveat naming them: cards from unloaded projects cannot be placed, so treat a no-coverage answer " +
+        "as unproven there.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
@@ -124,7 +126,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        await new ExplainRunner(output, source).RunAsync(
+        // Error writer deliberately discarded: explain's answer is spec-derived and cannot be made wrong by
+        // a load failure; the caveat channel for a partial model is arch_context's body, not this tool's.
+        await new ExplainRunner(output, TextWriter.Null, source).RunAsync(
             new ExplainRequest(ruleId, binding.Solution, binding.Spec, binding.WorkingDirectory), cancellationToken);
         return output.ToString();
     }

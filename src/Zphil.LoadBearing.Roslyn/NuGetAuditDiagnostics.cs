@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Zphil.LoadBearing.Cli;
+namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     Recognises the NuGet audit diagnostic family (NU19xx) so the <c>check</c> fail-closed gate can carve

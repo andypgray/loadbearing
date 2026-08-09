@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -32,7 +33,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
         composed.Count.ShouldBe(3);
         composed[0].ShouldBe("first failure");
         composed[1].ShouldBe("second failure");
-        composed[2].ShouldBe(WorkspaceDiagnosticsRenderer.MsBuildNote());
+        composed[2].ShouldBe(MsBuildBootstrap.SelectionNote());
     }
 
     [Fact]

@@ -363,7 +363,7 @@ loadbearing check MyApp.sln
 
 The machine running it needs a .NET 10 SDK: commands that load a solution (`check`, `render`, `status`, `graph`, `baseline`, `mcp`) do so through MSBuildWorkspace via MSBuildLocator, and a runtime-only environment cannot host that load. The codebase under check has no version requirement of its own: LoadBearing never builds or retargets it, and it can target .NET Framework 4.8 or anything newer. The spec project compiles against one package, `Zphil.LoadBearing`, which is netstandard2.0.
 
-A project that fails to load is treated as a wrong model rather than a smaller one: `check`, `baseline`, `graph` and `status` all exit 2 and say which projects failed, and `--allow-workspace-diagnostics` opts into the partial model.
+A project that fails to load is treated as a wrong model rather than a smaller one: `check`, `baseline`, `render`, `graph` and `status` all exit 2 and say which projects failed, and `--allow-workspace-diagnostics` opts into the partial model. The xUnit adapter answers the same way in test dress: one named test fails carrying the load failures, every rule case skips, and an `AllowWorkspaceDiagnostics` override opts in.
 
 The command is `loadbearing`. Four lockstep-versioned packages make up a release:
 

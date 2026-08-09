@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`render` now fails closed on an incomplete model, closing the one-answer sweep.** It was
+  the last verb that would consume a partial model and exit 0, and the two things that go wrong
+  there are silent: a scope or layer card whose project failed to load resolves no directory
+  and is dropped from the committed files rather than written wrong, and `--diagram` draws the
+  very survey `graph` refuses to print. Render now refuses with exit 2 after the load warnings
+  and before the first byte hits disk, with the same `--allow-workspace-diagnostics` opt-out as
+  the other verbs.
+- **`explain` and `arch_context` stop discarding load failures.** Neither gates. `explain` took
+  no error writer at all, so a load failure vanished; it now echoes the warnings to stderr on
+  the workspace path and still answers, because its answer comes from the spec and cannot be
+  made wrong by a project that did not load (a built-DLL `--spec` never opens the workspace and
+  stays silent). `arch_context` resolves card placement from the extracted codebase, so a
+  partial load could answer "no architecture scope covers this path" about a path inside a
+  project that did not load: a false all-clear precisely where the spec had something to say.
+  Its answer now opens with a caveat block naming the load failures, inline, on the only
+  channel the tool has.
 - **`arch_graph` coarsens its own grain instead of returning cut JSON.** A survey bigger than
   the client's response budget used to be truncated mid-array — unparseable, with a footer
   suggesting the results were merely incomplete — which in practice sent agents away from the
@@ -64,6 +80,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The xUnit adapter no longer turns a project that fails to load into a green test run.** The
+  adapter never passed the loader a diagnostic log, which is the only way load failures leave
+  it, so they were dropped: every rule whose subject lived in an unloaded project selected
+  nothing, an empty subject passes, and the green landed in a CI report. The adapter now gives
+  `check`'s answer in test dress: a new `Workspace_LoadedCompletely` test fails carrying the
+  diagnostics inline, every rule case skips rather than report a verdict that was never
+  reached, and a `protected virtual bool AllowWorkspaceDiagnostics` override opts into the
+  partial model, flipping the named test to a skip so its name never asserts something false.
 - **A registry launch that cannot find a solution now starts and says why, instead of dying during
   `initialize`.** The manifest's `dnx` entry passes the bare `mcp` verb with no solution argument, so
   the server walks up from its working directory. That resolves nothing where the solution sits under

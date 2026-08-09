@@ -12,6 +12,9 @@ namespace Zphil.LoadBearing.Cli;
 ///     every placement whose resolved directory contains the query path. No placement covers the path ⇒ the
 ///     same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The card body carries
 ///     no provenance line (that is a <c>render</c> file-splice concern).
+///     An incomplete model never gates here — but it is announced: the answer opens with a caveat block
+///     naming the load failures, because a card whose project failed to load places nowhere and the pinned
+///     pointer line would otherwise read as a clean "not dragon territory".
 /// </summary>
 internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null)
 {
@@ -21,6 +24,15 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
     {
         using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+
+        // Ahead of every exit below, because each of them can be the false all-clear: the body is context's
+        // only channel, so the load failures ride it or reach nobody.
+        if (IncompleteModelGate.IsIncomplete(workspace.Diagnostics))
+        {
+            foreach (string line in IncompleteModelGate.ContextCaveat(workspace.Diagnostics).Split('\n'))
+                output.WriteLine(line);
+            output.WriteLine();
+        }
 
         // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost
         // and point at the root block.

@@ -60,6 +60,21 @@ public static class MsBuildBootstrap
     internal static string? LastSelection { get; private set; }
 
     /// <summary>
+    ///     The MSBuild-selection line appended to every non-empty diagnostics list
+    ///     (<c>WorkspaceDiagnosticsRenderer.Compose</c>) and carried inline by the refusals that bypass
+    ///     composed lists (<see cref="IncompleteModelGate.GraphRefusal" />). A project that fails to load is
+    ///     nearly always a question about which MSBuild opened it, so the line that answers lives beside the
+    ///     state it reads. A null selection means nothing registered MSBuild at all, which for a caller that
+    ///     just opened a workspace is itself worth saying.
+    /// </summary>
+    internal static string SelectionNote()
+    {
+        string selection = LastSelection ?? "not registered by this process";
+        return $"MSBuild for this run: {selection}. Set {LoadBearingEnvVars.VsInstallPath} to a Visual Studio "
+               + "install root (the parent of MSBuild\\Current\\Bin) to select a different MSBuild.";
+    }
+
+    /// <summary>
     ///     Registers an MSBuild instance and propagates the choice to subprocesses.
     /// </summary>
     /// <remarks>

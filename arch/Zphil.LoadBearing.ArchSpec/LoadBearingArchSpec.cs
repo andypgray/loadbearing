@@ -248,12 +248,13 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
                 .Authored()
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
-                .Where(m => m.Name != "Rule_Holds" && m.Name != "WhenAllCallsComplete",
-                    description: "whose name is not Rule_Holds (a consumer-facing test display name) " +
-                                 "or WhenAllCallsComplete (a Task.WhenAll-style combinator)")
+                .Where(m => m.Name != "Rule_Holds" && m.Name != "Workspace_LoadedCompletely"
+                                                   && m.Name != "WhenAllCallsComplete",
+                    description: "whose name is not Rule_Holds or Workspace_LoadedCompletely (consumer-facing " +
+                                 "test display names) or WhenAllCallsComplete (a Task.WhenAll-style combinator)")
                 .MustHaveSuffix("Async"))
             .Because("House convention held repo-wide: an agent grepping *Async sees every await point; " +
-                     "the two named exceptions are deliberate, not drift.")
+                     "the three named exceptions are deliberate, not drift.")
             .Fix("Name Task-returning methods with the Async suffix.");
 
         arch.Rule("mcp/warm-state-constructed-once")

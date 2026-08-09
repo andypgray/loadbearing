@@ -127,7 +127,8 @@ internal static class CommandFactory
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunExplainAsync(request, output, hostSource, ct), error);
+            return CommandEntryPoint.RunAsync(
+                () => MsBuildGate.RunExplainAsync(request, output, error, hostSource, ct), error);
         });
 
         return explain;
@@ -137,6 +138,9 @@ internal static class CommandFactory
     {
         var solution = SolutionArgument();
         var spec = SpecOption();
+        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Render from the partial model even when some projects fail to load, instead of refusing the "
+            + "command with exit 2.");
         Option<string?> diagram = new("--diagram")
         {
             Description =
@@ -157,10 +161,14 @@ internal static class CommandFactory
                 + "scopes the codebase survey fence only, never the law fence. With --diagram."
         };
 
-        Command render = new("render", "Render the managed AGENTS.md block(s) from the spec.")
+        Command render = new(
+            "render",
+            "Render the managed AGENTS.md block(s) from the spec; a project that fails to load refuses the "
+            + "command (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
+            allowWorkspaceDiagnostics,
             diagram,
             diagramOnly,
             diagramExclude
@@ -172,6 +180,7 @@ internal static class CommandFactory
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 Directory.GetCurrentDirectory(),
+                parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(diagram),
                 parseResult.GetValue(diagramOnly),
                 parseResult.GetValue(diagramExclude));
@@ -446,7 +455,7 @@ internal static class CommandFactory
     }
 
     // The one opt-out out of the incomplete-model gate, worded per verb but always the same flag name: the
-    // four verbs that consume the model answer a partial load the same way, so an operator learns one flag.
+    // five verbs that consume the model answer a partial load the same way, so an operator learns one flag.
     private static Option<bool> AllowWorkspaceDiagnosticsOption(string description)
     {
         return new Option<bool>("--allow-workspace-diagnostics") { Description = description };

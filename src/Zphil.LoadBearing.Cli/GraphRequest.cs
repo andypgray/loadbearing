@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli;
 

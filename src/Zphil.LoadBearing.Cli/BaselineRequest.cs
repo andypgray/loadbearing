@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Roslyn;
+
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>

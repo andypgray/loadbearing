@@ -35,6 +35,29 @@ Projects the solution declares stay in the universe even when the spec reference
 spec may reference the very code it governs. If your spec lives outside the target solution,
 override `ExcludeProjectName` to return `null`.
 
+## When the workspace does not load completely
+
+A project that fails to load would otherwise vanish from the checked universe: every rule
+whose subject lived there selects nothing, and an empty subject passes. The adapter refuses to
+let that read as green. One named test, `Workspace_LoadedCompletely`, fails carrying the load
+diagnostics and the MSBuild selection that produced them, and every rule case skips rather
+than report a verdict that was never reached. Restore and build the target solution, then
+rerun.
+
+To check whatever did load anyway, opt in:
+
+```csharp
+public sealed class ArchitectureTests : ArchRuleTests<MyApp.ArchSpec.ArchSpec>
+{
+    protected override string SolutionPath => FindSolutionUp("MyApp.sln");
+    protected override bool AllowWorkspaceDiagnostics => true;
+}
+```
+
+Rule verdicts then come from the partial model, and `Workspace_LoadedCompletely` reports as
+skipped, still carrying the diagnostics, rather than pass under a name the run cannot vouch
+for.
+
 ## Requirements
 
 - **xunit.v3 3.2.2 or later.** The adapter is built against the xunit.v3 authoring libraries;

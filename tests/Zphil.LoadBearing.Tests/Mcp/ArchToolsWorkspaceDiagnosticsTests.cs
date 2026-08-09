@@ -3,7 +3,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
-using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -44,7 +44,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
         WorkspaceDiagnosticsOf(document)
-            .ShouldBe([LoadDiagnostic, WorkspaceDiagnosticsRenderer.MsBuildNote()]);
+            .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
     }
 
     [Fact]

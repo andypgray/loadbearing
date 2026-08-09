@@ -19,6 +19,9 @@ namespace Zphil.LoadBearing.Xunit;
 ///     test explorer.
 ///     A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
 ///     a Quarantine tripwire (no diff context in a test run) is reported as skipped, and everything else passes.
+///     A workspace that fails to load completely fails one named test — <see cref="Workspace_LoadedCompletely" />,
+///     carrying the load diagnostics — and every rule case skips rather than pass against a partial model.
+///     Override <see cref="AllowWorkspaceDiagnostics" /> to opt into checking the partial model as it loaded.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -46,6 +49,17 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     <see langword="null" /> when the spec lives outside the target solution.
     /// </summary>
     protected virtual string? ExcludeProjectName => typeof(TSpec).Assembly.GetName().Name;
+
+    /// <summary>
+    ///     Opts the rule tests into a partially-loaded workspace — the adapter's spelling of the CLI's
+    ///     <c>--allow-workspace-diagnostics</c>. By default a load failure fails
+    ///     <see cref="Workspace_LoadedCompletely" /> and skips every rule case, because a rule whose subject
+    ///     lived in an unloaded project selects nothing and an empty subject passes — a green run against a
+    ///     partial model signs a verdict that was never reached. With <see langword="true" />, rule verdicts
+    ///     come from the partial model as it loaded, and <see cref="Workspace_LoadedCompletely" /> skips
+    ///     rather than pass under a name that would then be false.
+    /// </summary>
+    protected virtual bool AllowWorkspaceDiagnostics => false;
 
     /// <summary>
     ///     Resolves a solution file's absolute path by name, for the usual case where the solution is not
@@ -115,6 +129,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
             throw new InvalidOperationException(
                 $"Rule '{ruleId}' was enumerated at discovery but is absent from the check run.");
 
+        if (IncompleteModelGate.Gates(run.Diagnostics, AllowWorkspaceDiagnostics))
+            Assert.Skip(IncompleteModelGate.AdapterSkipReason);
+
         switch (result.Status)
         {
             case RuleStatus.Skipped:
@@ -124,6 +141,21 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                 Assert.Fail(HumanReportRenderer.RuleBlock(result, run.SolutionDirectory));
                 break;
         }
+    }
+
+    /// <summary>
+    ///     The named answer to a partially-loaded workspace: fails with the load diagnostics inline when a
+    ///     project failed to load (the rule cases then skip — no verdict is reached against a partial model),
+    ///     skips with the diagnostics when <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes
+    ///     silently on a complete load.
+    /// </summary>
+    [Fact]
+    public async Task Workspace_LoadedCompletely()
+    {
+        ArchCheckRun run = await GetRunAsync();
+        if (!IncompleteModelGate.IsIncomplete(run.Diagnostics)) return;
+        if (AllowWorkspaceDiagnostics) Assert.Skip(IncompleteModelGate.AdapterOptedIn(run.Diagnostics));
+        Assert.Fail(IncompleteModelGate.AdapterRefusal(run.Diagnostics));
     }
 
     // Lazily start (and then share) the one check run for this closed TSpec, seeded by the first case's
@@ -152,7 +184,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         BaselineIndex baselines = BaselineStore.LoadForModel(model, solutionDirectory);
 
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath);
+        var diagnostics = new List<string>();
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add);
         // The same closure the CLI applies: the spec project plus the plumbing only it references, with the
         // solution's declared members subtracted so a spec that references the code it governs never excludes it.
         var exclude = excludeProjectName is null
@@ -162,7 +195,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         CheckReport report = ArchChecker.Check(model, codebase, baselines, null);
         var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
-        return new ArchCheckRun(byId, solutionDirectory);
+        return new ArchCheckRun(byId, solutionDirectory, diagnostics);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -171,7 +204,10 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         MsBuildBootstrap.EnsureInitialized();
     }
 
-    private sealed record ArchCheckRun(IReadOnlyDictionary<string, RuleResult> ResultsById, string SolutionDirectory);
+    private sealed record ArchCheckRun(
+        IReadOnlyDictionary<string, RuleResult> ResultsById,
+        string SolutionDirectory,
+        IReadOnlyList<string> Diagnostics);
 
     // Per-closed-generic statics are load-bearing: each ArchRuleTests<TSpec> caches ITS spec's single check
     // run (per-TSpec caching is the whole point of the design), so these must NOT be shared across TSpec.

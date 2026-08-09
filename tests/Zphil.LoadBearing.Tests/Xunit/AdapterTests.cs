@@ -3,6 +3,7 @@ using Xunit;
 using Xunit.Sdk;
 using Zphil.LoadBearing.ArchSpec;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 using Zphil.LoadBearing.Xunit;
@@ -16,6 +17,9 @@ namespace Zphil.LoadBearing.Tests.Xunit;
 ///     inline specs replicate fixture rules verbatim because tests cannot reference the fixture spec
 ///     assemblies by design (<c>ReferenceOutputAssembly=false</c>); their driver classes are non-public, so
 ///     the test runner never discovers them — they are invoked directly.
+///     The last four facts cover the incomplete-model gate against the BrokenApp fixture: a partially-loaded
+///     workspace fails <c>Workspace_LoadedCompletely</c> and skips the rule cases, and
+///     <c>AllowWorkspaceDiagnostics</c> flips that pair over.
 /// </summary>
 [Collection("Serial")]
 public sealed class AdapterTests
@@ -91,6 +95,52 @@ public sealed class AdapterTests
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
         skip.Message.ShouldEndWith(ArchChecker.TripwireSkipReason);
+    }
+
+    [Fact]
+    public async Task PartialWorkspace_FailsTheNamedTestCarryingTheDiagnostics()
+    {
+        // The CLI gate transposed to a test report: check gates and emits no verdict, so the adapter emits no
+        // rule verdicts. The load failures ride the failure inline — a test report has no "warnings above" to
+        // point at — and the opt-out is named, because that is the reader's next question.
+        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppArchTests().Workspace_LoadedCompletely());
+
+        var failure = exception.ShouldBeOfType<FailException>();
+        failure.Message.ShouldContain("BrokenApp.Contracts.csproj");
+        failure.Message.ShouldContain("AllowWorkspaceDiagnostics");
+    }
+
+    [Fact]
+    public async Task PartialWorkspace_SkipsEveryRuleCase()
+    {
+        // The bug this exists to close: a rule whose subject lived in the unloaded project selects nothing, an
+        // empty subject passes, and the run goes green into CI's most-trusted signal. The reason is constant and
+        // points at the named test rather than repeating the diagnostics once per rule.
+        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppArchTests().Rule_Holds(BrokenAppRuleId));
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.ShouldEndWith(IncompleteModelGate.AdapterSkipReason);
+    }
+
+    [Fact]
+    public async Task PartialWorkspace_OptedIn_SkipsTheNamedTestRatherThanPassingFalsely()
+    {
+        // Opting in restores the rule verdicts, but a test called Workspace_LoadedCompletely cannot pass while
+        // the load failures it is named for are real — so it skips, carrying them.
+        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppOptedInArchTests().Workspace_LoadedCompletely());
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.ShouldContain("BrokenApp.Contracts.csproj");
+    }
+
+    [Fact]
+    public async Task PartialWorkspace_OptedIn_ReachesAVerdictOnTheRules()
+    {
+        // The opt-out's whole point: the rule is checked against the partial model as it loaded. Its subject and
+        // target both live in projects that did load, so this is a real verdict, not an empty-subject pass.
+        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppOptedInArchTests().Rule_Holds(BrokenAppRuleId));
+
+        exception.ShouldBeNull();
     }
 
     [Fact]
@@ -186,5 +236,48 @@ public sealed class AdapterTests
         {
             arch.Rule("area/rule").Enforce(arch.Types.MustHavePrefix("I"));
         }
+    }
+
+    private const string BrokenAppRuleId = "layering/core-independent";
+
+    // The fixture whose solution names three projects over a tree that holds two, so the load reports real
+    // failures. Read in place from the test output, as the other drivers here read MyApp: the adapter only ever
+    // reads the tree. BrokenApp.Contracts must stay absent — PartialLoadWorkspaceE2ETests guards that at arrange
+    // time, and the two assertions on "BrokenApp.Contracts.csproj" below go red if the fixture ever heals.
+    private static string BrokenAppSolution =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "PartialLoadSolutions", "BrokenApp", "BrokenApp.sln");
+
+    // One rule spanning the two projects that DO load, so the opted-in run reaches a genuine verdict rather than
+    // the empty-subject pass this whole gate exists to refuse.
+    private class BrokenAppInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            Layer core = arch.Layer("Core", "BrokenApp.Core.*");
+            Layer web = arch.Layer("Web", "BrokenApp.Web.*");
+
+            arch.Rule(BrokenAppRuleId)
+                .Enforce(core.MustNotReference(web))
+                .Because("Core holds the domain; the web host is a delivery detail.")
+                .Fix("Declare an abstraction in Core and implement it in Web.");
+        }
+    }
+
+    // The same spec under a second type purely to close ArchRuleTests<> over a different TSpec: the check run is
+    // cached in a static per closed generic with no reset hook, so one spec type would hand both drivers the
+    // first one's run and the AllowWorkspaceDiagnostics override would never be read.
+    private sealed class BrokenAppOptedInInlineSpec : BrokenAppInlineSpec;
+
+    private sealed class BrokenAppArchTests : ArchRuleTests<BrokenAppInlineSpec>
+    {
+        protected override string SolutionPath => BrokenAppSolution;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    private sealed class BrokenAppOptedInArchTests : ArchRuleTests<BrokenAppOptedInInlineSpec>
+    {
+        protected override string SolutionPath => BrokenAppSolution;
+        protected override string? ExcludeProjectName => null;
+        protected override bool AllowWorkspaceDiagnostics => true;
     }
 }

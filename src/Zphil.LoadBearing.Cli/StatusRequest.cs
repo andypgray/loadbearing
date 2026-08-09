@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Roslyn;
+
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>The parsed inputs for <c>loadbearing status</c> — the burndown report (human or <c>--json</c>).</summary>

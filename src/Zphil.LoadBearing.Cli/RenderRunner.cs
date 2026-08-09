@@ -16,8 +16,13 @@ namespace Zphil.LoadBearing.Cli;
 ///     the byte-level <see cref="ManagedBlockFile" /> adapter and reported as <c>wrote</c>/<c>unchanged</c>
 ///     with a solution-relative path. <c>--diagram &lt;path&gt;</c> adds a second, independent target: the
 ///     codebase graph and the law as two fences, composed by <see cref="DiagramComposer" />, on the same
-///     wrote/unchanged stream. Render is a mutation, not a gate: it always exits 0 on success;
-///     expected failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
+///     wrote/unchanged stream.
+///     Render fails closed on an incomplete model like every verb that consumes it — exit 2 after the
+///     diagnostics and before the first byte hits disk, opt-out <c>--allow-workspace-diagnostics</c> —
+///     because its output is committed context: a card whose project failed to load cannot be placed and
+///     would be dropped from the committed files, and <c>--diagram</c> would draw the survey <c>graph</c>
+///     refuses. On a complete model it exits 0 on success; expected failures surface as
+///     <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
 internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
 {
@@ -31,9 +36,19 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
             solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
-        // render has no gate of its own — it is a mutation, not a verdict — so there is no second list here.
+        // The gate below reads the source's own list, never this composed one: the trailing MSBuild note is
+        // not a load failure, and gating on it would refuse every run.
         var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
+
+        // Fail closed before the first byte hits disk: the files render writes are committed context, and a
+        // partial model composes them wrong — a card whose project failed to load resolves no directory and
+        // is dropped, and --diagram draws the very survey graph refuses to print.
+        if (IncompleteModelGate.Gates(workspace.Diagnostics, request.AllowWorkspaceDiagnostics))
+        {
+            error.WriteLine(IncompleteModelGate.RenderMessage);
+            return 2;
+        }
 
         string specName = Path.GetFileNameWithoutExtension(workspace.Resolution.DllPath);
         string solutionDirectory = workspace.SolutionDirectory;

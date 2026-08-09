@@ -2,6 +2,7 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Tests.Mcp;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -44,6 +45,12 @@ public sealed class PartialLoadWorkspaceE2ETests
         "error: the model is incomplete — one or more projects failed to load (see the warnings above), so no "
         + "baseline was written: a baseline captured from a partial model signs off debt that was never measured. "
         + "Pass --allow-workspace-diagnostics to baseline against the partial model anyway.";
+
+    private const string RenderGateLine =
+        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so nothing "
+        + "was rendered: a card whose project failed to load cannot be placed and would be dropped from the "
+        + "committed files, and --diagram would draw a survey missing whole projects. "
+        + "Pass --allow-workspace-diagnostics to render from the partial model anyway.";
 
     // The message shape of the crash this whole change exists to remove. Asserted absent, never present:
     // a refusal that names a symbol the caller never wrote is the failure, not the fix.
@@ -155,6 +162,75 @@ public sealed class PartialLoadWorkspaceE2ETests
         baseline.Err.ShouldContain(BaselineGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         FilesUnder(workspace).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task Render_PartiallyLoadedWorkspace_RefusesWithoutWritingAnything()
+    {
+        // The other stakes command. What render writes is committed context, and from a partial model it
+        // composes wrong rather than short: a card whose project failed to load resolves no directory and is
+        // dropped. So nothing under the solution root may appear, or change, as a result of this run.
+        using TempFixtureWorkspace workspace = BrokenApp();
+        string[] before = FilesUnder(workspace);
+
+        CliResult render = await CliRunner.InvokeColdAsync(
+            "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
+
+        render.ShouldRefuseWith();
+        render.Err.ShouldContain(RenderGateLine);
+        render.Err.ShouldNotContain(InvariantViolationFragment);
+        render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
+        FilesUnder(workspace).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task Render_PartiallyLoadedWorkspaceWithFlag_WritesTheBlockAndStillWarns()
+    {
+        // The opt-out, and the negative control for "wrote nothing" above: the operator takes the partial
+        // model, the load failures still print, and the root block lands. The tree written to is this
+        // class's own copy, which the next test's arrange resets.
+        using TempFixtureWorkspace workspace = BrokenApp();
+        string rootAgents = Path.Combine(Path.GetDirectoryName(workspace.SolutionPath)!, "AGENTS.md");
+
+        CliResult render = await CliRunner.InvokeColdAsync(
+            "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--allow-workspace-diagnostics");
+
+        render.ShouldSucceed("wrote AGENTS.md");
+        render.Err.ShouldContain("warning: Project file not found:"); // the diagnostics still render
+        render.Err.ShouldNotContain("error: the model is incomplete"); // but the gate did not fire
+        File.Exists(rootAgents).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Context_PartiallyLoadedWorkspace_OpensWithACaveatAndStillAnswers()
+    {
+        // The verb that never gates: context is a lookup an agent runs mid-edit, where a partial answer beats
+        // none. But "no architecture scope covers this path" is exactly the answer a partial load turns into
+        // a false all-clear, so the failures ride the body — stdout is the only channel this verb has (no CLI
+        // twin, no --json). Driven through the runner directly, because there is no CLI verb to invoke.
+        using TempFixtureWorkspace workspace = BrokenApp();
+        string solutionDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
+        var output = new StringWriter();
+
+        int exit = await new ContextRunner(output).RunAsync(
+            new ContextRequest(
+                Path.Combine("BrokenApp.Web", "WidgetController.cs"), workspace.SolutionPath,
+                CliRunner.CleanSpecDll, solutionDirectory),
+            Ct);
+
+        exit.ShouldBe(0); // a lookup, never a gate
+        var answer = output.ToString();
+        answer.ShouldStartWith("caveat: the model is incomplete"); // the caveat opens the body, above the answer
+        answer.ShouldContain("BrokenApp.Contracts.csproj"); // naming what failed, inline: there is no stderr here
+        answer.ShouldContain("MSBuild for this run:");
+        answer.ShouldContain("Restore and build the solution first (dotnet build), then retry for a whole answer.");
+        answer.ShouldNotContain(InvariantViolationFragment);
+
+        // ... and the answer the partial model still supports follows, one blank line below the caveat.
+        string[] lines = answer.Replace("\r\n", "\n").TrimEnd().Split('\n');
+        int pointer = Array.FindIndex(lines, line => line.StartsWith("No architecture scope covers", StringComparison.Ordinal));
+        pointer.ShouldBeGreaterThan(0, answer);
+        lines[pointer - 1].ShouldBeEmpty();
     }
 
     [Fact]

@@ -1,15 +1,16 @@
-using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The one place the CLI writes workspace diagnostics to stderr, shared by the five verbs that render
-///     them — <c>check</c>, <c>status</c>, <c>graph</c>, <c>baseline</c> and <c>render</c>. (<c>explain</c>
-///     is the sixth workspace verb and takes no error writer at all; it renders no diagnostics.)
-///     Diagnostics carry the <c>warning:</c> prefix in human mode and go bare under <c>--json</c>, where
-///     they also ride the document's <c>workspaceDiagnostics</c> array on stdout; stdout purity is why
-///     nothing here ever writes to it.
+///     The one place the CLI writes workspace diagnostics to stderr, shared by the six verbs that render
+///     them there — <c>check</c>, <c>status</c>, <c>graph</c>, <c>baseline</c>, <c>render</c> and
+///     <c>explain</c>. Diagnostics carry the <c>warning:</c> prefix in human mode and go bare under
+///     <c>--json</c>, where they also ride the document's <c>workspaceDiagnostics</c> array on stdout;
+///     stdout purity is why nothing here ever writes to it. <c>context</c> is the deliberate exception to
+///     that rule and so does not route through this class: it has no CLI verb and no <c>--json</c>, its
+///     body is its only channel, and <c>ContextRunner</c> writes its own caveat
+///     (<c>IncompleteModelGate.ContextCaveat</c>) straight to stdout, ahead of its answer.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -47,7 +48,7 @@ internal static class WorkspaceDiagnosticsRenderer
     /// </param>
     internal static IReadOnlyList<string> Compose(IReadOnlyList<string> diagnostics)
     {
-        return diagnostics.Count == 0 ? [] : [.. diagnostics, MsBuildNote()];
+        return diagnostics.Count == 0 ? [] : [.. diagnostics, MsBuildBootstrap.SelectionNote()];
     }
 
     /// <summary>
@@ -68,20 +69,5 @@ internal static class WorkspaceDiagnosticsRenderer
     private static string Line(string text, bool json)
     {
         return json ? text : $"warning: {text}";
-    }
-
-    /// <summary>
-    ///     The MSBuild-selection line <see cref="Compose" /> appends to a non-empty diagnostics list.
-    ///     Internal because the <c>graph</c> refusal carries its diagnostics inside a thrown message rather
-    ///     than through a composed list, and must not lose the one line that says which MSBuild opened the
-    ///     projects that failed.
-    /// </summary>
-    // Reads the selection back through the quarantine's sanctioned boundary type. Null only if nothing
-    // registered MSBuild at all, which for a verb that just opened a workspace is itself worth saying.
-    internal static string MsBuildNote()
-    {
-        string selection = MsBuildBootstrap.LastSelection ?? "not registered by this process";
-        return $"MSBuild for this run: {selection}. Set {LoadBearingEnvVars.VsInstallPath} to a Visual Studio "
-               + "install root (the parent of MSBuild\\Current\\Bin) to select a different MSBuild.";
     }
 }

@@ -301,20 +301,17 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
-    ///     The live oracle for <c>.Authored()</c>'s detection contract (GRAMMAR §5.2). The CLI runs two source
-    ///     generators, and between them they work both arms of the partial-type rule, so the difference between
-    ///     the CLI project noun and the same selection narrowed to authored types is knowable exactly.
-    ///     <c>[GeneratedRegex]</c> carries its attribute on the generated method, so the three types each
-    ///     one emits — plus the single <c>Utilities</c> class they share — show up here while the author's
-    ///     own partial class does not; two of every three are nested and carry no attribute of their own,
-    ///     which is what makes the containing-type walk load-bearing rather than incidental. The
-    ///     <c>_N</c> suffix is the generator's declaration index within the file, so reordering the partial
-    ///     methods in <c>NuGetAuditDiagnostics</c> renumbers them and moves this pin with them. The JSON
-    ///     generator carries its attribute on the generated
-    ///     class instead, and partial declarations merge onto one symbol, so <c>LoadBearingJsonContext</c>
-    ///     lands on the generated side even though its declaration is hand-written. Asserted as an equality
-    ///     rather than a containment, because a contract that quietly took one authored type with it would be
-    ///     a worse failure than one that missed a generated one.
+    ///     The live oracle for <c>.Authored()</c>'s detection contract (GRAMMAR §5.2), so the difference
+    ///     between the CLI project noun and the same selection narrowed to authored types is knowable
+    ///     exactly. The JSON generator carries its attribute on the generated class, and partial
+    ///     declarations merge onto one symbol, so <c>LoadBearingJsonContext</c> lands on the generated side
+    ///     even though its declaration is hand-written — the arm of the partial-type rule this project still
+    ///     works. The other arm, <c>[GeneratedRegex]</c>'s attribute-on-the-generated-method shape, left the
+    ///     CLI with <c>NuGetAuditDiagnostics</c> when the incomplete-model gate moved down to the Roslyn
+    ///     project, and is pinned there by
+    ///     <see cref="RoslynProject_MinusAuthored_IsExactlyTheRegexGeneratorEmittedTypes" />. Asserted as an
+    ///     equality rather than a containment, because a contract that quietly took one authored type with
+    ///     it would be a worse failure than one that missed a generated one.
     /// </summary>
     [Fact]
     public async Task CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes()
@@ -331,21 +328,55 @@ public sealed class SelfSpecTests
         var declared = Names(evaluator.Evaluate(cliProject, SelectionPosition.Subject));
         var authored = Names(evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject));
 
-        declared.Except(authored).ShouldBe(
-        [
-            "System.Text.RegularExpressions.Generated.AuditText_0",
-            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
-            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
-            "System.Text.RegularExpressions.Generated.AuditCode_1",
-            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory",
-            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory.Runner",
-            "System.Text.RegularExpressions.Generated.Utilities",
-            "Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"
-        ], ignoreOrder: true);
+        declared.Except(authored).ShouldBe(["Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"]);
 
         // The synthesized top-level-statements entry point is the nearest thing this project has to a type
         // nobody typed, and no generator emitted it — so it must survive the narrowing.
         authored.ShouldContain("Program");
+    }
+
+    /// <summary>
+    ///     The same contract's other arm, against the same real solution: <c>[GeneratedRegex]</c> carries its
+    ///     attribute on the generated <em>method</em>, so <c>NuGetAuditDiagnostics</c> — the author's own
+    ///     partial class, which the generator completes — stays authored while the three types each regex
+    ///     emits, plus the single <c>Utilities</c> class they share, do not. Two of every three are nested and
+    ///     carry no attribute of their own, which is what makes the containing-type walk load-bearing rather
+    ///     than defensive; the <c>_N</c> suffix is the generator's declaration index within the file, so
+    ///     reordering the partial methods renumbers them and moves this pin with them. It lives here rather
+    ///     than only in <c>GeneratedTypeExtractionTests</c>' synthetic generator because a hand-written
+    ///     generator can only prove the rule as its author understood it, and the shape this arm exists for is
+    ///     one the real toolchain emits.
+    /// </summary>
+    [Fact]
+    public async Task RoslynProject_MinusAuthored_IsExactlyTheRegexGeneratorEmittedTypes()
+    {
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
+            RepoRoot.Solution, TestContext.Current.CancellationToken);
+        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
+            snapshot.Solution, ct: TestContext.Current.CancellationToken);
+
+        var arch = new Arch();
+        Selection roslynProject = arch.Project("Zphil.LoadBearing.Roslyn");
+
+        var evaluator = new SelectionEvaluator(codebase);
+        var declared = Names(evaluator.Evaluate(roslynProject, SelectionPosition.Subject));
+        var authored = Names(evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject));
+
+        declared.Except(authored).ShouldBe(
+        [
+            "System.Text.RegularExpressions.Generated.AuditCode_1",
+            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory",
+            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory.Runner",
+            "System.Text.RegularExpressions.Generated.AuditText_0",
+            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
+            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
+            "System.Text.RegularExpressions.Generated.Utilities"
+        ], ignoreOrder: true);
+
+        // The type the generator completed rather than emitted. Its own declaration is hand-written, the
+        // attribute landed on the method, and the two parts merge onto one symbol — so it must survive the
+        // narrowing, and an equality above is what proves it was not quietly taken along.
+        authored.ShouldContain("Zphil.LoadBearing.Roslyn.NuGetAuditDiagnostics");
     }
 
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
