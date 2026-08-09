@@ -25,6 +25,13 @@ internal sealed class ConstraintEvaluator
     /// <summary>The pinned message on an empty <em>member</em> subject failure (the member analog, GRAMMAR §4.6).</summary>
     internal const string EmptyMemberSubjectMessage = "The subject selection matched no solution-declared members.";
 
+    /// <summary>
+    ///     The pinned warning text every forbidden-set verb raises on an inert target (GRAMMAR §4.1) —
+    ///     one string for the whole family, so a correction to what "inert" means cannot land on some
+    ///     verbs and miss others.
+    /// </summary>
+    private const string InertTargetMessage = "This rule is inert: its target selection matched no types.";
+
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
     private readonly IReadOnlyList<CatchEdge> _catchEdges;
@@ -37,7 +44,21 @@ internal sealed class ConstraintEvaluator
     private readonly SelectionEvaluator _selections;
     private readonly IReadOnlyList<ThrowEdge> _throwEdges;
 
-    internal ConstraintEvaluator(CodebaseModel model)
+    // The per-kind edge indexes, built on first use so a spec that never uses (say) a catch verb never
+    // pays for a catch index. Keyed on the endpoint the SUBJECT set is tested against — Source for the
+    // outbound verbs, Target for the two referenced-by verbs — with the default (reference) comparer,
+    // the same identity HashSet<TypeNode>.Contains used before them. Nodes are unique instances after
+    // the merge conflates same-FQN declarers, so a key is a node, not a name.
+    private ILookup<TypeNode, CatchEdge>? _catchEdgesBySource;
+    private ILookup<TypeNode, ConstructorEdge>? _constructorEdgesBySource;
+    private ILookup<TypeNode, ReferenceEdge>? _edgesBySource;
+    private ILookup<TypeNode, ReferenceEdge>? _edgesByTarget;
+    private ILookup<TypeNode, ExposureEdge>? _exposureEdgesBySource;
+    private ILookup<TypeNode, InjectionEdge>? _injectionEdgesBySource;
+    private ILookup<TypeNode, MemberEdge>? _memberEdgesBySource;
+    private ILookup<TypeNode, ThrowEdge>? _throwEdgesBySource;
+
+    internal ConstraintEvaluator(CodebaseModel model, SelectionEvaluator selections)
     {
         _edges = model.Edges;
         _memberEdges = model.MemberEdges;
@@ -46,9 +67,31 @@ internal sealed class ConstraintEvaluator
         _catchEdges = model.CatchEdges;
         _throwEdges = model.ThrowEdges;
         _exposureEdges = model.ExposureEdges;
-        _selections = new SelectionEvaluator(model);
-        _memberSelections = new MemberSelectionEvaluator(_selections);
+        _selections = selections;
+        _memberSelections = new MemberSelectionEvaluator(selections);
     }
+
+    private ILookup<TypeNode, ReferenceEdge> EdgesBySource => _edgesBySource ??= _edges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, ReferenceEdge> EdgesByTarget => _edgesByTarget ??= _edges.ToLookup(e => e.Target);
+
+    private ILookup<TypeNode, MemberEdge> MemberEdgesBySource =>
+        _memberEdgesBySource ??= _memberEdges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, ConstructorEdge> ConstructorEdgesBySource =>
+        _constructorEdgesBySource ??= _constructorEdges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, InjectionEdge> InjectionEdgesBySource =>
+        _injectionEdgesBySource ??= _injectionEdges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, CatchEdge> CatchEdgesBySource =>
+        _catchEdgesBySource ??= _catchEdges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, ThrowEdge> ThrowEdgesBySource =>
+        _throwEdgesBySource ??= _throwEdges.ToLookup(e => e.Source);
+
+    private ILookup<TypeNode, ExposureEdge> ExposureEdgesBySource =>
+        _exposureEdgesBySource ??= _exposureEdges.ToLookup(e => e.Source);
 
     /// <summary>
     ///     The pinned message on an empty union <em>operand</em> in subject position (GRAMMAR §9): a typo'd
@@ -64,16 +107,17 @@ internal sealed class ConstraintEvaluator
     {
         // Loud per-operand emptiness for a union subject (GRAMMAR §9), ahead of the member dispatch because
         // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
-        // member-subject paths alike.
-        var emptyOperands = EmptySubjectOperands(constraint.Subject);
+        // member-subject paths alike. The gate hands back the operand sets it evaluated, so the union
+        // subject is folded from them rather than evaluated a second time.
+        var (emptyOperands, unionOperands) = EmptySubjectOperands(constraint.Subject);
         if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
         // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
         // types none of whose members survive the kind filter is the ordinary way to fail empty).
-        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint);
+        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, unionOperands);
 
-        var subjects = _selections.Evaluate(constraint.Subject, SelectionPosition.Subject);
+        var subjects = Subjects(constraint.Subject, unionOperands);
         if (subjects.Count == 0) return (new[] { Violation.EmptySubject(EmptySubjectMessage) }, NoWarnings);
 
         switch (constraint)
@@ -147,29 +191,75 @@ internal sealed class ConstraintEvaluator
         }
     }
 
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
+    /// <summary>
+    ///     The one walk behind every forbidden-set verb (GRAMMAR §4.1, §4.3, §4.5, §4.7, §4.8, §4.9):
+    ///     resolve the operands, keep each candidate edge whose non-subject endpoint is a forbidden
+    ///     operand, mint one violation per survivor from the sites that verb treats as evidence, and — for
+    ///     the arms that warn — raise the inert-target warning. Inert only when the forbidden operand set
+    ///     is empty AND at least one operand is a pattern selection; a bare <c>typeof</c> target absent
+    ///     from the codebase is the win condition, not a warning. <c>requireSites</c> is the refinement
+    ///     the two catch subsets carry: an edge none of whose sites the ban forbids is green, and no
+    ///     printed <c>file:line</c> is ever a site the ban permits.
+    /// </summary>
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenEdge<TEdge>(
+        IEnumerable<TEdge> candidates,
+        IReadOnlyList<Selection> operands,
+        Func<TEdge, TypeNode> operandOf,
+        Func<TEdge, IReadOnlyList<SourceLocation>> sitesOf,
+        Func<TEdge, IReadOnlyList<SourceLocation>, Violation> toViolation,
+        bool requireSites,
+        bool warnInert)
     {
         var operandSet = ResolveOperands(operands);
         var violations = new List<Violation>();
 
-        // Outbound (MustNotReference): edge subject→operand. Inbound (MustNotBeReferencedBy):
-        // edge operand→subject, Source = the referencing type where the edit happens (GRAMMAR §4.3).
-        foreach (ReferenceEdge edge in _edges)
+        foreach (TEdge edge in candidates)
         {
-            bool hit = inbound
-                ? subjects.Contains(edge.Target) && operandSet.Contains(edge.Source)
-                : subjects.Contains(edge.Source) && operandSet.Contains(edge.Target);
-            if (hit) violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+            if (!operandSet.Contains(operandOf(edge))) continue;
+
+            var sites = sitesOf(edge);
+            if (requireSites && sites.Count == 0) continue;
+
+            violations.Add(toViolation(edge, sites));
         }
 
-        // Inert only when the forbidden operand set is empty AND at least one operand is a pattern
-        // selection; a bare typeof target absent from the codebase is the win condition, not a warning.
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
+        var warnings = warnInert
+                       && violations.Count == 0
+                       && operandSet.Count == 0
+                       && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage) }
             : NoWarnings;
 
         return (violations, warnings);
+    }
+
+    // The candidate edges of one kind for a subject-keyed walk: only those whose keyed endpoint is a
+    // subject, read off the per-kind index rather than by re-walking the whole edge list (the reference
+    // list is the biggest the extractor produces, and every rule paid O(|edges|) for it). Each edge sits
+    // under exactly one key and `subjects` is a set, so no edge is yielded twice. Walk order becomes the
+    // subject set's rather than the model's, which is unobservable: ArchChecker re-sorts every violation
+    // list on (source, target, member) before it reaches a report, and edges are unique per endpoint
+    // pair, so no tie-break rides on the walk.
+    private static IEnumerable<TEdge> Keyed<TEdge>(HashSet<TypeNode> subjects, ILookup<TypeNode, TEdge> index)
+    {
+        return subjects.SelectMany(subject => index[subject]);
+    }
+
+    /// <summary>
+    ///     The reference verbs (GRAMMAR §4.3). Outbound (<c>MustNotReference</c>): edge subject→operand.
+    ///     Inbound (<c>MustNotBeReferencedBy</c>): edge operand→subject, so the walk keys on the target
+    ///     while the violation still names <c>Source</c> — the referencing type, where the edit happens.
+    /// </summary>
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
+        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
+    {
+        return inbound
+            ? ForbiddenEdge(
+                Keyed(subjects, EdgesByTarget), operands, e => e.Source, e => e.Sites,
+                (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true)
+            : ForbiddenEdge(
+                Keyed(subjects, EdgesBySource), operands, e => e.Target, e => e.Sites,
+                (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true);
     }
 
     // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
@@ -190,8 +280,8 @@ internal sealed class ConstraintEvaluator
         }
 
         var violations = new List<Violation>();
-        foreach (MemberEdge edge in _memberEdges)
-            if (subjects.Contains(edge.Source) && banned.Contains((edge.Member.ContainingType.FullName, edge.Member.Name)))
+        foreach (MemberEdge edge in Keyed(subjects, MemberEdgesBySource))
+            if (banned.Contains((edge.Member.ContainingType.FullName, edge.Member.Name)))
                 violations.Add(Violation.MemberUse(edge.Source, edge.Member, edge.Sites));
 
         // MustNotUse never warns: member targets are concrete (type, name) anchors (no pattern form), so a banned member
@@ -199,175 +289,138 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings);
     }
 
-    // The construction verb (GRAMMAR §4.5, §5.3): a construction edge is a hit when its source is a subject
-    // AND the constructed type is a forbidden operand — the "you may use it; you may not create it" ban.
-    // Extraction already collapses every `new` of one type into one (source, constructed) edge with its sites
-    // aggregated, so one edge yields one Construction violation keyed on the type pair (overload-indifferent,
-    // §4.3). Inert-target warning semantics mirror ForbiddenReference exactly: a forbidden set that resolves
-    // empty from a pattern operand can never fire, so it is loudly flagged inert (a bare typeof absent from
-    // the codebase is the win condition, not a warning).
+    /// <summary>
+    ///     The construction verb (GRAMMAR §4.5, §5.3): a construction edge is a hit when its source is a
+    ///     subject AND the constructed type is a forbidden operand — the "you may use it; you may not
+    ///     create it" ban. Extraction already collapses every <c>new</c> of one type into one (source,
+    ///     constructed) edge with its sites aggregated, so one edge yields one Construction violation
+    ///     keyed on the type pair (overload-indifferent, §4.3). Inert-target warning semantics mirror
+    ///     ForbiddenReference exactly: a forbidden set that resolves empty from a pattern operand can
+    ///     never fire, so it is loudly flagged inert (a bare <c>typeof</c> absent from the codebase is the
+    ///     win condition, not a warning).
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenConstruction(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (ConstructorEdge edge in _constructorEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Constructed))
-                violations.Add(Violation.Construction(edge.Source, edge.Constructed, edge.Sites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, ConstructorEdgesBySource), operands, e => e.Constructed, e => e.Sites,
+            (e, sites) => Violation.Construction(e.Source, e.Constructed, sites), requireSites: false, warnInert: true);
     }
 
-    // The injection verb (GRAMMAR §4.7, §5.3): an injection edge is a hit when its source is a subject AND the
-    // injected parameter type is a forbidden operand — the captive-dependency ban. Extraction already collapses
-    // every constructor parameter typed on one injected type into one (source, injected) edge with its sites
-    // aggregated, so one edge yields one Injection violation keyed on the type pair (constructor-overload- and
-    // parameter-name-indifferent, §4.3). Unlike ForbiddenConstruction, MustNotInject NEVER warns: its natural
-    // operand is a Registered selection (§4.7), and an empty Registered operand means no such registrations
-    // exist — the win condition, exactly like a bare typeof target (GRAMMAR §4.1). So there is no inert-target
-    // arm here; an empty operand set is silence, not a warning.
+    /// <summary>
+    ///     The injection verb (GRAMMAR §4.7, §5.3): an injection edge is a hit when its source is a
+    ///     subject AND the injected parameter type is a forbidden operand — the captive-dependency ban.
+    ///     Extraction already collapses every constructor parameter typed on one injected type into one
+    ///     (source, injected) edge with its sites aggregated, so one edge yields one Injection violation
+    ///     keyed on the type pair (constructor-overload- and parameter-name-indifferent, §4.3). Unlike
+    ///     ForbiddenConstruction, <c>MustNotInject</c> NEVER warns — hence <c>warnInert: false</c>: its
+    ///     natural operand is a Registered selection (§4.7), and an empty Registered operand means no such
+    ///     registrations exist — the win condition, exactly like a bare <c>typeof</c> target (GRAMMAR
+    ///     §4.1). An empty operand set is silence, not a warning.
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenInjection(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (InjectionEdge edge in _injectionEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Injected))
-                violations.Add(Violation.Injection(edge.Source, edge.Injected, edge.Sites));
-
-        return (violations, NoWarnings);
+        return ForbiddenEdge(
+            Keyed(subjects, InjectionEdgesBySource), operands, e => e.Injected, e => e.Sites,
+            (e, sites) => Violation.Injection(e.Source, e.Injected, sites), requireSites: false, warnInert: false);
     }
 
-    // The catch verb (GRAMMAR §4.8, §5.3): a catch edge is a hit when its source is a subject AND the caught
-    // type is a forbidden operand — the "you may throw it; you may not swallow it" ban. Matching is exact
-    // definition-level FQN on the operand set (the shared HashSet<TypeNode> membership): MustNotCatch(
-    // typeof(Exception)) flags only `catch (System.Exception)` and bare-catch edges (a bare catch already
-    // synthesized System.Exception at extraction), never a narrower `catch (IOException)`. Inert-target warning
-    // semantics mirror ForbiddenConstruction exactly: a forbidden set that resolves empty from a pattern operand
-    // can never fire, so it is loudly flagged inert (a bare typeof absent from the codebase is the win condition,
-    // not a warning).
+    /// <summary>
+    ///     The catch verb (GRAMMAR §4.8, §5.3): a catch edge is a hit when its source is a subject AND the
+    ///     caught type is a forbidden operand — the "you may throw it; you may not swallow it" ban.
+    ///     Matching is exact definition-level FQN on the operand set (the family's shared node
+    ///     membership): <c>MustNotCatch(typeof(Exception))</c> flags only <c>catch (System.Exception)</c>
+    ///     and bare-catch edges (a bare catch already synthesized System.Exception at extraction), never a
+    ///     narrower <c>catch (IOException)</c>. Inert-target warning semantics mirror ForbiddenConstruction
+    ///     exactly: a forbidden set that resolves empty from a pattern operand can never fire, so it is
+    ///     loudly flagged inert (a bare <c>typeof</c> absent from the codebase is the win condition, not a
+    ///     warning).
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (CatchEdge edge in _catchEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught))
-                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.Sites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.Sites,
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: false, warnInert: true);
     }
 
-    // The filter-aware catch verb (GRAMMAR §4.8, §5.3): the same walk as ForbiddenCatch over the same edges,
-    // decided on the edge's recorded UNFILTERED sites instead of its sites. A matching edge violates iff at
-    // least one of its `catch` clauses spells no `when` filter, and the evidence is exactly those sites — so an
-    // edge every one of whose sites is filtered is GREEN, and no printed file:line is ever a filtered site.
-    // Extraction records the unfiltered subset as its own fact (§4.8), so this arm reads it directly as evidence
-    // rather than subtracting one set from another (the polarity that keeps a same-line collision red-biased).
-    // Identity is untouched — the (source, caught) type pair, the very key ForbiddenCatch's violations carry, so
-    // the unfiltered sites are evidence and never identity (§4.3) and a baseline entry means the same thing under
-    // either catch verb. Matching stays exact definition-level FQN and the inert-target warning is the §4.1
-    // forbidden-set family's, both exactly as ForbiddenCatch.
+    /// <summary>
+    ///     The filter-aware catch verb (GRAMMAR §4.8, §5.3): the same walk as ForbiddenCatch over the same
+    ///     edges, decided on the edge's recorded UNFILTERED sites instead of its sites. A matching edge
+    ///     violates iff at least one of its <c>catch</c> clauses spells no <c>when</c> filter, and the
+    ///     evidence is exactly those sites — so an edge every one of whose sites is filtered is GREEN, and
+    ///     no printed file:line is ever a filtered site. Extraction records the unfiltered subset as its
+    ///     own fact (§4.8), so this arm reads it directly as evidence rather than subtracting one set from
+    ///     another (the polarity that keeps a same-line collision red-biased). Identity is untouched — the
+    ///     (source, caught) type pair, the very key ForbiddenCatch's violations carry, so the unfiltered
+    ///     sites are evidence and never identity (§4.3) and a baseline entry means the same thing under
+    ///     either catch verb. Matching stays exact definition-level FQN and the inert-target warning is the
+    ///     §4.1 forbidden-set family's, both exactly as ForbiddenCatch.
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenUnfilteredCatch(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (CatchEdge edge in _catchEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught) && edge.UnfilteredSites.Count > 0)
-                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.UnfilteredSites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.UnfilteredSites,
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
     }
 
-    // The rethrow-aware catch verb (GRAMMAR §4.8, §5.3): the same walk again over the same edges, decided on the
-    // edge's recorded SWALLOWING sites — the ones that are unfiltered AND do not end in a throw. A matching edge
-    // violates iff at least one of its clauses holds the failure and continues, and the evidence is exactly those
-    // sites, so an edge whose every unfiltered clause rethrows or translates is GREEN and no printed file:line is
-    // ever a rethrowing site. Extraction records this subset as its own fact for the same polarity reason as the
-    // unfiltered subset (§4.8) — read the sites the ban forbids, never a complement. Identity is untouched: the
-    // (source, caught) type pair, so a baseline entry means the same thing under all three catch verbs, the sites
-    // stay evidence (§4.3), and narrowing which sites a violation prints never narrows what it keys. Matching
-    // stays exact definition-level FQN and the inert-target warning is the §4.1 forbidden-set family's.
+    /// <summary>
+    ///     The rethrow-aware catch verb (GRAMMAR §4.8, §5.3): the same walk again over the same edges,
+    ///     decided on the edge's recorded SWALLOWING sites — the ones that are unfiltered AND do not end in
+    ///     a throw. A matching edge violates iff at least one of its clauses holds the failure and
+    ///     continues, and the evidence is exactly those sites, so an edge whose every unfiltered clause
+    ///     rethrows or translates is GREEN and no printed file:line is ever a rethrowing site. Extraction
+    ///     records this subset as its own fact for the same polarity reason as the unfiltered subset
+    ///     (§4.8) — read the sites the ban forbids, never a complement. Identity is untouched: the
+    ///     (source, caught) type pair, so a baseline entry means the same thing under all three catch
+    ///     verbs, the sites stay evidence (§4.3), and narrowing which sites a violation prints never
+    ///     narrows what it keys. Matching stays exact definition-level FQN and the inert-target warning is
+    ///     the §4.1 forbidden-set family's.
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenSwallow(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (CatchEdge edge in _catchEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Caught) && edge.SwallowingSites.Count > 0)
-                violations.Add(Violation.Catch(edge.Source, edge.Caught, edge.SwallowingSites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.SwallowingSites,
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
     }
 
-    // The throw-ban verb (GRAMMAR §4.8, §5.3): the ban polarity beside MustOnlyThrow's strict allow-list — a
-    // throw edge is a hit when its source is a subject AND the thrown type is a forbidden operand, for the case
-    // where the forbidden thrown types are enumerable and the permitted ones are not. Matching is exact
-    // definition-level FQN on the operand set, so a ban on Exception never reaches a derived throw (the narrow
-    // throw is the good state, mirroring the catch verbs). Inert-target warning semantics are the §4.1
-    // forbidden-set family's, exactly as ForbiddenCatch — the point of departure from OnlyThrow, which never
-    // warns because an empty allow-set is loud on its own.
+    /// <summary>
+    ///     The throw-ban verb (GRAMMAR §4.8, §5.3): the ban polarity beside MustOnlyThrow's strict
+    ///     allow-list — a throw edge is a hit when its source is a subject AND the thrown type is a
+    ///     forbidden operand, for the case where the forbidden thrown types are enumerable and the
+    ///     permitted ones are not. Matching is exact definition-level FQN on the operand set, so a ban on
+    ///     Exception never reaches a derived throw (the narrow throw is the good state, mirroring the catch
+    ///     verbs). Inert-target warning semantics are the §4.1 forbidden-set family's, exactly as
+    ///     ForbiddenCatch — the point of departure from OnlyThrow, which never warns because an empty
+    ///     allow-set is loud on its own.
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenThrow(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (ThrowEdge edge in _throwEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Thrown))
-                violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, ThrowEdgesBySource), operands, e => e.Thrown, e => e.Sites,
+            (e, sites) => Violation.Throw(e.Source, e.Thrown, sites), requireSites: false, warnInert: true);
     }
 
-    // The exposure verb (GRAMMAR §4.9, §5.3): an exposure edge is a hit when its source is a subject AND the
-    // exposed type is a forbidden operand — the "you may use it; you may not surface it on your public API" ban.
-    // Matching is exact definition-level FQN on the operand set (the shared HashSet<TypeNode> membership):
-    // MustNotExpose(typeof(DataTable)) flags only a `DataTable` signature position, never a narrower `DataView`
-    // one (no hierarchy-aware matching). Inert-target warning semantics mirror ForbiddenCatch exactly: a forbidden
-    // set that resolves empty from a pattern operand can never fire, so it is loudly flagged inert (a bare typeof
-    // absent from the codebase is the win condition, not a warning).
+    /// <summary>
+    ///     The exposure verb (GRAMMAR §4.9, §5.3): an exposure edge is a hit when its source is a subject
+    ///     AND the exposed type is a forbidden operand — the "you may use it; you may not surface it on
+    ///     your public API" ban. Matching is exact definition-level FQN on the operand set (the family's
+    ///     shared node membership): <c>MustNotExpose(typeof(DataTable))</c> flags only a <c>DataTable</c>
+    ///     signature position, never a narrower <c>DataView</c> one (no hierarchy-aware matching).
+    ///     Inert-target warning semantics mirror ForbiddenCatch exactly: a forbidden set that resolves
+    ///     empty from a pattern operand can never fire, so it is loudly flagged inert (a bare
+    ///     <c>typeof</c> absent from the codebase is the win condition, not a warning).
+    /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
-        var operandSet = ResolveOperands(operands);
-        var violations = new List<Violation>();
-
-        foreach (ExposureEdge edge in _exposureEdges)
-            if (subjects.Contains(edge.Source) && operandSet.Contains(edge.Exposed))
-                violations.Add(Violation.Expose(edge.Source, edge.Exposed, edge.Sites));
-
-        var warnings = violations.Count == 0 && operandSet.Count == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, "This rule is inert: its target selection matched no types.") }
-            : NoWarnings;
-
-        return (violations, warnings);
+        return ForbiddenEdge(
+            Keyed(subjects, ExposureEdgesBySource), operands, e => e.Exposed, e => e.Sites,
+            (e, sites) => Violation.Expose(e.Source, e.Exposed, sites), requireSites: false, warnInert: true);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
@@ -378,8 +431,8 @@ internal sealed class ConstraintEvaluator
 
         // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
         // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
-        foreach (ReferenceEdge edge in _edges)
-            if (subjects.Contains(edge.Source) && !edge.Target.IsExternal && !allowed.Contains(edge.Target))
+        foreach (ReferenceEdge edge in Keyed(subjects, EdgesBySource))
+            if (!edge.Target.IsExternal && !allowed.Contains(edge.Target))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
@@ -393,8 +446,8 @@ internal sealed class ConstraintEvaluator
 
         // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
         // Edge sources are always solution-declared, so no external caveat is needed.
-        foreach (ReferenceEdge edge in _edges)
-            if (subjects.Contains(edge.Target) && !allowed.Contains(edge.Source))
+        foreach (ReferenceEdge edge in Keyed(subjects, EdgesByTarget))
+            if (!allowed.Contains(edge.Source))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
@@ -413,8 +466,8 @@ internal sealed class ConstraintEvaluator
         var allowed = ResolveOperands(allowedThrows);
         var violations = new List<Violation>();
 
-        foreach (ThrowEdge edge in _throwEdges)
-            if (subjects.Contains(edge.Source) && !allowed.Contains(edge.Thrown))
+        foreach (ThrowEdge edge in Keyed(subjects, ThrowEdgesBySource))
+            if (!allowed.Contains(edge.Thrown))
                 violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         return (violations, NoWarnings);
@@ -423,18 +476,36 @@ internal sealed class ConstraintEvaluator
     // Every operand of a union subject must match at least one type (GRAMMAR §9): law must load
     // predictably, so a typo'd project name inside a four-way union fails the rule in its own right
     // instead of being silently absorbed by its siblings. One never-baselinable EmptySubject violation per
-    // empty operand, in operand order; a non-union subject has no operands and passes straight through.
-    // Target position keeps the softer per-rule inert-target warning instead.
-    private IReadOnlyList<Violation> EmptySubjectOperands(Selection subject)
+    // empty operand, in operand order; a non-union subject has no operands and passes straight through
+    // (Operands null, so the caller evaluates the subject the ordinary way). Target position keeps the
+    // softer per-rule inert-target warning instead. The per-operand sets come back with the verdict: they
+    // ARE the union, so returning them is what keeps a union subject from being evaluated twice.
+    private (IReadOnlyList<Violation> Empty, IReadOnlyList<HashSet<TypeNode>>? Operands) EmptySubjectOperands(
+        Selection subject)
     {
-        if (subject is not UnionSelection union) return Array.Empty<Violation>();
+        if (subject is not UnionSelection union) return (Array.Empty<Violation>(), null);
 
+        var operands = new List<HashSet<TypeNode>>(union.Parts.Count);
         var violations = new List<Violation>();
         foreach (Selection operand in union.Parts)
-            if (_selections.Evaluate(operand, SelectionPosition.Subject).Count == 0)
+        {
+            var matched = _selections.Evaluate(operand, SelectionPosition.Subject);
+            operands.Add(matched);
+            if (matched.Count == 0)
                 violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
+        }
 
-        return violations;
+        return (violations, operands);
+    }
+
+    // The subject set, folded from the operand sets the union gate already computed where there is one —
+    // union semantics are exactly "union the operands, then apply the union's own adjectives", and the
+    // operands were evaluated in this same (Subject) position.
+    private HashSet<TypeNode> Subjects(Selection subject, IReadOnlyList<HashSet<TypeNode>>? unionOperands)
+    {
+        return subject is UnionSelection union && unionOperands is not null
+            ? _selections.Unite(union, unionOperands)
+            : _selections.Evaluate(subject, SelectionPosition.Subject);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
@@ -466,9 +537,13 @@ internal sealed class ConstraintEvaluator
     // violation at its own declaration sites, identity keyed on its DocId (§4.6). An empty member subject
     // fails with the member-flavored message (the analog of the empty type subject). Resolution can throw
     // RuleEvaluationException (a closed-generic .Returning anchor); ArchChecker turns that into a RuleError.
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EvaluateMember(MemberConstraint constraint)
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EvaluateMember(
+        MemberConstraint constraint, IReadOnlyList<HashSet<TypeNode>>? unionOperands)
     {
-        var members = _memberSelections.Resolve(constraint.MemberSubject);
+        // MemberConstraint.Subject IS MemberSubject.Source, so the union gate's operand sets are this
+        // member selection's source types — resolved from them rather than evaluated a second time.
+        var sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
+        var members = _memberSelections.Resolve(constraint.MemberSubject, sourceTypes);
         if (members.Count == 0) return (new[] { Violation.EmptySubject(EmptyMemberSubjectMessage) }, NoWarnings);
 
         switch (constraint)

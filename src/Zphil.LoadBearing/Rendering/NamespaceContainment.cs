@@ -31,10 +31,9 @@ internal static class NamespaceContainment
         if (!TryParse(outer, out string outerPrefix, out bool outerSubtree)) return false;
 
         // A subtree covers its own prefix and every descendant of it, so an inner glob is inside it
-        // exactly when the inner prefix is the outer prefix or sits below it.
-        if (outerSubtree)
-            return string.Equals(innerPrefix, outerPrefix, StringComparison.Ordinal)
-                   || innerPrefix.StartsWith(outerPrefix + ".", StringComparison.Ordinal);
+        // exactly when the inner prefix is the outer prefix or sits below it — the matcher's own rule,
+        // asked of it rather than restated here.
+        if (outerSubtree) return NamespacePattern.PrefixCovers(outerPrefix, innerPrefix);
 
         // An exact outer covers one namespace and nothing under it. Only an identical exact inner fits;
         // a subtree inner also covers descendants the exact glob never reaches.
@@ -45,15 +44,7 @@ internal static class NamespaceContainment
     // the caller reports no containment in either direction.
     private static bool TryParse(string glob, out string prefix, out bool subtree)
     {
-        if (glob.EndsWith(".*", StringComparison.Ordinal))
-        {
-            prefix = glob.Substring(0, glob.Length - 2);
-            subtree = true;
-            return prefix.Length > 0 && prefix.IndexOf('*') < 0;
-        }
-
-        prefix = glob;
-        subtree = false;
-        return glob.Length > 0 && glob.IndexOf('*') < 0;
+        subtree = NamespacePattern.TryParseSubtree(glob, out prefix);
+        return prefix.Length > 0 && prefix.IndexOf('*') < 0;
     }
 }

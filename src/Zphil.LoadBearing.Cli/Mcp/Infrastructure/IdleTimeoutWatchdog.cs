@@ -21,8 +21,6 @@ internal static class IdleTimeoutWatchdog
 {
     internal const int DefaultTimeoutMinutes = 30;
 
-    private const string TimeoutVariable = "LOADBEARING_IDLE_TIMEOUT_MINUTES";
-
     private static readonly Lock DrainLock = new();
     private static long s_lastActivityTicks;
     private static int s_inFlightCount;
@@ -99,16 +97,21 @@ internal static class IdleTimeoutWatchdog
     }
 
     /// <summary>
-    ///     Reads <c>LOADBEARING_IDLE_TIMEOUT_MINUTES</c> (or the 30-minute default), then attaches a
-    ///     background watcher that exits the process after that long with no tool activity. Returns
-    ///     silently when the timeout resolves to zero (explicitly disabled via <c>=0</c>).
+    ///     Attaches a background watcher that exits the process after <paramref name="rawTimeoutMinutes" />
+    ///     (or the 30-minute default) with no tool activity. Returns silently when the timeout resolves to
+    ///     zero — the explicit opt-out.
     /// </summary>
-    public static void Start()
+    /// <param name="rawTimeoutMinutes">
+    ///     The unparsed <c>LOADBEARING_IDLE_TIMEOUT_MINUTES</c> value, handed in rather than read here: the
+    ///     caller starts this before the host exists and owns the one env seam, so the watchdog stays a pure
+    ///     function of its inputs.
+    /// </param>
+    public static void Start(string? rawTimeoutMinutes)
     {
         // A 30-second poll against a timeout measured in minutes: the cost of overshooting the deadline by
         // up to one interval is a leaked idle process for half a minute, so the wake-ups stay cheap.
         Start(
-            ParseTimeoutMinutes(Environment.GetEnvironmentVariable(TimeoutVariable)),
+            ParseTimeoutMinutes(rawTimeoutMinutes),
             TimeSpan.FromSeconds(30),
             Stopwatch.GetTimestamp,
             () => ServerShutdown.ExitWith("idle timeout"));

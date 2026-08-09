@@ -18,7 +18,10 @@ public static class HumanReportRenderer
     /// <summary>Renders the whole report (every rule block plus the summary line) to <paramref name="output" />.</summary>
     public static void Render(TextWriter output, CheckReport report, string solutionDirectory)
     {
-        foreach (RuleResult result in report.Results) RenderRule(output, result, solutionDirectory);
+        // One relativizer for the whole report: the solution directory is the same string for every site,
+        // and a migration report on a legacy codebase renders tens of thousands of them.
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        foreach (RuleResult result in report.Results) RenderRule(output, result, relativizer);
 
         output.WriteLine();
         output.WriteLine(
@@ -34,11 +37,11 @@ public static class HumanReportRenderer
     public static string RuleBlock(RuleResult result, string solutionDirectory)
     {
         var writer = new StringWriter { NewLine = "\n" };
-        RenderRule(writer, result, solutionDirectory);
+        RenderRule(writer, result, new PathFormat.Relativizer(solutionDirectory));
         return writer.ToString().TrimEnd('\n');
     }
 
-    private static void RenderRule(TextWriter output, RuleResult result, string solutionDirectory)
+    private static void RenderRule(TextWriter output, RuleResult result, PathFormat.Relativizer relativizer)
     {
         string header = result.Rule.Sentence.Length > 0
             ? $"{Marker(result)} {result.Rule.Id} — {result.Rule.Sentence}"
@@ -55,7 +58,7 @@ public static class HumanReportRenderer
         {
             output.WriteLine($"  because: {result.Rule.Because}");
             if (result.Rule.Fix is { } fix) output.WriteLine($"  fix: {fix}");
-            foreach (string line in ViolationLines(result, solutionDirectory)) output.WriteLine($"  {line}");
+            foreach (string line in ViolationLines(result, relativizer)) output.WriteLine($"  {line}");
         }
 
         if (result.Rule.BaselinePath is not null) RenderRatchetLines(output, result);
@@ -76,7 +79,7 @@ public static class HumanReportRenderer
                 "  hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
     }
 
-    private static IEnumerable<string> ViolationLines(RuleResult result, string solutionDirectory)
+    private static IEnumerable<string> ViolationLines(RuleResult result, PathFormat.Relativizer relativizer)
     {
         var located = new List<(string Path, int Line, string Text)>();
         var unlocated = new List<string>();
@@ -84,54 +87,27 @@ public static class HumanReportRenderer
         foreach (Violation violation in result.Violations)
             switch (violation.Kind)
             {
-                case ViolationKind.Reference:
+                // The seven edge kinds place identically — one line per reference site — so they share the
+                // loop and differ only in the verb EdgeText picks.
+                case ViolationKind.Reference or ViolationKind.MemberUse or ViolationKind.Construction
+                    or ViolationKind.Injection or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose:
+                    string edgeText = EdgeText(violation);
                     foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} references {violation.Target!.FullName}"));
-                    break;
-                case ViolationKind.MemberUse:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} uses {MemberDisplay(violation.Member!)}"));
-                    break;
-                case ViolationKind.Construction:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} constructs {violation.Target!.FullName}"));
-                    break;
-                case ViolationKind.Injection:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} injects {violation.Target!.FullName}"));
-                    break;
-                case ViolationKind.Catch:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} catches {violation.Target!.FullName}"));
-                    break;
-                case ViolationKind.Throw:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} throws {violation.Target!.FullName}"));
-                    break;
-                case ViolationKind.Expose:
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((PathFormat.Relative(solutionDirectory, site.FilePath), site.Line,
-                            $"{violation.Source!.FullName} exposes {violation.Target!.FullName}"));
+                        located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
                     break;
                 case ViolationKind.Shape:
                     SourceLocation? first = violation.Subject!.DeclarationSites.FirstOrDefault();
                     if (first is not null)
-                        located.Add((PathFormat.Relative(solutionDirectory, first.FilePath), first.Line, violation.Subject.FullName));
+                        located.Add((relativizer.Relative(first.FilePath), first.Line, violation.Subject.FullName));
                     else
                         unlocated.Add(violation.Subject.FullName);
                     break;
                 case ViolationKind.MemberShape:
                     MemberNode member = violation.SubjectMember!;
                     SourceLocation? at = member.DeclarationSites.FirstOrDefault();
-                    string memberLine = MemberSubjectDisplay(member);
+                    string memberLine = MemberText(((TypeNode)member.DeclaringType).FullName, member.Name, member.Kind);
                     if (at is not null)
-                        located.Add((PathFormat.Relative(solutionDirectory, at.FilePath), at.Line, memberLine));
+                        located.Add((relativizer.Relative(at.FilePath), at.Line, memberLine));
                     else
                         unlocated.Add(memberLine);
                     break;
@@ -152,20 +128,31 @@ public static class HumanReportRenderer
             yield return $"{path}:{line} — {text}";
     }
 
-    // The banned member the source used, as declaring-type-dot-member, with () appended iff a method
-    // (never a signature) — the human analog of the §6 prose form, over the extracted MemberReference.
-    private static string MemberDisplay(MemberReference member)
+    // What each of the seven edge kinds says, with placement left to the shared site loop. The
+    // cross-renderer twin of this switch in SarifReportRenderer is a house convention (each renderer
+    // formats independently); the seven copies of the loop it replaced here were not.
+    private static string EdgeText(Violation violation)
     {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
+        return violation.Kind switch
+        {
+            ViolationKind.Reference => $"{violation.Source!.FullName} references {violation.Target!.FullName}",
+            ViolationKind.MemberUse => $"{violation.Source!.FullName} uses {MemberText(violation.Member!.ContainingType.FullName, violation.Member.Name, violation.Member.Kind)}",
+            ViolationKind.Construction => $"{violation.Source!.FullName} constructs {violation.Target!.FullName}",
+            ViolationKind.Injection => $"{violation.Source!.FullName} injects {violation.Target!.FullName}",
+            ViolationKind.Catch => $"{violation.Source!.FullName} catches {violation.Target!.FullName}",
+            ViolationKind.Throw => $"{violation.Source!.FullName} throws {violation.Target!.FullName}",
+            ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
+            _ => string.Empty
+        };
     }
 
-    // The offending member subject, in the same declaring-type-dot-member, () iff a method convention
-    // (GRAMMAR §4.6, §6) — over an inventoried MemberNode (its DeclaringType is the owning TypeNode).
-    private static string MemberSubjectDisplay(MemberNode member)
+    // Declaring-type-dot-member, with () appended iff a method (never a signature) — the human analog of
+    // the §6 prose form (GRAMMAR §4.6, §6). One helper for both member shapes: the banned MemberReference
+    // a source used, and the offending inventoried MemberNode whose DeclaringType is its owning TypeNode.
+    private static string MemberText(string containingFullName, string name, MemberKind kind)
     {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
+        string suffix = kind == MemberKind.Method ? "()" : string.Empty;
+        return $"{containingFullName}.{name}{suffix}";
     }
 
     private static string Marker(RuleResult result)

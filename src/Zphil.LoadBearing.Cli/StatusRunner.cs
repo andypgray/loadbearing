@@ -21,24 +21,12 @@ internal sealed class StatusRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
 {
-    private readonly IEnvironment environment = environment ?? new SystemEnvironment();
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
-    // ReSharper disable UnusedAutoPropertyAccessor.Global — observables kept symmetric across the three cache-wired runners
-    /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
-    internal CodebaseSourceOutcome? LastOutcome { get; private set; }
-
-    /// <summary>The projects the last run re-extracted from a workspace. Internal test observable; never printed.</summary>
-    internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = new HashSet<string>();
-
-    // ReSharper restore UnusedAutoPropertyAccessor.Global
-
     public async Task<int> RunAsync(StatusRequest request, CancellationToken ct)
     {
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            solutionSource, environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
+            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
         // status carries no --rules flag: a burndown of part of the spec would read as progress on all of
         // it. The empty selection — every rule — is spelled out so both callers of the shared pipeline
@@ -46,17 +34,16 @@ internal sealed class StatusRunner(
         var rules = CheckPipeline.SelectRules(source.Model, []);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, null, rules, ct);
-        LastOutcome = source.Outcome;
-        LastReExtractedProjects = source.ReExtractedProjects;
+        RecordCacheOutcome(source);
 
         // Composed once and handed to both surfaces, so the MSBuild-selection note rides the burndown
-        // document as well as stderr. The gate below reads source.Diagnostics — never this list, whose extra
-        // line is informational and would mark every run incomplete.
-        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(source.Diagnostics);
+        // document as well as stderr.
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
-        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
+        bool modelIncomplete = diagnostics.IsIncomplete;
 
         if (request.Json)
             StatusJsonRenderer.Render(
@@ -66,7 +53,7 @@ internal sealed class StatusRunner(
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);
 
-        if (IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics))
+        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
             error.WriteLine(IncompleteModelGate.StatusMessage);
             return 2;

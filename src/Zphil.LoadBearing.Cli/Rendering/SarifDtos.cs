@@ -46,8 +46,11 @@ internal sealed record SarifReportingDescriptor(
 /// <summary>A rule's default configuration — its severity <c>level</c>.</summary>
 internal sealed record SarifReportingConfiguration(string Level);
 
-/// <summary>A rule's LoadBearing-specific property bag — currently just its posture.</summary>
-internal sealed record SarifRuleProperties(string Posture);
+/// <summary>
+///     A rule's LoadBearing-specific property bag — currently just its posture, the model's own enum cased
+///     for the wire by <see cref="LoadBearingJson.Options" /> exactly as <c>check --json</c> cases it.
+/// </summary>
+internal sealed record SarifRuleProperties(Posture Posture);
 
 /// <summary>One result — a single violation site. <see cref="Suppressions" /> is null (omitted) on red.</summary>
 internal sealed record SarifResult(

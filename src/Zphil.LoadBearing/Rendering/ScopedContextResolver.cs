@@ -21,24 +21,26 @@ public static class ScopedContextResolver
         Guard.NotNull(model, nameof(model));
         Guard.NotNull(codebase, nameof(codebase));
 
-        var evaluator = new SelectionEvaluator(codebase);
+        return Resolve(model, new SelectionEvaluator(codebase));
+    }
+
+    // The shared-evaluator entry point, the twin of LayerContextResolver's: the composer resolves both
+    // emission keys for one codebase, and one evaluator serves both rather than each materializing the
+    // solution-declared type list for itself.
+    internal static IReadOnlyList<ScopePlacement> Resolve(ArchitectureModel model, SelectionEvaluator evaluator)
+    {
         var placements = new List<ScopePlacement>();
 
         foreach (ArchRule rule in model.Rules)
         {
             if (rule.Quarantine is not { Role: QuarantineRole.Containment, Quarantined: { } quarantined } quarantine) continue;
 
-            var sites = evaluator.Evaluate(quarantined, SelectionPosition.Subject)
-                .Where(type => !type.IsExternal)
-                .SelectMany(type => type.DeclarationSites)
-                .Select(site => site.FilePath)
-                .Distinct()
-                .ToList();
+            string? directory = DirectoryPlacement.ResolveDirectory(evaluator, quarantined);
 
-            placements.Add(sites.Count == 0
+            placements.Add(directory is null
                 ? new ScopePlacement(quarantine.ScopeId, rule, null,
                     $"scope '{quarantine.ScopeId}' matched no types; no scoped context emitted")
-                : new ScopePlacement(quarantine.ScopeId, rule, DirectoryPlacement.DeepestCommonDirectory(sites), null));
+                : new ScopePlacement(quarantine.ScopeId, rule, directory, null));
         }
 
         return placements;

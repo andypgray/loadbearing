@@ -17,7 +17,7 @@ internal sealed class SolutionHandle(
     string solutionPath,
     IReadOnlyList<string> diagnostics,
     IDisposable? owned,
-    Func<CancellationToken, Task<SessionFragmentSet>>? warmFragments = null) : IDisposable
+    Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null) : IDisposable
 {
     /// <summary>The loaded, unresolved-reference-stripped solution the command reads.</summary>
     public Solution Solution { get; } = solution;
@@ -29,13 +29,17 @@ internal sealed class SolutionHandle(
     public IReadOnlyList<string> Diagnostics { get; } = diagnostics;
 
     /// <summary>
-    ///     The warm path's incremental fragment extractor, or null on the cold/one-shot path. When present
-    ///     (the warm MCP source), the extraction seam calls it instead of re-walking the whole
-    ///     solution: it captures this call's snapshot plus the session's <see cref="SessionFragmentStore" />,
-    ///     so it reuses clean projects' fragments and re-extracts only the dirty ∪ dependent set. Null falls
-    ///     straight through to today's full <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.
+    ///     The warm path's incremental codebase producer, or null on the cold/one-shot path. When present
+    ///     (the warm MCP source), the extraction seam calls it instead of re-walking the whole solution: it
+    ///     captures this call's snapshot plus the session's <see cref="SessionFragmentStore" />, so it reuses
+    ///     clean projects' fragments, re-extracts only the dirty ∪ dependent set, and hands back the merged
+    ///     model — memoized, so a call that re-walked nothing re-merges nothing either. It takes the caller's
+    ///     excluded project names because the exclusion is applied at merge time, which is what lets one
+    ///     store serve every tool whatever each drops. Null falls straight through to today's full
+    ///     <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.
     /// </summary>
-    public Func<CancellationToken, Task<SessionFragmentSet>>? WarmFragments { get; } = warmFragments;
+    public Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? WarmCodebase { get; } =
+        warmCodebase;
 
     /// <summary>Disposes the owned workspace on the cold path; a no-op when the source owns nothing.</summary>
     public void Dispose()

@@ -6,6 +6,7 @@ using ModelContextProtocol.Protocol;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Mcp.Prompts;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
@@ -23,12 +24,6 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 /// </summary>
 internal static class McpServerCommand
 {
-    // Set LOADBEARING_DISABLE_WARM_WORKSPACE=true to fall back to the cold one-shot source (following the
-    // LOADBEARING_DISABLE_PARENT_WATCH precedent for opting out of an MCP-lifetime behaviour). Read through
-    // the IEnvironment seam, never System.Environment, so the env-through-seam ratchet stays green and the
-    // test harness can drive both paths without touching real process state.
-    internal const string DisableWarmWorkspaceVariable = "LOADBEARING_DISABLE_WARM_WORKSPACE";
-
     public static async Task<int> RunAsync(McpServerBinding binding, TextWriter error, CancellationToken ct)
     {
         if (!Console.IsInputRedirected)
@@ -43,21 +38,29 @@ internal static class McpServerCommand
         // no argument to be wrong about. See ResolveBoundSolution for why the two halves differ.
         string? bindingFailure = ResolveBoundSolution(binding);
 
+        // The one env seam, built here because the logger and both watchdogs are configured from process
+        // state before there is a host to inject it from. Each of them then takes its value as an argument
+        // rather than reading at the leaf, so the reads that shape a server's lifetime all happen on this
+        // one line of the startup path.
+        var environment = new SystemEnvironment();
+
         // A real MCP client launched us over piped stdio. Bring up the file logger and crash handlers
         // before host building so a catastrophic startup failure still lands in the post-mortem log.
-        SerilogConfiguration.InitializeFileLogger();
+        SerilogConfiguration.InitializeFileLogger(
+            environment.GetVariable(LoadBearingEnvVars.LogLevel),
+            environment.GetVariable(LoadBearingEnvVars.ClaudeCodeSessionId));
         SerilogConfiguration.RegisterCrashHandlers();
 
         // Watchers first, so they cover the whole lifetime including MSBuild registration.
-        ParentProcessWatcher.Start();
-        IdleTimeoutWatchdog.Start();
+        ParentProcessWatcher.Start(IsTrue(environment, LoadBearingEnvVars.DisableParentWatch));
+        IdleTimeoutWatchdog.Start(environment.GetVariable(LoadBearingEnvVars.IdleTimeoutMinutes));
 
         EnsureMsBuildRegistered();
 
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         builder.AddSerilogLogging();
 
-        builder.Services.AddSingleton<IEnvironment, SystemEnvironment>();
+        builder.Services.AddSingleton<IEnvironment>(environment);
         builder.Services.AddSingleton(binding);
         AddWorkspaceSolutionSource(builder.Services);
 
@@ -85,11 +88,14 @@ internal static class McpServerCommand
     ///     Registers the warm-workspace services shared by the production server and the in-process test
     ///     harness, so the two compose the same graph: the long-lived <see cref="WorkspaceSession" /> (its
     ///     reconcile log routed to the host logger), the session-scoped <see cref="SessionFragmentStore" />
-    ///     that reuses clean projects' fragments across tool calls, and the
+    ///     that reuses clean projects' fragments across tool calls, the <see cref="SpecModelCache" /> that
+    ///     does the same for the spec's model, and the
     ///     <see cref="ISolutionSource" /> the tools acquire the solution through. The source is warm by
     ///     default — one session reconciled per call across the server's lifetime, one store paired with it —
-    ///     unless <see cref="DisableWarmWorkspaceVariable" /> is <c>true</c>, which resolves the cold one-shot
-    ///     <see cref="ColdSolutionSource" /> instead. The warm branch registers the session's disposer with
+    ///     unless <see cref="LoadBearingEnvVars.DisableWarmWorkspace" /> is <c>true</c>, which resolves the
+    ///     cold one-shot <see cref="ColdSolutionSource" /> instead. Read through the
+    ///     <see cref="IEnvironment" /> seam, never <c>System.Environment</c>, so the test harness can drive
+    ///     both paths without touching real process state. The warm branch registers the session's disposer with
     ///     <see cref="ServerShutdown" /> lazily, from inside the factory, so a run that never builds a warm
     ///     source wires no disposer.
     /// </summary>
@@ -105,22 +111,28 @@ internal static class McpServerCommand
         // resolve it; it is only ever populated when the warm source is built and a tool call runs.
         services.AddSingleton(_ => new SessionFragmentStore());
 
+        // The spec side of the same lifetime: one cache of loaded spec models for the server, stamped
+        // against the DLLs they came from. Registered unconditionally for the same reason as the store.
+        services.AddSingleton(_ => new SpecModelCache());
+
         services.AddSingleton<ISolutionSource>(provider =>
         {
             var environment = provider.GetRequiredService<IEnvironment>();
-            if (WarmWorkspaceDisabled(environment)) return new ColdSolutionSource();
+            if (IsTrue(environment, LoadBearingEnvVars.DisableWarmWorkspace)) return new ColdSolutionSource();
 
             var session = provider.GetRequiredService<WorkspaceSession>();
             var store = provider.GetRequiredService<SessionFragmentStore>();
+            var specs = provider.GetRequiredService<SpecModelCache>();
             ServerShutdown.RegisterDisposer(session.DisposeAsync);
-            return new WarmSolutionSource(session, store);
+            return new WarmSolutionSource(session, store, specs);
         });
     }
 
-    private static bool WarmWorkspaceDisabled(IEnvironment environment)
+    // The spelling every LOADBEARING_* opt-out takes: the literal "true", case-insensitively, and nothing
+    // else — so a value nobody meant as a flag leaves the behaviour on.
+    private static bool IsTrue(IEnvironment environment, string variable)
     {
-        return string.Equals(
-            environment.GetVariable(DisableWarmWorkspaceVariable), "true", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(environment.GetVariable(variable), "true", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

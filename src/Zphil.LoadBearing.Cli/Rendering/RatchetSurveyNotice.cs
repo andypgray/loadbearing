@@ -27,20 +27,15 @@ internal static class RatchetSurveyNotice
         if (unratcheted.Count == 0) return lines;
 
         int violationCount = unratcheted.Sum(r => r.Violations.Count);
-        string ruleVerb = unratcheted.Count == 1 ? "is" : "are";
+        string ruleVerb = Plurals.Verb(unratcheted.Count);
         lines.Add(
-            $"{unratcheted.Count} {Plural(unratcheted.Count, "rule")} {ruleVerb} failing with no baseline to capture " +
-            $"({violationCount} {Plural(violationCount, "violation")}):");
+            $"{unratcheted.Count} {Plurals.Noun(unratcheted.Count, "rule")} {ruleVerb} failing with no baseline to capture " +
+            $"({violationCount} {Plurals.Noun(violationCount, "violation")}):");
         foreach (RuleResult result in unratcheted)
-            lines.Add($"  {result.Rule.Id} — {result.Violations.Count} {Plural(result.Violations.Count, "violation")}");
+            lines.Add($"  {result.Rule.Id} — {result.Violations.Count} {Plurals.Noun(result.Violations.Count, "violation")}");
         lines.Add(
             "Enforce carries no baseline, so 'check' stays red on these until each is fixed at the source — " +
             "in the code, in the rule, or by re-posturing the debt as Migrate or Quarantine.");
         return lines;
-    }
-
-    private static string Plural(int count, string noun)
-    {
-        return count == 1 ? noun : noun + "s";
     }
 }

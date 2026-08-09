@@ -1,4 +1,4 @@
-using Zphil.LoadBearing.Roslyn.MsBuild;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -13,47 +13,17 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     (<c>IncompleteModelGate.ContextCaveat</c>) straight to stdout, ahead of its answer.
 /// </summary>
 /// <remarks>
-///     <para>
-///         When — and only when — there is at least one diagnostic, one further line names the MSBuild the
-///         run registered and the environment variable that overrides it. A project that fails to load is
-///         nearly always a question about which MSBuild opened it, and until this line existed the answer
-///         was unobtainable: the selection was described in four places in
-///         <see cref="MsBuildBootstrap" /> and printed in none, so the failure arrived as a bare exit code.
-///         Quiet runs stay quiet — the note is diagnostic context, not a banner.
-///     </para>
-///     <para>
-///         <b>The note rides the composed list, not the write.</b> <see cref="Compose" /> appends it once,
-///         and callers hand that one list to <em>both</em> renderers — stderr and the JSON document. That is
-///         what makes it reachable from MCP, where the tools pass <see cref="TextWriter.Null" /> as the
-///         error writer: the note was the single line the MCP surface lost, and it now arrives inside
-///         <c>workspaceDiagnostics</c> like everything else. Appending at write time reached stderr only.
-///     </para>
-///     <para>
-///         The note is <em>not</em> a workspace diagnostic. It never enters
-///         <see cref="CodebaseSource.Diagnostics" />, which is the fail-closed gate's input: an
-///         informational line there would flip <c>check</c>'s exit code to 2 on every run. Callers therefore
-///         gate on the source's own list and render the composed one — two visibly different variables in
-///         the same method.
-///     </para>
+///     What gets written is <see cref="WorkspaceDiagnostics.Rendered" /> (or, for <c>check</c>,
+///     <see cref="WorkspaceDiagnostics.RenderedWithMergeNotes" />) — composed once by the caller and handed
+///     to <em>both</em> surfaces, stderr and the JSON document, so the MSBuild-selection note reaches the
+///     MCP tools, which pass <see cref="TextWriter.Null" /> here. This class therefore only echoes: it never
+///     appends, and never sees the load failures the gate keys on.
 /// </remarks>
 internal static class WorkspaceDiagnosticsRenderer
 {
     /// <summary>
-    ///     The list both surfaces read: <paramref name="diagnostics" /> with the MSBuild selection note
-    ///     appended, or empty for an empty input — a clean run says nothing about MSBuild anywhere.
-    /// </summary>
-    /// <param name="diagnostics">
-    ///     The workspace-load diagnostics (and, for <c>check</c>, the merge notes). Never the fail-closed
-    ///     gate's input: pass the source's own list there, not this one.
-    /// </param>
-    internal static IReadOnlyList<string> Compose(IReadOnlyList<string> diagnostics)
-    {
-        return diagnostics.Count == 0 ? [] : [.. diagnostics, MsBuildBootstrap.SelectionNote()];
-    }
-
-    /// <summary>
     ///     Writes <paramref name="diagnostics" /> to <paramref name="error" />, one line each. A no-op for
-    ///     an empty list. Callers pass a <see cref="Compose" />d list, so the MSBuild note is already in it.
+    ///     an empty list.
     /// </summary>
     /// <param name="error">The stderr writer; never stdout.</param>
     /// <param name="diagnostics">The composed diagnostics to echo.</param>

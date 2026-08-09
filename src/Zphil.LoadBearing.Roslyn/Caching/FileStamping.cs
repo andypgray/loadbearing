@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
@@ -68,18 +69,29 @@ internal static class FileStamping
 
     /// <summary>
     ///     Lowercase-hex SHA-256 of the file's bytes, or null when it is unreadable — an I/O failure degrades, never
-    ///     throws.
+    ///     throws. Streamed, because this runs over every source document in the solution on a cold run.
     /// </summary>
     internal static string? TryHashFile(string path)
     {
         try
         {
-            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+            using FileStream stream = File.OpenRead(path);
+            return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    ///     Lowercase-hex SHA-256 of <paramref name="value" />'s UTF-8 bytes — the same digest format as
+    ///     <see cref="TryHashFile" />, beside it so the four decisions the two share (algorithm, encoding, hex
+    ///     case, no separator) stay one decision. Both cache stores key their on-disk identity on it.
+    /// </summary>
+    internal static string HashText(string value)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
 
     /// <summary>

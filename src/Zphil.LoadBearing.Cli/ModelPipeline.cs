@@ -6,12 +6,13 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The spec→model prefix shared by every workspace command (check, render, and explain's
-///     convention/csproj path): discover the solution → load the workspace → resolve the spec →
-///     ALC-load and validate the model. Factored out of <c>CheckRunner</c> so all three commands share
-///     one staleness contract and one quarantine story. explain's DLL fast path skips the workspace
-///     entirely via <see cref="SpecResolver.TryResolveWithoutSolution" /> and only calls
-///     <see cref="LoadModel" />.
+///     The two spec→model primitives every workspace command needs: <see cref="DiscoverSolution" /> (which
+///     solution a run is about) and <see cref="LoadModel" /> (the ALC-loaded, validated model behind a spec
+///     DLL). <see cref="CodebaseSource" /> composes them into the one acquisition ladder — discover, acquire
+///     the workspace, resolve the spec, load the model — so both live here rather than in it: solution
+///     discovery is also what each <see cref="ISolutionSource" /> performs, and <c>explain</c>'s DLL fast path
+///     reaches <see cref="LoadModel" /> alone, with no workspace at all
+///     (<see cref="SpecResolver.TryResolveWithoutSolution" />).
 /// </summary>
 internal static class ModelPipeline
 {
@@ -38,39 +39,6 @@ internal static class ModelPipeline
         {
             throw new UserErrorException(ex.Message, ex);
         }
-    }
-
-    /// <summary>
-    ///     Runs the whole workspace prefix over an <see cref="ISolutionSource" /> and returns a disposable
-    ///     bundle the caller <c>using</c>s. On any failure after the solution is acquired, the handle is
-    ///     disposed before the exception propagates, so a partial run never leaks a BuildHost (a no-op when
-    ///     a warm source owns nothing).
-    /// </summary>
-    public static async Task<WorkspaceModel> LoadWithWorkspaceAsync(
-        ISolutionSource source, string? solution, string? spec, string workingDirectory, CancellationToken ct)
-    {
-        SolutionHandle handle = await source.AcquireAsync(solution, workingDirectory, ct);
-        try
-        {
-            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, handle.SolutionPath, spec);
-            ArchitectureModel model = LoadModel(resolution.DllPath);
-            return new WorkspaceModel(handle, model, resolution);
-        }
-        catch
-        {
-            handle.Dispose();
-            throw;
-        }
-    }
-
-    /// <summary>
-    ///     The cold-source convenience overload: the CLI/adapter lifetime, where each call opens and owns a
-    ///     fresh one-shot workspace. Equivalent to passing a <see cref="ColdSolutionSource" />.
-    /// </summary>
-    public static Task<WorkspaceModel> LoadWithWorkspaceAsync(
-        string? solution, string? spec, string workingDirectory, CancellationToken ct)
-    {
-        return LoadWithWorkspaceAsync(new ColdSolutionSource(), solution, spec, workingDirectory, ct);
     }
 
     /// <summary>

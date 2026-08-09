@@ -27,13 +27,17 @@ internal static class JsonReportRenderer
         bool modelIncomplete,
         IReadOnlyList<string> rulesFilter)
     {
+        // One relativizer for the whole document: the base directory is the same string for every site,
+        // and normalizing plus splitting it is the constant half of the walk.
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+
         var document = new CheckJson(
             3,
             solutionName,
             specAssembly,
             diffBase,
             rulesFilter.Count > 0 ? rulesFilter : null,
-            report.Results.Select(r => ToRule(r, solutionDirectory)).ToList(),
+            report.Results.Select(r => ToRule(r, relativizer)).ToList(),
             workspaceDiagnostics,
             modelIncomplete ? true : null,
             new SummaryJson(
@@ -43,19 +47,19 @@ internal static class JsonReportRenderer
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson));
     }
 
-    private static RuleJson ToRule(RuleResult result, string solutionDirectory)
+    private static RuleJson ToRule(RuleResult result, PathFormat.Relativizer relativizer)
     {
         return new RuleJson(
             result.Rule.Id,
-            Camel(result.Rule.Posture.ToString()),
-            Camel(result.Status.ToString()),
+            result.Rule.Posture,
+            result.Status,
             result.Rule.Sentence,
             result.Rule.Because,
             result.Rule.Fix,
             result.SkipReason,
             ToBaseline(result),
-            result.Violations.Select(v => ToViolation(v, solutionDirectory)).ToList(),
-            result.Warnings.Select(w => new WarningJson(Camel(w.Kind.ToString()), w.Message)).ToList());
+            result.Violations.Select(v => ToViolation(v, relativizer)).ToList(),
+            result.Warnings.Select(w => new WarningJson(w.Kind, w.Message)).ToList());
     }
 
     // The baseline block is present for any ratcheted rule (Migrate or Quarantine containment); the model's
@@ -71,21 +75,16 @@ internal static class JsonReportRenderer
     // symbol ID in targetMember; a memberShape violation carries the offending member's raw symbol ID in
     // subjectMember (Subject/Target stay null). Every slot is null-omitted, so a report from a spec with
     // no member rule carries neither key.
-    private static ViolationJson ToViolation(Violation violation, string solutionDirectory)
+    private static ViolationJson ToViolation(Violation violation, PathFormat.Relativizer relativizer)
     {
         return new ViolationJson(
-            Camel(violation.Kind.ToString()),
+            violation.Kind,
             violation.Source?.FullName,
             violation.Target?.FullName,
             violation.Member?.SymbolId,
             violation.Subject?.FullName,
             violation.SubjectMember?.SymbolId,
             violation.Detail,
-            violation.Sites.Select(s => new SiteJson(PathFormat.Relative(solutionDirectory, s.FilePath), s.Line)).ToList());
-    }
-
-    private static string Camel(string name)
-    {
-        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
+            violation.Sites.Select(s => new SiteJson(relativizer.Relative(s.FilePath), s.Line)).ToList());
     }
 }

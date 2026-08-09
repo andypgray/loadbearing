@@ -25,51 +25,46 @@ namespace Zphil.LoadBearing.Cli;
 ///     <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
 internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
+    : WorkspaceRunner(source)
 {
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
     public async Task<int> RunAsync(RenderRequest request, CancellationToken ct)
     {
         ValidateDiagramOptions(request);
 
-        using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+        using var source = await CodebaseSource.CreateWithSpecAsync(
+            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
-        // The gate below reads the source's own list, never this composed one: the trailing MSBuild note is
-        // not a load failure, and gating on it would refuse every run.
-        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
-        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        WorkspaceDiagnosticsRenderer.Render(error, diagnostics.Rendered);
 
         // Fail closed before the first byte hits disk: the files render writes are committed context, and a
         // partial model composes them wrong — a card whose project failed to load resolves no directory and
         // is dropped, and --diagram draws the very survey graph refuses to print.
-        if (IncompleteModelGate.Gates(workspace.Diagnostics, request.AllowWorkspaceDiagnostics))
+        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
             error.WriteLine(IncompleteModelGate.RenderMessage);
             return 2;
         }
 
-        string specName = Path.GetFileNameWithoutExtension(workspace.Resolution.DllPath);
-        string solutionDirectory = workspace.SolutionDirectory;
+        string specName = Path.GetFileNameWithoutExtension(source.Resolution.DllPath);
+        string solutionDirectory = source.SolutionDirectory;
 
         // Extraction only earns its cost when there is something scoped to place — a quarantined scope, or a
         // layer carrying anchored rules; with nothing scoped the composer gets no codebase and returns the
         // root block alone.
-        bool anyQuarantine = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Quarantine);
-        CodebaseModel? codebase = anyQuarantine || LayerContextResolver.HasAnchoredLayers(workspace.Model)
-            ? await CodebaseExtractor.ExtractFromSolutionAsync(
-                workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct)
+        CodebaseModel? codebase = ContextFileComposer.HasAnythingToPlace(source.Model)
+            ? await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct)
             : null;
 
         ContextComposition composition = ContextFileComposer.Compose(
-            workspace.Model, codebase, solutionDirectory, specName);
+            source.Model, codebase, solutionDirectory, specName);
 
         foreach (string warning in composition.Warnings) error.WriteLine($"warning: {warning}");
 
         WriteFiles(composition.Files, solutionDirectory);
 
-        if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, workspace, specName, diagramPath, ct);
+        if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, source, specName, diagramPath, ct);
 
         return 0;
     }
@@ -90,16 +85,15 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
     // summary shape; the second extraction is the cost, and only when --diagram and scoped cards coincide.
     // The law fence beside it costs nothing extra — it is pure over the model already in hand.
     private async Task WriteDiagramAsync(
-        RenderRequest request, WorkspaceModel workspace, string specName, string diagramPath, CancellationToken ct)
+        RenderRequest request, CodebaseSource source, string specName, string diagramPath, CancellationToken ct)
     {
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(workspace.Solution, [], ct);
+        CodebaseModel codebase = await source.ExtractAsync([], ct);
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string body = DiagramComposer.Compose(
-            summary, Path.GetFileName(workspace.SolutionPath), workspace.Model, specName, DiagramScopeFrom(request));
+            summary, Path.GetFileName(source.SolutionPath), source.Model, specName, DiagramScopeFrom(request));
 
         WriteOutcome outcome = ManagedBlockFile.Splice(diagramPath, body);
-        string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";
-        output.WriteLine($"{label} {PathFormat.Relative(workspace.SolutionDirectory, diagramPath)}");
+        output.WriteLine(WriteReport.Line(outcome, source.SolutionDirectory, diagramPath));
     }
 
     private static DiagramScope DiagramScopeFrom(RenderRequest request)
@@ -114,8 +108,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         foreach (ContextFile file in files)
         {
             WriteOutcome outcome = ManagedBlockFile.Splice(file.Path, file.Body);
-            string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";
-            output.WriteLine($"{label} {PathFormat.Relative(solutionDirectory, file.Path)}");
+            output.WriteLine(WriteReport.Line(outcome, solutionDirectory, file.Path));
         }
     }
 }

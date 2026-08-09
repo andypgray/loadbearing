@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -57,11 +55,8 @@ internal static class CacheLocations
     {
         string root = string.IsNullOrWhiteSpace(cacheRootOverride) ? DefaultCacheRoot() : cacheRootOverride;
         string canonical = PathCanonicalizer.Resolve(solutionPath);
-        string identityKey = PathComparison.Comparison == StringComparison.OrdinalIgnoreCase
-            ? canonical.ToLowerInvariant()
-            : canonical;
-
-        string hashHex = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identityKey))).ToLowerInvariant();
+        string identityKey = PathComparison.Fold(canonical);
+        string hashHex = FileStamping.HashText(identityKey);
         string name = Path.GetFileNameWithoutExtension(canonical);
         return Path.Combine(root, $"{name}-{hashHex[..PathHashHexLength]}");
     }

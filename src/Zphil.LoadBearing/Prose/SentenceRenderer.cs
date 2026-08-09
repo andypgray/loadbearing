@@ -118,26 +118,8 @@ internal static class SentenceRenderer
         // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
         // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
         // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
-        string head = headOverride ?? noun.SubjectHead;
-        string headPrefix = headPrefixOverride ?? string.Empty;
-        var inline = string.Empty;
-        var subjectFinal = string.Empty;
-        foreach (SelectionAdjective adjective in adjectives)
-            switch (adjective.Placement)
-            {
-                case AdjectivePlacement.Head:
-                    head = adjective.Fragment;
-                    break;
-                case AdjectivePlacement.HeadPrefix:
-                    headPrefix = adjective.Fragment;
-                    break;
-                case AdjectivePlacement.Inline:
-                    inline += adjective.Fragment;
-                    break;
-                case AdjectivePlacement.SubjectFinal:
-                    subjectFinal += adjective.Fragment;
-                    break;
-            }
+        (string? head, string? headPrefix, string inline, string subjectFinal) =
+            Placements(adjectives, headOverride ?? noun.SubjectHead, headPrefixOverride ?? string.Empty);
 
         return headPrefix + head + noun.Locative + inline + subjectFinal;
     }
@@ -166,8 +148,27 @@ internal static class SentenceRenderer
         var adjectives = union.Adjectives;
         if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
-        string? head = headOverride;
-        string? headPrefix = headPrefixOverride;
+        (string? head, string? headPrefix, string inline, string subjectFinal) =
+            Placements(adjectives, headOverride, headPrefixOverride);
+
+        var nouns = CollapsibleNouns(union);
+        if (nouns is not null)
+            return (headPrefix ?? string.Empty) + (head ?? nouns[0].SubjectHead)
+                                                + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
+
+        var parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
+        return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
+    }
+
+    // Where each adjective lands (GRAMMAR §5.2), accumulated in authoring order: Head and HeadPrefix
+    // substitute, Inline and SubjectFinal concatenate. The caller supplies the seeds — Phrase its noun's
+    // head and an empty prefix, UnionPhrase the union's nullable overrides — so the two types-voice
+    // assemblies cannot disagree about a placement, and a fifth AdjectivePlacement is one edit rather than
+    // two silently-diverging ones. MemberPhrase keeps its own variant: its HeadPrefix arm concatenates
+    // rather than substitutes, which is a documented divergence and not a copy.
+    private static (string? Head, string? HeadPrefix, string Inline, string SubjectFinal) Placements(
+        IReadOnlyList<SelectionAdjective> adjectives, string? head, string? headPrefix)
+    {
         var inline = string.Empty;
         var subjectFinal = string.Empty;
         foreach (SelectionAdjective adjective in adjectives)
@@ -187,13 +188,7 @@ internal static class SentenceRenderer
                     break;
             }
 
-        var nouns = CollapsibleNouns(union);
-        if (nouns is not null)
-            return (headPrefix ?? string.Empty) + (head ?? nouns[0].SubjectHead)
-                                                + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
-
-        var parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
-        return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
+        return (head, headPrefix, inline, subjectFinal);
     }
 
     // The operand nouns of a union that collapses to one head and locative, or null when it does not

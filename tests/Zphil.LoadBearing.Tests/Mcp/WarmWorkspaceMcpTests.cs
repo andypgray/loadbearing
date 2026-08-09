@@ -390,7 +390,7 @@ public sealed class WarmWorkspaceMcpTests
 
         // Act — flip the disable flag on the fake environment, then resolve the composed source. The factory
         // reads the flag lazily on first resolve, so setting it before this resolve selects the cold path.
-        harness.Environment.SetVariable(McpServerCommand.DisableWarmWorkspaceVariable, "true");
+        harness.Environment.SetVariable(LoadBearingEnvVars.DisableWarmWorkspace, "true");
         var source = harness.Services.GetRequiredService<ISolutionSource>();
 
         // Assert

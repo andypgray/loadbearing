@@ -3,6 +3,7 @@ using ModelContextProtocol.Server;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 
@@ -73,22 +74,13 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         var output = new StringWriter();
         // Exit code and error writer deliberately discarded — everything they would carry is in the document.
         // Violations ride in rules[]; the load failures ride in workspaceDiagnostics, and so does the
-        // MSBuild-selection note, which WorkspaceDiagnosticsRenderer.Compose puts in the list both surfaces
-        // read rather than appending it at write time (it was the one line TextWriter.Null used to swallow,
-        // and "which MSBuild opened it" is the next question after any load failure). The gate verdict the
-        // exit code would have expressed rides in modelIncomplete, so a client learns the answer was reached
-        // against a partial model without needing an exit code this surface does not have.
-        // AllowWorkspaceDiagnostics true says exactly that: the document reports the incompleteness rather
-        // than the run refusing to produce one. NoCache: the warm workspace and the persisted cache keep
-        // independent lifetimes — a tool call never reads or writes the cache file. Binlog null: the warm
-        // path never uses the build capture (latency-critical callers ride the session). The rules globs go
-        // in raw, so the same parse and the same unmatched-filter refusal serve both surfaces — here as an
-        // error result rather than exit 2.
+        // MSBuild-selection note, which WorkspaceDiagnostics puts in the list both surfaces read rather than
+        // appending it at write time (it was the one line TextWriter.Null used to swallow, and "which MSBuild
+        // opened it" is the next question after any load failure). The gate verdict the exit code would have
+        // expressed rides in modelIncomplete, and an unmatched --rules filter surfaces as an error result
+        // rather than exit 2.
         await new CheckRunner(output, TextWriter.Null, source).RunAsync(
-            new CheckRequest(
-                binding.Solution, binding.Spec, true, diffBase, binding.WorkingDirectory, true, null, true, null,
-                rules),
-            cancellationToken);
+            binding.CheckRequest(diffBase, rules), cancellationToken);
         return output.ToString();
     }
 
@@ -103,12 +95,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        // Binlog null: the warm path never uses the build capture. AllowWorkspaceDiagnostics true for the same
-        // reason as arch_check: the burndown document now carries workspaceDiagnostics and modelIncomplete, so
-        // the incompleteness reaches the client as data rather than as an exit code this surface discards.
         await new StatusRunner(output, TextWriter.Null, source).RunAsync(
-            new StatusRequest(binding.Solution, binding.Spec, true, binding.WorkingDirectory, true, null, true),
-            cancellationToken);
+            binding.StatusRequest(), cancellationToken);
         return output.ToString();
     }
 
@@ -129,7 +117,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // Error writer deliberately discarded: explain's answer is spec-derived and cannot be made wrong by
         // a load failure; the caveat channel for a partial model is arch_context's body, not this tool's.
         await new ExplainRunner(output, TextWriter.Null, source).RunAsync(
-            new ExplainRequest(ruleId, binding.Solution, binding.Spec, binding.WorkingDirectory), cancellationToken);
+            binding.ExplainRequest(ruleId), cancellationToken);
         return output.ToString();
     }
 
@@ -147,8 +135,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        await new ContextRunner(output, source).RunAsync(
-            new ContextRequest(path, binding.Solution, binding.Spec, binding.WorkingDirectory), cancellationToken);
+        await new ContextRunner(output, source).RunAsync(binding.ContextRequest(path), cancellationToken);
         return output.ToString();
     }
 
@@ -182,11 +169,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
-        // binding.Spec is deliberately unused: the survey is a property of the codebase, and derive runs
-        // before any spec exists (a spec project would appear here as an ordinary project). Binlog null: the
-        // warm path never uses the build capture. Unlike arch_check and arch_status, the incomplete-model
-        // verdict cannot ride this document by default — graph refuses before there is one — so the refusal
-        // throws and GlobalCallToolFilter returns it as a clean un-logged error result.
+        // Unlike arch_check and arch_status, the incomplete-model verdict cannot ride this document by
+        // default — graph refuses before there is one — so the refusal throws and GlobalCallToolFilter
+        // returns it as a clean un-logged error result.
         //
         // The response budget is this surface's alone: over it, the runner walks down the grain ladder until a
         // whole document fits instead of handing the truncator one to cut in half. One extraction, and the
@@ -194,9 +179,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // trust the grain stamp rather than diffing two surveys. The cap is the truncator's, so degrading
         // fires against exactly the number that would otherwise have truncated.
         await new GraphRunner(output, TextWriter.Null, source).RunAsync(
-            new GraphRequest(
-                binding.Solution, true, binding.WorkingDirectory, true, null, allowWorkspaceDiagnostics,
-                Grain(overview, skeleton), projects, ResponseBudget()),
+            binding.GraphRequest(allowWorkspaceDiagnostics, Grain(overview, skeleton), projects, ResponseBudget()),
             cancellationToken);
         return output.ToString();
     }
@@ -212,6 +195,6 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
 
     private int ResponseBudget()
     {
-        return ResponseTruncator.ComputeMaxChars(environment.GetVariable(ResponseTruncator.MaxOutputTokensVariable));
+        return ResponseTruncator.ComputeMaxChars(environment.GetVariable(LoadBearingEnvVars.MaxMcpOutputTokens));
     }
 }

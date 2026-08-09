@@ -5,57 +5,53 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The <c>arch_context</c> pipeline (the MCP <c>arch_context</c> tool's core): load the model → if no
-///     quarantined scope and no anchored layer exist, emit the pointer line and stop (no extraction —
-///     <see cref="RenderRunner" />'s cost gate) → otherwise extract, resolve each layer's and each quarantined
-///     scope's directory placement, and write the covering cards (layer card(s) before quarantine card(s)) for
-///     every placement whose resolved directory contains the query path. No placement covers the path ⇒ the
-///     same pinned pointer line. Always exits 0 — context is a lookup, never a gate. The card body carries
-///     no provenance line (that is a <c>render</c> file-splice concern).
+///     The <c>arch_context</c> pipeline (the MCP <c>arch_context</c> tool's core): load the model → if
+///     nothing is scoped to place, emit the pointer line and stop (no extraction — the cost gate
+///     <see cref="RenderRunner" /> consults too) → otherwise extract, ask
+///     <see cref="ContextFileComposer.Placements" /> for the cards <c>render</c> would splice, and write the
+///     ones whose resolved directory contains the query path (layer card(s) before quarantine card(s)). No
+///     card covers the path ⇒ the same pinned pointer line. Always exits 0 — context is a lookup, never a
+///     gate. The card body carries no provenance line (that is a <c>render</c> file-splice concern).
 ///     An incomplete model never gates here — but it is announced: the answer opens with a caveat block
 ///     naming the load failures, because a card whose project failed to load places nowhere and the pinned
 ///     pointer line would otherwise read as a clean "not dragon territory".
 /// </summary>
-internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null)
+internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null) : WorkspaceRunner(source)
 {
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
-        using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+        using var source = await CodebaseSource.CreateWithSpecAsync(
+            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         // Ahead of every exit below, because each of them can be the false all-clear: the body is context's
         // only channel, so the load failures ride it or reach nobody.
-        if (IncompleteModelGate.IsIncomplete(workspace.Diagnostics))
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        if (diagnostics.IsIncomplete)
         {
-            foreach (string line in IncompleteModelGate.ContextCaveat(workspace.Diagnostics).Split('\n'))
+            foreach (string line in IncompleteModelGate.ContextCaveat(diagnostics).Split('\n'))
                 output.WriteLine(line);
             output.WriteLine();
         }
 
         // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost
         // and point at the root block.
-        bool anyQuarantine = workspace.Model.Rules.Any(rule => rule.Posture == Posture.Quarantine);
-        if (!anyQuarantine && !LayerContextResolver.HasAnchoredLayers(workspace.Model))
+        if (!ContextFileComposer.HasAnythingToPlace(source.Model))
         {
             output.WriteLine(PointerLine(request.Path));
             return 0;
         }
 
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
+        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
 
-        string queryFullPath = ResolveQueryPath(request.Path, workspace.SolutionDirectory);
+        string queryFullPath = ResolveQueryPath(request.Path, source.SolutionDirectory);
 
-        // Layer local-rules card(s) first, then quarantined-scope card(s) — the same order render merges them.
-        var cards = new List<string>();
-        cards.AddRange(LayerContextResolver.Resolve(workspace.Model, codebase)
-            .Where(placement => placement.DirectoryPath is not null && Covers(placement.DirectoryPath, queryFullPath))
-            .Select(placement => AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules)));
-        cards.AddRange(ScopedContextResolver.Resolve(workspace.Model, codebase)
-            .Where(placement => placement.DirectoryPath is not null && Covers(placement.DirectoryPath, queryFullPath))
-            .Select(placement => AgentContextRenderer.ScopeCard(placement.ContainmentRule)));
+        // The composer's own placements, filtered to the ones covering the query path: layer local-rules
+        // card(s) ahead of quarantined-scope card(s), the same cards in the same order render splices. An
+        // unplaceable card carries a null directory and so covers nothing, which is the drop it always was.
+        var cards = ContextFileComposer.Placements(source.Model, codebase)
+            .Where(card => card.DirectoryPath is not null && PathFormat.Contains(card.DirectoryPath, queryFullPath))
+            .Select(card => card.Body)
+            .ToList();
 
         if (cards.Count == 0)
         {
@@ -90,30 +86,6 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
             ? Path.GetFullPath(path)
             : Path.GetFullPath(Path.Combine(solutionDirectory, path));
         return PathCanonicalizer.Resolve(full);
-    }
-
-    // True when the scope's resolved directory equals or is an ancestor of the query path — i.e. the
-    // directory's full-path segments are a prefix of the query's, compared with the per-OS rule.
-    private static bool Covers(string directoryPath, string queryFullPath)
-    {
-        string[] dirSegments = Segments(Path.GetFullPath(directoryPath));
-        string[] querySegments = Segments(queryFullPath);
-        if (dirSegments.Length > querySegments.Length) return false;
-
-        for (var i = 0; i < dirSegments.Length; i++)
-            if (!string.Equals(dirSegments[i], querySegments[i], PathComparison.Comparison))
-                return false;
-
-        return true;
-    }
-
-    private static string[] Segments(string fullPath)
-    {
-        string[] parts = fullPath.Split('/', '\\');
-        int end = parts.Length;
-        while (end > 0 && parts[end - 1].Length == 0) end--;
-
-        return end == parts.Length ? parts : parts.Take(end).ToArray();
     }
 
     private static string PointerLine(string path)

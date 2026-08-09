@@ -47,6 +47,22 @@ internal static class FragmentMerger
         return new MergeState().Run(fragments);
     }
 
+    /// <summary>
+    ///     The merge inputs a caller keeps: <paramref name="fragments" /> minus
+    ///     <paramref name="excludeProjectNames" /> (its spec project and the private plumbing only that
+    ///     references, or nothing for the spec-less survey). Dropping a project here is byte-identical to
+    ///     never extracting it — a referenced-but-dropped project survives as an external node — which is
+    ///     what lets one fragment set serve every caller whatever each excludes.
+    /// </summary>
+    internal static List<CodebaseFragment> Retain(
+        IReadOnlyList<CodebaseFragment> fragments, IReadOnlyCollection<string> excludeProjectNames)
+    {
+        if (excludeProjectNames.Count == 0) return fragments.ToList();
+
+        var excluded = new HashSet<string>(excludeProjectNames, StringComparer.Ordinal);
+        return fragments.Where(f => !excluded.Contains(f.ProjectName)).ToList();
+    }
+
     private sealed class MergeState
     {
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
@@ -90,7 +106,7 @@ internal static class FragmentMerger
             // Edge site-sets union per (src, tgt).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentEdge edge in fragment.Edges)
-                MergeEdge(edge);
+                MergeSimpleEdge(edge.SourceFullName, edge.TargetFullName, _edgeSites, edge.Sites);
 
             // Member-use edges (GRAMMAR §4.5) key on (src, member SymbolId) rather than a type pair, and the
             // self-drop is therefore a same-type guard; one shared MemberReference per distinct SymbolId.
@@ -107,12 +123,14 @@ internal static class FragmentMerger
             // Construction edges (GRAMMAR §4.5) key on (src, constructed).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
-                MergeConstructorEdge(constructorEdge);
+                MergeSimpleEdge(
+                    constructorEdge.SourceFullName, constructorEdge.ConstructedFullName, _constructorEdgeSites, constructorEdge.Sites);
 
             // Injection edges (GRAMMAR §4.7) key on (src, injected).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
-                MergeInjectionEdge(injectionEdge);
+                MergeSimpleEdge(
+                    injectionEdge.SourceFullName, injectionEdge.InjectedFullName, _injectionEdgeSites, injectionEdge.Sites);
 
             // Registration facts (GRAMMAR §4.7) are the one axis with no node resolution: they key on
             // (lifetime, service, impl?) string-side, because registration is many-to-many and membership is
@@ -131,12 +149,13 @@ internal static class FragmentMerger
             // Throw edges (GRAMMAR §4.8) key on (src, thrown).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
-                MergeThrowEdge(throwEdge);
+                MergeSimpleEdge(throwEdge.SourceFullName, throwEdge.ThrownFullName, _throwEdgeSites, throwEdge.Sites);
 
             // Exposure edges (GRAMMAR §4.9) key on (src, exposed).
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
-                MergeExposureEdge(exposureEdge);
+                MergeSimpleEdge(
+                    exposureEdge.SourceFullName, exposureEdge.ExposedFullName, _exposureEdgeSites, exposureEdge.Sites);
 
             return Materialize(fragments);
         }
@@ -154,7 +173,7 @@ internal static class FragmentMerger
                 NoteConflationIfCrossProject(fqn, projectName);
             }
 
-            var sites = DeclarationSites(fqn);
+            var sites = FragmentSiteSets.For(_declarationSites, fqn);
             foreach (FragmentSite site in declared.DeclarationSites) sites.Add(site);
         }
 
@@ -254,14 +273,24 @@ internal static class FragmentMerger
                 facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList());
         }
 
-        private void MergeEdge(FragmentEdge edge)
+        // The one edge merge, stated once for every axis that keys on an endpoint pair: the ordinal self-edge
+        // guard (extraction already dropped these, so it is defensive), ResolveNode on BOTH endpoints — the
+        // rule that keeps an external endpoint one shared node however many fragments referenced it — and the
+        // site union. Returns false for the dropped self-edge, so an axis carrying parallel subsets (catch)
+        // gates them on the same guard rather than restating it.
+        private bool MergeSimpleEdge(
+            string source,
+            string target,
+            Dictionary<(string, string), SortedSet<FragmentSite>> map,
+            IReadOnlyList<FragmentSite> sites)
         {
-            if (string.Equals(edge.SourceFullName, edge.TargetFullName, StringComparison.Ordinal)) return; // self-edge
+            if (string.Equals(source, target, StringComparison.Ordinal)) return false;
 
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.TargetFullName);
-            var sites = EdgeSites((edge.SourceFullName, edge.TargetFullName));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+            ResolveNode(source);
+            ResolveNode(target);
+            var merged = FragmentSiteSets.For(map, (source, target));
+            foreach (FragmentSite site in sites) merged.Add(site);
+            return true;
         }
 
         private void MergeMemberEdge(FragmentMemberEdge edge)
@@ -275,74 +304,24 @@ internal static class FragmentMerger
             // Member facts are functions of the SymbolId, so the first mention wins and every later one agrees.
             _memberFacts.TryAdd(edge.MemberSymbolId, new MemberEdgeFacts(edge.TargetContainingTypeFullName, edge.MemberName, edge.MemberKind));
 
-            var sites = MemberEdgeSites((edge.SourceFullName, edge.MemberSymbolId));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
-        }
-
-        private void MergeConstructorEdge(FragmentConstructorEdge edge)
-        {
-            // Self-construction guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.ConstructedFullName, StringComparison.Ordinal)) return;
-
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.ConstructedFullName);
-            var sites = ConstructorEdgeSites((edge.SourceFullName, edge.ConstructedFullName));
+            var sites = FragmentSiteSets.For(_memberEdgeSites, (edge.SourceFullName, edge.MemberSymbolId));
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
         private void MergeCatchEdge(FragmentCatchEdge edge)
         {
-            // Self-catch guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.CaughtFullName, StringComparison.Ordinal)) return;
-
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.CaughtFullName);
-            var sites = CatchEdgeSites((edge.SourceFullName, edge.CaughtFullName));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
+            if (!MergeSimpleEdge(edge.SourceFullName, edge.CaughtFullName, _catchEdgeSites, edge.Sites)) return;
 
             // The unfiltered subset unions under the same key and the same guard. Unioning the UNFILTERED sites
             // is what keeps a `#if`-divergent filter honest: a (file, line) filtered in one fragment and
             // unfiltered in another reads unfiltered here, the truthful answer for a ban.
-            var unfilteredSites = CatchEdgeUnfilteredSites((edge.SourceFullName, edge.CaughtFullName));
+            var unfilteredSites = FragmentSiteSets.For(_catchEdgeUnfilteredSites, (edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.UnfilteredSites) unfilteredSites.Add(site);
 
             // The swallowing subset unions the same way, and for the same reason: a (file, line) that rethrows
             // in one fragment and swallows in another reads swallowing here.
-            var swallowingSites = CatchEdgeSwallowingSites((edge.SourceFullName, edge.CaughtFullName));
+            var swallowingSites = FragmentSiteSets.For(_catchEdgeSwallowingSites, (edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.SwallowingSites) swallowingSites.Add(site);
-        }
-
-        private void MergeThrowEdge(FragmentThrowEdge edge)
-        {
-            // Self-throw guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.ThrownFullName, StringComparison.Ordinal)) return;
-
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.ThrownFullName);
-            var sites = ThrowEdgeSites((edge.SourceFullName, edge.ThrownFullName));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
-        }
-
-        private void MergeExposureEdge(FragmentExposureEdge edge)
-        {
-            // Self-exposure guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.ExposedFullName, StringComparison.Ordinal)) return;
-
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.ExposedFullName);
-            var sites = ExposureEdgeSites((edge.SourceFullName, edge.ExposedFullName));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
-        }
-
-        private void MergeInjectionEdge(FragmentInjectionEdge edge)
-        {
-            // Self-injection guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.InjectedFullName, StringComparison.Ordinal)) return;
-
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.InjectedFullName);
-            var sites = InjectionEdgeSites((edge.SourceFullName, edge.InjectedFullName));
-            foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
         // Registrations are string-side (never resolved to nodes): the union key is the whole
@@ -350,7 +329,8 @@ internal static class FragmentMerger
         // the identical registration collapse to one fact with unioned sites.
         private void MergeRegistration(FragmentServiceRegistration registration)
         {
-            var sites = RegistrationSites((registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
+            var sites = FragmentSiteSets.For(
+                _registrationSites, (registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
             foreach (FragmentSite site in registration.Sites) sites.Add(site);
         }
 
@@ -393,48 +373,31 @@ internal static class FragmentMerger
                 .OrderBy(n => n.FullName, StringComparer.Ordinal)
                 .ToList();
 
-            var edges = _edgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Tgt, StringComparer.Ordinal)
-                .Select(kv => new ReferenceEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Tgt], ToLocations(kv.Value)))
-                .ToList();
+            var edges = FragmentSiteSets.OrderedPairs(
+                _edgeSites, (src, tgt, sites) => new ReferenceEdge(_nodes[src], _nodes[tgt], ToLocations(sites)));
 
             var memberEdges = BuildMemberEdges();
 
-            var constructorEdges = _constructorEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Ctor, StringComparer.Ordinal)
-                .Select(kv => new ConstructorEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Ctor], ToLocations(kv.Value)))
-                .ToList();
+            var constructorEdges = FragmentSiteSets.OrderedPairs(
+                _constructorEdgeSites, (src, ctor, sites) => new ConstructorEdge(_nodes[src], _nodes[ctor], ToLocations(sites)));
 
-            var injectionEdges = _injectionEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Injected, StringComparer.Ordinal)
-                .Select(kv => new InjectionEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Injected], ToLocations(kv.Value)))
-                .ToList();
+            var injectionEdges = FragmentSiteSets.OrderedPairs(
+                _injectionEdgeSites, (src, injected, sites) => new InjectionEdge(_nodes[src], _nodes[injected], ToLocations(sites)));
 
             // All three site lists come out of SortedSets, so each is (file, line) ordered and each is a subset
             // of the one before it; an edge with no unfiltered (or no swallowing) site materializes the empty list.
-            var catchEdges = _catchEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
-                .Select(kv => new CatchEdge(
-                    _nodes[kv.Key.Src], _nodes[kv.Key.Caught], ToLocations(kv.Value),
-                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? ToLocations(unfiltered) : [],
-                    _catchEdgeSwallowingSites.TryGetValue(kv.Key, out var swallowing) ? ToLocations(swallowing) : []))
-                .ToList();
+            var catchEdges = FragmentSiteSets.OrderedPairs(
+                _catchEdgeSites,
+                (src, caught, sites) => new CatchEdge(
+                    _nodes[src], _nodes[caught], ToLocations(sites),
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? ToLocations(unfiltered) : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? ToLocations(swallowing) : []));
 
-            var throwEdges = _throwEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Thrown, StringComparer.Ordinal)
-                .Select(kv => new ThrowEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Thrown], ToLocations(kv.Value)))
-                .ToList();
+            var throwEdges = FragmentSiteSets.OrderedPairs(
+                _throwEdgeSites, (src, thrown, sites) => new ThrowEdge(_nodes[src], _nodes[thrown], ToLocations(sites)));
 
-            var exposureEdges = _exposureEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Exposed, StringComparer.Ordinal)
-                .Select(kv => new ExposureEdge(_nodes[kv.Key.Src], _nodes[kv.Key.Exposed], ToLocations(kv.Value)))
-                .ToList();
+            var exposureEdges = FragmentSiteSets.OrderedPairs(
+                _exposureEdgeSites, (src, exposed, sites) => new ExposureEdge(_nodes[src], _nodes[exposed], ToLocations(sites)));
 
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
@@ -472,11 +435,9 @@ internal static class FragmentMerger
                 return reference;
             }
 
-            return _memberEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.MemberSymbolId, StringComparer.Ordinal)
-                .Select(kv => new MemberEdge(_nodes[kv.Key.Src], MemberReferenceFor(kv.Key.MemberSymbolId), ToLocations(kv.Value)))
-                .ToList();
+            return FragmentSiteSets.OrderedPairs(
+                _memberEdgeSites,
+                (src, symbolId, sites) => new MemberEdge(_nodes[src], MemberReferenceFor(symbolId), ToLocations(sites)));
         }
 
         private static List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
@@ -502,127 +463,6 @@ internal static class FragmentMerger
         private static IReadOnlyList<SourceLocation> ToLocations(SortedSet<FragmentSite> sites)
         {
             return sites.Select(s => new SourceLocation(s.File, s.Line)).ToList();
-        }
-
-        private SortedSet<FragmentSite> DeclarationSites(string fqn)
-        {
-            if (!_declarationSites.TryGetValue(fqn, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _declarationSites[fqn] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
-        {
-            if (!_edgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _edgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> MemberEdgeSites((string Src, string MemberSymbolId) key)
-        {
-            if (!_memberEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _memberEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ConstructorEdgeSites((string Src, string Ctor) key)
-        {
-            if (!_constructorEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _constructorEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeUnfilteredSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeUnfilteredSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeUnfilteredSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeSwallowingSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeSwallowingSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeSwallowingSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ThrowEdgeSites((string Src, string Thrown) key)
-        {
-            if (!_throwEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _throwEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> InjectionEdgeSites((string Src, string Injected) key)
-        {
-            if (!_injectionEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _injectionEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ExposureEdgeSites((string Src, string Exposed) key)
-        {
-            if (!_exposureEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _exposureEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> RegistrationSites((Lifetime Lifetime, string Service, string? Impl) key)
-        {
-            if (!_registrationSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _registrationSites[key] = sites;
-            }
-
-            return sites;
         }
 
         /// <summary>

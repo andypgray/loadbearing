@@ -69,8 +69,11 @@ public static class ArchChecker
         Guard.NotNull(codebase, nameof(codebase));
         Guard.NotNull(baselines, nameof(baselines));
 
-        var evaluator = new ConstraintEvaluator(codebase);
+        // One selection evaluator for the whole run — the constraint arms and the tripwire path share it.
+        // Its constructor materializes the solution-declared type list and the noun indexes, so building a
+        // second would repeat a full pass over the model; it holds no per-rule mutable state.
         var selections = new SelectionEvaluator(codebase);
+        var evaluator = new ConstraintEvaluator(codebase, selections);
         var results = rules.Select(rule => CheckRule(rule, evaluator, selections, baselines, diff)).ToList();
         return new CheckReport(results);
     }

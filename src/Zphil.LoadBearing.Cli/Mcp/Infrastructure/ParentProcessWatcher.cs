@@ -18,19 +18,21 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 /// </remarks>
 internal static class ParentProcessWatcher
 {
-    private const string DisableVariable = "LOADBEARING_DISABLE_PARENT_WATCH";
-
     /// <summary>
     ///     Resolves the parent PID, attaches a background waiter, and exits the process when the
     ///     parent dies. Logs and returns silently when disabled, on non-Windows hosts, or when the
     ///     parent PID cannot be resolved.
     /// </summary>
-    public static void Start()
+    /// <param name="disabled">
+    ///     The <c>LOADBEARING_DISABLE_PARENT_WATCH</c> opt-out, resolved by the caller: the watcher is
+    ///     started before the host exists, and the caller owns the one env seam.
+    /// </param>
+    public static void Start(bool disabled)
     {
         Start(
             GetParentProcessId,
             () => ServerShutdown.ExitWith("parent process exited"),
-            DisabledViaEnv());
+            disabled);
     }
 
     /// <summary>
@@ -110,12 +112,6 @@ internal static class ParentProcessWatcher
             Log.Debug(ex, "Parent PID lookup failed");
             return null;
         }
-    }
-
-    private static bool DisabledViaEnv()
-    {
-        return string.Equals(
-            Environment.GetEnvironmentVariable(DisableVariable), "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WatchAsync(Process parent, Action onParentExited)

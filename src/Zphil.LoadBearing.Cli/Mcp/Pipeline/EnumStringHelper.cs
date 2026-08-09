@@ -9,6 +9,39 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 internal static class EnumStringHelper
 {
     /// <summary>
+    ///     The one enum-name rule both coercers apply: refuse anything
+    ///     <see cref="ResolvesByArithmetic" /> would let through by ordinal arithmetic, then match a
+    ///     member name case-insensitively and require that member to be defined. A name the caller may not
+    ///     reach returns <c>false</c> with <paramref name="parsed" /> left at its default, never at the
+    ///     undefined value <see cref="Enum.TryParse{T}(string,bool,out T)" /> would have bound it to.
+    /// </summary>
+    /// <remarks>
+    ///     Here rather than in either factory because the array path and the scalar path must admit the
+    ///     same spellings: a name a tool parameter refuses cannot be one the same tool's array parameter
+    ///     accepts.
+    /// </remarks>
+    internal static bool TryParseName<T>(string name, out T parsed) where T : struct, Enum
+    {
+        parsed = default;
+        if (ResolvesByArithmetic(name)) return false;
+
+        if (!Enum.TryParse(name, true, out T candidate) || !Enum.IsDefined(typeof(T), candidate)) return false;
+
+        parsed = candidate;
+        return true;
+    }
+
+    /// <summary>
+    ///     The refusal a rejected value gets, naming what was attempted and listing every valid value so
+    ///     the model can self-correct on the next call. One builder, so the scalar path and the array path
+    ///     cannot word the same rejection differently — the text is pinned as the spec.
+    /// </summary>
+    internal static string InvalidValueMessage<T>(string? attempted) where T : struct, Enum
+    {
+        return $"Invalid value \"{attempted}\" for parameter. Valid values: {string.Join(", ", Enum.GetNames<T>())}.";
+    }
+
+    /// <summary>
     ///     Returns <c>true</c> when <see cref="Enum.TryParse{T}(string,bool,out T)" /> would resolve
     ///     <paramref name="value" /> by arithmetic over ordinals rather than by matching one member
     ///     name, which is how a caller ends up bound to a member they never named.

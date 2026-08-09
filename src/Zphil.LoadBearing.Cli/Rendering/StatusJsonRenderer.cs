@@ -37,8 +37,8 @@ internal static class StatusJsonRenderer
     {
         return new StatusRuleJson(
             result.Rule.Id,
-            Camel(result.Rule.Posture.ToString()),
-            Camel(result.Status.ToString()),
+            result.Rule.Posture,
+            result.Status,
             result.Violations.Count,
             result.Warnings.Count,
             ToRatchet(result));
@@ -59,10 +59,5 @@ internal static class StatusJsonRenderer
         return new RatchetStatusJson(
             path, result.BaselineCaptured, result.Grandfathered.Count, result.Violations.Count,
             result.StaleBaselineEntries, promotable);
-    }
-
-    private static string Camel(string name)
-    {
-        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
     }
 }

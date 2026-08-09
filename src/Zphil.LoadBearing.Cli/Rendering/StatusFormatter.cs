@@ -40,8 +40,8 @@ internal static class StatusFormatter
     private static string EnforceLine(RuleResult result)
     {
         var details = new List<string>();
-        if (result.Violations.Count > 0) details.Add($"{result.Violations.Count} {Plural(result.Violations.Count, "violation")}");
-        if (result.Warnings.Count > 0) details.Add($"{result.Warnings.Count} {Plural(result.Warnings.Count, "warning")}");
+        if (result.Violations.Count > 0) details.Add($"{result.Violations.Count} {Plurals.Noun(result.Violations.Count, "violation")}");
+        if (result.Warnings.Count > 0) details.Add($"{result.Warnings.Count} {Plurals.Noun(result.Warnings.Count, "warning")}");
 
         string marker = result.Status == RuleStatus.Failed ? "FAIL" : "pass";
         return details.Count > 0 ? $"{marker} {result.Rule.Id} — {string.Join(", ", details)}" : $"{marker} {result.Rule.Id}";
@@ -62,7 +62,7 @@ internal static class StatusFormatter
     private static string RatchetDetail(bool captured, int remaining, int newCount, int stale, bool promotable)
     {
         if (!captured)
-            return $"no baseline captured; run 'loadbearing baseline --init' ({newCount} current {Plural(newCount, "violation")})";
+            return $"no baseline captured; run 'loadbearing baseline --init' ({newCount} current {Plurals.Noun(newCount, "violation")})";
         if (newCount > 0)
             return $"{remaining} grandfathered remaining, {newCount} new, {stale} fixed awaiting acceptance";
         if (remaining == 0 && stale == 0)
@@ -77,10 +77,5 @@ internal static class StatusFormatter
         return $"Checked {report.RulesChecked} rules: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
                $"{report.RulesSkipped} skipped. Burndown: {report.GrandfatheredCount} grandfathered remaining, " +
                $"{report.StaleBaselineEntryCount} fixed awaiting acceptance.";
-    }
-
-    private static string Plural(int count, string noun)
-    {
-        return count == 1 ? noun : noun + "s";
     }
 }

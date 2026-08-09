@@ -289,8 +289,8 @@ public sealed class BinlogCliE2ETests : IDisposable
     // set survives for the next serial test.
     private static async Task<GateRun> RunAsync(string cacheDir, params string[] args)
     {
-        string? previous = Environment.GetEnvironmentVariable(CodebaseSource.CacheDirectoryVariable);
-        Environment.SetEnvironmentVariable(CodebaseSource.CacheDirectoryVariable, cacheDir);
+        string? previous = Environment.GetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory);
+        Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, cacheDir);
         long loaderBefore = WorkspaceLoader.LoadCount;
         try
         {
@@ -302,7 +302,7 @@ public sealed class BinlogCliE2ETests : IDisposable
         }
         finally
         {
-            Environment.SetEnvironmentVariable(CodebaseSource.CacheDirectoryVariable, previous);
+            Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, previous);
         }
     }
 

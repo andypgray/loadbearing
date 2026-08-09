@@ -15,6 +15,8 @@ namespace Zphil.LoadBearing.Checking;
 /// </summary>
 internal sealed class SelectionEvaluator
 {
+    private readonly Dictionary<string, TypeNode> _byFullName;
+    private readonly ILookup<string, TypeNode> _byProjectName;
     private readonly CodebaseModel _model;
     private readonly List<TypeNode> _solutionDeclared;
 
@@ -22,6 +24,14 @@ internal sealed class SelectionEvaluator
     {
         _model = model;
         _solutionDeclared = model.Types.Where(t => !t.IsExternal).ToList();
+
+        // The two noun indexes, built once per evaluator and immutable afterwards: a typeof or project
+        // operand is otherwise a full linear scan of the type universe — the largest list in the model —
+        // per operand per rule. Both preserve Types order within a key, so the sets they feed are
+        // populated in exactly the order the equivalent Where scan populated them.
+        _byFullName = new Dictionary<string, TypeNode>(model.Types.Count, StringComparer.Ordinal);
+        foreach (TypeNode type in model.Types) _byFullName[type.FullName] = type;
+        _byProjectName = model.Types.ToLookup(t => t.ProjectName, StringComparer.Ordinal);
     }
 
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
@@ -34,31 +44,47 @@ internal sealed class SelectionEvaluator
     {
         if (selection is UnionSelection union)
         {
-            var members = new HashSet<TypeNode>();
-            foreach (Selection member in union.Parts) members.UnionWith(Evaluate(member, position));
+            var parts = new List<HashSet<TypeNode>>(union.Parts.Count);
+            foreach (Selection member in union.Parts) parts.Add(Evaluate(member, position));
 
-            // Union adjectives apply to the unioned set, never through each operand (GRAMMAR §5.1):
-            // AnyOf(a, b).Except(c) is (a ∪ b) − c.
-            if (union.Adjectives.Count == 0) return members;
-
-            IEnumerable<TypeNode> unioned = members;
-            foreach (SelectionAdjective adjective in union.Adjectives) unioned = ApplyAdjective(unioned, adjective);
-
-            return new HashSet<TypeNode>(unioned);
+            return Unite(union, parts);
         }
 
-        IEnumerable<TypeNode> universe = position == SelectionPosition.Subject ? _solutionDeclared : _model.Types;
-        var current = ByNoun(selection.Noun, universe);
+        var current = ByNoun(selection.Noun, position);
         foreach (SelectionAdjective adjective in selection.Adjectives) current = ApplyAdjective(current, adjective);
 
         return new HashSet<TypeNode>(current);
     }
 
+    /// <summary>
+    ///     The second half of the union arm: fold the already-evaluated operand sets together and apply
+    ///     the union's own adjectives. Union adjectives apply to the unioned set, never through each
+    ///     operand (GRAMMAR §5.1): <c>AnyOf(a, b).Except(c)</c> is (a ∪ b) − c. Exposed so a caller that
+    ///     has already evaluated the operands in the same position — the per-operand emptiness gate in
+    ///     <see cref="ConstraintEvaluator" /> (GRAMMAR §9) — can finish the union without evaluating them
+    ///     a second time.
+    /// </summary>
+    internal HashSet<TypeNode> Unite(UnionSelection union, IReadOnlyList<HashSet<TypeNode>> parts)
+    {
+        var members = new HashSet<TypeNode>();
+        foreach (var part in parts) members.UnionWith(part);
+
+        if (union.Adjectives.Count == 0) return members;
+
+        IEnumerable<TypeNode> unioned = members;
+        foreach (SelectionAdjective adjective in union.Adjectives) unioned = ApplyAdjective(unioned, adjective);
+
+        return new HashSet<TypeNode>(unioned);
+    }
+
     // Instance (not static) because the RegisteredNoun arm reads model-side registration facts
     // (CodebaseModel.ServiceRegistrations) — membership is many-to-many and never denormalized onto a
-    // TypeNode (GRAMMAR §4.7). The other nouns select purely off the position-correct universe.
-    private IEnumerable<TypeNode> ByNoun(SelectionNoun noun, IEnumerable<TypeNode> universe)
+    // TypeNode (GRAMMAR §4.7). The other nouns select purely off the position-correct universe. Never an
+    // iterator: TypeNounFullName must refuse a closed-generic noun eagerly, before any node is tested.
+    private IEnumerable<TypeNode> ByNoun(SelectionNoun noun, SelectionPosition position)
     {
+        bool subject = position == SelectionPosition.Subject;
+        IEnumerable<TypeNode> universe = subject ? _solutionDeclared : _model.Types;
         switch (noun)
         {
             case TypesNoun:
@@ -70,10 +96,17 @@ internal sealed class SelectionEvaluator
                 var pattern = new NamespacePattern(ns.Glob);
                 return universe.Where(t => pattern.Matches(t.Namespace));
             case ProjectNoun project:
-                return universe.Where(t => string.Equals(t.ProjectName, project.Name, StringComparison.Ordinal));
+                // The ordinal ProjectName index, then the position filter — the same nodes in the same
+                // order the universe scan yielded, because a lookup grouping keeps Types order.
+                var declaring = _byProjectName[project.Name];
+                return subject ? declaring.Where(t => !t.IsExternal) : declaring;
             case TypeNoun typeNoun:
+                // Types is unique by FullName (same-FQN declarers are conflated at merge), so the scan
+                // was a dictionary lookup wearing a Where: at most one node, position-filtered.
                 string fullName = TypeNounFullName(typeNoun.Type);
-                return universe.Where(t => string.Equals(t.FullName, fullName, StringComparison.Ordinal));
+                return _byFullName.TryGetValue(fullName, out TypeNode? named) && !(subject && named.IsExternal)
+                    ? new[] { named }
+                    : Array.Empty<TypeNode>();
             case RegisteredNoun registered:
                 // Membership = service ∪ implementation FQNs of the recognized registrations at this lifetime
                 // (null = any lifetime, §4.7). Filtering the position-correct universe (subject = solution-
@@ -196,16 +229,30 @@ internal sealed class SelectionEvaluator
         return ConstructionMatcher(anchor, t => t.AttributeConstructions);
     }
 
+    /// <summary>
+    ///     The name an anchor compares on, and whether it compares on the <em>definition</em> name — the
+    ///     three-arm GRAMMAR §5.2 decision, stated once for every matcher that anchors on a
+    ///     <see cref="TypeAnchor" /> (the type-side construction matchers and the member-side attribute
+    ///     matcher). A string anchor names a definition; an open-generic <c>typeof</c> matches on the
+    ///     definition name ("any construction"); anything else on the constructed name ("that construction
+    ///     exactly"). <see cref="TypeName.FullDisplay" /> runs here, so an unrepresentable <c>typeof</c>
+    ///     throws while the matcher is being built — before any subject is tested — and a string anchor
+    ///     needs no reflection at all, which is the whole point of the hatch.
+    /// </summary>
+    internal static (string Key, bool OnDefinition) AnchorKey(TypeAnchor anchor)
+    {
+        if (anchor.DefinitionFullName is { } name) return (name, true);
+
+        Type type = anchor.Type!;
+        return (TypeName.FullDisplay(type), type.IsGenericTypeDefinition);
+    }
+
     // The one comparison the three matchers share, parameterized by which construction list to read.
     private static Func<TypeNode, bool> ConstructionMatcher(
         TypeAnchor anchor, Func<TypeNode, IReadOnlyList<TypeConstruction>> constructions)
     {
-        if (anchor.DefinitionFullName is { } name)
-            return t => constructions(t).Any(c => c.Definition.FullName == name);
-
-        Type type = anchor.Type!;
-        string key = TypeName.FullDisplay(type);
-        return type.IsGenericTypeDefinition
+        (string key, bool onDefinition) = AnchorKey(anchor);
+        return onDefinition
             ? t => constructions(t).Any(c => c.Definition.FullName == key)
             : t => constructions(t).Any(c => c.FullName == key);
     }

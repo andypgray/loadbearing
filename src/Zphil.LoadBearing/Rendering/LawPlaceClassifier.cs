@@ -140,9 +140,11 @@ internal static class LawPlaceClassifier
     }
 
     // The subtree operator is noise in an identifier, and the prefix is what a reader recognizes:
-    // `Microsoft.Build.*` slugs from `Microsoft.Build`.
+    // `Microsoft.Build.*` slugs from `Microsoft.Build`. The operator is decomposed by the matcher that
+    // owns it, so a second spelling of it could never leave the slug reading the old one.
     private static string IdSourceOf(string glob)
     {
-        return glob.EndsWith(".*", StringComparison.Ordinal) ? glob.Substring(0, glob.Length - 2) : glob;
+        NamespacePattern.TryParseSubtree(glob, out string prefix);
+        return prefix;
     }
 }

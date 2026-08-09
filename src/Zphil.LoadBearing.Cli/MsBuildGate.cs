@@ -254,7 +254,7 @@ internal static class MsBuildGate
     private static string? CacheRootOverride()
     {
         IEnvironment environment = new SystemEnvironment();
-        string? cacheRoot = environment.GetVariable(CodebaseSource.CacheDirectoryVariable);
+        string? cacheRoot = environment.GetVariable(LoadBearingEnvVars.CacheDirectory);
         return string.IsNullOrWhiteSpace(cacheRoot) ? null : cacheRoot;
     }
 

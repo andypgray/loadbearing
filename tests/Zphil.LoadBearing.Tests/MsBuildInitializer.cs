@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Build.Locator;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -29,7 +29,7 @@ internal static class MsBuildInitializer
         // observable output shows up as golden churn. Read CLI-side through IEnvironment/SystemEnvironment.
         // Routed through TestTempRoot so the roots earlier runs left behind get swept: this directory used
         // to be minted directly under %TEMP% and never deleted, which had reached 160 roots / 1.3 GB.
-        Environment.SetEnvironmentVariable(CodebaseSource.CacheDirectoryVariable, TestTempRoot.For("cache"));
+        Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, TestTempRoot.For("cache"));
 
         // NB: fixture restore is deliberately NOT done here. A [ModuleInitializer] runs during the
         // runner's assembly-info probe too, whose 60s no-response deadline a cold restore blows past

@@ -343,18 +343,16 @@ internal sealed class BinlogCaptureStore
         return CaptureValidation.Usable(captureBinlogPath);
     }
 
-    // Enumerates the project cone's *.cs and returns the first present in neither the recorded ConeFiles nor
-    // the compiled DocumentPaths — the SDK-glob add a stat sweep cannot see. An excluded stray that was in the
-    // cone at ingest is in ConeFiles, so it is not read as an add; only a file new since ingest trips this.
-    // Sorted so "first" is deterministic.
+    // The first cone add — a *.cs present in neither the recorded ConeFiles nor the compiled DocumentPaths,
+    // i.e. the SDK-glob add a stat sweep cannot see. An excluded stray that was in the cone at ingest is in
+    // ConeFiles, so it is not read as an add; only a file new since ingest trips this. ProjectCone.Adds owns
+    // the scan and its ordinal sort, so "first" means the same thing here as it does to the fragment cache.
     private static string? FirstConeAdd(CaptureProjectEntry project)
     {
         var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
         known.UnionWith(project.ConeFiles);
 
-        var adds = ProjectCone.Enumerate(project.ProjectDirectory).Where(full => !known.Contains(full)).ToList();
-        adds.Sort(StringComparer.Ordinal);
-        return adds.Count > 0 ? adds[0] : null;
+        return ProjectCone.Adds(project.ProjectDirectory, known).FirstOrDefault();
     }
 
     private void PromoteIfChanged(CaptureManifest manifest, IReadOnlyList<FileStamp> refreshedStructural)
@@ -415,11 +413,12 @@ internal sealed class BinlogCaptureStore
         foreach (CaptureProjectEntry project in projects)
         {
             yield return project.CsprojPath;
-            yield return FileStamping.AssetsPathOf(project.ProjectDirectory);
 
-            foreach (string ancestor in ProjectCone.Ancestors(project.ProjectDirectory))
-            foreach (string probe in FileStamping.StructuralProbeFileNames)
-                yield return Path.Combine(ancestor, probe);
+            // The assets file then the ancestor × probe cross-product, in ProjectCone's order — the same
+            // recipe and the same order the fragment cache stamps, so the two cannot disagree about what
+            // "the structure moved" means.
+            foreach (string path in ProjectCone.StructuralPaths(project.ProjectDirectory))
+                yield return path;
         }
     }
 

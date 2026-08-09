@@ -151,16 +151,18 @@ internal static class FragmentExtractor
     // values (an enum-value read stays a recorded member USE, §4.5) and a delegate's Invoke/BeginInvoke are
     // runtime plumbing. Ordered ordinal by the member's DocumentationCommentId, so the fragment (and the
     // merged node built from it) is deterministic.
-    private static IReadOnlyList<FragmentMember> BuildMembers(INamedTypeSymbol type, CoreTypeKind kind)
+    // Each survivor is kept paired with the symbol it was built from: the exposure pass (§4.9) screens this
+    // same inventory rather than re-walking GetMembers and recomputing every member's declaration sites.
+    private static IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> BuildMembers(INamedTypeSymbol type, CoreTypeKind kind)
     {
         if (kind is CoreTypeKind.Enum or CoreTypeKind.Delegate) return [];
 
-        var members = new List<FragmentMember>();
+        var members = new List<(ISymbol Symbol, FragmentMember Member)>();
         foreach (ISymbol member in type.GetMembers())
             if (IsInventoried(member))
-                members.Add(BuildMember(member));
+                members.Add((member, BuildMember(member)));
 
-        members.Sort((left, right) => string.CompareOrdinal(left.Facts.SymbolId, right.Facts.SymbolId));
+        members.Sort((left, right) => string.CompareOrdinal(left.Member.Facts.SymbolId, right.Member.Facts.SymbolId));
         return members;
     }
 
@@ -435,6 +437,13 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
+
+        // The per-compilation memo behind this state's FullNameOf. The display walk is the most expensive
+        // per-reference operation in extraction and the same handful of symbols recur across thousands of
+        // sites, so the memo is keyed on OriginalDefinition — what FullNameOf reads — and every construction of
+        // one generic shares its entry. It holds symbols, so it is scoped to the state that dies with the
+        // compilation.
+        private readonly Dictionary<ISymbol, string> _fullNames = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
@@ -464,7 +473,7 @@ internal static class FragmentExtractor
             // declaration-side pass, never folded into the Pass-1 inventory loop: an in-solution endpoint must
             // resolve against the fully-populated _declared table, not be minted as an external mid-inventory.
             foreach (DeclaredBuilder builder in _declared.Values)
-                WalkExposureEdges(builder.Symbol);
+                WalkExposureEdges(builder);
 
             // Pass R — registration facts (whole-compilation walk; a top-level-statements Program is not a
             // declared type, so a per-declared-type walk would miss the most common composition root).
@@ -554,7 +563,7 @@ internal static class FragmentExtractor
                         if (tgtFqn != srcFqn) // self-edge — drops the type edge and any member use on this node
                         {
                             ResolveName(target);
-                            EdgeSites((srcFqn, tgtFqn)).Add(site);
+                            FragmentSiteSets.For(_edgeSites, (srcFqn, tgtFqn)).Add(site);
 
                             // The member's containing type is the type-channel target (they agree by construction),
                             // so it is already resolved above; the member edge reuses tgtFqn and records the member.
@@ -572,7 +581,7 @@ internal static class FragmentExtractor
                         if (ctorFqn != srcFqn)
                         {
                             ResolveName(constructed);
-                            ConstructorEdgeSites((srcFqn, ctorFqn)).Add(site);
+                            FragmentSiteSets.For(_constructorEdgeSites, (srcFqn, ctorFqn)).Add(site);
                         }
                     }
 
@@ -589,9 +598,10 @@ internal static class FragmentExtractor
                         if (caughtFqn != srcFqn)
                         {
                             ResolveName(caught);
-                            CatchEdgeSites((srcFqn, caughtFqn)).Add(site);
-                            if (!caughtHasFilter) CatchEdgeUnfilteredSites((srcFqn, caughtFqn)).Add(site);
-                            if (!caughtHasFilter && !caughtEndsInThrow) CatchEdgeSwallowingSites((srcFqn, caughtFqn)).Add(site);
+                            FragmentSiteSets.For(_catchEdgeSites, (srcFqn, caughtFqn)).Add(site);
+                            if (!caughtHasFilter) FragmentSiteSets.For(_catchEdgeUnfilteredSites, (srcFqn, caughtFqn)).Add(site);
+                            if (!caughtHasFilter && !caughtEndsInThrow)
+                                FragmentSiteSets.For(_catchEdgeSwallowingSites, (srcFqn, caughtFqn)).Add(site);
                         }
                     }
 
@@ -604,7 +614,7 @@ internal static class FragmentExtractor
                         if (thrownFqn != srcFqn)
                         {
                             ResolveName(thrown);
-                            ThrowEdgeSites((srcFqn, thrownFqn)).Add(site);
+                            FragmentSiteSets.For(_throwEdgeSites, (srcFqn, thrownFqn)).Add(site);
                         }
                     }
                 }
@@ -646,7 +656,7 @@ internal static class FragmentExtractor
                     {
                         string injectedFqn = ResolveName(endpoint);
                         if (injectedFqn == srcFqn) continue; // self-injection dropped
-                        InjectionEdgeSites((srcFqn, injectedFqn)).Add(site);
+                        FragmentSiteSets.For(_injectionEdgeSites, (srcFqn, injectedFqn)).Add(site);
                     }
                 }
             }
@@ -659,21 +669,24 @@ internal static class FragmentExtractor
         // type edge (§4.1); self-exposure is dropped like the type-edge self-drop (which also self-drops an enum
         // value's self-typing); ResolveName runs on every decomposed endpoint so external exposed types get
         // nodes. The member's declaration sites (a partial member's several parts union) are the edge's sites.
-        private void WalkExposureEdges(INamedTypeSymbol symbol)
+        // The pass screens pass 1's inventory, so the §4.6 filter and the sites are read, not recomputed; the
+        // two kinds that inventory nothing contribute nothing here either — a delegate's members are every one
+        // implicitly declared (so §4.6 already drops them all), and an enum's values are typed by the enum
+        // itself and so only ever self-dropped.
+        private void WalkExposureEdges(DeclaredBuilder builder)
         {
-            string srcFqn = FullNameOf(symbol);
-            foreach (ISymbol member in symbol.GetMembers())
+            string srcFqn = FullNameOf(builder.Symbol);
+            foreach ((ISymbol symbol, FragmentMember member) in builder.Members)
             {
-                if (!IsInventoried(member) || !IsEffectivelyPublicMember(member)) continue;
+                if (!IsEffectivelyPublicMember(symbol)) continue;
 
-                var sites = MemberDeclarationSites(member);
-                foreach (ITypeSymbol signatureType in SignatureTypesOf(member))
+                foreach (ITypeSymbol signatureType in SignatureTypesOf(symbol))
                 foreach (INamedTypeSymbol endpoint in DecomposeType(signatureType))
                 {
                     string exposedFqn = ResolveName(endpoint);
                     if (exposedFqn == srcFqn) continue; // self-exposure dropped (enum value self-typing self-drops here)
-                    foreach (FragmentSite site in sites)
-                        ExposureEdgeSites((srcFqn, exposedFqn)).Add(site);
+                    var sites = FragmentSiteSets.For(_exposureEdgeSites, (srcFqn, exposedFqn));
+                    foreach (FragmentSite site in member.DeclarationSites) sites.Add(site);
                 }
             }
         }
@@ -701,7 +714,24 @@ internal static class FragmentExtractor
         {
             string serviceFqn = FullNameOf(registration.Service);
             string? implFqn = registration.Implementation is { } impl ? FullNameOf(impl) : null;
-            RegistrationSites((registration.Lifetime, serviceFqn, implFqn)).Add(site);
+            FragmentSiteSets.For(_registrationSites, (registration.Lifetime, serviceFqn, implFqn)).Add(site);
+        }
+
+        /// <summary>
+        ///     The memoized <see cref="FragmentExtractor.FullNameOf" />. Declaring it here hides the outer
+        ///     static one throughout <see cref="ExtractState" />, so every name this state reads — the walk's
+        ///     four channels, each pass's source name, <see cref="ResolveName" />'s own lookup — comes back
+        ///     through the memo, and the same symbol is displayed once per compilation rather than once per
+        ///     site.
+        /// </summary>
+        private string FullNameOf(INamedTypeSymbol symbol)
+        {
+            INamedTypeSymbol definition = symbol.OriginalDefinition;
+            if (_fullNames.TryGetValue(definition, out string? fqn)) return fqn;
+
+            fqn = FragmentExtractor.FullNameOf(definition);
+            _fullNames[definition] = fqn;
+            return fqn;
         }
 
         /// <summary>
@@ -747,55 +777,35 @@ internal static class FragmentExtractor
                 .OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
                 .ToList();
 
-            var edges = _edgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Tgt, StringComparer.Ordinal)
-                .Select(kv => new FragmentEdge(kv.Key.Src, kv.Key.Tgt, kv.Value.ToList()))
-                .ToList();
+            var edges = FragmentSiteSets.OrderedPairs(
+                _edgeSites, (src, tgt, sites) => new FragmentEdge(src, tgt, sites.ToList()));
 
-            var memberEdges = _memberEdges
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.MemberSymbolId, StringComparer.Ordinal)
-                .Select(kv => new FragmentMemberEdge(
-                    kv.Key.Src, kv.Value.ContainingFullName, kv.Value.MemberName, kv.Key.MemberSymbolId, kv.Value.Kind,
-                    kv.Value.Sites.ToList()))
-                .ToList();
+            var memberEdges = FragmentSiteSets.OrderedPairs(
+                _memberEdges,
+                (src, symbolId, builder) => new FragmentMemberEdge(
+                    src, builder.ContainingFullName, builder.MemberName, symbolId, builder.Kind, builder.Sites.ToList()));
 
-            var constructorEdges = _constructorEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Ctor, StringComparer.Ordinal)
-                .Select(kv => new FragmentConstructorEdge(kv.Key.Src, kv.Key.Ctor, kv.Value.ToList()))
-                .ToList();
+            var constructorEdges = FragmentSiteSets.OrderedPairs(
+                _constructorEdgeSites, (src, ctor, sites) => new FragmentConstructorEdge(src, ctor, sites.ToList()));
 
-            var injectionEdges = _injectionEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Injected, StringComparer.Ordinal)
-                .Select(kv => new FragmentInjectionEdge(kv.Key.Src, kv.Key.Injected, kv.Value.ToList()))
-                .ToList();
+            var injectionEdges = FragmentSiteSets.OrderedPairs(
+                _injectionEdgeSites, (src, injected, sites) => new FragmentInjectionEdge(src, injected, sites.ToList()));
 
             // An edge whose every site is filtered has no entry in either parallel table, which materializes as
             // the empty list — the honest reading, since nothing about that edge is unfiltered. An edge whose
             // every unfiltered site ends in a throw materializes the third list empty for the same reason.
-            var catchEdges = _catchEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Caught, StringComparer.Ordinal)
-                .Select(kv => new FragmentCatchEdge(
-                    kv.Key.Src, kv.Key.Caught, kv.Value.ToList(),
-                    _catchEdgeUnfilteredSites.TryGetValue(kv.Key, out var unfiltered) ? unfiltered.ToList() : [],
-                    _catchEdgeSwallowingSites.TryGetValue(kv.Key, out var swallowing) ? swallowing.ToList() : []))
-                .ToList();
+            var catchEdges = FragmentSiteSets.OrderedPairs(
+                _catchEdgeSites,
+                (src, caught, sites) => new FragmentCatchEdge(
+                    src, caught, sites.ToList(),
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? unfiltered.ToList() : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? swallowing.ToList() : []));
 
-            var throwEdges = _throwEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Thrown, StringComparer.Ordinal)
-                .Select(kv => new FragmentThrowEdge(kv.Key.Src, kv.Key.Thrown, kv.Value.ToList()))
-                .ToList();
+            var throwEdges = FragmentSiteSets.OrderedPairs(
+                _throwEdgeSites, (src, thrown, sites) => new FragmentThrowEdge(src, thrown, sites.ToList()));
 
-            var exposureEdges = _exposureEdgeSites
-                .OrderBy(kv => kv.Key.Src, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Exposed, StringComparer.Ordinal)
-                .Select(kv => new FragmentExposureEdge(kv.Key.Src, kv.Key.Exposed, kv.Value.ToList()))
-                .ToList();
+            var exposureEdges = FragmentSiteSets.OrderedPairs(
+                _exposureEdgeSites, (src, exposed, sites) => new FragmentExposureEdge(src, exposed, sites.ToList()));
 
             var serviceRegistrations = _registrationSites
                 .OrderBy(kv => kv.Key.Lifetime)
@@ -808,116 +818,26 @@ internal static class FragmentExtractor
                 input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges,
                 injectionEdges, catchEdges, throwEdges, exposureEdges, serviceRegistrations);
         }
-
-        private SortedSet<FragmentSite> EdgeSites((string Src, string Tgt) key)
-        {
-            if (!_edgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _edgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ConstructorEdgeSites((string Src, string Ctor) key)
-        {
-            if (!_constructorEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _constructorEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeUnfilteredSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeUnfilteredSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeUnfilteredSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> CatchEdgeSwallowingSites((string Src, string Caught) key)
-        {
-            if (!_catchEdgeSwallowingSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _catchEdgeSwallowingSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ThrowEdgeSites((string Src, string Thrown) key)
-        {
-            if (!_throwEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _throwEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> InjectionEdgeSites((string Src, string Injected) key)
-        {
-            if (!_injectionEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _injectionEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> ExposureEdgeSites((string Src, string Exposed) key)
-        {
-            if (!_exposureEdgeSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _exposureEdgeSites[key] = sites;
-            }
-
-            return sites;
-        }
-
-        private SortedSet<FragmentSite> RegistrationSites((Lifetime Lifetime, string Service, string? Impl) key)
-        {
-            if (!_registrationSites.TryGetValue(key, out var sites))
-            {
-                sites = new SortedSet<FragmentSite>();
-                _registrationSites[key] = sites;
-            }
-
-            return sites;
-        }
     }
 
     /// <summary>
     ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration sites, and
     ///     hierarchy filled in pass 2.
     /// </summary>
-    private sealed class DeclaredBuilder(TypeFacts facts, INamedTypeSymbol symbol, IReadOnlyList<FragmentMember> members)
+    private sealed class DeclaredBuilder(
+        TypeFacts facts,
+        INamedTypeSymbol symbol,
+        IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> members)
     {
         public TypeFacts Facts { get; } = facts;
         public INamedTypeSymbol Symbol { get; } = symbol;
-        public IReadOnlyList<FragmentMember> Members { get; } = members;
+
+        /// <summary>
+        ///     The §4.6 inventory, each member paired with the symbol it was read from — pass 1's work, held so
+        ///     the exposure pass reads the members and their declaration sites rather than deriving them twice.
+        /// </summary>
+        public IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> Members { get; } = members;
+
         public SortedSet<FragmentSite> Sites { get; } = [];
         public string? BaseTypeFullName { get; set; }
         public IReadOnlyList<string> Interfaces { get; set; } = [];
@@ -937,7 +857,7 @@ internal static class FragmentExtractor
                 AllInterfaces,
                 BaseTypeChain,
                 AttributeConstructions,
-                Members);
+                Members.Select(m => m.Member).ToList());
         }
     }
 

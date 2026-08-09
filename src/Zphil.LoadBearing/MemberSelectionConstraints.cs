@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
+using static Zphil.LoadBearing.Internal.Guard;
 
 namespace Zphil.LoadBearing;
 
@@ -149,17 +150,15 @@ public static class MemberSelectionConstraints
 
     private static MemberSelection Subject(MemberSelection subject)
     {
-        return Guard.NotNull(subject, nameof(subject));
+        return NotNull(subject, nameof(subject));
     }
 
     // The raw-Type anchor list of the negative attribute verb, minted as typeof TypeAnchors — the
-    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10).
+    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10), and
+    // literally it now: both project through the one shared (first, params more) builder.
     private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
     {
-        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromType(NotNull(first, nameof(first))) };
-        foreach (Type type in more) list.Add(TypeAnchor.FromType(NotNull(type, nameof(more))));
-
-        return list;
+        return OperandList.OneOrMore(first, more, type => TypeAnchor.FromType(type));
     }
 
     // The string twin of AnchorTypes: the same (first, params more) shape over attribute-definition names.
@@ -167,15 +166,6 @@ public static class MemberSelectionConstraints
     // reports with every other error rather than throwing first.
     private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
     {
-        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromName(NotNull(first, nameof(first))) };
-        foreach (string name in more) list.Add(TypeAnchor.FromName(NotNull(name, nameof(more))));
-
-        return list;
-    }
-
-    private static T NotNull<T>(T value, string paramName)
-        where T : class
-    {
-        return Guard.NotNull(value, paramName);
+        return OperandList.OneOrMore(first, more, name => TypeAnchor.FromName(name));
     }
 }

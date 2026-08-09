@@ -204,7 +204,7 @@ internal sealed class ExtractionCacheStore
             // excluded from compilation is a validation-time add, so an empty capture never validated and the
             // project stayed dirty forever. With capture and validation running the one routine, they agree.
             var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
-            var adds = ConeAdds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
+            var adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
             contentKeys[project.ProjectName] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
             referencesByName[project.ProjectName] = project.ProjectReferences;
             documentsByName[project.ProjectName] = documents;
@@ -373,28 +373,23 @@ internal sealed class ExtractionCacheStore
             refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, sha));
         }
 
-        var adds = ConeAdds(project.ProjectDirectory, knownDocuments);
+        // Capture and validation compute cone-adds through the one routine over the same known-document set,
+        // so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
+        var adds = ProjectCone.Adds(project.ProjectDirectory, knownDocuments);
         string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
         string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
         string contentKey = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
         return (contentKey, refreshedDocuments);
     }
 
-    // Returns the project cone's *.cs not already known — the SDK-glob adds a bare mtime sweep cannot see.
-    // Sorted so the content key is order-stable. Capture and validation both call this over the same known
-    // set, so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
-    private static IReadOnlyList<string> ConeAdds(string projectDirectory, HashSet<string> knownDocuments)
-    {
-        var adds = ProjectCone.Enumerate(projectDirectory).Where(full => !knownDocuments.Contains(full)).ToList();
-        adds.Sort(StringComparer.Ordinal);
-        return adds;
-    }
-
     // ── keys ────────────────────────────────────────────────────────────────────────────────────────────
 
     // ContentKey(P) = hash over P's document hashes (path + sha, deleted ⇒ MISSING), its structural inputs
     // (csproj + assets hashes), and any cone-add paths. Changes iff P's own content changes. Sorted by path so
-    // capture and validation agree regardless of input order.
+    // capture and validation agree regardless of input order. Fed to the digest a line at a time rather than
+    // as one assembled string: a large project's key would otherwise materialize a megabyte-scale string and
+    // its UTF-8 copy, both LOH-bound, per project per run. The byte sequence and its order are unchanged, so
+    // the digest is unchanged and cache files written before this stay valid.
     private static string ComputeContentKey(
         string projectName,
         IReadOnlyList<(string Path, string? Sha)> documents,
@@ -402,15 +397,28 @@ internal sealed class ExtractionCacheStore
         string? assetsSha,
         IReadOnlyList<string> adds)
     {
-        var builder = new StringBuilder();
-        builder.Append("project\0").Append(projectName).Append('\n');
-        foreach ((string path, string? sha) in documents.OrderBy(d => KeyPath(d.Path), StringComparer.Ordinal))
-            builder.Append("doc\0").Append(KeyPath(path)).Append('\0').Append(sha ?? "MISSING").Append('\n');
-        builder.Append("csproj\0").Append(csprojSha ?? "NONE").Append('\n');
-        builder.Append("assets\0").Append(assetsSha ?? "NONE").Append('\n');
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Append(hash, $"project\0{projectName}\n");
+
+        // Folded once per document, then sorted on the folded form — the same order the fold used to be
+        // recomputed for on every comparison.
+        var keyed = documents
+            .Select(d => (Path: PathComparison.Fold(d.Path), d.Sha))
+            .OrderBy(d => d.Path, StringComparer.Ordinal);
+        foreach ((string path, string? sha) in keyed)
+            Append(hash, $"doc\0{path}\0{sha ?? "MISSING"}\n");
+
+        Append(hash, $"csproj\0{csprojSha ?? "NONE"}\n");
+        Append(hash, $"assets\0{assetsSha ?? "NONE"}\n");
         foreach (string add in adds) // already ordinal-sorted
-            builder.Append("add\0").Append(KeyPath(add)).Append('\n');
-        return HashString(builder.ToString());
+            Append(hash, $"add\0{PathComparison.Fold(add)}\n");
+
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
+
+    private static void Append(IncrementalHash hash, string line)
+    {
+        hash.AppendData(Encoding.UTF8.GetBytes(line));
     }
 
     // MerkleKey(P) = hash(ContentKey(P), MerkleKey(dep) for each dep in name order). Memoized; a visiting set
@@ -436,7 +444,7 @@ internal sealed class ExtractionCacheStore
                     builder.Append('\0').Append(ComputeMerkleKey(dependency, contentKeys, referencesByName, memo, visiting));
 
         visiting.Remove(name);
-        string key = HashString(builder.ToString());
+        string key = FileStamping.HashText(builder.ToString());
         memo[name] = key;
         return key;
     }
@@ -499,12 +507,7 @@ internal sealed class ExtractionCacheStore
         return FileStamping.TryHashFile(path);
     }
 
-    private static string HashString(string value)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
-    }
-
-    // ── structural enumeration (mirrors WorkspaceSession) ───────────────────────────────────────────────
+    // ── structural enumeration ──────────────────────────────────────────────────────────────────────────
 
     private IEnumerable<string> EnumerateStructuralPaths(IReadOnlyList<ProjectInputs> projects)
     {
@@ -515,12 +518,8 @@ internal sealed class ExtractionCacheStore
         {
             yield return Path.GetFullPath(project.CsprojPath);
 
-            string projectDirectory = Path.GetFullPath(project.ProjectDirectory);
-            yield return FileStamping.AssetsPathOf(projectDirectory);
-
-            foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
-            foreach (string probe in FileStamping.StructuralProbeFileNames)
-                yield return Path.Combine(ancestor, probe);
+            foreach (string path in ProjectCone.StructuralPaths(Path.GetFullPath(project.ProjectDirectory)))
+                yield return path;
         }
     }
 
@@ -531,11 +530,6 @@ internal sealed class ExtractionCacheStore
         var map = new Dictionary<string, string?>(PathComparison.Comparer);
         foreach (FileStamp stamp in stamps) map[stamp.Path] = stamp.Sha256;
         return map;
-    }
-
-    private static string KeyPath(string path)
-    {
-        return PathComparison.Comparison == StringComparison.OrdinalIgnoreCase ? path.ToLowerInvariant() : path;
     }
 
     private static bool DocumentStampsEqual(IReadOnlyList<ProjectCacheEntry> left, IReadOnlyList<ProjectCacheEntry> right)

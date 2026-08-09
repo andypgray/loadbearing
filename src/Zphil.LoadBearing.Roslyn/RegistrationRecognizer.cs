@@ -40,6 +40,23 @@ internal sealed class RegistrationRecognizer
 {
     private const string DiNamespace = "Microsoft.Extensions.DependencyInjection";
     private const string DiExtensionsNamespace = "Microsoft.Extensions.DependencyInjection.Extensions";
+    private const string HostedServiceCall = "AddHostedService";
+    private const string DbContextCall = "AddDbContext";
+    private const string DbContextPoolCall = "AddDbContextPool";
+    private const string HttpClientCall = "AddHttpClient";
+
+    // The Add/TryAdd trio, dispatched as one arm. Declared before ArmedCalls, which is seeded from it.
+    private static readonly HashSet<string> AddFamilyCalls = new(StringComparer.Ordinal)
+    {
+        "AddSingleton", "AddScoped", "AddTransient",
+        "TryAddSingleton", "TryAddScoped", "TryAddTransient"
+    };
+
+    // Every armed name, and the ONE list of them: the syntactic pre-filter screens against this set and
+    // Recognize dispatches on the very members it was built from, so the cheap gate and the real gate cannot
+    // come to disagree about what is armed. A name the pre-filter drops could never have reached an arm.
+    private static readonly HashSet<string> ArmedCalls =
+        new(AddFamilyCalls, StringComparer.Ordinal) { HostedServiceCall, DbContextCall, DbContextPoolCall, HttpClientCall };
 
     private readonly INamedTypeSymbol? _hostedService;
     private readonly INamedTypeSymbol? _serviceCollection;
@@ -67,6 +84,14 @@ internal sealed class RegistrationRecognizer
     /// </summary>
     public IEnumerable<RecognizedRegistration> Recognize(InvocationExpressionSyntax invocation, SemanticModel model)
     {
+        // Syntactic pre-filter, ahead of the symbol gate: GetSymbolInfo binds the enclosing member body, and
+        // pass R offers it every invocation in the solution to find the few dozen in a composition root. C#
+        // gives an invoked method the same identifier text in every spelling (extension, static, generic,
+        // conditional access), so a readable name that is not armed can never reach an arm — while a shape
+        // whose name cannot be read (an invoked delegate-valued expression, say) falls through to the gate
+        // below and is decided exactly as before.
+        if (InvokedName(invocation) is { } invoked && !ArmedCalls.Contains(invoked)) return [];
+
         SymbolInfo info = model.GetSymbolInfo(invocation);
         if ((info.Symbol ?? info.CandidateSymbols.FirstOrDefault()) is not IMethodSymbol method) return [];
 
@@ -75,15 +100,29 @@ internal sealed class RegistrationRecognizer
         IMethodSymbol signature = method.ReducedFrom ?? method;
         if (!PassesGate(signature)) return [];
 
+        if (AddFamilyCalls.Contains(signature.Name)) return RecognizeAddFamily(signature.Name, method, invocation, model);
+
         return signature.Name switch
         {
-            "AddSingleton" or "AddScoped" or "AddTransient"
-                or "TryAddSingleton" or "TryAddScoped" or "TryAddTransient"
-                => RecognizeAddFamily(signature.Name, method, invocation, model),
-            "AddHostedService" => RecognizeHostedService(method),
-            "AddDbContext" or "AddDbContextPool" => RecognizeDbContext(method, invocation, model),
-            "AddHttpClient" => RecognizeHttpClient(method),
+            HostedServiceCall => RecognizeHostedService(method),
+            DbContextCall or DbContextPoolCall => RecognizeDbContext(method, invocation, model),
+            HttpClientCall => RecognizeHttpClient(method),
             _ => []
+        };
+    }
+
+    // The invoked method's identifier text, for the shapes an invocation can spell one in: `x.M(…)`,
+    // `x?.M(…)`, and a bare `M(…)` (including their generic forms, whose GenericNameSyntax carries the same
+    // identifier). Null for anything else — an invoked expression, a parenthesized receiver chain — which is
+    // the signal to decide semantically rather than guess.
+    private static string? InvokedName(InvocationExpressionSyntax invocation)
+    {
+        return invocation.Expression switch
+        {
+            MemberAccessExpressionSyntax memberAccess => memberAccess.Name.Identifier.ValueText,
+            MemberBindingExpressionSyntax memberBinding => memberBinding.Name.Identifier.ValueText,
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            _ => null
         };
     }
 

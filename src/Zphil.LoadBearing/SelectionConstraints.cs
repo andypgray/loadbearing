@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
+using static Zphil.LoadBearing.Internal.Guard;
 
 namespace Zphil.LoadBearing;
 
@@ -481,20 +482,14 @@ public static class SelectionConstraints
 
     private static IReadOnlyList<Selection> Selections(Selection subject, Selection first, Selection[] more)
     {
-        Guard.NotNull(subject, nameof(subject));
-        var list = new List<Selection>(1 + more.Length) { NotNull(first, nameof(first)) };
-        foreach (Selection selection in more) list.Add(NotNull(selection, nameof(more)));
-
-        return list;
+        NotNull(subject, nameof(subject));
+        return OperandList.OneOrMore(first, more, selection => selection);
     }
 
     private static IReadOnlyList<Selection> WrappedTypes(Selection subject, Type first, Type[] more)
     {
-        Guard.NotNull(subject, nameof(subject));
-        var list = new List<Selection>(1 + more.Length) { Wrap(subject, NotNull(first, nameof(first))) };
-        foreach (Type type in more) list.Add(Wrap(subject, NotNull(type, nameof(more))));
-
-        return list;
+        NotNull(subject, nameof(subject));
+        return OperandList.OneOrMore(first, more, type => Wrap(subject, type));
     }
 
     // The typeof anchor list of a negative hierarchy verb (MustNotImplement / MustNotDeriveFrom /
@@ -503,10 +498,7 @@ public static class SelectionConstraints
     // exactly.
     private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
     {
-        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromType(NotNull(first, nameof(first))) };
-        foreach (Type type in more) list.Add(TypeAnchor.FromType(NotNull(type, nameof(more))));
-
-        return list;
+        return OperandList.OneOrMore(first, more, type => TypeAnchor.FromType(type));
     }
 
     // The string twin of AnchorTypes, shared by all three negatives: the same (first, params more) shape
@@ -514,19 +506,13 @@ public static class SelectionConstraints
     // blank name reaches the validation catalog (GRAMMAR §8 item 15) so it reports with every other error.
     private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
     {
-        var list = new List<TypeAnchor>(1 + more.Length) { TypeAnchor.FromName(NotNull(first, nameof(first))) };
-        foreach (string name in more) list.Add(TypeAnchor.FromName(NotNull(name, nameof(more))));
-
-        return list;
+        return OperandList.OneOrMore(first, more, name => TypeAnchor.FromName(name));
     }
 
     private static IReadOnlyList<Member> Members(Selection subject, Member first, Member[] more)
     {
-        Guard.NotNull(subject, nameof(subject));
-        var list = new List<Member>(1 + more.Length) { NotNull(first, nameof(first)) };
-        foreach (Member member in more) list.Add(NotNull(member, nameof(more)));
-
-        return list;
+        NotNull(subject, nameof(subject));
+        return OperandList.OneOrMore(first, more, member => member);
     }
 
     // The static-form MustNotUse sugar: each lambda resolves through MemberExpressionResolver stamped with
@@ -537,12 +523,9 @@ public static class SelectionConstraints
     private static IReadOnlyList<Member> ResolvedMembers<TLambda>(Selection subject, TLambda first, TLambda[] more)
         where TLambda : LambdaExpression
     {
-        Guard.NotNull(subject, nameof(subject));
+        NotNull(subject, nameof(subject));
         Arch owner = subject.Owner;
-        var list = new List<Member>(1 + more.Length) { MemberExpressionResolver.Resolve(owner, NotNull(first, nameof(first))) };
-        foreach (TLambda lambda in more) list.Add(MemberExpressionResolver.Resolve(owner, NotNull(lambda, nameof(more))));
-
-        return list;
+        return OperandList.OneOrMore(first, more, lambda => MemberExpressionResolver.Resolve(owner, lambda));
     }
 
     // A bare type target wraps as a single-type selection stamped with the subject's owner, so the
@@ -554,12 +537,6 @@ public static class SelectionConstraints
 
     private static Selection Subject(Selection subject)
     {
-        return Guard.NotNull(subject, nameof(subject));
-    }
-
-    private static T NotNull<T>(T value, string paramName)
-        where T : class
-    {
-        return Guard.NotNull(value, paramName);
+        return NotNull(subject, nameof(subject));
     }
 }

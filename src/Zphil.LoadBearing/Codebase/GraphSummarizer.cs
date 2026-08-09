@@ -16,8 +16,15 @@ public static class GraphSummarizer
     /// <summary>Builds the survey from an extracted model.</summary>
     public static GraphSummary Summarize(CodebaseModel model)
     {
+        // One pass over the type universe rather than one per project: a per-project scan makes the survey
+        // O(projects x types), and orienting on a large unfamiliar solution is the whole job. The lookup
+        // preserves Types order within each group, and a project that declares nothing gets an empty group.
+        var declaredByProject = model.Types
+            .Where(type => !type.IsExternal)
+            .ToLookup(type => type.ProjectName, StringComparer.Ordinal);
+
         var projects = model.Projects
-            .Select(project => SummarizeProject(project, model))
+            .Select(project => SummarizeProject(project, declaredByProject[project.Name]))
             .ToList();
 
         // Cross-project edges only: a same-project reference is never a cross-boundary rule candidate, so
@@ -91,11 +98,9 @@ public static class GraphSummarizer
         return globs.Any(glob => Wildcard.Match(glob, projectName));
     }
 
-    private static ProjectSummary SummarizeProject(ProjectNode project, CodebaseModel model)
+    private static ProjectSummary SummarizeProject(ProjectNode project, IEnumerable<TypeNode> declared)
     {
-        var declaredTypes = model.Types
-            .Where(type => !type.IsExternal && type.ProjectName == project.Name)
-            .ToList();
+        var declaredTypes = declared.ToList();
 
         var namespaces = declaredTypes
             .GroupBy(type => type.Namespace)
@@ -113,8 +118,14 @@ public static class GraphSummarizer
     {
         if (@namespace.Length == 0) return GlobalNamespaceLabel;
 
-        string[] segments = @namespace.Split('.');
-        return segments.Length >= 2 ? $"{segments[0]}.{segments[1]}" : segments[0];
+        // Found by scanning to the second dot rather than splitting: this runs once per external reference
+        // edge — the largest edge population in the model — and a split allocates an array plus a substring
+        // per segment to keep two of them.
+        int firstDot = @namespace.IndexOf('.');
+        if (firstDot < 0) return @namespace;
+
+        int secondDot = @namespace.IndexOf('.', firstDot + 1);
+        return secondDot < 0 ? @namespace : @namespace.Substring(0, secondDot);
     }
 
     private static string DisplayNamespace(string @namespace)

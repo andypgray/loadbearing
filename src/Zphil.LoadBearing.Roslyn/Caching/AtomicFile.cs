@@ -33,23 +33,7 @@ internal static class AtomicFile
     /// </summary>
     public static void WriteAllBytes(string path, byte[] bytes)
     {
-        string fullPath = Path.GetFullPath(path);
-        string directory = Path.GetDirectoryName(fullPath)!;
-        Directory.CreateDirectory(directory);
-
-        // Same directory as the target, so File.Move is a rename within one volume (atomic) rather than a
-        // cross-volume copy (not); the Guid makes the scratch name unique per write.
-        string tempPath = Path.Combine(directory, $"{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            WriteDurably(tempPath, bytes);
-            File.Move(tempPath, fullPath, true);
-        }
-        catch
-        {
-            TryDelete(tempPath);
-            throw;
-        }
+        PromoteViaTemp(path, temp => WriteDurably(temp, bytes));
     }
 
     /// <summary>
@@ -59,18 +43,29 @@ internal static class AtomicFile
     /// </summary>
     public static void Copy(string source, string destination)
     {
-        string fullDestination = Path.GetFullPath(destination);
-        string directory = Path.GetDirectoryName(fullDestination)!;
+        PromoteViaTemp(destination, temp =>
+        {
+            File.Copy(source, temp, true);
+            FlushToDisk(temp);
+        });
+    }
+
+    // The scaffold both public methods are: create the target's directory, have `produce` fill a uniquely-named
+    // scratch file inside it, then promote. The temp file being a sibling of the target is what makes File.Move
+    // a rename within one volume (atomic) rather than a cross-volume copy (not), and the Guid is what lets two
+    // writers of one target coexist without clobbering each other's scratch — the class's two guarantees, held
+    // in one place so the two verbs cannot spell either differently. A failure deletes the scratch and rethrows.
+    private static void PromoteViaTemp(string destination, Action<string> produce)
+    {
+        string fullPath = Path.GetFullPath(destination);
+        string directory = Path.GetDirectoryName(fullPath)!;
         Directory.CreateDirectory(directory);
 
-        // Same directory as the destination, so the promoting File.Move is an atomic same-volume rename; the
-        // Guid makes the scratch name unique per copy.
-        string tempPath = Path.Combine(directory, $"{Path.GetFileName(fullDestination)}.{Guid.NewGuid():N}.tmp");
+        string tempPath = Path.Combine(directory, $"{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
         try
         {
-            File.Copy(source, tempPath, true);
-            FlushToDisk(tempPath);
-            File.Move(tempPath, fullDestination, true);
+            produce(tempPath);
+            File.Move(tempPath, fullPath, true);
         }
         catch
         {

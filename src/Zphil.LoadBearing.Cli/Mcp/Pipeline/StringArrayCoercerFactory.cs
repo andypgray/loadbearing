@@ -59,11 +59,11 @@ internal sealed class StringArrayCoercerFactory : JsonConverterFactory
             switch (reader.TokenType)
             {
                 case JsonTokenType.StartArray:
-                    return ReadArray(ref reader);
+                    return CoercedJsonArray.ReadArray(ref reader, Identity, BadElement);
 
                 case JsonTokenType.String:
                     string value = reader.GetString()!;
-                    if (TryParseAsJsonStringArray(value, out string[] unwrapped)) return unwrapped;
+                    if (CoercedJsonArray.TryParseJsonStringArray(value, Identity, out string[] unwrapped)) return unwrapped;
 
                     return [value];
 
@@ -81,63 +81,16 @@ internal sealed class StringArrayCoercerFactory : JsonConverterFactory
             writer.WriteEndArray();
         }
 
-        /// <summary>
-        ///     Reads tokens until the matching <see cref="JsonTokenType.EndArray" />. Hand-rolled
-        ///     to avoid recursing through <see cref="StringArrayCoercerFactory" /> via
-        ///     <c>JsonSerializer.Deserialize&lt;string[]&gt;</c>.
-        /// </summary>
-        private static string[] ReadArray(ref Utf8JsonReader reader)
+        // A string[] element is the string itself: the projection CoercedJsonArray takes is the identity,
+        // which is the whole of what this coercer does differently from its enum sibling.
+        private static string Identity(string element)
         {
-            List<string> items = new();
-            while (reader.Read())
-                switch (reader.TokenType)
-                {
-                    case JsonTokenType.EndArray:
-                        return items.ToArray();
-                    case JsonTokenType.String:
-                        items.Add(reader.GetString()!);
-                        break;
-                    default:
-                        throw new UserErrorException(
-                            $"Expected a JSON array of strings; got element of type {reader.TokenType}.");
-                }
-
-            throw new JsonException("Unexpected end of JSON while reading array.");
+            return element;
         }
 
-        /// <summary>
-        ///     Returns <c>true</c> only when <paramref name="value" /> parses as a JSON array
-        ///     whose every element is a JSON string. Anything else (mixed types, nested arrays,
-        ///     malformed JSON, scalar values) returns <c>false</c> so the caller falls back to
-        ///     single-element coercion.
-        /// </summary>
-        private static bool TryParseAsJsonStringArray(string value, out string[] result)
+        private static UserErrorException BadElement(JsonTokenType tokenType)
         {
-            result = [];
-
-            var trimmed = value.AsSpan().Trim();
-            if (trimmed.Length == 0 || trimmed[0] != '[') return false;
-
-            try
-            {
-                using JsonDocument doc = JsonDocument.Parse(trimmed.ToString());
-                if (doc.RootElement.ValueKind != JsonValueKind.Array) return false;
-
-                List<string> items = new(doc.RootElement.GetArrayLength());
-                foreach (JsonElement element in doc.RootElement.EnumerateArray())
-                {
-                    if (element.ValueKind != JsonValueKind.String) return false;
-
-                    items.Add(element.GetString()!);
-                }
-
-                result = items.ToArray();
-                return true;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
+            return new UserErrorException($"Expected a JSON array of strings; got element of type {tokenType}.");
         }
     }
 }

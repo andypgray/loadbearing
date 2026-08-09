@@ -22,4 +22,16 @@ public static class PathComparison
     /// <summary>The matching <see cref="StringComparer" /> for path-keyed sets and dictionaries on this OS.</summary>
     public static readonly StringComparer Comparer =
         CaseInsensitive ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    /// <summary>
+    ///     <paramref name="path" /> case-folded by the same rule — lowercased where this OS ignores case,
+    ///     returned as-is where it does not. The form to key on when the key must be a <em>string</em> rather
+    ///     than a comparer: a hashed cache identity, a path baked into a content key. Sharing the fold with
+    ///     <see cref="Comparison" /> and <see cref="Comparer" /> is what stops a cache splitting or colliding
+    ///     against the comparisons made elsewhere about the same path.
+    /// </summary>
+    public static string Fold(string path)
+    {
+        return CaseInsensitive ? path.ToLowerInvariant() : path;
+    }
 }

@@ -52,4 +52,38 @@ internal static class ProjectCone
             directory = Path.GetDirectoryName(directory);
         }
     }
+
+    /// <summary>
+    ///     Every non-source file whose state changes what a build of the project in
+    ///     <paramref name="projectDirectory" /> produces: its <c>obj/project.assets.json</c>, then each
+    ///     <see cref="Ancestors">ancestor</see> crossed with
+    ///     <see cref="FileStamping.StructuralProbeFileNames">every probe name</see> — absent ones included,
+    ///     because a probe that later appears is itself the change.
+    /// </summary>
+    /// <remarks>
+    ///     The composition, not just its two primitives, is what the consumers must agree on: they are
+    ///     deciding whether a cached model is still valid, and a probe one of them stamps and another does not
+    ///     is a stale answer served confidently, with nothing red. The order is the order stamps are recorded
+    ///     in, so a persisted stamp list keeps its shape.
+    /// </remarks>
+    public static IEnumerable<string> StructuralPaths(string projectDirectory)
+    {
+        yield return FileStamping.AssetsPathOf(projectDirectory);
+
+        foreach (string ancestor in Ancestors(projectDirectory))
+        foreach (string probe in FileStamping.StructuralProbeFileNames)
+            yield return Path.Combine(ancestor, probe);
+    }
+
+    /// <summary>
+    ///     The cone's <c>*.cs</c> that <paramref name="known" /> does not already hold, ordinal-sorted — the
+    ///     SDK-glob adds a stat sweep cannot see. Sorted so a caller keying on the result gets the same answer
+    ///     whatever order the file system enumerated.
+    /// </summary>
+    public static IReadOnlyList<string> Adds(string projectDirectory, ICollection<string> known)
+    {
+        var adds = Enumerate(projectDirectory).Where(full => !known.Contains(full)).ToList();
+        adds.Sort(StringComparer.Ordinal);
+        return adds;
+    }
 }

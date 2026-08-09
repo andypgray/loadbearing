@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Internal;
 
@@ -21,8 +22,7 @@ public static class ContextFileComposer
     ///     Composes the context files for <paramref name="model" />. Pass the extracted
     ///     <paramref name="codebase" /> to place scoped cards, or null to compose the root block alone —
     ///     the caller owns the decision, because extraction is the expensive half and only
-    ///     <see cref="LayerContextResolver.HasAnchoredLayers" /> plus a quarantine scan can say whether
-    ///     it is worth paying.
+    ///     <see cref="HasAnythingToPlace" /> can say whether it is worth paying.
     /// </summary>
     public static ContextComposition Compose(
         ArchitectureModel model, CodebaseModel? codebase, string solutionDirectory, string specName)
@@ -42,33 +42,70 @@ public static class ContextFileComposer
         return new ContextComposition(Group(units, specName), warnings);
     }
 
+    /// <summary>
+    ///     Whether this model places anything scoped at all — a quarantined scope, or a layer carrying
+    ///     anchored rules. The cost gate every caller consults before extracting: extraction is the
+    ///     expensive half, and with nothing scoped to place there is nothing for it to place. Pure over
+    ///     the model, so it is answered before a codebase exists.
+    /// </summary>
+    public static bool HasAnythingToPlace(ArchitectureModel model)
+    {
+        Guard.NotNull(model, nameof(model));
+
+        return model.Rules.Any(rule => rule.Posture == Posture.Quarantine)
+               || LayerContextResolver.HasAnchoredLayers(model);
+    }
+
+    /// <summary>
+    ///     Every scoped card this model places against <paramref name="codebase" />, rendered and paired
+    ///     with its directory: layer local-rules cards in declaration order ahead of quarantine cards in
+    ///     model order, and an unplaceable card carried as a null directory with its skip reason rather
+    ///     than dropped. This is the composition decision itself, so <see cref="Compose" /> and any other
+    ///     consumer of scoped context — a lookup that filters the cards by which one covers a path, say —
+    ///     agree on the card kinds, their order, and what an unplaceable card means, instead of each
+    ///     walking the two resolvers and deciding again.
+    /// </summary>
+    /// <param name="model">The reified spec whose layers and quarantined scopes place the cards.</param>
+    /// <param name="codebase">The extracted codebase the placements are resolved against.</param>
+    public static IReadOnlyList<ContextCard> Placements(ArchitectureModel model, CodebaseModel codebase)
+    {
+        Guard.NotNull(model, nameof(model));
+        Guard.NotNull(codebase, nameof(codebase));
+
+        // One evaluator for both emission keys: it materializes the solution-declared type list and its
+        // noun indexes in its constructor, and resolving the two keys separately built that twice.
+        var evaluator = new SelectionEvaluator(codebase);
+        var cards = new List<ContextCard>();
+
+        foreach (LayerPlacement placement in LayerContextResolver.Resolve(model, evaluator))
+            cards.Add(new ContextCard(
+                placement.DirectoryPath,
+                AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules),
+                placement.SkipReason));
+
+        foreach (ScopePlacement placement in ScopedContextResolver.Resolve(model, evaluator))
+            cards.Add(new ContextCard(
+                placement.DirectoryPath,
+                AgentContextRenderer.ScopeCard(placement.ContainmentRule),
+                placement.SkipReason));
+
+        return cards;
+    }
+
     // Layer cards (declaration order) ahead of quarantine cards (model order), so a directory hosting
     // both receives its layer unit first and Group merges them in that order.
     private static void AddScopedUnits(
         ArchitectureModel model, CodebaseModel codebase, List<ContentUnit> units, List<string> warnings)
     {
-        foreach (LayerPlacement placement in LayerContextResolver.Resolve(model, codebase))
+        foreach (ContextCard card in Placements(model, codebase))
         {
-            if (placement.DirectoryPath is null)
+            if (card.DirectoryPath is null)
             {
-                warnings.Add(placement.SkipReason!);
+                warnings.Add(card.SkipReason!);
                 continue;
             }
 
-            units.Add(new ContentUnit(
-                placement.DirectoryPath, AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules), false));
-        }
-
-        foreach (ScopePlacement placement in ScopedContextResolver.Resolve(model, codebase))
-        {
-            if (placement.DirectoryPath is null)
-            {
-                warnings.Add(placement.SkipReason!);
-                continue;
-            }
-
-            units.Add(new ContentUnit(
-                placement.DirectoryPath, AgentContextRenderer.ScopeCard(placement.ContainmentRule), false));
+            units.Add(new ContentUnit(card.DirectoryPath, card.Body, false));
         }
     }
 

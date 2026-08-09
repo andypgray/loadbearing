@@ -32,40 +32,37 @@ namespace Zphil.LoadBearing.Cli;
 ///     capture, not a failure, so it exits 0 on success.
 /// </remarks>
 internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
+    : WorkspaceRunner(source)
 {
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
     public async Task<int> RunAsync(BaselineRequest request, CancellationToken ct)
     {
         // Mode validation FIRST — before discovering a solution or loading a workspace.
         ValidateMode(request);
 
-        using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+        using var source = await CodebaseSource.CreateWithSpecAsync(
+            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
-        // Composed for the render, so the MSBuild-selection note goes out with the load failures; the gate
-        // below reads workspace.Diagnostics, which is the only list it may ever see.
-        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
-        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
+        // Composed for the render, so the MSBuild-selection note goes out with the load failures.
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        WorkspaceDiagnosticsRenderer.Render(error, diagnostics.Rendered);
 
         // Fail closed before extraction, and so before any mode writes a byte: the workspace's own load
-        // failures are the whole gate input here (merge notes are minted later, inside extraction, and never
-        // reach this stream), filtered for NuGetAudit advisories exactly as check filters them.
-        if (IncompleteModelGate.Gates(workspace.Diagnostics, request.AllowWorkspaceDiagnostics))
+        // failures are the whole gate input here (merge notes are minted later, inside extraction), filtered
+        // for NuGetAudit advisories exactly as check filters them.
+        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
             error.WriteLine(IncompleteModelGate.BaselineMessage);
             return 2;
         }
 
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            workspace.Solution, workspace.Resolution.ExcludeProjectNames, ct);
+        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
 
         // Evaluate against an empty baseline so every current violation surfaces as the state to capture.
-        CheckReport report = ArchChecker.Check(workspace.Model, codebase, BaselineIndex.Empty);
+        CheckReport report = ArchChecker.Check(source.Model, codebase, BaselineIndex.Empty);
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.
         if (request.Add)
-            return AddEntry(request, report, workspace.SolutionDirectory);
+            return AddEntry(request, report, source.SolutionDirectory);
 
         var ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
         if (ratchetResults.Count == 0)
@@ -75,8 +72,8 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
             return 0;
         }
 
-        foreach (FileGroup group in GroupByFile(ratchetResults, workspace.SolutionDirectory))
-            ApplyFile(request, group, workspace.SolutionDirectory);
+        foreach (FileGroup group in GroupByFile(ratchetResults, source.SolutionDirectory))
+            ApplyFile(request, group, source.SolutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
         foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
@@ -162,8 +159,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         }
 
         WriteOutcome outcome = BaselineStore.Write(path, new BaselineDocument(sections));
-        string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";
-        output.WriteLine($"{label} {PathFormat.Relative(solutionDirectory, path)}");
+        output.WriteLine(WriteReport.Line(outcome, solutionDirectory, path));
         return 0;
     }
 
@@ -179,8 +175,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         foreach (RuleResult result in group.Rules) ApplyRule(request, result, sections);
 
         WriteOutcome outcome = BaselineStore.Write(group.Path, new BaselineDocument(sections));
-        string label = outcome == WriteOutcome.Wrote ? "wrote" : "unchanged";
-        output.WriteLine($"{label} {PathFormat.Relative(solutionDirectory, group.Path)}");
+        output.WriteLine(WriteReport.Line(outcome, solutionDirectory, group.Path));
     }
 
     private void ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
@@ -212,7 +207,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         }
 
         sections[ruleId] = current;
-        output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plural(current.Count, "violation")}.");
+        output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plurals.Noun(current.Count, "violation")}.");
     }
 
     // --accept-reductions: section := section ∩ current. Never adds; reports refused growth. A violation that
@@ -236,11 +231,11 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
 
         sections[ruleId] = kept;
         output.WriteLine(removed > 0
-            ? $"{ruleId}: accepted {removed} {Plural(removed, "reduction")}."
+            ? $"{ruleId}: accepted {removed} {Plurals.Noun(removed, "reduction")}."
             : $"{ruleId}: nothing to accept.");
         if (additions > 0)
             output.WriteLine(
-                $"{ruleId}: refused {additions} {Plural(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
+                $"{ruleId}: refused {additions} {Plurals.Noun(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
     }
 
     // A ratcheted rule's current baseline entries (from an empty-baseline check). Any EmptySubject/RuleError
@@ -275,11 +270,6 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         }
 
         return groups;
-    }
-
-    private static string Plural(int count, string noun)
-    {
-        return count == 1 ? noun : noun + "s";
     }
 
     private sealed class FileGroup(string path)

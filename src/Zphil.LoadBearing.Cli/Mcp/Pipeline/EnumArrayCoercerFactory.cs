@@ -75,11 +75,11 @@ internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
             switch (reader.TokenType)
             {
                 case JsonTokenType.StartArray:
-                    return ReadArray(ref reader);
+                    return CoercedJsonArray.ReadArray(ref reader, ParseElement, BadElement);
 
                 case JsonTokenType.String:
                     string value = reader.GetString()!;
-                    if (TryParseAsJsonStringArray(value, out var unwrapped)) return unwrapped;
+                    if (CoercedJsonArray.TryParseJsonStringArray(value, ParseElement, out var unwrapped)) return unwrapped;
 
                     return [ParseElement(value)];
 
@@ -97,80 +97,19 @@ internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
             writer.WriteEndArray();
         }
 
-        /// <summary>
-        ///     Reads tokens until the matching <see cref="JsonTokenType.EndArray" />. Hand-rolled
-        ///     to avoid recursing through <see cref="EnumValidationConverterFactory" /> per element;
-        ///     keeps parity with <see cref="StringArrayCoercerFactory" />'s <c>ReadArray</c>.
-        /// </summary>
-        private static T[] ReadArray(ref Utf8JsonReader reader)
-        {
-            List<T> items = new();
-            while (reader.Read())
-                switch (reader.TokenType)
-                {
-                    case JsonTokenType.EndArray:
-                        return items.ToArray();
-                    case JsonTokenType.String:
-                        items.Add(ParseElement(reader.GetString()!));
-                        break;
-                    default:
-                        throw new UserErrorException(
-                            $"Expected a JSON array of {typeof(T).Name}; got element of type {reader.TokenType}.");
-                }
-
-            throw new JsonException("Unexpected end of JSON while reading array.");
-        }
-
-        /// <summary>
-        ///     Returns <c>true</c> only when <paramref name="value" /> parses as a JSON array
-        ///     whose every element is a JSON string. Each string is then mapped to an enum value
-        ///     via <see cref="ParseElement" />, which may throw <see cref="UserErrorException" />
-        ///     for an unknown name — propagated to the caller so the model gets the valid-values
-        ///     list instead of falling through to single-coerce.
-        /// </summary>
-        private static bool TryParseAsJsonStringArray(string value, out T[] result)
-        {
-            result = [];
-
-            var trimmed = value.AsSpan().Trim();
-            if (trimmed.Length == 0 || trimmed[0] != '[') return false;
-
-            try
-            {
-                using JsonDocument doc = JsonDocument.Parse(trimmed.ToString());
-                if (doc.RootElement.ValueKind != JsonValueKind.Array) return false;
-
-                List<T> items = new(doc.RootElement.GetArrayLength());
-                foreach (JsonElement element in doc.RootElement.EnumerateArray())
-                {
-                    if (element.ValueKind != JsonValueKind.String) return false;
-
-                    items.Add(ParseElement(element.GetString()!));
-                }
-
-                result = items.ToArray();
-                return true;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-        }
-
+        // The element projection CoercedJsonArray applies — the shared name rule, so an array element and
+        // a scalar parameter admit exactly the same spellings and refuse with exactly the same message.
         private static T ParseElement(string name)
         {
-            // A numeric string ("5", "+5", " 5 ") or a comma-separated name list ("A, B") would bind
-            // to an ordinal, or to the OR of two, via Enum.TryParse — reject before parsing.
-            if (EnumStringHelper.ResolvesByArithmetic(name)) throw new UserErrorException(BuildMessage(name));
+            if (EnumStringHelper.TryParseName(name, out T parsed)) return parsed;
 
-            if (Enum.TryParse(name, true, out T parsed) && Enum.IsDefined(typeof(T), parsed)) return parsed;
-
-            throw new UserErrorException(BuildMessage(name));
+            throw new UserErrorException(EnumStringHelper.InvalidValueMessage<T>(name));
         }
 
-        private static string BuildMessage(string? attempted)
+        private static UserErrorException BadElement(JsonTokenType tokenType)
         {
-            return $"Invalid value \"{attempted}\" for parameter. Valid values: {string.Join(", ", Enum.GetNames<T>())}.";
+            return new UserErrorException(
+                $"Expected a JSON array of {typeof(T).Name}; got element of type {tokenType}.");
         }
     }
 }

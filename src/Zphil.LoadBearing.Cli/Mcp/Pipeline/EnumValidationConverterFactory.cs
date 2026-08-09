@@ -47,27 +47,18 @@ internal sealed class EnumValidationConverterFactory : JsonConverterFactory
             // Our advertised schema is "type": "string"; a client that sends a number is already
             // violating the contract, so reject non-strings with the same valid-values message
             // a bad string would get. This keeps the error surface uniform.
-            if (reader.TokenType != JsonTokenType.String) throw new UserErrorException(BuildMessage(reader.TokenType.ToString()));
+            if (reader.TokenType != JsonTokenType.String)
+                throw new UserErrorException(EnumStringHelper.InvalidValueMessage<T>(reader.TokenType.ToString()));
 
             string? name = reader.GetString();
+            if (name is not null && EnumStringHelper.TryParseName(name, out T parsed)) return parsed;
 
-            // A numeric string ("5", "+5", " 5 ") or a comma-separated name list ("A, B") would bind
-            // to an ordinal, or to the OR of two, via Enum.TryParse — reject before parsing.
-            if (name is not null && EnumStringHelper.ResolvesByArithmetic(name)) throw new UserErrorException(BuildMessage(name));
-
-            if (name is not null && Enum.TryParse(name, true, out T parsed) && Enum.IsDefined(typeof(T), parsed)) return parsed;
-
-            throw new UserErrorException(BuildMessage(name));
+            throw new UserErrorException(EnumStringHelper.InvalidValueMessage<T>(name));
         }
 
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
             writer.WriteStringValue(value.ToString());
-        }
-
-        private static string BuildMessage(string? attempted)
-        {
-            return $"Invalid value \"{attempted}\" for parameter. Valid values: {string.Join(", ", Enum.GetNames<T>())}.";
         }
     }
 }

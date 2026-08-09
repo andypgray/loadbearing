@@ -443,9 +443,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
             string projectFile = Path.GetFullPath(project.FilePath);
             RecordStructural(projectFile);
 
-            string projectDirectory = Path.GetDirectoryName(projectFile)!;
-            projectDirectories.Add(projectDirectory);
-            RecordStructural(Path.Combine(projectDirectory, "obj", "project.assets.json"));
+            projectDirectories.Add(Path.GetDirectoryName(projectFile)!);
         }
 
         foreach (string projectDirectory in projectDirectories)
@@ -453,9 +451,8 @@ public sealed class WorkspaceSession : IAsyncDisposable
             foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))
                 knownConeFiles.Add(coneFile);
 
-            foreach (string ancestor in ProjectCone.Ancestors(projectDirectory))
-            foreach (string probe in FileStamping.StructuralProbeFileNames)
-                RecordStructural(Path.Combine(ancestor, probe));
+            foreach (string path in ProjectCone.StructuralPaths(projectDirectory))
+                RecordStructural(path);
         }
     }
 

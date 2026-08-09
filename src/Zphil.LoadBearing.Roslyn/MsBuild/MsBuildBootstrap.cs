@@ -61,7 +61,7 @@ public static class MsBuildBootstrap
 
     /// <summary>
     ///     The MSBuild-selection line appended to every non-empty diagnostics list
-    ///     (<c>WorkspaceDiagnosticsRenderer.Compose</c>) and carried inline by the refusals that bypass
+    ///     (<see cref="WorkspaceDiagnostics.Rendered" />) and carried inline by the refusals that bypass
     ///     composed lists (<see cref="IncompleteModelGate.GraphRefusal" />). A project that fails to load is
     ///     nearly always a question about which MSBuild opened it, so the line that answers lives beside the
     ///     state it reads. A null selection means nothing registered MSBuild at all, which for a caller that

@@ -34,8 +34,16 @@ internal sealed class MemberSelectionEvaluator
     /// </summary>
     internal IReadOnlyList<MemberNode> Resolve(MemberSelection selection)
     {
-        var sourceTypes = _selections.Evaluate(selection.Source, SelectionPosition.Subject);
+        return Resolve(selection, _selections.Evaluate(selection.Source, SelectionPosition.Subject));
+    }
 
+    /// <summary>
+    ///     The same resolution over a source-type set the caller has already evaluated in subject
+    ///     position — what <see cref="ConstraintEvaluator" /> passes when the union-operand gate has
+    ///     computed it already, so a union member subject is not evaluated twice.
+    /// </summary>
+    internal IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
+    {
         var members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
         foreach (MemberAdjective adjective in selection.Adjectives) members = ApplyAdjective(members, adjective);
 
@@ -91,11 +99,12 @@ internal sealed class MemberSelectionEvaluator
     /// <summary>
     ///     The declared-attribute matcher for a member (GRAMMAR §4.6, §5.7) — the member twin of
     ///     <see cref="SelectionEvaluator.AttributeMatcher" />, over <see cref="IMemberInfo.Attributes" />
-    ///     instead of a type's attribute constructions, and sharing its three arms exactly. A
-    ///     <em>string</em> anchor is the open-definition arm: a name is a DEFINITION name, so it matches
-    ///     every construction of that definition and a constructed spelling matches nothing. A
-    ///     <em>generic-definition</em> <c>typeof</c> anchor matches the same way; any other <c>typeof</c>
-    ///     matches the constructed name (for a non-generic attribute the two coincide). Declared attributes
+    ///     instead of a type's attribute constructions, and sharing its arms literally: the classification
+    ///     is <see cref="SelectionEvaluator.AnchorKey" />, so a <em>string</em> anchor is the
+    ///     open-definition arm (a name is a DEFINITION name, so it matches every construction of that
+    ///     definition and a constructed spelling matches nothing), a <em>generic-definition</em>
+    ///     <c>typeof</c> anchor matches the same way, and any other <c>typeof</c> matches the constructed
+    ///     name (for a non-generic attribute the two coincide). Declared attributes
     ///     only — no inheritance, and no accessor or <c>[return:]</c> attributes (they hang off other
     ///     symbols). <see cref="TypeName.FullDisplay" /> runs once, eagerly, so an unrepresentable anchor
     ///     throws before any member is tested and <see cref="ArchChecker" /> contains it per-rule as a
@@ -103,12 +112,8 @@ internal sealed class MemberSelectionEvaluator
     /// </summary>
     internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {
-        if (anchor.DefinitionFullName is { } name)
-            return member => member.Attributes.Any(a => a.DefinitionFullName == name);
-
-        Type type = anchor.Type!;
-        string key = TypeName.FullDisplay(type);
-        return type.IsGenericTypeDefinition
+        (string key, bool onDefinition) = SelectionEvaluator.AnchorKey(anchor);
+        return onDefinition
             ? member => member.Attributes.Any(a => a.DefinitionFullName == key)
             : member => member.Attributes.Any(a => a.FullName == key);
     }

@@ -224,19 +224,19 @@ public static class LawDiagramRenderer
     {
         string? verb = rule.Constraint switch
         {
-            MustNotExposeConstraint => "expose",
-            MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint => "only",
+            MustNotExposeConstraint => ExposeVerb,
+            MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint => OnlyVerb,
             _ => null
         };
 
         if (rule.Posture == Posture.Migrate)
-            return $"-.-x|\"{(verb is null ? "grandfathered" : "grandfathered " + verb)}\"|";
+            return $"{DebtArrowHead}|\"{(verb is null ? "grandfathered" : "grandfathered " + verb)}\"|";
 
         return verb switch
         {
-            null => "--x",
-            "only" => "-->|\"only\"|",
-            _ => $"--x|\"{verb}\"|"
+            null => BanArrow,
+            OnlyVerb => $"-->|\"{OnlyVerb}\"|",
+            _ => $"{BanArrow}|\"{verb}\"|"
         };
     }
 

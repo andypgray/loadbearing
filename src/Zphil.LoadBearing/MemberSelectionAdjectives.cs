@@ -1,5 +1,5 @@
-using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
+using static Zphil.LoadBearing.Internal.Guard;
 
 namespace Zphil.LoadBearing;
 
@@ -107,13 +107,7 @@ public static class MemberSelectionAdjectives
     private static TSelf Append<TSelf>(TSelf selection, MemberAdjective adjective)
         where TSelf : MemberSelection
     {
-        Guard.NotNull(selection, nameof(selection));
+        NotNull(selection, nameof(selection));
         return (TSelf)selection.Refined(adjective);
-    }
-
-    private static T NotNull<T>(T value, string paramName)
-        where T : class
-    {
-        return Guard.NotNull(value, paramName);
     }
 }

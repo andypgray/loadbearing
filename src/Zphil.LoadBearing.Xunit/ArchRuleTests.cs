@@ -1,11 +1,8 @@
 using System.Runtime.CompilerServices;
 using Xunit;
-using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
-using Zphil.LoadBearing.Roslyn.Baselines;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Xunit;
@@ -129,7 +126,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
             throw new InvalidOperationException(
                 $"Rule '{ruleId}' was enumerated at discovery but is absent from the check run.");
 
-        if (IncompleteModelGate.Gates(run.Diagnostics, AllowWorkspaceDiagnostics))
+        if (run.Diagnostics.Gates(AllowWorkspaceDiagnostics))
             Assert.Skip(IncompleteModelGate.AdapterSkipReason);
 
         switch (result.Status)
@@ -153,7 +150,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     public async Task Workspace_LoadedCompletely()
     {
         ArchCheckRun run = await GetRunAsync();
-        if (!IncompleteModelGate.IsIncomplete(run.Diagnostics)) return;
+        if (!run.Diagnostics.IsIncomplete) return;
         if (AllowWorkspaceDiagnostics) Assert.Skip(IncompleteModelGate.AdapterOptedIn(run.Diagnostics));
         Assert.Fail(IncompleteModelGate.AdapterRefusal(run.Diagnostics));
     }
@@ -171,8 +168,10 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     // NoInlining + the non-Roslyn EnsureMsBuild() first: keeps the JIT from resolving MSBuildWorkspace
-    // before MSBuildLocator registration, so a consumer needs no ModuleInitializer. Order mirrors the CLI's
-    // CheckPipeline: baselines before extraction (a tampered baseline fails fast, before the Roslyn walk).
+    // before MSBuildLocator registration, so a consumer needs no ModuleInitializer. The check itself is the
+    // shared ArchCheckSequence, so the adapter and the CLI cannot disagree about it; what the adapter brings
+    // is its own extraction — a cold one-shot workspace, opened inside the delegate so the sequence's
+    // baselines-before-extraction ordering covers the load too.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static async Task<ArchCheckRun> RunPipelineAsync(string solutionPath, string? excludeProjectName)
     {
@@ -182,20 +181,36 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         string fullSolutionPath = Path.GetFullPath(solutionPath);
         string solutionDirectory = Path.GetDirectoryName(fullSolutionPath)!;
 
-        BaselineIndex baselines = BaselineStore.LoadForModel(model, solutionDirectory);
-
         var diagnostics = new List<string>();
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add);
-        // The same closure the CLI applies: the spec project plus the plumbing only it references, with the
-        // solution's declared members subtracted so a spec that references the code it governs never excludes it.
-        var exclude = excludeProjectName is null
-            ? null
-            : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution, exclude);
+        LoadedSolution? opened = null;
+        try
+        {
+            CheckReport report = await ArchCheckSequence.ExecuteAsync(
+                model, model.Rules, solutionDirectory,
+                async ct =>
+                {
+                    LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add, ct);
+                    opened = loaded; // handed out so the finally below disposes it whatever the walk does
 
-        CheckReport report = ArchChecker.Check(model, codebase, baselines, null);
-        var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
-        return new ArchCheckRun(byId, solutionDirectory, diagnostics);
+                    // The same closure the CLI applies: the spec project plus the plumbing only it references,
+                    // with the solution's declared members subtracted so a spec that references the code it
+                    // governs never excludes it.
+                    var exclude = excludeProjectName is null
+                        ? null
+                        : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
+                    return await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution, exclude, ct);
+                },
+                null, CancellationToken.None);
+
+            var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
+            // No merge notes: the adapter has no channel that renders them, so its diagnostics are the load
+            // failures alone — which is also the only stream the gate below may ever see.
+            return new ArchCheckRun(byId, solutionDirectory, new WorkspaceDiagnostics(diagnostics, []));
+        }
+        finally
+        {
+            opened?.Dispose();
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -207,7 +222,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     private sealed record ArchCheckRun(
         IReadOnlyDictionary<string, RuleResult> ResultsById,
         string SolutionDirectory,
-        IReadOnlyList<string> Diagnostics);
+        WorkspaceDiagnostics Diagnostics);
 
     // Per-closed-generic statics are load-bearing: each ArchRuleTests<TSpec> caches ITS spec's single check
     // run (per-TSpec caching is the whole point of the design), so these must NOT be shared across TSpec.

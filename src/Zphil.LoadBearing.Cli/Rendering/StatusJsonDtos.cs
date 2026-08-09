@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Checking;
+
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `status --json` — its own document with its own schemaVersion (2), distinct from
@@ -26,12 +28,13 @@ internal sealed record StatusJson(
 
 /// <summary>
 ///     One rule's status. <see cref="Ratchet" /> is populated for ratcheted rules (Migrate and Quarantine
-///     containment).
+///     containment). <see cref="Posture" /> and <see cref="Status" /> are the model's own enums, cased for
+///     the wire by <see cref="LoadBearingJson.Options" /> — the same values <c>check --json</c> writes.
 /// </summary>
 internal sealed record StatusRuleJson(
     string Id,
-    string Posture,
-    string Status,
+    Posture Posture,
+    RuleStatus Status,
     int Violations,
     int Warnings,
     RatchetStatusJson? Ratchet);

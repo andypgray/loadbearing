@@ -79,9 +79,9 @@ internal static class CommandFactory
             binlog
         };
 
-        check.SetAction((parseResult, ct) =>
-        {
-            var request = new CheckRequest(
+        SetRequestAction(
+            check,
+            parseResult => new CheckRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 parseResult.GetValue(json),
@@ -91,12 +91,8 @@ internal static class CommandFactory
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(sarif),
-                parseResult.GetValue(rules));
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunCheckAsync(request, output, error, hostSource, ct), error);
-        });
+                parseResult.GetValue(rules)),
+            (request, output, error, ct) => MsBuildGate.RunCheckAsync(request, output, error, hostSource, ct));
 
         return check;
     }
@@ -117,19 +113,14 @@ internal static class CommandFactory
             spec
         };
 
-        explain.SetAction((parseResult, ct) =>
-        {
-            var request = new ExplainRequest(
+        SetRequestAction(
+            explain,
+            parseResult => new ExplainRequest(
                 parseResult.GetValue(ruleId)!,
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
-                Directory.GetCurrentDirectory());
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(
-                () => MsBuildGate.RunExplainAsync(request, output, error, hostSource, ct), error);
-        });
+                Directory.GetCurrentDirectory()),
+            (request, output, error, ct) => MsBuildGate.RunExplainAsync(request, output, error, hostSource, ct));
 
         return explain;
     }
@@ -174,21 +165,17 @@ internal static class CommandFactory
             diagramExclude
         };
 
-        render.SetAction((parseResult, ct) =>
-        {
-            var request = new RenderRequest(
+        SetRequestAction(
+            render,
+            parseResult => new RenderRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(diagram),
                 parseResult.GetValue(diagramOnly),
-                parseResult.GetValue(diagramExclude));
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunRenderAsync(request, output, error, hostSource, ct), error);
-        });
+                parseResult.GetValue(diagramExclude)),
+            (request, output, error, ct) => MsBuildGate.RunRenderAsync(request, output, error, hostSource, ct));
 
         return render;
     }
@@ -253,9 +240,9 @@ internal static class CommandFactory
             allowWorkspaceDiagnostics
         };
 
-        baseline.SetAction((parseResult, ct) =>
-        {
-            var request = new BaselineRequest(
+        SetRequestAction(
+            baseline,
+            parseResult => new BaselineRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 parseResult.GetValue(init),
@@ -267,12 +254,8 @@ internal static class CommandFactory
                 parseResult.GetValue(target),
                 parseResult.GetValue(subject),
                 Directory.GetCurrentDirectory(),
-                parseResult.GetValue(allowWorkspaceDiagnostics));
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunBaselineAsync(request, output, error, hostSource, ct), error);
-        });
+                parseResult.GetValue(allowWorkspaceDiagnostics)),
+            (request, output, error, ct) => MsBuildGate.RunBaselineAsync(request, output, error, hostSource, ct));
 
         return baseline;
     }
@@ -304,21 +287,17 @@ internal static class CommandFactory
             binlog
         };
 
-        status.SetAction((parseResult, ct) =>
-        {
-            var request = new StatusRequest(
+        SetRequestAction(
+            status,
+            parseResult => new StatusRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 parseResult.GetValue(json),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
-                parseResult.GetValue(allowWorkspaceDiagnostics));
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunStatusAsync(request, output, error, hostSource, ct), error);
-        });
+                parseResult.GetValue(allowWorkspaceDiagnostics)),
+            (request, output, error, ct) => MsBuildGate.RunStatusAsync(request, output, error, hostSource, ct));
 
         return status;
     }
@@ -374,9 +353,9 @@ internal static class CommandFactory
             projects
         };
 
-        graph.SetAction((parseResult, ct) =>
-        {
-            var request = new GraphRequest(
+        SetRequestAction(
+            graph,
+            parseResult => new GraphRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(json),
                 Directory.GetCurrentDirectory(),
@@ -392,12 +371,8 @@ internal static class CommandFactory
                 // The auto-degrade budget is a property of the caller's transport, and a terminal has none:
                 // named here so its absence reads as a decision rather than an omission.
                 // ReSharper disable once ArgumentsStyleNamedExpression
-                ResponseBudgetChars: null);
-
-            TextWriter output = parseResult.InvocationConfiguration.Output;
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => MsBuildGate.RunGraphAsync(request, output, error, hostSource, ct), error);
-        });
+                ResponseBudgetChars: null),
+            (request, output, error, ct) => MsBuildGate.RunGraphAsync(request, output, error, hostSource, ct));
 
         return graph;
     }
@@ -413,18 +388,36 @@ internal static class CommandFactory
             spec
         };
 
-        mcp.SetAction((parseResult, ct) =>
-        {
-            var binding = new McpServerBinding(
+        // The one command with nothing to write to stdout: the server owns it as a JSON-RPC channel, so the
+        // output writer is discarded here rather than handed on.
+        SetRequestAction(
+            mcp,
+            parseResult => new McpServerBinding(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
-                Directory.GetCurrentDirectory());
-
-            TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(() => McpServerCommand.RunAsync(binding, error, ct), error);
-        });
+                Directory.GetCurrentDirectory()),
+            (binding, _, error, ct) => McpServerCommand.RunAsync(binding, error, ct));
 
         return mcp;
+    }
+
+    // The action shape every command shares: build the request off the parse, then run it under the
+    // top-level error handler with the SAME error writer the run itself writes to — one place, so a verb
+    // added later cannot wire the two apart, and CliErrorMapper cannot end up writing somewhere the verb's
+    // own diagnostics did not.
+    private static void SetRequestAction<TRequest>(
+        Command command,
+        Func<ParseResult, TRequest> requestFrom,
+        Func<TRequest, TextWriter, TextWriter, CancellationToken, Task<int>> run)
+    {
+        command.SetAction((parseResult, ct) =>
+        {
+            TRequest request = requestFrom(parseResult);
+
+            TextWriter output = parseResult.InvocationConfiguration.Output;
+            TextWriter error = parseResult.InvocationConfiguration.Error;
+            return CommandEntryPoint.RunAsync(() => run(request, output, error, ct), error);
+        });
     }
 
     private static Argument<string?> SolutionArgument()

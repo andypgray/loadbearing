@@ -54,7 +54,7 @@ internal static class GraphFormatter
     private static string ProjectLine(ProjectSummary project)
     {
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
-        return $"  {project.Name} — {project.Types} {Plural(project.Types, "type")}; references: {references}";
+        return $"  {project.Name} — {project.Types} {Plurals.Noun(project.Types, "type")}; references: {references}";
     }
 
     private static string NamespaceLine(ProjectSummary project)
@@ -79,10 +79,5 @@ internal static class GraphFormatter
         return summary.ExternalEdges.Count > 0
             ? summary.ExternalEdges.Select(e => $"  {e.Source} -> {e.TargetNamespaceRoot}: {e.References}")
             : ["  (none)"];
-    }
-
-    private static string Plural(int count, string noun)
-    {
-        return count == 1 ? noun : noun + "s";
     }
 }

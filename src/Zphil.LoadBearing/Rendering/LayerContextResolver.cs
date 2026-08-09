@@ -26,7 +26,14 @@ public static class LayerContextResolver
         Guard.NotNull(model, nameof(model));
         Guard.NotNull(codebase, nameof(codebase));
 
-        var evaluator = new SelectionEvaluator(codebase);
+        return Resolve(model, new SelectionEvaluator(codebase));
+    }
+
+    // The shared-evaluator entry point. An evaluator materializes the solution-declared type list and its
+    // noun indexes once, so a caller resolving both emission keys for one codebase — the composer does —
+    // builds one and hands it to both resolvers rather than paying for that list twice.
+    internal static IReadOnlyList<LayerPlacement> Resolve(ArchitectureModel model, SelectionEvaluator evaluator)
+    {
         var placements = new List<LayerPlacement>();
 
         foreach (LayerDefinition layer in model.Layers)
@@ -34,17 +41,12 @@ public static class LayerContextResolver
             var anchored = AnchoredRules(model, layer).ToList();
             if (anchored.Count == 0) continue; // A layer no rule anchors on gets no placement at all.
 
-            var sites = evaluator.Evaluate(BareLayer(anchored[0]), SelectionPosition.Subject)
-                .Where(type => !type.IsExternal)
-                .SelectMany(type => type.DeclarationSites)
-                .Select(site => site.FilePath)
-                .Distinct()
-                .ToList();
+            string? directory = DirectoryPlacement.ResolveDirectory(evaluator, BareLayer(anchored[0]));
 
-            placements.Add(sites.Count == 0
+            placements.Add(directory is null
                 ? new LayerPlacement(layer.Name, anchored, null,
                     $"layer '{layer.Name}' matched no types; no scoped context emitted")
-                : new LayerPlacement(layer.Name, anchored, DirectoryPlacement.DeepestCommonDirectory(sites), null));
+                : new LayerPlacement(layer.Name, anchored, directory, null));
         }
 
         return placements;

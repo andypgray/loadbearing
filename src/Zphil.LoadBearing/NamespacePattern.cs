@@ -11,12 +11,39 @@ namespace Zphil.LoadBearing;
 /// </summary>
 public sealed class NamespacePattern
 {
+    /// <summary>The subtree operator's spelling (GRAMMAR §4.2), so the literal and its length live in one place.</summary>
+    private const string SubtreeSuffix = ".*";
+
+    private readonly bool _matchesEverything;
+
     private readonly string _pattern;
+
+    private readonly string[]? _patternSegments;
+
+    private readonly string? _subtreePrefix;
+
+    private readonly string? _subtreePrefixDot;
 
     /// <summary>Creates a matcher for the given namespace glob.</summary>
     public NamespacePattern(string pattern)
     {
         _pattern = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
+
+        // The pattern is immutable, so the whole of what it means is invariant: which of the three shapes
+        // it is, the subtree prefix and its `prefix + "."` probe, or the literal segments. Deriving it here
+        // rather than inside Matches is what makes matching allocation-free — Matches runs once per type in
+        // the universe, per pattern, per rule, and the alternative is a substring or a split per candidate.
+        _matchesEverything = _pattern == "*";
+        if (_matchesEverything) return;
+
+        if (TryParseSubtree(_pattern, out string prefix))
+        {
+            _subtreePrefix = prefix;
+            _subtreePrefixDot = prefix + ".";
+            return;
+        }
+
+        _patternSegments = _pattern.Split('.');
     }
 
     /// <summary>
@@ -37,8 +64,7 @@ public sealed class NamespacePattern
         // Only a trailing-`.*` subtree strands a wildcard: everything before the operator is matched
         // literally, so any `*` there is dead. An interior standalone `*` (no trailing `.*`) is segment
         // matching and is fine, as is a lone `*` (length 1, never ends with `.*`).
-        if (pattern.EndsWith(".*", StringComparison.Ordinal)
-            && pattern.Substring(0, pattern.Length - 2).IndexOf('*') >= 0)
+        if (TryParseSubtree(pattern, out string prefix) && prefix.IndexOf('*') >= 0)
             return "has a trailing `.*` subtree operator but its literal prefix contains a `*`, " +
                    "which never matches; anchor the subtree on a literal prefix";
 
@@ -50,17 +76,12 @@ public sealed class NamespacePattern
     {
         Guard.NotNull(@namespace, nameof(@namespace));
 
-        if (_pattern == "*") return true;
+        if (_matchesEverything) return true;
 
-        if (_pattern.EndsWith(".*", StringComparison.Ordinal))
-        {
-            // Self-inclusive subtree: `MyApp.Domain.*` matches `MyApp.Domain` and all descendants.
-            string prefix = _pattern.Substring(0, _pattern.Length - 2);
-            return string.Equals(@namespace, prefix, StringComparison.Ordinal)
-                   || @namespace.StartsWith(prefix + ".", StringComparison.Ordinal);
-        }
+        // Self-inclusive subtree: `MyApp.Domain.*` matches `MyApp.Domain` and all descendants.
+        if (_subtreePrefix is not null) return PrefixCovers(_subtreePrefix, _subtreePrefixDot!, @namespace);
 
-        string[] patternSegments = _pattern.Split('.');
+        string[] patternSegments = _patternSegments!;
         string[] namespaceSegments = @namespace.Split('.');
         if (patternSegments.Length != namespaceSegments.Length) return false;
 
@@ -69,6 +90,41 @@ public sealed class NamespacePattern
                 return false;
 
         return true;
+    }
+
+    /// <summary>
+    ///     Decomposes the trailing-<c>.*</c> subtree operator (GRAMMAR §4.2): true with the literal prefix
+    ///     when <paramref name="glob" /> carries it, false with the glob itself when it does not. The one
+    ///     home for the operator's spelling — the matcher, its build-time gate, the diagram's nesting
+    ///     decision and the diagram's node slug all ask here rather than each stripping two characters.
+    /// </summary>
+    internal static bool TryParseSubtree(string glob, out string prefix)
+    {
+        if (glob.EndsWith(SubtreeSuffix, StringComparison.Ordinal))
+        {
+            prefix = glob.Substring(0, glob.Length - SubtreeSuffix.Length);
+            return true;
+        }
+
+        prefix = glob;
+        return false;
+    }
+
+    /// <summary>
+    ///     Whether a subtree rooted at <paramref name="prefix" /> covers <paramref name="candidate" /> —
+    ///     the self-inclusive rule the operator carries: the prefix itself, or anything below a dot.
+    /// </summary>
+    internal static bool PrefixCovers(string prefix, string candidate)
+    {
+        return PrefixCovers(prefix, prefix + ".", candidate);
+    }
+
+    // The same rule with the `prefix + "."` probe supplied, for the matcher's hot path — it precomputes the
+    // probe once in the constructor rather than concatenating a string per candidate type.
+    private static bool PrefixCovers(string prefix, string prefixDot, string candidate)
+    {
+        return string.Equals(candidate, prefix, StringComparison.Ordinal)
+               || candidate.StartsWith(prefixDot, StringComparison.Ordinal);
     }
 
     private static bool SegmentMatches(string pattern, string segment)

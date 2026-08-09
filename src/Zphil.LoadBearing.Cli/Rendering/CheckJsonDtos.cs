@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Checking;
+
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `check --json` (schemaVersion 3 — Quarantine containment evaluates and ratchets, and a
@@ -35,12 +37,14 @@ internal sealed record CheckJson(
 
 /// <summary>
 ///     One rule's result. <see cref="Baseline" /> is populated for ratcheted rules (Migrate and Quarantine
-///     containment).
+///     containment). <see cref="Posture" /> and <see cref="Status" /> are the model's own enums — the
+///     camelCase wire spelling is <see cref="LoadBearingJson.Options" />'s to apply, so a renderer cannot
+///     write a value no member names.
 /// </summary>
 internal sealed record RuleJson(
     string Id,
-    string Posture,
-    string Status,
+    Posture Posture,
+    RuleStatus Status,
     string Sentence,
     string Because,
     string? Fix,
@@ -54,7 +58,7 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 
 /// <summary>One violation; the null slots are omitted per kind.</summary>
 internal sealed record ViolationJson(
-    string Kind,
+    ViolationKind Kind,
     string? Source,
     string? Target,
     string? TargetMember,
@@ -67,7 +71,7 @@ internal sealed record ViolationJson(
 internal sealed record SiteJson(string File, int Line);
 
 /// <summary>A non-fatal warning.</summary>
-internal sealed record WarningJson(string Kind, string Message);
+internal sealed record WarningJson(CheckWarningKind Kind, string Message);
 
 /// <summary>The roll-up counts.</summary>
 internal sealed record SummaryJson(

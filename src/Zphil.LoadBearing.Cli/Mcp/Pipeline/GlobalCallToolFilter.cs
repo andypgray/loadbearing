@@ -67,7 +67,7 @@ internal static class GlobalCallToolFilter
                     {
                         int maxChars = ResponseTruncator.ComputeMaxChars(
                             context.Server.Services?.GetService<IEnvironment>()
-                                ?.GetVariable(ResponseTruncator.MaxOutputTokensVariable));
+                                ?.GetVariable(LoadBearingEnvVars.MaxMcpOutputTokens));
                         string toolName = context.Params.Name;
                         foreach (ContentBlock contentBlock in result.Content)
                             if (contentBlock is TextContentBlock textBlock)

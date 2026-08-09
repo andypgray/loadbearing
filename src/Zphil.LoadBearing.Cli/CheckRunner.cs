@@ -26,21 +26,12 @@ internal sealed class CheckRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
 {
-    private readonly IEnvironment environment = environment ?? new SystemEnvironment();
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
-    /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
-    internal CodebaseSourceOutcome? LastOutcome { get; private set; }
-
-    /// <summary>The projects the last run re-extracted from a workspace. Internal test observable; never printed.</summary>
-    internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = new HashSet<string>();
-
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
     {
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            solutionSource, environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
+            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
         // Select — and refuse an unmatched filter — before extraction: rule IDs come from the spec model,
         // which is already resolved here, so nothing about a bad --rules value needs a codebase walk to say
@@ -50,24 +41,23 @@ internal sealed class CheckRunner(
         WriteFilterStamp(request, ruleGlobs, rules.Count, source.Model.Rules.Count);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, request.DiffBase, rules, ct);
-        LastOutcome = source.Outcome;
-        LastReExtractedProjects = source.ReExtractedProjects;
+        RecordCacheOutcome(source);
 
-        // Workspace-load failures and merge notes ride the one rendered diagnostics stream (stderr warning:
-        // lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures first, with the
-        // MSBuild-selection note composed onto the end so all three surfaces carry it. Only the load failures
-        // gate, so the two are combined for display but kept separate for the exit decision below — which is
-        // why every gate call below reads source.Diagnostics and never this list.
-        var renderedDiagnostics =
-            WorkspaceDiagnosticsRenderer.Compose([.. source.Diagnostics, .. source.MergeNotes]);
+        // check is the one verb that folds the advisory merge notes into its rendered diagnostics stream
+        // (stderr warning: lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures
+        // first. It has already extracted by the time it renders, so it is the only verb whose merge notes
+        // exist yet, and the same-FQN conflation advisories are read here beside the violations they can
+        // explain. They never reach the gate: that decision is WorkspaceDiagnostics' and keys on the load
+        // failures alone.
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        var renderedDiagnostics = diagnostics.RenderedWithMergeNotes;
 
         // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
-        // exit 2 take precedence over 0/1, unless the operator opted into the partial model. Merge notes
-        // never reach the gate by construction (they ride source.MergeNotes); the NuGetAudit carve-out lives
-        // in IncompleteModelGate with the rest of the shared answer. Both computed above Render so the
-        // document and the SARIF stamp carry the same verdict the gate below returns.
-        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
-        bool gated = IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics);
+        // exit 2 take precedence over 0/1, unless the operator opted into the partial model. The NuGetAudit
+        // carve-out lives with the rest of the shared answer. Both computed above Render so the document and
+        // the SARIF stamp carry the same verdict the gate below returns.
+        bool modelIncomplete = diagnostics.IsIncomplete;
+        bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
 
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),

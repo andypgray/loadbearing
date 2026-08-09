@@ -4,6 +4,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -235,7 +236,7 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable(
-            ResponseTruncator.MaxOutputTokensVariable, tokens.ToString(CultureInfo.InvariantCulture));
+            LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
 
         // Act — the plain call, with no overview argument: the degrade is the server's own decision.
         CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);

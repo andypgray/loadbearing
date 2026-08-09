@@ -66,12 +66,16 @@ internal static class SarifReportRenderer
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics)
     {
+        // One relativizer for the whole log: the solution directory is the same string for every site, and
+        // normalizing plus splitting it is the constant half of the walk.
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+
         var driver = new SarifDriver(DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report));
         var run = new SarifRun(
             new SarifTool(driver),
             BuildInvocations(executionSuccessful, workspaceDiagnostics),
             BuildOriginalUriBaseIds(),
-            BuildResults(report, solutionDirectory));
+            BuildResults(report, relativizer));
         var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
         return JsonSerializer.Serialize(log, LoadBearingJson.Context.SarifLog);
     }
@@ -89,7 +93,7 @@ internal static class SarifReportRenderer
                 new SarifMessage(rule.Because),
                 rule.Fix is { } fix ? new SarifMessage(fix) : null,
                 new SarifReportingConfiguration(ErrorLevel),
-                new SarifRuleProperties(Camel(rule.Posture.ToString()))))
+                new SarifRuleProperties(rule.Posture)))
             .ToList();
     }
 
@@ -116,13 +120,13 @@ internal static class SarifReportRenderer
 
     // Results in the locked order: rules in model order → per rule, red Violations then Grandfathered (both
     // already ordered by ArchChecker.Order) → each violation's Sites in stored order (one result per site).
-    private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, string solutionDirectory)
+    private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, PathFormat.Relativizer relativizer)
     {
         var results = new List<SarifResult>();
         foreach (RuleResult result in report.Results)
         {
             foreach (Violation violation in result.Violations)
-                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, "new", null, solutionDirectory));
+                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, "new", null, relativizer));
 
             // Grandfathered is index-aligned with GrandfatheredEntries (RuleResult invariant), so entry i
             // is the stored baseline entry that blessed violation i — its because becomes the justification.
@@ -132,7 +136,7 @@ internal static class SarifReportRenderer
                 BaselineEntry entry = result.GrandfatheredEntries[i];
                 string justification = entry.Because ?? $"grandfathered in {result.Rule.BaselinePath}";
                 IReadOnlyList<SarifSuppression> suppressions = new[] { new SarifSuppression("external", justification) };
-                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", suppressions, solutionDirectory));
+                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", suppressions, relativizer));
             }
         }
 
@@ -148,7 +152,7 @@ internal static class SarifReportRenderer
         string level,
         string baselineState,
         IReadOnlyList<SarifSuppression>? suppressions,
-        string solutionDirectory)
+        PathFormat.Relativizer relativizer)
     {
         BaselineEntry? identity = violation.BaselineIdentity();
         string source = identity?.Source ?? string.Empty;
@@ -159,7 +163,7 @@ internal static class SarifReportRenderer
 
         foreach (SourceLocation site in violation.Sites)
         {
-            string relativePath = PathFormat.Relative(solutionDirectory, site.FilePath);
+            string relativePath = relativizer.Relative(site.FilePath);
             int ordinal = ordinals.TryGetValue(relativePath, out int seen) ? seen : 0;
             ordinals[relativePath] = ordinal + 1;
 
@@ -207,10 +211,5 @@ internal static class SarifReportRenderer
     {
         string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
         return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
-    }
-
-    private static string Camel(string name)
-    {
-        return name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
     }
 }

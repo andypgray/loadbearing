@@ -16,18 +16,6 @@ internal static class SerilogConfiguration
     private const string OutputTemplate =
         "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SessionId}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-    /// <summary>Environment variable selecting the minimum log level (Serilog or Microsoft names accepted).</summary>
-    internal const string LogLevelVariable = "LOADBEARING_LOG_LEVEL";
-
-    /// <summary>
-    ///     Session id tagging every log line so concurrent server processes sharing the daily-rolling
-    ///     file can be told apart, and — when launched by Claude Code — correlated with that session.
-    /// </summary>
-    private static readonly string SessionId =
-        Environment.GetEnvironmentVariable("CLAUDE_CODE_SESSION_ID") is { Length: > 0 } claudeSession
-            ? claudeSession
-            : Guid.NewGuid().ToString("N")[..8];
-
     /// <summary>Absolute path to the daily-rolling log directory.</summary>
     internal static readonly string LogDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -38,13 +26,23 @@ internal static class SerilogConfiguration
     ///     Creates the static <see cref="Log.Logger" /> with a daily rolling file sink. Call before any
     ///     host building so crash handlers can use it immediately.
     /// </summary>
-    public static void InitializeFileLogger()
+    /// <param name="rawLogLevel">
+    ///     The unparsed <c>LOADBEARING_LOG_LEVEL</c> value — read by the caller, which owns the one env
+    ///     seam, because this runs before the host that would inject it exists.
+    /// </param>
+    /// <param name="sessionId">
+    ///     The launching agent session's id, or null for a generated one. It tags every log line so
+    ///     concurrent server processes sharing the daily-rolling file can be told apart and, when the
+    ///     launcher supplied one, correlated with the session that started them.
+    /// </param>
+    public static void InitializeFileLogger(string? rawLogLevel, string? sessionId)
     {
-        LogEventLevel minimumLevel = ParseLogLevel(Environment.GetEnvironmentVariable(LogLevelVariable));
+        LogEventLevel minimumLevel = ParseLogLevel(rawLogLevel);
+        string resolvedSessionId = sessionId is { Length: > 0 } ? sessionId : Guid.NewGuid().ToString("N")[..8];
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Is(minimumLevel)
-            .Enrich.WithProperty("SessionId", SessionId)
+            .Enrich.WithProperty("SessionId", resolvedSessionId)
             .WriteTo.File(
                 Path.Combine(LogDirectory, "loadbearing-mcp-.log"),
                 rollingInterval: RollingInterval.Day,
@@ -81,7 +79,7 @@ internal static class SerilogConfiguration
     }
 
     /// <summary>
-    ///     Parses a <see cref="LogLevelVariable" /> value into a Serilog level, accepting both
+    ///     Parses a <c>LOADBEARING_LOG_LEVEL</c> value into a Serilog level, accepting both
     ///     <see cref="LogLevel" /> and <see cref="LogEventLevel" /> names and falling back to
     ///     <see cref="LogEventLevel.Warning" /> for null, blank, or unrecognised input.
     /// </summary>

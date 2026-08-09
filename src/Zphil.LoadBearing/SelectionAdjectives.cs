@@ -1,5 +1,5 @@
-using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
+using static Zphil.LoadBearing.Internal.Guard;
 
 namespace Zphil.LoadBearing;
 
@@ -162,7 +162,7 @@ public static class SelectionAdjectives
 
     private static Selection Append(Selection selection, SelectionAdjective adjective)
     {
-        Guard.NotNull(selection, nameof(selection));
+        NotNull(selection, nameof(selection));
         var adjectives = new List<SelectionAdjective>(selection.Adjectives) { adjective };
 
         // A union owns its adjectives rather than distributing them through its operands (GRAMMAR §5.1):
@@ -171,11 +171,5 @@ public static class SelectionAdjectives
         return selection is UnionSelection union
             ? union.WithAdjectives(adjectives)
             : new RefinedSelection(selection.Owner, selection.Noun, adjectives);
-    }
-
-    private static T NotNull<T>(T value, string paramName)
-        where T : class
-    {
-        return Guard.NotNull(value, paramName);
     }
 }

@@ -32,33 +32,24 @@ internal sealed class GraphRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
 {
-    private readonly IEnvironment environment = environment ?? new SystemEnvironment();
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
-    /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
-    internal CodebaseSourceOutcome? LastOutcome { get; private set; }
-
-    /// <summary>The projects the last run re-extracted from a workspace. Internal test observable; never printed.</summary>
-    internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = new HashSet<string>();
-
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)
     {
         using var source = await CodebaseSource.CreateSpeclessAsync(
-            solutionSource, environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
+            SolutionSource, Environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
 
         // Refuse before extraction, not after: a survey of a partial model is a wrong map, not a smaller one.
         // The refusal carries the diagnostics in its own text rather than leaving them to the stderr render
         // below, so the MCP surface — which discards this error writer — gets the same actionable message.
         // A cache hit refuses identically: diagnostics persist into the extraction cache and replay with it.
-        bool modelIncomplete = IncompleteModelGate.IsIncomplete(source.Diagnostics);
-        if (IncompleteModelGate.Gates(source.Diagnostics, request.AllowWorkspaceDiagnostics))
-            throw new UserErrorException(IncompleteModelGate.GraphRefusal(source.Diagnostics));
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        bool modelIncomplete = diagnostics.IsIncomplete;
+        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
+            throw new UserErrorException(IncompleteModelGate.GraphRefusal(diagnostics));
 
         CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
-        LastOutcome = source.Outcome;
-        LastReExtractedProjects = source.ReExtractedProjects;
+        RecordCacheOutcome(source);
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string solutionName = Path.GetFileName(source.SolutionPath);
 
@@ -72,8 +63,8 @@ internal sealed class GraphRunner(
 
         // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr. Composed
         // once for both, so the survey document carries the MSBuild-selection note the refusal above already
-        // carries. The gate read source.Diagnostics, not this list.
-        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(source.Diagnostics);
+        // carries.
+        var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         if (request.Json)
@@ -150,12 +141,14 @@ internal sealed class GraphRunner(
                + "can name a project outside the scope.";
     }
 
-    // The unmatched-filter refusal, worded like explain's unknown-rule refusal: name what did not match, then
-    // list what was available, so the next command is one edit away.
+    // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal also takes. The
+    // roster rides in survey order, not sorted: it is the summary's own order, which is what the rest of
+    // the survey prints.
     private static string UnmatchedProjectsMessage(IReadOnlyList<string> projectGlobs, GraphSummary summary)
     {
-        var names = summary.Projects.Select(project => project.Name);
-        return $"No project matched '{string.Join(";", projectGlobs)}'. Available projects:\n  "
-               + string.Join("\n  ", names);
+        return Refusals.NotFoundMessage(
+            $"No project matched '{string.Join(";", projectGlobs)}'",
+            "Available projects",
+            summary.Projects.Select(project => project.Name));
     }
 }

@@ -1,28 +1,26 @@
-using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Diff;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
-using Zphil.LoadBearing.Roslyn.Baselines;
 
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The shared check core over a <see cref="CodebaseSource" />, reused by <c>check</c> and <c>status</c>:
-///     load the ratcheted baselines <em>before</em> extraction (so a tampered file fails fast, before the
-///     expensive Roslyn walk), resolve the optional <c>--diff-base</c> diff (a bad ref also fails fast),
-///     extract the codebase excluding the spec project and its private plumbing, and evaluate the rules the
-///     caller selected. The two commands differ only in how they render the resulting
-///     <see cref="CheckReport" /> and their exit codes — <c>check</c> gates, <c>status</c> reports (and
-///     passes no diff base, so its tripwires skip).
+///     The CLI's half of the check core over a <see cref="CodebaseSource" />, reused by <c>check</c> and
+///     <c>status</c>: pick the rules, name the two things only the host can supply — how to extract this
+///     run's codebase, and how to resolve its <c>--diff-base</c> — and hand them to
+///     <see cref="ArchCheckSequence" />, which owns the order they run in. The two commands differ only in
+///     how they render the resulting <see cref="CheckReport" /> and their exit codes — <c>check</c> gates,
+///     <c>status</c> reports (and passes no diff base, so its tripwires skip).
 /// </summary>
 /// <remarks>
-///     The baseline load and diff resolution deliberately precede <see cref="CodebaseSource.ExtractAsync" />:
-///     a tampered baseline or a bad <c>--diff-base</c> must fail fast before any extraction runs, whether that
-///     extraction is a cheap cache-hit merge or a full cold workspace walk. <see cref="SelectRules" /> is
-///     earlier still, and separated from <see cref="ExecuteAsync" /> for that reason — rule IDs are a
-///     property of the spec model, which is already in hand, so an unmatched filter must never cost a
-///     codebase walk to refuse.
+///     Both fail-fast preconditions — a tampered baseline, an unresolvable <c>--diff-base</c> — precede
+///     <see cref="CodebaseSource.ExtractAsync" />, which is why extraction goes down as a delegate rather
+///     than as an already-extracted model: the ordering is <see cref="ArchCheckSequence" />'s to hold, and it
+///     holds whether the extraction is a cheap cache-hit merge or a full cold workspace walk.
+///     <see cref="SelectRules" /> is earlier still, and separated from <see cref="ExecuteAsync" /> for that
+///     reason — rule IDs are a property of the spec model, which is already in hand, so an unmatched filter
+///     must never cost a codebase walk to refuse.
 /// </remarks>
 internal static class CheckPipeline
 {
@@ -40,28 +38,25 @@ internal static class CheckPipeline
         return selected;
     }
 
-    public static async Task<CheckReport> ExecuteAsync(
+    public static Task<CheckReport> ExecuteAsync(
         CodebaseSource source, string? diffBase, IReadOnlyList<ArchRule> rules, CancellationToken ct)
     {
-        BaselineIndex baselines = BaselineStore.LoadForModel(source.Model, source.SolutionDirectory);
+        Func<CancellationToken, Task<CodebaseModel>> extract =
+            token => source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
 
-        // Resolve the diff before extraction so a bad ref (or missing git) fails fast, mirroring the
-        // baseline-before-extraction ordering.
-        DiffContext? diff = diffBase is null
+        Func<CancellationToken, Task<DiffContext>>? resolveDiff = diffBase is null
             ? null
-            : await GitChangedFiles.ResolveAsync(diffBase, source.SolutionDirectory, ct);
+            : token => GitChangedFiles.ResolveAsync(diffBase, source.SolutionDirectory, token);
 
-        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
-
-        return ArchChecker.Check(rules, codebase, baselines, diff);
+        return ArchCheckSequence.ExecuteAsync(
+            source.Model, rules, source.SolutionDirectory, extract, resolveDiff, ct);
     }
 
-    // The unmatched-filter refusal, worded like explain's unknown-rule refusal and graph's unmatched-project
-    // one: name what did not match, then list what was available, so the next command is one edit away.
+    // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal and graph's
+    // unmatched-project one also take.
     private static string UnmatchedRulesMessage(IReadOnlyList<string> ruleIdGlobs, ArchitectureModel model)
     {
-        var ids = model.Rules.Select(rule => rule.Id).OrderBy(id => id, StringComparer.Ordinal);
-        return $"No rule matched '{string.Join(";", ruleIdGlobs)}'. Available rule IDs:\n  "
-               + string.Join("\n  ", ids);
+        return Refusals.NotFoundMessage(
+            $"No rule matched '{string.Join(";", ruleIdGlobs)}'", "Available rule IDs", Refusals.AvailableRuleIds(model));
     }
 }

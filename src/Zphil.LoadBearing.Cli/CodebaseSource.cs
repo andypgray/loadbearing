@@ -30,7 +30,7 @@ internal enum CodebaseSourceOutcome
 }
 
 /// <summary>
-///     The check/status/graph extraction seam over the persisted extraction cache. It carries
+///     The one model-acquisition seam, shared by every verb and tool that reads this solution. It carries
 ///     everything a run needs before the codebase itself — the loaded <see cref="Model" /> and spec
 ///     <see cref="Resolution" /> (both absent for the spec-less <c>graph</c> survey), the discovered
 ///     <see cref="SolutionPath" />, and the workspace <see cref="Diagnostics" /> — and defers the codebase to
@@ -54,23 +54,39 @@ internal enum CodebaseSourceOutcome
 ///         <b>The warm MCP path leaves the persisted cache untouched.</b> Tool calls pass <c>--no-cache</c>
 ///         (a <see cref="CodebaseSourceOutcome.Disabled" /> run), so <c>cache.json</c> and the warm
 ///         <see cref="WorkspaceSession" /> keep independent lifetimes and never race on the file. That
-///         Disabled branch is not always a full cold walk, though: when the handle carries a warm fragment
-///         extractor (<see cref="SolutionHandle.WarmFragments" />) it merges the session store's
-///         reused-plus-re-extracted fragments instead, so a warm re-check re-walks only the projects whose
-///         bytes changed.
+///         Disabled branch is not always a full cold walk, though: when the handle carries a warm codebase
+///         producer (<see cref="SolutionHandle.WarmCodebase" />) it takes the session store's model instead,
+///         so a warm re-check re-walks only the projects whose bytes changed — and re-merges only when one
+///         of them did.
+///     </para>
+///     <para>
+///         <b>
+///             Which verbs front the persisted cache is a policy, not an accident of which ladder they were
+///             written on.
+///         </b>
+///         <c>check</c>, <c>status</c> and <c>graph</c> do
+///         (<see cref="CreateWithSpecAsync(ISolutionSource,IEnvironment,string,string,string,bool,CancellationToken)" />
+///         and <see cref="CreateSpeclessAsync" /> take the caller's <c>--no-cache</c>); <c>render</c>,
+///         <c>baseline</c>, <c>explain</c> and the <c>arch_context</c> tool do not
+///         (<see cref="CreateWithSpecAsync(ISolutionSource,string,string,string,CancellationToken)" />).
+///         They all acquire here either way, so the warm path, the merge notes and the incomplete-model
+///         diagnostics are one thing taught once rather than a policy each ladder learns separately.
 ///     </para>
 /// </remarks>
 internal sealed class CodebaseSource : IDisposable
 {
-    /// <summary>The CLI-side environment variable overriding the cache root (also the test-isolation knob).</summary>
-    internal const string CacheDirectoryVariable = "LOADBEARING_CACHE_DIR";
-
     private readonly CacheReadResult cacheRead;
     private readonly SolutionHandle? handle;
+    private readonly IReadOnlyList<string> loadFailures;
     private readonly ArchitectureModel? model;
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
     private readonly ExtractionCacheStore? store;
+
+    // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
+    // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
+    // Empty until ExtractAsync runs, which is why Diagnostics is composed per read rather than captured.
+    private IReadOnlyList<string> mergeNotes = [];
 
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
@@ -87,7 +103,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         Outcome = outcome;
         SolutionPath = solutionPath;
-        Diagnostics = diagnostics;
+        loadFailures = diagnostics;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -107,8 +123,13 @@ internal sealed class CodebaseSource : IDisposable
     public SpecResolution Resolution =>
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
-    /// <summary>Workspace-load diagnostics — freshly collected on a cold run, replayed from the cache on a hit.</summary>
-    public IReadOnlyList<string> Diagnostics { get; }
+    /// <summary>
+    ///     How well the workspace loaded: the load failures — freshly collected on a cold run, replayed from
+    ///     the cache on a hit — and the merge notes the last <see cref="ExtractAsync" /> produced (empty
+    ///     before it runs). Read per call rather than captured, so a verb that renders after extracting sees
+    ///     the notes and one that gates before it sees the load failures alone.
+    /// </summary>
+    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes);
 
     /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>.</summary>
     public string SolutionPath { get; }
@@ -121,14 +142,6 @@ internal sealed class CodebaseSource : IDisposable
     ///     on a partial, none on a hit or disabled run). Internal test observable for the partial re-extraction pin.
     /// </summary>
     internal IReadOnlySet<string> ReExtractedProjects => reExtractedProjects;
-
-    /// <summary>
-    ///     The advisory merge notes the last <see cref="ExtractAsync" /> produced (same-FQN cross-project
-    ///     conflation), regenerated from the fragments on every path — a cache hit re-merges, so these
-    ///     need no persistence. Empty until <see cref="ExtractAsync" /> runs. Distinct from
-    ///     <see cref="Diagnostics" />: merge notes ride the same rendered diagnostics stream but never gate.
-    /// </summary>
-    internal IReadOnlyList<string> MergeNotes { get; private set; } = [];
 
     /// <summary>Disposes the owned cold workspace; a no-op on a cache hit (which owns none).</summary>
     public void Dispose()
@@ -164,7 +177,7 @@ internal sealed class CodebaseSource : IDisposable
         if (read.Outcome == CacheOutcome.Hit
             && ResolveSpecOnHit(spec, read.SpecResolutions) is { } hitResolution)
         {
-            ArchitectureModel hitModel = ModelPipeline.LoadModel(hitResolution.DllPath);
+            ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
             return new CodebaseSource(
                 CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, hitModel, hitResolution,
                 null, store, read, normalized);
@@ -174,6 +187,28 @@ internal sealed class CodebaseSource : IDisposable
         CodebaseSourceOutcome coldOutcome =
             read.Outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
         return await CreateColdWithSpecAsync(source, solutionPath, spec, normalized, store, read, coldOutcome, ct);
+    }
+
+    /// <summary>
+    ///     Discovers the solution and prepares a spec-ful source for the verbs that never front the persisted
+    ///     extraction cache — <c>render</c>, <c>baseline</c>, <c>explain</c> and the <c>arch_context</c> tool.
+    ///     Identical to the cache-aware overload with <c>noCache: true</c>: nothing is read from
+    ///     <c>cache.json</c> and nothing written to it, so what these runs touch on disk is what a plain cold
+    ///     run touches. They still acquire through the same seam, so a host that keeps a warm session serves
+    ///     them its model (<see cref="SolutionHandle.WarmCodebase" />) rather than a fresh walk per call.
+    /// </summary>
+    /// <remarks>
+    ///     The persisted cache is deliberately left to the three verbs that ratchet on it. These four either
+    ///     write files from the model (<c>render</c>, <c>baseline</c>) or answer a single lookup out of it
+    ///     (<c>explain</c>, <c>arch_context</c>), and none of them is the caller a cache-invalidation bug
+    ///     should first be discovered by.
+    /// </remarks>
+    public static Task<CodebaseSource> CreateWithSpecAsync(
+        ISolutionSource source, string? solution, string? spec, string workingDirectory, CancellationToken ct)
+    {
+        // The environment seam only ever locates the cache root, and this path has no cache to locate.
+        return CreateWithSpecAsync(
+            source, new SystemEnvironment(), solution, spec, workingDirectory, true, ct);
     }
 
     /// <summary>
@@ -218,8 +253,8 @@ internal sealed class CodebaseSource : IDisposable
         CodebaseModel codebase = await ExtractCoreAsync(excludeProjectNames, ct);
         // The advisory merge notes are a function of the merged fragments, so every path (hit, warm, cold)
         // regenerates them through FragmentMerger — the cache stores fragments, never notes. Captured here,
-        // off the one exit, so the runners can surface them beside the workspace-load diagnostics.
-        MergeNotes = codebase.MergeNotes;
+        // off the one exit, so Diagnostics can surface them beside the workspace-load failures.
+        mergeNotes = codebase.MergeNotes;
         return codebase;
     }
 
@@ -227,21 +262,23 @@ internal sealed class CodebaseSource : IDisposable
         IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
         if (Outcome == CodebaseSourceOutcome.Hit)
-            return FragmentMerger.Merge(Retain(cacheRead.ReusableFragments, excludeProjectNames));
+            return FragmentMerger.Merge(FragmentMerger.Retain(cacheRead.ReusableFragments, excludeProjectNames));
 
         Solution solution = handle!.Solution;
 
         if (store is null) // Disabled: no persisted cache — either a pure cold walk or the warm incremental path.
         {
-            if (handle.WarmFragments is { } warmFragments)
+            if (handle.WarmCodebase is { } warmCodebase)
             {
-                // The warm MCP path: the session-scoped store reuses clean projects' fragments and re-walks
-                // only the dirty ∪ dependent set, terminating in the same FragmentMerger every path uses.
-                // Exclusion is the merge-time Retain, so one store serves every tool whatever it drops; the
-                // store's re-extraction set becomes this source's observable so the runner counters keep meaning.
-                SessionFragmentSet warm = await warmFragments(ct);
+                // The warm MCP path: the session-scoped store reuses clean projects' fragments, re-walks only
+                // the dirty ∪ dependent set, and terminates in the same FragmentMerger every path uses —
+                // memoized against the fragment set and this exclusion, so a call that re-walked nothing gets
+                // the model unchanged. Exclusion goes down as an argument because it is applied at merge
+                // time, so one store serves every tool whatever it drops; the store's re-extraction set
+                // becomes this source's observable so the runner counters keep meaning.
+                SessionCodebase warm = await warmCodebase(excludeProjectNames, ct);
                 reExtractedProjects = new HashSet<string>(warm.ReExtractedProjects, StringComparer.Ordinal);
-                return FragmentMerger.Merge(Retain(warm.Fragments, excludeProjectNames));
+                return warm.Model;
             }
 
             return await CodebaseExtractor.ExtractFromSolutionAsync(solution, excludeProjectNames, ct);
@@ -251,7 +288,7 @@ internal sealed class CodebaseSource : IDisposable
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
         var allFragments = await ExtractAllFragmentsAsync(solution, ct);
-        CodebaseModel merged = FragmentMerger.Merge(Retain(allFragments, excludeProjectNames));
+        CodebaseModel merged = FragmentMerger.Merge(FragmentMerger.Retain(allFragments, excludeProjectNames));
 
         if (fingerprint is not null)
             TryWrite(solution, fingerprint, allFragments, ct);
@@ -290,7 +327,7 @@ internal sealed class CodebaseSource : IDisposable
         try
         {
             SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec);
-            ArchitectureModel model = ModelPipeline.LoadModel(resolution.DllPath);
+            ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
                 outcome, solutionPath, handle.Diagnostics, model, resolution, handle, store, cacheRead, normalizedSpec);
         }
@@ -359,7 +396,7 @@ internal sealed class CodebaseSource : IDisposable
         try
         {
             var records = BuildWriteSpecRecords(solution);
-            store!.Write(fingerprint, new ExtractionResult(allFragments, records, Diagnostics), ct);
+            store!.Write(fingerprint, new ExtractionResult(allFragments, records, loadFailures), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -390,15 +427,6 @@ internal sealed class CodebaseSource : IDisposable
 
     // ── small helpers ─────────────────────────────────────────────────────────────────────────────────────
 
-    private static List<CodebaseFragment> Retain(
-        IReadOnlyList<CodebaseFragment> fragments, IReadOnlyCollection<string> excludeProjectNames)
-    {
-        if (excludeProjectNames.Count == 0) return fragments.ToList();
-
-        var excluded = new HashSet<string>(excludeProjectNames, StringComparer.Ordinal);
-        return fragments.Where(f => !excluded.Contains(f.ProjectName)).ToList();
-    }
-
     private static string NormalizeSpecArgument(string? spec)
     {
         return string.IsNullOrWhiteSpace(spec) ? "" : Path.GetFullPath(spec);
@@ -408,7 +436,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         try
         {
-            string? cacheRoot = environment.GetVariable(CacheDirectoryVariable);
+            string? cacheRoot = environment.GetVariable(LoadBearingEnvVars.CacheDirectory);
             return new ExtractionCacheStore(solutionPath, string.IsNullOrWhiteSpace(cacheRoot) ? null : cacheRoot);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn;
@@ -11,8 +12,25 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     <see cref="ReExtractedProjects" /> as its re-extraction observable, so the CLI runner counters keep
 ///     their meaning on the warm path.
 /// </summary>
+/// <param name="Fragments">Every C# project's fragments, in cold order.</param>
+/// <param name="ReExtractedProjects">The projects this call re-walked; empty in the steady state.</param>
+/// <param name="Version">
+///     The store's fragment-set version these fragments were taken at — bumped only when the stored
+///     fragments actually change, so two sets sharing a version hold the identical fragment instances. It
+///     is what <see cref="SessionFragmentStore.GetCodebaseAsync" /> memoizes the merge against.
+/// </param>
 internal readonly record struct SessionFragmentSet(
     IReadOnlyList<CodebaseFragment> Fragments,
+    IReadOnlySet<string> ReExtractedProjects,
+    long Version);
+
+/// <summary>
+///     What one <see cref="SessionFragmentStore.GetCodebaseAsync" /> call produced: the merged
+///     <see cref="CodebaseModel" /> — shared, and possibly memoized from an earlier call — plus the names of
+///     the projects that call re-walked, which the caller surfaces as its re-extraction observable.
+/// </summary>
+internal readonly record struct SessionCodebase(
+    CodebaseModel Model,
     IReadOnlySet<string> ReExtractedProjects);
 
 /// <summary>
@@ -51,6 +69,17 @@ internal readonly record struct SessionFragmentSet(
 ///         span the <c>await</c>), so a <see cref="SemaphoreSlim" /> serializes the whole compare-and-extract:
 ///         a read never races a re-extraction, and the returned set is always internally consistent.
 ///     </para>
+///     <para>
+///         <b>The merge is memoized too.</b> Reusing a clean project's fragments still left every call
+///         rebuilding the whole <see cref="CodebaseModel" /> from them — every node, every hierarchy list,
+///         every edge site set across the solution — which in the steady state (an armed per-edit check, or
+///         two tools called back to back) is the same model built again from the same inputs.
+///         <see cref="GetCodebaseAsync" /> therefore memoizes it against
+///         <see cref="SessionFragmentSet.Version" /> and the caller's exclusion set. Handing back the same
+///         instance is safe because a merged model is read-only once built: the merge is the only writer of
+///         a <c>TypeNode</c>'s hierarchy and members, and every consumer — the checker, the renderers, the
+///         summarizer — reads.
+///     </para>
 /// </remarks>
 internal sealed class SessionFragmentStore
 {
@@ -63,12 +92,27 @@ internal sealed class SessionFragmentStore
 
     private readonly SemaphoreSlim gate = new(1, 1);
 
+    // The merged models for the fragment-set version in mergedVersion, keyed by exclusion set. Guarded by
+    // its own lock rather than the extraction gate: a merge is CPU-bound and takes no snapshot, so it has no
+    // business holding up the compare-and-extract.
+    private readonly Dictionary<string, CodebaseModel> merged = new(StringComparer.Ordinal);
+
+    private readonly object mergedGate = new();
+
     // The generation the stored fragments were extracted at. -1 means nothing extracted yet; a loaded
     // snapshot's generation is always >= 1, so the first call always mismatches and full-extracts.
     private long extractedGeneration = -1;
 
     // The edit-version map the stored fragments were extracted at, for same-generation dirty diffing.
     private IReadOnlyDictionary<string, int> extractedVersions = new Dictionary<string, int>(StringComparer.Ordinal);
+
+    // Bumped only when the stored fragments actually change (every full walk, and an incremental walk that
+    // re-extracted something), so a steady-state call reports the version its predecessor did — which is
+    // exactly the condition under which the merged model can be handed back rather than rebuilt.
+    private long fragmentSetVersion;
+
+    // The fragment-set version the memo above holds models for; -1 until the first merge.
+    private long mergedVersion = -1;
 
     /// <summary>
     ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked: every C# project on a full
@@ -106,6 +150,56 @@ internal sealed class SessionFragmentStore
         }
     }
 
+    /// <summary>
+    ///     The merged codebase for <paramref name="snapshot" />, dropping
+    ///     <paramref name="excludeProjectNames" /> at merge time — <see cref="GetFragmentsAsync" /> followed
+    ///     by the one <see cref="FragmentMerger" /> every extraction path terminates in, memoized so a call
+    ///     that re-walked nothing hands back the model its predecessor built rather than rebuilding it from
+    ///     the identical fragments.
+    /// </summary>
+    /// <remarks>
+    ///     The memo is keyed by the fragment-set version <em>and</em> the exclusion set, so it can never
+    ///     serve a model built from other inputs; a version change simply empties it. Two overlapping calls
+    ///     can therefore both merge (the loser's entry is re-made), which costs a merge and never a wrong
+    ///     model.
+    /// </remarks>
+    internal async Task<SessionCodebase> GetCodebaseAsync(
+        WorkspaceSnapshot snapshot, IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
+    {
+        SessionFragmentSet set = await GetFragmentsAsync(snapshot, ct).ConfigureAwait(false);
+        return new SessionCodebase(Merge(set, excludeProjectNames), set.ReExtractedProjects);
+    }
+
+    private CodebaseModel Merge(SessionFragmentSet set, IReadOnlyCollection<string> excludeProjectNames)
+    {
+        string key = ExclusionKey(excludeProjectNames);
+        lock (mergedGate)
+        {
+            if (mergedVersion != set.Version)
+            {
+                merged.Clear();
+                mergedVersion = set.Version;
+            }
+            else if (merged.TryGetValue(key, out CodebaseModel? hit))
+            {
+                return hit;
+            }
+
+            CodebaseModel model = FragmentMerger.Merge(FragmentMerger.Retain(set.Fragments, excludeProjectNames));
+            merged[key] = model;
+            return model;
+        }
+    }
+
+    // The exclusion set as one ordinal-stable string. Two callers excluding the same projects in a different
+    // order are the same merge, so the key sorts; '\n' cannot occur in a project name.
+    private static string ExclusionKey(IReadOnlyCollection<string> excludeProjectNames)
+    {
+        if (excludeProjectNames.Count == 0) return "";
+
+        return string.Join("\n", excludeProjectNames.OrderBy(name => name, StringComparer.Ordinal));
+    }
+
     private async Task<SessionFragmentSet> FullWalkAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
     {
         var fragments =
@@ -115,9 +209,10 @@ internal sealed class SessionFragmentStore
         Index(fragments);
         extractedGeneration = snapshot.Generation;
         extractedVersions = Copy(snapshot.ProjectEditVersions);
+        fragmentSetVersion++;
         FullWalkCount++;
         LastReExtractedProjects = fragments.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
-        return new SessionFragmentSet(OrderedFragments(), LastReExtractedProjects);
+        return new SessionFragmentSet(OrderedFragments(), LastReExtractedProjects, fragmentSetVersion);
     }
 
     private async Task<SessionFragmentSet> IncrementalWalkAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
@@ -131,11 +226,12 @@ internal sealed class SessionFragmentStore
             // Replace only the re-extracted names' lists; the clean projects' fragments ride through untouched.
             foreach (string name in dirty) fragmentsByProject.Remove(name);
             Index(reExtracted);
+            fragmentSetVersion++;
         }
 
         extractedVersions = Copy(snapshot.ProjectEditVersions);
         LastReExtractedProjects = dirty;
-        return new SessionFragmentSet(OrderedFragments(), dirty);
+        return new SessionFragmentSet(OrderedFragments(), dirty, fragmentSetVersion);
     }
 
     // Projects whose edit version differs from the one the stored fragments were extracted at. Within a

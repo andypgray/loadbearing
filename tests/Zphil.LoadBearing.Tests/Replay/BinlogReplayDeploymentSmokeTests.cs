@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -93,7 +92,7 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
         foreach (string arg in args) startInfo.ArgumentList.Add(arg);
 
         DotnetCli.ApplyCleanSdkEnvironment(startInfo);
-        startInfo.Environment[CodebaseSource.CacheDirectoryVariable] = cacheDir;
+        startInfo.Environment[LoadBearingEnvVars.CacheDirectory] = cacheDir;
 
         return ChildProcess.Run(startInfo);
     }

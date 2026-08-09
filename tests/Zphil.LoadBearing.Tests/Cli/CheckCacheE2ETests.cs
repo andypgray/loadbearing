@@ -246,7 +246,7 @@ public sealed class CheckCacheE2ETests
 
     private static FakeEnvironment EnvironmentFor(string cacheRoot)
     {
-        return new FakeEnvironment().SetVariable(CodebaseSource.CacheDirectoryVariable, cacheRoot);
+        return new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheRoot);
     }
 
     private static string WorkingDirectoryOf(string solution)

@@ -15,9 +15,8 @@ namespace Zphil.LoadBearing.Cli;
 ///     by construction.
 /// </summary>
 internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
+    : WorkspaceRunner(source)
 {
-    private readonly ISolutionSource solutionSource = source ?? new ColdSolutionSource();
-
     public async Task<int> RunAsync(ExplainRequest request, CancellationToken ct)
     {
         ArchitectureModel model = await LoadModelAsync(request, ct);
@@ -31,26 +30,28 @@ internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISoluti
 
     private async Task<ArchitectureModel> LoadModelAsync(ExplainRequest request, CancellationToken ct)
     {
-        // Fast path: a built-DLL --spec resolves without ever opening the solution.
+        // Fast path: a built-DLL --spec resolves without ever opening the solution. The model still comes
+        // through the source, so a warm host serves its cached one rather than reloading the DLL per call.
         SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(request.Spec);
-        if (withoutSolution is not null) return ModelPipeline.LoadModel(withoutSolution.DllPath);
+        if (withoutSolution is not null) return SolutionSource.LoadSpecModel(withoutSolution.DllPath);
 
-        // Convention or csproj --spec: load the workspace for resolution only; never extract.
-        using WorkspaceModel workspace = await ModelPipeline.LoadWithWorkspaceAsync(
-            solutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+        // Convention or csproj --spec: load the workspace for resolution only; never extract. The acquisition
+        // seam is the shared one, so explain's model is the model every other verb would have loaded — its
+        // lazy ExtractAsync is simply never called.
+        using var source = await CodebaseSource.CreateWithSpecAsync(
+            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
         // Nothing gates on them here: the rule being dumped is the spec's, so a project that failed to load
         // cannot change the answer — only the visibility of the failure.
-        var renderedDiagnostics = WorkspaceDiagnosticsRenderer.Compose(workspace.Diagnostics);
-        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics.Rendered);
 
-        return workspace.Model;
+        return source.Model;
     }
 
     private static string UnknownRuleMessage(string ruleId, ArchitectureModel model)
     {
-        var ids = model.Rules.Select(rule => rule.Id).OrderBy(id => id, StringComparer.Ordinal);
-        return $"Unknown rule ID '{ruleId}'. Available rule IDs:\n  " + string.Join("\n  ", ids);
+        return Refusals.NotFoundMessage(
+            $"Unknown rule ID '{ruleId}'", "Available rule IDs", Refusals.AvailableRuleIds(model));
     }
 }

@@ -3,6 +3,7 @@ using Serilog.Events;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.Mcp.Infrastructure;
 
@@ -82,7 +83,7 @@ public sealed class SerilogConfigurationTests
     [Fact]
     public void LogLevelVariable_IsThePrefixedName()
     {
-        SerilogConfiguration.LogLevelVariable.ShouldBe("LOADBEARING_LOG_LEVEL");
+        LoadBearingEnvVars.LogLevel.ShouldBe("LOADBEARING_LOG_LEVEL");
     }
 
     [Fact]
