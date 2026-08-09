@@ -27,10 +27,13 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Run the architecture spec against the bound solution and return the JSON check report " +
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
         "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
-        "only those.";
+        "only those. If projects fail to load the report still returns, stamped workspaceDiagnostics and " +
+        "modelIncomplete: true — a verdict reached against a partial model; report that, never plain green.";
 
     private const string StatusDescription =
-        "Return the JSON burndown (schemaVersion 2): per-rule grandfathered/stale counts and promotion suggestions.";
+        "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
+        "promotion suggestions. If projects fail to load the burndown still returns, stamped workspaceDiagnostics and " +
+        "modelIncomplete: true — counts from a partial model; report that rather than quoting them as whole.";
 
     private const string ExplainDescription =
         "Return one rule's because, fix, posture payload, and linked prose as text.";
@@ -41,7 +44,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
-        "projectEdges[] (source/target, declared vs observed), and externalEdges[] grouped by namespace root. " +
+        "projectEdges[] (source/target, declared vs observed dependencies), and externalEdges[] grouped by " +
+        "namespace root. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load it returns an error naming them rather than a survey missing them. " +
         "Narrow with overview or skeleton (coarser grain) or projects (fewer projects); an over-budget survey " +

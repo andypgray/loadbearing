@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `projects`, the subject, since the grain ladder is spent — with `rules` for `arch_check` and
   nothing for the three tools that have no knob to name. A complete document at coarser grain
   beats a cut document at full grain.
+- **The MCP server's instructions now fit the client's render window.** Claude Code puts a
+  server's `initialize` instructions into the session system prompt whole only up to 2,048
+  characters and silently cuts the rest, which had left everything after the tool list — the
+  `derive_spec` pointer and every cross-cutting rule — invisible in every session. The
+  instructions are rewritten routing-first at 1,971 characters: what each tool is for and when
+  to reach for it, the JSON shape, and the partial-model contract, with parameter reference
+  left to the tool descriptions, which are fetched on demand. A pinned test fails the build if
+  the text ever crosses the window again, and the `arch_check`/`arch_status` descriptions now
+  carry the partial-model stamp (`workspaceDiagnostics` + `modelIncomplete`) so that contract
+  survives on the per-call channel too.
 - `baseline --init` and `--accept-reductions` now name the rules that are failing with no baseline
   to capture — the Enforce reds a baseline cannot grandfather — instead of reporting only the
   ratchet work, or "nothing to do" on a spec with no ratcheted rules at all. The command already

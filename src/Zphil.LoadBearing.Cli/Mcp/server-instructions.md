@@ -1,20 +1,17 @@
 LoadBearing exposes this codebase's architecture spec — one reified model, enforced and explained. Five read-only tools:
 
-- `arch_check` — run the whole spec against the solution and return the JSON check report (schemaVersion 3). Call before finishing work that touched architecture-relevant code, to confirm no rule went red. Params: `rules` (optional semicolon-separated rule-ID globs — run a subset when the full report would be big; no match is an error listing every rule ID), `diffBase` (optional git ref; changed files in a quarantined scope raise a tripwire warning).
-- `arch_status` — return the JSON burndown (schemaVersion 2): per-rule grandfathered/stale counts and promotion suggestions. Call to see how much migration debt remains. No params.
-- `arch_explain` — return one rule's because / fix / posture payload / linked prose as text. Call when a violation or a rendered rule ID needs its full rationale. Params: `ruleId` (a post-desugar rule ID, e.g. `layering/domain-independent` or `legacy/billing/containment`).
-- `arch_context` — return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, or a layer's local rules — or a pointer line when none apply. Call before editing an unfamiliar directory to learn its architecture rules or whether it is dragon territory. Params: `path` (a file or directory, absolute or solution-relative).
-- `arch_graph` — return the JSON codebase survey (schemaVersion 1): projects with namespace inventories, declared vs observed project→project reference edges, and external references grouped by namespace root. Call it to orient on an unfamiliar solution or to plan new rules — it is the one tool that needs no spec. Params: `overview` (optional; elide the namespace inventories, keeping every project and edge — the document stamps `grain`), `projects` (optional semicolon-separated name globs; edges keep both directions), `allowWorkspaceDiagnostics` (optional; see the partial-model note below). An over-budget survey degrades to overview grain by itself: a complete document at coarser grain, never cut JSON.
+- `arch_check` — the spec's verdict as a JSON report. Call before finishing work that touched architecture-relevant code; narrow with `rules` globs.
+- `arch_status` — the migration burndown: per-rule grandfathered/stale counts and promotion suggestions.
+- `arch_explain` — one rule's because / fix / posture rationale, when a violation or a rule ID needs it.
+- `arch_context` — the scope card(s) covering a path. Call before editing an unfamiliar directory to learn its rules or whether it is dragon territory.
+- `arch_graph` — the codebase survey: projects, namespace inventories, reference edges. Needs no spec — orient on an unfamiliar solution or plan new rules; narrow with `overview` or `projects`.
 
-One prompt: `derive_spec` — the onboarding recipe for a solution with no spec project yet: survey with `arch_graph`, scaffold the spec project, draft candidate rules, validate with `arch_check`, then the human curates and baselines. Start there when spec resolution reports no spec project found.
+One prompt, `derive_spec` — the onboarding recipe to run when spec resolution reports no spec project yet.
 
-Cross-cutting:
-
-- **Violations are data, not errors.** `arch_check` returns its report even when rules fail — read the `summary` counts and the `rules[]` array; a red rule is a finding, never a tool failure.
-- Every tool document is its CLI verb's `--json` output byte for byte: camelCase keys, optional fields absent rather than null, and check entries keyed by `id` (`ruleId` exists only in SARIF).
-- A response that would overflow the client budget wants a narrower call, not paging: `rules` on `arch_check`; `overview` or `projects` on `arch_graph`.
-- The server is bound to **one solution + one spec** (set when it was started); the tools take no solution argument.
-- The workspace loads on the **first call** — expect several seconds on a large solution — then is held **warm** and reconciled against disk on every later call, so a post-edit re-check answers in milliseconds. Set `LOADBEARING_DISABLE_WARM_WORKSPACE=true` to load fresh per call instead.
-- The server **never builds.** Restore and build the solution yourself before checking; a stale build yields stale results.
-- **A project that fails to load is not a smaller model, it is a wrong one.** If that happens, `arch_graph` returns an *error result* naming the projects that failed — that is an actionable precondition (restore and build), not the server breaking. Retry with `allowWorkspaceDiagnostics: true` only to survey the partial model deliberately. `arch_check` and `arch_status` never refuse for this reason: they return their document with the failures in `workspaceDiagnostics` and `modelIncomplete: true`, which means every verdict in it was reached against a codebase missing whole projects — say so rather than reporting the rules as green.
-- Drill down with `arch_explain <rule-id>`; the always-on architecture summary lives in the repository's root `AGENTS.md` managed block.
+- Violations are data, not errors — a red rule is a finding in the report, never a tool failure.
+- Documents are the CLI verbs' `--json` output byte for byte: camelCase, optional fields absent rather than null, check entries keyed by `id` (`ruleId` is SARIF-only).
+- A response over the client budget wants a narrower call (`rules`; `overview`/`projects`), not paging.
+- The server is bound to one solution + one spec at start; the tools take no solution argument.
+- The first call loads the workspace — seconds on a large solution — then it stays warm, reconciled against disk per call. The server never builds: build first or results are stale.
+- A failed project load makes the model wrong, not smaller: `arch_graph` errors naming the failures (a build precondition, not a fault); `arch_check`/`arch_status` return their document stamped `workspaceDiagnostics` + `modelIncomplete: true` — report that, never plain green.
+- Drill down with `arch_explain <rule-id>`; the always-on summary lives in the root `AGENTS.md` managed block.
