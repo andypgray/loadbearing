@@ -1,5 +1,5 @@
-# Publishes the four Zphil.LoadBearing packages to NuGet and creates a GitHub release when a
-# v* tag is pushed.
+# Publishes the four Zphil.LoadBearing packages to NuGet, creates a GitHub release, and lists
+# the new version in the official MCP registry when a v* tag is pushed.
 #
 # Auth: NuGet trusted publishing (OIDC). The job trades a GitHub-signed OIDC token for
 # a short-lived (1-hour, single-use) nuget.org API key at run time via the NuGet/login
@@ -136,3 +136,55 @@ jobs:
         run: gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg artifacts/attestation.intoto.jsonl --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # Lists the released version in the official MCP registry (registry.modelcontextprotocol.io),
+  # which is the discovery surface for clients that do not read nuget.org. A separate job on
+  # purpose: it needs the packages to be live, so `needs: release` keeps a failed NuGet push
+  # from ever being advertised, and a registry outage cannot touch the publish it rides behind.
+  #
+  # Ownership is proven twice, with no stored credential. The login trades this job's GitHub
+  # OIDC token for publish rights on the io.github.andypgray/* namespace — the same id-token
+  # mechanism as the NuGet login above. The registry then validates the server independently:
+  # it fetches the package readme from nuget.org and requires the
+  # `mcp-name: io.github.andypgray/loadbearing` marker the README carries. That second check is
+  # why the wait step polls for the marker rather than for the package: nuget.org serves the
+  # readme only after indexing, measurably later than the flat container has the bytes
+  # (~18 minutes at 0.3.1), and publishing before then fails validation.
+  mcp-registry:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC: the registry's namespace grant; no long-lived registry token exists
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Capturing into a variable keeps a first-match grep from SIGPIPE-failing a live curl
+      # pipe, same as the unzip check above; `|| true` keeps a 404 (not yet indexed) polling.
+      - name: Wait for nuget.org to serve the readme the registry validates
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 45); do
+            readme="$(curl -fsS "https://api.nuget.org/v3-flatcontainer/zphil.loadbearing.cli/$VERSION/readme" || true)"
+            if grep -q 'mcp-name: io.github.andypgray/loadbearing' <<<"$readme"; then
+              echo "readme indexed with the mcp-name marker (attempt $attempt)"
+              exit 0
+            fi
+            sleep 60
+          done
+          echo "::error::nuget.org did not serve the readme with the mcp-name marker within 45 minutes; rerun this job once it does"
+          exit 1
+
+      # A release binary rather than an action, so the pin is the version plus its published
+      # sha256 digest — the same standing the SHA-pinned actions above have.
+      - name: Install mcp-publisher 1.8.1
+        run: |
+          curl -fsSLo mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Publish to the MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish .mcp/server.json
