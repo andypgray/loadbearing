@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-09
+
 ### Added
 
 - **Both querying surfaces can narrow, so a big solution answers whole.** `graph` takes two
@@ -77,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   codes are unchanged; the command still reports rather than gates. Without this, a newcomer
   running the handoff steps on a long-lived codebase could land on dozens of violations with
   nothing saying whether red was expected or their own mistake.
+- The warm MCP server reuses its merged codebase and loaded spec between calls when nothing has
+  changed on disk, keyed on the fragment-set version and the spec DLL's stamp, so a per-edit
+  `arch_check` hook stops re-merging every fragment and re-executing `Define()` on an unchanged
+  tree.
 
 ### Fixed
 
@@ -104,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anywhere" arm lists the solutions it found one level down. Naming `src\Storefront.sln` turns a dead
   end into one copy-paste. The README and the registry manifest say the same thing now: the argument
   is optional, and most repositories should pass it.
-- **The rule pack is no longer sold as something a reader can install.**
+- **The rule pack is no longer presented as something a reader can install.**
   `Zphil.LoadBearing.Packs.DotNet` is unpackable by design: it is the demonstrator that a pack is an
   ordinary class library, and keeping it out of the release keeps `dotnet pack` at the four nupkgs the
   workflows count. The public material had drifted from that, recommending a thing nobody outside a
@@ -120,6 +126,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own captured output shows. The "Try it yourself" removal dropped only the contract library, so the
   `dotnet sln list` count a reader was told to expect could not be the count they got. It removes both
   now.
+- **The published spec scaffold is valid on a repository using central package management.** The
+  recipe's csproj carried its version inline on the PackageReference, which under a
+  `Directory.Packages.props` is NU1008 — an error whose text is NuGet's and points nowhere near the
+  tool that produced the csproj. The scaffold now opts itself out with
+  `ManagePackageVersionsCentrally=false`, a per-project property evaluated after the implicit
+  central import, so the spec keeps the version pin that belongs to it and the adopter's central
+  file is never touched. The recipe carries NU1008 verbatim among the errors a reader may see, and
+  CI scaffolds and builds the published shape on both kinds of repository.
 - **The published MCP manifest can no longer advertise a version that does not exist.**
   `.mcp/server.json` is the file nuget.org reads to generate a client's MCP configuration, and its
   version is bumped when a release is *prepared* rather than when one happens. So a branch pushed
@@ -550,7 +564,8 @@ deterministic enforcement and generated AI-agent context.
 - xUnit adapter (`Zphil.LoadBearing.Xunit`): every rule in the spec as an individually named
   xUnit test, failure text identical to the CLI.
 
-[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/andypgray/loadbearing/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
 [0.3.0]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
 [0.2.0]: https://github.com/andypgray/loadbearing/compare/v0.1.0...v0.2.0
