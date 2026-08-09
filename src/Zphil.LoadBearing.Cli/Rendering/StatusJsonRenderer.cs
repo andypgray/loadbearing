@@ -6,9 +6,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <summary>
 ///     Renders a <see cref="CheckReport" /> as the <c>status --json</c> document (its own schemaVersion 2)
 ///     — burndown counts per ratcheted rule (Migrate and Quarantine containment) plus, for Migrate, the
-///     promotion flag (omitted for quarantine). Uses the shared <see cref="LoadBearingJson.Options" />;
-///     machine-independent (<c>solution</c>/<c>specAssembly</c> are file names).
+///     promotion flag (omitted for quarantine).
 /// </summary>
+/// <remarks>
+///     Uses the shared <see cref="LoadBearingJson.Options" />; machine-independent
+///     (<c>solution</c>/<c>specAssembly</c> are file names).
+/// </remarks>
 internal static class StatusJsonRenderer
 {
     public static void Render(
@@ -27,8 +30,12 @@ internal static class StatusJsonRenderer
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             modelIncomplete ? true : null,
             new StatusSummaryJson(
-                report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
-                report.GrandfatheredCount, report.StaleBaselineEntryCount));
+                report.RulesChecked,
+                report.RulesPassed,
+                report.RulesFailed,
+                report.RulesSkipped,
+                report.GrandfatheredCount,
+                report.StaleBaselineEntryCount));
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.StatusJson));
     }
@@ -57,7 +64,11 @@ internal static class StatusJsonRenderer
               && result.StaleBaselineEntries == 0
             : null;
         return new RatchetStatusJson(
-            path, result.BaselineCaptured, result.Grandfathered.Count, result.Violations.Count,
-            result.StaleBaselineEntries, promotable);
+            path,
+            result.BaselineCaptured,
+            result.Grandfathered.Count,
+            result.Violations.Count,
+            result.StaleBaselineEntries,
+            promotable);
     }
 }

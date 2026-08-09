@@ -5,15 +5,16 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     Renders a <see cref="CheckReport" /> as the <c>--json</c> document (schemaVersion 3 — Quarantine
-///     containment now evaluates and ratchets alongside Migrate, and a Quarantine tripwire warns) — the only
-///     content on stdout in JSON mode, so hooks can parse it. The optional <c>diffBase</c> echoes the
-///     <c>--diff-base</c> ref and <c>rulesFilter</c> the <c>--rules</c> globs (each omitted when absent),
-///     so a reader can tell a narrowed report from a whole one. Machine-independent: <c>solution</c> and
-///     <c>specAssembly</c> are file names, and every site path is solution-relative with forward slashes.
-///     Serialization lives here so Core stays dependency-free; the options are the shared
-///     <see cref="LoadBearingJson.Options" />.
+///     Renders a <see cref="CheckReport" /> as the <c>--json</c> document (schemaVersion 3) — the only
+///     content on stdout in JSON mode, so hooks can parse it.
 /// </summary>
+/// <remarks>
+///     The optional <c>diffBase</c> echoes the <c>--diff-base</c> ref and <c>rulesFilter</c> the
+///     <c>--rules</c> globs (each omitted when absent), so a reader can tell a narrowed report from a
+///     whole one. Machine-independent: <c>solution</c> and <c>specAssembly</c> are file names, and every
+///     site path is solution-relative with forward slashes. Serialization lives here so Core stays
+///     dependency-free; the options are the shared <see cref="LoadBearingJson.Options" />.
+/// </remarks>
 internal static class JsonReportRenderer
 {
     public static void Render(
@@ -41,8 +42,12 @@ internal static class JsonReportRenderer
             workspaceDiagnostics,
             modelIncomplete ? true : null,
             new SummaryJson(
-                report.RulesChecked, report.RulesPassed, report.RulesFailed, report.RulesSkipped,
-                report.ViolationCount, report.WarningCount));
+                report.RulesChecked,
+                report.RulesPassed,
+                report.RulesFailed,
+                report.RulesSkipped,
+                report.ViolationCount,
+                report.WarningCount));
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson));
     }
