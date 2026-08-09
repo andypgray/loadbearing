@@ -164,6 +164,177 @@ jobs:
           dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
           loadbearing check examples/Meridian.Quoting/Meridian.Quoting.slnx
 
+      # Above proves the tool. Nothing proves the package a spec project actually references.
+      # `derive_spec` hands every adopter a spec csproj built on
+      # `<PackageReference Include="Zphil.LoadBearing" ... />`, and not one spec in this tree is built
+      # that way: the four examples, the self-spec and every fixture use a ProjectReference. So spec
+      # discovery — the unique declared solution member whose reference paths hold a
+      # Zphil.LoadBearing.dll — has only ever run here against a project reference, while a metadata
+      # reference into the packages folder is what every reader gets. This scaffolds the reader's tree
+      # out of the pack above and checks it. It is also the first time anything compiles the scaffold
+      # the recipe publishes.
+      #
+      # The csproj and the spec class are cut from the recipe rather than written here, and the csproj
+      # gets the same Version="..." substitution ArchPrompts applies when the server serves the
+      # prompt. So this executes the published recipe instead of a copy that could drift from it, and
+      # a recipe edit that breaks the scaffold reddens here rather than reaching a reader. The cut is
+      # anchored on content rather than on fence order, and an empty cut is a loud failure: a
+      # restructure must redden this leg, never quietly scaffold nothing.
+      #
+      # One rule is authored here, in its own file, because the recipe's Define() is empty by design
+      # and a spec with no rules would prove loading and evaluate nothing. A second spec class is the
+      # honest seam — the model runs every IArchitectureSpec in the assembly over one shared Arch — so
+      # the recipe's own file stays byte for byte what it publishes, and the csproj, the artifact
+      # actually under test, is untouched.
+      #
+      # Under $RUNNER_TEMP, outside the working tree: nothing inherits this repository's
+      # Directory.Build.props (which would stamp its version, binding identity and package metadata
+      # onto the scaffold), and nothing lands where a git gate could see it. NUGET_PACKAGES is
+      # scaffold-local and the only feed is the local pack, so the restore cannot be answered by a
+      # copy of this version already on the machine or on nuget.org — which is the whole difference
+      # between testing the bytes packed above and testing whatever is published. Debug, not Release:
+      # the sibling-configuration fallback in spec resolution is a separate property, and a red here
+      # should mean exactly one thing.
+      #
+      # Then the negative control, because loading is not enforcing. A non-conforming interface goes
+      # into the product, it is rebuilt, and `check` must exit exactly 1. Not merely non-zero: exit 2
+      # is an unresolved spec or a workspace that failed to load, which would satisfy a "non-zero"
+      # test for precisely the reason this leg exists to rule out.
+      - name: Scaffold the documented PackageReference spec project and check it
+        run: |
+          version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          recipe="src/Zphil.LoadBearing.Cli/Mcp/Prompts/derive-spec.md"
+          root="$RUNNER_TEMP/packageref"
+          export NUGET_PACKAGES="$root/.packages"
+          mkdir -p "$root/src/MyApp" "$root/arch/MyApp.ArchSpec"
+
+          # The first fenced block in <lang> whose body carries <marker>. Content-anchored rather than
+          # positional, so re-ordering the recipe's fences can never select the wrong one; a marker
+          # that has gone yields nothing and trips the guard below.
+          fence() {
+            awk -v want="$1" -v marker="$2" '
+              /^```/ {
+                if (!open) { open = 1; lang = substr($0, 4); sub(/[ \t]+$/, "", lang); body = ""; next }
+                open = 0
+                if (lang == want && index(body, marker) > 0) { printf "%s", body; exit }
+                next
+              }
+              open { body = body $0 "\n" }
+            ' "$recipe"
+          }
+
+          csproj="$(fence xml 'PackageReference Include="Zphil.LoadBearing"')"
+          spec="$(fence csharp 'IArchitectureSpec')"
+          [ -n "$csproj" ] && [ -n "$spec" ] || {
+            echo "::error::Could not cut the spec scaffold out of $recipe — the xml fence carrying the PackageReference, or the csharp fence carrying the IArchitectureSpec class, has moved or changed shape. That recipe is what adopters follow, so fix it or fix this cut; do not delete the assertion."
+            exit 1
+          }
+
+          printf '%s\n' "$csproj" | sed 's|Version="\.\.\."|Version="'"$version"'"|' \
+            > "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
+          printf '%s\n' "$spec" > "$root/arch/MyApp.ArchSpec/ArchSpec.cs"
+
+          # The same line DeriveSpecPromptTests pins the served prompt to, asserted from the other
+          # side: the csproj under test is the one an adopter is handed, pinned to the pack above.
+          grep -Fq "<PackageReference Include=\"Zphil.LoadBearing\" Version=\"$version\" />" \
+            "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj" || {
+            echo "::error::The scaffold csproj did not come out pinned to $version — the Version=\"...\" placeholder ArchPrompts substitutes is no longer where the recipe spells it"
+            cat "$root/arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj"
+            exit 1
+          }
+
+          cat > "$root/arch/MyApp.ArchSpec/CheckedRule.cs" <<'CS'
+          using Zphil.LoadBearing;
+
+          namespace MyApp.ArchSpec;
+
+          public sealed class PackageReferenceProof : IArchitectureSpec
+          {
+              public void Define(Arch arch)
+              {
+                  arch.Rule("naming/interfaces")
+                      .Enforce(arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I"))
+                      .Because("The scaffolded spec has to evaluate over real symbols for a green run to mean anything, so it states the one convention the product below obeys and the violation below breaks.");
+              }
+          }
+          CS
+
+          cat > "$root/src/MyApp/MyApp.csproj" <<'CSPROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+          </Project>
+          CSPROJ
+
+          cat > "$root/src/MyApp/Shipments.cs" <<'CS'
+          namespace MyApp;
+
+          public interface IShipmentPort
+          {
+              string Describe();
+          }
+
+          public sealed class ShipmentPort : IShipmentPort
+          {
+              public string Describe() => "shipment";
+          }
+          CS
+
+          cat > "$root/MyApp.slnx" <<'SLNX'
+          <Solution>
+            <Folder Name="/src/">
+              <Project Path="src/MyApp/MyApp.csproj" />
+            </Folder>
+            <Folder Name="/arch/">
+              <Project Path="arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj" />
+            </Folder>
+          </Solution>
+          SLNX
+
+          cat > "$root/nuget.config" <<CONFIG
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+              <packageSources>
+                  <clear />
+                  <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
+              </packageSources>
+          </configuration>
+          CONFIG
+
+          dotnet build "$root/MyApp.slnx"
+
+          # Restored from the pack, not resolved from a project: the path is the assertion.
+          dll="$NUGET_PACKAGES/zphil.loadbearing/$version/lib/netstandard2.0/Zphil.LoadBearing.dll"
+          [ -f "$dll" ] || {
+            echo "::error::The scaffold's PackageReference did not restore the contract library from the local pack (expected zphil.loadbearing/$version/lib/netstandard2.0/Zphil.LoadBearing.dll)"
+            find "$NUGET_PACKAGES" -name 'Zphil.LoadBearing.dll' || true
+            exit 1
+          }
+
+          # No --spec: convention discovery is the documented path and the thing under test.
+          loadbearing check "$root/MyApp.slnx" || {
+            echo "::error::A spec project consuming Zphil.LoadBearing as a PackageReference — the shape derive_spec publishes — was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          cat > "$root/src/MyApp/Broken.cs" <<'CS'
+          namespace MyApp;
+
+          public interface ShipmentPortWithoutThePrefix
+          {
+          }
+          CS
+          dotnet build "$root/MyApp.slnx"
+          rc=0
+          loadbearing check "$root/MyApp.slnx" || rc=$?
+          [ "$rc" -eq 1 ] || {
+            echo "::error::check exited $rc over a deliberate violation; 1 is the only right answer (2 means the spec or the workspace did not resolve, which would make the green above meaningless)"
+            exit 1
+          }
+
   # Self-scan: LoadBearing checks its own solution and publishes the result to GitHub code
   # scanning as SARIF. The self-spec exits 0 today, so the job is green; a future violation
   # reddens the check step and the alerts still upload (if: always()). Forked-PR and
