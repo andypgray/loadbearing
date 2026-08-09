@@ -174,25 +174,18 @@ public sealed class CheckCacheE2ETests
         // Mirrors the SpecResolver sibling-configuration test (commit ce899f2): a hit re-runs the built-output
         // check over the recorded Debug path, and when only Release was built it must resolve the Release DLL —
         // identical fallback and identical error text to a cold run.
-        string root = Path.Combine(Path.GetTempPath(), "loadbearing-cache-specreplay", Guid.NewGuid().ToString("N"));
-        string evaluatedDebug = Path.Combine(root, "bin", "Debug", "net10.0", "MyApp.Arch.dll");
-        string builtRelease = Path.Combine(root, "bin", "Release", "net10.0", "MyApp.Arch.dll");
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(builtRelease)!);
-            File.WriteAllText(builtRelease, "");
-            var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], evaluatedDebug) };
+        using TempDirectory temp = TestTempRoot.Fresh("cache-spec-replay");
+        string evaluatedDebug = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
+        string builtRelease = temp.PathOf("bin", "Release", "net10.0", "MyApp.Arch.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(builtRelease)!);
+        File.WriteAllText(builtRelease, "");
+        var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], evaluatedDebug) };
 
-            SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
+        SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
 
-            resolution.ShouldNotBeNull();
-            resolution.DllPath.ShouldBe(builtRelease);
-            resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
-        }
-        finally
-        {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
-        }
+        resolution.ShouldNotBeNull();
+        resolution.DllPath.ShouldBe(builtRelease);
+        resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
     }
 
     [Fact]
@@ -284,19 +277,19 @@ public sealed class CheckCacheE2ETests
 
     private sealed class TempCacheDir : IDisposable
     {
-        public string Root { get; } =
-            Path.Combine(Path.GetTempPath(), "loadbearing-cache-e2e", Guid.NewGuid().ToString("N"));
+        private readonly TempDirectory temp = TestTempRoot.Fresh("check-cache");
+
+        // Not created: the cache root is the store's to mint, and every run here starts from its absence.
+        public string Root { get; }
+
+        public TempCacheDir()
+        {
+            Root = temp.UniqueChildPath();
+        }
 
         public void Dispose()
         {
-            try
-            {
-                if (Directory.Exists(Root)) Directory.Delete(Root, true);
-            }
-            catch
-            {
-                // best-effort temp cleanup
-            }
+            temp.Dispose();
         }
 
         public bool HasCacheFile()

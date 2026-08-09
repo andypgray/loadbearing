@@ -1,9 +1,7 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Extraction;
 
@@ -143,7 +141,7 @@ public sealed class MustNotConstructVerbTests
                                   }
                               }
                               """;
-        BaselineIndex index = Index("di/no-new", BaselineEntry.ForEdge("T:App.WidgetFactory", "T:Widgets.Widget"));
+        BaselineIndex index = Checker.Baselines("di/no-new", BaselineEntry.ForEdge("T:App.WidgetFactory", "T:Widgets.Widget"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("di/no-new")
@@ -170,7 +168,7 @@ public sealed class MustNotConstructVerbTests
                                   public class NewFactory { public Widget B() => new Widget(); }
                               }
                               """;
-        BaselineIndex index = Index("di/no-new", BaselineEntry.ForEdge("T:App.OldFactory", "T:Widgets.Widget"));
+        BaselineIndex index = Checker.Baselines("di/no-new", BaselineEntry.ForEdge("T:App.OldFactory", "T:Widgets.Widget"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("di/no-new")
@@ -207,25 +205,6 @@ public sealed class MustNotConstructVerbTests
                 .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("construction");
-        violation.GetProperty("source").GetString().ShouldBe("App.WidgetFactory");
-        violation.GetProperty("target").GetString().ShouldBe("Widgets.Widget");
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
-    }
-
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
+        report.ShouldRenderEdgeViolation("construction", "App.WidgetFactory", "Widgets.Widget");
     }
 }

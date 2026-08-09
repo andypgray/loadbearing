@@ -54,6 +54,17 @@ internal static class TestTempRoot
         return runRoot;
     }
 
+    /// <summary>
+    ///     A throwaway directory of this test's own under <see cref="For" />'s run root, deleted on dispose.
+    ///     Because it sits under the swept root, even a killed run cannot leak it past the sweep.
+    /// </summary>
+    internal static TempDirectory Fresh(string category)
+    {
+        string path = Path.Combine(For(category), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(path);
+        return new TempDirectory(path);
+    }
+
     private static void StartSweepOnce()
     {
         lock (SweepGate)
@@ -94,5 +105,49 @@ internal static class TestTempRoot
         {
             // best-effort: the sweep is hygiene, never a reason to fail a run.
         }
+    }
+}
+
+/// <summary>
+///     One test's throwaway directory under a swept <see cref="TestTempRoot" /> category, deleted when the
+///     <c>using</c> ends — and left for the sweep when it cannot be.
+/// </summary>
+internal sealed class TempDirectory(string path) : IDisposable
+{
+    /// <summary>The directory itself, already created.</summary>
+    public string Path { get; } = path;
+
+    /// <summary>Best-effort delete of the whole tree.</summary>
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(Path, true);
+        }
+        catch
+        {
+            // best-effort: a tree another process still holds is left for the sweep.
+        }
+    }
+
+    /// <summary>The path to <paramref name="segments" /> under this directory.</summary>
+    public string PathOf(params string[] segments)
+    {
+        return Under(segments);
+    }
+
+    /// <summary>
+    ///     A distinct child path, <em>not</em> created — for the callees that mint the directory themselves
+    ///     and would rather find it absent.
+    /// </summary>
+    public string UniqueChildPath()
+    {
+        return Under([Guid.NewGuid().ToString("N")]);
+    }
+
+    // Qualified because this type's own Path property shadows System.IO.Path for the whole class.
+    private string Under(string[] segments)
+    {
+        return System.IO.Path.Combine([Path, .. segments]);
     }
 }

@@ -6,35 +6,29 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
-///     Discovery tests. Each runs against a fresh <see cref="Directory.CreateTempSubdirectory(string)" />
-///     root and drives the walk-up via the <c>workingDirectory</c> parameter — the current directory
-///     is never mutated. The root is canonicalized (like <see cref="PathCanonicalizer" /> does at the
-///     seam) so the <c>Path.GetFullPath</c> expectations hold even on macOS, where the temp dir sits
-///     under a <c>/var</c> → <c>/private/var</c> symlink. The <see cref="LoadBearingEnvVars.SolutionPath" />
+///     Discovery tests. Each runs against a fresh <see cref="TestTempRoot" /> root and drives the walk-up
+///     via the <c>workingDirectory</c> parameter — the current directory is never mutated. That root is
+///     canonicalized (like <see cref="PathCanonicalizer" /> does at the seam) so the
+///     <c>Path.GetFullPath</c> expectations hold even on macOS, where the temp dir sits under a
+///     <c>/var</c> → <c>/private/var</c> symlink. The <see cref="LoadBearingEnvVars.SolutionPath" />
 ///     env var is cleared per test (ctor) and restored (Dispose); xUnit runs methods in one class
 ///     serially, so the one test that sets it cannot race the others.
 /// </summary>
 public sealed class SolutionDiscoveryTests : IDisposable
 {
-    private readonly string? _originalEnvValue;
-    private readonly string _tempRoot;
+    private readonly ScopedEnvironmentVariable _solutionPathVariable = new(LoadBearingEnvVars.SolutionPath, null);
 
-    public SolutionDiscoveryTests()
-    {
-        _tempRoot = PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-discovery-").FullName);
-        _originalEnvValue = Environment.GetEnvironmentVariable(LoadBearingEnvVars.SolutionPath);
-        Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, null);
-    }
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("discovery");
 
     public void Dispose()
     {
-        Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, _originalEnvValue);
-        if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true);
+        _solutionPathVariable.Dispose();
+        _temp.Dispose();
     }
 
     private string CreateDir(params string[] segments)
     {
-        string dir = Path.Combine([_tempRoot, .. segments]);
+        string dir = Path.Combine([_temp.Path, .. segments]);
         Directory.CreateDirectory(dir);
         return dir;
     }
@@ -76,7 +70,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     [Fact]
     public void DiscoverSolution_ExplicitPath_ReturnsFullPath()
     {
-        string slnPath = CreateSln(_tempRoot, "Explicit.sln");
+        string slnPath = CreateSln(_temp.Path, "Explicit.sln");
 
         string result = SolutionDiscovery.DiscoverSolution(slnPath);
 
@@ -86,7 +80,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     [Fact]
     public void DiscoverSolution_ExplicitPathMissing_Throws()
     {
-        string missing = Path.Combine(_tempRoot, "DoesNotExist.sln");
+        string missing = _temp.PathOf("DoesNotExist.sln");
 
         var ex = Should.Throw<FileNotFoundException>(() => SolutionDiscovery.DiscoverSolution(missing));
 
@@ -96,7 +90,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     [Fact]
     public void DiscoverSolution_EnvVarSet_TakesPrecedenceOverWalkUp()
     {
-        string envSln = CreateSln(_tempRoot, "FromEnvVar.sln");
+        string envSln = CreateSln(_temp.Path, "FromEnvVar.sln");
         string cwdDir = CreateDir("has-its-own-sln");
         CreateSln(cwdDir, "WalkUpWouldFindThis.sln");
         Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, envSln);
@@ -111,7 +105,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     {
         // The env var is set but names a file that does not exist: discovery throws with the env-var-specific
         // message rather than falling through to the walk-up.
-        string missing = Path.Combine(_tempRoot, "EnvVarGhost.slnx");
+        string missing = _temp.PathOf("EnvVarGhost.slnx");
         Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, missing);
 
         var ex = Should.Throw<FileNotFoundException>(() => SolutionDiscovery.DiscoverSolution());
@@ -192,7 +186,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // The scan is a courtesy on a path that has already failed, so an I/O error in it must not replace
         // the refusal with an unhandled exception: the reader would lose the message the whole change exists
         // to deliver. A directory that does not exist is the reachable form of that failure.
-        string vanished = Path.Combine(_tempRoot, "was-deleted-underneath-us");
+        string vanished = _temp.PathOf("was-deleted-underneath-us");
 
         SolutionDiscovery.NearMisses(vanished).ShouldBeEmpty();
     }
@@ -202,10 +196,10 @@ public sealed class SolutionDiscoveryTests : IDisposable
     {
         // Pure over the message static, so the cap and its tail pin without a filesystem to build first.
         string[] nearMisses = Enumerable.Range(1, 7)
-            .Select(n => Path.Combine(_tempRoot, "src", $"App{n}.sln"))
+            .Select(n => _temp.PathOf("src", $"App{n}.sln"))
             .ToArray();
 
-        string message = SolutionDiscovery.NotFoundMessage(_tempRoot, nearMisses);
+        string message = SolutionDiscovery.NotFoundMessage(_temp.Path, nearMisses);
 
         message.ShouldContain(Path.Combine("src", "App5.sln"));
         message.ShouldNotContain("App6.sln");
@@ -219,7 +213,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // must return the canonical (symlink-free) path, so the workspace agrees with git's toplevel.
         string realDir = CreateDir("real");
         string slnPath = CreateSln(realDir, "Linked.slnx");
-        string link = Path.Combine(_tempRoot, "link");
+        string link = _temp.PathOf("link");
         SymlinkSupport.CreateDirectorySymlink(link, realDir);
 
         string result = SolutionDiscovery.DiscoverSolution(Path.Combine(link, "Linked.slnx"));

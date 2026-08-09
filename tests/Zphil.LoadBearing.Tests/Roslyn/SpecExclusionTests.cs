@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
@@ -13,16 +14,13 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// </summary>
 public sealed class SpecExclusionTests : IDisposable
 {
-    private readonly string _tempRoot;
-
-    public SpecExclusionTests()
-    {
-        _tempRoot = PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-exclusion-").FullName);
-    }
+    // Canonical by construction — TestTempRoot resolves the temp base through PathCanonicalizer once per
+    // run — which is what lets the declared-member assertions compare against a path built from it.
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("spec-exclusion");
 
     public void Dispose()
     {
-        if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, true);
+        _temp.Dispose();
     }
 
     [Fact]
@@ -176,7 +174,7 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void TryReadDeclaredMembers_Slnx_ReturnsCanonicalizedDeclaredMembers()
     {
-        string solutionPath = Path.Combine(_tempRoot, "App.slnx");
+        string solutionPath = _temp.PathOf("App.slnx");
         File.WriteAllText(solutionPath, """
                                         <Solution>
                                           <Project Path="src/App/App.csproj" />
@@ -186,7 +184,7 @@ public sealed class SpecExclusionTests : IDisposable
         var members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
 
         members.ShouldNotBeNull();
-        members.ShouldContain(Path.Combine(_tempRoot, "src", "App", "App.csproj"));
+        members.ShouldContain(_temp.PathOf("src", "App", "App.csproj"));
     }
 
     [Fact]
@@ -194,7 +192,7 @@ public sealed class SpecExclusionTests : IDisposable
     {
         // A .slnf is JSON that SolutionDiscovery accepts and the classic-.sln regex reads as zero members.
         // Reporting "nothing is declared" would subtract the spec's whole closure; null is the fallback.
-        string solutionPath = Path.Combine(_tempRoot, "Filtered.slnf");
+        string solutionPath = _temp.PathOf("Filtered.slnf");
         File.WriteAllText(solutionPath, """{ "solution": { "path": "App.slnx", "projects": [] } }""");
 
         SpecExclusion.TryReadDeclaredMembers(solutionPath).ShouldBeNull();
@@ -203,14 +201,14 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void TryReadDeclaredMembers_MissingFile_ReturnsNull()
     {
-        SpecExclusion.TryReadDeclaredMembers(Path.Combine(_tempRoot, "does-not-exist.slnx")).ShouldBeNull();
+        SpecExclusion.TryReadDeclaredMembers(_temp.PathOf("does-not-exist.slnx")).ShouldBeNull();
     }
 
     [Fact]
     public void TryReadDeclaredMembers_MalformedSlnx_ReturnsNull()
     {
         // Unparseable XML is unreadable membership, not zero membership.
-        string solutionPath = Path.Combine(_tempRoot, "Broken.slnx");
+        string solutionPath = _temp.PathOf("Broken.slnx");
         File.WriteAllText(solutionPath, "<Solution><Project Path=\"a.csproj\">");
 
         SpecExclusion.TryReadDeclaredMembers(solutionPath).ShouldBeNull();

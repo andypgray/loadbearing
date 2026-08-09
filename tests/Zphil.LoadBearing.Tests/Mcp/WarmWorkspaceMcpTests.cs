@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
@@ -77,21 +76,25 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Act — add a new inbound reference (HomeController -> BillingCalculator) on disk, then re-check the
-        // still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        // still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle. The inserted
+        // member is the QuarantineContainmentE2ETests edit, so the resulting red edge is the one that suite pins.
         string homeController = fixture.PathOf(Web, "HomeController.cs");
-        EditOnDisk(homeController, InsertNewCalculatorMember);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(
+            homeController,
+            source => FixtureEdits.SpliceMemberLine(
+                source, "    public BillingCalculator NewCalculator() => new BillingCalculator();"));
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the edit (the new red edge appears, and the payload changed)
         // and is byte-identical to the cold run on the edited tree.
         after.ShouldContain("MyApp.Legacy.Billing.BillingCalculator");
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (HomeController is in Web) plus its
         // reverse-dependent Domain — Billing was reused, not re-extracted.
@@ -108,13 +111,17 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Act — append a THIRD banned read (another DateTime.Now use) on disk, then re-check the still-warm
-        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        // server. A fresh cold CLI run over the same edited tree is the parity oracle. The new read folds into
+        // the existing Now violation's site set rather than minting a new violation identity.
         string homeController = fixture.PathOf(Web, "HomeController.cs");
-        EditOnDisk(homeController, InsertAnotherClockRead);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(
+            homeController,
+            source => FixtureEdits.SpliceMemberLine(
+                source, "    public System.DateTime ExportStampAgain() => System.DateTime.Now;"));
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
@@ -122,8 +129,8 @@ public sealed class WarmWorkspaceMcpTests
         // to two), the payload changed, and it is byte-identical to the cold run on the edited tree.
         NowSiteCount(before).ShouldBe(1);
         NowSiteCount(after).ShouldBe(2);
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
@@ -140,23 +147,29 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Act — append a THIRD unsuffixed Task-returning method (Delete) on disk, then re-check the still-warm
-        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        // server. A fresh cold CLI run over the same edited tree is the parity oracle. The new method mints its
+        // own member-subject violation identity (M:...Delete) under naming/async-suffix (GRAMMAR §4.6).
         string homeController = fixture.PathOf(Web, "HomeController.cs");
-        EditOnDisk(homeController, InsertUnsuffixedTaskMethod);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(
+            homeController,
+            source => FixtureEdits.SpliceMemberLine(
+                source,
+                "    public System.Threading.Tasks.Task Delete() => System.Threading.Tasks.Task.CompletedTask;"));
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         // Assert — the warm re-check reflects the new member-shape red (the async-suffix subject set grows from
         // {Save, Load} to {Save, Load, Delete}, the new one keying its own M: DocId), the payload changed, and
         // it is byte-identical to the cold run on the edited tree.
-        AsyncSuffixSubjectMembers(before).ShouldBe([SaveMemberId, LoadMemberId], true);
-        AsyncSuffixSubjectMembers(after).ShouldBe([SaveMemberId, LoadMemberId, DeleteMemberId], true);
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        SubjectMembersOf(before, "naming/async-suffix").ShouldBe([SaveMemberId, LoadMemberId], true);
+        SubjectMembersOf(after, "naming/async-suffix")
+            .ShouldBe([SaveMemberId, LoadMemberId, DeleteMemberId], true);
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
@@ -169,44 +182,40 @@ public sealed class WarmWorkspaceMcpTests
         // then bind a warm server to a fixture copy + that spec. HomeController's three tokenless Task-returning
         // methods Save/Load/SaveAsync are all red (GRAMMAR §4.6). This is the parameter-facts warm analog of the
         // async-suffix member-subject test above — it proves Parameters survive the warm reconcile + cache path.
-        string specDirectory = Path.Combine(
-            Path.GetTempPath(), "loadbearing-warm-mcp-param", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(specDirectory);
-        string specDll = Path.Combine(specDirectory, "WarmAcceptCancellationSpec.dll");
+        // The temp root's delete is best-effort, which is what this DLL needs: a collectible spec ALC may not
+        // have released the emitted file's handle by teardown (unload is GC-timed), and the run root's sweep
+        // reclaims whatever a failed delete leaves.
+        using TempDirectory specTemp = TestTempRoot.Fresh("warm-mcp-param");
+        string specDll = specTemp.PathOf("WarmAcceptCancellationSpec.dll");
         SpecAssemblyCompiler.EmitSpecDll(
             AcceptCancellationSpecSource, specDll, "Zphil.LoadBearing.WarmAcceptCancellationSpec");
-        try
-        {
-            using var fixture = new TempFixtureWorkspace();
-            await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-                Binding(fixture.SolutionPath, specDll), Ct);
-            var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-            string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(fixture.SolutionPath, specDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-            // Act — add a CancellationToken parameter to the tokenless Save on disk, then re-check the
-            // still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle.
-            string homeController = fixture.PathOf(Web, "HomeController.cs");
-            EditOnDisk(homeController, AddCancellationTokenToSave);
-            string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-            CliResult coldEdited = await CliRunner.InvokeColdAsync(
-                "check", fixture.SolutionPath, "--spec", specDll, "--json");
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
-            // Assert — Save's member-shape red clears (Save now accepts the token, so the accept-cancellation
-            // subject set shrinks from {Save, Load, SaveAsync} to {Load, SaveAsync}), the payload changed, and
-            // the warm result is byte-identical to the cold run on the edited tree.
-            AcceptCancellationSubjectMembers(before).ShouldBe([SaveMemberId, LoadMemberId, SaveAsyncMemberId], true);
-            AcceptCancellationSubjectMembers(after).ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
-            Normalize(after).ShouldNotBe(Normalize(before));
-            Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        // Act — add a CancellationToken parameter to the tokenless Save on disk, then re-check the
+        // still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(homeController, AddCancellationTokenToSave);
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
+            "check", fixture.SolutionPath, "--spec", specDll, "--json");
 
-            // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
-            store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
-        }
-        finally
-        {
-            TryDeleteDirectory(specDirectory);
-        }
+        // Assert — Save's member-shape red clears (Save now accepts the token, so the accept-cancellation
+        // subject set shrinks from {Save, Load, SaveAsync} to {Load, SaveAsync}), the payload changed, and
+        // the warm result is byte-identical to the cold run on the edited tree.
+        SubjectMembersOf(before, "async/accept-cancellation")
+            .ShouldBe([SaveMemberId, LoadMemberId, SaveAsyncMemberId], true);
+        SubjectMembersOf(after, "async/accept-cancellation").ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+
+        // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
     }
 
     [Fact]
@@ -221,14 +230,14 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Act — flip IOrderFeed's registration from scoped to singleton on disk, then re-check the still-warm
         // server. A singleton injecting a now-singleton dependency is not captive, so the IOrderFeed edge drops
         // out of the violation set. A fresh cold CLI run over the same edited tree is the parity oracle.
         string serviceWiring = fixture.PathOf(Web, "ServiceWiring.cs");
-        EditOnDisk(serviceWiring, FlipOrderFeedToSingleton);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(serviceWiring, FlipOrderFeedToSingleton);
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
@@ -237,8 +246,8 @@ public sealed class WarmWorkspaceMcpTests
         // byte-identical to the cold run on the edited tree — the registration pass re-ran for Web.
         CaptiveInjectedTargets(before).ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
         CaptiveInjectedTargets(after).ShouldBe(["MyApp.Web.IOrderFormatter"], true);
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ServiceWiring is in Web) plus its
         // reverse-dependent Domain.
@@ -257,13 +266,18 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
-        // Act — append a second swallowing catch on the SAME Web type on disk, then re-check the still-warm
-        // server. A fresh cold CLI run over the same edited tree is the parity oracle.
+        // Act — append a second swallowing catch (System.Exception) on the SAME Web type on disk, then re-check
+        // the still-warm server. A fresh cold CLI run over the same edited tree is the parity oracle. The second
+        // site folds into the existing (ReportEndpoint, System.Exception) violation (GRAMMAR §4.8).
         string reportEndpoint = fixture.PathOf(Web, "ReportEndpoint.cs");
-        EditOnDisk(reportEndpoint, InsertAnotherSwallowingCatch);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(
+            reportEndpoint,
+            source => FixtureEdits.SpliceMemberLine(
+                source,
+                "    public int RenderAgain(int id) { try { return id; } catch (System.Exception) { return -1; } }"));
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
@@ -274,8 +288,8 @@ public sealed class WarmWorkspaceMcpTests
         CatchViolationCount(after).ShouldBe(1);
         CatchSiteCount(before).ShouldBe(1);
         CatchSiteCount(after).ShouldBe(2);
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
         // reverse-dependent Domain.
@@ -296,13 +310,13 @@ public sealed class WarmWorkspaceMcpTests
             Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
-        string before = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Act — add a `when` filter to that same catch on disk, then re-check the still-warm server. A fresh
         // cold CLI run over the same edited tree is the parity oracle.
         string reportEndpoint = fixture.PathOf(Web, "ReportEndpoint.cs");
-        EditOnDisk(reportEndpoint, AddWhenFilterToSwallowingCatch);
-        string after = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        FixtureEdits.EditOnDisk(reportEndpoint, AddWhenFilterToSwallowingCatch);
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         CliResult coldEdited = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
@@ -316,8 +330,8 @@ public sealed class WarmWorkspaceMcpTests
         RuleStatusOf(before, "exceptions/no-general-catch").ShouldBe("failed");
         RuleStatusOf(after, "exceptions/no-general-catch").ShouldBe("failed");
         CatchSiteCount(after).ShouldBe(1);
-        Normalize(after).ShouldNotBe(Normalize(before));
-        Normalize(after).ShouldBe(Normalize(coldEdited.Out));
+        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
         // reverse-dependent Domain.
@@ -342,21 +356,23 @@ public sealed class WarmWorkspaceMcpTests
 
         await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         WorkspaceSnapshot loaded = await session.GetCurrentAsync(solutionPath, Ct);
-        BackdateAllDocuments(loaded);
+        // Backdating is best-effort: a file that cannot be re-stamped stays racy and simply re-reads, which the
+        // warmup below captures into the baseline, before the measured window opens.
+        FixtureEdits.BackdateAllDocuments(loaded);
         await session.GetCurrentAsync(solutionPath, Ct); // warmup: content-verifies + promotes every document
         long readsBefore = session.SweepContentReads;
         long reloadsBefore = session.FullReloadCount;
 
         // Act — two more arch_check calls with disk untouched.
-        string first = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
-        string second = TextOf(await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct));
+        string first = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        string second = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
 
         // Assert — the warm reconcile read no content and triggered no reload, the incremental store re-walked
         // nothing on the steady-state call, and the two responses are byte-identical.
         (session.SweepContentReads - readsBefore).ShouldBe(0);
         (session.FullReloadCount - reloadsBefore).ShouldBe(0);
         store.LastReExtractedProjects.ShouldBeEmpty();
-        Normalize(second).ShouldBe(Normalize(first));
+        second.NormalizedTrimmed().ShouldBe(first.NormalizedTrimmed());
     }
 
     [Fact]
@@ -412,43 +428,35 @@ public sealed class WarmWorkspaceMcpTests
 
         // Assert — both succeeded with content.
         results.ShouldAllBe(result => result.IsError != true);
-        results.Select(TextOf).ShouldAllBe(text => text.Length > 0);
+        results.Select(result => result.ShouldHaveTextContent()).ShouldAllBe(text => text.Length > 0);
     }
 
     [Fact]
     public async Task ArchCheck_SpecDllDeletedMidSession_ReturnsSameErrorAsColdCli()
     {
         // Arrange — bind to a throwaway copy of a spec DLL so deleting it cannot disturb the shared fixture.
-        string tempDirectory = Path.Combine(
-            Path.GetTempPath(), "loadbearing-warm-mcp", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDirectory);
-        string tempSpec = Path.Combine(tempDirectory, "CopiedSpec.dll");
+        using TempDirectory temp = TestTempRoot.Fresh("warm-mcp-spec-copy");
+        string tempSpec = temp.PathOf("CopiedSpec.dll");
         File.Copy(CliRunner.CleanSpecDll, tempSpec);
-        try
-        {
-            await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-                Binding(CliRunner.MyAppSolution, tempSpec), Ct);
 
-            // Warm the session WITHOUT loading the spec: arch_graph opens the workspace (it is spec-free), so
-            // the spec DLL stays unlocked and can be deleted to model a mid-session removal.
-            CallToolResult graph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-            graph.IsError.ShouldNotBe(true);
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, tempSpec), Ct);
 
-            // Act — delete the bound spec DLL, then check against the still-warm workspace.
-            File.Delete(tempSpec);
-            CallToolResult check = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
-            CliResult coldCheck = await CliRunner.InvokeColdAsync(
-                "check", CliRunner.MyAppSolution, "--spec", tempSpec, "--json");
-            coldCheck.ShouldRefuseWith();
+        // Warm the session WITHOUT loading the spec: arch_graph opens the workspace (it is spec-free), so
+        // the spec DLL stays unlocked and can be deleted to model a mid-session removal.
+        CallToolResult graph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+        graph.IsError.ShouldNotBe(true);
 
-            // Assert — the tool errors with exactly the text the cold CLI wrote to stderr in the same state.
-            check.IsError.ShouldBe(true);
-            Normalize(TextOf(check)).ShouldBe(Normalize(coldCheck.Err));
-        }
-        finally
-        {
-            if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, true);
-        }
+        // Act — delete the bound spec DLL, then check against the still-warm workspace.
+        File.Delete(tempSpec);
+        CallToolResult check = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+        CliResult coldCheck = await CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", tempSpec, "--json");
+        coldCheck.ShouldRefuseWith();
+
+        // Assert — the tool errors with exactly the text the cold CLI wrote to stderr in the same state.
+        check.IsError.ShouldBe(true);
+        check.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(coldCheck.Err.NormalizedTrimmed());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
@@ -459,31 +467,6 @@ public sealed class WarmWorkspaceMcpTests
             ? Directory.GetCurrentDirectory()
             : Path.GetDirectoryName(Path.GetFullPath(solution))!;
         return new McpServerBinding(solution, spec, workingDirectory);
-    }
-
-    // Inserts a member referencing the quarantined scope's interior just before the class's final closing brace —
-    // the QuarantineContainmentE2ETests edit, so the resulting red edge is the same one that suite pins.
-    private static string InsertNewCalculatorMember(string source)
-    {
-        int lastBrace = source.LastIndexOf('}');
-        return source[..lastBrace] + "    public BillingCalculator NewCalculator() => new BillingCalculator();\n}\n";
-    }
-
-    // Appends one more DateTime.Now read to HomeController — a third banned member-use site (GRAMMAR §4.5),
-    // folding into the existing Now violation's site set rather than minting a new violation identity.
-    private static string InsertAnotherClockRead(string source)
-    {
-        int lastBrace = source.LastIndexOf('}');
-        return source[..lastBrace] + "    public System.DateTime ExportStampAgain() => System.DateTime.Now;\n}\n";
-    }
-
-    // Appends one more unsuffixed Task-returning method to HomeController — a third member-shape red under
-    // naming/async-suffix (GRAMMAR §4.6), minting its own member-subject violation identity (M:...Delete).
-    private static string InsertUnsuffixedTaskMethod(string source)
-    {
-        int lastBrace = source.LastIndexOf('}');
-        return source[..lastBrace]
-               + "    public System.Threading.Tasks.Task Delete() => System.Threading.Tasks.Task.CompletedTask;\n}\n";
     }
 
     // Turns HomeController's tokenless Save into one accepting a CancellationToken — the compliant signature,
@@ -505,15 +488,6 @@ public sealed class WarmWorkspaceMcpTests
         return source.Replace("AddScoped<IOrderFeed, OrderFeed>", "AddSingleton<IOrderFeed, OrderFeed>");
     }
 
-    // Appends a second swallowing catch (System.Exception) to ReportEndpoint — a second catch site folding into
-    // the existing (ReportEndpoint, System.Exception) catch violation's site set (GRAMMAR §4.8), not a new identity.
-    private static string InsertAnotherSwallowingCatch(string source)
-    {
-        int lastBrace = source.LastIndexOf('}');
-        return source[..lastBrace]
-               + "    public int RenderAgain(int id) { try { return id; } catch (System.Exception) { return -1; } }\n}\n";
-    }
-
     // Adds a `when` filter to ReportEndpoint's blanket catch, using the method's own parameter so nothing new is
     // referenced. The catch edge and its §4.1 reference edge are minted exactly as before (GRAMMAR §4.8) — only
     // the recorded unfiltered-site set changes, which is what separates the two catch rules over this one site.
@@ -524,49 +498,28 @@ public sealed class WarmWorkspaceMcpTests
             "catch (System.Exception) when (reportId > 0)");
     }
 
-    // The member subjects (subjectMember DocIds) reported red under the member-subject rule naming/async-suffix.
-    private static IReadOnlyList<string> AsyncSuffixSubjectMembers(string checkJson)
-    {
-        return SubjectMembersOf(checkJson, "naming/async-suffix");
-    }
-
-    // The member subjects (subjectMember DocIds) reported red under the member-subject rule async/accept-cancellation.
-    private static IReadOnlyList<string> AcceptCancellationSubjectMembers(string checkJson)
-    {
-        return SubjectMembersOf(checkJson, "async/accept-cancellation");
-    }
-
     // The member subjects (subjectMember DocIds) a member-subject rule reports red, keyed by rule id.
     private static IReadOnlyList<string> SubjectMembersOf(string checkJson, string ruleId)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == ruleId);
-        return rule.GetProperty("violations").EnumerateArray()
-            .Select(v => v.GetProperty("subjectMember").GetString()!)
+        return CheckJson.Violations(checkJson, ruleId)
+            .Select(violation => violation.GetProperty("subjectMember").GetString()!)
             .ToList();
     }
 
     // The injected-type targets reported red under the injection rule di/no-captive-dependencies (GRAMMAR §4.7).
     private static IReadOnlyList<string> CaptiveInjectedTargets(string checkJson)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "di/no-captive-dependencies");
-        return rule.GetProperty("violations").EnumerateArray()
-            .Select(v => v.GetProperty("target").GetString()!)
+        return CheckJson.Violations(checkJson, "di/no-captive-dependencies")
+            .Select(violation => violation.GetProperty("target").GetString()!)
             .ToList();
     }
 
     // The number of member-use sites reported for the banned DateTime.Now read under time/inject-clock.
     private static int NowSiteCount(string checkJson)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "time/inject-clock");
-        JsonElement now = rule.GetProperty("violations").EnumerateArray()
-            .Single(v => v.GetProperty("targetMember").GetString() == "P:System.DateTime.Now");
-        return now.GetProperty("sites").GetArrayLength();
+        return CheckJson.Violations(checkJson, "time/inject-clock")
+            .Single(violation => violation.GetProperty("targetMember").GetString() == "P:System.DateTime.Now")
+            .GetProperty("sites").GetArrayLength();
     }
 
     // The number of distinct catch violations ReportEndpoint contributes (one per (source, caught) type pair)
@@ -574,96 +527,29 @@ public sealed class WarmWorkspaceMcpTests
     // catcher, ReportPublisher, whose rethrowing clause the plain catch ban reds too.
     private static int CatchViolationCount(string checkJson)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
-        return rule.GetProperty("violations").EnumerateArray()
-            .Count(v => v.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
+        return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
+            .Count(violation => violation.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
     }
 
     // The number of catch sites reported for the (ReportEndpoint, System.Exception) swallow under exceptions/no-general-catch.
     private static int CatchSiteCount(string checkJson)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-general-catch");
-        JsonElement swallow = rule.GetProperty("violations").EnumerateArray()
-            .Single(v => v.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
-        return swallow.GetProperty("sites").GetArrayLength();
+        return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
+            .Single(violation => violation.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint")
+            .GetProperty("sites").GetArrayLength();
     }
 
     // A named rule's reported status — "passed", "failed" or "skipped".
     private static string RuleStatusOf(string checkJson, string ruleId)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == ruleId);
-        return rule.GetProperty("status").GetString()!;
+        return CheckJson.Rule(checkJson, ruleId).GetProperty("status").GetString()!;
     }
 
     // The catching types exceptions/no-unfiltered-catch reports, one per (source, caught) type pair.
     private static IReadOnlyList<string> UnfilteredCatchSources(string checkJson)
     {
-        using JsonDocument document = JsonDocument.Parse(checkJson);
-        JsonElement rule = document.RootElement.GetProperty("rules").EnumerateArray()
-            .Single(r => r.GetProperty("id").GetString() == "exceptions/no-unfiltered-catch");
-        return rule.GetProperty("violations").EnumerateArray()
-            .Select(v => v.GetProperty("source").GetString()!)
+        return CheckJson.Violations(checkJson, "exceptions/no-unfiltered-catch")
+            .Select(violation => violation.GetProperty("source").GetString()!)
             .ToList();
-    }
-
-    private static void EditOnDisk(string path, Func<string, string> transform)
-    {
-        string content = File.ReadAllText(path);
-        File.WriteAllText(path, transform(content));
-        // A future mtime guarantees the reconcile sweep sees a delta against the load-time fingerprint.
-        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(2));
-    }
-
-    // Best-effort temp cleanup: a collectible spec ALC may not have released the emitted DLL's file handle by
-    // teardown (unload is GC-timed), so a failed delete is swallowed and the OS reclaims the temp dir later.
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path)) Directory.Delete(path, true);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
-
-    private static void BackdateAllDocuments(WorkspaceSnapshot snapshot)
-    {
-        DateTime wellPast = DateTime.UtcNow.AddDays(-1);
-        var paths = snapshot.Solution.Projects
-            .SelectMany(p => p.Documents)
-            .Select(d => d.FilePath)
-            .OfType<string>()
-            .Distinct();
-
-        foreach (string path in paths)
-            try
-            {
-                File.SetLastWriteTimeUtc(path, wellPast);
-            }
-            catch (IOException)
-            {
-                // Best-effort: a file we cannot re-stamp stays racy and simply re-reads, which the warmup
-                // baseline captured before the measured window.
-            }
-    }
-
-    private static string TextOf(CallToolResult result)
-    {
-        return ((TextContentBlock)result.Content.Single()).Text;
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
     }
 }

@@ -4,6 +4,8 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Baselines;
+using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -20,30 +22,17 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class BaselineStoreTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(
-        Path.GetTempPath(), "loadbearing-baseline-tests", Guid.NewGuid().ToString("N"));
-
-    public BaselineStoreTests()
-    {
-        Directory.CreateDirectory(_dir);
-    }
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("baseline-store");
 
     public void Dispose()
     {
-        try
-        {
-            if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
-        }
-        catch
-        {
-            // best-effort cleanup
-        }
+        _temp.Dispose();
     }
 
     [Fact]
     public void TryReadDocument_MissingFile_ReturnsNull()
     {
-        BaselineStore.TryReadDocument(Path.Combine(_dir, "nope.json")).ShouldBeNull();
+        BaselineStore.TryReadDocument(Path.Combine(_temp.Path, "nope.json")).ShouldBeNull();
     }
 
     [Fact]
@@ -296,23 +285,23 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void ResolvePath_RelativePath_ResolvesAgainstSolutionDir()
     {
-        BaselineStore.ResolvePath("arch/baselines/data-access/no-inline-sql.json", _dir)
-            .ShouldBe(Path.GetFullPath(Path.Combine(_dir, "arch/baselines/data-access/no-inline-sql.json")));
+        BaselineStore.ResolvePath("arch/baselines/data-access/no-inline-sql.json", _temp.Path)
+            .ShouldBe(Path.GetFullPath(Path.Combine(_temp.Path, "arch/baselines/data-access/no-inline-sql.json")));
     }
 
     [Fact]
     public void ResolvePath_AbsolutePath_ReturnsItVerbatim()
     {
-        string absolute = Path.Combine(_dir, "elsewhere", "b.json");
+        string absolute = Path.Combine(_temp.Path, "elsewhere", "b.json");
 
-        BaselineStore.ResolvePath(absolute, Path.Combine(_dir, "unrelated"))
+        BaselineStore.ResolvePath(absolute, Path.Combine(_temp.Path, "unrelated"))
             .ShouldBe(Path.GetFullPath(absolute));
     }
 
     [Fact]
     public void LoadForModel_MissingFile_LeavesRuleUncaptured()
     {
-        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/absent.json"), _dir);
+        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/absent.json"), _temp.Path);
 
         index.TryGet("data/x", out _).ShouldBeFalse();
     }
@@ -322,7 +311,7 @@ public sealed class BaselineStoreTests : IDisposable
     {
         WriteComposed("arch/b.json", ("other/rule", [BaselineEntry.ForSubject("T:App.Thing")]));
 
-        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _dir);
+        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _temp.Path);
 
         index.TryGet("data/x", out _).ShouldBeFalse();
     }
@@ -332,7 +321,7 @@ public sealed class BaselineStoreTests : IDisposable
     {
         WriteComposed("arch/b.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
 
-        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _dir);
+        BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _temp.Path);
 
         index.TryGet("data/x", out RuleBaseline? section).ShouldBeTrue();
         section!.Count.ShouldBe(1);
@@ -345,7 +334,7 @@ public sealed class BaselineStoreTests : IDisposable
         {
             ["data/x"] = [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]
         });
-        string path = Path.Combine(_dir, "w.json");
+        string path = Path.Combine(_temp.Path, "w.json");
         BaselineStore.Write(path, document).ShouldBe(WriteOutcome.Wrote);
         File.WriteAllText(path, File.ReadAllText(path).Replace("\n", "\r\n")); // autocrlf checkout
 
@@ -354,7 +343,13 @@ public sealed class BaselineStoreTests : IDisposable
 
     private static ArchitectureModel MigrateModel(string ruleId, string baselinePath)
     {
-        return ArchModelBuilder.Build(new OneMigrateSpec(ruleId, baselinePath));
+        return Checker.Model(arch =>
+            arch.Rule(ruleId)
+                .Migrate(
+                    "old",
+                    arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+                .Baseline(baselinePath)
+                .Because("b"));
     }
 
     private string WriteComposed(string relativePath, params (string RuleId, BaselineEntry[] Entries)[] rules)
@@ -366,22 +361,9 @@ public sealed class BaselineStoreTests : IDisposable
 
     private string Write(string relativePath, string content)
     {
-        string path = Path.Combine(_dir, relativePath);
+        string path = Path.Combine(_temp.Path, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
         return path;
-    }
-
-    private sealed class OneMigrateSpec(string ruleId, string baselinePath) : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule(ruleId)
-                .Migrate(
-                    "old",
-                    arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
-                .Baseline(baselinePath)
-                .Because("b");
-        }
     }
 }

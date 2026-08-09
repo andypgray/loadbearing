@@ -181,7 +181,7 @@ public sealed class DocHygieneTests
         // budgeted, so a new example or package README cannot slip past the gate unnoticed.
         foreach (string parent in new[] { "examples", "src" })
         {
-            string parentDirectory = Absolute(parent);
+            string parentDirectory = RepoRoot.Absolute(parent);
             if (!Directory.Exists(parentDirectory)) continue;
 
             foreach (string childDirectory in Directory.GetDirectories(parentDirectory))
@@ -189,7 +189,7 @@ public sealed class DocHygieneTests
                 string readme = Path.Combine(childDirectory, "README.md");
                 if (!File.Exists(readme)) continue;
 
-                string relativePath = ToRepoRelative(readme);
+                string relativePath = RepoRoot.Relative(readme);
                 if (!BudgetDocs.Contains(relativePath)) uncovered.Add(relativePath);
             }
         }
@@ -199,7 +199,7 @@ public sealed class DocHygieneTests
             $"README(s) under examples/ or src/ are outside the budgeted set:\n{string.Join("\n", uncovered)}");
 
         const string adopting = "examples/Meridian/ADOPTING.md";
-        if (File.Exists(Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
+        if (File.Exists(RepoRoot.Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
     }
 
     [Fact]
@@ -218,22 +218,12 @@ public sealed class DocHygieneTests
             $"Tracked README(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
 
         const string adopting = "examples/Meridian/ADOPTING.md";
-        if (File.Exists(Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
+        if (File.Exists(RepoRoot.Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
     }
 
     private static string ReadDoc(string relativePath)
     {
-        return File.ReadAllText(Absolute(relativePath));
-    }
-
-    private static string Absolute(string relativePath)
-    {
-        return Path.Combine(RepoRoot.Directory, relativePath.Replace('/', Path.DirectorySeparatorChar));
-    }
-
-    private static string ToRepoRelative(string absolutePath)
-    {
-        return Path.GetRelativePath(RepoRoot.Directory, absolutePath).Replace(Path.DirectorySeparatorChar, '/');
+        return File.ReadAllText(RepoRoot.Absolute(relativePath));
     }
 
     private static TheoryData<string> ToTheoryData(string[] docs)

@@ -1,3 +1,5 @@
+using Xunit;
+
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
@@ -25,6 +27,61 @@ internal static class ShellInterpreter
     internal static string? Locate(string command)
     {
         return SearchPath(command) ?? GitForWindowsShell(command);
+    }
+
+    /// <summary>
+    ///     The path to <paramref name="command" />, skipping the test with a named reason where it is not
+    ///     installed — the shape every suite that shells out wants.
+    /// </summary>
+    internal static string Require(string command)
+    {
+        string path = Locate(command) ?? string.Empty;
+        Assert.SkipWhen(
+            path.Length == 0,
+            $"'{command}' is not available on this machine, so this arm cannot run here. It runs wherever "
+            + "the interpreter is installed, which for sh is every CI OS.");
+
+        return path;
+    }
+
+    /// <summary>
+    ///     <paramref name="path" /> with forward slashes throughout: a POSIX shell takes <c>C:/...</c> as a
+    ///     path, while a backslash inside it is an escape character rather than a separator.
+    /// </summary>
+    internal static string Posix(string path)
+    {
+        return path.Replace('\\', '/');
+    }
+
+    /// <summary>
+    ///     Writes an executable stub named <paramref name="name" /> into <paramref name="directory" />, in
+    ///     both shapes a shell can reach: an extensionless shebang script carrying
+    ///     <paramref name="shScript" /> (what a POSIX shell resolves, on every OS), and — where
+    ///     <paramref name="cmdScript" /> is given — a <c>.cmd</c> twin (what PowerShell resolves on Windows,
+    ///     where an extensionless file is not an executable).
+    /// </summary>
+    internal static void WriteExecutableStub(
+        string directory, string name, string shScript, string? cmdScript = null)
+    {
+        string posix = Path.Combine(directory, name);
+        File.WriteAllText(posix, shScript);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(
+                posix,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+        if (cmdScript is not null) File.WriteAllText(Path.Combine(directory, name + ".cmd"), cmdScript);
+    }
+
+    /// <summary>
+    ///     A <c>PATH</c> with <paramref name="directory" /> in front of this process's — how a stub is put
+    ///     where a child resolves the real command from.
+    /// </summary>
+    internal static string PrependedPath(string directory)
+    {
+        return directory + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
     }
 
     private static string? SearchPath(string command)

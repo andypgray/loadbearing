@@ -45,36 +45,31 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>Renders an edge as the pinned agent-facing form: <c>src -&gt; tgt @ file:line, ...</c>.</summary>
     public string RenderEdge(ReferenceEdge edge)
     {
-        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
-        return $"{edge.Source.FullName} -> {edge.Target.FullName} @ {sites}";
+        return $"{edge.Source.FullName} -> {edge.Target.FullName} @ {Sites(edge.Sites)}";
     }
 
     /// <summary>Renders a member-use edge as <c>src -&gt; member SymbolId @ file:line, ...</c> (GRAMMAR §4.5).</summary>
     public string RenderMemberEdge(MemberEdge edge)
     {
-        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
-        return $"{edge.Source.FullName} -> {edge.Member.SymbolId} @ {sites}";
+        return $"{edge.Source.FullName} -> {edge.Member.SymbolId} @ {Sites(edge.Sites)}";
     }
 
     /// <summary>Renders a construction edge as <c>src -&gt; constructed @ file:line, ...</c> (GRAMMAR §4.5).</summary>
     public string RenderConstructorEdge(ConstructorEdge edge)
     {
-        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
-        return $"{edge.Source.FullName} -> {edge.Constructed.FullName} @ {sites}";
+        return $"{edge.Source.FullName} -> {edge.Constructed.FullName} @ {Sites(edge.Sites)}";
     }
 
     /// <summary>Renders an injection edge as <c>src -&gt; injected @ file:line, ...</c> (GRAMMAR §4.7).</summary>
     public string RenderInjectionEdge(InjectionEdge edge)
     {
-        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
-        return $"{edge.Source.FullName} -> {edge.Injected.FullName} @ {sites}";
+        return $"{edge.Source.FullName} -> {edge.Injected.FullName} @ {Sites(edge.Sites)}";
     }
 
     /// <summary>Renders an exposure edge as <c>src -&gt; exposed @ file:line, ...</c> (GRAMMAR §4.9).</summary>
     public string RenderExposureEdge(ExposureEdge edge)
     {
-        string sites = string.Join(", ", edge.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
-        return $"{edge.Source.FullName} -> {edge.Exposed.FullName} @ {sites}";
+        return $"{edge.Source.FullName} -> {edge.Exposed.FullName} @ {Sites(edge.Sites)}";
     }
 
     /// <summary>
@@ -83,8 +78,13 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// </summary>
     public string RenderRegistration(ServiceRegistration registration)
     {
-        string sites = string.Join(", ", registration.Sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
         string implementation = registration.ImplementationFullName ?? "(none)";
-        return $"{registration.Lifetime} {registration.ServiceFullName} -> {implementation} @ {sites}";
+        return $"{registration.Lifetime} {registration.ServiceFullName} -> {implementation} @ {Sites(registration.Sites)}";
+    }
+
+    /// <summary>The site list every render above ends in: <c>file:line</c>, comma-separated, in model order.</summary>
+    private string Sites(IEnumerable<SourceLocation> sites)
+    {
+        return string.Join(", ", sites.Select(s => $"{RelativePath(s)}:{s.Line}"));
     }
 }

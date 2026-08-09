@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
@@ -137,7 +138,7 @@ public sealed class TrackedFileHygieneTests
         // Act
         foreach ((string path, string token) in NonSourceExemptions)
         {
-            string absolute = TrackedFiles.Absolute(path);
+            string absolute = RepoRoot.Absolute(path);
             if (!File.Exists(absolute))
             {
                 dead.Add($"{path} no longer exists.");
@@ -157,7 +158,7 @@ public sealed class TrackedFileHygieneTests
     {
         return paths
             .AsParallel()
-            .Select(path => (Path: path, Text: prepare(File.ReadAllText(TrackedFiles.Absolute(path)))))
+            .Select(path => (Path: path, Text: prepare(File.ReadAllText(RepoRoot.Absolute(path)))))
             .OrderBy(static entry => entry.Path, StringComparer.Ordinal)
             .ToArray();
     }

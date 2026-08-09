@@ -35,28 +35,32 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// </remarks>
 public sealed class CoercedToolSchemaTests
 {
-    [Fact]
-    public void ScalarString_ErasedToEmpty_IsRestoredToAPlainString()
+    // Both erasures, one claim: whatever keyword the exporter had left to erase, a string parameter reaches
+    // the client as a plain "string".
+    [Theory]
+    [InlineData(nameof(Probe.WithScalarString), "required")]
+    // The advertised shape is "string", not ["string","null"] — pinned because a union here would
+    // change what every optional arch_* parameter advertises, and all of them are string?.
+    [InlineData(nameof(Probe.WithNullableString), "optional")]
+    // The `true` erasure, and the branch every live parameter goes through: a parameter with no description
+    // and no default has neither keyword the exporter needs to emit an object at all.
+    [InlineData(nameof(Probe.WithUndescribedString), "plain")]
+    public void ErasedScalarString_IsRestoredToAPlainString(string methodName, string parameterName)
     {
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithScalarString), "required");
+        JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
         property["type"]!.GetValue<string>().ShouldBe("string");
     }
 
-    [Fact]
-    public void NullableScalarString_ErasedToEmpty_IsRestoredToAPlainStringWithNoNullUnion()
+    [Theory]
+    [InlineData(nameof(Probe.WithStringArray), "names")]
+    // The exporter's other erasure. A parameter carrying a description or a default lands as `{}`; one with
+    // neither lands as the bare `true` schema — "any value" — which is the same loss in a shape the
+    // object-guarded repair used to fall straight through, silently and in the direction of "anything goes".
+    [InlineData(nameof(Probe.WithUndescribedStringArray), "names")]
+    public void ErasedStringArray_IsRestoredToAnArrayOfStrings(string methodName, string parameterName)
     {
-        // The advertised shape is "string", not ["string","null"] — pinned because a union here would
-        // change what every optional arch_* parameter advertises, and all of them are string?.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithNullableString), "optional");
-
-        property["type"]!.GetValue<string>().ShouldBe("string");
-    }
-
-    [Fact]
-    public void StringArray_ErasedToEmpty_IsRestoredToAnArrayOfStrings()
-    {
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithStringArray), "names");
+        JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
         property["type"]!.GetValue<string>().ShouldBe("array");
         property["items"]!["type"]!.GetValue<string>().ShouldBe("string");
@@ -64,13 +68,19 @@ public sealed class CoercedToolSchemaTests
         property["items"]!.AsObject().ContainsKey("enum").ShouldBeFalse();
     }
 
-    [Fact]
-    public void EnumScalar_ErasedToEmpty_IsRestoredWithTheAllowedValueList()
+    // The value list is the whole point: the converter hides the enum from the exporter, so without
+    // this repair the allowed values would have to be duplicated into the description prose, where
+    // no client can validate against them.
+    [Theory]
+    [InlineData(nameof(Probe.WithEnum), "severity")]
+    // Nullable<T> is unwrapped before the type test, so an optional enum keeps its value list.
+    [InlineData(nameof(Probe.WithNullableEnum), "severity")]
+    // The costly half of the `true` erasure: no description means no prose to fall back on, so the
+    // repaired enum list is the only place a client can learn the allowed values.
+    [InlineData(nameof(Probe.WithUndescribedEnum), "severity")]
+    public void ErasedEnum_IsRestoredWithTheAllowedValueList(string methodName, string parameterName)
     {
-        // The value list is the whole point: the converter hides the enum from the exporter, so without
-        // this repair the allowed values would have to be duplicated into the description prose, where
-        // no client can validate against them.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithEnum), "severity");
+        JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
         property["type"]!.GetValue<string>().ShouldBe("string");
         EnumNamesOf(property).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
@@ -79,21 +89,11 @@ public sealed class CoercedToolSchemaTests
     [Fact]
     public void EnumArray_ErasedToEmpty_IsRestoredToAnArrayCarryingTheAllowedValueList()
     {
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithEnumArray), "severities");
+        JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithEnumArray), "severities");
 
         property["type"]!.GetValue<string>().ShouldBe("array");
         property["items"]!["type"]!.GetValue<string>().ShouldBe("string");
         EnumNamesOf(property["items"]!.AsObject()).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
-    }
-
-    [Fact]
-    public void NullableEnum_ErasedToEmpty_IsRestoredFromTheUnderlyingType()
-    {
-        // Nullable<T> is unwrapped before the type test, so an optional enum keeps its value list.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithNullableEnum), "severity");
-
-        property["type"]!.GetValue<string>().ShouldBe("string");
-        EnumNamesOf(property).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class CoercedToolSchemaTests
         // bool has no custom converter, so the exporter emits its shape and every repair branch is
         // guarded on !ContainsKey. A repair that overwrote here would silently retype live parameters:
         // arch_graph's overview and allowWorkspaceDiagnostics are both bool.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithBool), "flag");
+        JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithBool), "flag");
 
         property["type"]!.GetValue<string>().ShouldBe("boolean");
     }
@@ -112,7 +112,7 @@ public sealed class CoercedToolSchemaTests
     {
         // The repair rewrites the type node in place; losing the description would strip every
         // parameter's guidance from tools/list.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithScalarString), "required");
+        JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithScalarString), "required");
 
         property["description"]!.GetValue<string>().ShouldBe("A described parameter.");
     }
@@ -123,48 +123,13 @@ public sealed class CoercedToolSchemaTests
     [InlineData(nameof(Probe.WithUndescribedEnum), "severity")]
     public void ExporterWithoutTheHook_ErasesAnUndescribedParameterToTrue(string methodName, string parameterName)
     {
-        // The premise every "ErasedToTrue" test below rests on, observed with the hook off so it is an
-        // assertion rather than a claim: a converter-bound parameter with neither a description nor a
-        // default has no keyword left to carry, so the exporter emits the bare `true` schema rather than
-        // the `{}` the described parameters land as.
+        // The premise the undescribed rows of the restoration theories above rest on, observed with the hook
+        // off so it is an assertion rather than a claim: a converter-bound parameter with neither a
+        // description nor a default has no keyword left to carry, so the exporter emits the bare `true`
+        // schema rather than the `{}` the described parameters land as.
         JsonNode property = SchemaNodeFor(methodName, parameterName, repairErasures: false);
 
         property.GetValueKind().ShouldBe(JsonValueKind.True);
-    }
-
-    [Fact]
-    public void UndescribedScalarString_ErasedToTrue_IsRestoredToAPlainString()
-    {
-        // The branch every live parameter goes through, reached by the erasure that used to escape the
-        // repair: a parameter with no description and no default has neither keyword the exporter needs
-        // to emit an object at all.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithUndescribedString), "plain");
-
-        property["type"]!.GetValue<string>().ShouldBe("string");
-    }
-
-    [Fact]
-    public void UndescribedStringArray_ErasedToTrue_IsRestoredToAnArrayOfStrings()
-    {
-        // The exporter's other erasure. A parameter carrying a description or a default lands as `{}`;
-        // one with neither lands as the bare `true` schema — "any value" — which is the same loss in a
-        // shape the object-guarded repair used to fall straight through, silently and in the direction
-        // of "anything goes".
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithUndescribedStringArray), "names");
-
-        property["type"]!.GetValue<string>().ShouldBe("array");
-        property["items"]!["type"]!.GetValue<string>().ShouldBe("string");
-    }
-
-    [Fact]
-    public void UndescribedEnum_ErasedToTrue_IsRestoredWithTheAllowedValueList()
-    {
-        // The costly half of the `true` erasure: no description means no prose to fall back on, so the
-        // repaired enum list is the only place a client can learn the allowed values.
-        JsonObject property = SchemaPropertyFor(nameof(Probe.WithUndescribedEnum), "severity");
-
-        property["type"]!.GetValue<string>().ShouldBe("string");
-        EnumNamesOf(property).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
     }
 
     [Fact]
@@ -247,7 +212,7 @@ public sealed class CoercedToolSchemaTests
     ///     <c>CoercingToolRegistration.WithCoercingTools</c> creates the real ones — same schema hook, same
     ///     serializer options — and returns the advertised schema node for <paramref name="parameterName" />.
     /// </summary>
-    private static JsonObject SchemaPropertyFor(string methodName, string parameterName)
+    private static JsonObject ShouldHaveSchemaPropertyFor(string methodName, string parameterName)
     {
         JsonNode property = SchemaNodeFor(methodName, parameterName);
         property.ShouldBeOfType<JsonObject>($"'{parameterName}' is not an object schema: {property.ToJsonString()}");

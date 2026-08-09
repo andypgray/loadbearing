@@ -3,6 +3,7 @@ using Xunit;
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 using Zphil.LoadBearing.Validation;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -82,7 +83,7 @@ public sealed class CliErrorMapperTests
 
         CliErrorMapper.Write(exception, error);
 
-        Normalize(error.ToString()).ShouldBe(CliErrorMapper.UserFacingMessage(exception));
+        error.ToString().NormalizedLines().TrimEnd('\n').ShouldBe(CliErrorMapper.UserFacingMessage(exception));
     }
 
     [Fact]
@@ -98,11 +99,6 @@ public sealed class CliErrorMapperTests
 
         CliErrorMapper.Write(validation, error);
 
-        Normalize(error.ToString()).ShouldBe(CliErrorMapper.UserFacingMessage(validation));
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").TrimEnd('\n');
+        error.ToString().NormalizedLines().TrimEnd('\n').ShouldBe(CliErrorMapper.UserFacingMessage(validation));
     }
 }

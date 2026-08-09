@@ -36,6 +36,18 @@ internal static class RepoRoot
     /// </summary>
     public static string SolutionDotSettings => Solution + ".DotSettings";
 
+    /// <summary>The absolute native path for a forward-slash repo-relative one.</summary>
+    public static string Absolute(string repoRelativePath)
+    {
+        return Path.Combine([Directory, .. repoRelativePath.Split('/')]);
+    }
+
+    /// <summary>The forward-slash repo-relative path for an absolute one — how the repo spells its own files.</summary>
+    public static string Relative(string absolutePath)
+    {
+        return Path.GetRelativePath(Directory, absolutePath).Replace('\\', '/');
+    }
+
     private static string Find()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

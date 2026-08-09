@@ -74,7 +74,7 @@ public sealed class McpRegistrationTests
                 $"the registration no longer names {path}, so what a reader pastes and what is held to "
                 + "account here have come apart.");
 
-            string absolute = Absolute(path);
+            string absolute = RepoRoot.Absolute(path);
             File.Exists(absolute).ShouldBeTrue(
                 $"the registration names {path}, which is not there. Pasted as written, it points the client "
                 + "at nothing and the server never reaches a handshake.");
@@ -148,15 +148,6 @@ public sealed class McpRegistrationTests
 
     private static string ReadRepoFile(string repoRelativePath)
     {
-        string absolute = Absolute(repoRelativePath);
-
-        return File.ReadAllText(absolute);
-    }
-
-    private static string Absolute(string repoRelativePath)
-    {
-        string native = repoRelativePath.Replace('/', Path.DirectorySeparatorChar);
-
-        return Path.Combine(RepoRoot.Directory, native);
+        return File.ReadAllText(RepoRoot.Absolute(repoRelativePath));
     }
 }

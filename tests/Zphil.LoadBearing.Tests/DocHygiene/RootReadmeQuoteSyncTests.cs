@@ -157,12 +157,12 @@ public sealed class RootReadmeQuoteSyncTests
 
     private static string ReadRootReadme()
     {
-        return File.ReadAllText(Path.Combine(RepoRoot.Directory, RootReadme));
+        return File.ReadAllText(RepoRoot.Absolute(RootReadme));
     }
 
     private static IReadOnlyList<string> ReadSource(string repoRelative)
     {
-        return File.ReadAllLines(Path.Combine(RepoRoot.Directory, repoRelative.Replace('/', Path.DirectorySeparatorChar)));
+        return File.ReadAllLines(RepoRoot.Absolute(repoRelative));
     }
 
     private static bool ContainsMarker(IReadOnlyList<string> fence, string marker)

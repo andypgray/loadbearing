@@ -4,6 +4,7 @@ using Xunit;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -145,14 +146,7 @@ public sealed class ManagedBlockFileTests
 
     private static void WithTempDir(Action<string> body)
     {
-        DirectoryInfo dir = Directory.CreateTempSubdirectory("lb-render-");
-        try
-        {
-            body(dir.FullName);
-        }
-        finally
-        {
-            dir.Delete(true);
-        }
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        body(temp.Path);
     }
 }

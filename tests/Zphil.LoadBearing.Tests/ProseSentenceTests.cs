@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests;
 
@@ -74,7 +75,16 @@ public class ProseSentenceTests
     {
         // The member-access verb renders each target as a backticked declaring-type dot member,
         // joined with "or" (GRAMMAR §4.5, §6). Validation runs on build, so the members must be real.
-        ArchModelBuilder.Build(new InjectClockSpec())
+        // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
+        // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
+        Checker.Model(arch => arch.Rule("time/inject-clock")
+                .Migrate(
+                    "Code reads the ambient clock directly.",
+                    arch.Types.MustNotUse(
+                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
+                .Fix("Take IClock in the constructor; see OrderService for the pattern."))
             .Rules.Single(rule => rule.Id == "time/inject-clock").Sentence
             .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
     }
@@ -84,7 +94,14 @@ public class ProseSentenceTests
     {
         // Acceptance box 1: the flagship member-subject rule (GRAMMAR §4.6, §6). The member
         // subject is "{kind-plural} of {selection-reference}" + the Returning adjective; single anchor.
-        ArchModelBuilder.Build(new AsyncSuffixSpec())
+        // Single-anchor Enforce form, matching the acceptance sentence verbatim.
+        Checker.Model(arch =>
+            {
+                Selection web = arch.Namespace("MyApp.Web.*");
+                arch.Rule("naming/async-suffix")
+                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
+                    .Because("Async methods are discovered by suffix; agents grep by *Async.");
+            })
             .Rules.Single(rule => rule.Id == "naming/async-suffix").Sentence
             .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task` must be named `*Async`.");
     }
@@ -95,7 +112,14 @@ public class ProseSentenceTests
         // The parameter-facts flagship in Layer voice (GRAMMAR §4.6, §5.7): Web-layer methods returning a
         // Task must accept a CancellationToken. Two Returning anchors join with "or"; the verb renders the
         // article-safe "a parameter of type `X`" fragment.
-        ArchModelBuilder.Build(new AcceptCancellationSpec())
+        // Layer subject, multi-anchor Returning, single-Type MustAcceptParameter.
+        Checker.Model(arch =>
+            {
+                Layer web = arch.Layer("Web", "MyApp.Web.*");
+                arch.Rule("async/accept-cancellation")
+                    .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+                    .Because("Async Web methods must honor cancellation; agents thread the token through.");
+            })
             .Rules.Single(rule => rule.Id == "async/accept-cancellation").Sentence
             .ShouldBe("Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.");
     }
@@ -105,7 +129,9 @@ public class ProseSentenceTests
     {
         // The no-churn proof: an expression-minted method anchor renders byte-identically to the
         // typeof form — parens for a method (GRAMMAR §6). The member reifies to the same leaf, so the prose is unchanged.
-        ArchModelBuilder.Build(new ExpressionMintedMethodSpec())
+        Checker.Model(arch => arch.Rule("member/no-wait")
+                .Enforce(arch.Types.MustNotUse(arch.Member<Task>(t => t.Wait())))
+                .Because("Blocking waits deadlock the request thread."))
             .Rules.Single(rule => rule.Id == "member/no-wait").Sentence
             .ShouldBe("Types must not use `Task.Wait()`.");
     }
@@ -114,7 +140,9 @@ public class ProseSentenceTests
     public void MustNotUse_ExpressionMintedProperty_RendersNoParens()
     {
         // An expression-minted property anchor renders with no parens — identical to the typeof form.
-        ArchModelBuilder.Build(new ExpressionMintedPropertySpec())
+        Checker.Model(arch => arch.Rule("member/no-now")
+                .Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
+                .Because("Wall-clock reads are untestable."))
             .Rules.Single(rule => rule.Id == "member/no-now").Sentence
             .ShouldBe("Types must not use `DateTime.Now`.");
     }
@@ -124,7 +152,9 @@ public class ProseSentenceTests
     {
         // The static-form verb sugar: a bare () => GC.Collect() lambda desugars through
         // arch.Member(() => …) to the same method leaf, so the sentence is byte-identical — parens for a method.
-        ArchModelBuilder.Build(new VerbStaticMethodSpec())
+        Checker.Model(arch => arch.Rule("member/verb-collect")
+                .Enforce(arch.Types.MustNotUse(() => GC.Collect()))
+                .Because("Forced GCs stall the process."))
             .Rules.Single(rule => rule.Id == "member/verb-collect").Sentence
             .ShouldBe("Types must not use `GC.Collect()`.");
     }
@@ -133,96 +163,10 @@ public class ProseSentenceTests
     public void MustNotUse_VerbStaticProperty_RendersNoParens()
     {
         // The static-form verb sugar over a property renders with no parens — identical to the typeof form.
-        ArchModelBuilder.Build(new VerbStaticPropertySpec())
+        Checker.Model(arch => arch.Rule("member/verb-now")
+                .Enforce(arch.Types.MustNotUse(() => DateTime.Now))
+                .Because("Wall-clock reads are untestable."))
             .Rules.Single(rule => rule.Id == "member/verb-now").Sentence
             .ShouldBe("Types must not use `DateTime.Now`.");
-    }
-
-    // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
-    // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
-    private sealed class InjectClockSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("time/inject-clock")
-                .Migrate(
-                    "Code reads the ambient clock directly.",
-                    arch.Types.MustNotUse(
-                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
-                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
-                .Fix("Take IClock in the constructor; see OrderService for the pattern.");
-        }
-    }
-
-    // The flagship member-subject rule (GRAMMAR §4.6): Web-layer methods returning Task must be *Async.
-    // Single-anchor Enforce form, matching the acceptance sentence verbatim.
-    private sealed class AsyncSuffixSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Selection web = arch.Namespace("MyApp.Web.*");
-            arch.Rule("naming/async-suffix")
-                .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
-                .Because("Async methods are discovered by suffix; agents grep by *Async.");
-        }
-    }
-
-    // The parameter-facts flagship (GRAMMAR §4.6, §5.7): Web-layer methods returning a Task must accept a
-    // CancellationToken. Layer subject, multi-anchor Returning, single-Type MustAcceptParameter.
-    private sealed class AcceptCancellationSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Layer web = arch.Layer("Web", "MyApp.Web.*");
-            arch.Rule("async/accept-cancellation")
-                .Enforce(web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
-                .Because("Async Web methods must honor cancellation; agents thread the token through.");
-        }
-    }
-
-    // Expression-minted member anchors: the void method form (parens in prose) and the static
-    // property form (no parens) — each reifies to the same leaf as the typeof form, so the prose is unchanged.
-    private sealed class ExpressionMintedMethodSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("member/no-wait")
-                .Enforce(arch.Types.MustNotUse(arch.Member<Task>(t => t.Wait())))
-                .Because("Blocking waits deadlock the request thread.");
-        }
-    }
-
-    private sealed class ExpressionMintedPropertySpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("member/no-now")
-                .Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
-                .Because("Wall-clock reads are untestable.");
-        }
-    }
-
-    // Static-form verb sugar: the bare () => Type.M lambdas on MustNotUse desugar to the same leaf
-    // as arch.Member(() => …), so the rendered sentence is unchanged — parens for the void method, none for
-    // the property.
-    private sealed class VerbStaticMethodSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("member/verb-collect")
-                .Enforce(arch.Types.MustNotUse(() => GC.Collect()))
-                .Because("Forced GCs stall the process.");
-        }
-    }
-
-    private sealed class VerbStaticPropertySpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("member/verb-now")
-                .Enforce(arch.Types.MustNotUse(() => DateTime.Now))
-                .Because("Wall-clock reads are untestable.");
-        }
     }
 }

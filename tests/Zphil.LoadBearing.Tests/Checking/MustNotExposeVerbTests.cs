@@ -1,9 +1,7 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Extraction;
 
@@ -199,7 +197,7 @@ public sealed class MustNotExposeVerbTests
                                   }
                               }
                               """;
-        BaselineIndex index = Index("api/no-expose", BaselineEntry.ForEdge("T:App.Facade", "T:Secrets.A"));
+        BaselineIndex index = Checker.Baselines("api/no-expose", BaselineEntry.ForEdge("T:App.Facade", "T:Secrets.A"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("api/no-expose")
@@ -225,7 +223,7 @@ public sealed class MustNotExposeVerbTests
                                   public class NewFacade { public void Take(Secrets.Data d) {} }
                               }
                               """;
-        BaselineIndex index = Index("api/no-expose", BaselineEntry.ForEdge("T:App.OldFacade", "T:Secrets.Data"));
+        BaselineIndex index = Checker.Baselines("api/no-expose", BaselineEntry.ForEdge("T:App.OldFacade", "T:Secrets.Data"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("api/no-expose")
@@ -248,26 +246,6 @@ public sealed class MustNotExposeVerbTests
                 .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("expose");
-        violation.GetProperty("source").GetString().ShouldBe("App.Facade");
-        violation.GetProperty("target").GetString().ShouldBe("Secrets.Secret");
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
-    }
-
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
+        report.ShouldRenderEdgeViolation("expose", "App.Facade", "Secrets.Secret");
     }
 }

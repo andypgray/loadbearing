@@ -40,14 +40,13 @@ namespace Zphil.LoadBearing.Tests.Replay;
 [Collection("Serial")]
 public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
 {
-    private readonly string _cacheRootBase =
-        Path.Combine(Path.GetTempPath(), "loadbearing-binlog-smoke", Guid.NewGuid().ToString("N"));
+    private readonly TempDirectory _cacheRootBase = TestTempRoot.Fresh("binlog-smoke");
 
     private static BinlogFixtureWorkspace Fixture => BinlogFixtureWorkspace.Instance;
 
     public void Dispose()
     {
-        TryDeleteDirectory(_cacheRootBase);
+        _cacheRootBase.Dispose();
     }
 
     [Fact]
@@ -99,7 +98,7 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
 
     private string FreshCache()
     {
-        return Path.Combine(_cacheRootBase, Guid.NewGuid().ToString("N"));
+        return _cacheRootBase.UniqueChildPath();
     }
 
     // The tests project references the CLI project, so its build output (loadbearing.dll + runtimeconfig +
@@ -114,17 +113,5 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
                 + "The tests project references Zphil.LoadBearing.Cli, so its output should be copied here.");
 
         return path;
-    }
-
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path)) Directory.Delete(path, true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // best-effort cleanup of the throwaway cache root
-        }
     }
 }

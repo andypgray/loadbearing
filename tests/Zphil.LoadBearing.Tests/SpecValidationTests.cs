@@ -17,6 +17,54 @@ public class SpecValidationTests
         return Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(specs));
     }
 
+    // The catalog's data arms: one failing spec per code, where the reported (code, rule ID) pair is the
+    // whole claim. The facts below are the arms that pin something more — a message, a null rule ID, or
+    // several errors from one pass.
+    [Theory]
+    [InlineData(typeof(DanglingRuleSpec), Code.DanglingAnchor, "area/dangling")]
+    [InlineData(typeof(MissingBecauseScopeSpec), Code.MissingBecause, "legacy/billing")]
+    [InlineData(typeof(MissingDragonsSpec), Code.MissingDragons, "legacy/billing")]
+    [InlineData(typeof(BlankDescriptionSpec), Code.BlankProse, "area/rule")]
+    [InlineData(typeof(MultiLineBecauseSpec), Code.MultiLineProse, "area/rule")]
+    [InlineData(typeof(MalformedIdSpec), Code.MalformedId, "Bad_Id")]
+    [InlineData(typeof(ForeignSelectionSpec), Code.ForeignSelection, "area/rule")]
+    // The extended prose walk reaches a member Where description and a member Must description
+    // (GRAMMAR §8 item 5, §4.6).
+    [InlineData(typeof(BlankMemberWhereSpec), Code.BlankProse, "area/rule")]
+    [InlineData(typeof(BlankMemberMustSpec), Code.BlankProse, "area/rule")]
+    // An expression-minted member is Owner-stamped like the typeof form, so the foreign-Arch check
+    // (which precedes the poison short-circuit) catches it (GRAMMAR §8 item 13).
+    [InlineData(typeof(ForeignExpressionMemberSpec), Code.ForeignMember, "area/rule")]
+    // SpecValidator blank-pattern arms (GRAMMAR §8 item 15). Each arm — the shape/naming verb's own glob,
+    // a subject-side adjective, and their member analogs — routes through CheckPattern and emits the one
+    // shared Code.BlankPattern; a distinct spec per arm walks each ConstraintPatterns / SelectionPatterns /
+    // MemberAdjectivePatterns code path.
+    [InlineData(typeof(BlankTypeNameMatchingVerbSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankTypeNameMatchingAdjectiveSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankTypePrefixAdjectiveSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankMemberNameMatchingAdjectiveSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankMemberPrefixAdjectiveSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankMemberNameMatchingVerbSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankMemberPrefixVerbSpec), Code.BlankPattern, "area/rule")]
+    // MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb walk hook,
+    // like the reference verbs), so the existing §8 item 10 foreign-selection walk (ConstraintSelections →
+    // CheckForeign) reaches a construct target minted on another Arch with no new validator arm.
+    [InlineData(typeof(ForeignConstructTargetSpec), Code.ForeignSelection, "area/rule")]
+    // Surface union: a union carries adjectives of its own (GRAMMAR §5.1), so every §8 walk must reach them
+    // and not stop at the operands — including the union's own Except payload, not just its operands.
+    [InlineData(typeof(UnionBlankWhereSpec), Code.BlankProse, "area/rule")]
+    [InlineData(typeof(UnionBlankPatternSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(UnionForeignExceptPayloadSpec), Code.ForeignSelection, "area/rule")]
+    [InlineData(typeof(UnionForeignOperandSpec), Code.ForeignSelection, "area/rule")]
+    public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, Code code, string ruleId)
+    {
+        var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
+
+        SpecValidationException ex = BuildExpectingFailure(spec);
+
+        ex.ShouldHaveError(code, ruleId);
+    }
+
     [Fact]
     public void DuplicateId_AcrossTwoSpecClasses_IsReported()
     {
@@ -34,14 +82,6 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void DanglingAnchor_RuleWithNoPosture_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new DanglingRuleSpec());
-
-        ex.ShouldHaveError(Code.DanglingAnchor, "area/dangling");
-    }
-
-    [Fact]
     public void MissingBecause_OnRule_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
@@ -50,51 +90,11 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void MissingBecause_OnQuarantinedScope_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new MissingBecauseScopeSpec());
-
-        ex.ShouldHaveError(Code.MissingBecause, "legacy/billing");
-    }
-
-    [Fact]
-    public void MissingDragons_OnQuarantinedScope_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new MissingDragonsSpec());
-
-        ex.ShouldHaveError(Code.MissingDragons, "legacy/billing");
-    }
-
-    [Fact]
-    public void BlankProse_BlankEscapeHatchDescription_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankDescriptionSpec());
-
-        ex.ShouldHaveError(Code.BlankProse, "area/rule");
-    }
-
-    [Fact]
-    public void MultiLineProse_NewlineInBecause_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new MultiLineBecauseSpec());
-
-        ex.ShouldHaveError(Code.MultiLineProse, "area/rule");
-    }
-
-    [Fact]
     public void RepeatedTrailer_BecauseTwice_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new RepeatedBecauseSpec());
 
         ex.ShouldHaveError(Code.RepeatedTrailer, "area/rule").Message.ShouldBe("SpecValidationSpecs.cs:92: Repeated trailer 'Because' on 'area/rule'.");
-    }
-
-    [Fact]
-    public void MalformedId_NonConventionId_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new MalformedIdSpec());
-
-        ex.ShouldHaveError(Code.MalformedId, "Bad_Id");
     }
 
     [Fact]
@@ -130,14 +130,6 @@ public class SpecValidationTests
 
         ex.ShouldHaveError(Code.DuplicateLayerName).RuleId.ShouldBeNull();
         ex.ShouldHaveError(Code.DuplicateLayerName).Message.ShouldBe("Duplicate layer name 'Dup'.");
-    }
-
-    [Fact]
-    public void ForeignSelection_SelectionFromAnotherArch_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new ForeignSelectionSpec());
-
-        ex.ShouldHaveError(Code.ForeignSelection, "area/rule");
     }
 
     [Fact]
@@ -202,24 +194,6 @@ public class SpecValidationTests
         ex.ShouldHaveError(Code.MemberReturningClosedGeneric, "area/rule").Message
             .ShouldBe("SpecValidationSpecs.cs:212: 'System.Threading.Tasks.Task<System.Int32>' is a closed generic; .Returning matches definition-level — " +
                       "use typeof(Task<>) (used by 'area/rule').");
-    }
-
-    [Fact]
-    public void BlankProse_BlankMemberWhereDescription_IsReported()
-    {
-        // The extended prose walk reaches a member Where description (GRAMMAR §8 item 5, §4.6).
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberWhereSpec());
-
-        ex.ShouldHaveError(Code.BlankProse, "area/rule");
-    }
-
-    [Fact]
-    public void BlankProse_BlankMemberMustDescription_IsReported()
-    {
-        // The extended prose walk reaches a member Must description (GRAMMAR §8 item 5, §4.6).
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberMustSpec());
-
-        ex.ShouldHaveError(Code.BlankProse, "area/rule");
     }
 
     [Fact]
@@ -423,16 +397,6 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void ForeignMember_ExpressionMintedFromAnotherArch_IsReported()
-    {
-        // An expression-minted member is Owner-stamped like the typeof form, so the foreign-Arch check
-        // (which precedes the poison short-circuit) catches it (GRAMMAR §8 item 13).
-        SpecValidationException ex = BuildExpectingFailure(new ForeignExpressionMemberSpec());
-
-        ex.ShouldHaveError(Code.ForeignMember, "area/rule");
-    }
-
-    [Fact]
     public void ValidExpressionMemberUse_BuildsWithoutError()
     {
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidExpressionMemberSpec()));
@@ -567,78 +531,6 @@ public class SpecValidationTests
         memberError.Location!.Line.ShouldBeGreaterThan(ruleError.Location!.Line);
     }
 
-    // SpecValidator blank-pattern arms (GRAMMAR §8 item 15). Each arm — the
-    // shape/naming verb's own glob, a subject-side adjective, and their member analogs — routes through
-    // CheckPattern and emits the one shared Code.BlankPattern; a distinct spec per arm walks each
-    // ConstraintPatterns / SelectionPatterns / MemberAdjectivePatterns code path.
-    [Fact]
-    public void BlankPattern_BlankTypeNameMatchingVerb_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNameMatchingVerbSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankTypeNameMatchingAdjective_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNameMatchingAdjectiveSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankTypePrefixAdjective_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankTypePrefixAdjectiveSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankMemberNameMatchingAdjective_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameMatchingAdjectiveSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankMemberPrefixAdjective_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberPrefixAdjectiveSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankMemberNameMatchingVerb_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameMatchingVerbSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankMemberPrefixVerb_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberPrefixVerbSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    // MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb
-    // walk hook, like the reference verbs), so the existing §8 item 10 foreign-selection walk
-    // (ConstraintSelections → CheckForeign) reaches a construct target minted on another Arch with no new
-    // validator arm.
-    [Fact]
-    public void ForeignSelection_ConstructTargetFromAnotherArch_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new ForeignConstructTargetSpec());
-
-        ex.ShouldHaveError(Code.ForeignSelection, "area/rule");
-    }
-
     // GRAMMAR §8 item 19: an undefined Lifetime value on an arch.Registered noun used by a rule. The check rides the shared
     // RuleSelections walk, reaching the Registered subject with no new selection plumbing.
     [Fact]
@@ -734,42 +626,6 @@ public class SpecValidationTests
         // Interface anchors on (Must[Not])Implement, non-interface anchors on (Must[Not])DeriveFrom, and
         // Attribute-derived anchors on (Must[Not])BeAttributedWith are all accepted — only wrong-category fails.
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidHierarchyAnchorsSpec()));
-    }
-
-    // ---- Surface union: a union carries adjectives of its own (GRAMMAR §5.1), so every §8 walk must
-    //      reach them and not stop at the operands ----
-
-    [Fact]
-    public void BlankProse_BlankWhereDescriptionOnAUnion_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new UnionBlankWhereSpec());
-
-        ex.ShouldHaveError(Code.BlankProse, "area/rule");
-    }
-
-    [Fact]
-    public void BlankPattern_BlankNamespaceGlobOnAUnion_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new UnionBlankPatternSpec());
-
-        ex.ShouldHaveError(Code.BlankPattern, "area/rule");
-    }
-
-    [Fact]
-    public void ForeignSelection_InsideAUnionExceptPayload_IsReported()
-    {
-        // The union's own Except payload is walked, not just its operands.
-        SpecValidationException ex = BuildExpectingFailure(new UnionForeignExceptPayloadSpec());
-
-        ex.ShouldHaveError(Code.ForeignSelection, "area/rule");
-    }
-
-    [Fact]
-    public void ForeignSelection_AsAUnionOperand_IsReported()
-    {
-        SpecValidationException ex = BuildExpectingFailure(new UnionForeignOperandSpec());
-
-        ex.ShouldHaveError(Code.ForeignSelection, "area/rule");
     }
 
     // ---- String attribute anchors (GRAMMAR §5.2–§5.3). Blank is the ONLY well-formedness a definition FQN has, and it

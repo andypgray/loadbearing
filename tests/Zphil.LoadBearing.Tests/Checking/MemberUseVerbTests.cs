@@ -1,14 +1,13 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Baselines;
 using Zphil.LoadBearing.Tests.Checking.MemberTargets;
 using Zphil.LoadBearing.Tests.Extraction;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -226,63 +225,49 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_MemberRatchet_GrandfathersThenNewOverloadIsRed_AndTamperRefused()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "loadbearing-member-ratchet", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
+        using TempDirectory dir = TestTempRoot.Fresh("member-ratchet");
+
+        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("mig/no-wait")
+            .Migrate("legacy blocking waits", arch.Types.MustNotUse(arch.Member(typeof(Task), nameof(Task.Wait))))
+            .Baseline("member.json")
+            .Because("b")));
+
+        // Empty baseline → the blocking Wait() is red; capture its exact member identity.
+        CodebaseModel before = CompilationFactory.Extract(WaitSource("t.Wait();"));
+        RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty).Single();
+        red.Status.ShouldBe(RuleStatus.Failed);
+        Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberUse);
+        observed.Member!.SymbolId.ShouldBe("M:System.Threading.Tasks.Task.Wait");
+
+        // Grandfather it through the real store — a member entry (source T: / target M:) round-trips
+        // with zero format/parser changes.
+        BaselineEntry identity = observed.BaselineIdentity()!;
+        var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal)
         {
-            ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("mig/no-wait")
-                .Migrate("legacy blocking waits", arch.Types.MustNotUse(arch.Member(typeof(Task), nameof(Task.Wait))))
-                .Baseline("member.json")
-                .Because("b")));
+            ["mig/no-wait"] = [identity.WithBecause("INC-1")]
+        };
+        string path = dir.PathOf("member.json");
+        BaselineStore.Write(path, new BaselineDocument(sections));
 
-            // Empty baseline → the blocking Wait() is red; capture its exact member identity.
-            CodebaseModel before = CompilationFactory.Extract(WaitSource("t.Wait();"));
-            RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty).Single();
-            red.Status.ShouldBe(RuleStatus.Failed);
-            Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberUse);
-            observed.Member!.SymbolId.ShouldBe("M:System.Threading.Tasks.Task.Wait");
+        BaselineIndex loaded = BaselineStore.LoadForModel(model, dir.Path);
+        RuleResult grandfathered = ArchChecker.Check(model, before, loaded).Single();
+        grandfathered.ShouldHavePassed();
+        grandfathered.ShouldHaveGrandfathered(1);
 
-            // Grandfather it through the real store — a member entry (source T: / target M:) round-trips
-            // with zero format/parser changes.
-            BaselineEntry identity = observed.BaselineIdentity()!;
-            var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal)
-            {
-                ["mig/no-wait"] = [identity.WithBecause("INC-1")]
-            };
-            string path = Path.Combine(dir, "member.json");
-            BaselineStore.Write(path, new BaselineDocument(sections));
+        // Change the used overload Wait() → Wait(timeout): identity is the specific member id, so the
+        // grandfathered blessing does not cover it — NEW red.
+        CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
+        RuleResult regressed = ArchChecker.Check(model, after, loaded).Single();
+        regressed.Status.ShouldBe(RuleStatus.Failed);
+        regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse).Member!.SymbolId
+            .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
 
-            BaselineIndex loaded = BaselineStore.LoadForModel(model, dir);
-            RuleResult grandfathered = ArchChecker.Check(model, before, loaded).Single();
-            grandfathered.ShouldHavePassed();
-            grandfathered.ShouldHaveGrandfathered(1);
-
-            // Change the used overload Wait() → Wait(timeout): identity is the specific member id, so the
-            // grandfathered blessing does not cover it — NEW red.
-            CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
-            RuleResult regressed = ArchChecker.Check(model, after, loaded).Single();
-            regressed.Status.ShouldBe(RuleStatus.Failed);
-            regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse).Member!.SymbolId
-                .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
-
-            // Hand-edit the member entry's target line without rebuilding the digest → tamper refusal,
-            // proving the digest is computed over member ids too (prefix-agnostic, zero changes).
-            File.WriteAllText(path, File.ReadAllText(path).Replace(
-                "M:System.Threading.Tasks.Task.Wait", "M:System.Threading.Tasks.Task.Wait(System.TimeSpan)"));
-            Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-                .Message.ShouldContain("failed its integrity check");
-        }
-        finally
-        {
-            try
-            {
-                Directory.Delete(dir, true);
-            }
-            catch
-            {
-                // best-effort cleanup
-            }
-        }
+        // Hand-edit the member entry's target line without rebuilding the digest → tamper refusal,
+        // proving the digest is computed over member ids too (prefix-agnostic, zero changes).
+        File.WriteAllText(path, File.ReadAllText(path).Replace(
+            "M:System.Threading.Tasks.Task.Wait", "M:System.Threading.Tasks.Task.Wait(System.TimeSpan)"));
+        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
+            .Message.ShouldContain("failed its integrity check");
     }
 
     [Fact]
@@ -298,17 +283,7 @@ public sealed class MemberUseVerbTests
                 .Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("memberUse");
-        violation.GetProperty("source").GetString().ShouldBe("App.Home");
-        violation.GetProperty("targetMember").GetString().ShouldBe("P:System.DateTime.Now");
-        violation.TryGetProperty("target", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
+        report.ShouldRenderTargetMemberViolation("memberUse", "App.Home", "P:System.DateTime.Now");
     }
 
     [Fact]

@@ -7,6 +7,7 @@ using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Baselines;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -57,24 +58,11 @@ public sealed class BaselineRunnerAddTests : IDisposable
                                                  }
                                                  """;
 
-    private readonly string _dir = Path.Combine(
-        Path.GetTempPath(), "loadbearing-baseline-runner-tests", Guid.NewGuid().ToString("N"));
-
-    public BaselineRunnerAddTests()
-    {
-        Directory.CreateDirectory(_dir);
-    }
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("baseline-runner");
 
     public void Dispose()
     {
-        try
-        {
-            if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
-        }
-        catch
-        {
-            // best-effort cleanup
-        }
+        _temp.Dispose();
     }
 
     [Fact]
@@ -88,17 +76,17 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .Baseline("member.json")
             .Because("b")));
         CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
-        string path = Path.Combine(_dir, "member.json");
+        string path = Path.Combine(_temp.Path, "member.json");
         File.WriteAllText(path, Compose([]));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, RuleId, "INC-1234",
-            "MyApp.Web.HomeController", "System.DateTime.Now", null, _dir, false);
+            "MyApp.Web.HomeController", "System.DateTime.Now", null, _temp.Path, false);
 
         // Act — the MemberUse violation reaches the added-entry echo with a null Target slot.
-        int exit = runner.AddEntry(request, report, _dir);
+        int exit = runner.AddEntry(request, report, _temp.Path);
 
         // Assert — the pinned echo renders the member display, and the entry keys the P: member ID.
         exit.ShouldBe(0);
@@ -126,17 +114,17 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .Baseline("ctor.json")
             .Because("b")));
         CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
-        string path = Path.Combine(_dir, "ctor.json");
+        string path = Path.Combine(_temp.Path, "ctor.json");
         File.WriteAllText(path, ComposeCtor([]));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, CtorRuleId, "INC-9",
-            "MyApp.Web.OrderController", "MyApp.Data.Db", null, _dir, false);
+            "MyApp.Web.OrderController", "MyApp.Data.Db", null, _temp.Path, false);
 
         // Act — the Construction violation reaches the added-entry echo; the constructed type rides the Target slot.
-        int exit = runner.AddEntry(request, report, _dir);
+        int exit = runner.AddEntry(request, report, _temp.Path);
 
         // Assert — the echo renders Source -> Constructed via the shared full-name form, and the entry keys a
         // plain T:->T: ForEdge (identical to a reference edge — zero baseline-format change, GRAMMAR §4.3).
@@ -168,17 +156,17 @@ public sealed class BaselineRunnerAddTests : IDisposable
         CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);
         CheckReport report = ArchChecker.Check(model, codebase, BaselineIndex.Empty);
         report.Single().CatchPairs().ShouldBe(["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"], true);
-        string path = Path.Combine(_dir, "catch.json");
+        string path = Path.Combine(_temp.Path, "catch.json");
         File.WriteAllText(path, ComposeCatch([]));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
         var request = new BaselineRequest(
             null, null, false, false, true, UnfilteredCatchRuleId, "INC-77",
-            "App.LegacyHandler", "Errors.DbError", null, _dir, false);
+            "App.LegacyHandler", "Errors.DbError", null, _temp.Path, false);
 
         // Act — the valve resolves the unfiltered-catch violation by its (source, caught) type pair.
-        int exit = runner.AddEntry(request, report, _dir);
+        int exit = runner.AddEntry(request, report, _temp.Path);
 
         // Assert — the echo and the appended entry are a plain T:->T: ForEdge, indistinguishable from the
         // sibling catch verb's: the new verb reads a different fact but keys the same identity.
@@ -190,7 +178,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
 
         // …and the ratchet holds on the bytes the valve wrote: re-checking against the file grandfathers the
         // added edge and leaves ImportHandler's identical-looking catch — a distinct identity — red.
-        RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _dir)).Single();
+        RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path)).Single();
         ratcheted.Status.ShouldBe(RuleStatus.Failed);
         ratcheted.CatchPairs().ShouldBe(["App.ImportHandler -> Errors.DbError"]);
         ratcheted.ShouldHaveGrandfathered(1);

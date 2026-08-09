@@ -62,12 +62,6 @@ internal static class TrackedFiles
     /// </summary>
     public static IReadOnlyList<string> NonSourceText => LazyNonSourceText.Value;
 
-    /// <summary>The absolute path of a repository-relative tracked path.</summary>
-    public static string Absolute(string relativePath)
-    {
-        return Path.Combine(RepoRoot.Directory, relativePath.Replace('/', Path.DirectorySeparatorChar));
-    }
-
     private static bool IsCSharp(string relativePath)
     {
         return relativePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
@@ -78,7 +72,7 @@ internal static class TrackedFiles
     // thinks to add is scanned by nothing.
     private static bool IsText(string relativePath)
     {
-        using FileStream stream = File.OpenRead(Absolute(relativePath));
+        using FileStream stream = File.OpenRead(RepoRoot.Absolute(relativePath));
         var head = new byte[SniffBytes];
         int read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
 

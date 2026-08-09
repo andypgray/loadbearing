@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
@@ -12,7 +13,7 @@ public sealed class MsBuildBootstrapEnvVarCollection;
 ///     <see cref="MsBuildBootstrap.SelectBestInstance" /> is pure and needs no MSBuild runtime. The
 ///     two <c>Initialize</c> tests exercise the override throw-paths, which run BEFORE any
 ///     <c>MSBuildLocator</c> registration call — safe even though the module initializer has already
-///     registered MSBuild. Env vars are set/cleared in try/finally and the collection is serial.
+///     registered MSBuild. Env vars are scoped to the test that sets them and the collection is serial.
 /// </summary>
 [Collection("MsBuildBootstrapEnvVar")]
 public sealed class MsBuildBootstrapTests
@@ -104,41 +105,25 @@ public sealed class MsBuildBootstrapTests
     [Fact]
     public void Initialize_OverrideEnvVar_NonExistentDir_Throws()
     {
-        string? original = Environment.GetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath);
-        try
-        {
-            Environment.SetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath, @"C:\__does_not_exist_for_test__");
+        using var overridden = new ScopedEnvironmentVariable(
+            LoadBearingEnvVars.VsInstallPath, @"C:\__does_not_exist_for_test__");
 
-            Action act = () => MsBuildBootstrap.Initialize();
+        Action act = () => MsBuildBootstrap.Initialize();
 
-            var ex = act.ShouldThrow<InvalidOperationException>();
-            ex.Message.ShouldContain(LoadBearingEnvVars.VsInstallPath);
-            ex.Message.ShouldContain("not an existing directory");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath, original);
-        }
+        var ex = act.ShouldThrow<InvalidOperationException>();
+        ex.Message.ShouldContain(LoadBearingEnvVars.VsInstallPath);
+        ex.Message.ShouldContain("not an existing directory");
     }
 
     [Fact]
     public void Initialize_OverrideEnvVar_DirWithoutMsBuild_Throws()
     {
-        DirectoryInfo tempDir = Directory.CreateTempSubdirectory("MsBuildBootstrapTests_");
-        string? original = Environment.GetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath);
-        try
-        {
-            Environment.SetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath, tempDir.FullName);
+        using TempDirectory temp = TestTempRoot.Fresh("msbuild-bootstrap");
+        using var overridden = new ScopedEnvironmentVariable(LoadBearingEnvVars.VsInstallPath, temp.Path);
 
-            Action act = () => MsBuildBootstrap.Initialize();
+        Action act = () => MsBuildBootstrap.Initialize();
 
-            var ex = act.ShouldThrow<InvalidOperationException>();
-            ex.Message.ShouldContain("MSBuild.exe not found");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(LoadBearingEnvVars.VsInstallPath, original);
-            tempDir.Delete(true);
-        }
+        var ex = act.ShouldThrow<InvalidOperationException>();
+        ex.Message.ShouldContain("MSBuild.exe not found");
     }
 }

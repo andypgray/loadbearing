@@ -1,5 +1,5 @@
-using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -32,16 +32,6 @@ public sealed class StatusCommandE2ETests
             "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(Golden()));
-    }
-
-    private static string Golden()
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "violated-status.json"));
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
+        result.Out.ShouldMatchGolden("violated-status.json");
     }
 }

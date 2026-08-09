@@ -152,7 +152,7 @@ public sealed class McpChildServerRepoHandleTests
         {
             string? answer = answers.GetValueOrDefault(name);
             answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{diagnostics}");
-            ToolText(answer, name).ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
+            ShouldHaveToolText(answer, name).ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
         }
 
         alive.ShouldBeTrue(
@@ -160,7 +160,7 @@ public sealed class McpChildServerRepoHandleTests
 
         // arch_check must have genuinely run the whole diff path, spec load included — otherwise a server
         // that answered five errors would hold nothing and pass.
-        ToolText(answers["arch_check"]!, "arch_check").ShouldContain("quarantinedScopeTouched");
+        ShouldHaveToolText(answers["arch_check"]!, "arch_check").ShouldContain("quarantinedScopeTouched");
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public sealed class McpChildServerRepoHandleTests
     ///     legitimately report no such rule or no such scope against the fixture spec, and the spec still
     ///     loaded, which is the part this test is about.
     /// </summary>
-    private static string ToolText(string frame, string toolName)
+    private static string ShouldHaveToolText(string frame, string toolName)
     {
         using JsonDocument document = JsonDocument.Parse(frame);
         document.RootElement.TryGetProperty("error", out JsonElement error)

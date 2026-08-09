@@ -4,6 +4,7 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Baselines;
 
@@ -185,7 +186,7 @@ public sealed class BaselineFormatTests
         string violated = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
             [BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")])));
-        Normalize(ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBe(violated);
+        ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json").NormalizedLines().ShouldBe(violated);
 
         string clean = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
@@ -193,7 +194,7 @@ public sealed class BaselineFormatTests
                 BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable"),
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
             ])));
-        Normalize(ReadFixture("arch", "clean-baseline.json")).ShouldBe(clean);
+        ReadFixture("arch", "clean-baseline.json").NormalizedLines().ShouldBe(clean);
     }
 
     private static string ReadFixture(params string[] relativeParts)
@@ -201,10 +202,5 @@ public sealed class BaselineFormatTests
         var segments = new List<string> { AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp" };
         segments.AddRange(relativeParts);
         return File.ReadAllText(Path.Combine(segments.ToArray()));
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n");
     }
 }

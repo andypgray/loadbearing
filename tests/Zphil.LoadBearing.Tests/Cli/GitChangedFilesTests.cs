@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Diff;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -55,15 +56,8 @@ public sealed class GitChangedFilesTests
     [Fact]
     public async Task ResolveAsync_OutsideAnyRepo_ThrowsUserError()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "loadbearing-git-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            await Should.ThrowAsync<UserErrorException>(() => GitChangedFiles.ResolveAsync("HEAD", dir, TestContext.Current.CancellationToken));
-        }
-        finally
-        {
-            Directory.Delete(dir, true);
-        }
+        using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
+
+        await Should.ThrowAsync<UserErrorException>(() => GitChangedFiles.ResolveAsync("HEAD", temp.Path, TestContext.Current.CancellationToken));
     }
 }

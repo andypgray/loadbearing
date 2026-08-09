@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -82,23 +83,16 @@ public sealed class ExplainFormatterTests
     [Fact]
     public void QuarantineWithDragonsDoc_PrintsThePathOnly_NotDragonsOrBoundary()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new DragonsDocSpec());
+        // A hermetic quarantined scope documented via a linked file rather than inline dragons prose.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .DragonsDoc("arch/billing-dragons.md")
+                .Because("Replacement scheduled; see the linked doc."));
         string dump = string.Join("\n", ExplainFormatter.Lines(model.Rules.Single(rule => rule.Id == "legacy/billing/containment")));
 
         dump.ShouldContain("  dragons-doc: arch/billing-dragons.md");
         dump.ShouldNotContain("  dragons:");
         dump.ShouldNotContain("  boundary:"); // hermetic quarantine — no sanctioned surface
-    }
-
-    // A hermetic quarantined scope documented via a linked file rather than inline dragons prose.
-    private sealed class DragonsDocSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .DragonsDoc("arch/billing-dragons.md")
-                .Because("Replacement scheduled; see the linked doc.");
-        }
     }
 }

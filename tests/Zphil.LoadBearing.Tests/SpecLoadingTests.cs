@@ -18,7 +18,7 @@ public class SpecLoadingTests
     [Fact]
     public void LoadFixtureSpec_ViaAssemblyLoadContext_DiscoversBuildsAndEnumerates()
     {
-        string fixturePath = FixtureAssemblyPath();
+        string fixturePath = ShouldHaveFixtureAssemblyPath();
         var context = new SpecLoadContext(fixturePath);
         try
         {
@@ -40,7 +40,7 @@ public class SpecLoadingTests
         }
     }
 
-    private static string FixtureAssemblyPath()
+    private static string ShouldHaveFixtureAssemblyPath()
     {
         string? path = typeof(SpecLoadingTests).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()

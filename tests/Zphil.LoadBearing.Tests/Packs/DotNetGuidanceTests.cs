@@ -38,7 +38,7 @@ public class DotNetGuidanceTests
     public void Method_CalledAlone_DeclaresExactlyItsOwnId(string id)
     {
         // A la carte is the whole point: calling one method lands one rule, and nothing else rides along.
-        ArchitectureModel model = Build(arch => DeclareOne(arch, id, PackPosture.Enforce));
+        ArchitectureModel model = Checker.Model(arch => DeclareOne(arch, id, PackPosture.Enforce));
 
         model.Rules.Select(rule => rule.Id).ShouldBe([id]);
     }
@@ -46,7 +46,7 @@ public class DotNetGuidanceTests
     [Fact]
     public void ApplyAll_LandsTheNineInCanonicalOrder()
     {
-        ArchitectureModel model = Build(arch => ApplyAll(arch, PackPosture.Enforce));
+        ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Enforce));
 
         model.Rules.Select(rule => rule.Id).ShouldBe(CanonicalOrder);
     }
@@ -62,7 +62,7 @@ public class DotNetGuidanceTests
             .Select(method => method.Name)
             .ToList();
 
-        ArchitectureModel model = Build(arch => ApplyAll(arch, PackPosture.Enforce));
+        ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Enforce));
 
         model.Rules.Count.ShouldBe(ruleMethods.Count);
     }
@@ -70,7 +70,7 @@ public class DotNetGuidanceTests
     [Fact]
     public void ApplyAll_AtEnforce_GivesEveryRuleABecauseAndAFix()
     {
-        ArchitectureModel model = Build(arch => ApplyAll(arch, PackPosture.Enforce));
+        ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Enforce));
 
         model.Rules.ShouldAllBe(rule => rule.Posture == Posture.Enforce);
         model.Rules.ShouldAllBe(rule => !string.IsNullOrWhiteSpace(rule.Because));
@@ -82,7 +82,7 @@ public class DotNetGuidanceTests
     {
         const string from = "Most of this codebase predates the guidance.";
 
-        ArchitectureModel model = Build(arch => ApplyAll(arch, PackPosture.Migrate(from)));
+        ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Migrate(from)));
 
         model.Rules.ShouldAllBe(rule => rule.Posture == Posture.Migrate);
         model.Rules.ShouldAllBe(rule => rule.Migrate!.From == from);
@@ -98,8 +98,8 @@ public class DotNetGuidanceTests
     {
         const string overridden = "Take IPartnerClient in the constructor; MeridianHost owns the wiring.";
 
-        ArchitectureModel defaulted = Build(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce));
-        ArchitectureModel overrode = Build(arch =>
+        ArchitectureModel defaulted = Checker.Model(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce));
+        ArchitectureModel overrode = Checker.Model(arch =>
             DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
                 PackPosture.Enforce, overridden));
 
@@ -114,8 +114,8 @@ public class DotNetGuidanceTests
     [Fact]
     public void SameRule_EnforceInOneSpecAndMigrateInAnother_IsTheConsumersChoice()
     {
-        ArchitectureModel enforced = Build(arch => DeclareOne(arch, "naming/async-suffix", PackPosture.Enforce));
-        ArchitectureModel migrated = Build(arch =>
+        ArchitectureModel enforced = Checker.Model(arch => DeclareOne(arch, "naming/async-suffix", PackPosture.Enforce));
+        ArchitectureModel migrated = Checker.Model(arch =>
             DeclareOne(arch, "naming/async-suffix", PackPosture.Migrate("Task-returning methods here are bare-named.")));
 
         enforced.Rules.Single().Posture.ShouldBe(Posture.Enforce);
@@ -138,11 +138,6 @@ public class DotNetGuidanceTests
 
         source.ShouldNotContain("arch.Member<");
         source.ShouldNotContain("arch.Member(()");
-    }
-
-    private static ArchitectureModel Build(Action<Arch> define)
-    {
-        return ArchModelBuilder.Build(new InlineSpec(define));
     }
 
     private static void ApplyAll(Arch arch, PackPosture posture)

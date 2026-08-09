@@ -1,9 +1,7 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Extraction;
 
@@ -370,7 +368,7 @@ public sealed class MustNotSwallowVerbTests
                                   }
                               }
                               """;
-        BaselineIndex index = Index("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
+        BaselineIndex index = Checker.Baselines("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/no-swallowed-errors")
@@ -396,7 +394,7 @@ public sealed class MustNotSwallowVerbTests
                                   public class NewHandler { public void Run() { try { } catch (Errors.Err) { } } }
                               }
                               """;
-        BaselineIndex index = Index("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.OldHandler", "T:Errors.Err"));
+        BaselineIndex index = Checker.Baselines("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.OldHandler", "T:Errors.Err"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/no-swallowed-errors")
@@ -420,26 +418,6 @@ public sealed class MustNotSwallowVerbTests
                 .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("catch");
-        violation.GetProperty("source").GetString().ShouldBe("App.Swallower");
-        violation.GetProperty("target").GetString().ShouldBe("Errors.DbError");
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
-    }
-
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
+        report.ShouldRenderEdgeViolation("catch", "App.Swallower", "Errors.DbError");
     }
 }

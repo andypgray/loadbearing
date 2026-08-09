@@ -84,7 +84,7 @@ public sealed class AdapterTests
         Exception? exception = await Record.ExceptionAsync(() => new InlineViolatedArchTests().Rule_Holds("layering/domain-independent"));
 
         var failure = exception.ShouldBeOfType<FailException>();
-        Normalize(failure.Message).ShouldBe(expectedBlock);
+        failure.Message.NormalizedTrimmed().ShouldBe(expectedBlock);
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class AdapterTests
     // The "FAIL <ruleId> …" block from the CLI human output: the header line plus its indented lines.
     private static string ExtractBlock(string humanOutput, string ruleId)
     {
-        string[] lines = humanOutput.Replace("\r\n", "\n").Split('\n');
+        string[] lines = humanOutput.NormalizedLines().Split('\n');
         int start = Array.FindIndex(lines, line => line.StartsWith($"FAIL {ruleId}", StringComparison.Ordinal));
         if (start < 0) throw new InvalidOperationException($"No FAIL block for '{ruleId}' in:\n{humanOutput}");
 
@@ -168,11 +168,6 @@ public sealed class AdapterTests
             block.Add(lines[i]);
 
         return string.Join("\n", block);
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
     }
 
     // A verbatim inline copy of the fixture's layering/domain-independent rule, checked against the real

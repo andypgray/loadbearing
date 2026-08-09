@@ -48,8 +48,7 @@ public sealed class QuarantineContainmentTests
 
     private static BaselineIndex Index(params BaselineEntry[] entries)
     {
-        return new BaselineIndex(
-            new Dictionary<string, RuleBaseline>(StringComparer.Ordinal) { [ContainmentId] = new(entries) });
+        return Checker.Baselines(ContainmentId, entries);
     }
 
     private static RuleResult Containment(BaselineIndex baselines, Action<Arch> scope)

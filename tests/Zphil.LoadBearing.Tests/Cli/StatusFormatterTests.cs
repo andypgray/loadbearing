@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -14,7 +15,14 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class StatusFormatterTests
 {
-    private static readonly ArchitectureModel Model = ArchModelBuilder.Build(new ShapesSpec());
+    // One rule of each posture so the formatter can be pinned over real ArchRules.
+    private static readonly ArchitectureModel Model = Checker.Model(arch =>
+    {
+        arch.Rule("layering/billing-independent").Enforce(arch.Types.MustHaveSuffix("X")).Because("b");
+        arch.Rule("layering/domain-independent").Enforce(arch.Types.MustHaveSuffix("Y")).Because("b");
+        arch.Rule("data-access/no-inline-sql").Migrate("old", arch.Types.MustHaveSuffix("Z")).Because("b");
+        arch.Scope("legacy/billing").Quarantine(arch.Namespace("App.Legacy.*")).Dragons("d").Because("b");
+    });
 
     private static ArchRule Rule(string id)
     {
@@ -145,17 +153,5 @@ public sealed class StatusFormatterTests
     private static IReadOnlyList<Violation> Dummies(int count)
     {
         return Enumerable.Range(0, count).Select(_ => Violation.RuleError("x")).ToList();
-    }
-
-    // A spec that reifies one rule of each posture so the formatter can be pinned over real ArchRules.
-    private sealed class ShapesSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("layering/billing-independent").Enforce(arch.Types.MustHaveSuffix("X")).Because("b");
-            arch.Rule("layering/domain-independent").Enforce(arch.Types.MustHaveSuffix("Y")).Because("b");
-            arch.Rule("data-access/no-inline-sql").Migrate("old", arch.Types.MustHaveSuffix("Z")).Because("b");
-            arch.Scope("legacy/billing").Quarantine(arch.Namespace("App.Legacy.*")).Dragons("d").Because("b");
-        }
     }
 }

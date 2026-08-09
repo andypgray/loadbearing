@@ -91,7 +91,7 @@ public sealed class DotSettingsCleanupProfileTests
 
     private static string DeclaredProfileName(XDocument settings)
     {
-        XElement entry = Entries(settings).Single(static entry => KeyOf(entry) == SilentCleanupProfileKey);
+        XElement entry = ShouldHaveEntries(settings).Single(static entry => KeyOf(entry) == SilentCleanupProfileKey);
 
         return entry.Value;
     }
@@ -100,27 +100,27 @@ public sealed class DotSettingsCleanupProfileTests
     {
         string declared = DeclaredProfileName(settings);
 
-        return DefinedProfiles(settings).Single(profile => profile.Attribute("name")?.Value == declared);
+        return ShouldHaveDefinedProfiles(settings).Single(profile => profile.Attribute("name")?.Value == declared);
     }
 
     private static IReadOnlyList<string?> DefinedProfileNames(XDocument settings)
     {
-        return DefinedProfiles(settings)
+        return ShouldHaveDefinedProfiles(settings)
             .Select(static profile => profile.Attribute("name")?.Value)
             .ToArray();
     }
 
     // Each profile is a whole XML document escaped into its entry's text; parsing it back out reads
     // the content the way ReSharper does, so the pins hold against what actually runs.
-    private static IReadOnlyList<XElement> DefinedProfiles(XDocument settings)
+    private static IReadOnlyList<XElement> ShouldHaveDefinedProfiles(XDocument settings)
     {
-        return Entries(settings)
+        return ShouldHaveEntries(settings)
             .Where(static entry => KeyOf(entry).StartsWith(ProfileKeyPrefix, StringComparison.Ordinal))
             .Select(static entry => XDocument.Parse(entry.Value).Root.ShouldNotBeNull())
             .ToArray();
     }
 
-    private static IEnumerable<XElement> Entries(XDocument settings)
+    private static IEnumerable<XElement> ShouldHaveEntries(XDocument settings)
     {
         XElement root = settings.Root.ShouldNotBeNull();
 

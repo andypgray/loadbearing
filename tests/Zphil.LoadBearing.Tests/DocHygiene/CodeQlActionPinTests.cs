@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
@@ -91,7 +92,7 @@ public sealed class CodeQlActionPinTests
 
     private static IEnumerable<Pin> PinsIn(string workflow)
     {
-        string text = File.ReadAllText(TrackedFiles.Absolute(workflow));
+        string text = File.ReadAllText(RepoRoot.Absolute(workflow));
 
         return PinnedUse.Matches(text).Select(match => ToPin(workflow, match));
     }

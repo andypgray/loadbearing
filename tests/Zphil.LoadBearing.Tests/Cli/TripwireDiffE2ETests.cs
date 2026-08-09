@@ -38,7 +38,8 @@ public sealed class TripwireDiffE2ETests
         // Touch a tracked file inside the quarantined scope (tripwire warning) ...
         File.AppendAllText(repo.PathOf("MyApp.Legacy.Billing", "BillingCalculator.cs"), "\n// touched by the tripwire test\n");
         // ... and add a NEW interior reference from outside the scope (containment red).
-        InsertMember(repo.PathOf("MyApp.Web", "HomeController.cs"), "    public BillingCalculator NewCalculator() => new BillingCalculator();");
+        FixtureEdits.AppendMemberLine(
+            repo.PathOf("MyApp.Web", "HomeController.cs"), "    public BillingCalculator NewCalculator() => new BillingCalculator();");
 
         CliResult result = await CliRunner.InvokeAsync(
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
@@ -81,13 +82,5 @@ public sealed class TripwireDiffE2ETests
             // Delete only the symlink (non-recursive), never through it into the real repo.
             if (Directory.Exists(linkRoot)) Directory.Delete(linkRoot);
         }
-    }
-
-    // Inserts a member line just before a class's final closing brace.
-    private static void InsertMember(string filePath, string member)
-    {
-        string original = File.ReadAllText(filePath);
-        int lastBrace = original.LastIndexOf('}');
-        File.WriteAllText(filePath, original.Substring(0, lastBrace) + member + "\n}\n");
     }
 }

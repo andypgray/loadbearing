@@ -118,21 +118,16 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // SARIF is written before the fail-closed gate returns, so the incomplete-model verdict reaches code
         // scanning: the invocation records executionSuccessful: false and the load diagnostic rides as a
         // tool-execution notification, even though the run exits 2.
-        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
-        try
-        {
-            CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
+        using TempDirectory temp = TestTempRoot.Fresh("gate-sarif");
+        string sarifPath = temp.PathOf("gate.sarif");
 
-            result.ShouldRefuseWith();
-            string sarif = File.ReadAllText(sarifPath);
-            sarif.ShouldContain("\"executionSuccessful\": false");
-            sarif.ShouldContain("\"toolExecutionNotifications\"");
-            sarif.ShouldContain(LoadDiagnostic);
-        }
-        finally
-        {
-            File.Delete(sarifPath);
-        }
+        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
+
+        result.ShouldRefuseWith();
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.ShouldContain("\"executionSuccessful\": false");
+        sarif.ShouldContain("\"toolExecutionNotifications\"");
+        sarif.ShouldContain(LoadDiagnostic);
     }
 
     // ── The MSBuild selection rides both surfaces, but only when something failed ──────────────────────
@@ -282,21 +277,16 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // SARIF records a successful invocation: the advisory rides as a tool-execution notification but,
         // filtered out of the gate, it does not flip executionSuccessful — the run exits 0.
-        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
-        try
-        {
-            CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false, sarifPath);
+        using TempDirectory temp = TestTempRoot.Fresh("gate-sarif");
+        string sarifPath = temp.PathOf("gate.sarif");
 
-            result.ShouldSucceed();
-            string sarif = File.ReadAllText(sarifPath);
-            sarif.ShouldContain("\"executionSuccessful\": true");
-            sarif.ShouldContain("\"toolExecutionNotifications\"");
-            sarif.ShouldContain(AuditDiagnostic);
-        }
-        finally
-        {
-            File.Delete(sarifPath);
-        }
+        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, false, sarifPath);
+
+        result.ShouldSucceed();
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.ShouldContain("\"executionSuccessful\": true");
+        sarif.ShouldContain("\"toolExecutionNotifications\"");
+        sarif.ShouldContain(AuditDiagnostic);
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

@@ -1,9 +1,7 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Extraction;
 
@@ -190,7 +188,7 @@ public sealed class MustNotInjectVerbTests
                                   }
                               }
                               """;
-        BaselineIndex index = Index("di/no-captive", BaselineEntry.ForEdge("T:App.Svc", "T:App.IScopedA"));
+        BaselineIndex index = Checker.Baselines("di/no-captive", BaselineEntry.ForEdge("T:App.Svc", "T:App.IScopedA"));
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), index, arch =>
                 arch.Rule("di/no-captive")
@@ -227,7 +225,7 @@ public sealed class MustNotInjectVerbTests
                                   }
                               }
                               """;
-        BaselineIndex index = Index("di/no-captive", BaselineEntry.ForEdge("T:App.OldSvc", "T:App.IScopedDep"));
+        BaselineIndex index = Checker.Baselines("di/no-captive", BaselineEntry.ForEdge("T:App.OldSvc", "T:App.IScopedDep"));
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), index, arch =>
                 arch.Rule("di/no-captive")
@@ -279,26 +277,6 @@ public sealed class MustNotInjectVerbTests
                 .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("injection");
-        violation.GetProperty("source").GetString().ShouldBe("App.CaptiveSingleton");
-        violation.GetProperty("target").GetString().ShouldBe("App.IScopedDep");
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
-    }
-
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
+        report.ShouldRenderEdgeViolation("injection", "App.CaptiveSingleton", "App.IScopedDep");
     }
 }

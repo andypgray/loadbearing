@@ -25,14 +25,13 @@ namespace Zphil.LoadBearing.Tests.Replay;
 [Collection("Serial")]
 public sealed class BinlogCaptureStoreTests : IDisposable
 {
-    private readonly string _cacheRoot =
-        Path.Combine(Path.GetTempPath(), "loadbearing-capture-tests", Guid.NewGuid().ToString("N"));
+    private readonly TempDirectory _cacheRoot = TestTempRoot.Fresh("capture-store");
 
     private static BinlogFixtureWorkspace Fixture => BinlogFixtureWorkspace.Instance;
 
     public void Dispose()
     {
-        TryDeleteDirectory(_cacheRoot);
+        _cacheRoot.Dispose();
     }
 
     // ── happy path + the structure-only contract ─────────────────────────────────────────────────────────
@@ -42,17 +41,17 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange + Act
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         bool persisted = store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath);
 
         // Assert — both files land under the override root, and validation points at the copy.
         persisted.ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot)).ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot)).ShouldBeTrue();
+        File.Exists(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path)).ShouldBeTrue();
+        File.Exists(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path)).ShouldBeTrue();
 
         CaptureValidation validation = store.Validate();
         validation.State.ShouldBe(CaptureState.Usable);
-        validation.BinlogCopyPath.ShouldBe(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot));
+        validation.BinlogCopyPath.ShouldBe(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path));
     }
 
     [Fact]
@@ -87,7 +86,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        var original = Snapshot(csproj);
+        var original = FileSnapshot.Capture(csproj);
         try
         {
             // A warm-up validation promotes any structural stamp that was still racy at ingest, so the only
@@ -114,7 +113,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         }
         finally
         {
-            Restore(csproj, original);
+            FileSnapshot.Restore(csproj, original);
         }
     }
 
@@ -125,11 +124,11 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath).ShouldBeTrue();
 
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        var original = Snapshot(csproj);
+        var original = FileSnapshot.Capture(csproj);
         try
         {
             string edited = File.ReadAllText(csproj).Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
@@ -144,7 +143,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         }
         finally
         {
-            Restore(csproj, original);
+            FileSnapshot.Restore(csproj, original);
         }
     }
 
@@ -213,7 +212,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath).ShouldBeTrue();
 
         string document = DocumentPathOf(replayed.Solution, "MyApp.Legacy.Billing", "RoundingMode.cs");
@@ -244,7 +243,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
-        File.WriteAllText(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot), "{ not: valid json ]");
+        File.WriteAllText(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path), "{ not: valid json ]");
 
         // Act
         CaptureValidation validation = store.Validate();
@@ -259,7 +258,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     {
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
-        File.Delete(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot));
+        File.Delete(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path));
 
         // Act
         CaptureValidation validation = store.Validate();
@@ -303,7 +302,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     public void Validate_NoCapture_Absent()
     {
         // Arrange — a store over a solution with nothing ingested.
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // Act + Assert — silent absence; the cold path runs with no notice.
         store.Validate().State.ShouldBe(CaptureState.Absent);
@@ -317,12 +316,12 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange — make one csproj newer than the binlog (a rebuild the binlog no longer reflects).
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        var original = Snapshot(csproj);
+        var original = FileSnapshot.Capture(csproj);
         try
         {
             DateTime newer = File.GetLastWriteTimeUtc(Fixture.BinlogPath).AddHours(1);
             File.SetLastWriteTimeUtc(csproj, newer);
-            var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+            var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
             // Act
             var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath));
@@ -332,7 +331,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         }
         finally
         {
-            Restore(csproj, original);
+            FileSnapshot.Restore(csproj, original);
         }
     }
 
@@ -342,14 +341,13 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange — build ONLY the leaf project (MyApp.Legacy.Billing, which references nothing) into its
         // own binlog: replaying it yields a one-project solution that does not cover the full sln.
         string leafCsproj = Fixture.PathOf("MyApp.Legacy.Billing", "MyApp.Legacy.Billing.csproj");
-        string leafBinlog = Path.Combine(_cacheRoot, "billing-only.binlog");
-        Directory.CreateDirectory(_cacheRoot);
+        string leafBinlog = _cacheRoot.PathOf("billing-only.binlog");
         DotnetCli.Run(
             $"build \"{leafCsproj}\" -bl:LogFile=\"{leafBinlog}\" --no-incremental --disable-build-servers",
             Fixture.PathOf());
 
         using ReplayedSolution replayed = BinlogReplayer.Replay(leafBinlog);
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // The two solution members the leaf binlog does not build.
         var missing = SolutionProjectFileParser.ReadCsprojMembers(Fixture.SolutionPath)
@@ -370,7 +368,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // A store over a .slnf: Ingest must refuse before touching the solution (an empty AdhocWorkspace
         // solution proves it never reaches CollectProjects/coverage, which is where the misleading
         // zero-members "coverage" message used to come from).
-        var store = new BinlogCaptureStore(Path.Combine(_cacheRoot, "App.slnf"), _cacheRoot);
+        var store = new BinlogCaptureStore(_cacheRoot.PathOf("App.slnf"), _cacheRoot.Path);
         Solution empty = new AdhocWorkspace().CurrentSolution;
 
         var ex = Should.Throw<UserErrorException>(() => store.Ingest(empty, "build.binlog", "build.binlog"));
@@ -385,7 +383,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         try
         {
             using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
-            var store = new BinlogCaptureStore(reducedSln, _cacheRoot);
+            var store = new BinlogCaptureStore(reducedSln, _cacheRoot.Path);
             string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
 
             // Act
@@ -457,7 +455,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     private BinlogCaptureStore IngestFullCapture()
     {
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
-        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath).ShouldBeTrue();
         return store;
     }
@@ -493,32 +491,9 @@ public sealed class BinlogCaptureStoreTests : IDisposable
 
     private void MutateManifest(Action<JsonObject> mutate)
     {
-        string path = CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot);
+        string path = CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path);
         var root = (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
         mutate(root);
         File.WriteAllText(path, root.ToJsonString());
-    }
-
-    private static (byte[] bytes, DateTime mtime) Snapshot(string path)
-    {
-        return (File.ReadAllBytes(path), File.GetLastWriteTimeUtc(path));
-    }
-
-    private static void Restore(string path, (byte[] bytes, DateTime mtime) snapshot)
-    {
-        File.WriteAllBytes(path, snapshot.bytes);
-        File.SetLastWriteTimeUtc(path, snapshot.mtime);
-    }
-
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path)) Directory.Delete(path, true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // best-effort cleanup of the throwaway cache root
-        }
     }
 }

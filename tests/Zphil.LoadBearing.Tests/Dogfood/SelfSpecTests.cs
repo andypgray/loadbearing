@@ -49,6 +49,25 @@ public sealed class SelfSpecTests
     ];
 
     /// <summary>
+    ///     This repository's own codebase, extracted once for every gate below that reads all of it: the
+    ///     workspace comes from the warm pool (so the ~17-second load is shared with the rest of the suite)
+    ///     and nothing is excluded, which is the call <c>graph</c> makes.
+    /// </summary>
+    /// <remarks>
+    ///     The model is immutable and already shared assembly-wide by <see cref="WorkspaceFixture" />, so
+    ///     four gates reading one instance is the established shape rather than a new risk. The one gate that
+    ///     needs a <em>different</em> model — <see cref="ScopedCards_AreCurrent" />, which must exclude what
+    ///     <c>render</c> excludes — extracts its own.
+    /// </remarks>
+    private static readonly Lazy<Task<CodebaseModel>> WholeCodebase = new(async () =>
+    {
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
+            RepoRoot.Solution, CancellationToken.None);
+
+        return await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
+    });
+
+    /// <summary>
     ///     The CI-equivalent self-spec gate, and — on the same run — the gate on the advisory channel
     ///     beside it. <c>workspaceDiagnostics</c> is what every MCP consumer of this repo's own check
     ///     reads, the arch hook included, so it is asserted <em>empty</em>: a channel that is never empty
@@ -94,13 +113,9 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task ArchitectureMd_IsCurrent()
     {
-        // Through the warm pool, so this shares its ~17-second load of the whole repo solution with
-        // SelfSpec_Check_ExitsZero rather than paying a second one. The extraction excludes nothing, which
-        // is the call `graph` makes: the diagram and the survey are two renderings of one codebase and must
-        // never disagree about what is in it.
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
+        // The shared no-exclusions model: the diagram and the survey are two renderings of one codebase and
+        // must never disagree about what is in it.
+        CodebaseModel codebase = await WholeCodebase.Value;
 
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
@@ -275,10 +290,7 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task CoreLayer_MatchesTheCoreProject()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, ct: TestContext.Current.CancellationToken);
+        CodebaseModel codebase = await WholeCodebase.Value;
 
         // The layer selection is taken from the built model rather than re-declared, so this pins the globs
         // the spec actually ships. layering/core-no-roslyn's subject is the bare Core layer.
@@ -316,10 +328,7 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, ct: TestContext.Current.CancellationToken);
+        CodebaseModel codebase = await WholeCodebase.Value;
 
         var arch = new Arch();
         Selection cliProject = arch.Project("Zphil.LoadBearing.Cli");
@@ -350,10 +359,7 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task RoslynProject_MinusAuthored_IsExactlyTheRegexGeneratorEmittedTypes()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
-        CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, ct: TestContext.Current.CancellationToken);
+        CodebaseModel codebase = await WholeCodebase.Value;
 
         var arch = new Arch();
         Selection roslynProject = arch.Project("Zphil.LoadBearing.Roslyn");

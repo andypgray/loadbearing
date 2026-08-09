@@ -29,9 +29,9 @@ public sealed class OracleArchitecture
 
     public OracleArchitecture()
     {
-        string domainPath = BakedPath("MyAppDomainPath");
-        string webPath = BakedPath("MyAppWebPath");
-        string billingPath = BakedPath("MyAppBillingPath");
+        string domainPath = ShouldHaveBakedPath("MyAppDomainPath");
+        string webPath = ShouldHaveBakedPath("MyAppWebPath");
+        string billingPath = ShouldHaveBakedPath("MyAppBillingPath");
 
         Domain = Assembly.LoadFrom(domainPath);
         Web = Assembly.LoadFrom(webPath);
@@ -175,7 +175,7 @@ public sealed class OracleArchitecture
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private static string BakedPath(string key)
+    private static string ShouldHaveBakedPath(string key)
     {
         string? path = typeof(OracleArchitecture).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()

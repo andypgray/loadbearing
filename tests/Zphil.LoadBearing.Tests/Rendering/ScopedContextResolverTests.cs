@@ -3,6 +3,7 @@ using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
@@ -16,9 +17,14 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class ScopedContextResolverTests
 {
+    // A hermetic quarantined scope over the billing namespace (no BoundaryOnlyVia needed to place it).
     private static ArchitectureModel Model()
     {
-        return ArchModelBuilder.Build(new BillingQuarantineSpec());
+        return Checker.Model(arch =>
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Dragons("Banker's rounding is load-bearing.")
+                .Because("Replacement scheduled; not worth stabilizing."));
     }
 
     [Fact]
@@ -77,17 +83,5 @@ public class ScopedContextResolverTests
 
         placement.DirectoryPath.ShouldBeNull();
         placement.SkipReason.ShouldBe("scope 'legacy/billing' matched no types; no scoped context emitted");
-    }
-
-    // A hermetic quarantined scope over the billing namespace (no BoundaryOnlyVia needed to place it).
-    private sealed class BillingQuarantineSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .Dragons("Banker's rounding is load-bearing.")
-                .Because("Replacement scheduled; not worth stabilizing.");
-        }
     }
 }

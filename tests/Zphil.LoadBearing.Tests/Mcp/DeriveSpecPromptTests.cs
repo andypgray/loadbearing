@@ -73,7 +73,7 @@ public sealed class DeriveSpecPromptTests
 
         // Assert — the checker's authoring signals must survive prose edits: they are what stop an agent
         // misreading an empty subject or an inert target as evidence about the code.
-        string text = ((TextContentBlock)result.Messages[0].Content).Text;
+        string text = result.ShouldHaveTextContent();
         text.ShouldContain("emptySubject");
         text.ShouldContain("This rule is inert: its target selection matched no types.");
         text.ShouldContain("trailing `.*`");
@@ -91,7 +91,7 @@ public sealed class DeriveSpecPromptTests
             ArchPrompts.DeriveSpecName, cancellationToken: Ct);
 
         // Assert
-        string text = ((TextContentBlock)result.Messages[0].Content).Text;
+        string text = result.ShouldHaveTextContent();
         text.ShouldContain($"<PackageReference Include=\"Zphil.LoadBearing\" Version=\"{ServerVersion.SemVer}\" />");
         text.ShouldNotContain(ArchPrompts.ScaffoldVersionPlaceholder);
         text.ShouldContain("`loadbearing --version` prints");
@@ -110,7 +110,7 @@ public sealed class DeriveSpecPromptTests
         // Assert — the scaffold pins its own version inline, which is NU1008 on a repository that manages
         // package versions centrally. The opt-out is what makes one csproj valid either way, so it cannot
         // drop out of the recipe quietly; CI executes the same commitment against a real central file.
-        string text = ((TextContentBlock)result.Messages[0].Content).Text;
+        string text = result.ShouldHaveTextContent();
         text.ShouldContain("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>");
     }
 

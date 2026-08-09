@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -125,22 +126,15 @@ public sealed class SpecResolverTests
         // The release-CI regression: MSBuildWorkspace evaluates OutputFilePath in Debug, but a
         // `dotnet build -c Release` only produced the Release output. Resolution must find the assembly
         // that is actually on disk rather than fail "no built output" for a Debug DLL nobody built.
-        string root = Path.Combine(Path.GetTempPath(), "loadbearing-specresolver", Guid.NewGuid().ToString("N"));
-        string evaluatedDebugOutput = Path.Combine(root, "bin", "Debug", "net10.0", "MyApp.Arch.dll");
-        string builtReleaseOutput = Path.Combine(root, "bin", "Release", "net10.0", "MyApp.Arch.dll");
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(builtReleaseOutput)!);
-            File.WriteAllText(builtReleaseOutput, "");
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string evaluatedDebugOutput = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
+        string builtReleaseOutput = temp.PathOf("bin", "Release", "net10.0", "MyApp.Arch.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(builtReleaseOutput)!);
+        File.WriteAllText(builtReleaseOutput, "");
 
-            string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", evaluatedDebugOutput);
+        string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", evaluatedDebugOutput);
 
-            resolved.ShouldBe(builtReleaseOutput);
-        }
-        finally
-        {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
-        }
+        resolved.ShouldBe(builtReleaseOutput);
     }
 
     private static SpecProjectCandidate Candidate(string name, string referencePath, bool isDeclaredMember = true)

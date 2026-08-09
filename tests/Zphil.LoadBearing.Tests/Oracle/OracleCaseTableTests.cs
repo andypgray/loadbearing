@@ -244,28 +244,22 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
 
     private IReadOnlySet<string> LoadBearingReferenceViolators(Action<Arch> define)
     {
-        RuleResult result = Checker.Run(workspace.Model, define).Single();
-        return result.Violations
-            .Where(violation => violation.Kind == ViolationKind.Reference)
-            .Select(violation => violation.Source!.FullName)
+        return Checker.Run(workspace.Model, define).Single()
+            .Violators(ViolationKind.Reference, violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 
     private IReadOnlySet<string> LoadBearingShapeViolators(Action<Arch> define)
     {
-        RuleResult result = Checker.Run(workspace.Model, define).Single();
-        return result.Violations
-            .Where(violation => violation.Kind == ViolationKind.Shape)
-            .Select(violation => violation.Subject!.FullName)
+        return Checker.Run(workspace.Model, define).Single()
+            .ShapeSubjects()
             .ToHashSet(StringComparer.Ordinal);
     }
 
     private IReadOnlySet<string> LoadBearingMemberUseViolators(Action<Arch> define)
     {
-        RuleResult result = Checker.Run(workspace.Model, define).Single();
-        return result.Violations
-            .Where(violation => violation.Kind == ViolationKind.MemberUse)
-            .Select(violation => violation.Source!.FullName)
+        return Checker.Run(workspace.Model, define).Single()
+            .Violators(ViolationKind.MemberUse, violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 
@@ -274,10 +268,8 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // which types own an offending member, exactly as row 8 agrees on which types read the clock.
     private IReadOnlySet<string> LoadBearingMemberShapeViolators(Action<Arch> define)
     {
-        RuleResult result = Checker.Run(workspace.Model, define).Single();
-        return result.Violations
-            .Where(violation => violation.Kind == ViolationKind.MemberShape)
-            .Select(violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)
+        return Checker.Run(workspace.Model, define).Single()
+            .Violators(ViolationKind.MemberShape, violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 }

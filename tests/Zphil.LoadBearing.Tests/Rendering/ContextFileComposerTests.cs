@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
@@ -15,6 +16,45 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class ContextFileComposerTests
 {
+    // A Web layer with one bare-subject Enforce rule anchored on it.
+    private static readonly IArchitectureSpec WebLayerSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/web-not-billing")
+            .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
+            .Because("Web reaches billing only through the facade.");
+    });
+
+    // A Billing layer anchored by a rule, over a codebase that holds no billing type.
+    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/billing-not-web")
+            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
+            .Because("Billing is downstream of the web layer.");
+    });
+
+    // A quarantined scope over a namespace no type in the codebase occupies.
+    private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(arch =>
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Dragons("Banker's rounding is line-item level.")
+            .Because("Replacement scheduled."));
+
+    // A layer and a quarantined scope over the same namespace, so both cards resolve to one directory.
+    private static readonly IArchitectureSpec CoLocatedSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/billing-not-web")
+            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
+            .Because("Billing is downstream of the web layer.");
+
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Dragons("Banker's rounding is line-item level.")
+            .Because("Replacement scheduled.");
+    });
+
     private const string SpecName = "MyApp.ArchSpec";
 
     [Fact]
@@ -23,7 +63,7 @@ public class ContextFileComposerTests
         // The cost gate's shape: a caller that decides extraction is not worth paying passes no codebase
         // and gets the root block, which is a function of the spec alone.
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(new WebLayerSpec()), null, "/sln", SpecName);
+            ArchModelBuilder.Build(WebLayerSpec), null, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
         composition.Files.Count.ShouldBe(1);
@@ -42,7 +82,7 @@ public class ContextFileComposerTests
             ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
 
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(new WebLayerSpec()), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(WebLayerSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
         composition.Files.Select(file => file.Path).ShouldBe(
@@ -61,7 +101,7 @@ public class ContextFileComposerTests
                 "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
 
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(new CoLocatedSpec()), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(CoLocatedSpec), codebase, "/sln", SpecName);
 
         // One file, not two: the second splice would clobber the first, so co-located units merge.
         composition.Files.Count.ShouldBe(2);
@@ -85,7 +125,7 @@ public class ContextFileComposerTests
         // its card in. The skip has to surface: silently emitting nothing is how a spec stops describing
         // its codebase without anyone noticing.
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(new BillingLayerSpec()), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(BillingLayerSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["layer 'Billing' matched no types; no scoped context emitted"]);
         composition.Files.Count.ShouldBe(1); // the root file only
@@ -98,7 +138,7 @@ public class ContextFileComposerTests
             ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
 
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(new AbsentScopeSpec()), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(AbsentScopeSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["scope 'legacy/billing' matched no types; no scoped context emitted"]);
         composition.Files.Count.ShouldBe(1);
@@ -113,58 +153,5 @@ public class ContextFileComposerTests
             count++;
 
         return count;
-    }
-
-    // A Web layer with one bare-subject Enforce rule anchored on it.
-    private sealed class WebLayerSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Layer web = arch.Layer("Web", "MyApp.Web.*");
-            arch.Rule("layering/web-not-billing")
-                .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
-                .Because("Web reaches billing only through the facade.");
-        }
-    }
-
-    // A Billing layer anchored by a rule, over a codebase that holds no billing type.
-    private sealed class BillingLayerSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-            arch.Rule("layering/billing-not-web")
-                .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-                .Because("Billing is downstream of the web layer.");
-        }
-    }
-
-    // A quarantined scope over a namespace no type in the codebase occupies.
-    private sealed class AbsentScopeSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .Dragons("Banker's rounding is line-item level.")
-                .Because("Replacement scheduled.");
-        }
-    }
-
-    // A layer and a quarantined scope over the same namespace, so both cards resolve to one directory.
-    private sealed class CoLocatedSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-            arch.Rule("layering/billing-not-web")
-                .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-                .Because("Billing is downstream of the web layer.");
-
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .Dragons("Banker's rounding is line-item level.")
-                .Because("Replacement scheduled.");
-        }
     }
 }

@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Stubs;
 
 namespace Zphil.LoadBearing.Tests;
@@ -16,6 +17,20 @@ public class ModelReificationTests
     private const string DragonsProse =
         "Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.";
+
+    // A quarantined scope documented via .DragonsDoc(...) rather than inline .Dragons(...).
+    private static readonly IArchitectureSpec DragonsDocScopeSpec = new InlineSpec(arch =>
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .BoundaryOnlyVia(typeof(IBillingFacade))
+            .DragonsDoc("arch/billing-dragons.md")
+            .Because("Replacement scheduled; see the linked doc."));
+
+    // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
+    private static readonly IArchitectureSpec CtorRuleSpec = new InlineSpec(arch =>
+        arch.Rule("di/no-new-services")
+            .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
+            .Because("Services are DI-resolved; direct construction bypasses the container."));
 
     private static ArchitectureModel BuildCanonical()
     {
@@ -91,7 +106,17 @@ public class ModelReificationTests
     [Fact]
     public void MigrateRule_WithoutOptions_DefaultsBaselineToConventionalPathAndPolicyMigrateIfSmall()
     {
-        ArchRule rule = ArchModelBuilder.Build(new MigrateWithoutOptionsSpec()).Rules.Single();
+        // A Migrate rule with neither .Baseline(...) nor .WhileYoureThere(...) — exercises the defaults.
+        ArchRule rule = Checker.Model(arch =>
+            {
+                Layer web = arch.Layer("Web", "MyApp.Web.*");
+                arch.Rule("data-access/no-inline-sql")
+                    .Migrate(
+                        "Controllers open SqlConnection directly.",
+                        web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
+                    .Because("Repository pattern for testability.");
+            })
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Migrate);
         rule.Migrate.ShouldNotBeNull();
@@ -147,7 +172,7 @@ public class ModelReificationTests
     [Fact]
     public void QuarantineScope_WithDragonsDoc_ReifiesLinkedDocPathOnBothChildren()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new DragonsDocScopeSpec());
+        ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
         QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment").Quarantine!;
         containment.DragonsDoc.ShouldBe("arch/billing-dragons.md");
@@ -160,7 +185,7 @@ public class ModelReificationTests
     public void QuarantineScope_WithoutBaseline_DefaultsContainmentToConventionalPath()
     {
         // DragonsDocScopeSpec omits .Baseline, so the containment child falls back to the default.
-        ArchitectureModel model = ArchModelBuilder.Build(new DragonsDocScopeSpec());
+        ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
         QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment").Quarantine!;
         // .Baseline omitted ⇒ conventional default derived from the containment rule ID (GRAMMAR §4.4/§7).
@@ -172,7 +197,15 @@ public class ModelReificationTests
     [Fact]
     public void MustNotUseRule_ReifiesToWalkableMemberConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new MemberUseSpec()).Rules.Single(r => r.Id == "time/inject-clock");
+        // The flagship member-ban rule, for the walkable-model pins (Migrate posture, real members).
+        ArchRule rule = Checker.Model(arch => arch.Rule("time/inject-clock")
+                .Migrate(
+                    "Code reads the ambient clock directly.",
+                    arch.Types.MustNotUse(
+                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
+                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
+                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn."))
+            .Rules.Single(r => r.Id == "time/inject-clock");
 
         rule.Posture.ShouldBe(Posture.Migrate);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotUseConstraint>();
@@ -191,7 +224,7 @@ public class ModelReificationTests
     [Fact]
     public void MustNotConstructRule_ReifiesToWalkableConstructConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new CtorRuleSpec()).Rules.Single();
+        ArchRule rule = ArchModelBuilder.Build(CtorRuleSpec).Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotConstructConstraint>();
@@ -210,13 +243,21 @@ public class ModelReificationTests
         // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
         Rule("layering/domain-independent").Constraint!.MemberOperands.ShouldBeEmpty();
         // MustNotConstruct is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty too.
-        ArchModelBuilder.Build(new CtorRuleSpec()).Rules.Single().Constraint!.MemberOperands.ShouldBeEmpty();
+        ArchModelBuilder.Build(CtorRuleSpec).Rules.Single().Constraint!.MemberOperands.ShouldBeEmpty();
     }
 
     [Fact]
     public void MemberSubjectRule_ReifiesToWalkableMemberConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new AsyncSuffixSpec()).Rules.Single(r => r.Id == "naming/async-suffix");
+        // The flagship member-subject rule, for the walkable-model pins (GRAMMAR §4.6).
+        ArchRule rule = Checker.Model(arch =>
+            {
+                Selection web = arch.Namespace("MyApp.Web.*");
+                arch.Rule("naming/async-suffix")
+                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
+                    .Because("Async methods are discovered by suffix.");
+            })
+            .Rules.Single(r => r.Id == "naming/async-suffix");
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MemberMustHaveSuffixConstraint>();
@@ -239,7 +280,12 @@ public class ModelReificationTests
     {
         // arch.Registered(Lifetime.X) reifies to a RegisteredNoun carrying that lifetime; MustNotInject
         // reifies to a MustNotInjectConstraint whose Operands mirror its Targets (GRAMMAR §4.7).
-        var constraint = ArchModelBuilder.Build(new CaptiveDependencySpec()).Rules.Single().Constraint
+        // The captive-dependency flagship: singleton-registered types must not inject scoped/transient ones.
+        var constraint = Checker.Model(arch => arch.Rule("di/no-captive-dependencies")
+                .Enforce(arch.Registered(Lifetime.Singleton)
+                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
+                .Because("Singletons capturing scoped/transient services leak state across scopes."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
 
         constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBe(Lifetime.Singleton);
@@ -254,7 +300,10 @@ public class ModelReificationTests
     public void RegisteredNoun_NoArg_ReifiesWithNullLifetime()
     {
         // arch.Registered() reifies to a RegisteredNoun with a null lifetime (any lifetime).
-        var constraint = ArchModelBuilder.Build(new AnyLifetimeInjectSpec()).Rules.Single().Constraint
+        var constraint = Checker.Model(arch => arch.Rule("di/registered-inject")
+                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Because("Any registration must not inject a scoped service."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
         constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBeNull();
     }
@@ -264,9 +313,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — the model is identical to
         // writing arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for SqlConnection either way.
-        var sugar = ArchModelBuilder.Build(new InjectTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("di/no-inject-sql")
+                .Enforce(arch.Types.MustNotInject(typeof(SqlConnection)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
-        var wrapped = ArchModelBuilder.Build(new InjectWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("di/no-inject-sql")
+                .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -280,7 +335,11 @@ public class ModelReificationTests
     [Fact]
     public void MustNotCatchRule_ReifiesToWalkableCatchConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new CatchRuleSpec()).Rules.Single();
+        // A single MustNotCatch-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-catch-ioe")
+                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+                .Because("Swallowing invalid-operation signals hides real defects."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotCatchConstraint>();
@@ -298,7 +357,11 @@ public class ModelReificationTests
     [Fact]
     public void MustNotCatchUnfilteredRule_ReifiesToWalkableCatchConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new UnfilteredCatchRuleSpec()).Rules.Single();
+        // A single MustNotCatchUnfiltered-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("errors/filter-broad-catches")
+                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
+                .Because("A broad catch names what it expects in a `when` filter."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
@@ -317,7 +380,11 @@ public class ModelReificationTests
     [Fact]
     public void MustNotSwallowRule_ReifiesToWalkableCatchConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new SwallowRuleSpec()).Rules.Single();
+        // A single MustNotSwallow-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-swallowed-broad-catches")
+                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
+                .Because("A handler that holds a failure and continues hides it."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotSwallowConstraint>();
@@ -336,7 +403,11 @@ public class ModelReificationTests
     [Fact]
     public void MustNotThrowRule_ReifiesToWalkableThrowConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new ThrowBanRuleSpec()).Rules.Single();
+        // A single MustNotThrow-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-bare-bcl-throws")
+                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
+                .Because("Bare BCL exception types carry no meaning a caller can dispatch on."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotThrowConstraint>();
@@ -354,7 +425,11 @@ public class ModelReificationTests
     [Fact]
     public void MustOnlyThrowRule_ReifiesToWalkableThrowConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new ThrowRuleSpec()).Rules.Single();
+        // A single MustOnlyThrow-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("errors/throw-domain-only")
+                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+                .Because("Domain code must surface only sanctioned exception types."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustOnlyThrowConstraint>();
@@ -374,9 +449,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = ArchModelBuilder.Build(new CatchTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("errors/no-catch")
+                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotCatchConstraint>();
-        var wrapped = ArchModelBuilder.Build(new CatchWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("errors/no-catch")
+                .Enforce(arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotCatchConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -392,9 +473,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = ArchModelBuilder.Build(new UnfilteredCatchTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
+                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
-        var wrapped = ArchModelBuilder.Build(new UnfilteredCatchWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
+                .Enforce(arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -410,9 +497,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = ArchModelBuilder.Build(new SwallowTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("errors/no-swallow")
+                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotSwallowConstraint>();
-        var wrapped = ArchModelBuilder.Build(new SwallowWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("errors/no-swallow")
+                .Enforce(arch.Types.MustNotSwallow(arch.Type(typeof(Exception))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotSwallowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -428,9 +521,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = ArchModelBuilder.Build(new ThrowBanTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("errors/no-throw")
+                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotThrowConstraint>();
-        var wrapped = ArchModelBuilder.Build(new ThrowBanWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("errors/no-throw")
+                .Enforce(arch.Types.MustNotThrow(arch.Type(typeof(Exception))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotThrowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -446,9 +545,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = ArchModelBuilder.Build(new ThrowTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("errors/throw-only")
+                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustOnlyThrowConstraint>();
-        var wrapped = ArchModelBuilder.Build(new ThrowWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("errors/throw-only")
+                .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustOnlyThrowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -462,7 +567,11 @@ public class ModelReificationTests
     [Fact]
     public void MustNotExposeRule_ReifiesToWalkableExposeConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(new ExposeRuleSpec()).Rules.Single();
+        // A single MustNotExpose-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        ArchRule rule = Checker.Model(arch => arch.Rule("api/no-leaky-surface")
+                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
+                .Because("Public signatures must not leak infrastructure types."))
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotExposeConstraint>();
@@ -482,9 +591,15 @@ public class ModelReificationTests
     {
         // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
         // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exposed type either way.
-        var sugar = ArchModelBuilder.Build(new ExposeTypeSugarSpec()).Rules.Single().Constraint
+        var sugar = Checker.Model(arch => arch.Rule("api/no-expose")
+                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotExposeConstraint>();
-        var wrapped = ArchModelBuilder.Build(new ExposeWrappedSelectionSpec()).Rules.Single().Constraint
+        var wrapped = Checker.Model(arch => arch.Rule("api/no-expose")
+                .Enforce(arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))))
+                .Because("Reason."))
+            .Rules.Single().Constraint
             .ShouldBeOfType<MustNotExposeConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
@@ -559,306 +674,5 @@ public class ModelReificationTests
 
         union.Parts.Count.ShouldBe(1);
         union.Adjectives.ShouldBeEmpty();
-    }
-
-    // The flagship member-ban rule, reused for the walkable-model pins (Migrate posture, real members).
-    private sealed class MemberUseSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("time/inject-clock")
-                .Migrate(
-                    "Code reads the ambient clock directly.",
-                    arch.Types.MustNotUse(
-                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
-                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.");
-        }
-    }
-
-    // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class CtorRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("di/no-new-services")
-                .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
-                .Because("Services are DI-resolved; direct construction bypasses the container.");
-        }
-    }
-
-    // The flagship member-subject rule, reused for the walkable-model pins (GRAMMAR §4.6).
-    private sealed class AsyncSuffixSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Selection web = arch.Namespace("MyApp.Web.*");
-            arch.Rule("naming/async-suffix")
-                .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
-                .Because("Async methods are discovered by suffix.");
-        }
-    }
-
-    // A quarantined scope documented via .DragonsDoc(...) rather than inline .Dragons(...).
-    private sealed class DragonsDocScopeSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .BoundaryOnlyVia(typeof(IBillingFacade))
-                .DragonsDoc("arch/billing-dragons.md")
-                .Because("Replacement scheduled; see the linked doc.");
-        }
-    }
-
-    // A Migrate rule with neither .Baseline(...) nor .WhileYoureThere(...) — exercises the defaults.
-    private sealed class MigrateWithoutOptionsSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            Layer web = arch.Layer("Web", "MyApp.Web.*");
-            arch.Rule("data-access/no-inline-sql")
-                .Migrate(
-                    "Controllers open SqlConnection directly.",
-                    web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
-                .Because("Repository pattern for testability.");
-        }
-    }
-
-    // The captive-dependency flagship: singleton-registered types must not inject scoped/transient ones.
-    private sealed class CaptiveDependencySpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("di/no-captive-dependencies")
-                .Enforce(arch.Registered(Lifetime.Singleton)
-                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
-                .Because("Singletons capturing scoped/transient services leak state across scopes.");
-        }
-    }
-
-    // The any-lifetime Registered subject — exercises the null-lifetime reification.
-    private sealed class AnyLifetimeInjectSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("di/registered-inject")
-                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
-                .Because("Any registration must not inject a scoped service.");
-        }
-    }
-
-    // The MustNotInject Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class InjectTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("di/no-inject-sql")
-                .Enforce(arch.Types.MustNotInject(typeof(SqlConnection)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class InjectWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("di/no-inject-sql")
-                .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
-                .Because("Reason.");
-        }
-    }
-
-    // A single MustNotCatch-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class CatchRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-catch-ioe")
-                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
-                .Because("Swallowing invalid-operation signals hides real defects.");
-        }
-    }
-
-    // A single MustNotCatchUnfiltered-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class UnfilteredCatchRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/filter-broad-catches")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
-                .Because("A broad catch names what it expects in a `when` filter.");
-        }
-    }
-
-    // A single MustNotSwallow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class SwallowRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-swallowed-broad-catches")
-                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
-                .Because("A handler that holds a failure and continues hides it.");
-        }
-    }
-
-    // A single MustNotThrow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class ThrowBanRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-bare-bcl-throws")
-                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
-                .Because("Bare BCL exception types carry no meaning a caller can dispatch on.");
-        }
-    }
-
-    // A single MustOnlyThrow-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class ThrowRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/throw-domain-only")
-                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
-                .Because("Domain code must surface only sanctioned exception types.");
-        }
-    }
-
-    // The MustNotCatch Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class CatchTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-catch")
-                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class CatchWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-catch")
-                .Enforce(arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))))
-                .Because("Reason.");
-        }
-    }
-
-    // The MustNotCatchUnfiltered Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class UnfilteredCatchTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-unfiltered-catch")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class UnfilteredCatchWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-unfiltered-catch")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))))
-                .Because("Reason.");
-        }
-    }
-
-    // The MustNotSwallow Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class SwallowTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-swallow")
-                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class SwallowWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-swallow")
-                .Enforce(arch.Types.MustNotSwallow(arch.Type(typeof(Exception))))
-                .Because("Reason.");
-        }
-    }
-
-    // The MustNotThrow Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class ThrowBanTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-throw")
-                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class ThrowBanWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/no-throw")
-                .Enforce(arch.Types.MustNotThrow(arch.Type(typeof(Exception))))
-                .Because("Reason.");
-        }
-    }
-
-    // The MustOnlyThrow Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class ThrowTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/throw-only")
-                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class ThrowWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("errors/throw-only")
-                .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
-                .Because("Reason.");
-        }
-    }
-
-    // A single MustNotExpose-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private sealed class ExposeRuleSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("api/no-leaky-surface")
-                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
-                .Because("Public signatures must not leak infrastructure types.");
-        }
-    }
-
-    // The MustNotExpose Type-sugar overload and its hand-wrapped equivalent — reify to the same model.
-    private sealed class ExposeTypeSugarSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("api/no-expose")
-                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
-                .Because("Reason.");
-        }
-    }
-
-    private sealed class ExposeWrappedSelectionSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Rule("api/no-expose")
-                .Enforce(arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))))
-                .Because("Reason.");
-        }
     }
 }

@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -18,11 +19,11 @@ public sealed class ExplainCommandTests
             "explain", "layering/domain-independent", "--spec", CliRunner.ViolatedSpecDll);
 
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(
-            "layering/domain-independent (enforce)\n" +
-            "  sentence: The Domain layer must not reference the Web layer.\n" +
-            "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
-            "  fix: Define an abstraction in Domain and implement it in Web."));
+        result.Out.NormalizedTrimmed().ShouldBe(
+            ("layering/domain-independent (enforce)\n" +
+             "  sentence: The Domain layer must not reference the Web layer.\n" +
+             "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
+             "  fix: Define an abstraction in Domain and implement it in Web.").NormalizedTrimmed());
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class ExplainCommandTests
 
         result.ShouldRefuseWith();
         // The post-desugar ID set includes the quarantined scope's containment + tripwire children (GRAMMAR §7).
-        Normalize(result.Err).ShouldContain(
+        result.Err.NormalizedTrimmed().ShouldContain(
             "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
             "  api/return-dtos\n" +
             "  async/accept-cancellation\n" +
@@ -73,10 +74,5 @@ public sealed class ExplainCommandTests
         CliResult result = await CliRunner.InvokeAsync("explain", "--spec", CliRunner.ViolatedSpecDll);
 
         result.ShouldRefuseWith();
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
     }
 }

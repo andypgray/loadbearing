@@ -32,18 +32,10 @@ public sealed class MigrateRatchetTests
             .Because("Repository pattern for testability.");
     }
 
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
-    }
-
     [Fact]
     public void Check_MigrateViolationInBaseline_PassesWithGrandfathered()
     {
-        BaselineIndex index = Index("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess).Single();
 
@@ -57,7 +49,7 @@ public sealed class MigrateRatchetTests
     public void Check_MigrateViolationNotInBaseline_FailsRed()
     {
         // Captured section, but this edge is not in it — new code in the old pattern is red.
-        RuleResult result = Checker.Run(OneController, Index("data/x"), NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, Checker.Baselines("data/x"), NoDataAccess).Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.Violations.Count.ShouldBe(1);
@@ -80,7 +72,7 @@ public sealed class MigrateRatchetTests
                               }
                               namespace App.Data { public class Db {} public class Cache {} }
                               """;
-        BaselineIndex index = Index("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
         RuleResult result = Checker.Run(source, index, NoDataAccess).Single();
 
@@ -95,7 +87,7 @@ public sealed class MigrateRatchetTests
         // A construction violation ratchets exactly like a reference: its identity is the (source, constructed)
         // type pair (GRAMMAR §4.3), so the same ForEdge entry grandfathers OldController `new`ing Db with zero
         // baseline-format change. (OneController's Load() does `new App.Data.Db()`.)
-        BaselineIndex index = Index("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("data/x")
@@ -115,7 +107,7 @@ public sealed class MigrateRatchetTests
     public void Check_MigrateShapeViolation_GrandfathersBySubjectId()
     {
         const string source = "namespace App { public class GoodHandler {} public class BadThing {} }";
-        BaselineIndex index = Index("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
+        BaselineIndex index = Checker.Baselines("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("naming/x")
@@ -132,7 +124,7 @@ public sealed class MigrateRatchetTests
     public void Check_StaleBaselineEntry_CountsWithoutFailing()
     {
         // Old is grandfathered and present; the Ghost entry matches no current violation → stale.
-        BaselineIndex index = Index(
+        BaselineIndex index = Checker.Baselines(
             "data/x",
             BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
@@ -163,7 +155,7 @@ public sealed class MigrateRatchetTests
                               namespace App.Data { public class Db {} }
                               """;
 
-        RuleResult result = Checker.Run(source, Index("data/x"), NoDataAccess).Single();
+        RuleResult result = Checker.Run(source, Checker.Baselines("data/x"), NoDataAccess).Single();
 
         result.ShouldHavePassed();
         result.BaselineCaptured.ShouldBeTrue();
@@ -174,7 +166,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateEmptySubject_IsRedNeverBaselinable()
     {
-        RuleResult result = Checker.Run("namespace App { public class X {} }", Index("data/x"), arch =>
+        RuleResult result = Checker.Run("namespace App { public class X {} }", Checker.Baselines("data/x"), arch =>
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
@@ -190,7 +182,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateRuleError_IsFailedNeverBaselinable()
     {
-        RuleResult result = Checker.Run(Sources.Hierarchy, Index("data/x"), arch =>
+        RuleResult result = Checker.Run(Sources.Hierarchy, Checker.Baselines("data/x"), arch =>
                 arch.Rule("data/x")
                     .Migrate("old", arch.Types.MustNotReference(typeof(IHandler<Order>)))
                     .Because("b"))
@@ -204,7 +196,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateInertTarget_WarnsAndPasses()
     {
-        RuleResult result = Checker.Run("namespace App.Web { public class HomeController {} }", Index("data/x"), arch =>
+        RuleResult result = Checker.Run("namespace App.Web { public class HomeController {} }", Checker.Baselines("data/x"), arch =>
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
@@ -228,7 +220,7 @@ public sealed class MigrateRatchetTests
     public void Check_EnforceRule_IgnoresBaselineIndex()
     {
         // Even an index that carries the exact edge does not grandfather an Enforce rule.
-        BaselineIndex index = Index("layer/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("layer/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("layer/x")

@@ -40,8 +40,7 @@ namespace Zphil.LoadBearing.Tests.Replay;
 [Collection("Serial")]
 public sealed class BinlogCliE2ETests : IDisposable
 {
-    private readonly string _cacheRootBase =
-        Path.Combine(Path.GetTempPath(), "loadbearing-binlog-cli", Guid.NewGuid().ToString("N"));
+    private readonly TempDirectory _cacheRootBase = TestTempRoot.Fresh("binlog-cli");
 
     private static BinlogFixtureWorkspace Fixture => BinlogFixtureWorkspace.Instance;
     private static string Sln => Fixture.SolutionPath;
@@ -50,7 +49,7 @@ public sealed class BinlogCliE2ETests : IDisposable
 
     public void Dispose()
     {
-        TryDeleteDirectory(_cacheRootBase);
+        _cacheRootBase.Dispose();
     }
 
     // ── (1) byte-parity trio + auto-replay ───────────────────────────────────────────────────────────────
@@ -105,7 +104,7 @@ public sealed class BinlogCliE2ETests : IDisposable
         await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed the capture (replay)
 
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        var original = Snapshot(csproj);
+        var original = FileSnapshot.Capture(csproj);
         try
         {
             // A harmless XML comment: a structural content change that invalidates the capture (stale) and the
@@ -130,7 +129,7 @@ public sealed class BinlogCliE2ETests : IDisposable
         }
         finally
         {
-            Restore(csproj, original);
+            FileSnapshot.Restore(csproj, original);
         }
     }
 
@@ -173,8 +172,7 @@ public sealed class BinlogCliE2ETests : IDisposable
     [Fact]
     public async Task Check_JunkBinlog_ExitsTwoWithCouldNotBeReplayed()
     {
-        Directory.CreateDirectory(_cacheRootBase);
-        string junk = Path.Combine(_cacheRootBase, "junk.binlog");
+        string junk = _cacheRootBase.PathOf("junk.binlog");
         await File.WriteAllTextAsync(junk, "this is not a binlog");
 
         GateRun run = await RunAsync(FreshCache(), "check", Sln, "--binlog", junk, "--spec", CleanSpec);
@@ -280,53 +278,24 @@ public sealed class BinlogCliE2ETests : IDisposable
 
     private string FreshCache()
     {
-        return Path.Combine(_cacheRootBase, Guid.NewGuid().ToString("N"));
+        return _cacheRootBase.UniqueChildPath();
     }
 
     // Drives the real command tree, isolating the persisted caches at LOADBEARING_CACHE_DIR and capturing both
-    // internal observables. The serial collection makes the transient env-var write and the static observable
-    // reads race-free; the env var is restored (not cleared) so the run-wide default the module initializer
-    // set survives for the next serial test.
+    // internal observables.
     private static async Task<GateRun> RunAsync(string cacheDir, params string[] args)
     {
-        string? previous = Environment.GetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory);
-        Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, cacheDir);
+        // The serial collection makes the transient env-var write and the static observable reads race-free;
+        // the scope restores (not clears) the variable, so the run-wide default the module initializer set
+        // survives for the next serial test.
+        using var cacheDirectory = new ScopedEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, cacheDir);
         long loaderBefore = WorkspaceLoader.LoadCount;
-        try
-        {
-            // Cold, deliberately: every fact here reads the LoadCount delta to tell "replayed" from "built",
-            // so each invocation has to open (or decline to open) its own workspace.
-            CliResult result = await CliRunner.InvokeColdAsync(args);
-            return new GateRun(
-                result.Exit, result.Out, result.Err, MsBuildGate.LastAcquisition, WorkspaceLoader.LoadCount - loaderBefore);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, previous);
-        }
-    }
 
-    private static (byte[] bytes, DateTime mtime) Snapshot(string path)
-    {
-        return (File.ReadAllBytes(path), File.GetLastWriteTimeUtc(path));
-    }
-
-    private static void Restore(string path, (byte[] bytes, DateTime mtime) snapshot)
-    {
-        File.WriteAllBytes(path, snapshot.bytes);
-        File.SetLastWriteTimeUtc(path, snapshot.mtime);
-    }
-
-    private static void TryDeleteDirectory(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path)) Directory.Delete(path, true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // best-effort cleanup of the throwaway cache root
-        }
+        // Cold, deliberately: every fact here reads the LoadCount delta to tell "replayed" from "built",
+        // so each invocation has to open (or decline to open) its own workspace.
+        CliResult result = await CliRunner.InvokeColdAsync(args);
+        return new GateRun(
+            result.Exit, result.Out, result.Err, MsBuildGate.LastAcquisition, WorkspaceLoader.LoadCount - loaderBefore);
     }
 
     private sealed record GateRun(int Exit, string Out, string Err, GateAcquisition? Gate, long LoaderDelta);

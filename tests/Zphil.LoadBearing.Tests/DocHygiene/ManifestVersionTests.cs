@@ -67,16 +67,16 @@ public sealed class ManifestVersionTests
 
         return
         [
-            new VersionSite($"{PropsPath} <Version>", PropsVersion()),
+            new VersionSite($"{PropsPath} <Version>", ShouldHaveSinglePropsVersion()),
             new VersionSite(ManifestTopSite, top),
             new VersionSite(ManifestPackageSite, package),
             new VersionSite(SarifDriverSite, SarifDriverVersion())
         ];
     }
 
-    private static string PropsVersion()
+    private static string ShouldHaveSinglePropsVersion()
     {
-        XDocument props = XDocument.Load(Absolute(PropsPath));
+        XDocument props = XDocument.Load(RepoRoot.Absolute(PropsPath));
 
         var declared = props.Descendants("Version").ToArray();
         XElement version = declared.ShouldHaveSingleItem(
@@ -88,14 +88,14 @@ public sealed class ManifestVersionTests
 
     private static (string Top, string Package) ManifestVersions()
     {
-        string json = File.ReadAllText(Absolute(ManifestPath));
+        string json = File.ReadAllText(RepoRoot.Absolute(ManifestPath));
 
         using JsonDocument manifest = JsonDocument.Parse(json);
         JsonElement root = manifest.RootElement;
         JsonElement firstPackage = root.GetProperty("packages")[0];
 
-        string top = Text(root, "version", ManifestTopSite);
-        string package = Text(firstPackage, "version", ManifestPackageSite);
+        string top = ShouldHaveText(root, "version", ManifestTopSite);
+        string package = ShouldHaveText(firstPackage, "version", ManifestPackageSite);
 
         return (top, package);
     }
@@ -104,16 +104,16 @@ public sealed class ManifestVersionTests
     // leaf — the field a bump has to reach and nothing cross-checks against the tag — is read here.
     private static string SarifDriverVersion()
     {
-        string json = File.ReadAllText(Absolute(SarifGoldenPath));
+        string json = File.ReadAllText(RepoRoot.Absolute(SarifGoldenPath));
 
         using JsonDocument golden = JsonDocument.Parse(json);
         JsonElement firstRun = golden.RootElement.GetProperty("runs")[0];
         JsonElement driver = firstRun.GetProperty("tool").GetProperty("driver");
 
-        return Text(driver, "version", SarifDriverSite);
+        return ShouldHaveText(driver, "version", SarifDriverSite);
     }
 
-    private static string Text(JsonElement parent, string name, string site)
+    private static string ShouldHaveText(JsonElement parent, string name, string site)
     {
         bool found = parent.TryGetProperty(name, out JsonElement value);
         found.ShouldBeTrue($"{site} is absent, so nothing there states a version at all.");
@@ -126,13 +126,6 @@ public sealed class ManifestVersionTests
         var lines = sites.Select(static site => $"  {site.Site} -> {site.Version}");
 
         return string.Join("\n", lines);
-    }
-
-    private static string Absolute(string repoRelativePath)
-    {
-        string native = repoRelativePath.Replace('/', Path.DirectorySeparatorChar);
-
-        return Path.Combine(RepoRoot.Directory, native);
     }
 
     private sealed record VersionSite(string Site, string Version);

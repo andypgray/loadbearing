@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Caching;
 
@@ -344,10 +344,11 @@ public sealed class ExtractionCacheStoreTests
     {
         private readonly List<ProjectInputs> projects = [];
 
+        private readonly TempDirectory temp = TestTempRoot.Fresh("cache-store");
+
         public SyntheticSolution()
         {
-            Root = Path.Combine(Path.GetTempPath(), "lb-cache-tests", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(Root);
+            Root = temp.Path;
             CacheRoot = Path.Combine(Root, "cache");
             SolutionPath = Path.Combine(Root, "App.sln");
             File.WriteAllText(SolutionPath, "Microsoft Visual Studio Solution File\n");
@@ -365,14 +366,7 @@ public sealed class ExtractionCacheStoreTests
 
         public void Dispose()
         {
-            try
-            {
-                Directory.Delete(Root, true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // best-effort cleanup of the temp tree
-            }
+            temp.Dispose();
         }
 
         public void AddProject(string name, IReadOnlyList<string> references, params (string File, string Content)[] documents)
@@ -415,22 +409,11 @@ public sealed class ExtractionCacheStoreTests
         }
 
         // Set every input file's mtime well into the past so a capture stamps it promoted — the precondition
-        // for the stat fast path (the persisted-cache analog of WorkspaceSession's BackdateAllDocuments).
+        // for the stat fast path. The cache root lives inside the tree, so it is excluded: the store's own
+        // writes must keep the times it wrote them with.
         public void BackdateAll()
         {
-            DateTime wellPast = DateTime.UtcNow.AddDays(-1);
-            foreach (string file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
-            {
-                if (file.StartsWith(CacheRoot, PathComparison.Comparison)) continue;
-                try
-                {
-                    File.SetLastWriteTimeUtc(file, wellPast);
-                }
-                catch (IOException)
-                {
-                    // best-effort: a file we cannot re-stamp simply re-reads once, which the tests tolerate
-                }
-            }
+            FixtureEdits.BackdateTree(Root, CacheRoot);
         }
 
         public void MutateCacheJson(Action<JsonObject> mutate)

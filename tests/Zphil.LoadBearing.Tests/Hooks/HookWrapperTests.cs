@@ -84,7 +84,7 @@ public sealed class HookWrapperTests
 
         // 2 is how a Claude Code hook blocks, and the report on stderr is what the agent reads to self-correct.
         run.Result.ExitCode.ShouldBe(2);
-        Lines(run.Result.StandardError).ShouldContain(CannedReport);
+        run.Result.StandardError.NormalizedLines().ShouldContain(CannedReport);
     }
 
     [Theory]
@@ -97,7 +97,7 @@ public sealed class HookWrapperTests
         // Not 2: LoadBearing's own error is a config problem the user sees, not a violation the agent is
         // told to "fix".
         run.Result.ExitCode.ShouldBe(1);
-        Lines(run.Result.StandardError).ShouldStartWith("loadbearing config error:");
+        run.Result.StandardError.NormalizedLines().ShouldStartWith("loadbearing config error:");
     }
 
     [Theory]
@@ -132,10 +132,10 @@ public sealed class HookWrapperTests
     public void CommittedWrappers_ShareOneContractRegion(string family)
     {
         string[] wrappers = family == Sh ? CommittedShWrappers : CommittedPowerShellWrappers;
-        string reference = ContractRegion(wrappers[0]);
+        string reference = ShouldHaveContractRegion(wrappers[0]);
 
         foreach (string wrapper in wrappers.Skip(1))
-            ContractRegion(wrapper).ShouldBe(
+            ShouldHaveContractRegion(wrapper).ShouldBe(
                 reference,
                 $"{wrapper} has drifted from {wrappers[0]} inside the wrapper contract region. Only the three "
                 + "config defaults and the invocation line may differ between wrappers; everything from "
@@ -152,8 +152,8 @@ public sealed class HookWrapperTests
             ".claude/arch-hook.sh is absent — this checkout carries no local hook install, so the live "
             + "wrapper is outside the twin comparison on this run.");
 
-        ContractRegion(".claude/arch-hook.sh").ShouldBe(
-            ContractRegion("hooks/arch-hook.sh"),
+        ShouldHaveContractRegion(".claude/arch-hook.sh").ShouldBe(
+            ShouldHaveContractRegion("hooks/arch-hook.sh"),
             ".claude/arch-hook.sh has drifted from hooks/arch-hook.sh inside the wrapper contract region. "
             + "The local install may only differ from the committed wrapper on its invocation line (dotnet "
             + "exec on the built HEAD CLI rather than the installed global tool).");
@@ -164,7 +164,7 @@ public sealed class HookWrapperTests
     ///     of file, with the two per-repo differences flattened. Header prose above the region is per-repo by
     ///     design and stays out of the comparison.
     /// </summary>
-    private static string ContractRegion(string repoRelativePath)
+    private static string ShouldHaveContractRegion(string repoRelativePath)
     {
         string path = Path.Combine(RepoRoot.Directory, repoRelativePath.Replace('/', Path.DirectorySeparatorChar));
         string[] lines = File.ReadAllLines(path);
@@ -182,9 +182,9 @@ public sealed class HookWrapperTests
     /// </summary>
     private static string NormaliseLine(string line)
     {
-        if (ShConfigKeys.Any(key => line.StartsWith(key, StringComparison.Ordinal))) return CutAfter(line, ":-") + "<value>}\"";
+        if (ShConfigKeys.Any(key => line.StartsWith(key, StringComparison.Ordinal))) return ShouldCutAfter(line, ":-") + "<value>}\"";
 
-        if (PowerShellConfigKeys.Any(key => line.StartsWith(key, StringComparison.Ordinal))) return CutAfter(line, "else { '") + "<value>' }";
+        if (PowerShellConfigKeys.Any(key => line.StartsWith(key, StringComparison.Ordinal))) return ShouldCutAfter(line, "else { '") + "<value>' }";
 
         bool isInvocation = line.StartsWith("out=$(", StringComparison.Ordinal)
                             || line.StartsWith("$out = ", StringComparison.Ordinal);
@@ -192,7 +192,7 @@ public sealed class HookWrapperTests
         return isInvocation ? InvocationPlaceholder : line;
     }
 
-    private static string CutAfter(string line, string marker)
+    private static string ShouldCutAfter(string line, string marker)
     {
         int index = line.IndexOf(marker, StringComparison.Ordinal);
         index.ShouldBeGreaterThanOrEqualTo(0, $"Expected '{marker}' in the wrapper config line: {line}");
@@ -207,7 +207,7 @@ public sealed class HookWrapperTests
     /// </summary>
     private static HookRun Fire(string interpreter, string payload, int stubExit)
     {
-        string interpreterPath = RequireInterpreter(interpreter);
+        string interpreterPath = ShellInterpreter.Require(interpreter);
         string root = Path.Combine(TestTempRoot.For("hook-wrappers"), Guid.NewGuid().ToString("N"));
         string projectDirectory = Path.Combine(root, "project");
         string stubDirectory = Path.Combine(root, "stub");
@@ -225,7 +225,7 @@ public sealed class HookWrapperTests
         if (interpreter == Sh)
         {
             // Forward slashes: a POSIX shell on Windows takes C:/... without the backslash-escaping question.
-            startInfo.ArgumentList.Add(wrapper.Replace('\\', '/'));
+            startInfo.ArgumentList.Add(ShellInterpreter.Posix(wrapper));
         }
         else
         {
@@ -234,9 +234,8 @@ public sealed class HookWrapperTests
             startInfo.ArgumentList.Add(wrapper);
         }
 
-        startInfo.Environment["PATH"] =
-            stubDirectory + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
-        startInfo.Environment["CLAUDE_PROJECT_DIR"] = projectDirectory.Replace('\\', '/');
+        startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(stubDirectory);
+        startInfo.Environment["CLAUDE_PROJECT_DIR"] = ShellInterpreter.Posix(projectDirectory);
         startInfo.Environment["STUB_EXIT"] = stubExit.ToString(CultureInfo.InvariantCulture);
 
         // The payload goes in on stdin and the pipe closes behind it — the same closed stdin every child
@@ -249,56 +248,25 @@ public sealed class HookWrapperTests
     }
 
     /// <summary>
-    ///     Writes the stub <c>loadbearing</c> in both shapes a wrapper can reach: an extensionless
-    ///     shebang script (what a POSIX shell resolves, on every OS) and a <c>.cmd</c> (what PowerShell
-    ///     resolves on Windows, where an extensionless file is not an executable).
+    ///     Writes the stub <c>loadbearing</c> the wrappers resolve off <c>PATH</c>: it records that it ran,
+    ///     prints the canned two-line report, and exits <c>STUB_EXIT</c>.
     /// </summary>
     private static void WriteStub(string stubDirectory)
     {
-        string posix = Path.Combine(stubDirectory, "loadbearing");
-        File.WriteAllText(
-            posix,
+        ShellInterpreter.WriteExecutableStub(
+            stubDirectory,
+            "loadbearing",
             "#!/bin/sh\n"
             + $"printf 'ran\\n' > {Sentinel}\n"
             + "printf 'FAIL arch/stub-rule -- canned violation report\\n'\n"
             + "printf '  Probe.cs:10 -- second report line, so the multi-line path is covered\\n'\n"
-            + "exit \"${STUB_EXIT:-0}\"\n");
-        if (!OperatingSystem.IsWindows())
-            File.SetUnixFileMode(
-                posix,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
-                | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-
-        // echo( is the batch form that echoes leading whitespace verbatim, which the report's second line needs.
-        File.WriteAllText(
-            Path.Combine(stubDirectory, "loadbearing.cmd"),
+            + "exit \"${STUB_EXIT:-0}\"\n",
+            // echo( is the batch form that echoes leading whitespace verbatim, which the report's second line needs.
             "@echo off\r\n"
             + $"echo ran>{Sentinel}\r\n"
             + "echo(FAIL arch/stub-rule -- canned violation report\r\n"
             + "echo(  Probe.cs:10 -- second report line, so the multi-line path is covered\r\n"
             + "exit /b %STUB_EXIT%\r\n");
-    }
-
-    /// <summary>
-    ///     Resolves <paramref name="interpreter" />, and skips the test with a named reason where it is not
-    ///     installed.
-    /// </summary>
-    private static string RequireInterpreter(string interpreter)
-    {
-        string path = ShellInterpreter.Locate(interpreter) ?? string.Empty;
-        Assert.SkipWhen(
-            path.Length == 0,
-            $"'{interpreter}' is not available on this machine, so the {interpreter} wrapper arm cannot run "
-            + "here. It runs wherever the interpreter is installed, which for sh is every CI OS.");
-
-        return path;
-    }
-
-    /// <summary>Line endings only: the wrappers write LF, the Windows shells that host them write CRLF.</summary>
-    private static string Lines(string text)
-    {
-        return text.Replace("\r\n", "\n");
     }
 
     private readonly record struct HookRun(ChildProcess.ProcessResult Result, string ProjectDirectory);

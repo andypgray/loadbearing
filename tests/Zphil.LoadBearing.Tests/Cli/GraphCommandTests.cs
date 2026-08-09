@@ -97,7 +97,7 @@ public sealed class GraphCommandTests
 
         // Assert
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(ExpectedHuman));
+        result.Out.NormalizedTrimmed().ShouldBe(ExpectedHuman.NormalizedTrimmed());
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class GraphCommandTests
 
         // Assert
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(Golden()));
+        result.Out.ShouldMatchGolden("graph.json");
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class GraphCommandTests
         // Assert — the whole survey at coarser grain: every project, edge and external row still here, each
         // project's namespace inventory gone, and the grain stamped so a reader knows which document this is.
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(Golden("graph-overview.json")));
+        result.Out.ShouldMatchGolden("graph-overview.json");
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class GraphCommandTests
         // Assert — one project in the roster, both of its edges (inbound from MyApp.Domain included), and the
         // filter recorded in projectsScope so the document says what it covers.
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(Golden("graph-scoped.json")));
+        result.Out.ShouldMatchGolden("graph-scoped.json");
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public sealed class GraphCommandTests
 
         // Assert — the knobs compose: grain and scope are independent, and neither swallows the other.
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(ExpectedScopedOverviewHuman));
+        result.Out.NormalizedTrimmed().ShouldBe(ExpectedScopedOverviewHuman.NormalizedTrimmed());
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public sealed class GraphCommandTests
         // at overview grain, and the external rows replaced by their count so the document cannot be read as
         // a codebase with no external dependencies.
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe(Normalize(Golden("graph-skeleton.json")));
+        result.Out.ShouldMatchGolden("graph-skeleton.json");
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public sealed class GraphCommandTests
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
         document.RootElement.GetProperty("grain").GetString().ShouldBe("overview");
         degraded.ToString().ShouldBe(overview.ToString());
-        Normalize(degraded.ToString()).ShouldBe(Normalize(Golden("graph-overview.json")));
+        degraded.ToString().ShouldMatchGolden("graph-overview.json");
     }
 
     [Fact]
@@ -364,15 +364,5 @@ public sealed class GraphCommandTests
         string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!;
         return new GraphRequest(
             CliRunner.MyAppSolution, true, workingDirectory, false, null, false, grain, null, budget);
-    }
-
-    private static string Golden(string fileName = "graph.json")
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", fileName));
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
     }
 }

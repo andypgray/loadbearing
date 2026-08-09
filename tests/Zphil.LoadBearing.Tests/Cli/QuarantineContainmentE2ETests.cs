@@ -30,7 +30,7 @@ public sealed class QuarantineContainmentE2ETests
         using var workspace = new TempFixtureWorkspace();
         // Add a NEW inbound reference into the quarantined scope — not in the grandfather baseline → hard red.
         string homeController = workspace.PathOf("MyApp.Web", "HomeController.cs");
-        InsertMember(homeController, "    public BillingCalculator NewCalculator() => new BillingCalculator();");
+        FixtureEdits.AppendMemberLine(homeController, "    public BillingCalculator NewCalculator() => new BillingCalculator();");
 
         CliResult result = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll);
 
@@ -39,13 +39,5 @@ public sealed class QuarantineContainmentE2ETests
         result.Out.ShouldContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
         // The grandfathered InvoiceController edges stay green — not red-listed.
         result.Out.ShouldNotContain("MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator");
-    }
-
-    // Inserts a member line just before a class's final closing brace.
-    private static void InsertMember(string filePath, string member)
-    {
-        string original = File.ReadAllText(filePath);
-        int lastBrace = original.LastIndexOf('}');
-        File.WriteAllText(filePath, original.Substring(0, lastBrace) + member + "\n}\n");
     }
 }

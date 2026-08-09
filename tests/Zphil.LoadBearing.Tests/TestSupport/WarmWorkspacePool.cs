@@ -40,14 +40,16 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///     </para>
 ///     <para>
 ///         <b>Bounded.</b> At most <see cref="Capacity" /> sessions are live, evicted least-recently-used
-///         first, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Three
-///         covers the observed access pattern — a class's leased fixture copy, the shared output-tree
-///         solution, and this repo's own — without a class's alternating paths thrashing.
+///         first, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Four, not
+///         three: a leased fixture copy mints a fresh key for every class that takes one, so with three slots
+///         that churn is what does the evicting — and the victim is this repo's own solution, the single most
+///         expensive load there is (~17-24 s), between its two distant consumers. The fourth slot keeps it
+///         resident across them.
 ///     </para>
 /// </remarks>
 internal static class WarmWorkspacePool
 {
-    private const int Capacity = 3;
+    private const int Capacity = 4;
 
     private static readonly SemaphoreSlim Gate = new(1, 1);
 

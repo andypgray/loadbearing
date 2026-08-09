@@ -1,9 +1,7 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Checking.Targets;
 using Zphil.LoadBearing.Tests.Extraction;
@@ -746,17 +744,7 @@ public sealed class MemberSubjectVerbTests
                 .Enforce(arch.Namespace("App.Async.*").Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                 .Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        using JsonDocument document = JsonDocument.Parse(writer.ToString());
-        JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
-        violation.GetProperty("kind").GetString().ShouldBe("memberShape");
-        violation.GetProperty("subjectMember").GetString().ShouldBe("M:App.Async.HomeController.Save");
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("target", out _).ShouldBeFalse();
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
+        report.ShouldRenderMemberShapeViolation("memberShape", "M:App.Async.HomeController.Save");
     }
 
     [Fact]
@@ -767,10 +755,7 @@ public sealed class MemberSubjectVerbTests
         CheckReport report = Checker.Run("namespace App { public class foo {} }", arch =>
             arch.Rule("naming/x").Enforce(arch.Types.MustHavePrefix("Bar")).Because("b"));
 
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
-
-        writer.ToString().ShouldNotContain("subjectMember");
+        report.JsonReport().ShouldNotContain("subjectMember");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────

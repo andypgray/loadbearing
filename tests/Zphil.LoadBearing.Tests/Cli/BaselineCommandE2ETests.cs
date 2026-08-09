@@ -46,10 +46,10 @@ public sealed class BaselineCommandE2ETests
 
         init.ShouldSucceed("wrote");
         // --init grandfathers the current state: both controllers' DataTable sites.
-        Normalize(File.ReadAllText(file)).ShouldBe(BothPairsComposed());
+        File.ReadAllText(file).NormalizedLines().ShouldBe(BothPairsComposed());
         // --init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
         // InvoiceController's two interior references into the quarantined billing scope. (The quarantine --init e2e.)
-        Normalize(File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json")))
+        File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json")).NormalizedLines()
             .ShouldBe(ContainmentPairsComposed());
 
         // The survey ends by naming every failing Enforce rule, after the per-file lines, so a first --init
@@ -93,7 +93,7 @@ public sealed class BaselineCommandE2ETests
         accept.ShouldSucceed("accepted 1 reduction");
         accept.Out.ShouldContain("refused 1 addition");
         // The Invoice entry is gone; the section is empty (with a fresh digest).
-        Normalize(File.ReadAllText(workspace.PathOf(ConventionalFile))).ShouldBe(EmptySectionComposed());
+        File.ReadAllText(workspace.PathOf(ConventionalFile)).NormalizedLines().ShouldBe(EmptySectionComposed());
 
         // The ratchet never gated: HomeController is still red, so check still fails.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
@@ -156,10 +156,5 @@ public sealed class BaselineCommandE2ETests
         {
             [ruleId] = entries
         });
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n");
     }
 }

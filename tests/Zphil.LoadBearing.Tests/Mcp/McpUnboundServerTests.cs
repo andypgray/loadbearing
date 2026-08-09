@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
 
@@ -40,18 +41,18 @@ public sealed class McpUnboundServerTests : IDisposable
     /// <summary>Budget for the call: discovery refuses before any workspace opens, so this is generous.</summary>
     private static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(2);
 
-    private readonly string _root = Directory.CreateTempSubdirectory("loadbearing-unbound-").FullName;
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("unbound-server");
 
     public void Dispose()
     {
-        if (Directory.Exists(_root)) Directory.Delete(_root, true);
+        _temp.Dispose();
     }
 
     [Fact]
     public async Task SeveralSolutionsAtTheRoot_StartsUnboundAndSaysWhyOnBothChannels()
     {
         // The ILSpy / MathNet shape: enough .sln* at the repository root that the walk-up cannot choose.
-        AssertNoSolutionInAnyAncestor(_root);
+        AssertNoSolutionInAnyAncestor(_temp.Path);
         CreateSln("Alpha.sln");
         CreateSln("Beta.slnf");
         CreateSln("Gamma.slnx");
@@ -78,9 +79,9 @@ public sealed class McpUnboundServerTests : IDisposable
     {
         // The nopCommerce shape: nothing at the repository root, the solution under src\ — so the walk-up
         // climbs past the repository to the drive root and finds nothing at all.
-        AssertNoSolutionInAnyAncestor(_root);
-        Directory.CreateDirectory(Path.Combine(_root, "src"));
-        File.WriteAllText(Path.Combine(_root, "src", "Storefront.sln"), "");
+        AssertNoSolutionInAnyAncestor(_temp.Path);
+        Directory.CreateDirectory(_temp.PathOf("src"));
+        File.WriteAllText(_temp.PathOf("src", "Storefront.sln"), "");
 
         Conversation conversation = await ConverseAsync();
 
@@ -125,7 +126,7 @@ public sealed class McpUnboundServerTests : IDisposable
 
     private void CreateSln(string name)
     {
-        File.WriteAllText(Path.Combine(_root, name), "");
+        File.WriteAllText(_temp.PathOf(name), "");
     }
 
     /// <summary>
@@ -136,7 +137,7 @@ public sealed class McpUnboundServerTests : IDisposable
     /// </summary>
     private async Task<Conversation> ConverseAsync()
     {
-        ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(McpChildHarness.TestsBinCliDll(), _root);
+        ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(McpChildHarness.TestsBinCliDll(), _temp.Path);
 
         string? handshake = null;
         string? response = null;
@@ -179,10 +180,10 @@ public sealed class McpUnboundServerTests : IDisposable
             + $"reason at all.\nstderr:\n{diagnostics}");
         response.ShouldNotBeNull($"the arch_graph response never arrived.\nstderr:\n{diagnostics}");
 
-        return new Conversation(InstructionsOf(handshake), ToolTextOf(response), ToolIsErrorOf(response));
+        return new Conversation(ShouldHaveInstructions(handshake), ShouldHaveToolText(response), ToolIsErrorOf(response));
     }
 
-    private static string InstructionsOf(string handshake)
+    private static string ShouldHaveInstructions(string handshake)
     {
         using JsonDocument document = JsonDocument.Parse(handshake);
         document.RootElement.TryGetProperty("error", out JsonElement error)
@@ -191,7 +192,7 @@ public sealed class McpUnboundServerTests : IDisposable
         return document.RootElement.GetProperty("result").GetProperty("instructions").GetString() ?? string.Empty;
     }
 
-    private static string ToolTextOf(string response)
+    private static string ShouldHaveToolText(string response)
     {
         using JsonDocument document = JsonDocument.Parse(response);
         document.RootElement.TryGetProperty("error", out JsonElement error)

@@ -18,139 +18,43 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class BaselineAddMatcherTests
 {
-    [Fact]
-    public void ResolveEdge_ByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    [Theory]
+    [InlineData(ViolationKind.Reference, "N.A", "N.B")]
+    [InlineData(ViolationKind.Construction, "N.Factory", "N.Widget")]
+    [InlineData(ViolationKind.Injection, "N.Svc", "N.Dep")]
+    [InlineData(ViolationKind.Catch, "N.Handler", "N.Err")]
+    [InlineData(ViolationKind.Expose, "N.Facade", "N.Secret")]
+    [InlineData(ViolationKind.Throw, "N.Service", "N.Boom")]
+    public void ResolveEdge_ByFullNameSymbolIdAndMixed_ReturnsMatchingViolation(
+        ViolationKind kind, string source, string target)
     {
-        Violation edge = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());
+        // Every type-pair verb resolves on both endpoints the same way, because the second type — constructed,
+        // injected, caught, exposed or thrown — rides the Target slot exactly as a referenced one does
+        // (GRAMMAR §4.5, §4.7, §4.8, §4.9). Full name, symbol ID, and mixed all match, for all six.
+        Violation edge = Edge(kind, source, target);
         Violation[] violations = [edge];
 
-        Violation byName = BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "N.B");
-        Violation byId = BaselineAddMatcher.ResolveEdge("r", violations, "T:N.A", "T:N.B");
-        Violation mixed = BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "T:N.B");
-
-        byName.ShouldBeSameAs(edge);
-        byId.ShouldBeSameAs(edge);
-        mixed.ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, source, target).ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, $"T:{source}", $"T:{target}").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, source, $"T:{target}").ShouldBeSameAs(edge);
     }
 
-    [Fact]
-    public void ResolveEdge_ConstructionByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
+    [Theory]
+    [InlineData(ViolationKind.Reference, "N.A", "N.B")]
+    [InlineData(ViolationKind.Construction, "N.Factory", "N.Widget")]
+    [InlineData(ViolationKind.Injection, "N.Svc", "N.Dep")]
+    [InlineData(ViolationKind.Catch, "N.Handler", "N.Err")]
+    [InlineData(ViolationKind.Expose, "N.Facade", "N.Secret")]
+    [InlineData(ViolationKind.Throw, "N.Service", "N.Boom")]
+    public void ResolveEdge_NoMatch_ListsSourceArrowTargetInFullNameForm(
+        ViolationKind kind, string source, string target)
     {
-        // A construction violation resolves on both type endpoints exactly like a reference edge (the
-        // constructed type rides the Target slot, GRAMMAR §4.5) — full name, symbol ID, and mixed all match.
-        var edge = Violation.Construction(Node("N.Factory", "T:N.Factory"), Node("N.Widget", "T:N.Widget"), Array.Empty<SourceLocation>());
-        Violation[] violations = [edge];
-
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Factory", "N.Widget").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Factory", "T:N.Widget").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Factory", "T:N.Widget").ShouldBeSameAs(edge);
-    }
-
-    [Fact]
-    public void ResolveEdge_ConstructionNoMatch_ListsSourceArrowConstructedFullNameForm()
-    {
-        // FullNameForm's default arm already renders a construction candidate as `Source -> Constructed`, no
-        // code change from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
-        var edge = Violation.Construction(Node("N.Factory", "T:N.Factory"), Node("N.Widget", "T:N.Widget"), Array.Empty<SourceLocation>());
+        // FullNameForm's default arm already renders every type-pair candidate as `Source -> Target`, no code
+        // change per verb (GRAMMAR §4.3) — confirmed by the no-match candidate list, for all six.
+        Violation edge = Edge(kind, source, target);
 
         ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Factory", "N.Other"), "N.Factory -> N.Widget");
-    }
-
-    [Fact]
-    public void ResolveEdge_InjectionByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
-    {
-        // An injection violation resolves on both type endpoints exactly like a reference or construction edge
-        // (the injected parameter type rides the Target slot, GRAMMAR §4.7) — full name, symbol ID, and mixed all match.
-        Violation edge = Violation.Injection(Node("N.Svc", "T:N.Svc"), Node("N.Dep", "T:N.Dep"), Array.Empty<SourceLocation>());
-        Violation[] violations = [edge];
-
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Svc", "N.Dep").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Svc", "T:N.Dep").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Svc", "T:N.Dep").ShouldBeSameAs(edge);
-    }
-
-    [Fact]
-    public void ResolveEdge_InjectionNoMatch_ListsSourceArrowInjectedFullNameForm()
-    {
-        // FullNameForm's default arm already renders an injection candidate as `Source -> Injected`, no code
-        // change from the reference/construction form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
-        Violation edge = Violation.Injection(Node("N.Svc", "T:N.Svc"), Node("N.Dep", "T:N.Dep"), Array.Empty<SourceLocation>());
-
-        ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Svc", "N.Other"), "N.Svc -> N.Dep");
-    }
-
-    [Fact]
-    public void ResolveEdge_CatchByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
-    {
-        // A catch violation resolves on both type endpoints exactly like a reference/construction edge (the
-        // caught type rides the Target slot, GRAMMAR §4.8) — full name, symbol ID, and mixed all match.
-        Violation edge = Violation.Catch(Node("N.Handler", "T:N.Handler"), Node("N.Err", "T:N.Err"), Array.Empty<SourceLocation>());
-        Violation[] violations = [edge];
-
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Handler", "N.Err").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Handler", "T:N.Err").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Handler", "T:N.Err").ShouldBeSameAs(edge);
-    }
-
-    [Fact]
-    public void ResolveEdge_CatchNoMatch_ListsSourceArrowCaughtFullNameForm()
-    {
-        // FullNameForm's default arm already renders a catch candidate as `Source -> Caught`, no code change
-        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
-        Violation edge = Violation.Catch(Node("N.Handler", "T:N.Handler"), Node("N.Err", "T:N.Err"), Array.Empty<SourceLocation>());
-
-        ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Handler", "N.Other"), "N.Handler -> N.Err");
-    }
-
-    [Fact]
-    public void ResolveEdge_ExposeByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
-    {
-        // An expose violation resolves on both type endpoints exactly like a reference/construction edge (the
-        // exposed type rides the Target slot, GRAMMAR §4.9) — full name, symbol ID, and mixed all match.
-        Violation edge = Violation.Expose(Node("N.Facade", "T:N.Facade"), Node("N.Secret", "T:N.Secret"), Array.Empty<SourceLocation>());
-        Violation[] violations = [edge];
-
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Facade", "N.Secret").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Facade", "T:N.Secret").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Facade", "T:N.Secret").ShouldBeSameAs(edge);
-    }
-
-    [Fact]
-    public void ResolveEdge_ExposeNoMatch_ListsSourceArrowExposedFullNameForm()
-    {
-        // FullNameForm's default arm already renders an expose candidate as `Source -> Exposed`, no code change
-        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
-        Violation edge = Violation.Expose(Node("N.Facade", "T:N.Facade"), Node("N.Secret", "T:N.Secret"), Array.Empty<SourceLocation>());
-
-        ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Facade", "N.Other"), "N.Facade -> N.Secret");
-    }
-
-    [Fact]
-    public void ResolveEdge_ThrowByFullNameSymbolIdAndMixed_ReturnsMatchingViolation()
-    {
-        // A throw violation resolves on both type endpoints exactly like a reference/construction edge (the
-        // thrown type rides the Target slot, GRAMMAR §4.8) — full name, symbol ID, and mixed all match.
-        Violation edge = Violation.Throw(Node("N.Service", "T:N.Service"), Node("N.Boom", "T:N.Boom"), Array.Empty<SourceLocation>());
-        Violation[] violations = [edge];
-
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Service", "N.Boom").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "T:N.Service", "T:N.Boom").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, "N.Service", "T:N.Boom").ShouldBeSameAs(edge);
-    }
-
-    [Fact]
-    public void ResolveEdge_ThrowNoMatch_ListsSourceArrowThrownFullNameForm()
-    {
-        // FullNameForm's default arm already renders a throw candidate as `Source -> Thrown`, no code change
-        // from the reference form (GRAMMAR §4.3) — confirmed by the no-match candidate list.
-        Violation edge = Violation.Throw(Node("N.Service", "T:N.Service"), Node("N.Boom", "T:N.Boom"), Array.Empty<SourceLocation>());
-
-        ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveEdge("r", [edge], "N.Service", "N.Other"), "N.Service -> N.Boom");
+            () => BaselineAddMatcher.ResolveEdge("r", [edge], source, "N.Other"), $"{source} -> {target}");
     }
 
     [Fact]
@@ -343,6 +247,28 @@ public sealed class BaselineAddMatcherTests
             () => error.Message.ShouldContain($"  {candidate}"));
 
         return error;
+    }
+
+    /// <summary>
+    ///     One type-pair violation of <paramref name="kind" /> over synthetic endpoints — the arrange step
+    ///     the six edge verbs share, since only the factory that mints the violation differs between them.
+    /// </summary>
+    private static Violation Edge(ViolationKind kind, string source, string target)
+    {
+        TypeNode from = Node(source, $"T:{source}");
+        TypeNode to = Node(target, $"T:{target}");
+        IReadOnlyList<SourceLocation> sites = Array.Empty<SourceLocation>();
+
+        return kind switch
+        {
+            ViolationKind.Reference => Violation.Reference(from, to, sites),
+            ViolationKind.Construction => Violation.Construction(from, to, sites),
+            ViolationKind.Injection => Violation.Injection(from, to, sites),
+            ViolationKind.Catch => Violation.Catch(from, to, sites),
+            ViolationKind.Expose => Violation.Expose(from, to, sites),
+            ViolationKind.Throw => Violation.Throw(from, to, sites),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "not a type-pair edge kind")
+        };
     }
 
     private static TypeNode Node(string fullName, string symbolId)

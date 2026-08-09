@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -20,10 +21,21 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class CheckCommandE2ETests
 {
+    // The violated-spec report, run once for the whole class. A dozen facts below assert different slices
+    // of one report from a byte-identical command line, over paths that are run-stable statics and a fixture
+    // tree no fact here mutates — so re-running the check per fact bought twelve identical extractions and
+    // no isolation. The Lazy defers the run until the first fact that needs it and shares the fault if it
+    // throws; every other fact (clean spec, --sarif, --rules, missing spec) still runs its own command line.
+    private static readonly Lazy<Task<CliResult>> ViolatedHuman = new(() =>
+        CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll));
+
+    private static readonly Lazy<Task<CliResult>> ViolatedJson = new(() =>
+        CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
+
     [Fact]
     public async Task Check_ViolatedSpec_ExitsOneWithAllFourComponents()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations("FAIL layering/domain-independent");
         result.Out.ShouldContain("because: Domain is UI-agnostic; transaction boundaries live in services.");
@@ -35,7 +47,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_RatchetsMigrateRuleWithGrandfatheredInvoiceAndRedHome()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // HomeController's DataTable is new code in the old pattern — red.
@@ -49,7 +61,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsMemberUseRuleWithUsesLinesAndInitHint()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
@@ -64,7 +76,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_QuarantineContainmentRedInteriorGreenFacadeTripwireSkips()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // Uncaptured containment (its baseline path is deliberately uncommitted) → interior refs are hard red.
@@ -85,7 +97,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsCatchRuleWithCatchesLineAndInitHint()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
@@ -100,7 +112,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsThrowRuleWithThrowsLineAndAllowsDomainException()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
@@ -114,7 +126,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsUnfilteredCatchRuleAndSparesTheFilteredCatch()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
@@ -135,7 +147,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsSwallowRuleAndSparesTheRethrowingCatch()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The rethrow-aware catch half of the report (GRAMMAR §4.8), and the axis differentiator end to end.
@@ -151,7 +163,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsThrowBanRuleAlongsideTheThrowAllowList()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
@@ -170,7 +182,7 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpec_ReportsExposeRuleWithExposesLinesAndInitHint()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldReportViolations();
         // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
@@ -197,10 +209,10 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpecJson_MatchesGolden()
     {
-        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        CliResult result = await ViolatedJson.Value;
 
         result.ShouldReportViolations();
-        Normalize(result.Out).ShouldBe(Normalize(Golden()));
+        result.Out.ShouldMatchGolden("violated-check.json");
     }
 
     [Fact]
@@ -209,19 +221,14 @@ public sealed class CheckCommandE2ETests
         // The SARIF render target over the same result model: one result per violation site, red errors and
         // grandfathered notes, solution-relative paths. The golden is temp-path-independent because every URI
         // is resolved against SRCROOT, so the temp file the run writes to never leaks into the document.
-        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
-        try
-        {
-            CliResult result = await CliRunner.InvokeAsync(
-                "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
+        using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
+        string sarifPath = temp.PathOf("violated-check.sarif");
 
-            result.ShouldReportViolations();
-            Normalize(File.ReadAllText(sarifPath)).ShouldBe(Normalize(GoldenSarif()));
-        }
-        finally
-        {
-            File.Delete(sarifPath);
-        }
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
+
+        result.ShouldReportViolations();
+        File.ReadAllText(sarifPath).ShouldMatchGolden("violated-check.sarif");
     }
 
     [Fact]
@@ -229,22 +236,17 @@ public sealed class CheckCommandE2ETests
     {
         // --json owns stdout. --sarif writes its report to the file, and the human-mode `wrote <path>` line is
         // suppressed under --json, so a hook still parses a single JSON document off stdout.
-        string sarifPath = Path.Combine(Path.GetTempPath(), $"loadbearing-sarif-{Guid.NewGuid():N}.sarif");
-        try
-        {
-            CliResult result = await CliRunner.InvokeAsync(
-                "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--sarif", sarifPath);
+        using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
+        string sarifPath = temp.PathOf("violated-check.sarif");
 
-            result.ShouldReportViolations();
-            using JsonDocument _ = result.ShouldHaveJsonStdout();
-            result.Out.ShouldNotContain("wrote");
-            File.Exists(sarifPath).ShouldBeTrue();
-            File.ReadAllText(sarifPath).ShouldContain("\"$schema\"");
-        }
-        finally
-        {
-            File.Delete(sarifPath);
-        }
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--sarif", sarifPath);
+
+        result.ShouldReportViolations();
+        using JsonDocument _ = result.ShouldHaveJsonStdout();
+        result.Out.ShouldNotContain("wrote");
+        File.Exists(sarifPath).ShouldBeTrue();
+        File.ReadAllText(sarifPath).ShouldContain("\"$schema\"");
     }
 
     [Fact]
@@ -310,8 +312,7 @@ public sealed class CheckCommandE2ETests
     public async Task Check_UnfilteredJson_OmitsTheRulesFilterEntirely()
     {
         // Act
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        CliResult result = await ViolatedJson.Value;
 
         // Assert — the slot is additive: absent, not empty, so a whole-spec document is byte-identical to the
         // one before --rules existed (which the golden above pins).
@@ -336,27 +337,12 @@ public sealed class CheckCommandE2ETests
         result.Out.ShouldBeEmpty();
     }
 
-    private static string Golden()
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "violated-check.json"));
-    }
-
-    private static string GoldenSarif()
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "violated-check.sarif"));
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
-    }
-
     // One rule's block out of the human report: its marker line plus the indented lines under it. Needed
     // wherever an assertion is an ABSENCE — a type named by one rule and not another is invisible to a
     // whole-report ShouldNotContain.
     private static string RuleBlock(string report, string ruleId)
     {
-        string[] lines = Normalize(report).Split('\n');
+        string[] lines = report.NormalizedTrimmed().Split('\n');
         int start = Array.FindIndex(lines, line => line.Contains($" {ruleId} —", StringComparison.Ordinal));
         start.ShouldBeGreaterThanOrEqualTo(0, $"the report names no rule {ruleId}");
 

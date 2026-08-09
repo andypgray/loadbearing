@@ -264,7 +264,7 @@ public sealed class SarifReportRendererTests
     {
         // A grandfathered Migrate violation whose baseline entry has no `because`: the suppression falls back to
         // the generic `grandfathered in {conventional baseline path}` justification (note level, unchanged state).
-        BaselineIndex index = Index("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
         CheckReport report = Checker.Run(OneController, index, NoDataAccess);
 
         string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
@@ -289,7 +289,7 @@ public sealed class SarifReportRendererTests
         // suppression justification is the operator's own `because`, not the generic fallback.
         const string because = "Legacy Active Record; scheduled for removal in Q3.";
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db").WithBecause(because);
-        CheckReport report = Checker.Run(OneController, Index("data/x", entry), NoDataAccess);
+        CheckReport report = Checker.Run(OneController, Checker.Baselines("data/x", entry), NoDataAccess);
 
         string json = SarifReportRenderer.Serialize(report, SolutionDir, true, []);
 
@@ -313,14 +313,6 @@ public sealed class SarifReportRendererTests
                 "Controllers open the data layer directly (legacy Active Record style).",
                 arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("Repository pattern for testability.");
-    }
-
-    private static BaselineIndex Index(string ruleId, params BaselineEntry[] entries)
-    {
-        return new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            [ruleId] = new(entries)
-        });
     }
 
     // A metadata-only ArchRule (no constraint/migrate/quarantine payload) for hand-built reports — the renderer's

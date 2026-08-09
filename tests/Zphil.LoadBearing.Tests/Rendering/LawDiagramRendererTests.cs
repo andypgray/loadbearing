@@ -74,7 +74,7 @@ public sealed class LawDiagramRendererTests
     public void Block_TheTwoBanVerbs_PointInOppositeDirections()
     {
         // Arrange — the same two places, said from each end.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
                 .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*"))).Because("x");
@@ -94,7 +94,7 @@ public sealed class LawDiagramRendererTests
     {
         // Arrange — both verbs name their own subject in the allowed list, which is the permission for a
         // place to reference itself.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
                 .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("A.*"), arch.Namespace("B.*")))
@@ -115,7 +115,7 @@ public sealed class LawDiagramRendererTests
     public void Block_AMigrateRule_SwitchesTheSameEdgeToGrandfatheredDebt()
     {
         // Arrange — one banned relation and one exposure, each as Migrate rather than Enforce.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/ban")
                 .Migrate("Callers reach across.", arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*")))
@@ -140,7 +140,7 @@ public sealed class LawDiagramRendererTests
     {
         // Arrange — containment desugars to MustOnlyBeReferencedBy, so a triage that reached the verb
         // switch would draw the scope's box AND an "only" edge saying the same thing twice.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Scope("legacy/pricing")
                 .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
                 .BoundaryOnlyVia(typeof(IPricingFacade), typeof(PricingFacade))
@@ -169,7 +169,7 @@ public sealed class LawDiagramRendererTests
     public void Block_AHermeticScope_IsARectangleCarryingTheSameLabel()
     {
         // Arrange — no sanctioned surface at all, so there is nothing to draw inside the box.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Scope("legacy/pricing")
                 .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
                 .Dragons("Rounding happens at line-item level.")
@@ -186,7 +186,7 @@ public sealed class LawDiagramRendererTests
     public void Block_TheTripwire_DrawsNothingAndIsListed()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Scope("legacy/pricing")
                 .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
                 .Dragons("Rounding happens at line-item level.")
@@ -206,7 +206,7 @@ public sealed class LawDiagramRendererTests
     public void Block_AUnionSubject_IsListedAndNeverReadsTheNoun()
     {
         // Arrange — UnionSelection.Noun throws by design; this rendering at all is the pin.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/union")
                 .Enforce(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*"))
                     .MustNotReference(arch.Namespace("C.*")))
@@ -224,7 +224,7 @@ public sealed class LawDiagramRendererTests
     public void Block_APartialRule_DrawsItsPlaceEdgesAndIsAlsoListed()
     {
         // Arrange — one operand is a place and the other is a union, which is not.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/mixed")
                 .Enforce(arch.Namespace("A.*").MustNotReference(
                     arch.Namespace("B.*"),
@@ -243,7 +243,7 @@ public sealed class LawDiagramRendererTests
     public void Block_ANamespaceInsideAnother_IsDrawnInsideIt()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/one").Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("Z.*"))).Because("x");
             arch.Rule("r/two").Enforce(arch.Namespace("A.B.*").MustNotReference(arch.Namespace("Z.*"))).Because("x");
@@ -275,7 +275,7 @@ public sealed class LawDiagramRendererTests
     {
         // Arrange — `A.B.C.*` sits inside both `A.*` and the two-glob Split layer, and neither of those
         // contains the other, so there is no most-specific answer to nest under.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             Layer wide = arch.Layer("Wide", "A.*");
             Layer split = arch.Layer("Split", "A.B.*", "Q.*");
@@ -310,7 +310,7 @@ public sealed class LawDiagramRendererTests
     public void Block_ASingleGlobLayerAndItsGlob_DrawOneNodeUnderTheLayerName()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             Layer web = arch.Layer("Web", "MyApp.Web.*");
             arch.Rule("r/one").Enforce(web.MustNotReference(arch.Namespace("Z.*"))).Because("x");
@@ -365,7 +365,7 @@ public sealed class LawDiagramRendererTests
     public void Block_APlaceNamedForAMermaidToken_NeverEmitsItAsANodeId(string reserved, string expectedId)
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Project(reserved).MustNotReference(arch.Namespace("Z.*"))).Because("x"));
 
@@ -383,7 +383,7 @@ public sealed class LawDiagramRendererTests
     {
         // Arrange — a generic type's angle brackets would open markup inside an HTML label, and '#' opens
         // an entity reference. All go out as the entity Mermaid reads back as the character itself.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Namespace("A.*").MustNotReference(typeof(List<string>))).Because("x"));
 
@@ -399,7 +399,7 @@ public sealed class LawDiagramRendererTests
     public void Block_ALawWithNothingPlaceable_DrawsThePlaceholderNode()
     {
         // Arrange — a naming rule has no direction to draw.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("naming/interfaces")
                 .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I")).Because("x"));
 
@@ -416,7 +416,7 @@ public sealed class LawDiagramRendererTests
     public void Block_TheCompactList_TagsEveryNonEnforcePostureAndIsEmDashFree()
     {
         // Arrange — one of each posture that cannot be drawn.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("naming/interfaces")
                 .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I")).Because("x");
@@ -462,7 +462,7 @@ public sealed class LawDiagramRendererTests
     // naming rule with no direction, and a quarantined scope with one facade.
     private static ArchitectureModel WholeDrawingSpec()
     {
-        return Build(arch =>
+        return Checker.Model(arch =>
         {
             Layer domain = arch.Layer("Domain", "Shop.Domain.*");
             Layer web = arch.Layer("Web", "Shop.Web.*");
@@ -495,11 +495,6 @@ public sealed class LawDiagramRendererTests
                 .Dragons("Rounding happens at line-item level.")
                 .Because("Replacement scheduled; not worth stabilizing.");
         });
-    }
-
-    private static ArchitectureModel Build(Action<Arch> define)
-    {
-        return ArchModelBuilder.Build(new InlineSpec(define));
     }
 
     // The diagram's node, edge and legend lines, unindented: everything between the accDescr directive and

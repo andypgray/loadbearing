@@ -245,7 +245,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CallToolResult refused = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
 
         refused.IsError.ShouldBe(true);
-        string refusal = TextOf(refused);
+        string refusal = refused.ShouldHaveTextContent();
         refusal.ShouldContain("the model is incomplete");
         refusal.ShouldContain("BrokenApp.Contracts.csproj"); // the evidence, inline: there is no stderr here
         refusal.ShouldContain("Restore and build the solution first");
@@ -258,7 +258,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "arch_graph", new Dictionary<string, object?> { ["allowWorkspaceDiagnostics"] = true }, cancellationToken: Ct);
 
         surveyed.IsError.ShouldNotBe(true);
-        string survey = TextOf(surveyed);
+        string survey = surveyed.ShouldHaveTextContent();
         survey.ShouldContain("BrokenApp.Core");
         survey.ShouldContain("\"modelIncomplete\": true");
         survey.ShouldContain("\"workspaceDiagnostics\"");
@@ -293,10 +293,5 @@ public sealed class PartialLoadWorkspaceE2ETests
                            && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
             .Order(StringComparer.Ordinal)
             .ToArray();
-    }
-
-    private static string TextOf(CallToolResult result)
-    {
-        return ((TextContentBlock)result.Content.Single()).Text;
     }
 }

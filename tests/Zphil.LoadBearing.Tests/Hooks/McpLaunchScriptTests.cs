@@ -192,11 +192,7 @@ public sealed class McpLaunchScriptTests
         /// <summary>Runs the committed launcher with <paramref name="serverArguments" /> to pass through.</summary>
         internal ChildProcess.ProcessResult Launch(params string[] serverArguments)
         {
-            string shell = ShellInterpreter.Locate(ShellInterpreter.Sh) ?? string.Empty;
-            Assert.SkipWhen(
-                shell.Length == 0,
-                "'sh' is not available on this machine, so the launcher cannot be run here. It runs wherever a "
-                + "POSIX shell is installed, which is every CI OS.");
+            string shell = ShellInterpreter.Require(ShellInterpreter.Sh);
 
             File.Delete(_argumentsFile);
 
@@ -205,15 +201,14 @@ public sealed class McpLaunchScriptTests
                 // Not the project directory: the launcher has to reach CLAUDE_PROJECT_DIR itself.
                 WorkingDirectory = Root
             };
-            startInfo.ArgumentList.Add(Posix(Path.Combine(RepoRoot.Directory, "hooks", "mcp-launch.sh")));
+            startInfo.ArgumentList.Add(ShellInterpreter.Posix(RepoRoot.Absolute("hooks/mcp-launch.sh")));
             foreach (string argument in serverArguments) startInfo.ArgumentList.Add(argument);
 
-            startInfo.Environment["PATH"] =
-                _stubDirectory + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
-            startInfo.Environment["CLAUDE_PROJECT_DIR"] = Posix(ProjectDirectory);
+            startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(_stubDirectory);
+            startInfo.Environment["CLAUDE_PROJECT_DIR"] = ShellInterpreter.Posix(ProjectDirectory);
             startInfo.Environment["LOADBEARING_MCP_BUILD_OUTPUT"] = BuildOutput;
-            startInfo.Environment["LOADBEARING_MCP_RUN_ROOT"] = Posix(RunRoot);
-            startInfo.Environment["LOADBEARING_TEST_EXECED_ARGUMENTS"] = Posix(_argumentsFile);
+            startInfo.Environment["LOADBEARING_MCP_RUN_ROOT"] = ShellInterpreter.Posix(RunRoot);
+            startInfo.Environment["LOADBEARING_TEST_EXECED_ARGUMENTS"] = ShellInterpreter.Posix(_argumentsFile);
 
             return ChildProcess.Run(startInfo, TimeSpan.FromMinutes(1));
         }
@@ -235,34 +230,21 @@ public sealed class McpLaunchScriptTests
         /// <summary>The server the launcher should have execed: the one file inside the single staged copy.</summary>
         internal string StagedServerDll()
         {
-            return Posix(Path.Combine(StagedDirectories().Single(), ServerDll));
+            return ShellInterpreter.Posix(Path.Combine(StagedDirectories().Single(), ServerDll));
         }
 
         /// <summary>
-        ///     Writes the stub <c>dotnet</c>: an extensionless shebang script, which is what a POSIX shell
-        ///     resolves on every OS. It records its argument vector and exits, so no server is ever started.
+        ///     Writes the stub <c>dotnet</c>: it records its argument vector and exits, so no server is ever
+        ///     started. Only the POSIX shape — the launcher is a <c>.sh</c>, so nothing resolves a
+        ///     <c>.cmd</c> twin here.
         /// </summary>
         private void WriteStubDotnet()
         {
-            string stub = Path.Combine(_stubDirectory, "dotnet");
-            File.WriteAllText(
-                stub,
+            ShellInterpreter.WriteExecutableStub(
+                _stubDirectory,
+                "dotnet",
                 "#!/bin/sh\n"
                 + "printf '%s\\n' \"$@\" > \"$LOADBEARING_TEST_EXECED_ARGUMENTS\"\n");
-
-            if (!OperatingSystem.IsWindows())
-                File.SetUnixFileMode(
-                    stub,
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                    | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
-                    | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-
-        // Forward slashes throughout: a POSIX shell takes C:/... as a path, while a backslash inside it is an
-        // escape character rather than a separator.
-        private static string Posix(string path)
-        {
-            return path.Replace('\\', '/');
         }
     }
 }

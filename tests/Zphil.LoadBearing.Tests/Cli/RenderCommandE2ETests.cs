@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -171,7 +172,7 @@ public sealed class RenderCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
+        result.Out.NormalizedTrimmed().ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllText(RootAgents).ShouldBe(Wrap(RootBody, "\n"));
         File.ReadAllText(ScopeAgents).ShouldBe(Wrap(ScopeBody, "\n"));
     }
@@ -187,7 +188,7 @@ public sealed class RenderCommandE2ETests
         CliResult second = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
         second.ShouldSucceed();
-        Normalize(second.Out).ShouldBe("unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
+        second.Out.NormalizedTrimmed().ShouldBe("unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllBytes(RootAgents).ShouldBe(rootFirst);
         File.ReadAllBytes(ScopeAgents).ShouldBe(scopeFirst);
     }
@@ -222,7 +223,7 @@ public sealed class RenderCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
 
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe("wrote AGENTS.md");
+        result.Out.NormalizedTrimmed().ShouldBe("wrote AGENTS.md");
         File.Exists(ScopeAgents).ShouldBeFalse();
     }
 
@@ -236,7 +237,7 @@ public sealed class RenderCommandE2ETests
         result.ShouldSucceed();
         // Root first, then the layer files (declaration order: Web before Billing), then the Billing
         // directory whose layer + quarantine units merged into one wrote-line.
-        Normalize(result.Out).ShouldBe(
+        result.Out.NormalizedTrimmed().ShouldBe(
             "wrote AGENTS.md\nwrote MyApp.Web/AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllText(RootAgents).ShouldBe(Wrap(LayerRootBody, "\n"));
         File.ReadAllText(WebAgents).ShouldBe(Wrap(WebCardBody, "\n"));
@@ -252,7 +253,7 @@ public sealed class RenderCommandE2ETests
         CliResult second = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.LayerSpecDll);
 
         second.ShouldSucceed();
-        Normalize(second.Out).ShouldBe(
+        second.Out.NormalizedTrimmed().ShouldBe(
             "unchanged AGENTS.md\nunchanged MyApp.Web/AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
     }
 
@@ -266,7 +267,7 @@ public sealed class RenderCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        Normalize(result.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
+        result.Out.NormalizedTrimmed().ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.Exists(WebAgents).ShouldBeFalse();
         File.Exists(DomainAgents).ShouldBeFalse();
     }
@@ -282,14 +283,14 @@ public sealed class RenderCommandE2ETests
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
         first.ShouldSucceed();
-        Normalize(first.Out).ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote ARCHITECTURE.md");
-        Normalize(File.ReadAllText(Architecture)).ShouldBe(Normalize(GoldenDiagram()));
+        first.Out.NormalizedTrimmed().ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote ARCHITECTURE.md");
+        File.ReadAllText(Architecture).ShouldMatchGolden("diagram.md");
 
         CliResult second = await CliRunner.InvokeAsync(
             "render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
         second.ShouldSucceed();
-        Normalize(second.Out).ShouldBe(
+        second.Out.NormalizedTrimmed().ShouldBe(
             "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\nunchanged ARCHITECTURE.md");
     }
 
@@ -317,11 +318,6 @@ public sealed class RenderCommandE2ETests
         result.ShouldRefuseWith("--diagram-only and --diagram-exclude apply only with --diagram <path>.");
     }
 
-    private static string GoldenDiagram()
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Cli", "Golden", "diagram.md"));
-    }
-
     private static string Wrap(string body, string nl)
     {
         return $"<!-- loadbearing:begin -->{nl}{body.Replace("\n", nl)}{nl}<!-- loadbearing:end -->{nl}";
@@ -347,10 +343,5 @@ public sealed class RenderCommandE2ETests
         foreach (string path in paths)
             if (File.Exists(path))
                 File.Delete(path);
-    }
-
-    private static string Normalize(string value)
-    {
-        return value.Replace("\r\n", "\n").Trim();
     }
 }

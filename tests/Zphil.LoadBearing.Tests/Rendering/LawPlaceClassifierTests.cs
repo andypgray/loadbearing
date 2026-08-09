@@ -18,7 +18,7 @@ public sealed class LawPlaceClassifierTests
     public void IsDrawableVerb_TheFourDirectionVerbsAndExpose_AreDrawable()
     {
         // Arrange — one rule per drawable verb, in one model.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/not-reference")
                 .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*"))).Because("x");
@@ -41,7 +41,7 @@ public sealed class LawPlaceClassifierTests
     {
         // Arrange — a verb that constrains what a type IS rather than what it may reach has no direction,
         // and an arrow would misrepresent it.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/prefix").Enforce(arch.Namespace("A.*").MustHavePrefix("I")).Because("x");
             arch.Rule("r/sealed").Enforce(arch.Namespace("A.*").MustBeSealed()).Because("x");
@@ -57,7 +57,7 @@ public sealed class LawPlaceClassifierTests
     public void SubjectPlace_ALayer_IsAPlaceUnderTheLayerName()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             Layer domain = arch.Layer("Domain", "MyApp.Domain.*", "MyApp.Shared.*");
             arch.Rule("r/one").Enforce(domain.MustNotReference(arch.Namespace("B.*"))).Because("x");
@@ -79,7 +79,7 @@ public sealed class LawPlaceClassifierTests
     public void SubjectPlace_ASingleGlobLayerAndItsGlob_CollapseToOnePlace()
     {
         // Arrange — one rule names the layer, the next names the glob that defines it.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             Layer web = arch.Layer("Web", "MyApp.Web.*");
             arch.Rule("r/one").Enforce(web.MustNotReference(arch.Namespace("B.*"))).Because("x");
@@ -104,7 +104,7 @@ public sealed class LawPlaceClassifierTests
     public void SubjectPlace_ANamespaceOutsideEveryLayer_IsAPlaceUnderItsGlob()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Namespace("Microsoft.Build.*").MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
@@ -123,7 +123,7 @@ public sealed class LawPlaceClassifierTests
     public void SubjectPlace_AProject_IsAPlaceWithNoGlobs()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Project("MyApp.Web").MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
@@ -141,7 +141,7 @@ public sealed class LawPlaceClassifierTests
     public void Place_ASingleType_IsAnOperandPlaceAndNotASubjectPlace()
     {
         // Arrange
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Namespace("A.*").MustNotReference(typeof(Environment)))
                 .Because("x"));
@@ -163,7 +163,7 @@ public sealed class LawPlaceClassifierTests
     {
         // Arrange — the other adjectives narrow which types inside the region are governed, which is not a
         // question of where, so they never move the node.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Types.InNamespace("MyApp.Web.*").OfKind(TypeKind.Interface)
                     .Except(arch.Types.WithNameMatching("Legacy*"))
@@ -183,7 +183,7 @@ public sealed class LawPlaceClassifierTests
     {
         // Arrange — bare `arch.Types` is the whole solution, and two InNamespace adjectives are an
         // intersection of regions whose honest node is none.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/bare").Enforce(arch.Types.MustNotReference(arch.Namespace("B.*"))).Because("x");
             arch.Rule("r/two")
@@ -201,7 +201,7 @@ public sealed class LawPlaceClassifierTests
     {
         // Arrange — UnionSelection.Noun throws by design; the guard runs before any question about the
         // noun, so this returning null rather than throwing IS the pin.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*"))
                     .MustNotReference(arch.Namespace("C.*")))
@@ -218,18 +218,13 @@ public sealed class LawPlaceClassifierTests
     public void SubjectPlace_ARegistration_IsNoPlace()
     {
         // Arrange — a registration is a lifetime rather than a location.
-        ArchitectureModel model = Build(arch =>
+        ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.Registered(Lifetime.Singleton).MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
 
         // Act + Assert
         LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers).ShouldBeNull();
-    }
-
-    private static ArchitectureModel Build(Action<Arch> define)
-    {
-        return ArchModelBuilder.Build(new InlineSpec(define));
     }
 
     private static Selection Subject(ArchitectureModel model, int rule = 0)

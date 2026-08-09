@@ -11,81 +11,22 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 /// </summary>
 public sealed class CodebaseExtractorTypeTests
 {
-    [Fact]
-    public void ExtractFromCompilations_Record_MapsToClassKind()
+    // The kind mapping is one claim per declaration form, so the seven forms ride one arm. Records and static
+    // classes collapse onto Class, record structs onto Struct — the model carries no separate kind for either.
+    [Theory]
+    [InlineData("public record R(int X);", "N.R", TypeKind.Class)]
+    [InlineData("public record struct RS(int X);", "N.RS", TypeKind.Struct)]
+    [InlineData("public static class SC {}", "N.SC", TypeKind.Class)]
+    [InlineData("public enum E { A, B }", "N.E", TypeKind.Enum)]
+    [InlineData("public delegate void D();", "N.D", TypeKind.Delegate)]
+    [InlineData("public interface I {}", "N.I", TypeKind.Interface)]
+    [InlineData("public struct S {}", "N.S", TypeKind.Struct)]
+    public void ExtractFromCompilations_TypeDeclaration_MapsToDeclaredKind(
+        string declaration, string fullName, TypeKind kind)
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public record R(int X);
-                                                         """);
+        CodebaseModel model = CompilationFactory.Extract($"namespace N;\n{declaration}");
 
-        model.Type("N.R").Kind.ShouldBe(TypeKind.Class);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_RecordStruct_MapsToStructKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public record struct RS(int X);
-                                                         """);
-
-        model.Type("N.RS").Kind.ShouldBe(TypeKind.Struct);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_StaticClass_MapsToClassKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public static class SC {}
-                                                         """);
-
-        model.Type("N.SC").Kind.ShouldBe(TypeKind.Class);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_Enum_MapsToEnumKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public enum E { A, B }
-                                                         """);
-
-        model.Type("N.E").Kind.ShouldBe(TypeKind.Enum);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_Delegate_MapsToDelegateKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public delegate void D();
-                                                         """);
-
-        model.Type("N.D").Kind.ShouldBe(TypeKind.Delegate);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_Interface_MapsToInterfaceKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface I {}
-                                                         """);
-
-        model.Type("N.I").Kind.ShouldBe(TypeKind.Interface);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_Struct_MapsToStructKind()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public struct S {}
-                                                         """);
-
-        model.Type("N.S").Kind.ShouldBe(TypeKind.Struct);
+        model.Type(fullName).Kind.ShouldBe(kind);
     }
 
     [Fact]

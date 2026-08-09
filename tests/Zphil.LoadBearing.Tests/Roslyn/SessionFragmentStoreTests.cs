@@ -68,7 +68,7 @@ public sealed class SessionFragmentStoreTests
 
         // Act — append a new type to a Web source file (a content edit the sweep folds in place), then re-get.
         string webFile = fixture.PathOf(Web, "WebTextExtensions.cs");
-        EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
+        FixtureEdits.EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, Ct);
 
@@ -127,15 +127,5 @@ public sealed class SessionFragmentStoreTests
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
         ModelDump.Render(mergedExcluded).ShouldBe(ModelDump.Render(coldExcluded));
-    }
-
-    // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
-
-    private static void EditOnDisk(string path, Func<string, string> transform)
-    {
-        string content = File.ReadAllText(path);
-        File.WriteAllText(path, transform(content));
-        // A future mtime guarantees the sweep sees a delta against the load-time fingerprint.
-        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(2));
     }
 }

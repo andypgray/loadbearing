@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Caching;
 
@@ -149,14 +150,7 @@ public sealed class AtomicFileTests
 
     private static void WithTempDir(Action<string> body)
     {
-        DirectoryInfo dir = Directory.CreateTempSubdirectory("lb-atomic-");
-        try
-        {
-            body(dir.FullName);
-        }
-        finally
-        {
-            dir.Delete(true);
-        }
+        using TempDirectory temp = TestTempRoot.Fresh("atomic-file");
+        body(temp.Path);
     }
 }
