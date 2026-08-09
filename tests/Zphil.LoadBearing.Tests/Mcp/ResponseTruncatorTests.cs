@@ -5,16 +5,29 @@ using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
-///     The response cap (<see cref="ResponseTruncator" />): the token-budget → char-cap conversion and the
-///     truncate-at-last-newline behavior. Tool-specific narrowing-hint rows are deliberately absent — the
-///     <c>arch_*</c> tools have no per-tool hint, so the footer always ends the same way.
+///     The response cap (<see cref="ResponseTruncator" />): the token-budget → char-cap conversion, the
+///     truncate-at-last-newline behavior, and the per-tool narrowing hint the footer carries. Truncation is
+///     the backstop, not the answer — the tools that can narrow themselves say so here, and the ones with no
+///     knob deliberately say nothing, because a hint naming nothing is noise at the moment a reader is
+///     looking for something to do.
 /// </summary>
 public sealed class ResponseTruncatorTests
 {
+    private const string GraphHint =
+        "Narrow the subject rather than read half a survey: the grain ladder is already exhausted, so "
+        + "projects: \"<name globs>\" surveys part of the solution and is the knob left. On the CLI, "
+        + "loadbearing graph --projects <globs> --json, or redirect loadbearing graph --json to a file "
+        + "and slice it there.";
+
+    private const string CheckHint =
+        "Narrow the call rather than read half a report: rules: \"<rule-id globs>\" checks a subset, and "
+        + "arch_explain returns one rule whole. For the report entire, redirect "
+        + "loadbearing check --json to a file and slice it there.";
+
     [Fact]
     public void ComputeMaxChars_NullValue_ReturnsDefault()
     {
-        ResponseTruncator.ComputeMaxChars(null).ShouldBe(25_000);
+        ResponseTruncator.ComputeMaxChars(null).ShouldBe(62_500);
     }
 
     [Theory]
@@ -25,7 +38,7 @@ public sealed class ResponseTruncatorTests
     [InlineData("-100")]
     public void ComputeMaxChars_BlankUnparseableOrNonPositive_ReturnsDefault(string value)
     {
-        ResponseTruncator.ComputeMaxChars(value).ShouldBe(25_000);
+        ResponseTruncator.ComputeMaxChars(value).ShouldBe(62_500);
     }
 
     [Theory]
@@ -83,7 +96,7 @@ public sealed class ResponseTruncatorTests
     }
 
     [Fact]
-    public void TruncateIfNeeded_TextExceedsLimit_FooterReportsSizeAndOmittedCountAndNoHint()
+    public void TruncateIfNeeded_TextExceedsLimit_FooterReportsSizeAndOmittedCountAndTheToolHint()
     {
         string text = new('x', 50);
 
@@ -92,7 +105,44 @@ public sealed class ResponseTruncatorTests
         result.ShouldContain("--- RESPONSE TRUNCATED ---");
         result.ShouldContain("Output was 50 characters, limit is 20");
         result.ShouldContain("30 characters omitted");
-        // No per-tool narrowing hint — the footer ends here.
+        result.ShouldContain("The results above are incomplete.");
+        // The narrowing hint is the last thing a reader sees, because it is the only actionable line here.
+        result.ShouldEndWith(CheckHint);
+    }
+
+    [Fact]
+    public void TruncateIfNeeded_GraphTool_FooterNamesBothKnobsAndTheirCliTwins()
+    {
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "arch_graph", 20);
+
+        result.ShouldEndWith($"The results above are incomplete.\n{GraphHint}");
+    }
+
+    [Fact]
+    public void TruncateIfNeeded_CheckTool_FooterNamesTheRulesKnobAndTheSingleRuleTool()
+    {
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "arch_check", 20);
+
+        result.ShouldEndWith($"The results above are incomplete.\n{CheckHint}");
+    }
+
+    [Theory]
+    [InlineData("arch_status")]
+    [InlineData("arch_explain")]
+    [InlineData("arch_context")]
+    public void TruncateIfNeeded_ToolWithNoNarrowingKnob_FooterEndsWithoutAHint(string toolName)
+    {
+        // Nothing to name: these three take no filter, so the footer stops at the incompleteness itself.
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
+
+        result.ShouldEndWith("The results above are incomplete.");
+    }
+
+    [Fact]
+    public void TruncateIfNeeded_UnknownToolName_FooterEndsWithoutAHint()
+    {
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "some_other_tool", 20);
+
         result.ShouldEndWith("The results above are incomplete.");
     }
 }

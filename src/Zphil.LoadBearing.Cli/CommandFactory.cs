@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Zphil.LoadBearing.Cli.Mcp;
+using Zphil.LoadBearing.Cli.Rendering;
 
 namespace Zphil.LoadBearing.Cli;
 
@@ -52,6 +53,13 @@ internal static class CommandFactory
             Description =
                 "Write a SARIF 2.1.0 report to <path> (GitHub code scanning et al.); human/--json output is unchanged."
         };
+        Option<string?> rules = new("--rules")
+        {
+            Description =
+                "Check only the rules whose ID matches these globs (semicolon-separated, '*' allowed and it "
+                + "spans '/'); the report, the summary counts and the 0/1 verdict then cover that subset alone. "
+                + "A filter matching no rule refuses the run (exit 2) and lists the available rule IDs."
+        };
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
@@ -66,6 +74,7 @@ internal static class CommandFactory
             diffBase,
             allowWorkspaceDiagnostics,
             sarif,
+            rules,
             noCache,
             binlog
         };
@@ -81,7 +90,8 @@ internal static class CommandFactory
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
-                parseResult.GetValue(sarif));
+                parseResult.GetValue(sarif),
+                parseResult.GetValue(rules));
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
@@ -315,6 +325,27 @@ internal static class CommandFactory
             "Survey the partial model even when some projects fail to load, instead of refusing with exit 2.");
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
+        Option<bool> overview = new("--overview")
+        {
+            Description =
+                "Summarize at overview grain: the whole survey with each project's namespace inventory elided "
+                + "— coarser, not narrower."
+        };
+        Option<bool> skeleton = new("--skeleton")
+        {
+            Description =
+                "Summarize at skeleton grain: the structural spine only — every project with its declared "
+                + "references and type count, and the observed project edges. Namespace inventories and "
+                + "external references are both elided, the latter reported as a count. Coarser than "
+                + "--overview, and still not narrower."
+        };
+        Option<string?> projects = new("--projects")
+        {
+            Description =
+                "Survey only the projects matching these name globs (semicolon-separated, '*' allowed); "
+                + "references in both directions are kept, so an edge can name a project outside the scope. "
+                + "A filter matching no project refuses the survey (exit 2) and lists the available names."
+        };
 
         // Deliberately no --spec: the survey is a property of the codebase, and derive runs before any
         // spec exists (a spec project, once present, appears here as an ordinary project).
@@ -328,7 +359,10 @@ internal static class CommandFactory
             json,
             allowWorkspaceDiagnostics,
             noCache,
-            binlog
+            binlog,
+            overview,
+            skeleton,
+            projects
         };
 
         graph.SetAction((parseResult, ct) =>
@@ -339,7 +373,17 @@ internal static class CommandFactory
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
-                parseResult.GetValue(allowWorkspaceDiagnostics));
+                parseResult.GetValue(allowWorkspaceDiagnostics),
+                // The coarsest flag wins: the two name a floor on detail, so asking for both is not a
+                // conflict to refuse over.
+                parseResult.GetValue(skeleton) ? GraphGrain.Skeleton
+                : parseResult.GetValue(overview) ? GraphGrain.Overview
+                : GraphGrain.Full,
+                parseResult.GetValue(projects),
+                // The auto-degrade budget is a property of the caller's transport, and a terminal has none:
+                // named here so its absence reads as a decision rather than an omission.
+                // ReSharper disable once ArgumentsStyleNamedExpression
+                ResponseBudgetChars: null);
 
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;

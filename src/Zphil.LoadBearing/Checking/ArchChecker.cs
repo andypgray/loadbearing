@@ -47,13 +47,57 @@ public static class ArchChecker
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
         Guard.NotNull(model, nameof(model));
+
+        return Check(model.Rules, codebase, baselines, diff);
+    }
+
+    /// <summary>
+    ///     Checks exactly <paramref name="rules" /> — the whole model's, or the subset
+    ///     <see cref="SelectRules" /> chose — and returns the aggregate report. Each rule is evaluated
+    ///     exactly as the whole-model overload evaluates it; a narrowed run is a smaller report of the
+    ///     same shape, because <see cref="CheckReport" />'s counters derive from the results it holds.
+    ///     The verdict contract is unchanged: any red rule in the subset fails the report.
+    /// </summary>
+    /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
+    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
+    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
+    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    public static CheckReport Check(
+        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
+    {
+        Guard.NotNull(rules, nameof(rules));
         Guard.NotNull(codebase, nameof(codebase));
         Guard.NotNull(baselines, nameof(baselines));
 
         var evaluator = new ConstraintEvaluator(codebase);
         var selections = new SelectionEvaluator(codebase);
-        var results = model.Rules.Select(rule => CheckRule(rule, evaluator, selections, baselines, diff)).ToList();
+        var results = rules.Select(rule => CheckRule(rule, evaluator, selections, baselines, diff)).ToList();
         return new CheckReport(results);
+    }
+
+    /// <summary>
+    ///     The rules whose ID matches one of <paramref name="ruleIdGlobs" />, in model order — what a
+    ///     narrowed check runs, chosen before any evaluation cost is paid.
+    /// </summary>
+    /// <remarks>
+    ///     A pattern matches the whole rule ID as a single ordinal token, where <c>*</c> spans any run of
+    ///     characters including the <c>/</c> separator. There is no implicit subtree: <c>legacy/billing</c>
+    ///     selects a rule with exactly that ID and none of its children, while <c>legacy/billing/*</c>
+    ///     selects the children a Quarantine scope desugars into (GRAMMAR §7). An empty glob list selects
+    ///     every rule, so an unfiltered call costs nothing.
+    /// </remarks>
+    /// <param name="model">The finalized model to select from.</param>
+    /// <param name="ruleIdGlobs">The rule-ID globs; empty means every rule.</param>
+    public static IReadOnlyList<ArchRule> SelectRules(ArchitectureModel model, IReadOnlyList<string> ruleIdGlobs)
+    {
+        Guard.NotNull(model, nameof(model));
+        Guard.NotNull(ruleIdGlobs, nameof(ruleIdGlobs));
+
+        if (ruleIdGlobs.Count == 0) return model.Rules;
+
+        return model.Rules
+            .Where(rule => ruleIdGlobs.Any(glob => Wildcard.Match(glob, rule.Id)))
+            .ToList();
     }
 
     private static RuleResult CheckRule(

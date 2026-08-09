@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Internal;
+
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
@@ -37,6 +39,56 @@ public static class GraphSummarizer
             .ToList();
 
         return new GraphSummary(projects, projectEdges, externalEdges);
+    }
+
+    /// <summary>
+    ///     Narrows a survey to the projects whose name matches one of <paramref name="projectGlobs" /> — a
+    ///     complete survey of a smaller subject, not a truncated one. A pattern matches the project
+    ///     (assembly) name as a single ordinal token through the shared glob matcher, where <c>*</c> spans
+    ///     any run of characters; an empty list narrows nothing and hands the summary straight back.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         An observed project edge survives when <em>either</em> end is in scope. Who reaches into the
+    ///         scoped projects is the evidence a layering rule is drafted from, so dropping inbound edges
+    ///         would hide the half of the graph the reader came for. The deliberate consequence: a scoped
+    ///         survey's <see cref="GraphSummary.ProjectEdges" /> can name projects absent from
+    ///         <see cref="GraphSummary.Projects" />. External edges are attributed to one project, so they
+    ///         survive on a source match alone.
+    ///     </para>
+    ///     <para>
+    ///         Each surviving <see cref="ProjectSummary" /> is carried through verbatim, declared
+    ///         <see cref="ProjectSummary.ProjectReferences" /> included: a declared reference to a project
+    ///         outside the scope is exactly the divergence signal, and filtering it would erase it.
+    ///     </para>
+    /// </remarks>
+    /// <param name="summary">The survey to narrow.</param>
+    /// <param name="projectGlobs">The project-name globs; empty means every project.</param>
+    public static GraphSummary Scope(GraphSummary summary, IReadOnlyList<string> projectGlobs)
+    {
+        Guard.NotNull(summary, nameof(summary));
+        Guard.NotNull(projectGlobs, nameof(projectGlobs));
+
+        if (projectGlobs.Count == 0) return summary;
+
+        var projects = summary.Projects
+            .Where(project => Matches(projectGlobs, project.Name))
+            .ToList();
+
+        var projectEdges = summary.ProjectEdges
+            .Where(edge => Matches(projectGlobs, edge.Source) || Matches(projectGlobs, edge.Target))
+            .ToList();
+
+        var externalEdges = summary.ExternalEdges
+            .Where(edge => Matches(projectGlobs, edge.Source))
+            .ToList();
+
+        return new GraphSummary(projects, projectEdges, externalEdges);
+    }
+
+    private static bool Matches(IReadOnlyList<string> globs, string projectName)
+    {
+        return globs.Any(glob => Wildcard.Match(glob, projectName));
     }
 
     private static ProjectSummary SummarizeProject(ProjectNode project, CodebaseModel model)

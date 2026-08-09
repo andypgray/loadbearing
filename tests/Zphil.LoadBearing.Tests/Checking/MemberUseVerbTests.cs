@@ -299,7 +299,7 @@ public sealed class MemberUseVerbTests
                 .Because("b"));
 
         var writer = new StringWriter();
-        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false);
+        JsonReportRenderer.Render(writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
 
         using JsonDocument document = JsonDocument.Parse(writer.ToString());
         JsonElement violation = document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];

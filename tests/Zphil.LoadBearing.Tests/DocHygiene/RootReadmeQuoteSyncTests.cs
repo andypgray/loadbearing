@@ -12,7 +12,7 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     rendered Mermaid diagram of this solution — and
 ///     this gate holds each quote to the file it was cut from: every non-blank line of the excerpt's fence
 ///     must appear, in order, as a verbatim substring of its source, so an edit to the source that the
-///     README does not follow fails the suite instead of publishing a stale quote. Four excerpts are
+///     README does not follow fails the suite instead of publishing a stale quote. Five excerpts are
 ///     captured tool output with no committed source; they are demonstration-exempt, held only to the
 ///     requirement that their fences still exist, so an exemption cannot silently go dead.
 /// </summary>
@@ -68,14 +68,15 @@ public sealed class RootReadmeQuoteSyncTests
             "accTitle: Architecture law:",
             "ARCHITECTURE.md"),
 
-        // The four entries below quote output captured from a run rather than a committed file, so there
+        // The five entries below quote output captured from a run rather than a committed file, so there
         // is nothing to sync them against and they are demonstration-exempt — the exactly-one-fence guard
         // still holds each fence in place. hook-report is the stderr a red self-check feeds an agent
         // through the wrapper in hooks/; sarif-result is one result object from `check --sarif`;
-        // graph-survey is a slice of the `graph` project roster; legacy-check is a stanza from a check
-        // over the non-SDK-style ClassicApp test fixture, whose lines ClassicProjectCheckTests pins. If a
-        // committed capture of any of them ever lands, give that entry its source path and it graduates to
-        // a synced excerpt.
+        // check-json is that same rule's entry from `check --json` (whose `"id":` spelling is what keeps
+        // the sarif-result `"ruleId":` marker distinctive); graph-survey is a slice of the `graph`
+        // project roster; legacy-check is a stanza from a check over the non-SDK-style ClassicApp test
+        // fixture, whose lines ClassicProjectCheckTests pins. If a committed capture of any of them ever
+        // lands, give that entry its source path and it graduates to a synced excerpt.
         new(
             "hook-report",
             "FAIL cli/no-stdout",
@@ -83,6 +84,10 @@ public sealed class RootReadmeQuoteSyncTests
         new(
             "sarif-result",
             "\"ruleId\": \"mcp/env-through-seam\"",
+            null),
+        new(
+            "check-json",
+            "\"posture\": \"migrate\"",
             null),
         new(
             "graph-survey",

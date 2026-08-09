@@ -217,7 +217,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
             new CheckRequest(
                 workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, null,
                 Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, true, null,
-                allowWorkspaceDiagnostics, null),
+                allowWorkspaceDiagnostics, null, null),
             Ct);
 
         return new CliResult(exit, output.ToString(), error.ToString());

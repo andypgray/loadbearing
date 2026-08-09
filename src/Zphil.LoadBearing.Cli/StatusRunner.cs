@@ -39,7 +39,12 @@ internal sealed class StatusRunner(
         using var source = await CodebaseSource.CreateWithSpecAsync(
             solutionSource, environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
-        CheckReport report = await CheckPipeline.ExecuteAsync(source, null, ct);
+        // status carries no --rules flag: a burndown of part of the spec would read as progress on all of
+        // it. The empty selection — every rule — is spelled out so both callers of the shared pipeline
+        // choose their rules the same way.
+        var rules = CheckPipeline.SelectRules(source.Model, []);
+
+        CheckReport report = await CheckPipeline.ExecuteAsync(source, null, rules, ct);
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
 

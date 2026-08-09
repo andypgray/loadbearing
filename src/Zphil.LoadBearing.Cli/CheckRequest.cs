@@ -25,6 +25,11 @@ namespace Zphil.LoadBearing.Cli;
 ///     are byte-for-byte unchanged either way; the only added observable is a <c>wrote &lt;path&gt;</c>
 ///     line in human mode. Roslyn-free, so the record still crosses the MSBuild gate.
 /// </param>
+/// <param name="Rules">
+///     The <c>--rules</c> allow-list — rule-ID globs, semicolon-separated — or null for every rule in the
+///     spec. It narrows what <em>runs</em>, not what is displayed, so the summary and the 0/1 verdict cover
+///     the subset alone. A filter that matches no rule refuses the run rather than checking nothing.
+/// </param>
 internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
@@ -34,4 +39,5 @@ internal sealed record CheckRequest(
     bool NoCache,
     string? Binlog,
     bool AllowWorkspaceDiagnostics,
-    string? Sarif);
+    string? Sarif,
+    string? Rules);

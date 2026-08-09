@@ -89,16 +89,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
 
     private static DiagramScope DiagramScopeFrom(RenderRequest request)
     {
-        return new DiagramScope(Globs(request.DiagramOnly), Globs(request.DiagramExclude));
-    }
-
-    // Semicolon-separated globs, the MSBuild list idiom; blanks are dropped so a trailing separator is not
-    // a pattern that matches nothing.
-    private static IReadOnlyList<string> Globs(string? value)
-    {
-        return value is null
-            ? []
-            : value.Split(';').Select(glob => glob.Trim()).Where(glob => glob.Length > 0).ToList();
+        return new DiagramScope(GlobList.Parse(request.DiagramOnly), GlobList.Parse(request.DiagramExclude));
     }
 
     // Splices each composed file and reports it on the wrote/unchanged stream with a solution-relative

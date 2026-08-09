@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
@@ -11,9 +12,12 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
 ///     unexpected-error, truncated success, unknown-parameter guard — end to end (acceptance box
-///     2). Every row rides the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
-///     workspace), so the whole stack is proven in milliseconds. Serialized with the watchdog suites: the
-///     filter brackets each call with the shared <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />
+///     2). Every row but one rides the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
+///     workspace), so the whole stack is proven in milliseconds; the narrowing-hint row must call
+///     <c>arch_graph</c>, because the hint is keyed on the tool name and only a real survey proves it
+///     travels. Serialized with the watchdog suites: the
+///     filter brackets each call with the shared
+///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />
 ///     in-flight counter, so it must not run concurrently with the tests that read/reset that static.
 /// </summary>
 [Collection("Serial")]
@@ -84,6 +88,53 @@ public sealed class GlobalCallToolFilterTests
         // Assert — a successful result, truncated, unlogged.
         result.IsError.ShouldNotBe(true);
         TextOf(result).ShouldContain("--- RESPONSE TRUNCATED ---");
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_GraphOverBudgetAtEveryGrain_TruncatesWithTheNarrowingHint()
+    {
+        // Arrange — a 10-token budget (25-char cap) no survey can fit at any grain, so arch_graph walks the
+        // whole ladder down to skeleton and the truncator still fires. That is the backstop case, and the one
+        // that has to teach: with grain exhausted, the footer names the knob that is actually left.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+        harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "10");
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+
+        // Assert — the hint travels the whole pipeline, keyed on the tool name the filter passes through, and
+        // points at scope rather than back down a ladder this survey has already reached the bottom of.
+        result.IsError.ShouldNotBe(true);
+        string text = TextOf(result);
+        text.ShouldContain("--- RESPONSE TRUNCATED ---");
+        text.ShouldContain("Narrow the subject");
+        text.ShouldContain("loadbearing graph --projects <globs> --json");
+        text.ShouldNotContain("overview: true");
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_GraphOverBudgetButFittingAtACoarserGrain_ReturnsAWholeDocument()
+    {
+        // Arrange — the case the ladder exists for, driven end to end through the real pipeline rather than
+        // against the runner alone. A budget between the skeleton's size and the full survey's used to come
+        // back cut, because the runner stepped once to overview and the filter then truncated that document
+        // at the same number it had just been measured against.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+        harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "300"); // 750-char cap
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+
+        // Assert — a whole, parseable survey, stamped with the grain it landed on.
+        result.IsError.ShouldNotBe(true);
+        string text = TextOf(result);
+        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+        using JsonDocument document = JsonDocument.Parse(text);
+        document.RootElement.GetProperty("grain").GetString().ShouldBe("skeleton");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 

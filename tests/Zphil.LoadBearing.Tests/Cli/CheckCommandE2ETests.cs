@@ -10,6 +10,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     fix, and <c>file:line</c> together — plus the quarantine containment (uncaptured hard red + facade
 ///     green + tripwire skip), the JSON golden pin, and the SARIF golden pin (with its <c>--json</c>
 ///     stdout-purity guard); the clean spec exits 0.
+///     <para>
+///         The <c>--rules</c> rows pin the narrowing knob: it decides what <em>runs</em>, so the report, the
+///         summary counts and the 0/1 verdict are all the subset's, and the human stamp (or the document's
+///         <c>rulesFilter</c>) is what stops a green subset of a red spec reading as a green solution. A
+///         filter matching no rule refuses before extraction, since rule IDs come from the spec model.
+///     </para>
 /// </summary>
 [Collection("Serial")]
 public sealed class CheckCommandE2ETests
@@ -247,6 +253,87 @@ public sealed class CheckCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", "does-not-exist.dll");
 
         result.ShouldRefuseWith("was not found");
+    }
+
+    [Fact]
+    public async Task Check_RulesSelectingOnePassingRule_StampsTheFilterAndExitsZero()
+    {
+        // Act — one green rule picked out of a spec with fifteen red ones.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "layering/billing-independent");
+
+        // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
+        // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
+        result.ShouldSucceed(
+            "Checking 1 of 18 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            + "so a clean result here is not a clean solution.");
+        result.Out.ShouldNotContain("layering/domain-independent");
+    }
+
+    [Fact]
+    public async Task Check_RulesSelectingAnAreaGlob_CountsTheSubsetAndStillExitsOne()
+    {
+        // Act — an area glob over the five exceptions/* rules, all of them red.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "exceptions/*");
+
+        // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
+        result.ShouldReportViolations(
+            "Checking 5 of 18 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            + "result here is not a clean solution.",
+            "FAIL exceptions/no-general-catch",
+            "FAIL exceptions/no-bare-bcl-throw");
+        // The rules outside the filter are absent entirely — --rules narrows what runs, not what is displayed.
+        result.Out.ShouldNotContain("layering/domain-independent");
+        result.Out.ShouldNotContain("legacy/billing/containment");
+    }
+
+    [Fact]
+    public async Task Check_RulesSubsetJson_RecordsTheFilterAndCountsOnlyWhatRan()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--rules", "exceptions/*");
+
+        // Assert — the stamp never reaches stdout under --json; the document carries the same fact in
+        // rulesFilter, and the summary counts the five rules that ran rather than the eighteen that exist.
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        JsonElement root = document.RootElement;
+
+        root.GetProperty("rulesFilter").EnumerateArray().Select(glob => glob.GetString()).ShouldBe(["exceptions/*"]);
+        root.GetProperty("rules").GetArrayLength().ShouldBe(5);
+        root.GetProperty("summary").GetProperty("rulesChecked").GetInt32().ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task Check_UnfilteredJson_OmitsTheRulesFilterEntirely()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the slot is additive: absent, not empty, so a whole-spec document is byte-identical to the
+        // one before --rules existed (which the golden above pins).
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("rulesFilter", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Check_RulesMatchingNothing_RefusesBeforeExtractionAndListsTheAvailableRuleIds()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "nope/*");
+
+        // Assert — refusing beats checking nothing, which would exit 0 and read as a clean solution. The IDs
+        // come from the spec model, so this costs no codebase walk to say.
+        result.ShouldRefuseWith(
+            "No rule matched 'nope/*'. Available rule IDs:",
+            "layering/domain-independent",
+            "legacy/billing/tripwire");
+        result.Out.ShouldBeEmpty();
     }
 
     private static string Golden()

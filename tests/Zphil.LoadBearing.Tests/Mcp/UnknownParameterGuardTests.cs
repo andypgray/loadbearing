@@ -70,24 +70,30 @@ public sealed class UnknownParameterGuardTests
     }
 
     [Fact]
-    public void Validate_KnownKeyOnCheck_ReturnsNull()
+    public void Validate_KnownKeysOnCheck_ReturnsNull()
     {
-        // Act — arch_check's real optional parameter.
+        // Act — arch_check's real optional parameters: the tripwire diff ref and the rule-ID filter.
         string? message = UnknownParameterGuard.Validate(
             "arch_check",
-            new Dictionary<string, JsonElement> { ["diffBase"] = DummyValue });
+            new Dictionary<string, JsonElement> { ["diffBase"] = DummyValue, ["rules"] = DummyValue });
 
         // Assert
         message.ShouldBeNull();
     }
 
     [Fact]
-    public void Validate_KnownKeyOnGraph_ReturnsNull()
+    public void Validate_KnownKeysOnGraph_ReturnsNull()
     {
-        // Act — arch_graph's real optional parameter: the opt-out into surveying a partially-loaded model.
+        // Act — arch_graph's real optional parameters: the opt-out into surveying a partially-loaded model,
+        // and the two narrowing knobs (grain and subject).
         string? message = UnknownParameterGuard.Validate(
             "arch_graph",
-            new Dictionary<string, JsonElement> { ["allowWorkspaceDiagnostics"] = DummyValue });
+            new Dictionary<string, JsonElement>
+            {
+                ["allowWorkspaceDiagnostics"] = DummyValue,
+                ["overview"] = DummyValue,
+                ["projects"] = DummyValue
+            });
 
         // Assert
         message.ShouldBeNull();

@@ -5,6 +5,7 @@ using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Tests.Cli;
+using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -38,7 +39,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     [Fact]
     public async Task ArchCheck_WorkspaceLoadDiagnostic_CarriesTheMsBuildNoteLastInTheDocument()
     {
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([LoadDiagnostic]));
+        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([LoadDiagnostic]), new FakeEnvironment());
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -51,7 +52,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The negative control that keeps the note diagnostic context rather than a banner: an empty
         // composition stays empty, so a clean call's document says nothing about MSBuild at all.
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([]));
+        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([]), new FakeEnvironment());
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 

@@ -20,12 +20,16 @@ Work the steps in order. Do not skip the curation gate.
   the codebase violates, precisely to measure the violations. A red `arch_check` mid-derive
   means the evidence pass is working.
 - Everything here uses the read-only tools (`arch_graph`, `arch_check`, `arch_explain`,
-  `arch_status`) or their identical CLI verbs (`loadbearing graph|check|explain|status`,
-  add `--json` for the same documents). The CLI verbs take the solution path as their first
-  argument — `loadbearing graph MyApp.sln --json` — or walk up from the working directory
-  when omitted (`explain` differs: its rule ID comes first, the solution second —
-  `loadbearing explain area/rule MyApp.sln`); the MCP tools are already bound to the solution. The two ratchet mutations
-  that end the flow — `loadbearing baseline --init` and the commit — belong to the human.
+  `arch_status`) or their identical CLI verbs (`loadbearing graph|check|explain|status`, add
+  `--json` for the same documents). Prefer the tools: they are already bound to the solution,
+  the workspace stays warm between calls, and their narrowing parameters (`overview` and
+  `skeleton` for grain, `projects` for scope on the survey, `rules` on the check) keep a big
+  solution's answer a complete document rather than a truncated one. The CLI verbs are for when a document belongs in a
+  file. They take the solution path as their first argument — `loadbearing graph MyApp.sln
+  --json` — or walk up from the working directory when omitted (`explain` differs: its rule
+  ID comes first, the solution second — `loadbearing explain area/rule MyApp.sln`). The two
+  ratchet mutations that end the flow — `loadbearing baseline --init` and the commit — belong
+  to the human.
 
 ## 0. Discover stated intent first
 
@@ -62,6 +66,27 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 - `externalEdges[]` — external references grouped by namespace root. Scan for the classic
   dangerous externals: `System.Data` (inline SQL), `System.Web` (HttpContext-era coupling),
   direct driver namespaces, and anything the team says it is migrating away from.
+
+The document's keys, exactly (camelCase; an optional field is absent, never null):
+
+```text
+projects[]      { name, projectReferences[], types, namespaces[]{ namespace, types } }
+projectEdges[]  { source, target, references }
+externalEdges[] { source, targetNamespaceRoot, references }
+```
+
+Grain is a ladder, and an over-budget survey walks down it by itself rather than coming back
+cut. At overview grain — `overview: true`, or the server's own first step — the document
+stamps `"grain": "overview"` and elides each project's `namespaces`; every project, edge and
+external row survives. At skeleton grain — `skeleton: true`, or the server's second step when
+the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
+too, reporting how many rows went as `externalEdgeCount`; the projects and their edges stay.
+Read the stamp: a survey with no `grain` is the complete one.
+
+Scope is the other axis. `projects` (name globs) narrows the survey and stamps
+`projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
+outside the roster. On a solution too big to survey whole even at skeleton grain, scope is
+the knob left — grain has nowhere further to go.
 
 From the survey, write down **hypotheses, not conclusions**:
 
@@ -239,7 +264,8 @@ malformed IDs, dangling rules, blank prose) — fix them in one pass.
 ## 4. Check = the evidence pass
 
 Run `arch_check` (CLI: `loadbearing check MyApp.sln --json`; exit 1 is expected — violations
-are the data). For each rule, read `rules[]`:
+are the data). For each rule, read `rules[]` — keyed by `id` (`ruleId` is SARIF's spelling,
+not this document's), camelCase and exact like the step-1 key map:
 
 - `violations[]` with `sites[]` — the real edges, each with `file:line`. One violation per
   offending type pair; multiple reference sites between the same pair ride together in
@@ -258,9 +284,12 @@ are the data). For each rule, read `rules[]`:
 Iterate globs until the failures that remain are *genuine* — real edges, real nonconforming
 names. Iterating is cheap over MCP: the server holds the workspace warm and reconciles your
 edits per call, so a re-check after the first load answers in milliseconds; one-shot CLI runs
-pay a workspace load each time (a clean tree with a valid extraction cache skips it). If the
-MCP response is truncated on a big solution, check rule-by-rule at the CLI or split the draft
-spec temporarily.
+pay a workspace load each time (a clean tree with a valid extraction cache skips it). On a
+big solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules:
+"data-access/*"`; the CLI twin is `--rules`), so the evidence pass can walk the draft area
+by area with every response a complete document, and `arch_explain` returns one rule whole.
+When you want the report entire, redirect the CLI to a file — `loadbearing check MyApp.sln
+--json > check.json` — and slice it there.
 
 ## 5. Assign postures from the evidence
 

@@ -1,7 +1,9 @@
+using System.Globalization;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp;
+using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -15,6 +17,13 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a real git repo. Serialized
 ///     with the watchdog suites — the filter brackets each call with the shared
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
+///     <para>
+///         The narrowing rows extend the same contract to the knobs — each tool argument produces exactly
+///         what its CLI option produces — and the budget row covers the one behaviour with no CLI spelling:
+///         over the client's declared response budget, <c>arch_graph</c> re-renders at overview grain, and
+///         what it returns is byte-identical to <c>graph --overview --json</c>. That identity is the whole
+///         claim, because it is what makes a degraded answer a complete document rather than a cut one.
+///     </para>
 /// </summary>
 /// <remarks>
 ///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync" />, not the warm-by-default
@@ -46,6 +55,11 @@ public sealed class CliMcpParityTests
         "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
         "The web layer must reach billing only through the sanctioned facade.\n" +
         "- Expand any rule above with `loadbearing explain <rule-id>`.";
+
+    // The truncator's own token → character multiple, restated here because the budget row has to work
+    // backwards from a character count to the token budget a client would declare. The two preconditions it
+    // asserts on the resulting cap are what keep this honest if the multiple ever moves.
+    private const double CharsPerToken = 2.5;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -166,6 +180,71 @@ public sealed class CliMcpParityTests
         Normalize(TextOf(outScope)).ShouldBe(
             "No architecture scope covers 'MyApp.Domain/Order.cs'. Architecture context for this solution lives in " +
             "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
+    }
+
+    [Fact]
+    public async Task HarnessF_NarrowedCalls_MatchTheirCliTwins()
+    {
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+
+        // arch_graph overview ≡ graph --overview --json: the whole survey at coarser grain.
+        CliResult cliOverview = await CliRunner.InvokeColdAsync(
+            "graph", CliRunner.MyAppSolution, "--json", "--overview");
+        CallToolResult mcpOverview = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["overview"] = true }, cancellationToken: Ct);
+        Normalize(TextOf(mcpOverview)).ShouldBe(Normalize(cliOverview.Out));
+
+        // arch_graph projects ≡ graph --projects --json: the same survey over fewer projects.
+        CliResult cliScoped = await CliRunner.InvokeColdAsync(
+            "graph", CliRunner.MyAppSolution, "--json", "--projects", "MyApp.Web");
+        CallToolResult mcpScoped = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["projects"] = "MyApp.Web" }, cancellationToken: Ct);
+        Normalize(TextOf(mcpScoped)).ShouldBe(Normalize(cliScoped.Out));
+
+        // arch_check rules ≡ check --rules --json (CLI exits 1 on the subset's violations; the tool never
+        // reports IsError). Same parse, same selection, same document — including rulesFilter.
+        CliResult cliRules = await CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--rules", "exceptions/*");
+        cliRules.ShouldReportViolations();
+        CallToolResult mcpRules = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?> { ["rules"] = "exceptions/*" }, cancellationToken: Ct);
+        mcpRules.IsError.ShouldNotBe(true);
+        Normalize(TextOf(mcpRules)).ShouldBe(Normalize(cliRules.Out));
+    }
+
+    [Fact]
+    public async Task HarnessG_GraphOverTheResponseBudget_ReturnsExactlyTheCliOverviewDocument()
+    {
+        // Arrange — the budget is derived from the two CLI documents rather than guessed, so this row proves
+        // the degrade instead of assuming a fixture size: it must sit at or above the overview document (which
+        // therefore survives the truncator whole) and below the full one (which therefore overruns).
+        CliResult cliFull = await CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json");
+        CliResult cliOverview = await CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--overview");
+        cliFull.ShouldSucceed();
+        cliOverview.ShouldSucceed();
+
+        int fullChars = cliFull.Out.TrimEnd('\r', '\n').Length;
+        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n').Length;
+        var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
+        int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
+
+        budget.ShouldBeGreaterThanOrEqualTo(overviewChars + Environment.NewLine.Length);
+        budget.ShouldBeLessThan(fullChars);
+
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+        harness.Environment.SetVariable(
+            ResponseTruncator.MaxOutputTokensVariable, tokens.ToString(CultureInfo.InvariantCulture));
+
+        // Act — the plain call, with no overview argument: the degrade is the server's own decision.
+        CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+
+        // Assert — a complete document at coarser grain, byte-identical to what --overview writes. Nothing was
+        // cut, so the JSON still parses; the client reads a whole survey rather than half of one.
+        string text = TextOf(mcpGraph);
+        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+        Normalize(text).ShouldBe(Normalize(cliOverview.Out));
     }
 
     private static McpServerBinding Binding(string? solution, string? spec)

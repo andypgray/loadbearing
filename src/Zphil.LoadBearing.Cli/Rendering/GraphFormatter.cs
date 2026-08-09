@@ -7,11 +7,24 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     declared references and type counts, the observed cross-project reference edges, the namespace
 ///     inventory, and external references grouped by namespace root. Pure over the summary, so the line
 ///     shapes are unit-pinned. Mirrors <see cref="StatusFormatter" />'s terse, em-dashed voice; an empty
-///     section reads <c>(none)</c> rather than vanishing, so the survey's shape is stable.
+///     section reads <c>(none)</c> rather than vanishing, so the survey's shape is stable — which is also
+///     why overview grain replaces the namespace inventory with an elision line instead of dropping the
+///     section: a reader can see what was left out and how to get it back.
 /// </summary>
 internal static class GraphFormatter
 {
-    public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName)
+    private const string OverviewElisionLine =
+        "  (elided at overview grain — rerun without --overview for the per-project namespace inventory)";
+
+    private const string SkeletonElisionLine =
+        "  (elided at skeleton grain — rerun without --skeleton for the external references)";
+
+    /// <summary>
+    ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
+    ///     them: the namespace inventory becomes one elision line at overview grain, the external references
+    ///     become one more at skeleton grain, and no section ever disappears.
+    /// </summary>
+    public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName, GraphGrain grain)
     {
         var lines = new List<string> { $"Codebase survey: {solutionName}", "" };
 
@@ -24,13 +37,18 @@ internal static class GraphFormatter
         lines.Add("");
 
         lines.Add("Namespaces:");
-        lines.AddRange(summary.Projects.Select(NamespaceLine));
+        lines.AddRange(NamespaceLines(summary, grain));
         lines.Add("");
 
         lines.Add("External references (by namespace root):");
-        lines.AddRange(ExternalEdgeLines(summary));
+        lines.AddRange(ExternalEdgeLines(summary, grain));
 
         return lines;
+    }
+
+    private static IEnumerable<string> NamespaceLines(GraphSummary summary, GraphGrain grain)
+    {
+        return grain >= GraphGrain.Overview ? [OverviewElisionLine] : summary.Projects.Select(NamespaceLine);
     }
 
     private static string ProjectLine(ProjectSummary project)
@@ -54,8 +72,10 @@ internal static class GraphFormatter
             : ["  (none)"];
     }
 
-    private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary)
+    private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, GraphGrain grain)
     {
+        if (grain >= GraphGrain.Skeleton) return [SkeletonElisionLine];
+
         return summary.ExternalEdges.Count > 0
             ? summary.ExternalEdges.Select(e => $"  {e.Source} -> {e.TargetNamespaceRoot}: {e.References}")
             : ["  (none)"];

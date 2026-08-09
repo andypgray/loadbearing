@@ -7,8 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Both querying surfaces can narrow, so a big solution answers whole.** `graph` takes two
+  grain flags — `--overview` (every project, edge and external row kept, namespace inventories
+  elided) and `--skeleton` (coarser still: the structural spine of projects and their edges,
+  with the external rows elided too and reported as `externalEdgeCount`) — plus
+  `--projects <globs>`, which narrows the subject rather than the detail (a scoped survey whose
+  edges keep both directions, so an inbound edge still names its outside source); `check` takes
+  `--rules <globs>`, which filters what runs rather than what is shown, and the summary counts
+  the subset. The MCP twins are `overview`/`skeleton`/`projects` on `arch_graph` and `rules` on
+  `arch_check`. Globs match whole names (`*` spans `/`, so `legacy/billing` does not reach
+  `legacy/billing/containment`), and a glob that matches nothing refuses loudly, listing what
+  is available, rather than answering about an empty scope as if it were the solution. The new
+  JSON fields (`grain`, `projectsScope`, `rulesFilter`, `externalEdgeCount`) are omitted when
+  unused, so every schemaVersion is unchanged and an unnarrowed document is byte-identical.
+
 ### Changed
 
+- **`arch_graph` coarsens its own grain instead of returning cut JSON.** A survey bigger than
+  the client's response budget used to be truncated mid-array — unparseable, with a footer
+  suggesting the results were merely incomplete — which in practice sent agents away from the
+  MCP surface to guess at CLI schemas. Now the tool re-renders the same extraction one rung
+  coarser when the document would overflow, and keeps going while it still would: full →
+  overview → skeleton, each byte-identical to that grain's own flag, one extraction however far
+  it walks. One rung was not enough, and a real solution is what showed it: on a 34-project
+  codebase the full survey is ~147,000 characters and the overview it degrades to is still
+  ~82,000, over any default budget, so stopping there handed the truncator exactly the document
+  this behaviour exists to avoid. The default budget when the client sets no `MAX_MCP_OUTPUT_TOKENS`
+  is 62,500 characters rather than 25,000. Truncation stays the backstop for a survey too big
+  even at skeleton grain, and its footer now names the knob that would actually help there —
+  `projects`, the subject, since the grain ladder is spent — with `rules` for `arch_check` and
+  nothing for the three tools that have no knob to name. A complete document at coarser grain
+  beats a cut document at full grain.
 - `baseline --init` and `--accept-reductions` now name the rules that are failing with no baseline
   to capture — the Enforce reds a baseline cannot grandfather — instead of reporting only the
   ratchet work, or "nothing to do" on a spec with no ratcheted rules at all. The command already

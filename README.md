@@ -161,6 +161,26 @@ loadbearing check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/
 
 CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.github/workflows/ci.yml) runs that check on every push and uploads the SARIF it writes.
 
+The same rule from `check --json`, the document `arch_check` returns over MCP, with the ratchet as counters rather than suppressions:
+
+```json
+{
+  "id": "mcp/env-through-seam",
+  "posture": "migrate",
+  "status": "passed",
+  "sentence": "Types in `Zphil.LoadBearing.Cli.Mcp.Infrastructure.*`, except types whose name matches `SystemEnvironment` must not reference `Environment`.",
+  "because": "A single IEnvironment seam keeps the MCP pipeline testable without mutating real process state.",
+  "fix": "Inject IEnvironment (see SystemEnvironment); read via GetVariable.",
+  "baseline": {
+    "path": "arch/baselines/mcp/env-through-seam.json",
+    "grandfathered": 4,
+    "stale": 0
+  },
+  "violations": [],
+  "warnings": []
+}
+```
+
 ## The graph
 
 `loadbearing graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, every external dependency by root. Five of the twenty project lines for this solution:
@@ -258,7 +278,7 @@ The line under the fence is the honest part. A diagram can only draw a rule whos
 
 ## This page is tested
 
-The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The four fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
+The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The five fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the check document and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
 
 The page is the tool's output, and the [CI badge](https://github.com/andypgray/loadbearing/actions/workflows/ci.yml) at the top is what keeps it that way.
 

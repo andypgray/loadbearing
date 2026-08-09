@@ -326,7 +326,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         int exit = await runner.RunAsync(
             new CheckRequest(
                 solution, spec, json, null, Path.GetDirectoryName(Path.GetFullPath(solution))!, true, null,
-                allowWorkspaceDiagnostics, sarif),
+                allowWorkspaceDiagnostics, sarif, null),
             Ct);
 
         return new CliResult(exit, output.ToString(), error.ToString());

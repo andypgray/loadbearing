@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
@@ -222,7 +223,8 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null), Ct);
+            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null, null),
+            Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);
@@ -236,7 +238,7 @@ public sealed class CheckCacheE2ETests
         var runner = new GraphRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false), Ct);
+            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false, GraphGrain.Full, null, null), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

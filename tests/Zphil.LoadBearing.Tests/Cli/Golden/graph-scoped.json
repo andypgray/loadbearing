@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "solution": "MyApp.sln",
+  "projectsScope": [
+    "MyApp.Web"
+  ],
+  "projects": [
+    {
+      "name": "MyApp.Web",
+      "projectReferences": [
+        "MyApp.Legacy.Billing"
+      ],
+      "types": 18,
+      "namespaces": [
+        {
+          "namespace": "MyApp.Web",
+          "types": 18
+        }
+      ]
+    }
+  ],
+  "projectEdges": [
+    {
+      "source": "MyApp.Domain",
+      "target": "MyApp.Web",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "target": "MyApp.Legacy.Billing",
+      "references": 3
+    }
+  ],
+  "externalEdges": [
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "Microsoft.Extensions",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System",
+      "references": 4
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Data",
+      "references": 2
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Text",
+      "references": 1
+    },
+    {
+      "source": "MyApp.Web",
+      "targetNamespaceRoot": "System.Threading",
+      "references": 2
+    }
+  ]
+}

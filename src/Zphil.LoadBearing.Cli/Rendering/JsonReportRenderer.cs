@@ -8,7 +8,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     Renders a <see cref="CheckReport" /> as the <c>--json</c> document (schemaVersion 3 — Quarantine
 ///     containment now evaluates and ratchets alongside Migrate, and a Quarantine tripwire warns) — the only
 ///     content on stdout in JSON mode, so hooks can parse it. The optional <c>diffBase</c> echoes the
-///     <c>--diff-base</c> ref (omitted when absent). Machine-independent: <c>solution</c> and
+///     <c>--diff-base</c> ref and <c>rulesFilter</c> the <c>--rules</c> globs (each omitted when absent),
+///     so a reader can tell a narrowed report from a whole one. Machine-independent: <c>solution</c> and
 ///     <c>specAssembly</c> are file names, and every site path is solution-relative with forward slashes.
 ///     Serialization lives here so Core stays dependency-free; the options are the shared
 ///     <see cref="LoadBearingJson.Options" />.
@@ -23,13 +24,15 @@ internal static class JsonReportRenderer
         string specAssembly,
         string? diffBase,
         IReadOnlyList<string> workspaceDiagnostics,
-        bool modelIncomplete)
+        bool modelIncomplete,
+        IReadOnlyList<string> rulesFilter)
     {
         var document = new CheckJson(
             3,
             solutionName,
             specAssembly,
             diffBase,
+            rulesFilter.Count > 0 ? rulesFilter : null,
             report.Results.Select(r => ToRule(r, solutionDirectory)).ToList(),
             workspaceDiagnostics,
             modelIncomplete ? true : null,
