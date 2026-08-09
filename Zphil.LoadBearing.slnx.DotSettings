@@ -1,4 +1,4 @@
-<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<!-- Named arguments are a deliberate prose-parameter documentation convention (GRAMMAR §10:
 	     from:, to:, description:). Protecting them takes TWO settings, because inspect and cleanup
 	     read different axes and do not share a switch.
@@ -47,9 +47,9 @@
 
 	<!-- ReSharper's "profile to use when nobody picks one".
 
-	     The MCP cleanup server resolves this key, so a cleanup call that names no profile gets
-	     the profile above and the deliberate named arguments survive. Omitting the profile
-	     argument is the intended path; naming it explicitly is merely harmless.
+	     A runner that honours this key reads it before cleaning, so a cleanup call naming no
+	     profile still gets the profile above and the deliberate named arguments survive. Omitting
+	     the profile argument is the intended path there; naming it is merely harmless.
 
 	     Bare `jb cleanupcode` never reads this key: jb always defaults to Full Cleanup, so a direct
 	     CLI run must still pass the profile by name. jb's switch for that is not spelled literally
@@ -57,4 +57,28 @@
 	     file unreadable to every conformant XML parser while jb itself carried on regardless.
 	     DotSettingsCleanupProfileTests pins the file well-formed. -->
 	<s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">LoadBearing: Full Cleanup (keep named arguments)</s:String>
+
+	<!-- Line wrapping is deliberately OFF, and this key is what pins it.
+
+	     Fluent chains here follow the LINQ chain convention: one call per line, leading dot (see
+	     McpResultAssertions.cs). The test project got that shape in one machine pass, under a
+	     temporary WRAP_CHAINED_METHOD_CALLS=CHOP_ALWAYS key removed in the same commit that
+	     landed the reformat. The formatter's standing job is to PRESERVE the shape (keep existing
+	     line breaks), never to compute it, and the key above is what holds wrapping to that job.
+
+	     Two places were held out of the pass and are why no wrapping key may stand here:
+	     SpecValidationSpecs.cs, whose forty expected messages in SpecValidationTests.cs quote its
+	     anchors as literal "SpecValidationSpecs.cs:N" text, and the Fixtures and Stubs trees, whose
+	     goldens pin their line numbers. A chain-wrap key left in place chops them on the next
+	     cleanup of any file, silently. Margin wrapping is the same hazard from the other side: it
+	     fully chops any chain that already carries one break. Wrapping off is what keeps "any file
+	     can be passed to cleanup" true. Chop new chains by hand; cleanup will keep them.
+
+	     DotSettingsCleanupProfileTests pins both halves: this entry present and False, and no entry
+	     anywhere in the file whose key names chained method calls. -->
+	<s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpFormat/WRAP_LINES/@EntryValue">False</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpKeepExistingMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpPlaceEmbeddedOnSameLineMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpUseContinuousIndentInsideBracesMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ESettingsUpgrade_002EMigrateBlankLinesAroundFieldToBlankLinesAroundProperty/@EntryIndexedValue">True</s:Boolean>
 </wpf:ResourceDictionary>

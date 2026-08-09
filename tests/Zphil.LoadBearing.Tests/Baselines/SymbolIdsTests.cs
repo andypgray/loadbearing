@@ -19,12 +19,14 @@ public sealed class SymbolIdsTests
     [InlineData("E:N.Pub.Evt", "N.Pub.Evt")]
     public void Display_DocIdPrefix_StripsTheTag(string symbolId, string expected)
     {
-        SymbolIds.Display(symbolId).ShouldBe(expected);
+        SymbolIds.Display(symbolId)
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void Display_UnresolvedFallback_PrintsVerbatim()
     {
-        SymbolIds.Display("unresolved:N.Thing.Member").ShouldBe("unresolved:N.Thing.Member");
+        SymbolIds.Display("unresolved:N.Thing.Member")
+            .ShouldBe("unresolved:N.Thing.Member");
     }
 }

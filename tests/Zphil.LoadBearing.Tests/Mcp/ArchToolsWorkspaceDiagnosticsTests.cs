@@ -56,7 +56,8 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
-        WorkspaceDiagnosticsOf(document).ShouldBeEmpty();
+        WorkspaceDiagnosticsOf(document)
+            .ShouldBeEmpty();
     }
 
     private static McpServerBinding Binding()

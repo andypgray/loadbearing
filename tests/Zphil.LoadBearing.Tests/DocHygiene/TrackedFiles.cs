@@ -45,10 +45,13 @@ internal static class TrackedFiles
     private static readonly Lazy<IReadOnlyList<string>> LazyAll = new(Enumerate);
 
     private static readonly Lazy<IReadOnlyList<string>> LazyCSharp =
-        new(() => LazyAll.Value.Where(IsCSharp).ToArray());
+        new(() => LazyAll.Value.Where(IsCSharp)
+            .ToArray());
 
     private static readonly Lazy<IReadOnlyList<string>> LazyNonSourceText =
-        new(() => LazyAll.Value.Where(static path => !IsCSharp(path)).Where(IsText).ToArray());
+        new(() => LazyAll.Value.Where(static path => !IsCSharp(path))
+            .Where(IsText)
+            .ToArray());
 
     /// <summary>Every tracked path, repository-relative with forward slashes, as git reports it.</summary>
     public static IReadOnlyList<string> All => LazyAll.Value;
@@ -76,7 +79,8 @@ internal static class TrackedFiles
         var head = new byte[SniffBytes];
         int read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
 
-        return head.AsSpan(0, read).IndexOf((byte)0) < 0;
+        return head.AsSpan(0, read)
+            .IndexOf((byte)0) < 0;
     }
 
     // Runs `git -C <root> ls-files`; throws on non-zero exit. Launched through ChildProcess so this

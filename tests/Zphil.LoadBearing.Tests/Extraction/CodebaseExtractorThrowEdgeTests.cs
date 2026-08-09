@@ -27,9 +27,13 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // The same site yields all three facts: the throw edge (§4.8), the construction edge (§4.5), and the
         // §4.1 reference edge from the `MyError` name — recorded beside one another, never instead.
-        model.ThrowEdge("N.Worker", "N.MyError").Lines().ShouldBe([3]);
-        model.HasConstructorEdge("N.Worker", "N.MyError").ShouldBeTrue();
-        model.HasEdge("N.Worker", "N.MyError").ShouldBeTrue();
+        model.ThrowEdge("N.Worker", "N.MyError")
+            .Lines()
+            .ShouldBe([3]);
+        model.HasConstructorEdge("N.Worker", "N.MyError")
+            .ShouldBeTrue();
+        model.HasEdge("N.Worker", "N.MyError")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -44,8 +48,10 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // CRITICAL: the thrown type is the expression's NATURAL static type (MyError), never the throw
         // conversion's ConvertedType (System.Exception) — using ConvertedType would collapse every throw to
         // System.Exception and erase the real type.
-        model.HasThrowEdge("N.Worker", "N.MyError").ShouldBeTrue();
-        model.HasThrowEdge("N.Worker", "System.Exception").ShouldBeFalse();
+        model.HasThrowEdge("N.Worker", "N.MyError")
+            .ShouldBeTrue();
+        model.HasThrowEdge("N.Worker", "System.Exception")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -58,7 +64,9 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // The expression-bodied `=> throw new X()` is a throw EXPRESSION (the most common form in the wild).
-        model.ThrowEdge("N.Worker", "N.MyError").Lines().ShouldBe([3]);
+        model.ThrowEdge("N.Worker", "N.MyError")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -77,7 +85,9 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // A `?? throw` right-operand is a throw expression.
-        model.ThrowEdge("N.Worker", "N.MyError").Lines().ShouldBe([7]);
+        model.ThrowEdge("N.Worker", "N.MyError")
+            .Lines()
+            .ShouldBe([7]);
     }
 
     [Fact]
@@ -97,7 +107,9 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // A switch-expression arm is a throw expression.
-        model.ThrowEdge("N.Worker", "N.MyError").Lines().ShouldBe([8]);
+        model.ThrowEdge("N.Worker", "N.MyError")
+            .Lines()
+            .ShouldBe([8]);
     }
 
     [Fact]
@@ -118,7 +130,9 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // `throw ex` mints the VARIABLE's static type — the deliberate asymmetry with the bare rethrow `throw;`
         // (which mints nothing): under strict MustOnlyThrow, `catch (Exception ex) { throw ex; }` is red.
-        model.ThrowEdge("N.Worker", "N.MyError").Lines().ShouldBe([8]);
+        model.ThrowEdge("N.Worker", "N.MyError")
+            .Lines()
+            .ShouldBe([8]);
     }
 
     [Fact]
@@ -138,7 +152,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // A bare rethrow `throw;` (null expression) mints no throw edge.
-        model.ThrowEdges("N.Worker").ShouldBeEmpty();
+        model.ThrowEdges("N.Worker")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -150,7 +165,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // `throw null` has no thrown type (the null literal), so it mints nothing.
-        model.ThrowEdges("N.Worker").ShouldBeEmpty();
+        model.ThrowEdges("N.Worker")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -162,7 +178,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // A type-parameter thrown type is not a named type, so it mints nothing.
-        model.ThrowEdges("N.Worker").ShouldBeEmpty();
+        model.ThrowEdges("N.Worker")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -181,9 +198,12 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // A throw helper is an ordinary invocation, not a throw: the walk sees a member use, not a throw. So it
         // mints the member-use (and reference) edge but NO throw edge — the named §4.8 honesty boundary.
-        model.ThrowEdges("N.Worker").ShouldBeEmpty();
-        model.HasEdge("N.Worker", "System.ArgumentNullException").ShouldBeTrue();
-        model.MemberEdges("N.Worker").ShouldContain(e => e.Member.Name == "ThrowIfNull");
+        model.ThrowEdges("N.Worker")
+            .ShouldBeEmpty();
+        model.HasEdge("N.Worker", "System.ArgumentNullException")
+            .ShouldBeTrue();
+        model.MemberEdges("N.Worker")
+            .ShouldContain(e => e.Member.Name == "ThrowIfNull");
     }
 
     [Fact]
@@ -196,7 +216,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // throw new Boom<int>() records the OPEN definition N.Boom<T> (§4.1).
-        model.HasThrowEdge("N.Worker", "N.Boom<T>").ShouldBeTrue();
+        model.HasThrowEdge("N.Worker", "N.Boom<T>")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -211,8 +232,10 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // Self-throw is dropped, mirroring the type-edge self-drop (§4.1).
-        model.HasThrowEdge("N.Recursive", "N.Recursive").ShouldBeFalse();
-        model.ThrowEdges("N.Recursive").ShouldBeEmpty();
+        model.HasThrowEdge("N.Recursive", "N.Recursive")
+            .ShouldBeFalse();
+        model.ThrowEdges("N.Recursive")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -224,7 +247,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // An unresolvable thrown type is an error type — the TypeKindMapper gate drops it, no throw edge.
-        model.ThrowEdges("N.Worker").ShouldBeEmpty();
+        model.ThrowEdges("N.Worker")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -244,7 +268,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // A throw inside a local function attributes to the enclosing type (the existing attribution machinery).
-        model.HasThrowEdge("N.Worker", "N.MyError").ShouldBeTrue();
+        model.HasThrowEdge("N.Worker", "N.MyError")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -258,7 +283,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // precedent).
         ThrowEdge edge = model.ThrowEdge("Program", "System.InvalidOperationException");
         edge.Thrown.IsExternal.ShouldBeTrue();
-        edge.Lines().ShouldBe([1]);
+        edge.Lines()
+            .ShouldBe([1]);
     }
 
     [Fact]
@@ -278,6 +304,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          }
                                                          """);
 
-        model.ThrowEdges("N.Worker").Select(e => e.Thrown.FullName).ShouldBe(["N.Alpha", "N.Beta"]);
+        model.ThrowEdges("N.Worker")
+            .Select(e => e.Thrown.FullName)
+            .ShouldBe(["N.Alpha", "N.Beta"]);
     }
 }

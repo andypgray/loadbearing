@@ -51,7 +51,8 @@ public sealed class AccessibilityMapperTests
 
         unresolved.TypeKind.ShouldBe(RoslynTypeKind.Error);
         unresolved.DeclaredAccessibility.ShouldBe(RoslynAccessibility.NotApplicable);
-        AccessibilityMapper.TryMap(unresolved, out _).ShouldBeFalse();
+        AccessibilityMapper.TryMap(unresolved, out _)
+            .ShouldBeFalse();
     }
 
     [Theory]
@@ -67,9 +68,11 @@ public sealed class AccessibilityMapperTests
         // legal at the declaration site. Map and TryMap must never disagree on a mappable symbol.
         INamedTypeSymbol nested = NestedTypeSymbol(keyword);
 
-        AccessibilityMapper.TryMap(nested, out CoreAccessibility accessibility).ShouldBeTrue();
+        AccessibilityMapper.TryMap(nested, out CoreAccessibility accessibility)
+            .ShouldBeTrue();
         accessibility.ShouldBe(expected);
-        AccessibilityMapper.Map(nested).ShouldBe(expected);
+        AccessibilityMapper.Map(nested)
+            .ShouldBe(expected);
     }
 
     private static IArrayTypeSymbol ArrayTypeSymbol()
@@ -90,7 +93,8 @@ public sealed class AccessibilityMapperTests
     {
         CSharpCompilation compilation = Compilation(
             $"namespace App;\npublic class Outer {{ {keyword} class Nested {{ }} }}\n");
-        return compilation.GetTypeByMetadataName("App.Outer")!.GetTypeMembers("Nested").Single();
+        return compilation.GetTypeByMetadataName("App.Outer")!.GetTypeMembers("Nested")
+            .Single();
     }
 
     private static CSharpCompilation Compilation(string? source)

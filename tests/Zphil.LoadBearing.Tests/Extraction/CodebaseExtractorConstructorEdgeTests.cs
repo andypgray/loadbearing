@@ -23,7 +23,9 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          public class Maker { public object M() => new Thing(); }
                                                          """);
 
-        model.ConstructorEdge("N.Maker", "N.Thing").Lines().ShouldBe([3]);
+        model.ConstructorEdge("N.Maker", "N.Thing")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -37,9 +39,13 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         // Recorded BESIDE the type edge, never instead of it: the inner `Thing` name mints the §4.1 reference,
         // the `new` node mints the construction. Both stand at line 3.
-        model.HasConstructorEdge("N.Maker", "N.Thing").ShouldBeTrue();
-        model.HasEdge("N.Maker", "N.Thing").ShouldBeTrue();
-        model.Edge("N.Maker", "N.Thing").Lines().ShouldBe([3]);
+        model.HasConstructorEdge("N.Maker", "N.Thing")
+            .ShouldBeTrue();
+        model.HasEdge("N.Maker", "N.Thing")
+            .ShouldBeTrue();
+        model.Edge("N.Maker", "N.Thing")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -51,7 +57,9 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          public class Maker { public Widget M() { Widget w = new(); return w; } }
                                                          """);
 
-        model.ConstructorEdge("N.Maker", "N.Widget").Lines().ShouldBe([3]);
+        model.ConstructorEdge("N.Maker", "N.Widget")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -69,8 +77,12 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         // Line 6 (the target-typed new()) is the sole node contributing the Widget type edge purely from
         // implicit creation (there is no inner type-name syntax) — and it mints the ctor edge there too.
-        model.ConstructorEdge("N.Factory", "N.Widget").Lines().ShouldBe([6]);
-        model.Edge("N.Factory", "N.Widget").Lines().ShouldContain(6);
+        model.ConstructorEdge("N.Factory", "N.Widget")
+            .Lines()
+            .ShouldBe([6]);
+        model.Edge("N.Factory", "N.Widget")
+            .Lines()
+            .ShouldContain(6);
     }
 
     [Fact]
@@ -83,8 +95,11 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // new Box<int>() records the OPEN definition N.Box<T> (§4.1), and the co-existing type edge too.
-        model.ConstructorEdge("N.Maker", "N.Box<T>").Lines().ShouldBe([3]);
-        model.HasEdge("N.Maker", "N.Box<T>").ShouldBeTrue();
+        model.ConstructorEdge("N.Maker", "N.Box<T>")
+            .Lines()
+            .ShouldBe([3]);
+        model.HasEdge("N.Maker", "N.Box<T>")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -97,7 +112,8 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         ConstructorEdge edge = model.ConstructorEdge("N.Maker", "System.Text.StringBuilder");
         edge.Constructed.IsExternal.ShouldBeTrue();
-        edge.Lines().ShouldBe([2]);
+        edge.Lines()
+            .ShouldBe([2]);
     }
 
     [Fact]
@@ -112,8 +128,10 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // An attribute application is not an object-creation expression: the type edge rides, no ctor edge.
-        model.HasConstructorEdge("N.Decorated", "N.MyAttribute").ShouldBeFalse();
-        model.HasEdge("N.Decorated", "N.MyAttribute").ShouldBeTrue();
+        model.HasConstructorEdge("N.Decorated", "N.MyAttribute")
+            .ShouldBeFalse();
+        model.HasEdge("N.Decorated", "N.MyAttribute")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -130,9 +148,12 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // `: base(...)` and `: this(...)` are constructor initializers, not object-creation expressions.
-        model.HasConstructorEdge("N.Derived", "N.Base").ShouldBeFalse();
-        model.HasConstructorEdge("N.Derived", "N.Derived").ShouldBeFalse();
-        model.HasEdge("N.Derived", "N.Base").ShouldBeTrue(); // the base-list reference still stands
+        model.HasConstructorEdge("N.Derived", "N.Base")
+            .ShouldBeFalse();
+        model.HasConstructorEdge("N.Derived", "N.Derived")
+            .ShouldBeFalse();
+        model.HasEdge("N.Derived", "N.Base")
+            .ShouldBeTrue(); // the base-list reference still stands
     }
 
     [Fact]
@@ -149,8 +170,10 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // Delegate creation is excluded, keyed on the created symbol's TypeKind.Delegate — the type edge rides.
-        model.HasConstructorEdge("N.Wire", "N.Notify").ShouldBeFalse();
-        model.HasEdge("N.Wire", "N.Notify").ShouldBeTrue();
+        model.HasConstructorEdge("N.Wire", "N.Notify")
+            .ShouldBeFalse();
+        model.HasEdge("N.Wire", "N.Notify")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -167,7 +190,8 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // The delegate skip is symbol-keyed, so the target-typed spelling is excluded too.
-        model.HasConstructorEdge("N.Wire", "N.Notify").ShouldBeFalse();
+        model.HasConstructorEdge("N.Wire", "N.Notify")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -180,7 +204,8 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // A `with` expression is not an object-creation expression (walk boundary) — no ctor edge.
-        model.HasConstructorEdge("N.Mutator", "N.Point").ShouldBeFalse();
+        model.HasConstructorEdge("N.Mutator", "N.Point")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -193,8 +218,10 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // Array creation is not object creation: the element type edge rides, but no ctor edge.
-        model.HasConstructorEdge("N.Alloc", "N.Item").ShouldBeFalse();
-        model.HasEdge("N.Alloc", "N.Item").ShouldBeTrue();
+        model.HasConstructorEdge("N.Alloc", "N.Item")
+            .ShouldBeFalse();
+        model.HasEdge("N.Alloc", "N.Item")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -206,7 +233,8 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         // Self-construction is dropped, mirroring the type-edge self-drop the walker already applies (§4.1).
-        model.HasConstructorEdge("N.Recursive", "N.Recursive").ShouldBeFalse();
+        model.HasConstructorEdge("N.Recursive", "N.Recursive")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -218,7 +246,8 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          public class Maker { public object M() { var a = new Thing(); var b = new Thing(); return a; } }
                                                          """);
 
-        model.ConstructorEdge("N.Maker", "N.Thing").Sites.Count.ShouldBe(1);
+        model.ConstructorEdge("N.Maker", "N.Thing")
+            .Sites.Count.ShouldBe(1);
     }
 
     [Fact]

@@ -22,7 +22,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Legacy.Billing"))
                         .MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -38,7 +39,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
+        result.ReferencePairs()
+            .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
     }
 
     [Fact]
@@ -52,7 +54,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                         .Except(arch.Types.WithNameMatching("OrderService"))
                         .MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -65,7 +68,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                         .OfKind(TypeKind.Interface)
                         .MustHavePrefix("I"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -95,11 +99,12 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Because("b"))
             .Single();
 
-        result.Violations.Select(v => v.Detail).ShouldBe(
-        [
-            "The subject selection operand \"types in project `MyApp.Nope`\" matched no solution-declared types.",
-            "The subject selection operand \"types in `MyApp.Nope.*`\" matched no solution-declared types."
-        ]);
+        result.Violations.Select(v => v.Detail)
+            .ShouldBe(
+            [
+                "The subject selection operand \"types in project `MyApp.Nope`\" matched no solution-declared types.",
+                "The subject selection operand \"types in `MyApp.Nope.*`\" matched no solution-declared types."
+            ]);
     }
 
     [Fact]
@@ -128,6 +133,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Domain"), arch.Project("MyApp.Legacy.Billing"))
                         .Methods.MustHaveNameMatching("*"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 }

@@ -51,10 +51,14 @@ public sealed class DeriveFlowE2ETests
         init.ShouldSucceed();
         // A fully-ratcheted derive leaves nothing unratcheted to warn about — the happy path stays clean.
         init.Out.ShouldNotContain("failing with no baseline to capture");
-        File.Exists(workspace.PathOf("arch", "baselines", "layering", "domain-independent.json")).ShouldBeTrue();
-        File.Exists(workspace.PathOf("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBeTrue();
-        File.Exists(workspace.PathOf("arch", "baselines", "naming", "handlers.json")).ShouldBeTrue();
-        File.Exists(workspace.PathOf("arch", "baselines", "legacy", "billing", "containment.json")).ShouldBeTrue();
+        File.Exists(workspace.PathOf("arch", "baselines", "layering", "domain-independent.json"))
+            .ShouldBeTrue();
+        File.Exists(workspace.PathOf("arch", "baselines", "data-access", "no-inline-sql.json"))
+            .ShouldBeTrue();
+        File.Exists(workspace.PathOf("arch", "baselines", "naming", "handlers.json"))
+            .ShouldBeTrue();
+        File.Exists(workspace.PathOf("arch", "baselines", "legacy", "billing", "containment.json"))
+            .ShouldBeTrue();
 
         // Re-check: the debt is now the signed baseline, so the run is green with zero active violations.
         CliResult checkGreen = await CliRunner.InvokeAsync(
@@ -70,9 +74,13 @@ public sealed class DeriveFlowE2ETests
         render.ShouldSucceed();
         string rootAgents = workspace.PathOf("AGENTS.md");
         string scopeAgents = workspace.PathOf("MyApp.Legacy.Billing", "AGENTS.md");
-        File.Exists(rootAgents).ShouldBeTrue();
-        File.ReadAllText(rootAgents).ShouldContain("<!-- loadbearing:begin -->");
-        File.Exists(scopeAgents).ShouldBeTrue();
-        File.ReadAllText(scopeAgents).ShouldContain("## Quarantined scope `legacy/billing`");
+        File.Exists(rootAgents)
+            .ShouldBeTrue();
+        File.ReadAllText(rootAgents)
+            .ShouldContain("<!-- loadbearing:begin -->");
+        File.Exists(scopeAgents)
+            .ShouldBeTrue();
+        File.ReadAllText(scopeAgents)
+            .ShouldContain("## Quarantined scope `legacy/billing`");
     }
 }

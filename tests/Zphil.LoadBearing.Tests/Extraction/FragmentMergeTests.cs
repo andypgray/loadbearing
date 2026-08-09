@@ -51,7 +51,8 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Type("N.Dup").DeclarationSites.Select(s => (s.FilePath, s.Line))
+        model.Type("N.Dup")
+            .DeclarationSites.Select(s => (s.FilePath, s.Line))
             .ShouldBe([("A.cs", 2), ("B.cs", 2)]);
     }
 
@@ -72,7 +73,8 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([referencer, declarer]);
 
-        TypeNode target = model.Edge("N2.Early", "N.Late").Target;
+        TypeNode target = model.Edge("N2.Early", "N.Late")
+            .Target;
         target.IsExternal.ShouldBeFalse();
         target.ProjectName.ShouldBe("Bproj");
     }
@@ -96,7 +98,8 @@ public sealed class FragmentMergeTests
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
 
         TypeNode handlerDef = model.Type("N.IHandler<T>");
-        TypeConstruction construction = model.Type("N2.Handler").AllInterfaces
+        TypeConstruction construction = model.Type("N2.Handler")
+            .AllInterfaces
             .Single(c => c.Definition.FullName == "N.IHandler<T>");
         construction.Definition.ShouldBeSameAs(handlerDef);
         construction.FullName.ShouldBe("N.IHandler<N.Msg>");
@@ -139,13 +142,17 @@ public sealed class FragmentMergeTests
                             namespace P;
                             public class A {}
                             """);
-        var first = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Legacy"]);
-        var second = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Modern"]);
+        var first = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", ["Legacy"]);
+        var second = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", ["Modern"]);
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Projects.Count(p => p.Name == "P").ShouldBe(1);
-        model.Projects.Single(p => p.Name == "P").ProjectReferences.ShouldBe(["Legacy", "Modern"]);
+        model.Projects.Count(p => p.Name == "P")
+            .ShouldBe(1);
+        model.Projects.Single(p => p.Name == "P")
+            .ProjectReferences.ShouldBe(["Legacy", "Modern"]);
     }
 
     [Fact]
@@ -163,11 +170,14 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Types.Count(t => t.FullName == "System.Exception").ShouldBe(1);
+        model.Types.Count(t => t.FullName == "System.Exception")
+            .ShouldBe(1);
         TypeNode shared = model.Type("System.Exception");
         shared.IsExternal.ShouldBeTrue();
-        model.Edge("N.CA", "System.Exception").Target.ShouldBeSameAs(shared);
-        model.Edge("N2.CB", "System.Exception").Target.ShouldBeSameAs(shared);
+        model.Edge("N.CA", "System.Exception")
+            .Target.ShouldBeSameAs(shared);
+        model.Edge("N2.CB", "System.Exception")
+            .Target.ShouldBeSameAs(shared);
     }
 
     [Fact]
@@ -209,8 +219,10 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.ConstructorEdges.Count(e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A").ShouldBe(1);
-        model.ConstructorEdge("P.B", "P.A").Sites.Count.ShouldBe(1);
+        model.ConstructorEdges.Count(e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A")
+            .ShouldBe(1);
+        model.ConstructorEdge("P.B", "P.A")
+            .Sites.Count.ShouldBe(1);
     }
 
     // ── Injection edges / registration facts (GRAMMAR §4.7) ───────────────────────────────────────────
@@ -254,8 +266,10 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.InjectionEdges.Count(e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep").ShouldBe(1);
-        model.InjectionEdge("P.Svc", "P.IDep").Sites.Count.ShouldBe(1);
+        model.InjectionEdges.Count(e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep")
+            .ShouldBe(1);
+        model.InjectionEdge("P.Svc", "P.IDep")
+            .Sites.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -273,13 +287,17 @@ public sealed class FragmentMergeTests
                                   public static void Configure(IServiceCollection services) => services.AddSingleton<IFoo, Foo>();
                               }
                               """);
-        var first = new CompilationInput(CompilationFactory.CompileWithDi("P", file).Compilation, "P", ["Legacy"]);
-        var second = new CompilationInput(CompilationFactory.CompileWithDi("P", file).Compilation, "P", ["Modern"]);
+        var first = new CompilationInput(CompilationFactory.CompileWithDi("P", file)
+            .Compilation, "P", ["Legacy"]);
+        var second = new CompilationInput(CompilationFactory.CompileWithDi("P", file)
+            .Compilation, "P", ["Modern"]);
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.ServiceRegistrations.Count(r => r.ServiceFullName == "P.IFoo").ShouldBe(1);
-        model.Registration(Lifetime.Singleton, "P.IFoo", "P.Foo").Sites.Count.ShouldBe(1);
+        model.ServiceRegistrations.Count(r => r.ServiceFullName == "P.IFoo")
+            .ShouldBe(1);
+        model.Registration(Lifetime.Singleton, "P.IFoo", "P.Foo")
+            .Sites.Count.ShouldBe(1);
     }
 
     // ── Same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
@@ -315,8 +333,10 @@ public sealed class FragmentMergeTests
                             namespace P;
                             public class A {}
                             """);
-        var first = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Legacy"]);
-        var second = new CompilationInput(CompilationFactory.Compile("P", file).Compilation, "P", ["Modern"]);
+        var first = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", ["Legacy"]);
+        var second = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", ["Modern"]);
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
@@ -355,17 +375,20 @@ public sealed class FragmentMergeTests
             CompilationFactory.Compile("Bproj", ("B.cs", """
                                                          namespace N;
                                                          public class Dup {}
-                                                         """)).Compilation, "Bproj", ["Legacy"]);
+                                                         """))
+                .Compilation, "Bproj", ["Legacy"]);
         var loserSecond = new CompilationInput(
             CompilationFactory.Compile("Bproj", ("B.cs", """
                                                          namespace N;
                                                          public class Dup {}
-                                                         """)).Compilation, "Bproj", ["Modern"]);
+                                                         """))
+                .Compilation, "Bproj", ["Modern"]);
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, loserFirst, loserSecond]);
 
         model.MergeNotes.Count.ShouldBe(1);
-        model.MergeNotes[0].ShouldContain("declared by projects 'Aproj' and 'Bproj'");
+        model.MergeNotes[0]
+            .ShouldContain("declared by projects 'Aproj' and 'Bproj'");
     }
 
     [Fact]

@@ -114,7 +114,8 @@ public sealed class ShapeFactExtractionTests
         abstractRec.IsRecord.ShouldBeTrue();
         abstractRec.IsAbstract.ShouldBeTrue();
 
-        Model.Type("N.PlainClass").IsRecord.ShouldBeFalse();
+        Model.Type("N.PlainClass")
+            .IsRecord.ShouldBeFalse();
     }
 
     [Fact]
@@ -137,15 +138,24 @@ public sealed class ShapeFactExtractionTests
                                                          class DefaultType {}
                                                          """);
 
-        model.Type("N.PublicType").Accessibility.ShouldBe(Accessibility.Public);
-        model.Type("N.PublicType.PublicNested").Accessibility.ShouldBe(Accessibility.Public);
-        model.Type("N.PublicType.InternalNested").Accessibility.ShouldBe(Accessibility.Internal);
-        model.Type("N.PublicType.ProtectedNested").Accessibility.ShouldBe(Accessibility.Protected);
-        model.Type("N.PublicType.ProtectedInternalNested").Accessibility.ShouldBe(Accessibility.ProtectedInternal);
-        model.Type("N.PublicType.PrivateProtectedNested").Accessibility.ShouldBe(Accessibility.PrivateProtected);
-        model.Type("N.PublicType.PrivateNested").Accessibility.ShouldBe(Accessibility.Private);
-        model.Type("N.InternalType").Accessibility.ShouldBe(Accessibility.Internal);
-        model.Type("N.DefaultType").Accessibility.ShouldBe(Accessibility.Internal);
+        model.Type("N.PublicType")
+            .Accessibility.ShouldBe(Accessibility.Public);
+        model.Type("N.PublicType.PublicNested")
+            .Accessibility.ShouldBe(Accessibility.Public);
+        model.Type("N.PublicType.InternalNested")
+            .Accessibility.ShouldBe(Accessibility.Internal);
+        model.Type("N.PublicType.ProtectedNested")
+            .Accessibility.ShouldBe(Accessibility.Protected);
+        model.Type("N.PublicType.ProtectedInternalNested")
+            .Accessibility.ShouldBe(Accessibility.ProtectedInternal);
+        model.Type("N.PublicType.PrivateProtectedNested")
+            .Accessibility.ShouldBe(Accessibility.PrivateProtected);
+        model.Type("N.PublicType.PrivateNested")
+            .Accessibility.ShouldBe(Accessibility.Private);
+        model.Type("N.InternalType")
+            .Accessibility.ShouldBe(Accessibility.Internal);
+        model.Type("N.DefaultType")
+            .Accessibility.ShouldBe(Accessibility.Internal);
     }
 
     [Fact]
@@ -156,7 +166,8 @@ public sealed class ShapeFactExtractionTests
                                                          public class C {}
                                                          """);
 
-        model.Type("N.C").FilePaths.ShouldBe(["Test.cs"]);
+        model.Type("N.C")
+            .FilePaths.ShouldBe(["Test.cs"]);
     }
 
     [Fact]
@@ -173,7 +184,8 @@ public sealed class ShapeFactExtractionTests
                          public partial class P { public int B; }
                          """));
 
-        model.Type("N.P").FilePaths.ShouldBe(["PartA.cs", "PartB.cs"]);
+        model.Type("N.P")
+            .FilePaths.ShouldBe(["PartA.cs", "PartB.cs"]);
     }
 
     [Fact]
@@ -221,6 +233,7 @@ public sealed class ShapeFactExtractionTests
         math.IsSealed.ShouldBeFalse();
         math.IsAbstract.ShouldBeFalse();
 
-        model.Type("System.Attribute").IsAbstract.ShouldBeTrue();
+        model.Type("System.Attribute")
+            .IsAbstract.ShouldBeTrue();
     }
 }

@@ -45,7 +45,8 @@ internal static class RepoRoot
     /// <summary>The forward-slash repo-relative path for an absolute one — how the repo spells its own files.</summary>
     public static string Relative(string absolutePath)
     {
-        return Path.GetRelativePath(Directory, absolutePath).Replace('\\', '/');
+        return Path.GetRelativePath(Directory, absolutePath)
+            .Replace('\\', '/');
     }
 
     private static string Find()

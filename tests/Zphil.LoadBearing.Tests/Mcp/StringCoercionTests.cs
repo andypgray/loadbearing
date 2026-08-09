@@ -33,7 +33,8 @@ public sealed class StringCoercionTests
     [Fact]
     public void Scalar_PlainString_PassesThroughVerbatim()
     {
-        Deserialize<string>("\"layering/domain-independent\"").ShouldBe("layering/domain-independent");
+        Deserialize<string>("\"layering/domain-independent\"")
+            .ShouldBe("layering/domain-independent");
     }
 
     [Theory]
@@ -44,26 +45,30 @@ public sealed class StringCoercionTests
     {
         // A literal string argument must survive untouched: unwrapping here would silently rewrite a
         // caller's real value, which is worse than the error it would be saving them from.
-        Deserialize<string>(json).ShouldBe(expected);
+        Deserialize<string>(json)
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void Scalar_SingleElementArray_UnwrapsToTheString()
     {
         // The shape models actually send when a scalar is advertised.
-        Deserialize<string>("[\"arch_check\"]").ShouldBe("arch_check");
+        Deserialize<string>("[\"arch_check\"]")
+            .ShouldBe("arch_check");
     }
 
     [Fact]
     public void Scalar_EmptyArray_CoercesToNull()
     {
-        Deserialize<string>("[]").ShouldBeNull();
+        Deserialize<string>("[]")
+            .ShouldBeNull();
     }
 
     [Fact]
     public void Scalar_Null_IsNull()
     {
-        Deserialize<string>("null").ShouldBeNull();
+        Deserialize<string>("null")
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -105,20 +110,24 @@ public sealed class StringCoercionTests
     {
         // The converter is registered for writing too — a coercer that mangles output would corrupt
         // every serialized string on these options, not just tool inputs.
-        JsonSerializer.Serialize("A", Options).ShouldBe("\"A\"");
-        JsonSerializer.Serialize((string?)null, Options).ShouldBe("null");
+        JsonSerializer.Serialize("A", Options)
+            .ShouldBe("\"A\"");
+        JsonSerializer.Serialize((string?)null, Options)
+            .ShouldBe("null");
     }
 
     [Fact]
     public void Array_RealJsonArray_ReadsAsIs()
     {
-        Deserialize<string[]>("[\"A\",\"B\"]").ShouldBe(["A", "B"]);
+        Deserialize<string[]>("[\"A\",\"B\"]")
+            .ShouldBe(["A", "B"]);
     }
 
     [Fact]
     public void Array_EmptyJsonArray_ReadsAsEmpty()
     {
-        Deserialize<string[]>("[]").ShouldBeEmpty();
+        Deserialize<string[]>("[]")
+            .ShouldBeEmpty();
     }
 
     [Theory]
@@ -128,7 +137,8 @@ public sealed class StringCoercionTests
     public void Array_JsonEncodedArrayString_IsUnwrapped(string json)
     {
         // The shape models actually send: the array, but stringified. Surrounding whitespace tolerated.
-        Deserialize<string[]>(json).ShouldBe(["A", "B"]);
+        Deserialize<string[]>(json)
+            .ShouldBe(["A", "B"]);
     }
 
     [Theory]
@@ -137,7 +147,8 @@ public sealed class StringCoercionTests
     [InlineData("\"   \"", "   ")]
     public void Array_BareString_BecomesASingleElementArray(string json, string expected)
     {
-        Deserialize<string[]>(json).ShouldBe([expected]);
+        Deserialize<string[]>(json)
+            .ShouldBe([expected]);
     }
 
     [Theory]
@@ -152,13 +163,15 @@ public sealed class StringCoercionTests
     {
         // Falling back to the verbatim string rather than throwing is the point: only a JSON array whose
         // every element is a string is unambiguous enough to unwrap. Anything else may be a real value.
-        Deserialize<string[]>(json).ShouldBe([expected]);
+        Deserialize<string[]>(json)
+            .ShouldBe([expected]);
     }
 
     [Fact]
     public void Array_JsonEncodedEmptyArrayString_UnwrapsToEmpty()
     {
-        Deserialize<string[]>("\"[]\"").ShouldBeEmpty();
+        Deserialize<string[]>("\"[]\"")
+            .ShouldBeEmpty();
     }
 
     [Theory]
@@ -190,22 +203,30 @@ public sealed class StringCoercionTests
     [Fact]
     public void Array_Write_EmitsAPlainJsonArrayOfStrings()
     {
-        JsonSerializer.Serialize(new[] { "A", "B" }, Options).ShouldBe("[\"A\",\"B\"]");
-        JsonSerializer.Serialize(Array.Empty<string>(), Options).ShouldBe("[]");
+        JsonSerializer.Serialize(new[] { "A", "B" }, Options)
+            .ShouldBe("[\"A\",\"B\"]");
+        JsonSerializer.Serialize(Array.Empty<string>(), Options)
+            .ShouldBe("[]");
     }
 
     [Fact]
     public void Factories_ConvertTheirOwnShapeAndNothingElse()
     {
         StringCoercerFactory scalar = new();
-        scalar.CanConvert(typeof(string)).ShouldBeTrue();
-        scalar.CanConvert(typeof(string[])).ShouldBeFalse();
-        scalar.CanConvert(typeof(int)).ShouldBeFalse();
+        scalar.CanConvert(typeof(string))
+            .ShouldBeTrue();
+        scalar.CanConvert(typeof(string[]))
+            .ShouldBeFalse();
+        scalar.CanConvert(typeof(int))
+            .ShouldBeFalse();
 
         StringArrayCoercerFactory array = new();
-        array.CanConvert(typeof(string[])).ShouldBeTrue();
-        array.CanConvert(typeof(string)).ShouldBeFalse();
-        array.CanConvert(typeof(List<string>)).ShouldBeFalse();
+        array.CanConvert(typeof(string[]))
+            .ShouldBeTrue();
+        array.CanConvert(typeof(string))
+            .ShouldBeFalse();
+        array.CanConvert(typeof(List<string>))
+            .ShouldBeFalse();
     }
 
     private static T? Deserialize<T>(string json)

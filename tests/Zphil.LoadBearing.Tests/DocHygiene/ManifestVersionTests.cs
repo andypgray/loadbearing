@@ -78,7 +78,8 @@ public sealed class ManifestVersionTests
     {
         XDocument props = XDocument.Load(RepoRoot.Absolute(PropsPath));
 
-        var declared = props.Descendants("Version").ToArray();
+        var declared = props.Descendants("Version")
+            .ToArray();
         XElement version = declared.ShouldHaveSingleItem(
             $"{PropsPath} declares the lockstep <Version> exactly once, for all four packages at "
             + $"once; this run found {declared.Length}.");
@@ -108,7 +109,8 @@ public sealed class ManifestVersionTests
 
         using JsonDocument golden = JsonDocument.Parse(json);
         JsonElement firstRun = golden.RootElement.GetProperty("runs")[0];
-        JsonElement driver = firstRun.GetProperty("tool").GetProperty("driver");
+        JsonElement driver = firstRun.GetProperty("tool")
+            .GetProperty("driver");
 
         return ShouldHaveText(driver, "version", SarifDriverSite);
     }
@@ -118,7 +120,8 @@ public sealed class ManifestVersionTests
         bool found = parent.TryGetProperty(name, out JsonElement value);
         found.ShouldBeTrue($"{site} is absent, so nothing there states a version at all.");
 
-        return value.GetString().ShouldNotBeNull($"{site} carries no version string.");
+        return value.GetString()
+            .ShouldNotBeNull($"{site} carries no version string.");
     }
 
     private static string Describe(IEnumerable<VersionSite> sites)

@@ -39,7 +39,8 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>Solution-relative, forward-slash rendering of a location's file path.</summary>
     public string RelativePath(SourceLocation location)
     {
-        return Path.GetRelativePath(Path.GetDirectoryName(SolutionPath)!, location.FilePath).Replace('\\', '/');
+        return Path.GetRelativePath(Path.GetDirectoryName(SolutionPath)!, location.FilePath)
+            .Replace('\\', '/');
     }
 
     /// <summary>Renders an edge as the pinned agent-facing form: <c>src -&gt; tgt @ file:line, ...</c>.</summary>

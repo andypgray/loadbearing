@@ -187,7 +187,8 @@ public sealed class RootReadmeQuoteSyncTests
 
             int found = -1;
             for (int index = searchFrom; index < source.Count; index++)
-                if (source[index].Contains(fenceLine, StringComparison.Ordinal))
+                if (source[index]
+                    .Contains(fenceLine, StringComparison.Ordinal))
                 {
                     found = index;
                     break;

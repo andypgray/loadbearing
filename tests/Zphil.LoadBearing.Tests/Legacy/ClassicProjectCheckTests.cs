@@ -78,7 +78,8 @@ public sealed class ClassicProjectCheckTests
             "BuildHost-net472",
             "Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe");
 
-        File.Exists(buildHost).ShouldBeTrue(
-            $"The net472 build host was not deployed beside the CLI output at '{buildHost}'.");
+        File.Exists(buildHost)
+            .ShouldBeTrue(
+                $"The net472 build host was not deployed beside the CLI output at '{buildHost}'.");
     }
 }

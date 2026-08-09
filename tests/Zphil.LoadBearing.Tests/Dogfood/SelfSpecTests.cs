@@ -91,7 +91,8 @@ public sealed class SelfSpecTests
         result.ShouldSucceed();
 
         using JsonDocument report = result.ShouldHaveJsonStdout();
-        report.RootElement.GetProperty("workspaceDiagnostics").EnumerateArray()
+        report.RootElement.GetProperty("workspaceDiagnostics")
+            .EnumerateArray()
             .Select(note => note.GetString())
             .ShouldBeEmpty(
                 "this repo's own check must carry no advisory note at all — a duplicate declaration here is " +
@@ -106,8 +107,10 @@ public sealed class SelfSpecTests
         string committed = File.ReadAllText(RepoRoot.AgentsMd);
 
         // Exactly one marker pair (ExtractBody throws on any other count), and its body is current.
-        MarkerPairCount(committed).ShouldBe(1);
-        ManagedBlock.ExtractBody(committed).ShouldBe(composed);
+        MarkerPairCount(committed)
+            .ShouldBe(1);
+        ManagedBlock.ExtractBody(committed)
+            .ShouldBe(composed);
     }
 
     [Fact]
@@ -123,8 +126,10 @@ public sealed class SelfSpecTests
             summary, Path.GetFileName(RepoRoot.Solution), model, SpecName, new DiagramScope(ShippingProjects, []));
         string committed = File.ReadAllText(RepoRoot.ArchitectureMd);
 
-        MarkerPairCount(committed).ShouldBe(1);
-        ManagedBlock.ExtractBody(committed).ShouldBe(composed);
+        MarkerPairCount(committed)
+            .ShouldBe(1);
+        ManagedBlock.ExtractBody(committed)
+            .ShouldBe(composed);
     }
 
     /// <summary>
@@ -142,7 +147,8 @@ public sealed class SelfSpecTests
         string? body = ManagedBlock.ExtractBody(File.ReadAllText(RepoRoot.ArchitectureMd));
         body.ShouldNotBeNull("ARCHITECTURE.md carries no managed block.");
 
-        Occurrences(body, "```mermaid").ShouldBe(2, "the managed block must carry both drawings.");
+        Occurrences(body, "```mermaid")
+            .ShouldBe(2, "the managed block must carry both drawings.");
         body.ShouldContain("accTitle: Codebase survey:");
         body.ShouldContain("accTitle: Architecture law:");
     }
@@ -177,17 +183,21 @@ public sealed class SelfSpecTests
         foreach (ContextFile file in composition.Files)
         {
             string relative = PathFormat.Relative(RepoRoot.Directory, file.Path);
-            File.Exists(file.Path).ShouldBeTrue($"{relative} is not committed; run `loadbearing render`.");
+            File.Exists(file.Path)
+                .ShouldBeTrue($"{relative} is not committed; run `loadbearing render`.");
 
             string committed = File.ReadAllText(file.Path);
-            MarkerPairCount(committed).ShouldBe(1, relative);
-            ManagedBlock.ExtractBody(committed).ShouldBe(file.Body, relative);
+            MarkerPairCount(committed)
+                .ShouldBe(1, relative);
+            ManagedBlock.ExtractBody(committed)
+                .ShouldBe(file.Body, relative);
         }
 
-        CommittedContextFiles().ShouldBe(
-            composition.Files.Select(file => Path.GetFullPath(file.Path)),
-            ignoreOrder: true,
-            "a committed AGENTS.md that no placement produces is an orphan; delete it or restore the rule that placed it.");
+        CommittedContextFiles()
+            .ShouldBe(
+                composition.Files.Select(file => Path.GetFullPath(file.Path)),
+                ignoreOrder: true,
+                "a committed AGENTS.md that no placement produces is an orphan; delete it or restore the rule that placed it.");
     }
 
     /// <summary>
@@ -238,7 +248,8 @@ public sealed class SelfSpecTests
         field.ShouldNotBeNull("the self-spec no longer carries a SanctionedBroadCatchers set; move this pin with it.");
 
         var sanctioned = (HashSet<string>)field.GetValue(null)!;
-        var ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal).ToList();
+        var ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
 
         ordered.ShouldBe(
             [
@@ -295,7 +306,8 @@ public sealed class SelfSpecTests
         // The layer selection is taken from the built model rather than re-declared, so this pins the globs
         // the spec actually ships. layering/core-no-roslyn's subject is the bare Core layer.
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
-        Selection coreLayer = model.Rules.Single(rule => rule.Id == "layering/core-no-roslyn").Constraint!.Subject;
+        Selection coreLayer = model.Rules.Single(rule => rule.Id == "layering/core-no-roslyn")
+            .Constraint!.Subject;
         Selection coreProject = coreLayer.Owner.Project("Zphil.LoadBearing");
 
         var evaluator = new SelectionEvaluator(codebase);
@@ -304,12 +316,14 @@ public sealed class SelfSpecTests
 
         // Asserted as two set differences rather than one list equality, because the whole Core type list
         // is ~190 names and a positional diff of it says nothing. Each direction names only the strays.
-        inProject.Except(inLayer).ShouldBeEmpty(
-            "these Core types are in no Core-layer glob, so every rule anchored on `core` silently skips " +
-            "them — add their namespace to the Core layer in LoadBearingArchSpec.");
-        inLayer.Except(inProject).ShouldBeEmpty(
-            "these types match a Core-layer glob but are not in the Core project, so the layer now claims " +
-            "code it does not own — narrow the glob in LoadBearingArchSpec.");
+        inProject.Except(inLayer)
+            .ShouldBeEmpty(
+                "these Core types are in no Core-layer glob, so every rule anchored on `core` silently skips " +
+                "them — add their namespace to the Core layer in LoadBearingArchSpec.");
+        inLayer.Except(inProject)
+            .ShouldBeEmpty(
+                "these types match a Core-layer glob but are not in the Core project, so the layer now claims " +
+                "code it does not own — narrow the glob in LoadBearingArchSpec.");
     }
 
     /// <summary>
@@ -337,7 +351,8 @@ public sealed class SelfSpecTests
         var declared = Names(evaluator.Evaluate(cliProject, SelectionPosition.Subject));
         var authored = Names(evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject));
 
-        declared.Except(authored).ShouldBe(["Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"]);
+        declared.Except(authored)
+            .ShouldBe(["Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"]);
 
         // The synthesized top-level-statements entry point is the nearest thing this project has to a type
         // nobody typed, and no generator emitted it — so it must survive the narrowing.
@@ -368,16 +383,17 @@ public sealed class SelfSpecTests
         var declared = Names(evaluator.Evaluate(roslynProject, SelectionPosition.Subject));
         var authored = Names(evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject));
 
-        declared.Except(authored).ShouldBe(
-        [
-            "System.Text.RegularExpressions.Generated.AuditCode_1",
-            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory",
-            "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory.Runner",
-            "System.Text.RegularExpressions.Generated.AuditText_0",
-            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
-            "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
-            "System.Text.RegularExpressions.Generated.Utilities"
-        ], ignoreOrder: true);
+        declared.Except(authored)
+            .ShouldBe(
+            [
+                "System.Text.RegularExpressions.Generated.AuditCode_1",
+                "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory",
+                "System.Text.RegularExpressions.Generated.AuditCode_1.RunnerFactory.Runner",
+                "System.Text.RegularExpressions.Generated.AuditText_0",
+                "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
+                "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
+                "System.Text.RegularExpressions.Generated.Utilities"
+            ], ignoreOrder: true);
 
         // The type the generator completed rather than emitted. Its own declaration is hand-written, the
         // attribute landed on the method, and the two parts merge onto one symbol — so it must survive the
@@ -387,7 +403,9 @@ public sealed class SelfSpecTests
 
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
     {
-        return types.Select(type => type.FullName).OrderBy(name => name, StringComparer.Ordinal).ToList();
+        return types.Select(type => type.FullName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
     }
 
     // Every AGENTS.md this solution's render could own: the root one plus whatever sits under the source

@@ -111,7 +111,9 @@ public sealed class McpStdioChildServerTests
             .ShouldBeFalse($"the server returned a JSON-RPC error: {error}");
 
         JsonElement result = document.RootElement.GetProperty("result");
-        string text = result.GetProperty("content")[0].GetProperty("text").GetString() ?? string.Empty;
+        string text = result.GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString() ?? string.Empty;
 
         bool isError = result.TryGetProperty("isError", out JsonElement flag)
                        && flag.ValueKind == JsonValueKind.True;

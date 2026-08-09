@@ -43,7 +43,8 @@ public class PackParityTests
     [Fact]
     public void RuleOrder_PackedAndInline_Agree()
     {
-        Packed.Rules.Select(rule => rule.Id).ShouldBe(Inline.Rules.Select(rule => rule.Id));
+        Packed.Rules.Select(rule => rule.Id)
+            .ShouldBe(Inline.Rules.Select(rule => rule.Id));
     }
 
     [Theory]
@@ -70,7 +71,8 @@ public class PackParityTests
         // to their definition), so Task<object>.Result and typeof(Task<>) + "Result" are the same leaf.
         // This is the assertion that catches the conversion, since Location is diagnostics-only and does
         // not reach the model.
-        Anchors(Rule(Packed, id)).ShouldBe(Anchors(Rule(Inline, id)));
+        Anchors(Rule(Packed, id))
+            .ShouldBe(Anchors(Rule(Inline, id)));
     }
 
     private static ArchRule Rule(ArchitectureModel model, string id)

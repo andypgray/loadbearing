@@ -28,7 +28,9 @@ public sealed class MigrateRatchetTests
         arch.Rule("data/x")
             .Migrate(
                 "Controllers open the data layer directly (legacy Active Record style).",
-                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+                arch.Namespace("App.Web.*")
+                    .WithSuffix("Controller")
+                    .MustNotReference(arch.Namespace("App.Data.*")))
             .Because("Repository pattern for testability.");
     }
 
@@ -37,7 +39,8 @@ public sealed class MigrateRatchetTests
     {
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
-        RuleResult result = Checker.Run(OneController, index, NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+            .Single();
 
         result.ShouldHavePassed();
         result.Violations.ShouldBeEmpty();
@@ -49,7 +52,8 @@ public sealed class MigrateRatchetTests
     public void Check_MigrateViolationNotInBaseline_FailsRed()
     {
         // Captured section, but this edge is not in it — new code in the old pattern is red.
-        RuleResult result = Checker.Run(OneController, Checker.Baselines("data/x"), NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, Checker.Baselines("data/x"), NoDataAccess)
+            .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.Violations.Count.ShouldBe(1);
@@ -74,10 +78,12 @@ public sealed class MigrateRatchetTests
                               """;
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
 
-        RuleResult result = Checker.Run(source, index, NoDataAccess).Single();
+        RuleResult result = Checker.Run(source, index, NoDataAccess)
+            .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldBe(["App.Web.OldController -> App.Data.Cache"]);
+        result.ReferencePairs()
+            .ShouldBe(["App.Web.OldController -> App.Data.Cache"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -93,7 +99,9 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "Controllers `new` the data layer directly (legacy Active Record style).",
-                        arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotConstruct(arch.Namespace("App.Data.*")))
+                        arch.Namespace("App.Web.*")
+                            .WithSuffix("Controller")
+                            .MustNotConstruct(arch.Namespace("App.Data.*")))
                     .Because("Resolve via DI for testability."))
             .Single();
 
@@ -111,7 +119,8 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("naming/x")
-                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
+                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*")
+                        .MustHaveSuffix("Handler"))
                     .Because("Handler discovery is convention-based."))
             .Single();
 
@@ -129,7 +138,8 @@ public sealed class MigrateRatchetTests
             BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
 
-        RuleResult result = Checker.Run(OneController, index, NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+            .Single();
 
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
@@ -139,7 +149,8 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_UncapturedMigrateRule_AllViolationsRedAndCapturedFalse()
     {
-        RuleResult result = Checker.Run(OneController, BaselineIndex.Empty, NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, BaselineIndex.Empty, NoDataAccess)
+            .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.Violations.Count.ShouldBe(1);
@@ -155,7 +166,8 @@ public sealed class MigrateRatchetTests
                               namespace App.Data { public class Db {} }
                               """;
 
-        RuleResult result = Checker.Run(source, Checker.Baselines("data/x"), NoDataAccess).Single();
+        RuleResult result = Checker.Run(source, Checker.Baselines("data/x"), NoDataAccess)
+            .Single();
 
         result.ShouldHavePassed();
         result.BaselineCaptured.ShouldBeTrue();
@@ -170,12 +182,15 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
-                        arch.Namespace("App.Nowhere.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+                        arch.Namespace("App.Nowhere.*")
+                            .WithSuffix("Controller")
+                            .MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.EmptySubject);
         result.Grandfathered.ShouldBeEmpty();
     }
 
@@ -189,7 +204,8 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.RuleError);
         result.Grandfathered.ShouldBeEmpty();
     }
 
@@ -200,7 +216,9 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
-                        arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Ghost.*")))
+                        arch.Namespace("App.Web.*")
+                            .WithSuffix("Controller")
+                            .MustNotReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
             .Single();
 
@@ -210,7 +228,8 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_TwoArgOverload_TreatsBaselinesAsEmpty()
     {
-        RuleResult result = Checker.Run(OneController, NoDataAccess).Single();
+        RuleResult result = Checker.Run(OneController, NoDataAccess)
+            .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         result.BaselineCaptured.ShouldBeFalse();
@@ -224,7 +243,8 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("layer/x")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Web.*")
+                        .MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 

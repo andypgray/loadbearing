@@ -24,19 +24,22 @@ public sealed class GitChangedFilesTests
     [Fact]
     public void ParseZTerminated_EmptyOutput_IsEmpty()
     {
-        GitChangedFiles.ParseZTerminated("").ShouldBeEmpty();
+        GitChangedFiles.ParseZTerminated("")
+            .ShouldBeEmpty();
     }
 
     [Fact]
     public void ParseZTerminated_SplitsOnNulAndDropsTrailingEmpty()
     {
-        GitChangedFiles.ParseZTerminated("a\0b\0").ShouldBe(["a", "b"]);
+        GitChangedFiles.ParseZTerminated("a\0b\0")
+            .ShouldBe(["a", "b"]);
     }
 
     [Fact]
     public void ParseZTerminated_ToleratesMissingTrailingNul()
     {
-        GitChangedFiles.ParseZTerminated("a\0b").ShouldBe(["a", "b"]);
+        GitChangedFiles.ParseZTerminated("a\0b")
+            .ShouldBe(["a", "b"]);
     }
 
     [Fact]

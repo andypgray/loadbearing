@@ -75,9 +75,10 @@ public sealed class McpRegistrationTests
                 + "account here have come apart.");
 
             string absolute = RepoRoot.Absolute(path);
-            File.Exists(absolute).ShouldBeTrue(
-                $"the registration names {path}, which is not there. Pasted as written, it points the client "
-                + "at nothing and the server never reaches a handshake.");
+            File.Exists(absolute)
+                .ShouldBeTrue(
+                    $"the registration names {path}, which is not there. Pasted as written, it points the client "
+                    + "at nothing and the server never reaches a handshake.");
         }
     }
 
@@ -140,10 +141,11 @@ public sealed class McpRegistrationTests
 
         string shell = Path.Combine(GitPathEntry, "sh.exe");
 
-        File.Exists(shell).ShouldBeFalse(
-            $"{shell} exists, so a default install now puts a shell where the machine PATH reaches it and "
-            + "the README's reason for naming the shell absolutely no longer holds. Revisit what it tells a "
-            + "reader to paste.");
+        File.Exists(shell)
+            .ShouldBeFalse(
+                $"{shell} exists, so a default install now puts a shell where the machine PATH reaches it and "
+                + "the README's reason for naming the shell absolutely no longer holds. Revisit what it tells a "
+                + "reader to paste.");
     }
 
     private static string ReadRepoFile(string repoRelativePath)

@@ -188,7 +188,8 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // to deliver. A directory that does not exist is the reachable form of that failure.
         string vanished = _temp.PathOf("was-deleted-underneath-us");
 
-        SolutionDiscovery.NearMisses(vanished).ShouldBeEmpty();
+        SolutionDiscovery.NearMisses(vanished)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -226,10 +227,12 @@ public sealed class SolutionDiscoveryTests : IDisposable
     {
         string slnxDir = CreateDir("slnx-only");
         string slnxPath = CreateSln(slnxDir, "Modern.slnx");
-        SolutionDiscovery.DiscoverSolution(workingDirectory: slnxDir).ShouldBe(slnxPath);
+        SolutionDiscovery.DiscoverSolution(workingDirectory: slnxDir)
+            .ShouldBe(slnxPath);
 
         string slnfDir = CreateDir("slnf-only");
         string slnfPath = CreateSln(slnfDir, "Filtered.slnf");
-        SolutionDiscovery.DiscoverSolution(workingDirectory: slnfDir).ShouldBe(slnfPath);
+        SolutionDiscovery.DiscoverSolution(workingDirectory: slnfDir)
+            .ShouldBe(slnfPath);
     }
 }

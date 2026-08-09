@@ -21,7 +21,8 @@ public sealed class CacheLocationsTests
             "Zphil.LoadBearing",
             "cache");
 
-        CacheLocations.DefaultCacheRoot().ShouldBe(expected);
+        CacheLocations.DefaultCacheRoot()
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public sealed class CacheLocationsTests
         string path = CacheLocations.CacheFilePath(solutionPath, null);
 
         path.ShouldStartWith(CacheLocations.DefaultCacheRoot());
-        Path.GetFileName(path).ShouldBe("cache.json");
+        Path.GetFileName(path)
+            .ShouldBe("cache.json");
     }
 }

@@ -43,7 +43,8 @@ public sealed class SessionFragmentStoreTests
         store.FullWalkCount.ShouldBe(1);
 
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap1.Solution, ct: Ct);
-        ModelDump.Render(FragmentMerger.Merge(first.Fragments)).ShouldBe(ModelDump.Render(coldModel));
+        ModelDump.Render(FragmentMerger.Merge(first.Fragments))
+            .ShouldBe(ModelDump.Render(coldModel));
 
         // Act 2 — a second call with disk untouched must reuse everything.
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
@@ -53,7 +54,8 @@ public sealed class SessionFragmentStoreTests
         second.ReExtractedProjects.ShouldBeEmpty();
         store.LastReExtractedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
-        ModelDump.Render(FragmentMerger.Merge(second.Fragments)).ShouldBe(ModelDump.Render(coldModel));
+        ModelDump.Render(FragmentMerger.Merge(second.Fragments))
+            .ShouldBe(ModelDump.Render(coldModel));
     }
 
     [Fact]
@@ -81,8 +83,10 @@ public sealed class SessionFragmentStoreTests
         // The merged model carries the new type and equals a fresh cold extraction of the edited tree.
         CodebaseModel storeModel = FragmentMerger.Merge(edited.Fragments);
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
-        ModelDump.Render(storeModel).ShouldContain("MyApp.Web.WebIncrementalProbe");
-        ModelDump.Render(storeModel).ShouldBe(ModelDump.Render(coldModel));
+        ModelDump.Render(storeModel)
+            .ShouldContain("MyApp.Web.WebIncrementalProbe");
+        ModelDump.Render(storeModel)
+            .ShouldBe(ModelDump.Render(coldModel));
     }
 
     [Fact]
@@ -120,12 +124,14 @@ public sealed class SessionFragmentStoreTests
 
         // Act — merge the store's fragments minus Billing (as CodebaseSource.Retain does) versus a cold
         // extraction that excludes Billing at the input stage.
-        var retained = all.Fragments.Where(fragment => fragment.ProjectName != Billing).ToList();
+        var retained = all.Fragments.Where(fragment => fragment.ProjectName != Billing)
+            .ToList();
         CodebaseModel mergedExcluded = FragmentMerger.Merge(retained);
         CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution, [Billing], Ct);
 
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
-        ModelDump.Render(mergedExcluded).ShouldBe(ModelDump.Render(coldExcluded));
+        ModelDump.Render(mergedExcluded)
+            .ShouldBe(ModelDump.Render(coldExcluded));
     }
 }

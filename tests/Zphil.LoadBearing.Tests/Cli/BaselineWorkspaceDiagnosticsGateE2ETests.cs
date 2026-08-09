@@ -66,7 +66,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         init.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
         init.Err.ShouldContain(GateLine);
         init.Out.ShouldBeEmpty(); // it refused before the ratchet survey, so it reported no per-rule outcome
-        File.Exists(baselineFile).ShouldBeFalse(); // and above all, wrote nothing
+        File.Exists(baselineFile)
+            .ShouldBeFalse(); // and above all, wrote nothing
     }
 
     [Fact]
@@ -84,7 +85,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");
         init.Err.ShouldNotContain("error: the model is incomplete");
         init.Out.ShouldContain("wrote");
-        File.Exists(baselineFile).ShouldBeTrue();
+        File.Exists(baselineFile)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -102,7 +104,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         accept.ShouldRefuseWith();
         accept.Err.ShouldContain(GateLine);
-        File.ReadAllBytes(baselineFile).ShouldBe(before);
+        File.ReadAllBytes(baselineFile)
+            .ShouldBe(before);
     }
 
     [Fact]
@@ -119,7 +122,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         add.ShouldRefuseWith();
         add.Err.ShouldContain(GateLine);
-        File.ReadAllBytes(baselineFile).ShouldBe(before);
+        File.ReadAllBytes(baselineFile)
+            .ShouldBe(before);
     }
 
     [Fact]
@@ -137,7 +141,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         init.ShouldSucceed();
         init.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory still renders
         init.Err.ShouldNotContain("error: the model is incomplete");
-        File.Exists(baselineFile).ShouldBeTrue();
+        File.Exists(baselineFile)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -154,7 +159,8 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         init.Err.ShouldContain(GateLine);
         init.Err.ShouldContain($"warning: {AuditDiagnostic}");
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");
-        File.Exists(baselineFile).ShouldBeFalse();
+        File.Exists(baselineFile)
+            .ShouldBeFalse();
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

@@ -48,7 +48,8 @@ public sealed class FrameworkBinlogReplayTests
         using var fixture = new TempFixtureWorkspace("LegacySolutions/ClassicApp", "ClassicApp.sln", false);
         string binlog = fixture.PathOf("ClassicApp.binlog");
         RunFrameworkMsBuild(msBuildExe, fixture.SolutionPath, binlog);
-        File.Exists(binlog).ShouldBeTrue($"Framework MSBuild produced no binlog at '{binlog}'.");
+        File.Exists(binlog)
+            .ShouldBeTrue($"Framework MSBuild produced no binlog at '{binlog}'.");
 
         // Act: the same check twice — replaying the Framework build, and opening the workspace itself.
         // --no-cache on both so neither run reads or writes persisted state and the comparison is clean.

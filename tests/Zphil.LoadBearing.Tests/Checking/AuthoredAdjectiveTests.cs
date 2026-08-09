@@ -52,7 +52,8 @@ public sealed class AuthoredAdjectiveTests
         // Assert — exactly the generated pair goes, and nothing an author wrote goes with it.
         unnarrowed.ShouldContain("Gen.Emitted");
         unnarrowed.ShouldContain("Gen.Emitted.Inner");
-        unnarrowed.Except(authored).ShouldBe(["Gen.Emitted", "Gen.Emitted.Inner"], ignoreOrder: true);
+        unnarrowed.Except(authored)
+            .ShouldBe(["Gen.Emitted", "Gen.Emitted.Inner"], ignoreOrder: true);
     }
 
     [Fact]
@@ -81,7 +82,8 @@ public sealed class AuthoredAdjectiveTests
         var arch = new Arch();
 
         // Act
-        var authored = Names(arch.Project("TestProject").Authored());
+        var authored = Names(arch.Project("TestProject")
+            .Authored());
 
         // Assert
         authored.ShouldContain("Program");

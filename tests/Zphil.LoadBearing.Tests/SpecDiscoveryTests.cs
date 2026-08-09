@@ -16,16 +16,19 @@ public class SpecDiscoveryTests
     public void FindSpecs_OrdersByFullNameOrdinal()
     {
         var names = SpecDiscovery.FindSpecs(typeof(ArchSpec).Assembly)
-            .Select(spec => spec.GetType().FullName)
+            .Select(spec => spec.GetType()
+                .FullName)
             .ToList();
 
-        names.ShouldBe(names.OrderBy(name => name, StringComparer.Ordinal).ToList());
+        names.ShouldBe(names.OrderBy(name => name, StringComparer.Ordinal)
+            .ToList());
     }
 
     [Fact]
     public void FindSpecs_DiscoversPublicCanonicalSpec()
     {
-        SpecDiscovery.FindSpecs(typeof(ArchSpec).Assembly).ShouldContain(spec => spec is ArchSpec);
+        SpecDiscovery.FindSpecs(typeof(ArchSpec).Assembly)
+            .ShouldContain(spec => spec is ArchSpec);
     }
 
     [Fact]
@@ -55,7 +58,9 @@ public class SpecDiscoveryTests
         // inside the assembly it was handed either way: nothing a spec references can inject a rule the
         // spec did not ask for, which is what keeps rule packs plain libraries rather than a
         // conventions layer.
-        SpecDiscovery.FindSpecs(assembly).ShouldAllBe(spec => spec.GetType().Assembly == assembly);
+        SpecDiscovery.FindSpecs(assembly)
+            .ShouldAllBe(spec => spec.GetType()
+                .Assembly == assembly);
         typeof(LoadBearingArchSpec).Assembly.ShouldNotBe(assembly);
     }
 
@@ -65,7 +70,8 @@ public class SpecDiscoveryTests
         {
             public void Define(Arch arch)
             {
-                arch.Rule("discovery/nested-visible").Enforce(arch.Types.MustHavePrefix("I"))
+                arch.Rule("discovery/nested-visible")
+                    .Enforce(arch.Types.MustHavePrefix("I"))
                     .Because("Public specs nested in public types are discoverable via Type.IsVisible.");
             }
         }

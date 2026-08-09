@@ -26,13 +26,15 @@ public class ManagedBlockTests
     [Fact]
     public void Splice_EmptyFile_IsTreatedAsAbsent()
     {
-        ManagedBlock.Splice(string.Empty, Body).ShouldBe(ManagedBlock.Splice(null, Body));
+        ManagedBlock.Splice(string.Empty, Body)
+            .ShouldBe(ManagedBlock.Splice(null, Body));
     }
 
     [Fact]
     public void Splice_WhitespaceOnlyFile_IsTreatedAsAbsent()
     {
-        ManagedBlock.Splice("   \n\t\n", Body).ShouldBe(ManagedBlock.Splice(null, Body));
+        ManagedBlock.Splice("   \n\t\n", Body)
+            .ShouldBe(ManagedBlock.Splice(null, Body));
     }
 
     [Fact]
@@ -40,9 +42,10 @@ public class ManagedBlockTests
     {
         const string existing = "# Title\n\nHand-written intro.\n";
 
-        ManagedBlock.Splice(existing, Body).ShouldBe(
-            "# Title\n\nHand-written intro.\n\n" +
-            "<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
+        ManagedBlock.Splice(existing, Body)
+            .ShouldBe(
+                "# Title\n\nHand-written intro.\n\n" +
+                "<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
     }
 
     [Fact]
@@ -50,23 +53,26 @@ public class ManagedBlockTests
     {
         const string existing = "# Title\r\n\r\nIntro.\r\n";
 
-        ManagedBlock.Splice(existing, Body).ShouldBe(
-            "# Title\r\n\r\nIntro.\r\n\r\n" +
-            "<!-- loadbearing:begin -->\r\nline one\r\nline two\r\n<!-- loadbearing:end -->\r\n");
+        ManagedBlock.Splice(existing, Body)
+            .ShouldBe(
+                "# Title\r\n\r\nIntro.\r\n\r\n" +
+                "<!-- loadbearing:begin -->\r\nline one\r\nline two\r\n<!-- loadbearing:end -->\r\n");
     }
 
     [Fact]
     public void Splice_AppendIntoFileWithoutTrailingNewline_NormalizesToOneBlankLine()
     {
-        ManagedBlock.Splice("# Title", Body).ShouldBe(
-            "# Title\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
+        ManagedBlock.Splice("# Title", Body)
+            .ShouldBe(
+                "# Title\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
     }
 
     [Fact]
     public void Splice_AppendCollapsesExtraTrailingNewlinesToOneBlankLine()
     {
-        ManagedBlock.Splice("# Title\n\n\n\n", Body).ShouldBe(
-            "# Title\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
+        ManagedBlock.Splice("# Title\n\n\n\n", Body)
+            .ShouldBe(
+                "# Title\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
     }
 
     [Fact]
@@ -77,10 +83,11 @@ public class ManagedBlockTests
             "<!-- loadbearing:begin -->\nOLD BODY\nsecond old line\n<!-- loadbearing:end -->\n\n" +
             "Below the block.\n";
 
-        ManagedBlock.Splice(existing, Body).ShouldBe(
-            "# Title\nAbove the block.\n\n" +
-            "<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n\n" +
-            "Below the block.\n");
+        ManagedBlock.Splice(existing, Body)
+            .ShouldBe(
+                "# Title\nAbove the block.\n\n" +
+                "<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n\n" +
+                "Below the block.\n");
     }
 
     [Fact]
@@ -91,17 +98,19 @@ public class ManagedBlockTests
             "<!-- loadbearing:begin -->\r\nOLD BODY\r\n<!-- loadbearing:end -->\r\n\r\n" +
             "Below the block.\r\n";
 
-        ManagedBlock.Splice(existing, Body).ShouldBe(
-            "# Title\r\nAbove the block.\r\n\r\n" +
-            "<!-- loadbearing:begin -->\r\nline one\r\nline two\r\n<!-- loadbearing:end -->\r\n\r\n" +
-            "Below the block.\r\n");
+        ManagedBlock.Splice(existing, Body)
+            .ShouldBe(
+                "# Title\r\nAbove the block.\r\n\r\n" +
+                "<!-- loadbearing:begin -->\r\nline one\r\nline two\r\n<!-- loadbearing:end -->\r\n\r\n" +
+                "Below the block.\r\n");
     }
 
     [Fact]
     public void Splice_IsIdempotent_OnFreshFile()
     {
         string once = ManagedBlock.Splice(null, Body);
-        ManagedBlock.Splice(once, Body).ShouldBe(once);
+        ManagedBlock.Splice(once, Body)
+            .ShouldBe(once);
     }
 
     [Fact]
@@ -110,7 +119,8 @@ public class ManagedBlockTests
         const string existing = "# Title\nAbove.\n\nBelow.\n";
         string once = ManagedBlock.Splice(existing, Body);
 
-        ManagedBlock.Splice(once, Body).ShouldBe(once);
+        ManagedBlock.Splice(once, Body)
+            .ShouldBe(once);
     }
 
     [Fact]
@@ -119,15 +129,17 @@ public class ManagedBlockTests
         const string existing = "# Title\r\nAbove.\r\n\r\nBelow.\r\n";
         string once = ManagedBlock.Splice(existing, Body);
 
-        ManagedBlock.Splice(once, Body).ShouldBe(once);
+        ManagedBlock.Splice(once, Body)
+            .ShouldBe(once);
     }
 
     [Fact]
     public void Splice_DominantEndingTie_ChoosesLf()
     {
         // One CRLF, one LF — a tie, which resolves to LF for the written block.
-        ManagedBlock.Splice("a\r\nb\n", Body).ShouldBe(
-            "a\r\nb\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
+        ManagedBlock.Splice("a\r\nb\n", Body)
+            .ShouldBe(
+                "a\r\nb\n\n<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
     }
 
     [Fact]
@@ -137,8 +149,9 @@ public class ManagedBlockTests
         const string existing =
             "intro\n   <!-- loadbearing:begin -->\nOLD\n\t<!-- loadbearing:end -->   \noutro\n";
 
-        ManagedBlock.Splice(existing, Body).ShouldBe(
-            "intro\n   <!-- loadbearing:begin -->\nline one\nline two\n\t<!-- loadbearing:end -->   \noutro\n");
+        ManagedBlock.Splice(existing, Body)
+            .ShouldBe(
+                "intro\n   <!-- loadbearing:begin -->\nline one\nline two\n\t<!-- loadbearing:end -->   \noutro\n");
     }
 
     [Theory]
@@ -174,21 +187,24 @@ public class ManagedBlockTests
     [Fact]
     public void ExtractBody_NoMarkers_ReturnsNull()
     {
-        ManagedBlock.ExtractBody("# Just prose\nno markers here\n").ShouldBeNull();
+        ManagedBlock.ExtractBody("# Just prose\nno markers here\n")
+            .ShouldBeNull();
     }
 
     [Fact]
     public void ExtractBody_RoundTripsTheSplicedBody_Lf()
     {
         string spliced = ManagedBlock.Splice(null, Body);
-        ManagedBlock.ExtractBody(spliced).ShouldBe(Body);
+        ManagedBlock.ExtractBody(spliced)
+            .ShouldBe(Body);
     }
 
     [Fact]
     public void ExtractBody_NormalizesCrlfBodyToLf()
     {
         string spliced = ManagedBlock.Splice("# Title\r\n", Body); // CRLF file → CRLF block
-        ManagedBlock.ExtractBody(spliced).ShouldBe(Body);
+        ManagedBlock.ExtractBody(spliced)
+            .ShouldBe(Body);
     }
 
     [Fact]
@@ -202,6 +218,7 @@ public class ManagedBlockTests
     {
         // Adjacent markers (a hand-authored empty managed block) leave a zero-length region, which
         // StripOneTrailingNewline returns unchanged (ManagedBlock.cs:111) — there is no trailing newline to strip.
-        ManagedBlock.ExtractBody(Begin + "\n" + End + "\n").ShouldBe(string.Empty);
+        ManagedBlock.ExtractBody(Begin + "\n" + End + "\n")
+            .ShouldBe(string.Empty);
     }
 }

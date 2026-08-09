@@ -15,7 +15,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class SpecContractBindTests
 {
-    private static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName().Version!;
+    private static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName()
+        .Version!;
 
     [Theory]
     [InlineData("0.1.0.0")] // the identities shipped before the pin, whose specs are still out there
@@ -50,7 +51,8 @@ public sealed class SpecContractBindTests
         Assembly spec = SpecReferencing(new Version(2, 5, 0, 0));
         var missing = new MissingMethodException("Method not found: 'Void Zphil.LoadBearing.Arch.FutureVerb()'.");
 
-        string message = SpecContractMismatch.Map(spec, Path.Combine("out", "Sync.ArchSpec.dll"), missing).Message;
+        string message = SpecContractMismatch.Map(spec, Path.Combine("out", "Sync.ArchSpec.dll"), missing)
+            .Message;
 
         message.ShouldBe(
             "The spec assembly 'Sync.ArchSpec' calls LoadBearing API this tool's contract does not have "
@@ -71,7 +73,8 @@ public sealed class SpecContractBindTests
         Assembly spec = SpecReferencing(HostContractVersion);
         var missing = new MissingMethodException("Method not found: 'Void Zphil.LoadBearing.Arch.FutureVerb()'.");
 
-        string message = SpecContractMismatch.Map(spec, "Sync.ArchSpec.dll", missing).Message;
+        string message = SpecContractMismatch.Map(spec, "Sync.ArchSpec.dll", missing)
+            .Message;
 
         message.ShouldStartWith(
             "The spec assembly 'Sync.ArchSpec' calls LoadBearing API this tool's contract does not have:\n"

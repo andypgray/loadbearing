@@ -17,7 +17,8 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("empty/x")
-                    .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
+                    .Enforce(arch.Namespace("Nope.Nowhere.*")
+                        .MustHaveSuffix("X"))
                     .Because("b"))
             .Single();
 
@@ -29,7 +30,8 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
             .Single();
 
@@ -41,7 +43,8 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("no-guid/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(typeof(Guid)))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(typeof(Guid)))
                     .Because("b"))
             .Single();
 
@@ -54,7 +57,8 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("only/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustOnlyReference(arch.Namespace("App.Ghost.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustOnlyReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
             .Single();
 
@@ -79,11 +83,13 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Hierarchy, arch =>
                 arch.Rule("gen/x")
-                    .Enforce(arch.Type(typeof(IHandler<Order>)).MustHaveSuffix("X"))
+                    .Enforce(arch.Type(typeof(IHandler<Order>))
+                        .MustHaveSuffix("X"))
                     .Because("b"))
             .Single();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -91,11 +97,13 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("ptr/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(typeof(int*)))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(typeof(int*)))
                     .Because("b"))
             .Single();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -119,14 +127,17 @@ public sealed class CheckerSemanticsTests
         // hand-built as Enforce so the containment logic is exercised while Quarantine itself skips.
         RuleResult result = Checker.Run(Sources.Containment, arch =>
                 arch.Rule("contain/x")
-                    .Enforce(arch.Namespace("App.Legacy.*").Except(arch.Types.WithSuffix("Facade"))
+                    .Enforce(arch.Namespace("App.Legacy.*")
+                        .Except(arch.Types.WithSuffix("Facade"))
                         .MustOnlyBeReferencedBy(arch.Namespace("App.Legacy.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldContain("App.Client.User -> App.Legacy.Internal");
-        result.ReferencePairs().ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
+        result.ReferencePairs()
+            .ShouldContain("App.Client.User -> App.Legacy.Internal");
+        result.ReferencePairs()
+            .ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
     }
 
     [Fact]
@@ -134,15 +145,17 @@ public sealed class CheckerSemanticsTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("order/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Web.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("App.Web.*")))
                     .Because("b"))
             .Single();
 
-        result.ReferencePairs().ShouldBe([
-            "App.Domain.Apple -> App.Web.Controller",
-            "App.Domain.Service -> App.Web.Controller",
-            "App.Domain.Service -> App.Web.Helper",
-            "App.Domain.Zebra -> App.Web.Controller"
-        ]);
+        result.ReferencePairs()
+            .ShouldBe([
+                "App.Domain.Apple -> App.Web.Controller",
+                "App.Domain.Service -> App.Web.Controller",
+                "App.Domain.Service -> App.Web.Helper",
+                "App.Domain.Zebra -> App.Web.Controller"
+            ]);
     }
 }

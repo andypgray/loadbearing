@@ -75,7 +75,8 @@ internal static class CompilationFactory
     /// </summary>
     public static CodebaseModel ExtractConsoleApp(params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path)).ToArray();
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
+            .ToArray();
         var compilation = CSharpCompilation.Create(
             "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
         return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
@@ -90,7 +91,8 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractConsoleAppWithGenerator(
         IIncrementalGenerator generator, params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path)).ToArray();
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
+            .ToArray();
         var compilation = CSharpCompilation.Create(
             "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 
@@ -157,7 +159,8 @@ internal static class CompilationFactory
     /// </summary>
     public static CodebaseModel ExtractConsoleAppWithDi(params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path)).ToArray();
+        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
+            .ToArray();
         var compilation = CSharpCompilation.Create(
             "TestProject", trees, DiReferences, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
         return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);

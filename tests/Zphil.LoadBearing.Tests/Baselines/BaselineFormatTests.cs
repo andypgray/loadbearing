@@ -76,9 +76,11 @@ public sealed class BaselineFormatTests
             "r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
         byte[] bytes = Encoding.UTF8.GetBytes(composed);
 
-        bytes.Take(3).ShouldNotBe([0xEF, 0xBB, 0xBF]); // no UTF-8 BOM
+        bytes.Take(3)
+            .ShouldNotBe([0xEF, 0xBB, 0xBF]); // no UTF-8 BOM
         composed.ShouldNotContain("\r"); // LF only
-        composed.EndsWith("\n", StringComparison.Ordinal).ShouldBeTrue(); // trailing newline
+        composed.EndsWith("\n", StringComparison.Ordinal)
+            .ShouldBeTrue(); // trailing newline
     }
 
     [Fact]
@@ -107,7 +109,11 @@ public sealed class BaselineFormatTests
         // The escapes are valid JSON that round-trips back to the original subject through a standard parser.
         using JsonDocument document = JsonDocument.Parse(composed);
         string roundTripped = document.RootElement
-            .GetProperty("rules").GetProperty("r/x").GetProperty("entries")[0].GetProperty("subject").GetString()!;
+            .GetProperty("rules")
+            .GetProperty("r/x")
+            .GetProperty("entries")[0]
+            .GetProperty("subject")
+            .GetString()!;
         roundTripped.ShouldBe(subject);
     }
 
@@ -135,7 +141,8 @@ public sealed class BaselineFormatTests
         byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(BaselineFormat.DigestInput(rules)));
         string independent = string.Concat(hash.Select(b => b.ToString("x2")));
 
-        BaselineFormat.ComputeDigest(rules).ShouldBe(independent);
+        BaselineFormat.ComputeDigest(rules)
+            .ShouldBe(independent);
     }
 
     [Fact]
@@ -143,8 +150,10 @@ public sealed class BaselineFormatTests
     {
         string composed = BaselineFormat.ComposeFile(Rules(("r/x",
         [
-            BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithBecause("INC-1234"),
-            BaselineEntry.ForSubject("T:N.Sub").WithBecause("keep until migration")
+            BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+                .WithBecause("INC-1234"),
+            BaselineEntry.ForSubject("T:N.Sub")
+                .WithBecause("keep until migration")
         ])));
 
         composed.ShouldContain("        { \"source\": \"T:N.Src\", \"target\": \"T:N.Tgt\", \"because\": \"INC-1234\" }");
@@ -155,7 +164,11 @@ public sealed class BaselineFormatTests
     public void DigestInput_AttributedEntries_EmitBecauseLineAfterOwnLine()
     {
         string input = BaselineFormat.DigestInput(Rules((
-            "r/x", [BaselineEntry.ForEdge("T:A", "T:B").WithBecause("INC-1234"), BaselineEntry.ForSubject("T:C")])));
+            "r/x", [
+                BaselineEntry.ForEdge("T:A", "T:B")
+                    .WithBecause("INC-1234"),
+                BaselineEntry.ForSubject("T:C")
+            ])));
 
         input.ShouldBe(
             "loadbearing-baseline-digest-v1\n" +
@@ -170,9 +183,15 @@ public sealed class BaselineFormatTests
     {
         string plain = BaselineFormat.ComputeDigest(Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
         string attributed = BaselineFormat.ComputeDigest(Rules((
-            "r/x", [BaselineEntry.ForEdge("T:A", "T:B").WithBecause("INC-1234")])));
+            "r/x", [
+                BaselineEntry.ForEdge("T:A", "T:B")
+                    .WithBecause("INC-1234")
+            ])));
         string otherText = BaselineFormat.ComputeDigest(Rules((
-            "r/x", [BaselineEntry.ForEdge("T:A", "T:B").WithBecause("INC-9999")])));
+            "r/x", [
+                BaselineEntry.ForEdge("T:A", "T:B")
+                    .WithBecause("INC-9999")
+            ])));
 
         attributed.ShouldNotBe(plain);
         attributed.ShouldNotBe(otherText);
@@ -186,7 +205,9 @@ public sealed class BaselineFormatTests
         string violated = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
             [BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")])));
-        ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json").NormalizedLines().ShouldBe(violated);
+        ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json")
+            .NormalizedLines()
+            .ShouldBe(violated);
 
         string clean = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
@@ -194,7 +215,9 @@ public sealed class BaselineFormatTests
                 BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable"),
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
             ])));
-        ReadFixture("arch", "clean-baseline.json").NormalizedLines().ShouldBe(clean);
+        ReadFixture("arch", "clean-baseline.json")
+            .NormalizedLines()
+            .ShouldBe(clean);
     }
 
     private static string ReadFixture(params string[] relativeParts)

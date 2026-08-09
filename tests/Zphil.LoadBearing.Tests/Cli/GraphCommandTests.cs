@@ -97,7 +97,8 @@ public sealed class GraphCommandTests
 
         // Assert
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed().ShouldBe(ExpectedHuman.NormalizedTrimmed());
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(ExpectedHuman.NormalizedTrimmed());
     }
 
     [Fact]
@@ -144,7 +145,8 @@ public sealed class GraphCommandTests
 
         // Assert — the knobs compose: grain and scope are independent, and neither swallows the other.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed().ShouldBe(ExpectedScopedOverviewHuman.NormalizedTrimmed());
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(ExpectedScopedOverviewHuman.NormalizedTrimmed());
     }
 
     [Fact]
@@ -159,13 +161,23 @@ public sealed class GraphCommandTests
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement root = document.RootElement;
 
-        root.GetProperty("grain").GetString().ShouldBe("overview");
-        root.GetProperty("projectsScope").EnumerateArray().Select(glob => glob.GetString()).ShouldBe(["MyApp.We*"]);
-        root.GetProperty("projects").EnumerateArray().Select(project => project.GetProperty("name").GetString())
+        root.GetProperty("grain")
+            .GetString()
+            .ShouldBe("overview");
+        root.GetProperty("projectsScope")
+            .EnumerateArray()
+            .Select(glob => glob.GetString())
+            .ShouldBe(["MyApp.We*"]);
+        root.GetProperty("projects")
+            .EnumerateArray()
+            .Select(project => project.GetProperty("name")
+                .GetString())
             .ShouldBe(["MyApp.Web"]);
 
-        var projectFields = root.GetProperty("projects").EnumerateArray()
-            .SelectMany(project => project.EnumerateObject().Select(field => field.Name))
+        var projectFields = root.GetProperty("projects")
+            .EnumerateArray()
+            .SelectMany(project => project.EnumerateObject()
+                .Select(field => field.Name))
             .Distinct()
             .ToList();
         projectFields.ShouldNotContain("namespaces");
@@ -210,16 +222,22 @@ public sealed class GraphCommandTests
         int overviewLength = await LengthAt(GraphGrain.Overview);
 
         // Act
-        await Runner(degraded).RunAsync(Request(budget: overviewLength), Ct);
-        await Runner(overview).RunAsync(Request(GraphGrain.Overview), Ct);
+        await Runner(degraded)
+            .RunAsync(Request(budget: overviewLength), Ct);
+        await Runner(overview)
+            .RunAsync(Request(GraphGrain.Overview), Ct);
 
         // Assert — parseable (nothing was truncated), stamped, and byte-identical both to what --overview
         // writes here and to the pinned --overview document, which is what keeps the degraded answer honest
         // about which document a reader is holding.
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
-        document.RootElement.GetProperty("grain").GetString().ShouldBe("overview");
-        degraded.ToString().ShouldBe(overview.ToString());
-        degraded.ToString().ShouldMatchGolden("graph-overview.json");
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("overview");
+        degraded.ToString()
+            .ShouldBe(overview.ToString());
+        degraded.ToString()
+            .ShouldMatchGolden("graph-overview.json");
     }
 
     [Fact]
@@ -232,13 +250,18 @@ public sealed class GraphCommandTests
         var skeleton = new StringWriter();
 
         // Act
-        await Runner(degraded).RunAsync(Request(budget: 500), Ct);
-        await Runner(skeleton).RunAsync(Request(GraphGrain.Skeleton), Ct);
+        await Runner(degraded)
+            .RunAsync(Request(budget: 500), Ct);
+        await Runner(skeleton)
+            .RunAsync(Request(GraphGrain.Skeleton), Ct);
 
         // Assert — it walked past overview to the last rung, and the answer is still a whole document.
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
-        document.RootElement.GetProperty("grain").GetString().ShouldBe("skeleton");
-        degraded.ToString().ShouldBe(skeleton.ToString());
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("skeleton");
+        degraded.ToString()
+            .ShouldBe(skeleton.ToString());
     }
 
     [Fact]
@@ -250,11 +273,14 @@ public sealed class GraphCommandTests
         var degraded = new StringWriter();
 
         // Act
-        await Runner(degraded).RunAsync(Request(GraphGrain.Overview, budget: 500), Ct);
+        await Runner(degraded)
+            .RunAsync(Request(GraphGrain.Overview, budget: 500), Ct);
 
         // Assert
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
-        document.RootElement.GetProperty("grain").GetString().ShouldBe("skeleton");
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("skeleton");
     }
 
     [Fact]
@@ -265,13 +291,17 @@ public sealed class GraphCommandTests
         var withoutBudget = new StringWriter();
 
         // Act
-        await Runner(withBudget).RunAsync(Request(budget: 100_000), Ct);
-        await Runner(withoutBudget).RunAsync(Request(), Ct);
+        await Runner(withBudget)
+            .RunAsync(Request(budget: 100_000), Ct);
+        await Runner(withoutBudget)
+            .RunAsync(Request(), Ct);
 
         // Assert — the budget is a ceiling, not a mode: under it, nothing about the document moves.
         using JsonDocument document = JsonDocument.Parse(withBudget.ToString());
-        document.RootElement.TryGetProperty("grain", out _).ShouldBeFalse();
-        withBudget.ToString().ShouldBe(withoutBudget.ToString());
+        document.RootElement.TryGetProperty("grain", out _)
+            .ShouldBeFalse();
+        withBudget.ToString()
+            .ShouldBe(withoutBudget.ToString());
     }
 
     [Fact]
@@ -283,17 +313,23 @@ public sealed class GraphCommandTests
         var full = new StringWriter();
 
         // Act
-        await Runner(skeleton).RunAsync(Request(GraphGrain.Skeleton), Ct);
-        await Runner(full).RunAsync(Request(), Ct);
+        await Runner(skeleton)
+            .RunAsync(Request(GraphGrain.Skeleton), Ct);
+        await Runner(full)
+            .RunAsync(Request(), Ct);
 
         // Assert
         using JsonDocument skeletonDocument = JsonDocument.Parse(skeleton.ToString());
         using JsonDocument fullDocument = JsonDocument.Parse(full.ToString());
-        int elided = fullDocument.RootElement.GetProperty("externalEdges").GetArrayLength();
+        int elided = fullDocument.RootElement.GetProperty("externalEdges")
+            .GetArrayLength();
 
         elided.ShouldBeGreaterThan(0);
-        skeletonDocument.RootElement.TryGetProperty("externalEdges", out _).ShouldBeFalse();
-        skeletonDocument.RootElement.GetProperty("externalEdgeCount").GetInt32().ShouldBe(elided);
+        skeletonDocument.RootElement.TryGetProperty("externalEdges", out _)
+            .ShouldBeFalse();
+        skeletonDocument.RootElement.GetProperty("externalEdgeCount")
+            .GetInt32()
+            .ShouldBe(elided);
     }
 
     [Theory]
@@ -311,14 +347,17 @@ public sealed class GraphCommandTests
         var output = new StringWriter();
 
         // Act — the runner degrades against the budget, then the truncator sees what it produced.
-        await Runner(output).RunAsync(Request(budget: budget), Ct);
-        string document = output.ToString().TrimEnd('\r', '\n');
+        await Runner(output)
+            .RunAsync(Request(budget: budget), Ct);
+        string document = output.ToString()
+            .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, budget);
 
         // Assert — the truncator is a no-op here, and what the caller holds is a whole document.
         afterTruncation.ShouldBe(document);
         afterTruncation.ShouldNotContain("RESPONSE TRUNCATED");
-        Should.NotThrow(() => JsonDocument.Parse(afterTruncation).Dispose());
+        Should.NotThrow(() => JsonDocument.Parse(afterTruncation)
+            .Dispose());
     }
 
     [Fact]
@@ -330,8 +369,10 @@ public sealed class GraphCommandTests
         var output = new StringWriter();
 
         // Act
-        await Runner(output).RunAsync(Request(budget: belowSkeleton), Ct);
-        string document = output.ToString().TrimEnd('\r', '\n');
+        await Runner(output)
+            .RunAsync(Request(budget: belowSkeleton), Ct);
+        string document = output.ToString()
+            .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, belowSkeleton);
 
         // Assert — cut, and the hint names the one knob still worth reaching for. Naming a grain here would
@@ -355,8 +396,11 @@ public sealed class GraphCommandTests
     private static async Task<int> LengthAt(GraphGrain grain)
     {
         var output = new StringWriter();
-        await Runner(output).RunAsync(Request(grain), Ct);
-        return output.ToString().TrimEnd('\r', '\n').Length;
+        await Runner(output)
+            .RunAsync(Request(grain), Ct);
+        return output.ToString()
+            .TrimEnd('\r', '\n')
+            .Length;
     }
 
     private static GraphRequest Request(GraphGrain grain = GraphGrain.Full, int? budget = null)

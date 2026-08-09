@@ -35,11 +35,16 @@ public sealed class CodebaseExtractorMemberInventoryTests
         TypeNode c = model.Type("N.C");
 
         // One entry per kind, no accessors and no auto-property / field-like-event backing field.
-        c.MemberIds().ShouldBe(["E:N.C.Evt", "F:N.C.Field", "M:N.C.Do", "P:N.C.Prop"]);
-        c.Member("M:N.C.Do").Kind.ShouldBe(MemberKind.Method);
-        c.Member("P:N.C.Prop").Kind.ShouldBe(MemberKind.Property);
-        c.Member("F:N.C.Field").Kind.ShouldBe(MemberKind.Field);
-        c.Member("E:N.C.Evt").Kind.ShouldBe(MemberKind.Event);
+        c.MemberIds()
+            .ShouldBe(["E:N.C.Evt", "F:N.C.Field", "M:N.C.Do", "P:N.C.Prop"]);
+        c.Member("M:N.C.Do")
+            .Kind.ShouldBe(MemberKind.Method);
+        c.Member("P:N.C.Prop")
+            .Kind.ShouldBe(MemberKind.Property);
+        c.Member("F:N.C.Field")
+            .Kind.ShouldBe(MemberKind.Field);
+        c.Member("E:N.C.Evt")
+            .Kind.ShouldBe(MemberKind.Event);
     }
 
     [Fact]
@@ -60,13 +65,18 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // void → System.Void; a constructed generic erases to its definition (declared type-parameter names),
         // so `Task<int>` matches a `.Returning(typeof(Task<>))` anchor (GRAMMAR §4.6). Never the metadata form.
-        c.Member("M:N.C.Nothing").ReturnTypeFullName.ShouldBe("System.Void");
-        c.Member("M:N.C.Bare").ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task");
-        c.Member("M:N.C.Generic").ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task<TResult>");
-        c.Member("M:N.C.Number").ReturnTypeFullName.ShouldBe("System.Int32");
+        c.Member("M:N.C.Nothing")
+            .ReturnTypeFullName.ShouldBe("System.Void");
+        c.Member("M:N.C.Bare")
+            .ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task");
+        c.Member("M:N.C.Generic")
+            .ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task<TResult>");
+        c.Member("M:N.C.Number")
+            .ReturnTypeFullName.ShouldBe("System.Int32");
 
         // A method carries only a return type; its member-type slot is null.
-        c.Member("M:N.C.Nothing").MemberTypeFullName.ShouldBeNull();
+        c.Member("M:N.C.Nothing")
+            .MemberTypeFullName.ShouldBeNull();
     }
 
     [Fact]
@@ -84,10 +94,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         TypeNode c = model.Type("N.C");
 
-        c.Member("P:N.C.Prop").MemberTypeFullName.ShouldBe("System.String");
-        c.Member("P:N.C.Prop").ReturnTypeFullName.ShouldBeNull();
-        c.Member("F:N.C.Field").MemberTypeFullName.ShouldBe("System.Int32");
-        c.Member("E:N.C.Evt").MemberTypeFullName.ShouldBe("System.Action");
+        c.Member("P:N.C.Prop")
+            .MemberTypeFullName.ShouldBe("System.String");
+        c.Member("P:N.C.Prop")
+            .ReturnTypeFullName.ShouldBeNull();
+        c.Member("F:N.C.Field")
+            .MemberTypeFullName.ShouldBe("System.Int32");
+        c.Member("E:N.C.Evt")
+            .MemberTypeFullName.ShouldBe("System.Action");
     }
 
     [Fact]
@@ -99,7 +113,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // One P: entry — never M:get_P / M:set_P (accessors fold), and no <P>k__BackingField (implicit).
-        model.Type("N.C").MemberIds().ShouldBe(["P:N.C.P"]);
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["P:N.C.P"]);
     }
 
     [Fact]
@@ -121,7 +137,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // Only the Ordinary method survives — ctor, static ctor, finalizer, operator, conversion, and indexer
         // are all excluded (the ratified §4.6 list).
-        model.Type("N.C").MemberIds().ShouldBe(["M:N.C.Ordinary"]);
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.Ordinary"]);
     }
 
     [Fact]
@@ -141,7 +159,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // ExplicitInterfaceImplementation), so the §4.6 kind filter drops it before it can enter the
         // inventory — only the ordinary method survives. It therefore never becomes a member subject, and
         // MustAcceptParameter (§5.7) never reads its parameters: it is absent from the inventory both consult.
-        model.Type("N.C").MemberIds().ShouldBe(["M:N.C.Ordinary"]);
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.Ordinary"]);
     }
 
     [Fact]
@@ -167,7 +187,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // PROPERTY or EVENT impl via its non-empty ExplicitInterfaceImplementations. An explicit impl is
         // interface plumbing (Private, name fixed by the interface), never authored surface: no member subject
         // sees one and MustAcceptParameter (§5.7) never reads one. Only the ordinary property Q survives.
-        model.Type("N.C").MemberIds().ShouldBe(["P:N.C.Q"]);
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["P:N.C.Q"]);
     }
 
     [Fact]
@@ -181,7 +203,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // EMPIRICAL PIN (GRAMMAR §4.6 compiler-generated boundary): the positional property X is present; the
         // synthesized EqualityContract / <Clone>$ / PrintMembers / ToString / Equals / GetHashCode / copy-ctor
         // / Deconstruct / == / != are all implicitly declared or non-Ordinary and excluded.
-        model.Type("N.R").MemberIds().ShouldBe(["P:N.R.X"]);
+        model.Type("N.R")
+            .MemberIds()
+            .ShouldBe(["P:N.R.X"]);
     }
 
     [Fact]
@@ -193,7 +217,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // An enum's fields are its values — an enum-value read stays a recorded member USE (§4.5), not inventory.
-        model.Type("N.Color").Members.ShouldBeEmpty();
+        model.Type("N.Color")
+            .Members.ShouldBeEmpty();
     }
 
     [Fact]
@@ -205,7 +230,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // Invoke / BeginInvoke / EndInvoke are runtime plumbing, not authored surface.
-        model.Type("N.Notify").Members.ShouldBeEmpty();
+        model.Type("N.Notify")
+            .Members.ShouldBeEmpty();
     }
 
     [Fact]
@@ -216,7 +242,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          public class Base { public virtual void M() {} }
                                                          """);
 
-        MemberNode m = model.Type("N.Base").Member("M:N.Base.M");
+        MemberNode m = model.Type("N.Base")
+            .Member("M:N.Base.M");
         m.IsVirtual.ShouldBeTrue();
         m.IsAbstract.ShouldBeFalse();
     }
@@ -231,7 +258,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // C# declaration semantics, not IL: an override is not itself "virtual" in the authored sense.
-        MemberNode m = model.Type("N.Derived").Member("M:N.Derived.M");
+        MemberNode m = model.Type("N.Derived")
+            .Member("M:N.Derived.M");
         m.IsVirtual.ShouldBeFalse();
         m.IsAbstract.ShouldBeFalse();
     }
@@ -244,7 +272,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          public abstract class A { public abstract void M(); }
                                                          """);
 
-        MemberNode m = model.Type("N.A").Member("M:N.A.M");
+        MemberNode m = model.Type("N.A")
+            .Member("M:N.A.M");
         m.IsAbstract.ShouldBeTrue();
         m.IsVirtual.ShouldBeFalse();
     }
@@ -258,9 +287,12 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         TypeNode i = model.Type("N.I");
-        i.Member("M:N.I.M").IsAbstract.ShouldBeTrue();
-        i.Member("M:N.I.M").IsVirtual.ShouldBeFalse();
-        i.Member("P:N.I.P").IsAbstract.ShouldBeTrue();
+        i.Member("M:N.I.M")
+            .IsAbstract.ShouldBeTrue();
+        i.Member("M:N.I.M")
+            .IsVirtual.ShouldBeFalse();
+        i.Member("P:N.I.P")
+            .IsAbstract.ShouldBeTrue();
     }
 
     [Fact]
@@ -275,10 +307,13 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          }
                                                          """);
 
-        MemberNode go = model.Type("N.C").Member("M:N.C.Go");
+        MemberNode go = model.Type("N.C")
+            .Member("M:N.C.Go");
         go.IsAsync.ShouldBeTrue();
         go.ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task");
-        model.Type("N.C").Member("M:N.C.Sync").IsAsync.ShouldBeFalse();
+        model.Type("N.C")
+            .Member("M:N.C.Sync")
+            .IsAsync.ShouldBeFalse();
     }
 
     [Fact]
@@ -296,11 +331,16 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         TypeNode c = model.Type("N.C");
-        c.Member("M:N.C.Pub").Accessibility.ShouldBe(Accessibility.Public);
-        c.Member("M:N.C.Int").Accessibility.ShouldBe(Accessibility.Internal);
-        c.Member("M:N.C.Priv").Accessibility.ShouldBe(Accessibility.Private);
-        c.Member("M:N.C.Stat").IsStatic.ShouldBeTrue();
-        c.Member("M:N.C.Pub").IsStatic.ShouldBeFalse();
+        c.Member("M:N.C.Pub")
+            .Accessibility.ShouldBe(Accessibility.Public);
+        c.Member("M:N.C.Int")
+            .Accessibility.ShouldBe(Accessibility.Internal);
+        c.Member("M:N.C.Priv")
+            .Accessibility.ShouldBe(Accessibility.Private);
+        c.Member("M:N.C.Stat")
+            .IsStatic.ShouldBeTrue();
+        c.Member("M:N.C.Pub")
+            .IsStatic.ShouldBeFalse();
     }
 
     [Fact]
@@ -318,10 +358,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         TypeNode c = model.Type("N.C");
-        c.MemberIds().ShouldBe(["F:N.C.Inst", "F:N.C.Max", "F:N.C.Ro", "F:N.C.Shared"]);
-        c.Member("F:N.C.Max").IsStatic.ShouldBeTrue(); // const is static
-        c.Member("F:N.C.Shared").IsStatic.ShouldBeTrue();
-        c.Member("F:N.C.Inst").IsStatic.ShouldBeFalse();
+        c.MemberIds()
+            .ShouldBe(["F:N.C.Inst", "F:N.C.Max", "F:N.C.Ro", "F:N.C.Shared"]);
+        c.Member("F:N.C.Max")
+            .IsStatic.ShouldBeTrue(); // const is static
+        c.Member("F:N.C.Shared")
+            .IsStatic.ShouldBeTrue();
+        c.Member("F:N.C.Inst")
+            .IsStatic.ShouldBeFalse();
     }
 
     [Fact]
@@ -333,7 +377,8 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // The return type is the method's own type parameter, rendered as its declared name (definition-level).
-        MemberNode echo = model.Type("N.C").Members.Single(m => m.Name == "Echo");
+        MemberNode echo = model.Type("N.C")
+            .Members.Single(m => m.Name == "Echo");
         echo.SymbolId.ShouldBe("M:N.C.Echo``1(``0)");
         echo.ReturnTypeFullName.ShouldBe("T");
     }
@@ -347,7 +392,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // One inventory entry per overload — the §4.3 per-subject identity substrate, mirroring the edge side.
-        model.Type("N.C").MemberIds().ShouldBe(["M:N.C.M(System.Int32)", "M:N.C.M(System.String)"]);
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.M(System.Int32)", "M:N.C.M(System.String)"]);
     }
 
     [Fact]
@@ -366,13 +413,20 @@ public sealed class CodebaseExtractorMemberInventoryTests
         TypeNode split = model.Type("N.Split");
 
         // Members from both parts, ordered ordinal by SymbolId (F: before M:, then B before C).
-        split.MemberIds().ShouldBe(["F:N.Split.A", "M:N.Split.B", "M:N.Split.C"]);
+        split.MemberIds()
+            .ShouldBe(["F:N.Split.A", "M:N.Split.B", "M:N.Split.C"]);
 
         // Each member's declaration site is the identifier line (+1) of its own part.
-        split.Member("M:N.Split.B").FilePaths.ShouldBe(["PartB.cs"]);
-        split.Member("M:N.Split.B").DeclarationLines().ShouldBe([2]);
-        split.Member("M:N.Split.C").FilePaths.ShouldBe(["PartA.cs"]);
-        split.Member("M:N.Split.C").DeclarationLines().ShouldBe([2]);
+        split.Member("M:N.Split.B")
+            .FilePaths.ShouldBe(["PartB.cs"]);
+        split.Member("M:N.Split.B")
+            .DeclarationLines()
+            .ShouldBe([2]);
+        split.Member("M:N.Split.C")
+            .FilePaths.ShouldBe(["PartA.cs"]);
+        split.Member("M:N.Split.C")
+            .DeclarationLines()
+            .ShouldBe([2]);
     }
 
     [Fact]
@@ -388,12 +442,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // Declaration order is preserved ([count, cancellationToken], not sorted or reversed) and a
         // default-valued parameter is a fact like any other — it counts (GRAMMAR §4.6, §5.6).
-        MemberNode seed = model.Type("N.C").Members.Single(m => m.Name == "Seed");
-        seed.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
-        [
-            ("count", "System.Int32"),
-            ("cancellationToken", "System.Threading.CancellationToken")
-        ]);
+        MemberNode seed = model.Type("N.C")
+            .Members.Single(m => m.Name == "Seed");
+        seed.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("count", "System.Int32"),
+                ("cancellationToken", "System.Threading.CancellationToken")
+            ]);
     }
 
     [Fact]
@@ -409,8 +465,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // The DECLARED static method's parameter list is read (never the reduced instance form), so the `this`
         // receiver parameter is a recorded fact — present in both the DocId and the parameter facts.
-        MemberNode shout = model.Type("N.StringExtensions").Member("M:N.StringExtensions.Shout(System.String)");
-        shout.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("text", "System.String")]);
+        MemberNode shout = model.Type("N.StringExtensions")
+            .Member("M:N.StringExtensions.Shout(System.String)");
+        shout.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("text", "System.String")]);
     }
 
     [Fact]
@@ -426,13 +484,15 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // ref/in/out are calling-convention modifiers, not part of the recorded parameter type — all three
         // record the underlying System.Int32.
-        MemberNode move = model.Type("N.C").Members.Single(m => m.Name == "Move");
-        move.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
-        [
-            ("a", "System.Int32"),
-            ("b", "System.Int32"),
-            ("c", "System.Int32")
-        ]);
+        MemberNode move = model.Type("N.C")
+            .Members.Single(m => m.Name == "Move");
+        move.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("a", "System.Int32"),
+                ("b", "System.Int32"),
+                ("c", "System.Int32")
+            ]);
     }
 
     [Fact]
@@ -447,9 +507,11 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // A params parameter records the ARRAY type, never the element type.
-        MemberNode cancelAll = model.Type("N.C").Members.Single(m => m.Name == "CancelAll");
-        cancelAll.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
-            [("tokens", "System.Threading.CancellationToken[]")]);
+        MemberNode cancelAll = model.Type("N.C")
+            .Members.Single(m => m.Name == "CancelAll");
+        cancelAll.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+                [("tokens", "System.Threading.CancellationToken[]")]);
     }
 
     [Fact]
@@ -465,8 +527,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // A T? parameter records System.Nullable<T>'s definition form (never the unwrapped T), the same
         // construction-erasing normalization the return type uses.
-        MemberNode maybe = model.Type("N.C").Members.Single(m => m.Name == "Maybe");
-        maybe.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("token", "System.Nullable<T>")]);
+        MemberNode maybe = model.Type("N.C")
+            .Members.Single(m => m.Name == "Maybe");
+        maybe.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("token", "System.Nullable<T>")]);
     }
 
     [Fact]
@@ -478,8 +542,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          """);
 
         // The same definition-level path that renders Echo's RETURN type as "T" renders its parameter type "T".
-        MemberNode echo = model.Type("N.C").Members.Single(m => m.Name == "Echo");
-        echo.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe([("value", "T")]);
+        MemberNode echo = model.Type("N.C")
+            .Members.Single(m => m.Name == "Echo");
+        echo.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("value", "T")]);
     }
 
     [Fact]
@@ -493,8 +559,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // The positional list surfaces as the generated property X only; the primary constructor is outside the
         // member inventory, so nothing here carries parameter facts.
         TypeNode r = model.Type("N.R");
-        r.MemberIds().ShouldBe(["P:N.R.X"]);
-        r.Member("P:N.R.X").Parameters.ShouldBeEmpty();
+        r.MemberIds()
+            .ShouldBe(["P:N.R.X"]);
+        r.Member("P:N.R.X")
+            .Parameters.ShouldBeEmpty();
     }
 
     [Fact]
@@ -512,12 +580,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // A partial method's defining and implementing parts resolve to ONE inventory member (Single throws on
         // a duplicate), and its parameters are read once — [index, label], never doubled to four or reordered.
-        MemberNode onScan = model.Type("N.Host").Members.Single(m => m.Name == "OnScan");
-        onScan.Parameters.Select(p => (p.Name, p.TypeFullName)).ShouldBe(
-        [
-            ("index", "System.Int32"),
-            ("label", "System.String")
-        ]);
+        MemberNode onScan = model.Type("N.Host")
+            .Members.Single(m => m.Name == "OnScan");
+        onScan.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("index", "System.Int32"),
+                ("label", "System.String")
+            ]);
     }
 
     [Fact]
@@ -537,10 +607,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // Only methods carry parameters; a property, field, and event each hold the empty list, as does a
         // parameterless method.
         TypeNode c = model.Type("N.C");
-        c.Member("F:N.C.Field").Parameters.ShouldBeEmpty();
-        c.Member("P:N.C.Prop").Parameters.ShouldBeEmpty();
-        c.Member("E:N.C.Evt").Parameters.ShouldBeEmpty();
-        c.Member("M:N.C.Nullary").Parameters.ShouldBeEmpty();
+        c.Member("F:N.C.Field")
+            .Parameters.ShouldBeEmpty();
+        c.Member("P:N.C.Prop")
+            .Parameters.ShouldBeEmpty();
+        c.Member("E:N.C.Evt")
+            .Parameters.ShouldBeEmpty();
+        c.Member("M:N.C.Nullary")
+            .Parameters.ShouldBeEmpty();
     }
 
     [Fact]
@@ -562,10 +636,18 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // pair; for a non-generic attribute the two names coincide, and both keep the `Attribute` suffix — the
         // extraction FQN, never the `[Mark]` shorthand the source spells.
         TypeNode c = model.Type("N.C");
-        c.Member("F:N.C.Field").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
-        c.Member("P:N.C.Prop").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
-        c.Member("E:N.C.Evt").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
-        c.Member("M:N.C.Do").AttributeNames().ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("F:N.C.Field")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("P:N.C.Prop")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("E:N.C.Evt")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("M:N.C.Do")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
     }
 
     [Fact]
@@ -585,10 +667,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // A member that declares no attribute holds the empty list, never null — the same contract the
         // parameter facts carry.
         TypeNode c = model.Type("N.C");
-        c.Member("F:N.C.Field").Attributes.ShouldBeEmpty();
-        c.Member("P:N.C.Prop").Attributes.ShouldBeEmpty();
-        c.Member("E:N.C.Evt").Attributes.ShouldBeEmpty();
-        c.Member("M:N.C.Do").Attributes.ShouldBeEmpty();
+        c.Member("F:N.C.Field")
+            .Attributes.ShouldBeEmpty();
+        c.Member("P:N.C.Prop")
+            .Attributes.ShouldBeEmpty();
+        c.Member("E:N.C.Evt")
+            .Attributes.ShouldBeEmpty();
+        c.Member("M:N.C.Do")
+            .Attributes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -606,7 +692,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // Source order is deliberately Zeta-then-Alpha: the recorded order is ordinal by constructed name, so a
         // persisted fragment is byte-stable however the source (or Roslyn) happened to order the list.
-        model.Type("N.C").Member("M:N.C.Do").Attributes.Select(a => a.FullName)
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .Attributes.Select(a => a.FullName)
             .ShouldBe(["N.AlphaAttribute", "N.ZetaAttribute"]);
     }
 
@@ -626,7 +714,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // RATIFIED boundary (GRAMMAR §4.6): the fact is DECLARED-ONLY — read off the member symbol itself. An
         // attribute on the property is in; one on its `get` accessor is out, because it hangs off the accessor
         // METHOD symbol, and accessors fold into the property rather than being inventoried in their own right.
-        model.Type("N.C").Member("P:N.C.P").Attributes.Select(a => a.FullName).ShouldBe(["N.MarkAttribute"]);
+        model.Type("N.C")
+            .Member("P:N.C.P")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.MarkAttribute"]);
     }
 
     [Fact]
@@ -646,7 +737,10 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // The same declared-only boundary on the method side: a `[return:]` attribute hangs off the return-value
         // pseudo-symbol, not the method, so it is deliberately outside the fact a member subject reads.
-        model.Type("N.C").Member("M:N.C.Do").Attributes.Select(a => a.FullName).ShouldBe(["N.MarkAttribute"]);
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.MarkAttribute"]);
     }
 
     [Fact]
@@ -664,7 +758,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // A C# 11 generic attribute is where the pair earns its keep: the definition side erases the
         // construction (so an open-definition anchor matches any construction), while the constructed name keeps
         // the substituted argument — exactly the type-side attribute-construction discipline, member-level.
-        model.Type("N.C").Member("M:N.C.Do").AttributeNames()
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .AttributeNames()
             .ShouldBe([("N.MarkAttribute<T>", "N.MarkAttribute<System.Int32>")]);
     }
 
@@ -690,7 +786,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // inventory reads reports BOTH — observed Roslyn merged-symbol behaviour, not a designed rule. The union
         // is the honest reading for a member subject (either part's attribute is authored surface). The names
         // are chosen so ordinal order reverses part order, which pins the ordering as by constructed name.
-        model.Type("N.Host").Members.Single(m => m.Name == "OnScan").Attributes.Select(a => a.FullName)
+        model.Type("N.Host")
+            .Members.Single(m => m.Name == "OnScan")
+            .Attributes.Select(a => a.FullName)
             .ShouldBe(["N.AlsoOnImplementingAttribute", "N.OnDefiningAttribute"]);
     }
 }

@@ -72,14 +72,16 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
     public void ParseTimeoutMinutes_Zero_ReturnsZeroDisabled()
     {
         // Act / Assert — "0" is the only explicit, documented opt-out.
-        IdleTimeoutWatchdog.ParseTimeoutMinutes("0").ShouldBe(TimeSpan.Zero);
+        IdleTimeoutWatchdog.ParseTimeoutMinutes("0")
+            .ShouldBe(TimeSpan.Zero);
     }
 
     [Fact]
     public void ParseTimeoutMinutes_ValidPositive()
     {
         // Act / Assert
-        IdleTimeoutWatchdog.ParseTimeoutMinutes("45").ShouldBe(TimeSpan.FromMinutes(45));
+        IdleTimeoutWatchdog.ParseTimeoutMinutes("45")
+            .ShouldBe(TimeSpan.FromMinutes(45));
     }
 
     [Theory]
@@ -137,8 +139,10 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
 
         // Assert — 50 s after the ExitCall stamp is still inside the window (clock reset);
         // 120 s after it would expire, proving the anchor moved to the ExitCall, not 0.
-        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit + Ticks(50)).ShouldBeFalse();
-        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit + Ticks(120)).ShouldBeTrue();
+        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit + Ticks(50))
+            .ShouldBeFalse();
+        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit + Ticks(120))
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -151,12 +155,14 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
         // not count as idle: a multi-minute cold first call can never self-kill.
         IdleTimeoutWatchdog.EnterCall();
         long whileInFlight = Stopwatch.GetTimestamp() + Ticks(3600);
-        IdleTimeoutWatchdog.IsIdleExpired(timeout, whileInFlight).ShouldBeFalse();
+        IdleTimeoutWatchdog.IsIdleExpired(timeout, whileInFlight)
+            .ShouldBeFalse();
 
         // Once the call completes the same elapsed time does expire.
         IdleTimeoutWatchdog.ExitCall();
         long afterExit = Stopwatch.GetTimestamp() + Ticks(3600);
-        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit).ShouldBeTrue();
+        IdleTimeoutWatchdog.IsIdleExpired(timeout, afterExit)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -177,6 +183,7 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
         // poll-loop test. A tighter budget flakes under coverage instrumentation / a
         // saturated thread pool, where the Task.Run + PeriodicTimer first tick can be
         // delayed seconds past the 50 ms timeout; the loop still fires, just not within 2 s.
-        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken).ShouldBeTrue();
+        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)
+            .ShouldBeTrue();
     }
 }

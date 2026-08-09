@@ -26,7 +26,8 @@ public sealed class NamespaceContainmentTests
     [InlineData("MyApp.*", "MyApp.*")]
     public void Implies_AContainedGlob_IsTrue(string inner, string outer)
     {
-        NamespaceContainment.Implies(inner, outer).ShouldBeTrue();
+        NamespaceContainment.Implies(inner, outer)
+            .ShouldBeTrue();
     }
 
     [Theory]
@@ -43,7 +44,8 @@ public sealed class NamespaceContainmentTests
     [InlineData("Other.Domain.*", "MyApp.*")]
     public void Implies_AGlobOutsideTheOther_IsFalse(string inner, string outer)
     {
-        NamespaceContainment.Implies(inner, outer).ShouldBeFalse();
+        NamespaceContainment.Implies(inner, outer)
+            .ShouldBeFalse();
     }
 
     [Theory]
@@ -63,6 +65,7 @@ public sealed class NamespaceContainmentTests
     {
         // Never lie: a shape outside the two comparable ones reports no containment in either direction,
         // and the node it belongs to stays flat.
-        NamespaceContainment.Implies(inner, outer).ShouldBeFalse();
+        NamespaceContainment.Implies(inner, outer)
+            .ShouldBeFalse();
     }
 }

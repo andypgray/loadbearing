@@ -17,19 +17,24 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
     {
         RuleResult result = Checker.Run(fixture.Model, arch =>
                 arch.Rule("layering/domain-independent")
-                    .Enforce(arch.Layer("Domain", "MyApp.Domain.*").MustNotReference(arch.Layer("Web", "MyApp.Web.*")))
+                    .Enforce(arch.Layer("Domain", "MyApp.Domain.*")
+                        .MustNotReference(arch.Layer("Web", "MyApp.Web.*")))
                     .Because("Domain is UI-agnostic; transaction boundaries live in services.")
                     .Fix("Define an abstraction in Domain and implement it in Web."))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
-        result.ReferencePairs().ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions");
+        result.ReferencePairs()
+            .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
+        result.ReferencePairs()
+            .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions");
 
         Violation homeController = result.Violations.Single(v =>
             v.Source!.FullName == "MyApp.Domain.OrderService" && v.Target!.FullName == "MyApp.Web.HomeController");
-        homeController.Sites.Select(s => fixture.RelativePath(s)).ShouldContain("MyApp.Domain/OrderService.cs");
-        homeController.Sites.Select(s => s.Line).ShouldContain(9);
+        homeController.Sites.Select(s => fixture.RelativePath(s))
+            .ShouldContain("MyApp.Domain/OrderService.cs");
+        homeController.Sites.Select(s => s.Line)
+            .ShouldContain(9);
     }
 
     [Fact]
@@ -37,9 +42,11 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
     {
         Checker.Run(fixture.Model, arch =>
                 arch.Rule("layering/billing-independent")
-                    .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
+                    .Enforce(arch.Namespace("MyApp.Legacy.Billing.*")
+                        .MustNotReference(arch.Namespace("MyApp.Web.*")))
                     .Because("Billing must not reach up into the web layer."))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -47,8 +54,11 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
     {
         Checker.Run(fixture.Model, arch =>
                 arch.Rule("naming/interfaces")
-                    .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*").MustHavePrefix("I"))
+                    .Enforce(arch.Types.OfKind(TypeKind.Interface)
+                        .InNamespace("MyApp.*")
+                        .MustHavePrefix("I"))
                     .Because("House naming convention; agents grep by I-prefix."))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 }

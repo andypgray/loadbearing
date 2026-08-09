@@ -62,7 +62,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["App", "Lib"], []));
 
         // Assert — Orphan leaves, and its dotted edge leaves with it.
-        Diagram(block).ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
+        Diagram(block)
+            .ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
     }
 
     [Fact]
@@ -76,7 +77,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["My.*"], []));
 
         // Assert — the hyphenated sibling is out; both dotted ones are in.
-        Diagram(block).ShouldBe(["p_My_App[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
+        Diagram(block)
+            .ShouldBe(["p_My_App[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
     }
 
     [Fact]
@@ -90,7 +92,8 @@ public sealed class GraphDiagramRendererTests
             summary, SolutionName, new DiagramScope(["App", "Lib", "Orphan"], ["Orphan"]));
 
         // Assert
-        Diagram(block).ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
+        Diagram(block)
+            .ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
     }
 
     [Fact]
@@ -103,7 +106,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope([], ["Lib"]));
 
         // Assert — two nodes, no phantom Lib node, no dangling edge.
-        Diagram(block).ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
+        Diagram(block)
+            .ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
     }
 
     [Fact]
@@ -116,7 +120,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["Nothing"], []));
 
         // Assert — the (none) convention the text survey uses: an empty section keeps its shape.
-        Diagram(block).ShouldBe(["p_none[\"(no projects in scope)\"]"]);
+        Diagram(block)
+            .ShouldBe(["p_none[\"(no projects in scope)\"]"]);
     }
 
     [Fact]
@@ -130,7 +135,8 @@ public sealed class GraphDiagramRendererTests
 
         // Assert — first come (ordinal order) keeps the plain slug and the collision takes the ordinal
         // suffix, which the underscore keeps clear of a name that genuinely ends in a digit.
-        Diagram(block).ShouldBe(["p_My_App[\"My-App\"]", "p_My_App_2[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
+        Diagram(block)
+            .ShouldBe(["p_My_App[\"My-App\"]", "p_My_App_2[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
     }
 
     [Theory]
@@ -169,7 +175,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(GraphSummarizer.Summarize(model), SolutionName);
 
         // Assert
-        Diagram(block).ShouldBe([$"{expectedId}[\"{reserved}\"]"]);
+        Diagram(block)
+            .ShouldBe([$"{expectedId}[\"{reserved}\"]"]);
     }
 
     [Fact]
@@ -183,7 +190,8 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(GraphSummarizer.Summarize(model), SolutionName);
 
         // Assert — the '#' is escaped, and the ID's slug flattens it to an underscore.
-        Diagram(block).ShouldBe(["p_A_1[\"A#35;1\"]"]);
+        Diagram(block)
+            .ShouldBe(["p_A_1[\"A#35;1\"]"]);
     }
 
     [Fact]
@@ -236,10 +244,13 @@ public sealed class GraphDiagramRendererTests
     // closing fence, so a test asserts on the drawing rather than re-pinning the frame each time.
     private static IReadOnlyList<string> Diagram(string block)
     {
-        var lines = block.Split('\n').ToList();
+        var lines = block.Split('\n')
+            .ToList();
         int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
         int end = lines.FindLastIndex(line => line == "```");
 
-        return lines.GetRange(start, end - start).Select(line => line.Trim()).ToList();
+        return lines.GetRange(start, end - start)
+            .Select(line => line.Trim())
+            .ToList();
     }
 }

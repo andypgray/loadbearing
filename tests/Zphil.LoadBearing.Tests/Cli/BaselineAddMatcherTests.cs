@@ -34,9 +34,12 @@ public sealed class BaselineAddMatcherTests
         Violation edge = Edge(kind, source, target);
         Violation[] violations = [edge];
 
-        BaselineAddMatcher.ResolveEdge("r", violations, source, target).ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, $"T:{source}", $"T:{target}").ShouldBeSameAs(edge);
-        BaselineAddMatcher.ResolveEdge("r", violations, source, $"T:{target}").ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, source, target)
+            .ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, $"T:{source}", $"T:{target}")
+            .ShouldBeSameAs(edge);
+        BaselineAddMatcher.ResolveEdge("r", violations, source, $"T:{target}")
+            .ShouldBeSameAs(edge);
     }
 
     [Theory]

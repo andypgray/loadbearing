@@ -18,32 +18,37 @@ public class SentenceAssemblyTests
     [Fact]
     public void BareLayerSubject_SpeaksCollectively()
     {
-        SentenceRenderer.Subject(Arch.Layer("Domain", "MyApp.Domain.*")).ShouldBe("The Domain layer");
+        SentenceRenderer.Subject(Arch.Layer("Domain", "MyApp.Domain.*"))
+            .ShouldBe("The Domain layer");
     }
 
     [Fact]
     public void LayerSubjectWithAnyAdjective_SwitchesToTypesVoice()
     {
         Layer web = Arch.Layer("Web", "MyApp.Web.*");
-        SentenceRenderer.Subject(web.WithSuffix("Controller")).ShouldBe("Types in the Web layer named `*Controller`");
+        SentenceRenderer.Subject(web.WithSuffix("Controller"))
+            .ShouldBe("Types in the Web layer named `*Controller`");
     }
 
     [Fact]
     public void BareTypesSubject_IsCapitalizedHead()
     {
-        SentenceRenderer.Subject(Arch.Types).ShouldBe("Types");
+        SentenceRenderer.Subject(Arch.Types)
+            .ShouldBe("Types");
     }
 
     [Fact]
     public void NamespaceNounSubject_RendersLocative()
     {
-        SentenceRenderer.Subject(Arch.Namespace("MyApp.*")).ShouldBe("Types in `MyApp.*`");
+        SentenceRenderer.Subject(Arch.Namespace("MyApp.*"))
+            .ShouldBe("Types in `MyApp.*`");
     }
 
     [Fact]
     public void ProjectNounSubject_RendersProjectLocative()
     {
-        SentenceRenderer.Subject(Arch.Project("MyApp.Web")).ShouldBe("Types in project `MyApp.Web`");
+        SentenceRenderer.Subject(Arch.Project("MyApp.Web"))
+            .ShouldBe("Types in project `MyApp.Web`");
     }
 
     [Theory]
@@ -54,25 +59,29 @@ public class SentenceAssemblyTests
     [InlineData(TypeKind.Delegate, "Delegates")]
     public void OfKind_SubstitutesTheHeadPlural(TypeKind kind, string expectedHead)
     {
-        SentenceRenderer.Subject(Arch.Types.OfKind(kind)).ShouldBe(expectedHead);
+        SentenceRenderer.Subject(Arch.Types.OfKind(kind))
+            .ShouldBe(expectedHead);
     }
 
     [Fact]
     public void WithPrefixSubjectHead_RendersNamedGlob()
     {
-        SentenceRenderer.Subject(Arch.Types.WithPrefix("Legacy")).ShouldBe("Types named `Legacy*`");
+        SentenceRenderer.Subject(Arch.Types.WithPrefix("Legacy"))
+            .ShouldBe("Types named `Legacy*`");
     }
 
     [Fact]
     public void WithNameMatchingSubjectHead_RendersMatchesClause()
     {
-        SentenceRenderer.Subject(Arch.Types.WithNameMatching("*Repo*")).ShouldBe("Types whose name matches `*Repo*`");
+        SentenceRenderer.Subject(Arch.Types.WithNameMatching("*Repo*"))
+            .ShouldBe("Types whose name matches `*Repo*`");
     }
 
     [Fact]
     public void DerivedFromSubjectHead_RendersDerivedClause()
     {
-        SentenceRenderer.Subject(Arch.Types.DerivedFrom(typeof(ControllerBase))).ShouldBe("Types derived from `ControllerBase`");
+        SentenceRenderer.Subject(Arch.Types.DerivedFrom(typeof(ControllerBase)))
+            .ShouldBe("Types derived from `ControllerBase`");
     }
 
     [Fact]
@@ -86,8 +95,10 @@ public class SentenceAssemblyTests
     public void Except_CanonicalizesToSentenceFinal_RegardlessOfChainPosition()
     {
         Selection exclusion = Arch.Type(typeof(SqlConnection));
-        string chainedBefore = SentenceRenderer.Subject(Arch.Types.Except(exclusion).InNamespace("MyApp.*"));
-        string chainedAfter = SentenceRenderer.Subject(Arch.Types.InNamespace("MyApp.*").Except(exclusion));
+        string chainedBefore = SentenceRenderer.Subject(Arch.Types.Except(exclusion)
+            .InNamespace("MyApp.*"));
+        string chainedAfter = SentenceRenderer.Subject(Arch.Types.InNamespace("MyApp.*")
+            .Except(exclusion));
 
         chainedBefore.ShouldBe("Types in `MyApp.*`, except `SqlConnection`");
         chainedAfter.ShouldBe(chainedBefore);
@@ -97,8 +108,10 @@ public class SentenceAssemblyTests
     public void Authored_RendersTheHeadPremodifier()
     {
         // Arrange
-        Selection namespaced = Arch.Types.InNamespace("MyApp.*").Authored();
-        Selection layer = Arch.Layer("Domain", "MyApp.Domain.*").Authored();
+        Selection namespaced = Arch.Types.InNamespace("MyApp.*")
+            .Authored();
+        Selection layer = Arch.Layer("Domain", "MyApp.Domain.*")
+            .Authored();
 
         // Act
         string namespacedSubject = SentenceRenderer.Subject(namespaced);
@@ -114,8 +127,12 @@ public class SentenceAssemblyTests
     public void Authored_ComposesWithOfKind_RegardlessOfChainPosition()
     {
         // Arrange — a premodifier composes with the head OfKind substitutes rather than clobbering it.
-        Selection kindFirst = Arch.Types.InNamespace("MyApp.*").OfKind(TypeKind.Interface).Authored();
-        Selection authoredFirst = Arch.Types.InNamespace("MyApp.*").Authored().OfKind(TypeKind.Interface);
+        Selection kindFirst = Arch.Types.InNamespace("MyApp.*")
+            .OfKind(TypeKind.Interface)
+            .Authored();
+        Selection authoredFirst = Arch.Types.InNamespace("MyApp.*")
+            .Authored()
+            .OfKind(TypeKind.Interface);
 
         // Act
         string kindFirstSubject = SentenceRenderer.Subject(kindFirst);
@@ -131,21 +148,24 @@ public class SentenceAssemblyTests
     {
         Selection selection = Arch.Types.InNamespace("MyApp.*")
             .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit");
-        SentenceRenderer.Subject(selection).ShouldBe("Types in `MyApp.*` whose name contains a digit");
+        SentenceRenderer.Subject(selection)
+            .ShouldBe("Types in `MyApp.*` whose name contains a digit");
     }
 
     [Fact]
     public void CollidingSimpleNames_QualifyWithMinimalTrailingSegments()
     {
         Constraint constraint = Arch.Types.MustNotReference(typeof(Order), typeof(Stubs.Sales.Order));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not reference `Billing.Order` or `Sales.Order`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not reference `Billing.Order` or `Sales.Order`.");
     }
 
     [Fact]
     public void TwoTargets_JoinWithOr()
     {
         Constraint constraint = Arch.Types.MustNotReference(typeof(SqlConnection), typeof(ControllerBase));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not reference `SqlConnection` or `ControllerBase`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not reference `SqlConnection` or `ControllerBase`.");
     }
 
     [Fact]
@@ -170,7 +190,8 @@ public class SentenceAssemblyTests
         Constraint constraint = Arch.Types.MustNotUse(
             Arch.Member(typeof(DateTime), nameof(DateTime.Now)),
             Arch.Member(typeof(DateTime), nameof(DateTime.UtcNow)));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
     }
 
     [Fact]
@@ -185,14 +206,16 @@ public class SentenceAssemblyTests
     public void MustNotUse_MethodMember_AppendsParens()
     {
         Constraint constraint = Arch.Types.MustNotUse(Arch.Member(typeof(Task), nameof(Task.Wait)));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `Task.Wait()`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not use `Task.Wait()`.");
     }
 
     [Fact]
     public void MustNotUse_GenericAnchorProperty_RendersDeclaredTypeParameterName()
     {
         Constraint constraint = Arch.Types.MustNotUse(Arch.Member(typeof(Task<>), "Result"));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not use `Task<TResult>.Result`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not use `Task<TResult>.Result`.");
     }
 
     [Fact]
@@ -222,7 +245,8 @@ public class SentenceAssemblyTests
     {
         // The Selection overload: a pattern-selection target renders in reference position.
         Constraint constraint = Arch.Types.MustNotConstruct(Arch.Namespace("MyApp.Services.*"));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct types in `MyApp.Services.*`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not construct types in `MyApp.Services.*`.");
     }
 
     [Fact]
@@ -230,14 +254,16 @@ public class SentenceAssemblyTests
     {
         // The Type sugar overload wraps the bare type as a single-type selection (arch.Type written for you).
         Constraint constraint = Arch.Types.MustNotConstruct(typeof(SqlConnection));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `SqlConnection`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not construct `SqlConnection`.");
     }
 
     [Fact]
     public void MustNotConstruct_MultipleTargets_JoinWithOr()
     {
         Constraint constraint = Arch.Types.MustNotConstruct(typeof(SqlConnection), typeof(ControllerBase));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `SqlConnection` or `ControllerBase`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not construct `SqlConnection` or `ControllerBase`.");
     }
 
     [Fact]
@@ -245,7 +271,8 @@ public class SentenceAssemblyTests
     {
         // Shares TargetList with the reference verbs, so colliding simple names widen identically.
         Constraint constraint = Arch.Types.MustNotConstruct(typeof(Order), typeof(Stubs.Sales.Order));
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
     }
 
     // ---- Colliding anchors, negative hierarchy/attribute verbs (GRAMMAR §6): the raw-Type anchor lists
@@ -293,7 +320,8 @@ public class SentenceAssemblyTests
         // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice —
         // "Types in the Web layer named `*Controller` …", never a bare "The Web layer …".
         Layer web = Arch.Layer("Web", "MyApp.Web.*");
-        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotCatch(typeof(Exception)))
+        SentenceRenderer.Sentence(web.WithSuffix("Controller")
+                .MustNotCatch(typeof(Exception)))
             .ShouldBe("Types in the Web layer named `*Controller` must not catch `Exception`.");
     }
 
@@ -328,7 +356,8 @@ public class SentenceAssemblyTests
     {
         // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice.
         Layer web = Arch.Layer("Web", "MyApp.Web.*");
-        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotCatchUnfiltered(typeof(Exception)))
+        SentenceRenderer.Sentence(web.WithSuffix("Controller")
+                .MustNotCatchUnfiltered(typeof(Exception)))
             .ShouldBe("Types in the Web layer named `*Controller` must not catch `Exception` without a `when` filter.");
     }
 
@@ -364,7 +393,8 @@ public class SentenceAssemblyTests
     {
         // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice.
         Layer web = Arch.Layer("Web", "MyApp.Web.*");
-        SentenceRenderer.Sentence(web.WithSuffix("Controller").MustNotSwallow(typeof(Exception)))
+        SentenceRenderer.Sentence(web.WithSuffix("Controller")
+                .MustNotSwallow(typeof(Exception)))
             .ShouldBe("Types in the Web layer named `*Controller` must not swallow `Exception`.");
     }
 
@@ -399,7 +429,8 @@ public class SentenceAssemblyTests
     {
         // Head truth under adjectives (§6): the layer subject switches to types voice under WithSuffix.
         Layer domain = Arch.Layer("Domain", "MyApp.Domain.*");
-        SentenceRenderer.Sentence(domain.WithSuffix("Service").MustNotThrow(typeof(Exception)))
+        SentenceRenderer.Sentence(domain.WithSuffix("Service")
+                .MustNotThrow(typeof(Exception)))
             .ShouldBe("Types in the Domain layer named `*Service` must not throw `Exception`.");
     }
 
@@ -426,7 +457,8 @@ public class SentenceAssemblyTests
     {
         // The namespace-locative subject + the strict throw allowlist: exact equality proves no external-
         // packages caveat rides along (unlike MustOnlyReference), which is the strictness rendering (§5.3).
-        Constraint constraint = Arch.Namespace("MyApp.Domain.*").MustOnlyThrow(typeof(InvalidOperationException));
+        Constraint constraint = Arch.Namespace("MyApp.Domain.*")
+            .MustOnlyThrow(typeof(InvalidOperationException));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types in `MyApp.Domain.*` must throw only `InvalidOperationException`.");
     }
@@ -484,25 +516,32 @@ public class SentenceAssemblyTests
     public void MemberProjections_RenderKindPluralHeads()
     {
         // The five projection heads: "{kind-plural} of {reference}" (§5.7). Reference is "types".
-        SentenceRenderer.MemberSubject(Arch.Types.Members).ShouldBe("Members of types");
-        SentenceRenderer.MemberSubject(Arch.Types.Methods).ShouldBe("Methods of types");
-        SentenceRenderer.MemberSubject(Arch.Types.Properties).ShouldBe("Properties of types");
-        SentenceRenderer.MemberSubject(Arch.Types.Fields).ShouldBe("Fields of types");
-        SentenceRenderer.MemberSubject(Arch.Types.Events).ShouldBe("Events of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Members)
+            .ShouldBe("Members of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods)
+            .ShouldBe("Methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Properties)
+            .ShouldBe("Properties of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Fields)
+            .ShouldBe("Fields of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Events)
+            .ShouldBe("Events of types");
     }
 
     [Fact]
     public void MemberSubject_ReferenceIsUnderlyingTypeSelection()
     {
         // The {reference} is the source type selection in reference position (§6): a namespace locative.
-        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*").Methods)
+        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*")
+                .Methods)
             .ShouldBe("Methods of types in `MyApp.Web.*`");
     }
 
     [Fact]
     public void Returning_SingleAnchor_RendersReturningClause()
     {
-        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task)))
+        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*")
+                .Methods.Returning(typeof(Task)))
             .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task`");
     }
 
@@ -526,9 +565,11 @@ public class SentenceAssemblyTests
     {
         // The member Where renders sentence-final after the inline adjective, whatever the chain order.
         string whereFirst = SentenceRenderer.MemberSubject(
-            Arch.Types.Methods.Where(m => m.IsAsync, "that are async").WithSuffix("Handler"));
+            Arch.Types.Methods.Where(m => m.IsAsync, "that are async")
+                .WithSuffix("Handler"));
         string whereLast = SentenceRenderer.MemberSubject(
-            Arch.Types.Methods.WithSuffix("Handler").Where(m => m.IsAsync, "that are async"));
+            Arch.Types.Methods.WithSuffix("Handler")
+                .Where(m => m.IsAsync, "that are async"));
 
         whereFirst.ShouldBe("Methods of types named `*Handler` that are async");
         whereLast.ShouldBe(whereFirst);
@@ -538,9 +579,11 @@ public class SentenceAssemblyTests
     public void MemberAdjectives_RenderInAuthoringOrder()
     {
         // Two inline adjectives render in the order written — order is preserved, not canonicalized.
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task)).WithSuffix("Async"))
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task))
+                .WithSuffix("Async"))
             .ShouldBe("Methods of types returning `Task` named `*Async`");
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async").Returning(typeof(Task)))
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async")
+                .Returning(typeof(Task)))
             .ShouldBe("Methods of types named `*Async` returning `Task`");
     }
 
@@ -560,13 +603,15 @@ public class SentenceAssemblyTests
     public void Registered_NoArg_RendersRegisteredTypesSubjectHead()
     {
         // The any-lifetime noun's subject head — the head IS the noun fragment (GRAMMAR §5.1), capitalized.
-        SentenceRenderer.Subject(Arch.Registered()).ShouldBe("Registered types");
+        SentenceRenderer.Subject(Arch.Registered())
+            .ShouldBe("Registered types");
     }
 
     [Fact]
     public void Registered_WithLifetime_RendersLifetimePrefixedSubjectHead()
     {
-        SentenceRenderer.Subject(Arch.Registered(Lifetime.Singleton)).ShouldBe("Singleton-registered types");
+        SentenceRenderer.Subject(Arch.Registered(Lifetime.Singleton))
+            .ShouldBe("Singleton-registered types");
     }
 
     [Fact]
@@ -587,7 +632,8 @@ public class SentenceAssemblyTests
         // ("Singleton-registered types, except …") — never a false bare "Types, …". Except canonicalizes
         // sentence-final as usual.
         Selection exclusion = Arch.Type(typeof(SqlConnection));
-        Constraint constraint = Arch.Registered(Lifetime.Singleton).Except(exclusion)
+        Constraint constraint = Arch.Registered(Lifetime.Singleton)
+            .Except(exclusion)
             .MustNotInject(Arch.Registered(Lifetime.Scoped));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Singleton-registered types, except `SqlConnection` must not inject scoped-registered types.");
@@ -602,7 +648,8 @@ public class SentenceAssemblyTests
         // The flagship shape: four project operands read as one locative, not four repeated phrases.
         Selection union = Arch.AnyOf(
             Arch.Project("A"), Arch.Project("B"), Arch.Project("C"), Arch.Project("D"));
-        SentenceRenderer.Subject(union).ShouldBe("Types in projects `A`, `B`, `C` or `D`");
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Types in projects `A`, `B`, `C` or `D`");
     }
 
     [Fact]
@@ -616,7 +663,8 @@ public class SentenceAssemblyTests
     public void UnionOfTypes_InReferencePosition_IsTheBareBacktickedList()
     {
         Selection union = Arch.AnyOf(Arch.Type(typeof(SqlConnection)), Arch.Type(typeof(ControllerBase)));
-        SentenceRenderer.Reference(union).ShouldBe("`SqlConnection` or `ControllerBase`");
+        SentenceRenderer.Reference(union)
+            .ShouldBe("`SqlConnection` or `ControllerBase`");
     }
 
     [Fact]
@@ -632,14 +680,16 @@ public class SentenceAssemblyTests
     public void UnionOfBareLayers_SpeaksCollectivelyInThePlural()
     {
         Selection union = Arch.AnyOf(Arch.Layer("UnionDomain", "MyApp.Domain.*"), Arch.Layer("UnionWeb", "MyApp.Web.*"));
-        SentenceRenderer.Subject(union).ShouldBe("The UnionDomain or UnionWeb layers");
+        SentenceRenderer.Subject(union)
+            .ShouldBe("The UnionDomain or UnionWeb layers");
     }
 
     [Fact]
     public void UnionMemberSubject_TakesTheCollapsedReference()
     {
         // The path the dogfood rule actually takes: a member subject renders "methods of {reference}".
-        SentenceRenderer.MemberSubject(Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Methods)
+        SentenceRenderer.MemberSubject(Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+                .Methods)
             .ShouldBe("Methods of types in projects `A` or `B`");
     }
 
@@ -647,15 +697,19 @@ public class SentenceAssemblyTests
     public void UnionExcept_CanonicalizesSentenceFinalAfterTheCollapsedLocative()
     {
         // Adjectives attach to the union, not through it: (a ∪ b) − c, rendered against the hoisted head.
-        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Except(Arch.Type(typeof(SqlConnection)));
-        SentenceRenderer.Subject(union).ShouldBe("Types in projects `A` or `B`, except `SqlConnection`");
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+            .Except(Arch.Type(typeof(SqlConnection)));
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Types in projects `A` or `B`, except `SqlConnection`");
     }
 
     [Fact]
     public void UnionOfKind_SubstitutesTheHoistedHead()
     {
-        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).OfKind(TypeKind.Interface);
-        SentenceRenderer.Subject(union).ShouldBe("Interfaces in projects `A` or `B`");
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+            .OfKind(TypeKind.Interface);
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Interfaces in projects `A` or `B`");
     }
 
     [Fact]
@@ -663,9 +717,12 @@ public class SentenceAssemblyTests
     {
         // The premodifier assembles against the hoisted head exactly as a substitution does — and in
         // reference position too, which is the shape a member subject renders its type selection in.
-        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).Authored();
-        SentenceRenderer.Subject(union).ShouldBe("Authored types in projects `A` or `B`");
-        SentenceRenderer.Reference(union).ShouldBe("authored types in projects `A` or `B`");
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+            .Authored();
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Authored types in projects `A` or `B`");
+        SentenceRenderer.Reference(union)
+            .ShouldBe("authored types in projects `A` or `B`");
     }
 
     [Fact]
@@ -673,8 +730,10 @@ public class SentenceAssemblyTests
     {
         // Same contract as the head adjective: a union that does not collapse distributes the prefix into
         // its operands, so the filter the checker applies always reaches the sentence.
-        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*")).Authored();
-        SentenceRenderer.Subject(union).ShouldBe("Authored types in project `A` or authored types in `B.*`");
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*"))
+            .Authored();
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Authored types in project `A` or authored types in `B.*`");
     }
 
     [Fact]
@@ -689,8 +748,10 @@ public class SentenceAssemblyTests
     public void UnionWithAnAdjectiveBearingOperand_FallsBackToOrJoinedPhrases()
     {
         // An operand carrying its own adjective cannot fold into a shared locative, so the whole union falls back.
-        Selection union = Arch.AnyOf(Arch.Project("A").WithSuffix("Controller"), Arch.Project("B"));
-        SentenceRenderer.Subject(union).ShouldBe("Types in project `A` named `*Controller` or types in project `B`");
+        Selection union = Arch.AnyOf(Arch.Project("A")
+            .WithSuffix("Controller"), Arch.Project("B"));
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Types in project `A` named `*Controller` or types in project `B`");
     }
 
     [Fact]
@@ -698,8 +759,10 @@ public class SentenceAssemblyTests
     {
         // A head adjective on a union that does not collapse still reaches the prose — the checker applies
         // the kind filter, so the sentence must say so rather than silently reading "types".
-        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*")).OfKind(TypeKind.Interface);
-        SentenceRenderer.Subject(union).ShouldBe("Interfaces in project `A` or interfaces in `B.*`");
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Namespace("B.*"))
+            .OfKind(TypeKind.Interface);
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Interfaces in project `A` or interfaces in `B.*`");
     }
 
     [Fact]
@@ -707,16 +770,20 @@ public class SentenceAssemblyTests
     {
         // Selections are loop-buildable (§2 principle 5), so a loop yielding one operand is legal — and an
         // identity in both positions, not a degenerate "or" list.
-        SentenceRenderer.Subject(Arch.AnyOf(Arch.Project("A"))).ShouldBe("Types in project `A`");
-        SentenceRenderer.Reference(Arch.AnyOf(Arch.Project("A"))).ShouldBe("types in project `A`");
+        SentenceRenderer.Subject(Arch.AnyOf(Arch.Project("A")))
+            .ShouldBe("Types in project `A`");
+        SentenceRenderer.Reference(Arch.AnyOf(Arch.Project("A")))
+            .ShouldBe("types in project `A`");
     }
 
     [Fact]
     public void UnionSubject_RendersThroughTheFullSentence()
     {
         // End to end: the union reaches the law sentence like any other subject.
-        Constraint constraint = Arch.AnyOf(Arch.Project("A"), Arch.Project("B")).MustBeSealed();
-        SentenceRenderer.Sentence(constraint).ShouldBe("Types in projects `A` or `B` must be sealed.");
+        Constraint constraint = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+            .MustBeSealed();
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types in projects `A` or `B` must be sealed.");
     }
 
     // ---- String attribute anchors (GRAMMAR §5.2–§5.3, §6): a name-anchored attribute assembles exactly as
@@ -817,7 +884,8 @@ public class SentenceAssemblyTests
         // The rule this axis exists for, in this repository's own spec: the MCP tool methods, not the types
         // that happen to declare them. Reached by string, because a spec need not reference the attribute's
         // package to name it.
-        SentenceRenderer.MemberSubject(Arch.Namespace("Zphil.LoadBearing.*").Methods
+        SentenceRenderer.MemberSubject(Arch.Namespace("Zphil.LoadBearing.*")
+                .Methods
                 .AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute"))
             .ShouldBe("`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`");
     }
@@ -841,7 +909,8 @@ public class SentenceAssemblyTests
         // THE disambiguation pin — the whole reason the member adjective premodifies. Two different subjects
         // (every method of an attributed type, versus the attributed methods of any type); an inline member
         // fragment would give them one byte-identical sentence.
-        string typeAttributed = SentenceRenderer.MemberSubject(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)).Methods);
+        string typeAttributed = SentenceRenderer.MemberSubject(Arch.Types.AttributedWith(typeof(ApiControllerAttribute))
+            .Methods);
         string memberAttributed = SentenceRenderer.MemberSubject(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute)));
 
         typeAttributed.ShouldBe("Methods of types attributed with `[ApiController]`");

@@ -53,7 +53,8 @@ public sealed class McpLaunchScriptTests
         argv.ShouldBe(["exec", lab.StagedServerDll(), "mcp", "MyApp.sln", "--spec", "./Spec.dll"]);
 
         // The whole build output travels, not just the file the identity is keyed on.
-        File.Exists(Path.Combine(lab.StagedDirectories().Single(), SiblingDll))
+        File.Exists(Path.Combine(lab.StagedDirectories()
+                .Single(), SiblingDll))
             .ShouldBeTrue($"{SiblingDll} was left behind, so the staged copy is not a runnable server.");
     }
 
@@ -66,15 +67,19 @@ public sealed class McpLaunchScriptTests
 
         // Written into the staged copy between the two launches: a re-stage would replace the directory this
         // sits in, so surviving is what "copied nothing" looks like from outside.
-        File.WriteAllText(Path.Combine(lab.StagedDirectories().Single(), StagedMarker), "still here");
+        File.WriteAllText(Path.Combine(lab.StagedDirectories()
+            .Single(), StagedMarker), "still here");
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ExitCode.ShouldBe(0);
-        lab.ExecutedArguments()[1].ShouldBe(first);
-        lab.StagedDirectories().Length.ShouldBe(
-            1, "a second session on one build must share the first session's copy, not mint its own.");
-        File.Exists(Path.Combine(lab.StagedDirectories().Single(), StagedMarker))
+        lab.ExecutedArguments()[1]
+            .ShouldBe(first);
+        lab.StagedDirectories()
+            .Length.ShouldBe(
+                1, "a second session on one build must share the first session's copy, not mint its own.");
+        File.Exists(Path.Combine(lab.StagedDirectories()
+                .Single(), StagedMarker))
             .ShouldBeTrue("the copy was re-staged over a build that had not changed.");
     }
 
@@ -95,8 +100,10 @@ public sealed class McpLaunchScriptTests
 
         // The old directory stays: a server may still be running from it, which is the whole reason the key
         // exists rather than one directory that gets overwritten.
-        lab.StagedDirectories().Length.ShouldBe(2);
-        File.ReadAllText(afterRebuild).ShouldBe("a rebuilt CLI, of a different size");
+        lab.StagedDirectories()
+            .Length.ShouldBe(2);
+        File.ReadAllText(afterRebuild)
+            .ShouldBe("a rebuilt CLI, of a different size");
     }
 
     [Fact]
@@ -130,7 +137,8 @@ public sealed class McpLaunchScriptTests
         result.ExitCode.ShouldBe(0);
         result.StandardOutput.ShouldBeEmpty();
         result.StandardError.ShouldContain("could not stage a copy");
-        lab.ExecutedArguments()[1].ShouldBe($"{lab.BuildOutput}/{ServerDll}");
+        lab.ExecutedArguments()[1]
+            .ShouldBe($"{lab.BuildOutput}/{ServerDll}");
     }
 
     /// <summary>
@@ -144,7 +152,8 @@ public sealed class McpLaunchScriptTests
 
         internal Lab()
         {
-            Root = Path.Combine(TestTempRoot.For("mcp-launcher"), Guid.NewGuid().ToString("N"));
+            Root = Path.Combine(TestTempRoot.For("mcp-launcher"), Guid.NewGuid()
+                .ToString("N"));
             ProjectDirectory = Path.Combine(Root, "project");
             RunRoot = Path.Combine(Root, "copies");
             _stubDirectory = Path.Combine(Root, "stub");
@@ -216,7 +225,8 @@ public sealed class McpLaunchScriptTests
         /// <summary>What the stub <c>dotnet</c> was execed with, one argument per line.</summary>
         internal string[] ExecutedArguments()
         {
-            File.Exists(_argumentsFile).ShouldBeTrue("the launcher never reached the exec.");
+            File.Exists(_argumentsFile)
+                .ShouldBeTrue("the launcher never reached the exec.");
 
             return File.ReadAllLines(_argumentsFile);
         }
@@ -224,13 +234,18 @@ public sealed class McpLaunchScriptTests
         /// <summary>The copies staged so far, newest key last.</summary>
         internal string[] StagedDirectories()
         {
-            return Directory.Exists(RunRoot) ? Directory.GetDirectories(RunRoot).Order().ToArray() : [];
+            return Directory.Exists(RunRoot)
+                ? Directory.GetDirectories(RunRoot)
+                    .Order()
+                    .ToArray()
+                : [];
         }
 
         /// <summary>The server the launcher should have execed: the one file inside the single staged copy.</summary>
         internal string StagedServerDll()
         {
-            return ShellInterpreter.Posix(Path.Combine(StagedDirectories().Single(), ServerDll));
+            return ShellInterpreter.Posix(Path.Combine(StagedDirectories()
+                .Single(), ServerDll));
         }
 
         /// <summary>

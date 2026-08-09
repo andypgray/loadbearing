@@ -301,7 +301,8 @@ internal static class ProcessFileFootprint
         string canonicalRoot,
         List<RetainedPath> found)
     {
-        var count = Marshal.PtrToStructure<ProcessHandleSnapshotInformation>(snapshot).NumberOfHandles.ToInt64();
+        var count = Marshal.PtrToStructure<ProcessHandleSnapshotInformation>(snapshot)
+            .NumberOfHandles.ToInt64();
         int entrySize = Marshal.SizeOf<ProcessHandleTableEntryInfo>();
         int headerSize = Marshal.SizeOf<ProcessHandleSnapshotInformation>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

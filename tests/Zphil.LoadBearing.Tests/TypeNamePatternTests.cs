@@ -36,12 +36,14 @@ public class TypeNamePatternTests
     [InlineData("*", "", true)]
     public void Matches_TablePins(string pattern, string name, bool expected)
     {
-        new TypeNamePattern(pattern).Matches(name).ShouldBe(expected);
+        new TypeNamePattern(pattern).Matches(name)
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void Matches_IsCaseSensitive()
     {
-        new TypeNamePattern("*Repo*").Matches("orderrepository").ShouldBeFalse();
+        new TypeNamePattern("*Repo*").Matches("orderrepository")
+            .ShouldBeFalse();
     }
 }

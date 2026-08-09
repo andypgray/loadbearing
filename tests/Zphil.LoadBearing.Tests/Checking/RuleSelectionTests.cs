@@ -37,7 +37,8 @@ public sealed class RuleSelectionTests
         var selected = ArchChecker.SelectRules(model, ["layering/*"]);
 
         // Assert
-        selected.Select(rule => rule.Id).ShouldBe(["layering/web-not-data", "layering/web-not-legacy"]);
+        selected.Select(rule => rule.Id)
+            .ShouldBe(["layering/web-not-data", "layering/web-not-legacy"]);
     }
 
     [Fact]
@@ -50,7 +51,8 @@ public sealed class RuleSelectionTests
         var selected = ArchChecker.SelectRules(model, ["legacy/billing"]);
 
         // Assert — no implicit subtree: an ID is a pattern over the whole ID, not a prefix.
-        selected.Select(rule => rule.Id).ShouldBe(["legacy/billing"]);
+        selected.Select(rule => rule.Id)
+            .ShouldBe(["legacy/billing"]);
     }
 
     [Fact]
@@ -63,7 +65,8 @@ public sealed class RuleSelectionTests
         var selected = ArchChecker.SelectRules(model, ["legacy/*"]);
 
         // Assert — one '*' reaches across the slash, so an area glob takes a scope's children too.
-        selected.Select(rule => rule.Id).ShouldBe(["legacy/billing", "legacy/billing/containment"]);
+        selected.Select(rule => rule.Id)
+            .ShouldBe(["legacy/billing", "legacy/billing/containment"]);
     }
 
     [Fact]
@@ -90,7 +93,8 @@ public sealed class RuleSelectionTests
         var selected = ArchChecker.SelectRules(model, []);
 
         // Assert
-        selected.Select(rule => rule.Id).ShouldBe(model.Rules.Select(rule => rule.Id));
+        selected.Select(rule => rule.Id)
+            .ShouldBe(model.Rules.Select(rule => rule.Id));
     }
 
     [Fact]
@@ -119,13 +123,15 @@ public sealed class RuleSelectionTests
         CheckReport report = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
 
         // Assert — the counters are the subset's, and the unselected red rule does not reach the verdict.
-        report.Results.Select(result => result.Rule.Id).ShouldBe(["layering/web-not-legacy"]);
+        report.Results.Select(result => result.Rule.Id)
+            .ShouldBe(["layering/web-not-legacy"]);
         report.RulesChecked.ShouldBe(1);
         report.RulesPassed.ShouldBe(1);
         report.RulesFailed.ShouldBe(0);
         report.ViolationCount.ShouldBe(0);
         report.HasViolations.ShouldBeFalse();
-        report.Results.Single().ShouldHavePassedClean();
+        report.Results.Single()
+            .ShouldHavePassedClean();
     }
 
     [Fact]
@@ -160,7 +166,8 @@ public sealed class RuleSelectionTests
         CheckReport whole = ArchChecker.Check(model, codebase, BaselineIndex.Empty, null);
 
         // Assert — the unfiltered narrow path is the whole-model path, so nothing about the default run moves.
-        subset.Results.Select(result => result.Rule.Id).ShouldBe(whole.Results.Select(result => result.Rule.Id));
+        subset.Results.Select(result => result.Rule.Id)
+            .ShouldBe(whole.Results.Select(result => result.Rule.Id));
         subset.RulesChecked.ShouldBe(whole.RulesChecked);
         subset.RulesFailed.ShouldBe(whole.RulesFailed);
         subset.ViolationCount.ShouldBe(whole.ViolationCount);
@@ -173,19 +180,23 @@ public sealed class RuleSelectionTests
         return ArchModelBuilder.Build(new InlineSpec(arch =>
         {
             arch.Rule("layering/web-not-data")
-                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
+                .Enforce(arch.Namespace("App.Web.*")
+                    .MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("Controllers must reach data through a repository.");
 
             arch.Rule("layering/web-not-legacy")
-                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Legacy.*")))
+                .Enforce(arch.Namespace("App.Web.*")
+                    .MustNotReference(arch.Namespace("App.Legacy.*")))
                 .Because("The web layer must not grow new ties to the legacy ledger.");
 
             arch.Rule("legacy/billing")
-                .Enforce(arch.Namespace("App.Legacy.*").MustNotReference(arch.Namespace("App.Web.*")))
+                .Enforce(arch.Namespace("App.Legacy.*")
+                    .MustNotReference(arch.Namespace("App.Web.*")))
                 .Because("The ledger must not call back into the web layer.");
 
             arch.Rule("legacy/billing/containment")
-                .Enforce(arch.Namespace("App.Data.*").MustNotReference(arch.Namespace("App.Legacy.*")))
+                .Enforce(arch.Namespace("App.Data.*")
+                    .MustNotReference(arch.Namespace("App.Legacy.*")))
                 .Because("The data layer must not depend on the ledger it feeds.");
         }));
     }

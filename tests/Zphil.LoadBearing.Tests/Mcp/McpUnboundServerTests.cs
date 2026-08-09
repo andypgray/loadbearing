@@ -189,7 +189,9 @@ public sealed class McpUnboundServerTests : IDisposable
         document.RootElement.TryGetProperty("error", out JsonElement error)
             .ShouldBeFalse($"the server returned a JSON-RPC error to initialize: {error}");
 
-        return document.RootElement.GetProperty("result").GetProperty("instructions").GetString() ?? string.Empty;
+        return document.RootElement.GetProperty("result")
+            .GetProperty("instructions")
+            .GetString() ?? string.Empty;
     }
 
     private static string ShouldHaveToolText(string response)
@@ -198,14 +200,17 @@ public sealed class McpUnboundServerTests : IDisposable
         document.RootElement.TryGetProperty("error", out JsonElement error)
             .ShouldBeFalse($"the server returned a JSON-RPC error rather than a tool error: {error}");
 
-        return document.RootElement.GetProperty("result").GetProperty("content")[0]
-            .GetProperty("text").GetString() ?? string.Empty;
+        return document.RootElement.GetProperty("result")
+            .GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString() ?? string.Empty;
     }
 
     private static bool ToolIsErrorOf(string response)
     {
         using JsonDocument document = JsonDocument.Parse(response);
-        return document.RootElement.GetProperty("result").TryGetProperty("isError", out JsonElement flag)
+        return document.RootElement.GetProperty("result")
+                   .TryGetProperty("isError", out JsonElement flag)
                && flag.ValueKind == JsonValueKind.True;
     }
 

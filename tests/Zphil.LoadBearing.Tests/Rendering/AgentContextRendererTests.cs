@@ -18,7 +18,8 @@ public class AgentContextRendererTests
     // into the always-on block (progressive disclosure).
     private static readonly IArchitectureSpec DogfoodShapeSpec = new InlineSpec(arch =>
         arch.Rule("layering/core-no-roslyn")
-            .Enforce(arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn")))
+            .Enforce(arch.Project("Zphil.LoadBearing")
+                .MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn")))
             .Because("Core is the netstandard2.0 reified model both render targets consume; " +
                      "Roslyn extraction is host machinery.")
             .Fix("Depend on the Codebase model types in Core; keep Microsoft.CodeAnalysis behind " +
@@ -77,7 +78,8 @@ public class AgentContextRendererTests
             "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
             "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
-        AgentContextRenderer.RootBlock(Canonical(), "CanonicalSampleSpec").ShouldBe(expected);
+        AgentContextRenderer.RootBlock(Canonical(), "CanonicalSampleSpec")
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -96,13 +98,15 @@ public class AgentContextRendererTests
             "Core is the netstandard2.0 reified model both render targets consume; " +
             "Roslyn extraction is host machinery.";
 
-        AgentContextRenderer.RootBlock(model, "Zphil.LoadBearing.ArchSpec").ShouldBe(expected);
+        AgentContextRenderer.RootBlock(model, "Zphil.LoadBearing.ArchSpec")
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void ScopeCard_CanonicalQuarantinedScope_MatchesGolden()
     {
-        ArchRule containment = Canonical().Rules.Single(rule => rule.Id == "legacy/billing/containment");
+        ArchRule containment = Canonical()
+            .Rules.Single(rule => rule.Id == "legacy/billing/containment");
 
         const string expected =
             "## Quarantined scope `legacy/billing`\n\n" +
@@ -116,7 +120,8 @@ public class AgentContextRendererTests
             "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
             "- Expand: `loadbearing explain legacy/billing/containment`.";
 
-        AgentContextRenderer.ScopeCard(containment).ShouldBe(expected);
+        AgentContextRenderer.ScopeCard(containment)
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -165,7 +170,8 @@ public class AgentContextRendererTests
                 .Enforce(dispatch.MustNotBeReferencedBy(arch.Namespace("Acme.Legacy.*")))
                 .Because("Nothing legacy may depend on dispatch.");
         });
-        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
+        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
+            .ToList();
 
         const string expected =
             "## Layer `Dispatch`\n\n" +
@@ -176,7 +182,8 @@ public class AgentContextRendererTests
             "Nothing legacy may depend on dispatch.\n" +
             "- Expand any rule above with `loadbearing explain <rule-id>`.";
 
-        AgentContextRenderer.LayerCard("Dispatch", rules).ShouldBe(expected);
+        AgentContextRenderer.LayerCard("Dispatch", rules)
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -189,10 +196,12 @@ public class AgentContextRendererTests
             arch.Rule("data-access/no-inline-sql")
                 .Migrate(
                     "Controllers build DataTables inline (legacy Active Record style).",
-                    web.WithSuffix("Controller").MustNotReference(arch.Namespace("System.Data.*")))
+                    web.WithSuffix("Controller")
+                        .MustNotReference(arch.Namespace("System.Data.*")))
                 .Because("Repository pattern for testability.");
         });
-        var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
+        var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate)
+            .ToList();
 
         // The exact counter-prior bullet the root ### Migrations section renders for this rule.
         const string counterPriorBullet =
@@ -204,9 +213,11 @@ public class AgentContextRendererTests
             "If you are already editing a grandfathered site and the migration is small, migrate it; " +
             "otherwise do not grow the debt.";
 
-        AgentContextRenderer.RootBlock(model, "Spec").ShouldContain(counterPriorBullet);
+        AgentContextRenderer.RootBlock(model, "Spec")
+            .ShouldContain(counterPriorBullet);
         // The shared composer renders the Migrate rule byte-identically in the layer card (no Fix, no count).
-        AgentContextRenderer.LayerCard("Web", migrateRules).ShouldContain(counterPriorBullet);
+        AgentContextRenderer.LayerCard("Web", migrateRules)
+            .ShouldContain(counterPriorBullet);
     }
 
     [Fact]
@@ -221,7 +232,8 @@ public class AgentContextRendererTests
                 .Because("Web reaches billing only through the facade.")
                 .Fix("Inject IBillingFacade instead of newing up billing types.");
         });
-        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
+        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
+            .ToList();
 
         string card = AgentContextRenderer.LayerCard("Web", rules);
 
@@ -244,9 +256,10 @@ public class AgentContextRendererTests
     [Fact]
     public void ProvenanceLine_NamesSpecDeterministically_NoTimestamp()
     {
-        AgentContextRenderer.ProvenanceLine("MyApp.ArchSpec").ShouldBe(
-            "*Generated by `loadbearing render` from `MyApp.ArchSpec` — " +
-            "do not edit between the markers; edit the spec and re-render.*");
+        AgentContextRenderer.ProvenanceLine("MyApp.ArchSpec")
+            .ShouldBe(
+                "*Generated by `loadbearing render` from `MyApp.ArchSpec` — " +
+                "do not edit between the markers; edit the spec and re-render.*");
     }
 
     [Theory]
@@ -263,7 +276,8 @@ public class AgentContextRendererTests
     {
         ArchitectureModel model = ArchModelBuilder.Build(PolicySpec(policy));
 
-        AgentContextRenderer.RootBlock(model, "Spec").ShouldContain(expectedSentence);
+        AgentContextRenderer.RootBlock(model, "Spec")
+            .ShouldContain(expectedSentence);
     }
 
     [Fact]
@@ -272,7 +286,8 @@ public class AgentContextRendererTests
         ArchitectureModel model = ArchModelBuilder.Build(PolicySpec(MigrationPolicy.MigrateIfSmall));
 
         // The optional live-count provider supplies the count the burndown sentence reports.
-        AgentContextRenderer.RootBlock(model, "Spec", _ => 7).ShouldContain("Grandfathered sites remaining: 7.");
+        AgentContextRenderer.RootBlock(model, "Spec", _ => 7)
+            .ShouldContain("Grandfathered sites remaining: 7.");
     }
 
     [Fact]
@@ -364,7 +379,8 @@ public class AgentContextRendererTests
     {
         // A Registered noun on a non-inject verb — triggers the registered line but no inject clause.
         ArchitectureModel model = Checker.Model(arch => arch.Rule("di/registered-no-clock")
-            .Enforce(arch.Registered(Lifetime.Singleton).MustNotReference(typeof(DateTime)))
+            .Enforce(arch.Registered(Lifetime.Singleton)
+                .MustNotReference(typeof(DateTime)))
             .Because("Singletons must not read the wall clock."));
 
         string block = AgentContextRenderer.RootBlock(model, "Spec");

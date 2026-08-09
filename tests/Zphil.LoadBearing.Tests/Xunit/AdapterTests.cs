@@ -31,35 +31,37 @@ public sealed class AdapterTests
         // ID as its own display name — including the Quarantine scope's containment + tripwire children,
         // and the two rules the spec takes from the DotNetGuidance pack (a pack-declared rule is an
         // ordinary rule by the time the adapter sees it).
-        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows().ToList();
+        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows()
+            .ToList();
 
-        rows.Select(row => row.TestDisplayName).ShouldBe(
-        [
-            "layering/core-no-roslyn",
-            "layering/model-independent",
-            "cli/no-stdout",
-            "di/no-captive-dependencies",
-            "di/no-service-locator",
-            "di/no-buildserviceprovider",
-            "mcp/tools-accept-cancellation",
-            "mcp/tool-types-attributed",
-            "roslyn/no-msbuildlocator-query",
-            "mcp/no-blocking-waits",
-            "mcp/no-path-assembly-loads",
-            "naming/async-suffix",
-            "mcp/warm-state-constructed-once",
-            "roslyn/no-engine-types-on-seam",
-            "xunit/leaf-adapter",
-            "xunit/throws-setup-errors-only",
-            "exceptions/no-swallowed-broad-catches",
-            "exceptions/no-bare-bcl-throws",
-            "packs/depends-on-core-only",
-            "naming/interfaces",
-            "model/constraint-nodes",
-            "mcp/env-through-seam",
-            "roslyn/msbuild-bootstrap/containment",
-            "roslyn/msbuild-bootstrap/tripwire"
-        ], true);
+        rows.Select(row => row.TestDisplayName)
+            .ShouldBe(
+            [
+                "layering/core-no-roslyn",
+                "layering/model-independent",
+                "cli/no-stdout",
+                "di/no-captive-dependencies",
+                "di/no-service-locator",
+                "di/no-buildserviceprovider",
+                "mcp/tools-accept-cancellation",
+                "mcp/tool-types-attributed",
+                "roslyn/no-msbuildlocator-query",
+                "mcp/no-blocking-waits",
+                "mcp/no-path-assembly-loads",
+                "naming/async-suffix",
+                "mcp/warm-state-constructed-once",
+                "roslyn/no-engine-types-on-seam",
+                "xunit/leaf-adapter",
+                "xunit/throws-setup-errors-only",
+                "exceptions/no-swallowed-broad-catches",
+                "exceptions/no-bare-bcl-throws",
+                "packs/depends-on-core-only",
+                "naming/interfaces",
+                "model/constraint-nodes",
+                "mcp/env-through-seam",
+                "roslyn/msbuild-bootstrap/containment",
+                "roslyn/msbuild-bootstrap/tripwire"
+            ], true);
     }
 
     [Fact]
@@ -68,7 +70,8 @@ public sealed class AdapterTests
         // A spec that fails validation at build time (a rule with no .Because) cannot enumerate its rules, so
         // discovery collapses to one sentinel row that lands red at run time — where the pipeline rebuild
         // rethrows the real SpecValidationException — rather than vanishing as a silent discovery diagnostic.
-        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<SpecBuildFailsSpec>.RuleRows().ToList();
+        IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<SpecBuildFailsSpec>.RuleRows()
+            .ToList();
 
         ITheoryDataRow row = rows.ShouldHaveSingleItem();
         row.TestDisplayName.ShouldBe($"{nameof(SpecBuildFailsSpec)}: spec build failed");
@@ -84,7 +87,8 @@ public sealed class AdapterTests
         Exception? exception = await Record.ExceptionAsync(() => new InlineViolatedArchTests().Rule_Holds("layering/domain-independent"));
 
         var failure = exception.ShouldBeOfType<FailException>();
-        failure.Message.NormalizedTrimmed().ShouldBe(expectedBlock);
+        failure.Message.NormalizedTrimmed()
+            .ShouldBe(expectedBlock);
     }
 
     [Fact]
@@ -146,7 +150,8 @@ public sealed class AdapterTests
     [Fact]
     public void FindSolutionUp_FromTestOutput_ResolvesRepoSolution()
     {
-        HelperAccessor.Call("Zphil.LoadBearing.slnx").ShouldBe(RepoRoot.Solution);
+        HelperAccessor.Call("Zphil.LoadBearing.slnx")
+            .ShouldBe(RepoRoot.Solution);
     }
 
     [Fact]
@@ -159,12 +164,16 @@ public sealed class AdapterTests
     // The "FAIL <ruleId> …" block from the CLI human output: the header line plus its indented lines.
     private static string ExtractBlock(string humanOutput, string ruleId)
     {
-        string[] lines = humanOutput.NormalizedLines().Split('\n');
+        string[] lines = humanOutput.NormalizedLines()
+            .Split('\n');
         int start = Array.FindIndex(lines, line => line.StartsWith($"FAIL {ruleId}", StringComparison.Ordinal));
         if (start < 0) throw new InvalidOperationException($"No FAIL block for '{ruleId}' in:\n{humanOutput}");
 
         var block = new List<string> { lines[start] };
-        for (int i = start + 1; i < lines.Length && lines[i].StartsWith("  ", StringComparison.Ordinal); i++)
+        for (int i = start + 1;
+             i < lines.Length && lines[i]
+                 .StartsWith("  ", StringComparison.Ordinal);
+             i++)
             block.Add(lines[i]);
 
         return string.Join("\n", block);
@@ -229,7 +238,8 @@ public sealed class AdapterTests
     {
         public void Define(Arch arch)
         {
-            arch.Rule("area/rule").Enforce(arch.Types.MustHavePrefix("I"));
+            arch.Rule("area/rule")
+                .Enforce(arch.Types.MustHavePrefix("I"));
         }
     }
 

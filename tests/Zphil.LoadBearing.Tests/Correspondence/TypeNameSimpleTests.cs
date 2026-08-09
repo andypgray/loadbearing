@@ -16,7 +16,8 @@ public sealed class TypeNameSimpleTests
     public void Simple_TopLevelOpenGeneric_UsesDeclaredParameterName()
     {
         // Unchanged baseline: a top-level generic still renders its own parameters.
-        TypeName.Simple(typeof(IDictionary<,>)).ShouldBe("IDictionary<TKey, TValue>");
+        TypeName.Simple(typeof(IDictionary<,>))
+            .ShouldBe("IDictionary<TKey, TValue>");
     }
 
     [Fact]
@@ -24,7 +25,8 @@ public sealed class TypeNameSimpleTests
     {
         // GenericInner introduces one parameter (TInner); TOuter belongs to GenericOuter. The buggy Simple
         // rendered "GenericInner<String, Int32>" — the whole chain's arguments against the leaf name.
-        TypeName.Simple(typeof(GenericOuter<string>.GenericInner<int>)).ShouldBe("GenericInner<Int32>");
+        TypeName.Simple(typeof(GenericOuter<string>.GenericInner<int>))
+            .ShouldBe("GenericInner<Int32>");
     }
 
     [Fact]
@@ -32,7 +34,8 @@ public sealed class TypeNameSimpleTests
     {
         // PlainInner introduces zero parameters though it inherits the outer's; the buggy Simple emitted
         // "PlainInner<String>".
-        TypeName.Simple(typeof(GenericOuter<string>.PlainInner)).ShouldBe("PlainInner");
+        TypeName.Simple(typeof(GenericOuter<string>.PlainInner))
+            .ShouldBe("PlainInner");
     }
 
     // Arity is the shape under test — neither parameter is meant to be used.

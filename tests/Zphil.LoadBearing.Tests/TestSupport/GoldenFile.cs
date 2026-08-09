@@ -20,9 +20,11 @@ internal static class GoldenFile
     /// </summary>
     internal static void ShouldMatchGolden(this string actual, string fileName)
     {
-        actual.NormalizedTrimmed().ShouldBe(
-            Read(fileName).NormalizedTrimmed(),
-            $"The render no longer matches the golden. Update it deliberately: {GoldenPath(fileName)}");
+        actual.NormalizedTrimmed()
+            .ShouldBe(
+                Read(fileName)
+                    .NormalizedTrimmed(),
+                $"The render no longer matches the golden. Update it deliberately: {GoldenPath(fileName)}");
     }
 
     private static string GoldenPath(string fileName)

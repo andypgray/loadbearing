@@ -29,12 +29,14 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("layering/x")
-                    .Enforce(arch.Layer("Domain", "App.Domain.*").MustNotReference(arch.Layer("Web", "App.Web.*")))
+                    .Enforce(arch.Layer("Domain", "App.Domain.*")
+                        .MustNotReference(arch.Layer("Web", "App.Web.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> App.Web.Controller");
         result.Violations.First(v => v.Source!.FullName == "App.Domain.Service" && v.Target!.FullName == "App.Web.Controller")
             .Sites.ShouldNotBeEmpty();
     }
@@ -44,7 +46,8 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("layering/x")
-                    .Enforce(arch.Layer("Web", "App.Web.*").MustNotReference(arch.Layer("Domain", "App.Domain.*")))
+                    .Enforce(arch.Layer("Web", "App.Web.*")
+                        .MustNotReference(arch.Layer("Domain", "App.Domain.*")))
                     .Because("b"))
             .Single();
 
@@ -57,12 +60,14 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("no-sql/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(typeof(StringBuilder)))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(typeof(StringBuilder)))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> System.Text.StringBuilder");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> System.Text.StringBuilder");
     }
 
     [Fact]
@@ -70,13 +75,15 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("inbound/x")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotBeReferencedBy(arch.Namespace("App.Domain.*")))
+                    .Enforce(arch.Namespace("App.Web.*")
+                        .MustNotBeReferencedBy(arch.Namespace("App.Domain.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         // Source is the referencing Domain type (where the edit happens); Target is the referenced Web type.
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> App.Web.Controller");
         result.Violations.ShouldAllBe(v => v.Target!.Namespace == "App.Web");
     }
 
@@ -85,15 +92,18 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("only/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustOnlyReference(arch.Namespace("App.Domain.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustOnlyReference(arch.Namespace("App.Domain.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         // The BCL reference (StringBuilder) is exempt; the same-layer reference (Model) is allowed.
         result.Violations.ShouldAllBe(v => !v.Target!.IsExternal);
-        result.ReferencePairs().ShouldNotContain("App.Domain.Service -> App.Domain.Model");
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ReferencePairs()
+            .ShouldNotContain("App.Domain.Service -> App.Domain.Model");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> App.Web.Controller");
     }
 
     [Fact]
@@ -101,13 +111,15 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("only/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustOnlyReference(arch.Namespace("App.Web.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustOnlyReference(arch.Namespace("App.Web.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         // Allowed = Web only; the Domain→Domain edge (Service→Model) is not implicitly self-allowed.
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Domain.Model");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> App.Domain.Model");
     }
 
     [Fact]
@@ -115,13 +127,15 @@ public sealed class DependencyVerbTests
     {
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("contain/x")
-                    .Enforce(arch.Namespace("App.Web.*").MustOnlyBeReferencedBy(arch.Namespace("App.Web.*")))
+                    .Enforce(arch.Namespace("App.Web.*")
+                        .MustOnlyBeReferencedBy(arch.Namespace("App.Web.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         // Web may be referenced only by Web; the inbound Domain→Web edge is a violation.
-        result.ReferencePairs().ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ReferencePairs()
+            .ShouldContain("App.Domain.Service -> App.Web.Controller");
     }
 
     [Fact]
@@ -131,7 +145,8 @@ public sealed class DependencyVerbTests
         // A pattern operand (not a bare typeof) is the warning gate (ConstraintEvaluator.ForbiddenReference).
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -151,12 +166,14 @@ public sealed class DependencyVerbTests
         // `new Db()` trips — Holder's Db field is a reference, invisible to MustNotConstruct.
         RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
                 arch.Rule("di/x")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotConstruct(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Web.*")
+                        .MustNotConstruct(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ConstructionPairs().ShouldBe(["App.Web.Maker -> App.Data.Db"]);
+        result.ConstructionPairs()
+            .ShouldBe(["App.Web.Maker -> App.Data.Db"]);
     }
 
     [Fact]
@@ -166,7 +183,9 @@ public sealed class DependencyVerbTests
         // it, so MustNotConstruct is silent exactly where MustNotReference would fire.
         RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
                 arch.Rule("di/x")
-                    .Enforce(arch.Namespace("App.Web.*").WithSuffix("Holder").MustNotConstruct(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Web.*")
+                        .WithSuffix("Holder")
+                        .MustNotConstruct(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 

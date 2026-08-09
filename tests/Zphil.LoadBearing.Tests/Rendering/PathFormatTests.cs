@@ -30,9 +30,11 @@ public sealed class PathFormatTests
         // Off Windows, Path.GetRelativePath neither splits on '\' nor treats "C:\…" as rooted, so the
         // oracle and these drive-letter vectors are only meaningful on Windows.
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows drive-letter path vectors.");
-        string expected = Path.GetRelativePath(solutionDirectory, filePath).Replace('\\', '/');
+        string expected = Path.GetRelativePath(solutionDirectory, filePath)
+            .Replace('\\', '/');
 
-        PathFormat.Relative(solutionDirectory, filePath).ShouldBe(expected);
+        PathFormat.Relative(solutionDirectory, filePath)
+            .ShouldBe(expected);
     }
 
     [Theory]
@@ -47,8 +49,10 @@ public sealed class PathFormatTests
         // On Windows the leading-'/' vectors are drive-relative, not rooted, so GetRelativePath diverges;
         // these run on Linux and macOS, giving PathFormat.Relative its native-path coverage there.
         Assert.SkipWhen(OperatingSystem.IsWindows(), "POSIX rooted-path vectors.");
-        string expected = Path.GetRelativePath(solutionDirectory, filePath).Replace('\\', '/');
+        string expected = Path.GetRelativePath(solutionDirectory, filePath)
+            .Replace('\\', '/');
 
-        PathFormat.Relative(solutionDirectory, filePath).ShouldBe(expected);
+        PathFormat.Relative(solutionDirectory, filePath)
+            .ShouldBe(expected);
     }
 }

@@ -24,60 +24,65 @@ public sealed class ExplainFormatterTests
     [Fact]
     public void Enforce_WithFix_DumpsHeaderSentenceBecauseFix()
     {
-        Dump("layering/domain-independent").ShouldBe(
-            "layering/domain-independent (enforce)\n" +
-            "  sentence: The Domain layer must not reference the Web layer.\n" +
-            "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
-            "  fix: Define an abstraction in Domain and implement it in Web.");
+        Dump("layering/domain-independent")
+            .ShouldBe(
+                "layering/domain-independent (enforce)\n" +
+                "  sentence: The Domain layer must not reference the Web layer.\n" +
+                "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
+                "  fix: Define an abstraction in Domain and implement it in Web.");
     }
 
     [Fact]
     public void Enforce_WithoutFix_OmitsTheFixLine()
     {
-        Dump("naming/interfaces").ShouldBe(
-            "naming/interfaces (enforce)\n" +
-            "  sentence: Interfaces in `MyApp.*` must be named `I*`.\n" +
-            "  because: House naming convention; agents grep by I-prefix.");
+        Dump("naming/interfaces")
+            .ShouldBe(
+                "naming/interfaces (enforce)\n" +
+                "  sentence: Interfaces in `MyApp.*` must be named `I*`.\n" +
+                "  because: House naming convention; agents grep by I-prefix.");
     }
 
     [Fact]
     public void Migrate_DumpsFromPolicyAndBaseline()
     {
-        Dump("data-access/no-inline-sql").ShouldBe(
-            "data-access/no-inline-sql (migrate)\n" +
-            "  sentence: Types in the Web layer named `*Controller` must not reference `SqlConnection`.\n" +
-            "  because: Repository pattern for testability — ADR-012.\n" +
-            "  fix: Inject the repository; see OrdersRepository for the pattern.\n" +
-            "  from: Controllers open SqlConnection directly (legacy Active Record style).\n" +
-            "  policy: MigrateIfSmall\n" +
-            "  baseline: arch/baseline.json");
+        Dump("data-access/no-inline-sql")
+            .ShouldBe(
+                "data-access/no-inline-sql (migrate)\n" +
+                "  sentence: Types in the Web layer named `*Controller` must not reference `SqlConnection`.\n" +
+                "  because: Repository pattern for testability — ADR-012.\n" +
+                "  fix: Inject the repository; see OrdersRepository for the pattern.\n" +
+                "  from: Controllers open SqlConnection directly (legacy Active Record style).\n" +
+                "  policy: MigrateIfSmall\n" +
+                "  baseline: arch/baseline.json");
     }
 
     [Fact]
     public void QuarantineContainment_DumpsRoleScopeBoundaryBaselineAndDragons()
     {
-        Dump("legacy/billing/containment").ShouldBe(
-            "legacy/billing/containment (quarantine/containment)\n" +
-            "  sentence: Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
-            "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.\n" +
-            "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
-            "  fix: use `IBillingFacade`\n" +
-            "  scope: legacy/billing\n" +
-            "  boundary: `IBillingFacade`, `BillingFacade`\n" +
-            "  baseline: arch/baseline.json\n" +
-            "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
-            "Nightly reconciliation depends on this. Do not normalize.");
+        Dump("legacy/billing/containment")
+            .ShouldBe(
+                "legacy/billing/containment (quarantine/containment)\n" +
+                "  sentence: Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
+                "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.\n" +
+                "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
+                "  fix: use `IBillingFacade`\n" +
+                "  scope: legacy/billing\n" +
+                "  boundary: `IBillingFacade`, `BillingFacade`\n" +
+                "  baseline: arch/baseline.json\n" +
+                "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
+                "Nightly reconciliation depends on this. Do not normalize.");
     }
 
     [Fact]
     public void QuarantineTripwire_DumpsRoleScopeAndDragons_NoSentenceOrBoundary()
     {
-        Dump("legacy/billing/tripwire").ShouldBe(
-            "legacy/billing/tripwire (quarantine/tripwire)\n" +
-            "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
-            "  scope: legacy/billing\n" +
-            "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
-            "Nightly reconciliation depends on this. Do not normalize.");
+        Dump("legacy/billing/tripwire")
+            .ShouldBe(
+                "legacy/billing/tripwire (quarantine/tripwire)\n" +
+                "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
+                "  scope: legacy/billing\n" +
+                "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
+                "Nightly reconciliation depends on this. Do not normalize.");
     }
 
     [Fact]

@@ -26,7 +26,8 @@ public sealed class DocProseTests
         stripped.ShouldContain("before");
         stripped.ShouldContain("after");
         stripped.ShouldNotContain("inside");
-        DocProse.CountEmDashes(stripped).ShouldBe(2);
+        DocProse.CountEmDashes(stripped)
+            .ShouldBe(2);
     }
 
     [Fact]
@@ -43,7 +44,8 @@ public sealed class DocProseTests
         stripped.ShouldContain("keep one");
         stripped.ShouldContain("keep two");
         stripped.ShouldNotContain("drop");
-        DocProse.CountEmDashes(stripped).ShouldBe(0);
+        DocProse.CountEmDashes(stripped)
+            .ShouldBe(0);
     }
 
     [Fact]
@@ -108,7 +110,8 @@ public sealed class DocProseTests
         stripped.ShouldContain("before");
         stripped.ShouldContain("after");
         stripped.ShouldNotContain("inside");
-        DocProse.CountEmDashes(stripped).ShouldBe(0);
+        DocProse.CountEmDashes(stripped)
+            .ShouldBe(0);
     }
 
     [Fact]
@@ -131,17 +134,22 @@ public sealed class DocProseTests
         var withDashes = $"a{EmDash}b{EmDash}c and none here";
 
         // Act & Assert
-        DocProse.CountEmDashes(withDashes).ShouldBe(2);
-        DocProse.CountEmDashes("no dashes at all").ShouldBe(0);
+        DocProse.CountEmDashes(withDashes)
+            .ShouldBe(2);
+        DocProse.CountEmDashes("no dashes at all")
+            .ShouldBe(0);
     }
 
     [Fact]
     public void CountTics_MixedCase_CountedCaseInsensitively()
     {
         // Act & Assert
-        DocProse.CountTics("This is deliberately here and intentionally there").ShouldBe(2);
-        DocProse.CountTics("Deliberately capitalised and INTENTIONALLY shouted").ShouldBe(2);
-        DocProse.CountTics("nothing of the sort").ShouldBe(0);
+        DocProse.CountTics("This is deliberately here and intentionally there")
+            .ShouldBe(2);
+        DocProse.CountTics("Deliberately capitalised and INTENTIONALLY shouted")
+            .ShouldBe(2);
+        DocProse.CountTics("nothing of the sort")
+            .ShouldBe(0);
     }
 
     [Fact]
@@ -281,7 +289,8 @@ public sealed class DocProseTests
         var hits = DocProse.FindForbidden(text, DocHygieneTests.HouseVoicePatterns);
 
         // Assert
-        hits.ShouldHaveSingleItem().ShouldBe("2: messy");
+        hits.ShouldHaveSingleItem()
+            .ShouldBe("2: messy");
     }
 
     [Theory]

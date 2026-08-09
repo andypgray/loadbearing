@@ -52,7 +52,8 @@ public sealed class ParentProcessWatcherTests
             false);
 
         // Assert — synchronous: should already be set, but allow tiny slack.
-        exited.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken).ShouldBeTrue();
+        exited.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -72,7 +73,8 @@ public sealed class ParentProcessWatcherTests
             false);
 
         // Assert — the helper exits quickly; allow generous slack for CI/scheduler.
-        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken).ShouldBeTrue();
+        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -104,7 +106,8 @@ public sealed class ParentProcessWatcherTests
         using Process proc = Process.Start(psi)
                              ?? throw new InvalidOperationException("Failed to start cmd.exe");
         int pid = proc.Id;
-        proc.WaitForExit(TimeSpan.FromSeconds(5)).ShouldBeTrue();
+        proc.WaitForExit(TimeSpan.FromSeconds(5))
+            .ShouldBeTrue();
         return pid;
     }
 

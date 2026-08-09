@@ -40,8 +40,10 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
-        summary.Projects.Select(p => p.Name).ShouldBe(["App", "Lib"]);
-        summary.ProjectEdges.Select(e => (e.Source, e.Target, e.References)).ShouldBe([("App", "Lib", 2)]);
+        summary.Projects.Select(p => p.Name)
+            .ShouldBe(["App", "Lib"]);
+        summary.ProjectEdges.Select(e => (e.Source, e.Target, e.References))
+            .ShouldBe([("App", "Lib", 2)]);
     }
 
     [Fact]
@@ -62,7 +64,8 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — the declared reference is visible, but no observed edge backs it (the dead-reference signal).
-        summary.Projects.Single(p => p.Name == "App").ProjectReferences.ShouldBe(["Lib"]);
+        summary.Projects.Single(p => p.Name == "App")
+            .ProjectReferences.ShouldBe(["Lib"]);
         summary.ProjectEdges.ShouldBeEmpty();
     }
 
@@ -127,7 +130,8 @@ public sealed class GraphSummarizerTests
         GraphSummary scoped = GraphSummarizer.Scope(summary, ["Acme.*"]);
 
         // Assert — the roster narrows; the one external edge rides with its source project.
-        scoped.Projects.Select(p => p.Name).ShouldBe(["Acme.App", "Acme.Lib"]);
+        scoped.Projects.Select(p => p.Name)
+            .ShouldBe(["Acme.App", "Acme.Lib"]);
         scoped.ExternalEdges.Select(e => (e.Source, e.TargetNamespaceRoot, e.References))
             .ShouldBe([("Acme.App", "System", 1)]);
     }
@@ -144,12 +148,14 @@ public sealed class GraphSummarizerTests
         // Assert — source-OR-target: an edge whose source is out of scope survives, because who reaches into
         // the scoped projects is the evidence a layering rule is drafted from. Requiring both ends would
         // drop this row and leave the survey claiming nobody references Acme.Lib.
-        scoped.Projects.Select(p => p.Name).ShouldBe(["Acme.Lib"]);
+        scoped.Projects.Select(p => p.Name)
+            .ShouldBe(["Acme.Lib"]);
         scoped.ProjectEdges.Select(e => (e.Source, e.Target, e.References))
             .ShouldBe([("Acme.App", "Acme.Lib", 1)]);
 
         // The documented consequence: the surviving edge names a project the roster does not carry.
-        scoped.Projects.Select(p => p.Name).ShouldNotContain("Acme.App");
+        scoped.Projects.Select(p => p.Name)
+            .ShouldNotContain("Acme.App");
 
         // An external edge is attributed to one project, so it needs a source match and Acme.App's is gone.
         scoped.ExternalEdges.ShouldBeEmpty();
@@ -166,10 +172,12 @@ public sealed class GraphSummarizerTests
 
         // Assert — one project, both of its edges, and the declared reference to the now-out-of-scope
         // Acme.Lib still verbatim (filtering it would erase the declared-versus-observed divergence signal).
-        scoped.Projects.Select(p => p.Name).ShouldBe(["Acme.App"]);
+        scoped.Projects.Select(p => p.Name)
+            .ShouldBe(["Acme.App"]);
         scoped.ProjectEdges.Select(e => (e.Source, e.Target))
             .ShouldBe([("Acme.App", "Acme.Lib"), ("Contoso.Web", "Acme.App")]);
-        scoped.Projects.Single().ProjectReferences.ShouldBe(["Acme.Lib"]);
+        scoped.Projects.Single()
+            .ProjectReferences.ShouldBe(["Acme.Lib"]);
     }
 
     [Fact]
@@ -182,7 +190,8 @@ public sealed class GraphSummarizerTests
         GraphSummary scoped = GraphSummarizer.Scope(summary, []);
 
         // Assert — the unscoped survey, unchanged.
-        scoped.Projects.Select(p => p.Name).ShouldBe(["Acme.App", "Acme.Lib", "Contoso.Web"]);
+        scoped.Projects.Select(p => p.Name)
+            .ShouldBe(["Acme.App", "Acme.Lib", "Contoso.Web"]);
         scoped.ProjectEdges.Count.ShouldBe(summary.ProjectEdges.Count);
         scoped.ExternalEdges.Count.ShouldBe(summary.ExternalEdges.Count);
     }

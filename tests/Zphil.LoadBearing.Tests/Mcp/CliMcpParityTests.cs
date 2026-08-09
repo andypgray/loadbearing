@@ -89,25 +89,33 @@ public sealed class CliMcpParityTests
         cliCheck.ShouldReportViolations();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         mcpCheck.IsError.ShouldNotBe(true);
-        mcpCheck.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliCheck.Out.NormalizedTrimmed());
+        mcpCheck.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliCheck.Out.NormalizedTrimmed());
 
         // arch_status ≡ status --json.
         CliResult cliStatus = await CliRunner.InvokeColdAsync(
             "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
         CallToolResult mcpStatus = await harness.Client.CallToolAsync("arch_status", cancellationToken: Ct);
-        mcpStatus.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliStatus.Out.NormalizedTrimmed());
+        mcpStatus.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliStatus.Out.NormalizedTrimmed());
 
         // arch_graph ≡ graph --json (spec-independent; the survey ignores the bound spec, and graph takes no --spec).
         CliResult cliGraph = await ColdGraph.Value;
         CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-        mcpGraph.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliGraph.Out.NormalizedTrimmed());
+        mcpGraph.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliGraph.Out.NormalizedTrimmed());
 
         // arch_explain <known> ≡ explain <known> stdout.
         CliResult cliExplain = await CliRunner.InvokeColdAsync(
             "explain", "layering/domain-independent", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
         CallToolResult mcpExplain = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "layering/domain-independent" }, cancellationToken: Ct);
-        mcpExplain.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliExplain.Out.NormalizedTrimmed());
+        mcpExplain.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliExplain.Out.NormalizedTrimmed());
 
         // arch_explain <unknown> IsError text ≡ explain <unknown> stderr (CLI exit 2).
         CliResult cliUnknown = await CliRunner.InvokeColdAsync(
@@ -116,7 +124,9 @@ public sealed class CliMcpParityTests
         CallToolResult mcpUnknown = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "unknown/id" }, cancellationToken: Ct);
         mcpUnknown.IsError.ShouldBe(true);
-        mcpUnknown.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliUnknown.Err.NormalizedTrimmed());
+        mcpUnknown.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliUnknown.Err.NormalizedTrimmed());
     }
 
     [Fact]
@@ -130,7 +140,9 @@ public sealed class CliMcpParityTests
         cliCheck.ShouldSucceed();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
 
-        mcpCheck.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliCheck.Out.NormalizedTrimmed());
+        mcpCheck.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliCheck.Out.NormalizedTrimmed());
     }
 
     [Fact]
@@ -142,15 +154,19 @@ public sealed class CliMcpParityTests
         // A path inside the quarantined scope → that scope's card body.
         CallToolResult inScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing/BillingCalculator.cs" }, cancellationToken: Ct);
-        inScope.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(ExpectedScopeCard);
+        inScope.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(ExpectedScopeCard);
 
         // A path no scope covers → the pinned pointer line (echoing the query path). The RenderSpec's
         // Domain/Web layers carry no anchored rules, so no layer card competes here.
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
-        outScope.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(
-            "No architecture scope covers 'MyApp.Web/HomeController.cs'. Architecture context for this solution lives in " +
-            "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
+        outScope.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(
+                "No architecture scope covers 'MyApp.Web/HomeController.cs'. Architecture context for this solution lives in " +
+                "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
     }
 
     [Fact]
@@ -170,7 +186,8 @@ public sealed class CliMcpParityTests
         CallToolResult mcpCheck = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["diffBase"] = "HEAD" }, cancellationToken: Ct);
 
-        string mcpText = mcpCheck.ShouldHaveTextContent().NormalizedTrimmed();
+        string mcpText = mcpCheck.ShouldHaveTextContent()
+            .NormalizedTrimmed();
         mcpText.ShouldBe(cliCheck.Out.NormalizedTrimmed());
         mcpText.ShouldContain("quarantinedScopeTouched");
     }
@@ -184,14 +201,18 @@ public sealed class CliMcpParityTests
         // A path inside the Web layer directory → that layer's local-rules card.
         CallToolResult inLayer = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
-        inLayer.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(ExpectedWebLayerCard);
+        inLayer.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(ExpectedWebLayerCard);
 
         // A path no layer or quarantined scope covers → the reworded pointer line (echoing the query path).
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/Order.cs" }, cancellationToken: Ct);
-        outScope.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(
-            "No architecture scope covers 'MyApp.Domain/Order.cs'. Architecture context for this solution lives in " +
-            "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
+        outScope.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(
+                "No architecture scope covers 'MyApp.Domain/Order.cs'. Architecture context for this solution lives in " +
+                "the root AGENTS.md managed block; expand any rule with 'loadbearing explain <rule-id>'.");
     }
 
     [Fact]
@@ -204,14 +225,18 @@ public sealed class CliMcpParityTests
         CliResult cliOverview = await ColdGraphOverview.Value;
         CallToolResult mcpOverview = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["overview"] = true }, cancellationToken: Ct);
-        mcpOverview.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliOverview.Out.NormalizedTrimmed());
+        mcpOverview.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
 
         // arch_graph projects ≡ graph --projects --json: the same survey over fewer projects.
         CliResult cliScoped = await CliRunner.InvokeColdAsync(
             "graph", CliRunner.MyAppSolution, "--json", "--projects", "MyApp.Web");
         CallToolResult mcpScoped = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["projects"] = "MyApp.Web" }, cancellationToken: Ct);
-        mcpScoped.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliScoped.Out.NormalizedTrimmed());
+        mcpScoped.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliScoped.Out.NormalizedTrimmed());
 
         // arch_check rules ≡ check --rules --json (CLI exits 1 on the subset's violations; the tool never
         // reports IsError). Same parse, same selection, same document — including rulesFilter.
@@ -221,7 +246,9 @@ public sealed class CliMcpParityTests
         CallToolResult mcpRules = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["rules"] = "exceptions/*" }, cancellationToken: Ct);
         mcpRules.IsError.ShouldNotBe(true);
-        mcpRules.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(cliRules.Out.NormalizedTrimmed());
+        mcpRules.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliRules.Out.NormalizedTrimmed());
     }
 
     [Fact]
@@ -235,8 +262,10 @@ public sealed class CliMcpParityTests
         cliFull.ShouldSucceed();
         cliOverview.ShouldSucceed();
 
-        int fullChars = cliFull.Out.TrimEnd('\r', '\n').Length;
-        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n').Length;
+        int fullChars = cliFull.Out.TrimEnd('\r', '\n')
+            .Length;
+        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n')
+            .Length;
         var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
         int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
 
@@ -255,7 +284,8 @@ public sealed class CliMcpParityTests
         // cut, so the JSON still parses; the client reads a whole survey rather than half of one.
         string text = mcpGraph.ShouldHaveTextContent();
         text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        text.NormalizedTrimmed().ShouldBe(cliOverview.Out.NormalizedTrimmed());
+        text.NormalizedTrimmed()
+            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
     }
 
     private static McpServerBinding Binding(string? solution, string? spec)

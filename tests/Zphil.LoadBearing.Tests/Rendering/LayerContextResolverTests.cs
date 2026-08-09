@@ -32,7 +32,8 @@ public class LayerContextResolverTests
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-core-not-legacy")
-            .Enforce(web.Except(arch.Namespace("MyApp.Web.Internal.*")).MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Enforce(web.Except(arch.Namespace("MyApp.Web.Internal.*"))
+                .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("Public web must not touch legacy.");
     });
 
@@ -41,7 +42,8 @@ public class LayerContextResolverTests
     {
         arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-namespace")
-            .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Enforce(arch.Namespace("MyApp.Web.*")
+                .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("A namespace-subject rule, deliberately not layer-anchored.");
     });
 
@@ -86,10 +88,15 @@ public class LayerContextResolverTests
         var placements = LayerContextResolver.Resolve(ArchModelBuilder.Build(WebLayerSpec), codebase);
 
         placements.Count.ShouldBe(1);
-        placements[0].LayerName.ShouldBe("Web");
-        placements[0].Rules.Select(rule => rule.Id).ShouldBe(["layering/web-not-billing"]);
-        placements[0].DirectoryPath.ShouldBe("src/MyApp.Web");
-        placements[0].SkipReason.ShouldBeNull();
+        placements[0]
+            .LayerName.ShouldBe("Web");
+        placements[0]
+            .Rules.Select(rule => rule.Id)
+            .ShouldBe(["layering/web-not-billing"]);
+        placements[0]
+            .DirectoryPath.ShouldBe("src/MyApp.Web");
+        placements[0]
+            .SkipReason.ShouldBeNull();
     }
 
     [Fact]
@@ -114,7 +121,8 @@ public class LayerContextResolverTests
 
         // A rule whose subject is arch.Namespace("MyApp.Web.*") ranges over the same types as the Web
         // layer, but its noun head is a NamespaceNoun — anchoring is by noun identity, not type set.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(NamespaceSubjectSpec), codebase).ShouldBeEmpty();
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(NamespaceSubjectSpec), codebase)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -126,7 +134,8 @@ public class LayerContextResolverTests
         // The layer is quarantined (its desugared containment subject is layer-anchored) but carries no
         // Enforce/Migrate rule — Quarantine posture is excluded, so the layer earns no card and does not
         // double-emit beside its quarantine card.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(QuarantinedLayerSpec), codebase).ShouldBeEmpty();
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(QuarantinedLayerSpec), codebase)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -151,19 +160,23 @@ public class LayerContextResolverTests
         // A union has no single home directory even when a Layer is one of its operands, so it anchors no
         // scoped card and the rule renders into the root block only (GRAMMAR §6). A union also carries no
         // noun, so anchoring must never be decided by reading one.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(UnionSubjectSpec), codebase).ShouldBeEmpty();
-        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(UnionSubjectSpec)).ShouldBeFalse();
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(UnionSubjectSpec), codebase)
+            .ShouldBeEmpty();
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(UnionSubjectSpec))
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void HasAnchoredLayers_LayerButNoAnchoringRule_False()
     {
-        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(NamespaceSubjectSpec)).ShouldBeFalse();
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(NamespaceSubjectSpec))
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void HasAnchoredLayers_AnchoredRule_True()
     {
-        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(WebLayerSpec)).ShouldBeTrue();
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(WebLayerSpec))
+            .ShouldBeTrue();
     }
 }

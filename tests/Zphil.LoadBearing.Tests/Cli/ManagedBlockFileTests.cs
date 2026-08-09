@@ -32,8 +32,10 @@ public sealed class ManagedBlockFileTests
 
             outcome.ShouldBe(WriteOutcome.Wrote);
             byte[] bytes = File.ReadAllBytes(path);
-            StartsWithBom(bytes).ShouldBeFalse();
-            Encoding.UTF8.GetString(bytes).ShouldBe("<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
+            StartsWithBom(bytes)
+                .ShouldBeFalse();
+            Encoding.UTF8.GetString(bytes)
+                .ShouldBe("<!-- loadbearing:begin -->\nline one\nline two\n<!-- loadbearing:end -->\n");
         });
     }
 
@@ -49,7 +51,8 @@ public sealed class ManagedBlockFileTests
             ManagedBlockFile.Splice(path, Body);
 
             byte[] bytes = File.ReadAllBytes(path);
-            StartsWithBom(bytes).ShouldBeTrue();
+            StartsWithBom(bytes)
+                .ShouldBeTrue();
             // The BOM never enters the spliced text: the '# Title' heading is preserved once, un-mangled.
             string text = Encoding.UTF8.GetString(bytes, Utf8Bom.Length, bytes.Length - Utf8Bom.Length);
             text.ShouldStartWith("# Title\n\n<!-- loadbearing:begin -->");
@@ -66,7 +69,8 @@ public sealed class ManagedBlockFileTests
 
             ManagedBlockFile.Splice(path, Body);
 
-            StartsWithBom(File.ReadAllBytes(path)).ShouldBeFalse();
+            StartsWithBom(File.ReadAllBytes(path))
+                .ShouldBeFalse();
         });
     }
 
@@ -82,7 +86,8 @@ public sealed class ManagedBlockFileTests
             WriteOutcome second = ManagedBlockFile.Splice(path, Body);
 
             second.ShouldBe(WriteOutcome.Unchanged);
-            File.ReadAllBytes(path).ShouldBe(afterFirst);
+            File.ReadAllBytes(path)
+                .ShouldBe(afterFirst);
         });
     }
 
@@ -115,7 +120,8 @@ public sealed class ManagedBlockFileTests
             error.Message.ShouldBe(
                 $"{path}: not valid UTF-8. LoadBearing manages a UTF-8 AGENTS.md block and refuses a file it "
                 + "cannot decode rather than rewriting it with replacement characters; convert it to UTF-8 and re-render.");
-            File.ReadAllBytes(path).ShouldBe(invalid); // refused, not rewritten
+            File.ReadAllBytes(path)
+                .ShouldBe(invalid); // refused, not rewritten
         });
     }
 
@@ -135,7 +141,8 @@ public sealed class ManagedBlockFileTests
             error.Message.ShouldBe(
                 $"{path}: looks like UTF-16 (a leading byte-order mark). LoadBearing manages UTF-8 files only; "
                 + "convert it to UTF-8 and re-render.");
-            File.ReadAllBytes(path).ShouldBe(utf16); // refused, not rewritten
+            File.ReadAllBytes(path)
+                .ShouldBe(utf16); // refused, not rewritten
         });
     }
 

@@ -20,7 +20,10 @@ internal static class ModelDump
 
         builder.AppendLine("== PROJECTS ==");
         foreach (ProjectNode project in model.Projects)
-            builder.Append(project.Name).Append(" -> [").Append(string.Join(", ", project.ProjectReferences)).AppendLine("]");
+            builder.Append(project.Name)
+                .Append(" -> [")
+                .Append(string.Join(", ", project.ProjectReferences))
+                .AppendLine("]");
 
         builder.AppendLine("== TYPES ==");
         foreach (TypeNode type in model.Types)
@@ -28,50 +31,90 @@ internal static class ModelDump
 
         builder.AppendLine("== EDGES ==");
         foreach (ReferenceEdge edge in model.Edges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Target.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Target.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== MEMBER EDGES ==");
         foreach (MemberEdge edge in model.MemberEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Member.SymbolId)
-                .Append(" (").Append(edge.Member.Kind).Append(' ').Append(edge.Member.ContainingType.FullName)
-                .Append('.').Append(edge.Member.Name).Append(") @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Member.SymbolId)
+                .Append(" (")
+                .Append(edge.Member.Kind)
+                .Append(' ')
+                .Append(edge.Member.ContainingType.FullName)
+                .Append('.')
+                .Append(edge.Member.Name)
+                .Append(") @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== CONSTRUCTOR EDGES ==");
         foreach (ConstructorEdge edge in model.ConstructorEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Constructed.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Constructed.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== INJECTION EDGES ==");
         foreach (InjectionEdge edge in model.InjectionEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Injected.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Injected.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         // The catch line renders all three site lists: the totality contract means the unfiltered subset and the
         // swallowing subset within it (§4.8) must show up here or neither is pinned by any dump comparison. An
         // all-filtered edge renders `unfiltered=[] swallowing=[]`; an all-rethrowing one `swallowing=[]`.
         builder.AppendLine("== CATCH EDGES ==");
         foreach (CatchEdge edge in model.CatchEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Caught.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites))
-                .Append("] unfiltered=[").Append(RenderSites(edge.UnfilteredSites))
-                .Append("] swallowing=[").Append(RenderSites(edge.SwallowingSites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Caught.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .Append("] unfiltered=[")
+                .Append(RenderSites(edge.UnfilteredSites))
+                .Append("] swallowing=[")
+                .Append(RenderSites(edge.SwallowingSites))
+                .AppendLine("]");
 
         builder.AppendLine("== THROW EDGES ==");
         foreach (ThrowEdge edge in model.ThrowEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Thrown.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Thrown.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== EXPOSURE EDGES ==");
         foreach (ExposureEdge edge in model.ExposureEdges)
-            builder.Append(edge.Source.FullName).Append(" -> ").Append(edge.Exposed.FullName)
-                .Append(" @ [").Append(RenderSites(edge.Sites)).AppendLine("]");
+            builder.Append(edge.Source.FullName)
+                .Append(" -> ")
+                .Append(edge.Exposed.FullName)
+                .Append(" @ [")
+                .Append(RenderSites(edge.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== REGISTRATIONS ==");
         foreach (ServiceRegistration registration in model.ServiceRegistrations)
-            builder.Append(registration.Lifetime).Append(' ').Append(registration.ServiceFullName)
-                .Append(" -> ").Append(registration.ImplementationFullName ?? "<none>")
-                .Append(" @ [").Append(RenderSites(registration.Sites)).AppendLine("]");
+            builder.Append(registration.Lifetime)
+                .Append(' ')
+                .Append(registration.ServiceFullName)
+                .Append(" -> ")
+                .Append(registration.ImplementationFullName ?? "<none>")
+                .Append(" @ [")
+                .Append(RenderSites(registration.Sites))
+                .AppendLine("]");
 
         builder.AppendLine("== DECLARED MEMBERS ==");
         foreach (TypeNode type in model.Types)
@@ -83,17 +126,42 @@ internal static class ModelDump
 
     private static void RenderMember(StringBuilder builder, TypeNode type, MemberNode member)
     {
-        builder.Append("MEMBER ").Append(type.FullName).Append(' ').AppendLine(member.SymbolId);
-        builder.Append("  name=").Append(member.Name).Append(" kind=").Append(member.Kind)
-            .Append(" acc=").Append(member.Accessibility).Append(" static=").Append(member.IsStatic)
-            .Append(" abstract=").Append(member.IsAbstract).Append(" virtual=").Append(member.IsVirtual)
-            .Append(" async=").Append(member.IsAsync).AppendLine();
-        builder.Append("  returnType=").Append(member.ReturnTypeFullName ?? "<null>")
-            .Append(" memberType=").Append(member.MemberTypeFullName ?? "<null>").AppendLine();
-        builder.Append("  parameters=[").Append(RenderParameters(member.Parameters)).AppendLine("]");
-        builder.Append("  attributes=[").Append(RenderAttributes(member.Attributes)).AppendLine("]");
-        builder.Append("  declSites=[").Append(RenderSites(member.DeclarationSites)).AppendLine("]");
-        builder.Append("  filePaths=[").Append(string.Join(", ", member.FilePaths)).AppendLine("]");
+        builder.Append("MEMBER ")
+            .Append(type.FullName)
+            .Append(' ')
+            .AppendLine(member.SymbolId);
+        builder.Append("  name=")
+            .Append(member.Name)
+            .Append(" kind=")
+            .Append(member.Kind)
+            .Append(" acc=")
+            .Append(member.Accessibility)
+            .Append(" static=")
+            .Append(member.IsStatic)
+            .Append(" abstract=")
+            .Append(member.IsAbstract)
+            .Append(" virtual=")
+            .Append(member.IsVirtual)
+            .Append(" async=")
+            .Append(member.IsAsync)
+            .AppendLine();
+        builder.Append("  returnType=")
+            .Append(member.ReturnTypeFullName ?? "<null>")
+            .Append(" memberType=")
+            .Append(member.MemberTypeFullName ?? "<null>")
+            .AppendLine();
+        builder.Append("  parameters=[")
+            .Append(RenderParameters(member.Parameters))
+            .AppendLine("]");
+        builder.Append("  attributes=[")
+            .Append(RenderAttributes(member.Attributes))
+            .AppendLine("]");
+        builder.Append("  declSites=[")
+            .Append(RenderSites(member.DeclarationSites))
+            .AppendLine("]");
+        builder.Append("  filePaths=[")
+            .Append(string.Join(", ", member.FilePaths))
+            .AppendLine("]");
     }
 
     // Each declared parameter as name:type (the same colon convention a SourceLocation's file:line uses), in
@@ -114,22 +182,57 @@ internal static class ModelDump
 
     private static void RenderType(StringBuilder builder, TypeNode type)
     {
-        builder.Append("TYPE ").AppendLine(type.FullName);
-        builder.Append("  symbolId=").AppendLine(type.SymbolId);
-        builder.Append("  name=").Append(type.Name).Append(" ns=").AppendLine(type.Namespace);
-        builder.Append("  kind=").Append(type.Kind).Append(" acc=").Append(type.Accessibility)
-            .Append(" sealed=").Append(type.IsSealed).Append(" static=").Append(type.IsStatic)
-            .Append(" abstract=").Append(type.IsAbstract).Append(" record=").Append(type.IsRecord)
-            .Append(" generated=").Append(type.IsGenerated).AppendLine();
-        builder.Append("  project=").Append(type.ProjectName).Append(" external=").Append(type.IsExternal).AppendLine();
-        builder.Append("  declSites=[").Append(RenderSites(type.DeclarationSites)).AppendLine("]");
-        builder.Append("  filePaths=[").Append(string.Join(", ", type.FilePaths)).AppendLine("]");
-        builder.Append("  baseType=").AppendLine(FullNameOf(type.BaseType));
-        builder.Append("  interfaces=[").Append(string.Join(", ", type.Interfaces.Select(FullNameOf))).AppendLine("]");
-        builder.Append("  attributes=[").Append(string.Join(", ", type.Attributes.Select(FullNameOf))).AppendLine("]");
-        builder.Append("  allInterfaces=[").Append(string.Join(", ", type.AllInterfaces.Select(RenderConstruction))).AppendLine("]");
-        builder.Append("  baseChain=[").Append(string.Join(", ", type.BaseTypeChain.Select(RenderConstruction))).AppendLine("]");
-        builder.Append("  attrConstructions=[").Append(string.Join(", ", type.AttributeConstructions.Select(RenderConstruction))).AppendLine("]");
+        builder.Append("TYPE ")
+            .AppendLine(type.FullName);
+        builder.Append("  symbolId=")
+            .AppendLine(type.SymbolId);
+        builder.Append("  name=")
+            .Append(type.Name)
+            .Append(" ns=")
+            .AppendLine(type.Namespace);
+        builder.Append("  kind=")
+            .Append(type.Kind)
+            .Append(" acc=")
+            .Append(type.Accessibility)
+            .Append(" sealed=")
+            .Append(type.IsSealed)
+            .Append(" static=")
+            .Append(type.IsStatic)
+            .Append(" abstract=")
+            .Append(type.IsAbstract)
+            .Append(" record=")
+            .Append(type.IsRecord)
+            .Append(" generated=")
+            .Append(type.IsGenerated)
+            .AppendLine();
+        builder.Append("  project=")
+            .Append(type.ProjectName)
+            .Append(" external=")
+            .Append(type.IsExternal)
+            .AppendLine();
+        builder.Append("  declSites=[")
+            .Append(RenderSites(type.DeclarationSites))
+            .AppendLine("]");
+        builder.Append("  filePaths=[")
+            .Append(string.Join(", ", type.FilePaths))
+            .AppendLine("]");
+        builder.Append("  baseType=")
+            .AppendLine(FullNameOf(type.BaseType));
+        builder.Append("  interfaces=[")
+            .Append(string.Join(", ", type.Interfaces.Select(FullNameOf)))
+            .AppendLine("]");
+        builder.Append("  attributes=[")
+            .Append(string.Join(", ", type.Attributes.Select(FullNameOf)))
+            .AppendLine("]");
+        builder.Append("  allInterfaces=[")
+            .Append(string.Join(", ", type.AllInterfaces.Select(RenderConstruction)))
+            .AppendLine("]");
+        builder.Append("  baseChain=[")
+            .Append(string.Join(", ", type.BaseTypeChain.Select(RenderConstruction)))
+            .AppendLine("]");
+        builder.Append("  attrConstructions=[")
+            .Append(string.Join(", ", type.AttributeConstructions.Select(RenderConstruction)))
+            .AppendLine("]");
     }
 
     private static string RenderSites(IReadOnlyList<SourceLocation> sites)

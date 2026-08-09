@@ -23,7 +23,9 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class Svc { public Svc(IDep d) {} }
                                                          """);
 
-        model.InjectionEdge("N.Svc", "N.IDep").Lines().ShouldBe([3]);
+        model.InjectionEdge("N.Svc", "N.IDep")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -35,7 +37,9 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class Svc(IDep d) { }
                                                          """);
 
-        model.InjectionEdge("N.Svc", "N.IDep").Lines().ShouldBe([3]);
+        model.InjectionEdge("N.Svc", "N.IDep")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -47,7 +51,9 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public record Rec { public Rec(IDep d) {} }
                                                          """);
 
-        model.InjectionEdge("N.Rec", "N.IDep").Lines().ShouldBe([3]);
+        model.InjectionEdge("N.Rec", "N.IDep")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -62,8 +68,11 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public record Rec(IDep D);
                                                          """);
 
-        model.InjectionEdges("N.Rec").Select(e => e.Injected.FullName).ShouldBe(["N.IDep"]);
-        model.HasInjectionEdge("N.Rec", "N.Rec").ShouldBeFalse();
+        model.InjectionEdges("N.Rec")
+            .Select(e => e.Injected.FullName)
+            .ShouldBe(["N.IDep"]);
+        model.HasInjectionEdge("N.Rec", "N.Rec")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -76,10 +85,16 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class C { public C(IHandler<Order> h) {} }
                                                          """);
 
-        model.HasInjectionEdge("N.C", "N.IHandler<T>").ShouldBeTrue();
-        model.HasInjectionEdge("N.C", "N.Order").ShouldBeTrue();
-        model.InjectionEdge("N.C", "N.IHandler<T>").Lines().ShouldBe([4]);
-        model.InjectionEdge("N.C", "N.Order").Lines().ShouldBe([4]);
+        model.HasInjectionEdge("N.C", "N.IHandler<T>")
+            .ShouldBeTrue();
+        model.HasInjectionEdge("N.C", "N.Order")
+            .ShouldBeTrue();
+        model.InjectionEdge("N.C", "N.IHandler<T>")
+            .Lines()
+            .ShouldBe([4]);
+        model.InjectionEdge("N.C", "N.Order")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -92,7 +107,9 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         // The element type is the endpoint; the array type itself is not a node.
-        model.InjectionEdges("N.C").Select(e => e.Injected.FullName).ShouldBe(["N.IDep"]);
+        model.InjectionEdges("N.C")
+            .Select(e => e.Injected.FullName)
+            .ShouldBe(["N.IDep"]);
     }
 
     [Fact]
@@ -104,8 +121,10 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class C { public C(System.Collections.Generic.IEnumerable<IFoo> foos) {} }
                                                          """);
 
-        model.HasInjectionEdge("N.C", "System.Collections.Generic.IEnumerable<T>").ShouldBeTrue();
-        model.HasInjectionEdge("N.C", "N.IFoo").ShouldBeTrue();
+        model.HasInjectionEdge("N.C", "System.Collections.Generic.IEnumerable<T>")
+            .ShouldBeTrue();
+        model.HasInjectionEdge("N.C", "N.IFoo")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -118,7 +137,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
 
         InjectionEdge edge = model.InjectionEdge("N.C", "System.IDisposable");
         edge.Injected.IsExternal.ShouldBeTrue();
-        edge.Lines().ShouldBe([2]);
+        edge.Lines()
+            .ShouldBe([2]);
     }
 
     [Fact]
@@ -131,7 +151,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class WithStaticCtor { static WithStaticCtor() {} }
                                                          """);
 
-        model.InjectionEdges("N.WithStaticCtor").ShouldBeEmpty();
+        model.InjectionEdges("N.WithStaticCtor")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -142,7 +163,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class Bare {}
                                                          """);
 
-        model.InjectionEdges("N.Bare").ShouldBeEmpty();
+        model.InjectionEdges("N.Bare")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -153,8 +175,10 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class Selfish { public Selfish(Selfish other) {} }
                                                          """);
 
-        model.HasInjectionEdge("N.Selfish", "N.Selfish").ShouldBeFalse();
-        model.InjectionEdges("N.Selfish").ShouldBeEmpty();
+        model.HasInjectionEdge("N.Selfish", "N.Selfish")
+            .ShouldBeFalse();
+        model.InjectionEdges("N.Selfish")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -168,8 +192,10 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public enum Color { Red }
                                                          """);
 
-        model.InjectionEdges("N.Notify").ShouldBeEmpty();
-        model.InjectionEdges("N.Color").ShouldBeEmpty();
+        model.InjectionEdges("N.Notify")
+            .ShouldBeEmpty();
+        model.InjectionEdges("N.Color")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -188,6 +214,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          }
                                                          """);
 
-        model.InjectionEdge("N.Svc", "N.IDep").Lines().ShouldBe([6, 7]);
+        model.InjectionEdge("N.Svc", "N.IDep")
+            .Lines()
+            .ShouldBe([6, 7]);
     }
 }

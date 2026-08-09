@@ -22,12 +22,14 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this ReferenceEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     public static IReadOnlyList<string> Files(this ReferenceEdge edge)
     {
-        return edge.Sites.Select(s => s.FilePath).ToList();
+        return edge.Sites.Select(s => s.FilePath)
+            .ToList();
     }
 
     public static MemberEdge MemberEdge(this CodebaseModel model, string sourceFullName, string memberSymbolId)
@@ -37,12 +39,14 @@ internal static class ModelQuery
 
     public static IReadOnlyList<MemberEdge> MemberEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.MemberEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.MemberEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static IReadOnlyList<int> Lines(this MemberEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── construction edges (GRAMMAR §4.5) ─────────────────────────────────────────────────────────────────
@@ -54,7 +58,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<ConstructorEdge> ConstructorEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.ConstructorEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.ConstructorEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static bool HasConstructorEdge(this CodebaseModel model, string sourceFullName, string constructedFullName)
@@ -64,7 +69,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this ConstructorEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     public static string FullName(this ITypeInfo type)
@@ -81,7 +87,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<InjectionEdge> InjectionEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.InjectionEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.InjectionEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static bool HasInjectionEdge(this CodebaseModel model, string sourceFullName, string injectedFullName)
@@ -91,7 +98,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this InjectionEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── catch edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
@@ -103,7 +111,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<CatchEdge> CatchEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.CatchEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.CatchEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static bool HasCatchEdge(this CodebaseModel model, string sourceFullName, string caughtFullName)
@@ -113,13 +122,15 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this CatchEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     /// <summary>The lines of the edge's unfiltered sites — the subset whose clause spells no `when` filter.</summary>
     public static IReadOnlyList<int> UnfilteredLines(this CatchEdge edge)
     {
-        return edge.UnfilteredSites.Select(s => s.Line).ToList();
+        return edge.UnfilteredSites.Select(s => s.Line)
+            .ToList();
     }
 
     /// <summary>
@@ -128,7 +139,8 @@ internal static class ModelQuery
     /// </summary>
     public static IReadOnlyList<int> SwallowingLines(this CatchEdge edge)
     {
-        return edge.SwallowingSites.Select(s => s.Line).ToList();
+        return edge.SwallowingSites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── throw edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
@@ -140,7 +152,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<ThrowEdge> ThrowEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.ThrowEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.ThrowEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static bool HasThrowEdge(this CodebaseModel model, string sourceFullName, string thrownFullName)
@@ -150,7 +163,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this ThrowEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── exposure edges (GRAMMAR §4.9) ─────────────────────────────────────────────────────────────────────
@@ -162,7 +176,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<ExposureEdge> ExposureEdges(this CodebaseModel model, string sourceFullName)
     {
-        return model.ExposureEdges.Where(e => e.Source.FullName == sourceFullName).ToList();
+        return model.ExposureEdges.Where(e => e.Source.FullName == sourceFullName)
+            .ToList();
     }
 
     public static bool HasExposureEdge(this CodebaseModel model, string sourceFullName, string exposedFullName)
@@ -172,7 +187,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this ExposureEdge edge)
     {
-        return edge.Sites.Select(s => s.Line).ToList();
+        return edge.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── registration facts (GRAMMAR §4.7) ─────────────────────────────────────────────────────────────────
@@ -191,7 +207,8 @@ internal static class ModelQuery
 
     public static IReadOnlyList<int> Lines(this ServiceRegistration registration)
     {
-        return registration.Sites.Select(s => s.Line).ToList();
+        return registration.Sites.Select(s => s.Line)
+            .ToList();
     }
 
     // ── declared members (GRAMMAR §4.6) ───────────────────────────────────────────────────────────────────
@@ -203,18 +220,21 @@ internal static class ModelQuery
 
     public static MemberNode Member(this CodebaseModel model, string typeFullName, string symbolId)
     {
-        return model.Type(typeFullName).Member(symbolId);
+        return model.Type(typeFullName)
+            .Member(symbolId);
     }
 
     /// <summary>The type's declared-member SymbolIds, in the model's ordinal-by-SymbolId order.</summary>
     public static IReadOnlyList<string> MemberIds(this TypeNode type)
     {
-        return type.Members.Select(m => m.SymbolId).ToList();
+        return type.Members.Select(m => m.SymbolId)
+            .ToList();
     }
 
     public static IReadOnlyList<int> DeclarationLines(this MemberNode member)
     {
-        return member.DeclarationSites.Select(s => s.Line).ToList();
+        return member.DeclarationSites.Select(s => s.Line)
+            .ToList();
     }
 
     /// <summary>
@@ -223,6 +243,7 @@ internal static class ModelQuery
     /// </summary>
     public static IReadOnlyList<(string Definition, string Constructed)> AttributeNames(this MemberNode member)
     {
-        return member.Attributes.Select(a => (a.DefinitionFullName, a.FullName)).ToList();
+        return member.Attributes.Select(a => (a.DefinitionFullName, a.FullName))
+            .ToList();
     }
 }

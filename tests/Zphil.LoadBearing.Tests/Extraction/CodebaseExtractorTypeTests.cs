@@ -26,7 +26,8 @@ public sealed class CodebaseExtractorTypeTests
     {
         CodebaseModel model = CompilationFactory.Extract($"namespace N;\n{declaration}");
 
-        model.Type(fullName).Kind.ShouldBe(kind);
+        model.Type(fullName)
+            .Kind.ShouldBe(kind);
     }
 
     [Fact]
@@ -97,8 +98,10 @@ public sealed class CodebaseExtractorTypeTests
                          """));
 
         ReferenceEdge edge = model.Edge("N.P", "N.Dep");
-        edge.Files().ShouldBe(["PartA.cs", "PartB.cs"]);
-        edge.Lines().ShouldBe([3, 2]);
+        edge.Files()
+            .ShouldBe(["PartA.cs", "PartB.cs"]);
+        edge.Lines()
+            .ShouldBe([3, 2]);
     }
 
     [Fact]
@@ -112,7 +115,9 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class Decorated {}
                                                          """);
 
-        model.Type("N.Decorated").DeclarationSites.Single().Line.ShouldBe(5);
+        model.Type("N.Decorated")
+            .DeclarationSites.Single()
+            .Line.ShouldBe(5);
     }
 
     [Fact]
@@ -133,8 +138,11 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class Derived : Base {}
                                                          """);
 
-        model.Type("N.Derived").BaseType!.FullName().ShouldBe("N.Base");
-        model.HasEdge("N.Derived", "N.Base").ShouldBeTrue();
+        model.Type("N.Derived")
+            .BaseType!.FullName()
+            .ShouldBe("N.Base");
+        model.HasEdge("N.Derived", "N.Base")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -145,10 +153,12 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class Plain {}
                                                          """);
 
-        var baseType = (TypeNode)model.Type("N.Plain").BaseType!;
+        var baseType = (TypeNode)model.Type("N.Plain")
+            .BaseType!;
         baseType.FullName.ShouldBe("System.Object");
         baseType.IsExternal.ShouldBeTrue();
-        model.HasEdge("N.Plain", "System.Object").ShouldBeFalse();
+        model.HasEdge("N.Plain", "System.Object")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -159,7 +169,8 @@ public sealed class CodebaseExtractorTypeTests
                                                          public interface I {}
                                                          """);
 
-        model.Type("N.I").BaseType.ShouldBeNull();
+        model.Type("N.I")
+            .BaseType.ShouldBeNull();
     }
 
     [Fact]
@@ -172,7 +183,8 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class C : IA, IB {}
                                                          """);
 
-        model.Type("N.C").Interfaces.Select(i => i.FullName())
+        model.Type("N.C")
+            .Interfaces.Select(i => i.FullName())
             .ShouldBe(["N.IA", "N.IB"], true);
     }
 
@@ -187,7 +199,8 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class C {}
                                                          """);
 
-        model.Type("N.C").Attributes.Select(a => a.FullName())
+        model.Type("N.C")
+            .Attributes.Select(a => a.FullName())
             .ShouldContain("N.TagAttribute");
     }
 
@@ -201,7 +214,8 @@ public sealed class CodebaseExtractorTypeTests
                                                          public sealed class SelfAttribute : Attribute {}
                                                          """);
 
-        model.Type("N.SelfAttribute").Attributes.Select(a => a.FullName())
+        model.Type("N.SelfAttribute")
+            .Attributes.Select(a => a.FullName())
             .ShouldContain("N.SelfAttribute");
     }
 

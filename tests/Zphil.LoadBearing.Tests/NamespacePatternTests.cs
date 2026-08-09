@@ -29,13 +29,15 @@ public class NamespacePatternTests
     [InlineData("*", "MyApp.Domain.Orders", true)]
     public void Matches_TablePins(string pattern, string @namespace, bool expected)
     {
-        new NamespacePattern(pattern).Matches(@namespace).ShouldBe(expected);
+        new NamespacePattern(pattern).Matches(@namespace)
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void Matches_IsCaseSensitive()
     {
-        new NamespacePattern("MyApp.Domain").Matches("myapp.domain").ShouldBeFalse();
+        new NamespacePattern("MyApp.Domain").Matches("myapp.domain")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -43,7 +45,8 @@ public class NamespacePatternTests
     {
         // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
         // (NamespacePattern.cs:108-110): `Legacy*` diverges from `Ledger` at the third character.
-        new NamespacePattern("MyApp.Legacy*").Matches("MyApp.Ledger").ShouldBeFalse();
+        new NamespacePattern("MyApp.Legacy*").Matches("MyApp.Ledger")
+            .ShouldBeFalse();
     }
 
     [Theory]
@@ -55,7 +58,8 @@ public class NamespacePatternTests
     [InlineData("*")]
     public void Validate_WellFormedGlob_ReturnsNull(string pattern)
     {
-        NamespacePattern.Validate(pattern).ShouldBeNull();
+        NamespacePattern.Validate(pattern)
+            .ShouldBeNull();
     }
 
     [Theory]
@@ -63,7 +67,8 @@ public class NamespacePatternTests
     [InlineData("   ")]
     public void Validate_BlankGlob_ReturnsBlankReason(string pattern)
     {
-        NamespacePattern.Validate(pattern).ShouldBe("is blank");
+        NamespacePattern.Validate(pattern)
+            .ShouldBe("is blank");
     }
 
     [Fact]

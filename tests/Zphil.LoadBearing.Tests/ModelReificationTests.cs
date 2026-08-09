@@ -39,23 +39,26 @@ public class ModelReificationTests
 
     private static ArchRule Rule(string id)
     {
-        return BuildCanonical().Rules.Single(rule => rule.Id == id);
+        return BuildCanonical()
+            .Rules.Single(rule => rule.Id == id);
     }
 
     [Fact]
     public void Build_CanonicalSample_ReifiesEightRulesInPinnedOrder()
     {
-        BuildCanonical().Rules.Select(rule => rule.Id).ShouldBe(
-        [
-            "layering/domain-independent",
-            "naming/interfaces",
-            "data-access/no-inline-sql",
-            "legacy/billing/containment",
-            "legacy/billing/tripwire",
-            "naming/handlers",
-            "di/handlers-via-registry",
-            "style/type-name-length"
-        ]);
+        BuildCanonical()
+            .Rules.Select(rule => rule.Id)
+            .ShouldBe(
+            [
+                "layering/domain-independent",
+                "naming/interfaces",
+                "data-access/no-inline-sql",
+                "legacy/billing/containment",
+                "legacy/billing/tripwire",
+                "naming/handlers",
+                "di/handlers-via-registry",
+                "style/type-name-length"
+            ]);
     }
 
     [Theory]
@@ -69,7 +72,8 @@ public class ModelReificationTests
     [InlineData("style/type-name-length", Posture.Enforce)]
     public void Build_CanonicalSample_AssignsPostures(string id, Posture posture)
     {
-        Rule(id).Posture.ShouldBe(posture);
+        Rule(id)
+            .Posture.ShouldBe(posture);
     }
 
     [Fact]
@@ -87,7 +91,8 @@ public class ModelReificationTests
     [Fact]
     public void EnforceRule_WithoutFix_LeavesFixNull()
     {
-        Rule("naming/interfaces").Fix.ShouldBeNull();
+        Rule("naming/interfaces")
+            .Fix.ShouldBeNull();
     }
 
     [Fact]
@@ -113,7 +118,8 @@ public class ModelReificationTests
                 arch.Rule("data-access/no-inline-sql")
                     .Migrate(
                         "Controllers open SqlConnection directly.",
-                        web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
+                        web.WithSuffix("Controller")
+                            .MustNotReference(typeof(SqlConnection)))
                     .Because("Repository pattern for testability.");
             })
             .Rules.Single();
@@ -165,8 +171,10 @@ public class ModelReificationTests
     public void QuarantineScope_SharesBecauseAcrossBothChildren()
     {
         const string because = "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.";
-        Rule("legacy/billing/containment").Because.ShouldBe(because);
-        Rule("legacy/billing/tripwire").Because.ShouldBe(because);
+        Rule("legacy/billing/containment")
+            .Because.ShouldBe(because);
+        Rule("legacy/billing/tripwire")
+            .Because.ShouldBe(because);
     }
 
     [Fact]
@@ -174,10 +182,12 @@ public class ModelReificationTests
     {
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment").Quarantine!;
+        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment")
+            .Quarantine!;
         containment.DragonsDoc.ShouldBe("arch/billing-dragons.md");
         containment.Dragons.ShouldBeNull();
-        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire").Quarantine!.DragonsDoc
+        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire")
+            .Quarantine!.DragonsDoc
             .ShouldBe("arch/billing-dragons.md");
     }
 
@@ -187,11 +197,13 @@ public class ModelReificationTests
         // DragonsDocScopeSpec omits .Baseline, so the containment child falls back to the default.
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment").Quarantine!;
+        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment")
+            .Quarantine!;
         // .Baseline omitted ⇒ conventional default derived from the containment rule ID (GRAMMAR §4.4/§7).
         containment.BaselinePath.ShouldBe("arch/baselines/legacy/billing/containment.json");
         // The tripwire's baseline stays null — grandfathering is a containment concern.
-        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire").Quarantine!.BaselinePath.ShouldBeNull();
+        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire")
+            .Quarantine!.BaselinePath.ShouldBeNull();
     }
 
     [Fact]
@@ -212,10 +224,14 @@ public class ModelReificationTests
 
         // Members in authoring order, each with its authored declaring type + name (GRAMMAR §4.5).
         constraint.Members.Count.ShouldBe(2);
-        constraint.Members[0].DeclaringType.ShouldBe(typeof(DateTime));
-        constraint.Members[0].Name.ShouldBe("Now");
-        constraint.Members[1].DeclaringType.ShouldBe(typeof(DateTime));
-        constraint.Members[1].Name.ShouldBe("UtcNow");
+        constraint.Members[0]
+            .DeclaringType.ShouldBe(typeof(DateTime));
+        constraint.Members[0]
+            .Name.ShouldBe("Now");
+        constraint.Members[1]
+            .DeclaringType.ShouldBe(typeof(DateTime));
+        constraint.Members[1]
+            .Name.ShouldBe("UtcNow");
         // Subject selection intact — the bare Types noun, no adjectives.
         constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
@@ -224,7 +240,8 @@ public class ModelReificationTests
     [Fact]
     public void MustNotConstructRule_ReifiesToWalkableConstructConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(CtorRuleSpec).Rules.Single();
+        ArchRule rule = ArchModelBuilder.Build(CtorRuleSpec)
+            .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotConstructConstraint>();
@@ -241,9 +258,12 @@ public class ModelReificationTests
     public void DependencyVerbConstraint_HasEmptyMemberOperands()
     {
         // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
-        Rule("layering/domain-independent").Constraint!.MemberOperands.ShouldBeEmpty();
+        Rule("layering/domain-independent")
+            .Constraint!.MemberOperands.ShouldBeEmpty();
         // MustNotConstruct is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty too.
-        ArchModelBuilder.Build(CtorRuleSpec).Rules.Single().Constraint!.MemberOperands.ShouldBeEmpty();
+        ArchModelBuilder.Build(CtorRuleSpec)
+            .Rules.Single()
+            .Constraint!.MemberOperands.ShouldBeEmpty();
     }
 
     [Fact]
@@ -254,7 +274,8 @@ public class ModelReificationTests
             {
                 Selection web = arch.Namespace("MyApp.Web.*");
                 arch.Rule("naming/async-suffix")
-                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
+                    .Enforce(web.Methods.Returning(typeof(Task))
+                        .MustHaveSuffix("Async"))
                     .Because("Async methods are discovered by suffix.");
             })
             .Rules.Single(r => r.Id == "naming/async-suffix");
@@ -264,7 +285,8 @@ public class ModelReificationTests
 
         // The member subject: the Methods projection carrying one Returning adjective (GRAMMAR §4.6).
         constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Method);
-        constraint.MemberSubject.Adjectives.OfType<ReturningAdjective>().ShouldHaveSingleItem();
+        constraint.MemberSubject.Adjectives.OfType<ReturningAdjective>()
+            .ShouldHaveSingleItem();
 
         // The inherited Subject is the underlying TYPE selection (Subject => MemberSubject.Source), so
         // foreign walks and Quarantine desugaring keep working on the type side.
@@ -285,10 +307,12 @@ public class ModelReificationTests
                 .Enforce(arch.Registered(Lifetime.Singleton)
                     .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
                 .Because("Singletons capturing scoped/transient services leak state across scopes."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
 
-        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBe(Lifetime.Singleton);
+        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>()
+            .Lifetime.ShouldBe(Lifetime.Singleton);
         constraint.Operands.ShouldBe(constraint.Targets);
         constraint.Targets.Select(target => ((RegisteredNoun)target.Noun).Lifetime)
             .ShouldBe([Lifetime.Scoped, Lifetime.Transient]);
@@ -301,11 +325,14 @@ public class ModelReificationTests
     {
         // arch.Registered() reifies to a RegisteredNoun with a null lifetime (any lifetime).
         var constraint = Checker.Model(arch => arch.Rule("di/registered-inject")
-                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Enforce(arch.Registered()
+                    .MustNotInject(arch.Registered(Lifetime.Scoped)))
                 .Because("Any registration must not inject a scoped service."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
-        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime.ShouldBeNull();
+        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>()
+            .Lifetime.ShouldBeNull();
     }
 
     [Fact]
@@ -316,20 +343,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("di/no-inject-sql")
                 .Enforce(arch.Types.MustNotInject(typeof(SqlConnection)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("di/no-inject-sql")
                 .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(SqlConnection));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -452,20 +486,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("errors/no-catch")
                 .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotCatchConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("errors/no-catch")
                 .Enforce(arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotCatchConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(InvalidOperationException));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -476,20 +517,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
                 .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
                 .Enforce(arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(Exception));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -500,20 +548,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("errors/no-swallow")
                 .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotSwallowConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("errors/no-swallow")
                 .Enforce(arch.Types.MustNotSwallow(arch.Type(typeof(Exception))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotSwallowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(Exception));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -524,20 +579,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("errors/no-throw")
                 .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotThrowConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("errors/no-throw")
                 .Enforce(arch.Types.MustNotThrow(arch.Type(typeof(Exception))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotThrowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(Exception));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -548,20 +610,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("errors/throw-only")
                 .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustOnlyThrowConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("errors/throw-only")
                 .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustOnlyThrowConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(InvalidOperationException));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     [Fact]
@@ -594,20 +663,27 @@ public class ModelReificationTests
         var sugar = Checker.Model(arch => arch.Rule("api/no-expose")
                 .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotExposeConstraint>();
         var wrapped = Checker.Model(arch => arch.Rule("api/no-expose")
                 .Enforce(arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))))
                 .Because("Reason."))
-            .Rules.Single().Constraint
+            .Rules.Single()
+            .Constraint
             .ShouldBeOfType<MustNotExposeConstraint>();
 
         sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
-        Type wrappedType = wrapped.Targets[0].Noun.ShouldBeOfType<TypeNoun>().Type;
+        Type sugarType = sugar.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = wrapped.Targets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
         sugarType.ShouldBe(typeof(SqlConnection));
         wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0].Adjectives.ShouldBeEmpty();
+        sugar.Targets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 
     // ---- Surface union: arch.AnyOf reification (GRAMMAR §5.1) ----
@@ -621,7 +697,9 @@ public class ModelReificationTests
         var union = arch.AnyOf(arch.AnyOf(arch.Project("A"), arch.Project("B")), arch.Project("C"))
             .ShouldBeOfType<UnionSelection>();
 
-        union.Parts.Select(part => part.Noun.ShouldBeOfType<ProjectNoun>().Name).ShouldBe(["A", "B", "C"]);
+        union.Parts.Select(part => part.Noun.ShouldBeOfType<ProjectNoun>()
+                .Name)
+            .ShouldBe(["A", "B", "C"]);
     }
 
     [Fact]
@@ -630,11 +708,15 @@ public class ModelReificationTests
         // An inner union with adjectives is a narrowed set of its own — flattening it would lose the
         // narrowing, so it survives as one operand.
         var arch = new Arch();
-        Selection inner = arch.AnyOf(arch.Project("A"), arch.Project("B")).Except(arch.Type(typeof(SqlConnection)));
-        var outer = arch.AnyOf(inner, arch.Project("C")).ShouldBeOfType<UnionSelection>();
+        Selection inner = arch.AnyOf(arch.Project("A"), arch.Project("B"))
+            .Except(arch.Type(typeof(SqlConnection)));
+        var outer = arch.AnyOf(inner, arch.Project("C"))
+            .ShouldBeOfType<UnionSelection>();
 
         outer.Parts.Count.ShouldBe(2);
-        outer.Parts[0].ShouldBeOfType<UnionSelection>().Parts.Count.ShouldBe(2);
+        outer.Parts[0]
+            .ShouldBeOfType<UnionSelection>()
+            .Parts.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -648,7 +730,8 @@ public class ModelReificationTests
 
         union.Parts.Count.ShouldBe(2);
         union.Adjectives.Count.ShouldBe(1);
-        union.Adjectives[0].ShouldBeOfType<ExceptAdjective>();
+        union.Adjectives[0]
+            .ShouldBeOfType<ExceptAdjective>();
     }
 
     [Fact]
@@ -657,11 +740,14 @@ public class ModelReificationTests
         // The adjective carries no payload — the whole statement is the placement and the fragment — so
         // the model pin is that one lands, on the union as well as on a plain selection.
         var arch = new Arch();
-        var union = arch.AnyOf(arch.Project("A"), arch.Project("B")).Authored().ShouldBeOfType<UnionSelection>();
+        var union = arch.AnyOf(arch.Project("A"), arch.Project("B"))
+            .Authored()
+            .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(2);
         union.Adjectives.Count.ShouldBe(1);
-        union.Adjectives[0].ShouldBeOfType<AuthoredAdjective>();
+        union.Adjectives[0]
+            .ShouldBeOfType<AuthoredAdjective>();
     }
 
     [Fact]
@@ -670,7 +756,8 @@ public class ModelReificationTests
         // Legal and an identity (§2 principle 5): a loop that yields one operand must not become an error,
         // and the node stays a union so the shape does not depend on how many times the loop ran.
         var arch = new Arch();
-        var union = arch.AnyOf(arch.Project("A")).ShouldBeOfType<UnionSelection>();
+        var union = arch.AnyOf(arch.Project("A"))
+            .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(1);
         union.Adjectives.ShouldBeEmpty();

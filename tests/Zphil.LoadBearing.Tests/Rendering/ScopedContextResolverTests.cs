@@ -37,10 +37,14 @@ public class ScopedContextResolverTests
         var placements = ScopedContextResolver.Resolve(Model(), codebase);
 
         placements.Count.ShouldBe(1);
-        placements[0].ScopeId.ShouldBe("legacy/billing");
-        placements[0].ContainmentRule.Id.ShouldBe("legacy/billing/containment");
-        placements[0].DirectoryPath.ShouldBe("MyApp.Legacy.Billing");
-        placements[0].SkipReason.ShouldBeNull();
+        placements[0]
+            .ScopeId.ShouldBe("legacy/billing");
+        placements[0]
+            .ContainmentRule.Id.ShouldBe("legacy/billing/containment");
+        placements[0]
+            .DirectoryPath.ShouldBe("MyApp.Legacy.Billing");
+        placements[0]
+            .SkipReason.ShouldBeNull();
     }
 
     [Fact]
@@ -49,7 +53,8 @@ public class ScopedContextResolverTests
         CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
             ("src/MyApp.Legacy.Billing/Only.cs", "namespace MyApp.Legacy.Billing; public class Only {}"));
 
-        ScopedContextResolver.Resolve(Model(), codebase)[0].DirectoryPath.ShouldBe("src/MyApp.Legacy.Billing");
+        ScopedContextResolver.Resolve(Model(), codebase)[0]
+            .DirectoryPath.ShouldBe("src/MyApp.Legacy.Billing");
     }
 
     [Fact]
@@ -60,7 +65,8 @@ public class ScopedContextResolverTests
             CompilationFactory.Compile("ProjB", ("src/ProjB/Facade.cs", "namespace MyApp.Legacy.Billing; public class Facade {}"))
         ]);
 
-        ScopedContextResolver.Resolve(Model(), codebase)[0].DirectoryPath.ShouldBe("src");
+        ScopedContextResolver.Resolve(Model(), codebase)[0]
+            .DirectoryPath.ShouldBe("src");
     }
 
     [Fact]
@@ -70,7 +76,8 @@ public class ScopedContextResolverTests
             (@"C:\repo\MyApp.Legacy.Billing\Calc.cs", "namespace MyApp.Legacy.Billing; public class Calc {}"),
             (@"C:\repo\MyApp.Legacy.Billing\Facade.cs", "namespace MyApp.Legacy.Billing; public class Facade {}"));
 
-        ScopedContextResolver.Resolve(Model(), codebase)[0].DirectoryPath.ShouldBe(@"C:\repo\MyApp.Legacy.Billing");
+        ScopedContextResolver.Resolve(Model(), codebase)[0]
+            .DirectoryPath.ShouldBe(@"C:\repo\MyApp.Legacy.Billing");
     }
 
     [Fact]

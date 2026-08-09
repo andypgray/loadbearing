@@ -21,6 +21,7 @@ internal static class TextNormalization
     /// <summary>CRLF folded to LF, then trimmed — for comparisons a trailing newline must not decide.</summary>
     internal static string NormalizedTrimmed(this string value)
     {
-        return value.Replace("\r\n", "\n").Trim();
+        return value.Replace("\r\n", "\n")
+            .Trim();
     }
 }

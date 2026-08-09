@@ -157,7 +157,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document).ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
+        WorkspaceDiagnosticsOf(document)
+            .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
         result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
     }
 
@@ -172,8 +173,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document).ShouldBe([AuditDiagnostic, MsBuildBootstrap.SelectionNote()]);
-        document.RootElement.TryGetProperty("modelIncomplete", out _).ShouldBeFalse();
+        WorkspaceDiagnosticsOf(document)
+            .ShouldBe([AuditDiagnostic, MsBuildBootstrap.SelectionNote()]);
+        document.RootElement.TryGetProperty("modelIncomplete", out _)
+            .ShouldBeFalse();
         result.Err.ShouldNotContain("error: the model is incomplete");
     }
 

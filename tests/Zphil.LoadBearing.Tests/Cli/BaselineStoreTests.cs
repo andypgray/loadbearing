@@ -32,7 +32,8 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_MissingFile_ReturnsNull()
     {
-        BaselineStore.TryReadDocument(Path.Combine(_temp.Path, "nope.json")).ShouldBeNull();
+        BaselineStore.TryReadDocument(Path.Combine(_temp.Path, "nope.json"))
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -43,7 +44,8 @@ public sealed class BaselineStoreTests : IDisposable
         BaselineDocument? document = BaselineStore.TryReadDocument(path);
 
         document.ShouldNotBeNull();
-        document.Sections["data/x"].ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
+        document.Sections["data/x"]
+            .ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
     }
 
     [Fact]
@@ -51,8 +53,14 @@ public sealed class BaselineStoreTests : IDisposable
     {
         string path = WriteComposed(
             "attributed.json",
-            ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db").WithBecause("INC-1234")]),
-            ("legacy/billing/containment", [BaselineEntry.ForSubject("T:App.Legacy.Thing").WithBecause("grandfathered pending rewrite")]));
+            ("data/x", [
+                BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")
+                    .WithBecause("INC-1234")
+            ]),
+            ("legacy/billing/containment", [
+                BaselineEntry.ForSubject("T:App.Legacy.Thing")
+                    .WithBecause("grandfathered pending rewrite")
+            ]));
 
         BaselineDocument? document = BaselineStore.TryReadDocument(path);
 
@@ -60,10 +68,12 @@ public sealed class BaselineStoreTests : IDisposable
         // Equality ignores attribution, so pin identity and .Because separately.
         var edges = document.Sections["data/x"];
         edges.ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
-        edges[0].Because.ShouldBe("INC-1234");
+        edges[0]
+            .Because.ShouldBe("INC-1234");
         var subjects = document.Sections["legacy/billing/containment"];
         subjects.ShouldBe([BaselineEntry.ForSubject("T:App.Legacy.Thing")]);
-        subjects[0].Because.ShouldBe("grandfathered pending rewrite");
+        subjects[0]
+            .Because.ShouldBe("grandfathered pending rewrite");
     }
 
     [Fact]
@@ -71,7 +81,8 @@ public sealed class BaselineStoreTests : IDisposable
     {
         string path = WriteComposed("b.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
         // Hand-edit an entry without updating the digest — the tamper the ratchet must refuse.
-        File.WriteAllText(path, File.ReadAllText(path).Replace("T:App.Web.Old", "T:App.Web.Hacked"));
+        File.WriteAllText(path, File.ReadAllText(path)
+            .Replace("T:App.Web.Old", "T:App.Web.Hacked"));
 
         var ex = Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path));
         ex.Message.ShouldContain("failed its integrity check");
@@ -88,9 +99,13 @@ public sealed class BaselineStoreTests : IDisposable
     {
         string path = WriteComposed(
             "attributed.json",
-            ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db").WithBecause("INC-1234")]));
+            ("data/x", [
+                BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")
+                    .WithBecause("INC-1234")
+            ]));
         // The attribution is folded into the digest — rewording it by hand is tamper too.
-        File.WriteAllText(path, File.ReadAllText(path).Replace("INC-1234", "INC-9999"));
+        File.WriteAllText(path, File.ReadAllText(path)
+            .Replace("INC-1234", "INC-9999"));
 
         var ex = Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path));
         ex.Message.ShouldContain("failed its integrity check");
@@ -262,9 +277,11 @@ public sealed class BaselineStoreTests : IDisposable
     {
         string path = WriteComposed("b.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
         // Simulate an autocrlf checkout: rewrite with CRLF endings. The digest is over entries, not bytes.
-        File.WriteAllText(path, File.ReadAllText(path).Replace("\n", "\r\n"));
+        File.WriteAllText(path, File.ReadAllText(path)
+            .Replace("\n", "\r\n"));
 
-        BaselineStore.TryReadDocument(path).ShouldNotBeNull();
+        BaselineStore.TryReadDocument(path)
+            .ShouldNotBeNull();
     }
 
     [Fact]
@@ -303,7 +320,8 @@ public sealed class BaselineStoreTests : IDisposable
     {
         BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/absent.json"), _temp.Path);
 
-        index.TryGet("data/x", out _).ShouldBeFalse();
+        index.TryGet("data/x", out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -313,7 +331,8 @@ public sealed class BaselineStoreTests : IDisposable
 
         BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _temp.Path);
 
-        index.TryGet("data/x", out _).ShouldBeFalse();
+        index.TryGet("data/x", out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -323,7 +342,8 @@ public sealed class BaselineStoreTests : IDisposable
 
         BaselineIndex index = BaselineStore.LoadForModel(MigrateModel("data/x", "arch/b.json"), _temp.Path);
 
-        index.TryGet("data/x", out RuleBaseline? section).ShouldBeTrue();
+        index.TryGet("data/x", out RuleBaseline? section)
+            .ShouldBeTrue();
         section!.Count.ShouldBe(1);
     }
 
@@ -335,10 +355,13 @@ public sealed class BaselineStoreTests : IDisposable
             ["data/x"] = [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]
         });
         string path = Path.Combine(_temp.Path, "w.json");
-        BaselineStore.Write(path, document).ShouldBe(WriteOutcome.Wrote);
-        File.WriteAllText(path, File.ReadAllText(path).Replace("\n", "\r\n")); // autocrlf checkout
+        BaselineStore.Write(path, document)
+            .ShouldBe(WriteOutcome.Wrote);
+        File.WriteAllText(path, File.ReadAllText(path)
+            .Replace("\n", "\r\n")); // autocrlf checkout
 
-        BaselineStore.Write(path, document).ShouldBe(WriteOutcome.Unchanged);
+        BaselineStore.Write(path, document)
+            .ShouldBe(WriteOutcome.Unchanged);
     }
 
     private static ArchitectureModel MigrateModel(string ruleId, string baselinePath)
@@ -347,7 +370,9 @@ public sealed class BaselineStoreTests : IDisposable
             arch.Rule(ruleId)
                 .Migrate(
                     "old",
-                    arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+                    arch.Namespace("App.Web.*")
+                        .WithSuffix("Controller")
+                        .MustNotReference(arch.Namespace("App.Data.*")))
                 .Baseline(baselinePath)
                 .Because("b"));
     }

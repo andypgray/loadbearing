@@ -76,9 +76,10 @@ public sealed class SpecLoadContextFallbackTests
             // Assert: a path is what the loader reports, so this is not a dependency failure and must not be
             // reported as one — the packaging remedy would be nonsense for a file the user has not built.
             thrown.FileName.ShouldBe(stagedSpec);
-            SpecDependencyLoadFailure.IsAssemblyLoadFailure(thrown).ShouldBeFalse(
-                "a missing spec DLL is not a missing dependency; reporting it as one would offer the "
-                + "CopyLocalLockFileAssemblies remedy for a file that was simply never built.");
+            SpecDependencyLoadFailure.IsAssemblyLoadFailure(thrown)
+                .ShouldBeFalse(
+                    "a missing spec DLL is not a missing dependency; reporting it as one would offer the "
+                    + "CopyLocalLockFileAssemblies remedy for a file that was simply never built.");
         }
         finally
         {

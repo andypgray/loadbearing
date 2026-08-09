@@ -71,7 +71,8 @@ public sealed class CommentTextTests
 
         // Assert
         masked.ShouldNotContain("Phase");
-        DocProse.FindForbidden(masked, [PhaseLabel]).ShouldBeEmpty();
+        DocProse.FindForbidden(masked, [PhaseLabel])
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -94,7 +95,8 @@ public sealed class CommentTextTests
         var hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
 
         // Assert
-        hits.ShouldHaveSingleItem().ShouldBe("4: Phase 9");
+        hits.ShouldHaveSingleItem()
+            .ShouldBe("4: Phase 9");
     }
 
     [Fact]
@@ -107,7 +109,8 @@ public sealed class CommentTextTests
         var hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
 
         // Assert
-        hits.ShouldHaveSingleItem().ShouldBe("2: Phase 9");
+        hits.ShouldHaveSingleItem()
+            .ShouldBe("2: Phase 9");
     }
 
     [Fact]
@@ -122,12 +125,15 @@ public sealed class CommentTextTests
 
         // Assert
         masked.ShouldBe(source.Replace(" var spacer = 1; ", new string(CommentText.Blank, 17)));
-        Regex.IsMatch(masked, @"\bthe\s+current\s+phase\b").ShouldBeFalse();
+        Regex.IsMatch(masked, @"\bthe\s+current\s+phase\b")
+            .ShouldBeFalse();
 
         // And the reason it holds for every pattern rather than just this one: the blank satisfies
         // neither of the two classes a pattern can cross a gap with.
-        Regex.IsMatch(CommentText.Blank.ToString(), @"\s").ShouldBeFalse();
-        Regex.IsMatch(CommentText.Blank.ToString(), @"\w").ShouldBeFalse();
+        Regex.IsMatch(CommentText.Blank.ToString(), @"\s")
+            .ShouldBeFalse();
+        Regex.IsMatch(CommentText.Blank.ToString(), @"\w")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -143,7 +149,8 @@ public sealed class CommentTextTests
         masked.Length.ShouldBe(source.Length);
         for (var index = 0; index < source.Length; index++)
             if (source[index] is '\n' or '\r')
-                masked[index].ShouldBe(source[index]);
+                masked[index]
+                    .ShouldBe(source[index]);
     }
 
     [Fact]

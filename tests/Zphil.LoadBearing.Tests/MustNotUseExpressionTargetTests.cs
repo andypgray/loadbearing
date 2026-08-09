@@ -67,7 +67,10 @@ public class MustNotUseExpressionTargetTests
 
     private static string Sentence(Func<Arch, Constraint> constraint)
     {
-        return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule").Enforce(constraint(arch)).Because("b")))
-            .Rules.Single().Sentence;
+        return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule")
+                .Enforce(constraint(arch))
+                .Because("b")))
+            .Rules.Single()
+            .Sentence;
     }
 }

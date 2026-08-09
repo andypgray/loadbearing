@@ -35,14 +35,18 @@ public sealed class HumanReportRendererTests
         // A hand-built model bypasses spec-build's closed-generic refusal (GRAMMAR §8 item 14) to reach the
         // checker's RuleError backstop; the renderer's RuleError arm prefixes the detail with "error: ".
         var arch = new Arch();
-        Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>)).MustHaveSuffix("Async");
+        Constraint constraint = arch.Namespace("App.Async.*")
+            .Methods.Returning(typeof(Task<int>))
+            .MustHaveSuffix("Async");
         var model = new ArchitectureModel(
             [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
-        RuleResult result = ArchChecker.Check(model, AsyncModel).Single();
+        RuleResult result = ArchChecker.Check(model, AsyncModel)
+            .Single();
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.RuleError);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.RuleError);
         block.ShouldContain(
             "error: `Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
             "Anchor on the open definition instead.");
@@ -52,14 +56,17 @@ public sealed class HumanReportRendererTests
     public void RuleBlock_EmptySubject_RendersMatchedNoTypesDetailLine()
     {
         RuleResult result = Checker.Run(
-            "namespace App { public class Foo {} }",
-            arch => arch.Rule("naming/x")
-                .Enforce(arch.Namespace("Nowhere.*").MustHavePrefix("I"))
-                .Because("b")).Single();
+                "namespace App { public class Foo {} }",
+                arch => arch.Rule("naming/x")
+                    .Enforce(arch.Namespace("Nowhere.*")
+                        .MustHavePrefix("I"))
+                    .Because("b"))
+            .Single();
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.EmptySubject);
         block.ShouldContain("The subject selection matched no solution-declared types.");
     }
 
@@ -90,7 +97,8 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Construction);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Construction);
         block.ShouldContain("App.Factory constructs Widgets.Widget");
         block.ShouldContain(":12 — App.Factory constructs Widgets.Widget");
     }
@@ -107,7 +115,8 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Catch);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Catch);
         block.ShouldContain("App.Handler catches Errors.DbError");
         block.ShouldContain(":9 — App.Handler catches Errors.DbError");
     }
@@ -124,7 +133,8 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Expose);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Expose);
         block.ShouldContain("App.Facade exposes Secrets.Secret");
         block.ShouldContain(":5 — App.Facade exposes Secrets.Secret");
     }
@@ -141,7 +151,8 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Throw);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Throw);
         block.ShouldContain("App.Service throws Errors.InfraError");
         block.ShouldContain(":14 — App.Service throws Errors.InfraError");
     }
@@ -170,13 +181,16 @@ public sealed class HumanReportRendererTests
                               }
                               """;
         RuleResult result = Checker.Run(source, arch =>
-            arch.Rule("ex/filter-catches")
-                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                .Because("A broad catch names what it expects.")).Single();
+                arch.Rule("ex/filter-catches")
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Because("A broad catch names what it expects."))
+            .Single();
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Catch);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Catch);
         block.ShouldContain("Test.cs:11 — App.Handler catches Errors.DbError");
         block.ShouldNotContain("Test.cs:9");
     }
@@ -196,13 +210,16 @@ public sealed class HumanReportRendererTests
                               }
                               """;
         RuleResult result = Checker.Run(source, arch =>
-            arch.Rule("ex/no-bare-throws")
-                .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
-                .Because("Throw a type a caller can dispatch on.")).Single();
+                arch.Rule("ex/no-bare-throws")
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotThrow(typeof(Exception)))
+                    .Because("Throw a type a caller can dispatch on."))
+            .Single();
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem().Kind.ShouldBe(ViolationKind.Throw);
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.Throw);
         block.ShouldContain("Test.cs:5 — App.Service throws System.Exception");
     }
 

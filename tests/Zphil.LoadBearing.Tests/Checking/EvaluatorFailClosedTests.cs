@@ -64,7 +64,8 @@ public sealed class EvaluatorFailClosedTests
         var model = new ArchitectureModel(
             [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
 
-        RuleResult result = ArchChecker.Check(model, EmptyCodebase).Results.Single();
+        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+            .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled selection adjective 'UnknownAdjective'.");
     }
@@ -86,7 +87,8 @@ public sealed class EvaluatorFailClosedTests
         var model = new ArchitectureModel(
             [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
 
-        RuleResult result = ArchChecker.Check(model, EmptyCodebase).Results.Single();
+        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+            .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled member adjective 'UnknownMemberAdjective'.");
     }

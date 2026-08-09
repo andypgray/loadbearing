@@ -53,7 +53,8 @@ public sealed class MustNotExposeVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("b"))
             .Single();
 
@@ -72,7 +73,9 @@ public sealed class MustNotExposeVerbTests
         // The forbidden target resolves (Secrets.Secret exists), so this is a real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanService").MustNotExpose(arch.Namespace("Secrets.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .WithSuffix("CleanService")
+                        .MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("b"))
             .Single();
 
@@ -106,7 +109,8 @@ public sealed class MustNotExposeVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ExposurePairs().ShouldBe(["App.Wide -> System.Exception"]);
+        result.ExposurePairs()
+            .ShouldBe(["App.Wide -> System.Exception"]);
     }
 
     [Fact]
@@ -130,12 +134,14 @@ public sealed class MustNotExposeVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("api/no-expose-derived")
-                    .Enforce(arch.Namespace("N.*").MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*")
+                        .MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ExposurePairs().ShouldBe(["N.Gateway -> N.AppError"]);
+        result.ExposurePairs()
+            .ShouldBe(["N.Gateway -> N.AppError"]);
     }
 
     [Fact]
@@ -145,7 +151,8 @@ public sealed class MustNotExposeVerbTests
         // pattern operand is the warning gate, exactly as MustNotCatch's inert-target semantics (§4.9).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotExpose(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -160,7 +167,8 @@ public sealed class MustNotExposeVerbTests
         // pattern — stays silent (the departure from the pattern-operand inert warning above).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-format")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotExpose(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -173,10 +181,12 @@ public sealed class MustNotExposeVerbTests
         // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
         // other verb — the exposure verb takes the same subject gate.
         RuleResult result = Checker.Run(
-            "namespace App { public class Foo {} }",
-            arch => arch.Rule("api/empty")
-                .Enforce(arch.Namespace("Nowhere.*").MustNotExpose(arch.Namespace("App.*")))
-                .Because("b")).Single();
+                "namespace App { public class Foo {} }",
+                arch => arch.Rule("api/empty")
+                    .Enforce(arch.Namespace("Nowhere.*")
+                        .MustNotExpose(arch.Namespace("App.*")))
+                    .Because("b"))
+            .Single();
 
         result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
@@ -201,12 +211,14 @@ public sealed class MustNotExposeVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("api/no-expose")
-                    .Migrate("legacy leaked surface", arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
+                    .Migrate("legacy leaked surface", arch.Namespace("App.*")
+                        .MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("keep the internal types off the public API"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ExposurePairs().ShouldBe(["App.Facade -> Secrets.B"]);
+        result.ExposurePairs()
+            .ShouldBe(["App.Facade -> Secrets.B"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -227,12 +239,14 @@ public sealed class MustNotExposeVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("api/no-expose")
-                    .Migrate("legacy leaked surface", arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
+                    .Migrate("legacy leaked surface", arch.Namespace("App.*")
+                        .MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("keep the internal types off the public API"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ExposurePairs().ShouldBe(["App.NewFacade -> Secrets.Data"]);
+        result.ExposurePairs()
+            .ShouldBe(["App.NewFacade -> Secrets.Data"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -243,7 +257,8 @@ public sealed class MustNotExposeVerbTests
         // `target` field — no new slot, schemaVersion stays 3, so member/subject slots stay omitted as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("api/no-expose-secret")
-                .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotExpose(arch.Namespace("Secrets.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("expose", "App.Facade", "Secrets.Secret");

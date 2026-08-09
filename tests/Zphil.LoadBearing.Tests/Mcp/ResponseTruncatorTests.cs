@@ -27,7 +27,8 @@ public sealed class ResponseTruncatorTests
     [Fact]
     public void ComputeMaxChars_NullValue_ReturnsDefault()
     {
-        ResponseTruncator.ComputeMaxChars(null).ShouldBe(62_500);
+        ResponseTruncator.ComputeMaxChars(null)
+            .ShouldBe(62_500);
     }
 
     [Theory]
@@ -38,7 +39,8 @@ public sealed class ResponseTruncatorTests
     [InlineData("-100")]
     public void ComputeMaxChars_BlankUnparseableOrNonPositive_ReturnsDefault(string value)
     {
-        ResponseTruncator.ComputeMaxChars(value).ShouldBe(62_500);
+        ResponseTruncator.ComputeMaxChars(value)
+            .ShouldBe(62_500);
     }
 
     [Theory]
@@ -46,7 +48,8 @@ public sealed class ResponseTruncatorTests
     [InlineData("4000", 10_000)]
     public void ComputeMaxChars_PositiveTokenBudget_ReturnsTokensTimesCharsPerToken(string value, int expected)
     {
-        ResponseTruncator.ComputeMaxChars(value).ShouldBe(expected);
+        ResponseTruncator.ComputeMaxChars(value)
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -54,7 +57,8 @@ public sealed class ResponseTruncatorTests
     {
         const string text = "short output";
 
-        ResponseTruncator.TruncateIfNeeded(text, "arch_check", 100).ShouldBe(text);
+        ResponseTruncator.TruncateIfNeeded(text, "arch_check", 100)
+            .ShouldBe(text);
     }
 
     [Fact]
@@ -92,7 +96,8 @@ public sealed class ResponseTruncatorTests
         // The kept prefix stops before the split emoji — nine 'a's, no dangling surrogate.
         string kept = result[..result.IndexOf('\n')];
         kept.ShouldBe(new string('a', maxChars - 1));
-        char.IsHighSurrogate(kept[^1]).ShouldBeFalse();
+        char.IsHighSurrogate(kept[^1])
+            .ShouldBeFalse();
     }
 
     [Fact]

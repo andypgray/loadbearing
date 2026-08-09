@@ -23,7 +23,8 @@ public sealed class DiffContextTests
     [Fact]
     public void ChangedFiles_AreNormalizedToForwardSlashes()
     {
-        Make(@"C:\repo\sln\App\Foo.cs").ChangedFiles.ShouldBe(["C:/repo/sln/App/Foo.cs"]);
+        Make(@"C:\repo\sln\App\Foo.cs")
+            .ChangedFiles.ShouldBe(["C:/repo/sln/App/Foo.cs"]);
     }
 
     [Fact]
@@ -31,40 +32,52 @@ public sealed class DiffContextTests
     {
         DiffContext diff = Make(@"C:\repo\sln\App\Foo.cs");
 
-        diff.Contains(@"C:\repo\sln\App\Foo.cs").ShouldBeTrue();
-        diff.Contains("C:/repo/sln/App/Foo.cs").ShouldBeTrue();
+        diff.Contains(@"C:\repo\sln\App\Foo.cs")
+            .ShouldBeTrue();
+        diff.Contains("C:/repo/sln/App/Foo.cs")
+            .ShouldBeTrue();
     }
 
     [Fact]
     public void Contains_OnCaseInsensitiveFileSystem_MatchesRegardlessOfCase()
     {
         Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
-        Make(@"C:\repo\sln\App\Foo.cs").Contains("c:/REPO/sln/app/foo.cs").ShouldBeTrue();
+        Make(@"C:\repo\sln\App\Foo.cs")
+            .Contains("c:/REPO/sln/app/foo.cs")
+            .ShouldBeTrue();
     }
 
     [Fact]
     public void Contains_OnCaseSensitiveFileSystem_DoesNotMatchCaseVariant()
     {
         Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
-        Make(@"C:\repo\sln\App\Foo.cs").Contains("c:/REPO/sln/app/foo.cs").ShouldBeFalse();
+        Make(@"C:\repo\sln\App\Foo.cs")
+            .Contains("c:/REPO/sln/app/foo.cs")
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void Contains_UnchangedFile_IsFalse()
     {
-        Make(@"C:\repo\sln\App\Foo.cs").Contains(@"C:\repo\sln\App\Bar.cs").ShouldBeFalse();
+        Make(@"C:\repo\sln\App\Foo.cs")
+            .Contains(@"C:\repo\sln\App\Bar.cs")
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void SolutionRelative_StripsTheSolutionPrefix()
     {
-        Make().SolutionRelative(@"C:\repo\sln\App\Foo.cs").ShouldBe("App/Foo.cs");
+        Make()
+            .SolutionRelative(@"C:\repo\sln\App\Foo.cs")
+            .ShouldBe("App/Foo.cs");
     }
 
     [Fact]
     public void SolutionRelative_OutsideTheSolution_ReturnsNormalizedPathUnchanged()
     {
-        Make().SolutionRelative(@"D:\other\Baz.cs").ShouldBe("D:/other/Baz.cs");
+        Make()
+            .SolutionRelative(@"D:\other\Baz.cs")
+            .ShouldBe("D:/other/Baz.cs");
     }
 
     [Fact]

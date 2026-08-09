@@ -23,13 +23,15 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // Act — a cache written by a future schema version is unusable.
         solution.MutateCacheJson(root => root["SchemaVersion"] = 999);
 
         // Assert
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -42,13 +44,15 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // Act — downgrade the recorded schema to the immediately-prior version.
         solution.MutateCacheJson(root => root["SchemaVersion"] = 13);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -62,10 +66,12 @@ public sealed class ExtractionCacheStoreTests
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], [])).ToList(),
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+                .ToList(),
             [new SpecResolutionRecord("", "A", ["A"], "/out/A.dll")],
             []);
-        store.Write(store.CaptureFingerprint(solution.Projects), extraction).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction)
+            .ShouldBeTrue();
 
         solution.MutateCacheJson(root =>
         {
@@ -75,7 +81,8 @@ public sealed class ExtractionCacheStoreTests
             record["ExcludeProjectName"] = "A";
         });
 
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -90,7 +97,8 @@ public sealed class ExtractionCacheStoreTests
         solution.AddStrayFile("A", Path.Combine("Snippets", "Excluded.cs"), "class Excluded {}");
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // Act — steady-state revalidation with the stray untouched.
         CacheReadResult result = store.ReadAndValidate();
@@ -107,13 +115,15 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // Act — a cache from a different tool build (commit) is discarded.
         solution.MutateCacheJson(root => root["ToolVersion"] = "0.0.0-not-this-build");
 
         // Assert
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -142,13 +152,15 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         byte[] bytes = File.ReadAllBytes(solution.CacheFilePath);
         File.WriteAllBytes(solution.CacheFilePath, bytes[..(bytes.Length / 2)]);
 
         // Act + Assert
-        Should.NotThrow(() => store.ReadAndValidate()).Outcome.ShouldBe(CacheOutcome.Miss);
+        Should.NotThrow(() => store.ReadAndValidate())
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     /// <summary>
@@ -174,15 +186,18 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Hit); // baseline: clean before the file appears
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit); // baseline: clean before the file appears
 
         // Act — the recorded-absent probe file appears. The store stats and hashes rather than parsing, so
         // the bytes carry no meaning here; the file existing is the whole signal.
         File.WriteAllText(Path.Combine(solution.Root, probeFileName), "probe\n");
 
         // Assert — an existence flip on a structural probe is a full miss.
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Miss);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -193,11 +208,13 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"), ("B.cs", "class B {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // A clean tree is a pure-stat hit: zero content reads even on the first validation.
         long baseline = store.ContentHashCount;
-        store.ReadAndValidate().Outcome.ShouldBe(CacheOutcome.Hit);
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit);
         (store.ContentHashCount - baseline).ShouldBe(0);
 
         // Act 1 — bump one document's mtime to a different past instant without changing its bytes.
@@ -229,7 +246,8 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("D", [], ("D.cs", "class D {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution)).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
 
         // Act — change A's content; the Merkle keys carry the change to every dependent.
         File.WriteAllText(solution.PathOf("A", "A.cs"), "class A { int x; }");
@@ -239,7 +257,8 @@ public sealed class ExtractionCacheStoreTests
         // Assert — {A, B, C} dirty (D clean); the reusable fragments are exactly the clean projects'.
         result.Outcome.ShouldBe(CacheOutcome.Partial);
         result.DirtyProjects.ShouldBe(["A", "B", "C"], true);
-        result.ReusableFragments.Select(f => f.ProjectName).ShouldBe(["D"]);
+        result.ReusableFragments.Select(f => f.ProjectName)
+            .ShouldBe(["D"]);
     }
 
     [Fact]
@@ -260,7 +279,8 @@ public sealed class ExtractionCacheStoreTests
 
         // Assert — the write is skipped, and no cache file is left behind to poison a later run.
         wrote.ShouldBeFalse();
-        File.Exists(solution.CacheFilePath).ShouldBeFalse();
+        File.Exists(solution.CacheFilePath)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -272,11 +292,14 @@ public sealed class ExtractionCacheStoreTests
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
 
-        store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "first")).ShouldBeTrue();
-        store.ReadAndValidate().Diagnostics.ShouldBe(["first"]);
+        store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "first"))
+            .ShouldBeTrue();
+        store.ReadAndValidate()
+            .Diagnostics.ShouldBe(["first"]);
 
         // Act — a second atomic write fully replaces the file.
-        store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "second")).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "second"))
+            .ShouldBeTrue();
         CacheReadResult result = store.ReadAndValidate();
 
         // Assert — the new content, whole (no partial state from the overwrite).
@@ -295,17 +318,20 @@ public sealed class ExtractionCacheStoreTests
         ExtractionCacheStore store = solution.NewStore();
         SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], "/out/A.dll")];
         var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], [])).ToList(),
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+                .ToList(),
             specs,
             ["load-diag-1", "load-diag-2"]);
-        store.Write(store.CaptureFingerprint(solution.Projects), extraction).ShouldBeTrue();
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction)
+            .ShouldBeTrue();
 
         // Act
         CacheReadResult result = store.ReadAndValidate();
 
         // Assert — a full hit returns every fragment plus the recorded spec resolutions and diagnostics.
         result.Outcome.ShouldBe(CacheOutcome.Hit);
-        result.ReusableFragments.Select(f => f.ProjectName).ShouldBe(["A", "B"], true);
+        result.ReusableFragments.Select(f => f.ProjectName)
+            .ShouldBe(["A", "B"], true);
         result.DirtyProjects.ShouldBeEmpty();
         // Field-by-field: the record carries a collection, so its synthesized equality compares that member
         // by reference and a round-tripped list can never equal the written one.

@@ -54,7 +54,8 @@ public sealed class EnumCoercionTests
     [InlineData("\"WARNING\"", Severity.Warning)]
     public void Scalar_KnownName_ParsesCaseInsensitively(string json, Severity expected)
     {
-        Deserialize<Severity>(json).ShouldBe(expected);
+        Deserialize<Severity>(json)
+            .ShouldBe(expected);
     }
 
     [Theory]
@@ -100,19 +101,22 @@ public sealed class EnumCoercionTests
     [Fact]
     public void Scalar_Write_EmitsTheMemberName()
     {
-        JsonSerializer.Serialize(Severity.Warning, Options).ShouldBe("\"Warning\"");
+        JsonSerializer.Serialize(Severity.Warning, Options)
+            .ShouldBe("\"Warning\"");
     }
 
     [Fact]
     public void Array_JsonArrayOfNames_ParsesEachElement()
     {
-        Deserialize<Severity[]>("[\"Warning\",\"Error\"]").ShouldBe([Severity.Warning, Severity.Error]);
+        Deserialize<Severity[]>("[\"Warning\",\"Error\"]")
+            .ShouldBe([Severity.Warning, Severity.Error]);
     }
 
     [Fact]
     public void Array_EmptyJsonArray_ReadsAsEmpty()
     {
-        Deserialize<Severity[]>("[]").ShouldBeEmpty();
+        Deserialize<Severity[]>("[]")
+            .ShouldBeEmpty();
     }
 
     [Theory]
@@ -120,13 +124,15 @@ public sealed class EnumCoercionTests
     [InlineData("\"  [\\\"warning\\\", \\\"ERROR\\\"]  \"")]
     public void Array_JsonEncodedArrayString_IsUnwrappedAndEachElementParsed(string json)
     {
-        Deserialize<Severity[]>(json).ShouldBe([Severity.Warning, Severity.Error]);
+        Deserialize<Severity[]>(json)
+            .ShouldBe([Severity.Warning, Severity.Error]);
     }
 
     [Fact]
     public void Array_BareName_BecomesASingleElementArray()
     {
-        Deserialize<Severity[]>("\"Warning\"").ShouldBe([Severity.Warning]);
+        Deserialize<Severity[]>("\"Warning\"")
+            .ShouldBe([Severity.Warning]);
     }
 
     [Theory]
@@ -198,14 +204,20 @@ public sealed class EnumCoercionTests
     public void Factories_ConvertTheirOwnShapeAndNothingElse()
     {
         EnumValidationConverterFactory scalar = new();
-        scalar.CanConvert(typeof(Severity)).ShouldBeTrue();
-        scalar.CanConvert(typeof(Severity[])).ShouldBeFalse();
-        scalar.CanConvert(typeof(string)).ShouldBeFalse();
+        scalar.CanConvert(typeof(Severity))
+            .ShouldBeTrue();
+        scalar.CanConvert(typeof(Severity[]))
+            .ShouldBeFalse();
+        scalar.CanConvert(typeof(string))
+            .ShouldBeFalse();
 
         EnumArrayCoercerFactory array = new();
-        array.CanConvert(typeof(Severity[])).ShouldBeTrue();
-        array.CanConvert(typeof(Severity)).ShouldBeFalse();
-        array.CanConvert(typeof(string[])).ShouldBeFalse();
+        array.CanConvert(typeof(Severity[]))
+            .ShouldBeTrue();
+        array.CanConvert(typeof(Severity))
+            .ShouldBeFalse();
+        array.CanConvert(typeof(string[]))
+            .ShouldBeFalse();
     }
 
     [Theory]
@@ -224,7 +236,8 @@ public sealed class EnumCoercionTests
     {
         // A leading-digit check would miss "+2" and " 2 ", and a long-only check would miss ordinals
         // wider than long.
-        EnumStringHelper.LooksNumeric(value).ShouldBe(expected);
+        EnumStringHelper.LooksNumeric(value)
+            .ShouldBe(expected);
     }
 
     [Theory]
@@ -240,7 +253,8 @@ public sealed class EnumCoercionTests
     {
         // The shared guard both converters call before Enum.TryParse. Ordinals are one route; a comma
         // list is the other, and a comma is decisive on its own because no member name can contain one.
-        EnumStringHelper.ResolvesByArithmetic(value).ShouldBe(expected);
+        EnumStringHelper.ResolvesByArithmetic(value)
+            .ShouldBe(expected);
     }
 
     [Theory]

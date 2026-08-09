@@ -71,7 +71,8 @@ public sealed class SolutionProjectFileParserTests
         const string text = "Microsoft Visual Studio Solution File, Format Version 12.00\n";
 
         // Act + Assert
-        SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory).ShouldBeEmpty();
+        SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -79,9 +80,13 @@ public sealed class SolutionProjectFileParserTests
     {
         // The distinction a membership subtraction depends on: a .slnf is JSON that the classic-.sln regex
         // would read as zero members, which is not the same statement as "the solution declares nothing".
-        SolutionProjectFileParser.OwnsFormat("/repo/App.sln").ShouldBeTrue();
-        SolutionProjectFileParser.OwnsFormat("/repo/App.SLNX").ShouldBeTrue();
-        SolutionProjectFileParser.OwnsFormat("/repo/Filtered.slnf").ShouldBeFalse();
-        SolutionProjectFileParser.OwnsFormat("/repo/App").ShouldBeFalse();
+        SolutionProjectFileParser.OwnsFormat("/repo/App.sln")
+            .ShouldBeTrue();
+        SolutionProjectFileParser.OwnsFormat("/repo/App.SLNX")
+            .ShouldBeTrue();
+        SolutionProjectFileParser.OwnsFormat("/repo/Filtered.slnf")
+            .ShouldBeFalse();
+        SolutionProjectFileParser.OwnsFormat("/repo/App")
+            .ShouldBeFalse();
     }
 }

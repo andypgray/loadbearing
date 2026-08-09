@@ -45,7 +45,8 @@ public sealed class NuGetAuditDiagnosticsTests
     [InlineData("Restore surfaced advisory code NU1999")]
     public void IsAudit_AuditAdvisory_ReturnsTrue(string diagnostic)
     {
-        NuGetAuditDiagnostics.IsAudit(diagnostic).ShouldBeTrue();
+        NuGetAuditDiagnostics.IsAudit(diagnostic)
+            .ShouldBeTrue();
     }
 
     [Theory]
@@ -62,6 +63,7 @@ public sealed class NuGetAuditDiagnosticsTests
     [InlineData("")]
     public void IsAudit_NonAuditText_ReturnsFalse(string diagnostic)
     {
-        NuGetAuditDiagnostics.IsAudit(diagnostic).ShouldBeFalse();
+        NuGetAuditDiagnostics.IsAudit(diagnostic)
+            .ShouldBeFalse();
     }
 }

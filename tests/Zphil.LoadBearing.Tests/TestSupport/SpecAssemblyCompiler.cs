@@ -57,6 +57,7 @@ internal static class SpecAssemblyCompiler
         if (!paths.Any(path => string.Equals(path, corePath, StringComparison.OrdinalIgnoreCase)))
             paths.Add(corePath);
 
-        return paths.Select(path => (MetadataReference)MetadataReference.CreateFromFile(path)).ToArray();
+        return paths.Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .ToArray();
     }
 }

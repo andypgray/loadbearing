@@ -21,6 +21,7 @@ public sealed class TypeKindMapperTests
         var compilation = CSharpCompilation.Create("t");
         INamedTypeSymbol errorSymbol = compilation.CreateErrorTypeSymbol(compilation.GlobalNamespace, "Ghost", 0);
 
-        TypeKindMapper.TryMap(errorSymbol, out _).ShouldBeFalse();
+        TypeKindMapper.TryMap(errorSymbol, out _)
+            .ShouldBeFalse();
     }
 }

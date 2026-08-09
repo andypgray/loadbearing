@@ -232,7 +232,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
 
     private static string PrivateCopy(string source)
     {
-        string root = Path.Combine(TestTempRoot.For("fixtures"), Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(TestTempRoot.For("fixtures"), Guid.NewGuid()
+            .ToString("N"));
         CopyTree(source, root);
         return root;
     }
@@ -287,7 +288,9 @@ internal sealed class TempFixtureWorkspace : IDisposable
         if (targetInfo.Length != new FileInfo(source).Length) return false;
 
         // Fixture files are small (the largest MyApp source is a few KB), so a full compare beats hashing.
-        return File.ReadAllBytes(source).AsSpan().SequenceEqual(File.ReadAllBytes(target));
+        return File.ReadAllBytes(source)
+            .AsSpan()
+            .SequenceEqual(File.ReadAllBytes(target));
     }
 
     private static void CopyTree(string source, string destination)
@@ -305,7 +308,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
 
     private static bool IsBuildArtifact(string path, string source)
     {
-        string relative = path.Substring(source.Length).Replace('\\', '/');
+        string relative = path.Substring(source.Length)
+            .Replace('\\', '/');
         return relative.Contains("/bin/") || relative.Contains("/obj/");
     }
 }

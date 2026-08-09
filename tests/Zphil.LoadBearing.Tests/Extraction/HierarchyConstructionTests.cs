@@ -24,7 +24,8 @@ public sealed class HierarchyConstructionTests
                                                          public class MyHandler : HandlerBase<Order> {}
                                                          """);
 
-        TypeConstruction handler = model.Type("N.MyHandler").AllInterfaces
+        TypeConstruction handler = model.Type("N.MyHandler")
+            .AllInterfaces
             .Single(c => c.Definition.FullName == "N.IHandler<T>");
         handler.FullName.ShouldBe("N.IHandler<N.Order>");
     }
@@ -39,7 +40,8 @@ public sealed class HierarchyConstructionTests
                                                          public class C : IB {}
                                                          """);
 
-        model.Type("N.C").AllInterfaces.Select(c => c.FullName)
+        model.Type("N.C")
+            .AllInterfaces.Select(c => c.FullName)
             .ShouldBe(["N.IA", "N.IB"]);
     }
 
@@ -52,7 +54,8 @@ public sealed class HierarchyConstructionTests
                                                          public class IntHandler : IHandler<int> {}
                                                          """);
 
-        TypeConstruction handler = model.Type("N.IntHandler").AllInterfaces.Single();
+        TypeConstruction handler = model.Type("N.IntHandler")
+            .AllInterfaces.Single();
         handler.Definition.FullName.ShouldBe("N.IHandler<T>");
         handler.FullName.ShouldBe("N.IHandler<System.Int32>");
     }
@@ -67,7 +70,8 @@ public sealed class HierarchyConstructionTests
                                                          public class C : IZebra, IApple {}
                                                          """);
 
-        model.Type("N.C").AllInterfaces.Select(c => c.FullName)
+        model.Type("N.C")
+            .AllInterfaces.Select(c => c.FullName)
             .ShouldBe(["N.IApple", "N.IZebra"]);
     }
 
@@ -81,7 +85,8 @@ public sealed class HierarchyConstructionTests
                                                          public class D : B {}
                                                          """);
 
-        model.Type("N.D").BaseTypeChain.Select(c => c.FullName)
+        model.Type("N.D")
+            .BaseTypeChain.Select(c => c.FullName)
             .ShouldBe(["N.B", "N.A", "System.Object"]);
     }
 
@@ -95,7 +100,8 @@ public sealed class HierarchyConstructionTests
                                                          public class MyHandler : HandlerBase<Order> {}
                                                          """);
 
-        TypeConstruction nearest = model.Type("N.MyHandler").BaseTypeChain[0];
+        TypeConstruction nearest = model.Type("N.MyHandler")
+            .BaseTypeChain[0];
         nearest.Definition.FullName.ShouldBe("N.HandlerBase<T>");
         nearest.FullName.ShouldBe("N.HandlerBase<N.Order>");
     }
@@ -108,7 +114,8 @@ public sealed class HierarchyConstructionTests
                                                          public struct S {}
                                                          """);
 
-        model.Type("N.S").BaseTypeChain.Select(c => c.FullName)
+        model.Type("N.S")
+            .BaseTypeChain.Select(c => c.FullName)
             .ShouldBe(["System.ValueType", "System.Object"]);
     }
 
@@ -120,7 +127,8 @@ public sealed class HierarchyConstructionTests
                                                          public enum E { A, B }
                                                          """);
 
-        model.Type("N.E").BaseTypeChain.Select(c => c.FullName)
+        model.Type("N.E")
+            .BaseTypeChain.Select(c => c.FullName)
             .ShouldBe(["System.Enum", "System.ValueType", "System.Object"]);
     }
 
@@ -132,7 +140,8 @@ public sealed class HierarchyConstructionTests
                                                          public delegate void D();
                                                          """);
 
-        model.Type("N.D").BaseTypeChain.Select(c => c.FullName)
+        model.Type("N.D")
+            .BaseTypeChain.Select(c => c.FullName)
             .ShouldBe(["System.MulticastDelegate", "System.Delegate", "System.Object"]);
     }
 
@@ -144,7 +153,8 @@ public sealed class HierarchyConstructionTests
                                                          public interface I {}
                                                          """);
 
-        model.Type("N.I").BaseTypeChain.ShouldBeEmpty();
+        model.Type("N.I")
+            .BaseTypeChain.ShouldBeEmpty();
     }
 
     [Fact]
@@ -160,7 +170,8 @@ public sealed class HierarchyConstructionTests
                                                          public class C {}
                                                          """);
 
-        model.Type("N.C").AttributeConstructions.Select(c => c.FullName)
+        model.Type("N.C")
+            .AttributeConstructions.Select(c => c.FullName)
             .ShouldBe(["N.AbleAttribute", "N.ZedAttribute"]);
     }
 
@@ -175,7 +186,8 @@ public sealed class HierarchyConstructionTests
                                                          public class C {}
                                                          """);
 
-        TypeConstruction tag = model.Type("N.C").AttributeConstructions.Single();
+        TypeConstruction tag = model.Type("N.C")
+            .AttributeConstructions.Single();
         tag.Definition.FullName.ShouldBe("N.TagAttribute<T>");
         tag.FullName.ShouldBe("N.TagAttribute<System.Int32>");
     }

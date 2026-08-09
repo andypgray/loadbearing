@@ -50,12 +50,18 @@ public sealed class DependabotCoverageTests
     public void DependabotNuGetList_CoversEveryCommittedLockFile()
     {
         // Arrange
-        var listed = ReadNuGetDirectories().ToHashSet(StringComparer.Ordinal);
-        var committed = CommittedLockFileDirectories().ToHashSet(StringComparer.Ordinal);
+        var listed = ReadNuGetDirectories()
+            .ToHashSet(StringComparer.Ordinal);
+        var committed = CommittedLockFileDirectories()
+            .ToHashSet(StringComparer.Ordinal);
 
         // Act
-        var unlisted = committed.Except(listed).Order(StringComparer.Ordinal).ToList();
-        var unlocked = listed.Except(committed).Order(StringComparer.Ordinal).ToList();
+        var unlisted = committed.Except(listed)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        var unlocked = listed.Except(committed)
+            .Order(StringComparer.Ordinal)
+            .ToList();
 
         // Assert
         unlisted.ShouldBeEmpty(

@@ -17,13 +17,20 @@ internal static class McpResultAssertions
     /// <summary>Asserts the tool result has exactly one content block, a text one, and returns its text.</summary>
     internal static string ShouldHaveTextContent(this CallToolResult result)
     {
-        return result.Content.ShouldHaveSingleItem().ShouldBeOfType<TextContentBlock>().Text;
+        return result.Content
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TextContentBlock>()
+            .Text;
     }
 
     /// <summary>Asserts the prompt result has at least one message, text-first, and returns that text.</summary>
     internal static string ShouldHaveTextContent(this GetPromptResult result)
     {
         result.Messages.ShouldNotBeEmpty();
-        return result.Messages[0].Content.ShouldBeOfType<TextContentBlock>().Text;
+
+        return result.Messages[0]
+            .Content
+            .ShouldBeOfType<TextContentBlock>()
+            .Text;
     }
 }

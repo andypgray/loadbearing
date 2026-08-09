@@ -37,13 +37,18 @@ public sealed class FragmentRoundTripTests
 
         // Assert — the member-attribute fact is non-vacuous here: without a member that actually carries one,
         // both dumps would render an empty list and a dropped field would still round-trip equal.
-        direct.Type("N.Handler").Member("M:N.Handler.Handle(N.Msg)").AttributeNames()
+        direct.Type("N.Handler")
+            .Member("M:N.Handler.Handle(N.Msg)")
+            .AttributeNames()
             .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
-        fromCache.Type("N.Handler").Member("M:N.Handler.Handle(N.Msg)").AttributeNames()
+        fromCache.Type("N.Handler")
+            .Member("M:N.Handler.Handle(N.Msg)")
+            .AttributeNames()
             .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
 
         // Total-fact equality: the round-trip is invisible to the merged model.
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     [Fact]
@@ -91,7 +96,8 @@ public sealed class FragmentRoundTripTests
                            private void OnEvt() {}
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+            .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -101,9 +107,11 @@ public sealed class FragmentRoundTripTests
 
         // Assert — the member kinds serialize as names, the edges are present, and the round-trip is invisible.
         json.ShouldContain("\"MemberKind\":\"Event\"");
-        direct.MemberEdges.Select(e => e.Member.SymbolId).ShouldBe(
-            ["E:N.Api.Evt", "F:N.Api.Field", "M:N.Api.Do", "P:N.Api.Prop"]);
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        direct.MemberEdges.Select(e => e.Member.SymbolId)
+            .ShouldBe(
+                ["E:N.Api.Evt", "F:N.Api.Field", "M:N.Api.Do", "P:N.Api.Prop"]);
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     [Fact]
@@ -130,7 +138,8 @@ public sealed class FragmentRoundTripTests
                            private static void H() {}
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+            .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -140,9 +149,11 @@ public sealed class FragmentRoundTripTests
 
         // Assert — the ctor edges are present (explicit+target-typed union to Widget, generic normalized to the
         // open definition, the delegate creation excluded), and the round-trip is invisible to the merged model.
-        direct.ConstructorEdges.Select(e => (e.Source.FullName, e.Constructed.FullName)).ShouldBe(
-            [("M.User", "N.Box<T>"), ("M.User", "N.Widget")]);
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        direct.ConstructorEdges.Select(e => (e.Source.FullName, e.Constructed.FullName))
+            .ShouldBe(
+                [("M.User", "N.Box<T>"), ("M.User", "N.Widget")]);
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     [Fact]
@@ -166,7 +177,8 @@ public sealed class FragmentRoundTripTests
                                                                                        }
                                                                                    }
                                                                                    """));
-        var fragments = new[] { app }.Select(FragmentExtractor.Extract).ToList();
+        var fragments = new[] { app }.Select(FragmentExtractor.Extract)
+            .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -177,11 +189,13 @@ public sealed class FragmentRoundTripTests
         // Assert — the lifetime enum serializes as a name, both fact families are present, and the round-trip
         // is invisible to the merged model.
         json.ShouldContain("\"Lifetime\":\"Singleton\"");
-        direct.InjectionEdges.Select(e => (e.Source.FullName, e.Injected.FullName)).ShouldContain(("N.Svc", "N.IFoo"));
+        direct.InjectionEdges.Select(e => (e.Source.FullName, e.Injected.FullName))
+            .ShouldContain(("N.Svc", "N.IFoo"));
         direct.ServiceRegistrations
             .Any(r => r.Lifetime == Lifetime.Singleton && r.ServiceFullName == "N.IFoo" && r.ImplementationFullName == "N.Foo")
             .ShouldBeTrue();
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     [Fact]
@@ -220,7 +234,8 @@ public sealed class FragmentRoundTripTests
                            }
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+            .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -233,16 +248,29 @@ public sealed class FragmentRoundTripTests
         // line 9 is absent from the unfiltered set; the rethrowing clause at line 10 is unfiltered but not
         // swallowing; only the bare-block clause at line 18 swallows), the bare `catch` at line 11 counts as
         // unfiltered and its `throw new` keeps it out of the swallowing set, and the round-trip is invisible.
-        direct.CatchEdges.Select(e => (e.Source.FullName, e.Caught.FullName)).ShouldBe(
-            [("M.Handler", "N.DomainError"), ("M.Handler", "System.Exception")]);
-        direct.ThrowEdges.Select(e => (e.Source.FullName, e.Thrown.FullName)).ShouldBe(
-            [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
-        direct.CatchEdge("M.Handler", "N.DomainError").Lines().ShouldBe([9, 10, 18]);
-        direct.CatchEdge("M.Handler", "N.DomainError").UnfilteredLines().ShouldBe([10, 18]);
-        direct.CatchEdge("M.Handler", "N.DomainError").SwallowingLines().ShouldBe([18]);
-        direct.CatchEdge("M.Handler", "System.Exception").UnfilteredLines().ShouldBe([11]);
-        direct.CatchEdge("M.Handler", "System.Exception").SwallowingLines().ShouldBeEmpty();
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        direct.CatchEdges.Select(e => (e.Source.FullName, e.Caught.FullName))
+            .ShouldBe(
+                [("M.Handler", "N.DomainError"), ("M.Handler", "System.Exception")]);
+        direct.ThrowEdges.Select(e => (e.Source.FullName, e.Thrown.FullName))
+            .ShouldBe(
+                [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
+        direct.CatchEdge("M.Handler", "N.DomainError")
+            .Lines()
+            .ShouldBe([9, 10, 18]);
+        direct.CatchEdge("M.Handler", "N.DomainError")
+            .UnfilteredLines()
+            .ShouldBe([10, 18]);
+        direct.CatchEdge("M.Handler", "N.DomainError")
+            .SwallowingLines()
+            .ShouldBe([18]);
+        direct.CatchEdge("M.Handler", "System.Exception")
+            .UnfilteredLines()
+            .ShouldBe([11]);
+        direct.CatchEdge("M.Handler", "System.Exception")
+            .SwallowingLines()
+            .ShouldBeEmpty();
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     [Fact]
@@ -274,7 +302,8 @@ public sealed class FragmentRoundTripTests
                            public event N.Notify Ev;
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract).ToList();
+        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+            .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -284,16 +313,18 @@ public sealed class FragmentRoundTripTests
 
         // Assert — every signature position surfaced (the constructed generic split to open definition + argument,
         // the external Task`1 endpoint kept whole), and the round-trip is invisible to the merged model.
-        direct.ExposureEdges.Select(e => (e.Source.FullName, e.Exposed.FullName)).ShouldBe(
-        [
-            ("M.Service", "N.Cog"),
-            ("M.Service", "N.Gadget"),
-            ("M.Service", "N.Notify"),
-            ("M.Service", "N.Sprocket"),
-            ("M.Service", "N.Widget"),
-            ("M.Service", "System.Threading.Tasks.Task<TResult>")
-        ]);
-        ModelDump.Render(fromCache).ShouldBe(ModelDump.Render(direct));
+        direct.ExposureEdges.Select(e => (e.Source.FullName, e.Exposed.FullName))
+            .ShouldBe(
+            [
+                ("M.Service", "N.Cog"),
+                ("M.Service", "N.Gadget"),
+                ("M.Service", "N.Notify"),
+                ("M.Service", "N.Sprocket"),
+                ("M.Service", "N.Widget"),
+                ("M.Service", "System.Threading.Tasks.Task<TResult>")
+            ]);
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
     }
 
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
@@ -343,8 +374,10 @@ public sealed class FragmentRoundTripTests
                                                             namespace P;
                                                             public class Widget {}
                                                             """);
-        var legacy = new CompilationInput(CompilationFactory.Compile("P", shared).Compilation, "P", ["Legacy"]);
-        var modern = new CompilationInput(CompilationFactory.Compile("P", shared).Compilation, "P", ["Modern"]);
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
+            .Compilation, "P", ["Legacy"]);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", shared)
+            .Compilation, "P", ["Modern"]);
 
         return new[] { lib, app, legacy, modern }
             .Select(FragmentExtractor.Extract)

@@ -42,11 +42,14 @@ public sealed class ShapeVerbTests
     {
         RuleResult result = Checker.Run(Naming, arch =>
                 arch.Rule("naming/interfaces")
-                    .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("App.Naming.*").MustHavePrefix("I"))
+                    .Enforce(arch.Types.OfKind(TypeKind.Interface)
+                        .InNamespace("App.Naming.*")
+                        .MustHavePrefix("I"))
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects().ShouldBe(["App.Naming.Bar"]);
+        result.ShapeSubjects()
+            .ShouldBe(["App.Naming.Bar"]);
     }
 
     [Fact]
@@ -54,11 +57,13 @@ public sealed class ShapeVerbTests
     {
         RuleResult result = Checker.Run(Naming, arch =>
                 arch.Rule("naming/handlers")
-                    .Enforce(arch.Types.WithPrefix("Order").MustHaveSuffix("Handler"))
+                    .Enforce(arch.Types.WithPrefix("Order")
+                        .MustHaveSuffix("Handler"))
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects().ShouldBe(["App.Naming.OrderController"]);
+        result.ShapeSubjects()
+            .ShouldBe(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -66,9 +71,11 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Naming, arch =>
                 arch.Rule("naming/repo")
-                    .Enforce(arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
+                    .Enforce(arch.Types.WithNameMatching("*Repo*")
+                        .MustHaveNameMatching("*Repository"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -81,11 +88,13 @@ public sealed class ShapeVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("layout/x")
-                    .Enforce(arch.Types.WithPrefix("Widget").MustResideInNamespace("App.Good.*"))
+                    .Enforce(arch.Types.WithPrefix("Widget")
+                        .MustResideInNamespace("App.Good.*"))
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects().ShouldBe(["App.Bad.Widget2"]);
+        result.ShapeSubjects()
+            .ShouldBe(["App.Bad.Widget2"]);
     }
 
     [Fact]
@@ -93,15 +102,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Naming, arch =>
                 arch.Rule("style/short")
-                    .Enforce(arch.Types.WithPrefix("X").Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
+                    .Enforce(arch.Types.WithPrefix("X")
+                        .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Naming, arch =>
                 arch.Rule("style/short")
-                    .Enforce(arch.Types.WithPrefix("OrderC").Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
+                    .Enforce(arch.Types.WithPrefix("OrderC")
+                        .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Naming.OrderController"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -110,11 +124,14 @@ public sealed class ShapeVerbTests
         // Subjects = Order* except *Handler = {OrderController}; it fails the Handler suffix.
         RuleResult result = Checker.Run(Naming, arch =>
                 arch.Rule("naming/x")
-                    .Enforce(arch.Types.WithPrefix("Order").Except(arch.Types.WithSuffix("Handler")).MustHaveSuffix("Handler"))
+                    .Enforce(arch.Types.WithPrefix("Order")
+                        .Except(arch.Types.WithSuffix("Handler"))
+                        .MustHaveSuffix("Handler"))
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects().ShouldBe(["App.Naming.OrderController"]);
+        result.ShapeSubjects()
+            .ShouldBe(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -127,7 +144,8 @@ public sealed class ShapeVerbTests
                         .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal), "whose name ends with Handler")
                         .MustHaveSuffix("Handler"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -136,9 +154,11 @@ public sealed class ShapeVerbTests
         // CompilationFactory compiles into project "TestProject"; a non-empty pass proves the noun resolved.
         Checker.Run(Naming, arch =>
                 arch.Rule("proj/x")
-                    .Enforce(arch.Project("TestProject").MustHaveNameMatching("*"))
+                    .Enforce(arch.Project("TestProject")
+                        .MustHaveNameMatching("*"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -146,15 +166,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Sealed").MustBeSealed())
+                    .Enforce(arch.Types.WithPrefix("Sealed")
+                        .MustBeSealed())
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Open").MustBeSealed())
+                    .Enforce(arch.Types.WithPrefix("Open")
+                        .MustBeSealed())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.OpenThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.OpenThing"]);
     }
 
     [Fact]
@@ -162,15 +187,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/static")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeStatic())
+                    .Enforce(arch.Types.WithPrefix("Static")
+                        .MustBeStatic())
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/static")
-                    .Enforce(arch.Types.WithPrefix("Open").MustBeStatic())
+                    .Enforce(arch.Types.WithPrefix("Open")
+                        .MustBeStatic())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.OpenThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.OpenThing"]);
     }
 
     [Fact]
@@ -178,15 +208,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Abstract").MustBeAbstract())
+                    .Enforce(arch.Types.WithPrefix("Abstract")
+                        .MustBeAbstract())
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Sealed").MustBeAbstract())
+                    .Enforce(arch.Types.WithPrefix("Sealed")
+                        .MustBeAbstract())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.SealedThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.SealedThing"]);
     }
 
     [Fact]
@@ -194,15 +229,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/public")
-                    .Enforce(arch.Types.WithPrefix("Public").MustBePublic())
+                    .Enforce(arch.Types.WithPrefix("Public")
+                        .MustBePublic())
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/public")
-                    .Enforce(arch.Types.WithPrefix("Internal").MustBePublic())
+                    .Enforce(arch.Types.WithPrefix("Internal")
+                        .MustBePublic())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.InternalThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.InternalThing"]);
     }
 
     [Fact]
@@ -210,15 +250,20 @@ public sealed class ShapeVerbTests
     {
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/internal")
-                    .Enforce(arch.Types.WithPrefix("Internal").MustBeInternal())
+                    .Enforce(arch.Types.WithPrefix("Internal")
+                        .MustBeInternal())
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/internal")
-                    .Enforce(arch.Types.WithPrefix("Public").MustBeInternal())
+                    .Enforce(arch.Types.WithPrefix("Public")
+                        .MustBeInternal())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.PublicThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.PublicThing"]);
     }
 
     [Fact]
@@ -228,15 +273,21 @@ public sealed class ShapeVerbTests
         // MustBeAbstract (it is neither in C# declaration semantics).
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeSealed())
+                    .Enforce(arch.Types.WithPrefix("Static")
+                        .MustBeSealed())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.StaticThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.StaticThing"]);
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeAbstract())
+                    .Enforce(arch.Types.WithPrefix("Static")
+                        .MustBeAbstract())
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Shape.StaticThing"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Shape.StaticThing"]);
     }
 
     [Fact]
@@ -252,9 +303,12 @@ public sealed class ShapeVerbTests
 
         Checker.Run(source, arch =>
                 arch.Rule("events/records")
-                    .Enforce(arch.Types.InNamespace("App.Events.*").Must(t => t.IsRecord, "be a record"))
+                    .Enforce(arch.Types.InNamespace("App.Events.*")
+                        .Must(t => t.IsRecord, "be a record"))
                     .Because("b"))
-            .Single().ShapeSubjects().ShouldBe(["App.Events.OrderHandler"]);
+            .Single()
+            .ShapeSubjects()
+            .ShouldBe(["App.Events.OrderHandler"]);
     }
 
     [Fact]
@@ -275,7 +329,8 @@ public sealed class ShapeVerbTests
                             "declared in `Special.cs`")
                         .MustHaveSuffix("Thing"))
                     .Because("b"))
-            .Single().ShouldHavePassed();
+            .Single()
+            .ShouldHavePassed();
     }
 
     [Fact]
@@ -285,7 +340,8 @@ public sealed class ShapeVerbTests
         // the detail names the `Where` hatch and echoes the thrown exception (SelectionEvaluator.InvokePredicate).
         RuleResult result = Checker.Run(Sources.Layered, arch =>
                 arch.Rule("throwing/x")
-                    .Enforce(arch.Types.Where(_ => throw new Exception("boom"), "d").MustHavePrefix("I"))
+                    .Enforce(arch.Types.Where(_ => throw new Exception("boom"), "d")
+                        .MustHavePrefix("I"))
                     .Because("b"))
             .Single();
 

@@ -55,8 +55,11 @@ public sealed class TopLevelProgramExtractionTests
     public void TopLevelStatements_ReferenceFromTopLevelCode_MintsAnEdgeFromProgram()
     {
         // `Worker.Start();` is a top-level statement, so the edge is attributed to the synthesized Program.
-        Model.HasEdge("Program", "N.Worker").ShouldBeTrue();
-        Model.Edge("Program", "N.Worker").Lines().ShouldBe([3]);
+        Model.HasEdge("Program", "N.Worker")
+            .ShouldBeTrue();
+        Model.Edge("Program", "N.Worker")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -64,8 +67,10 @@ public sealed class TopLevelProgramExtractionTests
     {
         // Gadget.Spin() is called from Worker.Start(), not from top-level code: the edge is Worker's, and
         // Program must NOT pick it up even though Worker is declared in Program's own compilation unit.
-        Model.HasEdge("N.Worker", "N.Gadget").ShouldBeTrue();
-        Model.HasEdge("Program", "N.Gadget").ShouldBeFalse();
+        Model.HasEdge("N.Worker", "N.Gadget")
+            .ShouldBeTrue();
+        Model.HasEdge("Program", "N.Gadget")
+            .ShouldBeFalse();
     }
 
     [Fact]

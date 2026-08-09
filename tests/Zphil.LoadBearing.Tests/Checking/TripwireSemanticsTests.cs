@@ -43,7 +43,8 @@ public sealed class TripwireSemanticsTests
 
     private static RuleResult Tripwire(DiffContext? diff)
     {
-        return Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope).ForRule("legacy/quarantined/tripwire");
+        return Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope)
+            .ForRule("legacy/quarantined/tripwire");
     }
 
     [Fact]
@@ -86,7 +87,8 @@ public sealed class TripwireSemanticsTests
         // the warning uses the codebase path.
         RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"App.Legacy\Alpha.cs"]));
 
-        tripwire.Warnings.Single().Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+        tripwire.Warnings.Single()
+            .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
     }
 
     [Fact]
@@ -96,7 +98,8 @@ public sealed class TripwireSemanticsTests
         Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
         RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"app.legacy\ALPHA.cs"]));
 
-        tripwire.Warnings.Single().Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+        tripwire.Warnings.Single()
+            .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
     }
 
     [Fact]
@@ -115,10 +118,11 @@ public sealed class TripwireSemanticsTests
         // Diff lists Beta before Alpha; the tripwire re-orders ordinal.
         RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", ["App.Legacy/Beta.cs", "App.Legacy/Alpha.cs"]));
 
-        tripwire.Warnings.Select(w => w.Message).ShouldBe(
-        [
-            ExpectedWarning("App.Legacy/Alpha.cs"),
-            ExpectedWarning("App.Legacy/Beta.cs")
-        ]);
+        tripwire.Warnings.Select(w => w.Message)
+            .ShouldBe(
+            [
+                ExpectedWarning("App.Legacy/Alpha.cs"),
+                ExpectedWarning("App.Legacy/Beta.cs")
+            ]);
     }
 }

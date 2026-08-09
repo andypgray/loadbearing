@@ -40,7 +40,8 @@ public class DotNetGuidanceTests
         // A la carte is the whole point: calling one method lands one rule, and nothing else rides along.
         ArchitectureModel model = Checker.Model(arch => DeclareOne(arch, id, PackPosture.Enforce));
 
-        model.Rules.Select(rule => rule.Id).ShouldBe([id]);
+        model.Rules.Select(rule => rule.Id)
+            .ShouldBe([id]);
     }
 
     [Fact]
@@ -48,7 +49,8 @@ public class DotNetGuidanceTests
     {
         ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Enforce));
 
-        model.Rules.Select(rule => rule.Id).ShouldBe(CanonicalOrder);
+        model.Rules.Select(rule => rule.Id)
+            .ShouldBe(CanonicalOrder);
     }
 
     [Fact]
@@ -103,12 +105,16 @@ public class DotNetGuidanceTests
             DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
                 PackPosture.Enforce, overridden));
 
-        overrode.Rules.Single().Fix.ShouldBe(overridden);
-        defaulted.Rules.Single().Fix.ShouldNotBe(overridden);
+        overrode.Rules.Single()
+            .Fix.ShouldBe(overridden);
+        defaulted.Rules.Single()
+            .Fix.ShouldNotBe(overridden);
 
         // A repeated Fix is a spec-build error (a rule carries at most one), so the model building at
         // all is the proof that the override replaced the default rather than being appended to it.
-        overrode.Rules.Single().Because.ShouldBe(defaulted.Rules.Single().Because);
+        overrode.Rules.Single()
+            .Because.ShouldBe(defaulted.Rules.Single()
+                .Because);
     }
 
     [Fact]
@@ -118,13 +124,19 @@ public class DotNetGuidanceTests
         ArchitectureModel migrated = Checker.Model(arch =>
             DeclareOne(arch, "naming/async-suffix", PackPosture.Migrate("Task-returning methods here are bare-named.")));
 
-        enforced.Rules.Single().Posture.ShouldBe(Posture.Enforce);
-        migrated.Rules.Single().Posture.ShouldBe(Posture.Migrate);
+        enforced.Rules.Single()
+            .Posture.ShouldBe(Posture.Enforce);
+        migrated.Rules.Single()
+            .Posture.ShouldBe(Posture.Migrate);
 
         // Posture belongs to the consumer; the reason the rule exists belongs to the pack, so the same
         // Because rides both.
-        migrated.Rules.Single().Because.ShouldBe(enforced.Rules.Single().Because);
-        migrated.Rules.Single().Sentence.ShouldBe(enforced.Rules.Single().Sentence);
+        migrated.Rules.Single()
+            .Because.ShouldBe(enforced.Rules.Single()
+                .Because);
+        migrated.Rules.Single()
+            .Sentence.ShouldBe(enforced.Rules.Single()
+                .Sentence);
     }
 
     [Fact]

@@ -49,7 +49,8 @@ public sealed class CoercedToolSchemaTests
     {
         JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
-        property["type"]!.GetValue<string>().ShouldBe("string");
+        property["type"]!.GetValue<string>()
+            .ShouldBe("string");
     }
 
     [Theory]
@@ -62,10 +63,14 @@ public sealed class CoercedToolSchemaTests
     {
         JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
-        property["type"]!.GetValue<string>().ShouldBe("array");
-        property["items"]!["type"]!.GetValue<string>().ShouldBe("string");
+        property["type"]!.GetValue<string>()
+            .ShouldBe("array");
+        property["items"]!["type"]!.GetValue<string>()
+            .ShouldBe("string");
         // No enum constraint: any string is a legal element.
-        property["items"]!.AsObject().ContainsKey("enum").ShouldBeFalse();
+        property["items"]!.AsObject()
+            .ContainsKey("enum")
+            .ShouldBeFalse();
     }
 
     // The value list is the whole point: the converter hides the enum from the exporter, so without
@@ -82,8 +87,10 @@ public sealed class CoercedToolSchemaTests
     {
         JsonObject property = ShouldHaveSchemaPropertyFor(methodName, parameterName);
 
-        property["type"]!.GetValue<string>().ShouldBe("string");
-        EnumNamesOf(property).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
+        property["type"]!.GetValue<string>()
+            .ShouldBe("string");
+        EnumNamesOf(property)
+            .ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
     }
 
     [Fact]
@@ -91,9 +98,12 @@ public sealed class CoercedToolSchemaTests
     {
         JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithEnumArray), "severities");
 
-        property["type"]!.GetValue<string>().ShouldBe("array");
-        property["items"]!["type"]!.GetValue<string>().ShouldBe("string");
-        EnumNamesOf(property["items"]!.AsObject()).ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
+        property["type"]!.GetValue<string>()
+            .ShouldBe("array");
+        property["items"]!["type"]!.GetValue<string>()
+            .ShouldBe("string");
+        EnumNamesOf(property["items"]!.AsObject())
+            .ShouldBe(["Hint", "Suggestion", "Warning", "Error"]);
     }
 
     [Fact]
@@ -104,7 +114,8 @@ public sealed class CoercedToolSchemaTests
         // arch_graph's overview and allowWorkspaceDiagnostics are both bool.
         JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithBool), "flag");
 
-        property["type"]!.GetValue<string>().ShouldBe("boolean");
+        property["type"]!.GetValue<string>()
+            .ShouldBe("boolean");
     }
 
     [Fact]
@@ -114,7 +125,8 @@ public sealed class CoercedToolSchemaTests
         // parameter's guidance from tools/list.
         JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithScalarString), "required");
 
-        property["description"]!.GetValue<string>().ShouldBe("A described parameter.");
+        property["description"]!.GetValue<string>()
+            .ShouldBe("A described parameter.");
     }
 
     [Theory]
@@ -129,7 +141,8 @@ public sealed class CoercedToolSchemaTests
         // schema rather than the `{}` the described parameters land as.
         JsonNode property = SchemaNodeFor(methodName, parameterName, repairErasures: false);
 
-        property.GetValueKind().ShouldBe(JsonValueKind.True);
+        property.GetValueKind()
+            .ShouldBe(JsonValueKind.True);
     }
 
     [Fact]
@@ -139,7 +152,8 @@ public sealed class CoercedToolSchemaTests
         // is handed back byte-identical rather than widened into an equivalent-but-different `{}`.
         JsonNode property = SchemaNodeFor(nameof(Probe.WithUndescribedObject), "payload");
 
-        property.GetValueKind().ShouldBe(JsonValueKind.True);
+        property.GetValueKind()
+            .ShouldBe(JsonValueKind.True);
     }
 
     [Fact]
@@ -149,7 +163,8 @@ public sealed class CoercedToolSchemaTests
         // "nothing allowed" into "anything of this type allowed", the one direction this hook must never
         // move. Asserted against the helper directly because no exporter path reaches the hook with
         // `false`, so there is no probe parameter that could provoke it.
-        CoercingToolRegistration.ErasureTarget(JsonValue.Create(false)).ShouldBeNull();
+        CoercingToolRegistration.ErasureTarget(JsonValue.Create(false))
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -163,7 +178,8 @@ public sealed class CoercedToolSchemaTests
         foreach (McpServerTool tool in LiveArchTools())
         {
             JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
-            JsonObject properties = schema["properties"]?.AsObject() ?? [];
+            JsonObject properties = schema["properties"]
+                ?.AsObject() ?? [];
 
             foreach ((string parameterName, JsonNode? property) in properties)
             {
@@ -204,7 +220,9 @@ public sealed class CoercedToolSchemaTests
 
     private static string[] EnumNamesOf(JsonObject property)
     {
-        return property["enum"]!.AsArray().Select(node => node!.GetValue<string>()).ToArray();
+        return property["enum"]!.AsArray()
+            .Select(node => node!.GetValue<string>())
+            .ToArray();
     }
 
     /// <summary>

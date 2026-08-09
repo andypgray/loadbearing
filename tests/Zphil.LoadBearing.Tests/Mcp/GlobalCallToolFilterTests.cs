@@ -41,7 +41,8 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — surfaced as an error result with the exact message, and the filter stayed silent.
         result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent().ShouldStartWith("Unknown rule ID 'nope/nope'.");
+        result.ShouldHaveTextContent()
+            .ShouldStartWith("Unknown rule ID 'nope/nope'.");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 
@@ -85,7 +86,8 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — a successful result, truncated, unlogged.
         result.IsError.ShouldNotBe(true);
-        result.ShouldHaveTextContent().ShouldContain("--- RESPONSE TRUNCATED ---");
+        result.ShouldHaveTextContent()
+            .ShouldContain("--- RESPONSE TRUNCATED ---");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 
@@ -132,7 +134,9 @@ public sealed class GlobalCallToolFilterTests
         string text = result.ShouldHaveTextContent();
         text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
         using JsonDocument document = JsonDocument.Parse(text);
-        document.RootElement.GetProperty("grain").GetString().ShouldBe("skeleton");
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("skeleton");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 

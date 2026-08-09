@@ -22,8 +22,10 @@ public sealed class CliErrorMapperTests
         var validation = Should.Throw<SpecValidationException>(() =>
             ArchModelBuilder.Build(new InlineSpec(arch =>
             {
-                arch.Rule("area/one").Enforce(arch.Types.MustHavePrefix("X"));
-                arch.Rule("area/two").Enforce(arch.Types.MustHaveSuffix("Y"));
+                arch.Rule("area/one")
+                    .Enforce(arch.Types.MustHavePrefix("X"));
+                arch.Rule("area/two")
+                    .Enforce(arch.Types.MustHaveSuffix("Y"));
             })));
 
         var error = new StringWriter();
@@ -44,13 +46,16 @@ public sealed class CliErrorMapperTests
         int exit = CliErrorMapper.Write(new UserErrorException("no spec project found"), error);
 
         exit.ShouldBe(2);
-        error.ToString().Trim().ShouldBe("no spec project found");
+        error.ToString()
+            .Trim()
+            .ShouldBe("no spec project found");
     }
 
     [Fact]
     public void UserFacingMessage_UnexpectedError_ReturnsNull()
     {
-        CliErrorMapper.UserFacingMessage(new InvalidCastException("bug")).ShouldBeNull();
+        CliErrorMapper.UserFacingMessage(new InvalidCastException("bug"))
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -83,7 +88,10 @@ public sealed class CliErrorMapperTests
 
         CliErrorMapper.Write(exception, error);
 
-        error.ToString().NormalizedLines().TrimEnd('\n').ShouldBe(CliErrorMapper.UserFacingMessage(exception));
+        error.ToString()
+            .NormalizedLines()
+            .TrimEnd('\n')
+            .ShouldBe(CliErrorMapper.UserFacingMessage(exception));
     }
 
     [Fact]
@@ -92,13 +100,18 @@ public sealed class CliErrorMapperTests
         var validation = Should.Throw<SpecValidationException>(() =>
             ArchModelBuilder.Build(new InlineSpec(arch =>
             {
-                arch.Rule("area/one").Enforce(arch.Types.MustHavePrefix("X"));
-                arch.Rule("area/two").Enforce(arch.Types.MustHaveSuffix("Y"));
+                arch.Rule("area/one")
+                    .Enforce(arch.Types.MustHavePrefix("X"));
+                arch.Rule("area/two")
+                    .Enforce(arch.Types.MustHaveSuffix("Y"));
             })));
         var error = new StringWriter();
 
         CliErrorMapper.Write(validation, error);
 
-        error.ToString().NormalizedLines().TrimEnd('\n').ShouldBe(CliErrorMapper.UserFacingMessage(validation));
+        error.ToString()
+            .NormalizedLines()
+            .TrimEnd('\n')
+            .ShouldBe(CliErrorMapper.UserFacingMessage(validation));
     }
 }

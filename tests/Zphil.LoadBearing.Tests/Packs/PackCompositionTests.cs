@@ -19,8 +19,10 @@ public class PackCompositionTests
         ArchitectureModel packFirst = ArchModelBuilder.Build(new PackCallSpec(), new LocalDistinctSpec());
         ArchitectureModel localFirst = ArchModelBuilder.Build(new LocalDistinctSpec(), new PackCallSpec());
 
-        packFirst.Rules.Select(rule => rule.Id).ShouldBe(["di/no-buildserviceprovider", "sample/local-only"]);
-        localFirst.Rules.Select(rule => rule.Id).ShouldBe(["sample/local-only", "di/no-buildserviceprovider"]);
+        packFirst.Rules.Select(rule => rule.Id)
+            .ShouldBe(["di/no-buildserviceprovider", "sample/local-only"]);
+        localFirst.Rules.Select(rule => rule.Id)
+            .ShouldBe(["sample/local-only", "di/no-buildserviceprovider"]);
     }
 
     [Fact]

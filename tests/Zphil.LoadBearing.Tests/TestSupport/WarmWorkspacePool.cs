@@ -104,7 +104,8 @@ internal static class WarmWorkspacePool
         Gate.Wait();
         try
         {
-            var doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison)).ToList();
+            var doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
+                .ToList();
             foreach (Entry entry in doomed)
             {
                 Live.Remove(entry);
@@ -162,7 +163,10 @@ internal static class WarmWorkspacePool
     // session's own DisposeAsync is already bounded, so there is nothing here to deadlock against.
     private static void Dispose(Entry entry)
     {
-        entry.Session.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        entry.Session.DisposeAsync()
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
     }
 
     private sealed record Entry(string Key, WorkspaceSession Session);

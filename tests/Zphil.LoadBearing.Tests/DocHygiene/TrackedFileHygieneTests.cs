@@ -119,7 +119,8 @@ public sealed class TrackedFileHygieneTests
     public void TrackedPaths_NeedNoQuoting()
     {
         // Act
-        var quoted = TrackedFiles.All.Where(static path => !PlainPath.IsMatch(path)).ToList();
+        var quoted = TrackedFiles.All.Where(static path => !PlainPath.IsMatch(path))
+            .ToList();
 
         // Assert: the inventory is read from line-oriented output, so a path git would quote or one
         // holding a newline would come back mangled. Pinning the character set means the day such a

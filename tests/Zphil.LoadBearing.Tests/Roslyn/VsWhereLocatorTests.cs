@@ -36,10 +36,14 @@ public sealed class VsWhereLocatorTests
         var instances = VsWhereLocator.ParseInstances(json);
 
         instances.Count.ShouldBe(2);
-        instances[0].InstallationPath.ShouldBe(@"C:\Program Files\Microsoft Visual Studio\2022\Community");
-        instances[0].Version.ShouldBe(new Version(17, 14, 36915, 13));
-        instances[0].Name.ShouldBe("Visual Studio Community 2022");
-        instances[1].Version.ShouldBe(new Version(18, 4, 11605, 240));
+        instances[0]
+            .InstallationPath.ShouldBe(@"C:\Program Files\Microsoft Visual Studio\2022\Community");
+        instances[0]
+            .Version.ShouldBe(new Version(17, 14, 36915, 13));
+        instances[0]
+            .Name.ShouldBe("Visual Studio Community 2022");
+        instances[1]
+            .Version.ShouldBe(new Version(18, 4, 11605, 240));
     }
 
     [Theory]
@@ -48,7 +52,8 @@ public sealed class VsWhereLocatorTests
     [InlineData("{}")]
     public void ParseInstances_EmptyOrNonArray_ReturnsEmpty(string json)
     {
-        VsWhereLocator.ParseInstances(json).ShouldBeEmpty();
+        VsWhereLocator.ParseInstances(json)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -67,7 +72,8 @@ public sealed class VsWhereLocatorTests
         var instances = VsWhereLocator.ParseInstances(json);
 
         instances.Count.ShouldBe(1);
-        instances[0].InstallationPath.ShouldBe(@"C:\VS\Good");
+        instances[0]
+            .InstallationPath.ShouldBe(@"C:\VS\Good");
     }
 
     [Fact]
@@ -82,7 +88,8 @@ public sealed class VsWhereLocatorTests
                             ]
                             """;
 
-        VsWhereLocator.ParseInstances(json).ShouldBeEmpty();
+        VsWhereLocator.ParseInstances(json)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -99,6 +106,7 @@ public sealed class VsWhereLocatorTests
 
         var instances = VsWhereLocator.ParseInstances(json);
 
-        instances[0].Name.ShouldBe("Visual Studio");
+        instances[0]
+            .Name.ShouldBe("Visual Studio");
     }
 }

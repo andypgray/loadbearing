@@ -89,7 +89,8 @@ internal static class CliRunner
     {
         string? value = typeof(CliRunner).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(a => a.Key == key)?.Value;
+            .SingleOrDefault(a => a.Key == key)
+            ?.Value;
 
         if (string.IsNullOrEmpty(value)) throw new InvalidOperationException($"Assembly metadata '{key}' was not baked in by the build.");
 

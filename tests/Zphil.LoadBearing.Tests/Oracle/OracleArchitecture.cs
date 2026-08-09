@@ -37,12 +37,14 @@ public sealed class OracleArchitecture
         Web = Assembly.LoadFrom(webPath);
         Billing = Assembly.LoadFrom(billingPath);
 
-        Architecture = new ArchLoader().LoadAssemblies(Domain, Web, Billing).Build();
+        Architecture = new ArchLoader().LoadAssemblies(Domain, Web, Billing)
+            .Build();
 
         // Architecture.Types is declared-only (the referenced/System stubs live in ReferencedTypes),
         // so with only the three MyApp assemblies loaded this is exactly the solution-declared universe.
         MyAppTypes = Architecture.Types.ToList();
-        _declaredNames = MyAppTypes.Select(t => t.FullName).ToHashSet(StringComparer.Ordinal);
+        _declaredNames = MyAppTypes.Select(t => t.FullName)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>The architecture built from the three MyApp DLLs' IL.</summary>
@@ -67,7 +69,9 @@ public sealed class OracleArchitecture
     /// </summary>
     public IObjectProvider<IType> DeclaredTypes()
     {
-        return ArchRuleDefinition.Types().That().ResideInAssembly(Domain, Web, Billing);
+        return ArchRuleDefinition.Types()
+            .That()
+            .ResideInAssembly(Domain, Web, Billing);
     }
 
     /// <summary>
@@ -105,7 +109,8 @@ public sealed class OracleArchitecture
     public IReadOnlySet<string> TypesReadingAmbientClock()
     {
         return MyAppTypes
-            .Where(type => type.Dependencies.OfType<MethodCallDependency>().Any(IsClockGetterCall))
+            .Where(type => type.Dependencies.OfType<MethodCallDependency>()
+                .Any(IsClockGetterCall))
             .Select(type => type.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
@@ -137,7 +142,8 @@ public sealed class OracleArchitecture
     {
         return MyAppTypes
             .Where(type => type.FullName.StartsWith("MyApp.Web.", StringComparison.Ordinal))
-            .Where(type => type.GetMethodMembers().Any(IsUnsuffixedTaskReturningMethod))
+            .Where(type => type.GetMethodMembers()
+                .Any(IsUnsuffixedTaskReturningMethod))
             .Select(type => type.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
@@ -148,7 +154,8 @@ public sealed class OracleArchitecture
     {
         return method.MethodForm == MethodForm.Normal
                && method.ReturnType.FullName.StartsWith("System.Threading.Tasks.Task", StringComparison.Ordinal)
-               && !BareName(method).EndsWith("Async", StringComparison.Ordinal);
+               && !BareName(method)
+                   .EndsWith("Async", StringComparison.Ordinal);
     }
 
     // The bare method name: 0.13.3's MethodMember.Name is parens-inclusive ("Save()"), so drop the signature.
@@ -179,10 +186,12 @@ public sealed class OracleArchitecture
     {
         string? path = typeof(OracleArchitecture).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(attribute => attribute.Key == key)?.Value;
+            .SingleOrDefault(attribute => attribute.Key == key)
+            ?.Value;
 
         path.ShouldNotBeNullOrEmpty();
-        File.Exists(path).ShouldBeTrue($"MyApp fixture DLL for '{key}' should exist at the baked path '{path}'.");
+        File.Exists(path)
+            .ShouldBeTrue($"MyApp fixture DLL for '{key}' should exist at the baked path '{path}'.");
         return path;
     }
 }

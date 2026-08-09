@@ -72,8 +72,10 @@ public sealed class BinlogCliE2ETests : IDisposable
         replay.Exit.ShouldBe(cold.Exit);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
         replay.LoaderDelta.ShouldBe(0);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, replayCache)).ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureBinlogPath(Sln, replayCache)).ShouldBeTrue();
+        File.Exists(CacheLocations.CaptureManifestPath(Sln, replayCache))
+            .ShouldBeTrue();
+        File.Exists(CacheLocations.CaptureBinlogPath(Sln, replayCache))
+            .ShouldBeTrue();
 
         // (c) rerun WITHOUT --binlog on the same cache: (b) wrote fragments, so this is a fragment-cache hit —
         //     no workspace acquired at all, and the gate still decided the capture is usable. Byte-identical.
@@ -109,7 +111,8 @@ public sealed class BinlogCliE2ETests : IDisposable
         {
             // A harmless XML comment: a structural content change that invalidates the capture (stale) and the
             // fragment cache (a structural miss), without changing the extracted model — so stdout is unmoved.
-            string edited = File.ReadAllText(csproj).Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
+            string edited = File.ReadAllText(csproj)
+                .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
             File.WriteAllText(csproj, edited);
 
             // Baseline: a plain cold run over the edited tree with no capture (fresh cache) — one build, silent.
@@ -144,15 +147,19 @@ public sealed class BinlogCliE2ETests : IDisposable
         try
         {
             // Bump a csproj past the binlog with no content change: ingest must refuse the now-stale build.
-            File.SetLastWriteTimeUtc(csproj, File.GetLastWriteTimeUtc(Binlog).AddHours(1));
+            File.SetLastWriteTimeUtc(csproj, File.GetLastWriteTimeUtc(Binlog)
+                .AddHours(1));
 
             GateRun run = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
 
             run.Exit.ShouldBe(2);
-            run.Err.Trim().ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
+            run.Err.Trim()
+                .ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
             // The refusal fired before persistence: nothing was written.
-            File.Exists(CacheLocations.CaptureManifestPath(Sln, cache)).ShouldBeFalse();
-            File.Exists(CacheLocations.CaptureBinlogPath(Sln, cache)).ShouldBeFalse();
+            File.Exists(CacheLocations.CaptureManifestPath(Sln, cache))
+                .ShouldBeFalse();
+            File.Exists(CacheLocations.CaptureBinlogPath(Sln, cache))
+                .ShouldBeFalse();
         }
         finally
         {
@@ -166,7 +173,8 @@ public sealed class BinlogCliE2ETests : IDisposable
         GateRun run = await RunAsync(FreshCache(), "check", Sln, "--binlog", "nope.binlog", "--spec", CleanSpec);
 
         run.Exit.ShouldBe(2);
-        run.Err.Trim().ShouldBe(BinlogReplayMessages.MissingFileMessage("nope.binlog"));
+        run.Err.Trim()
+            .ShouldBe(BinlogReplayMessages.MissingFileMessage("nope.binlog"));
     }
 
     [Fact]
@@ -197,7 +205,8 @@ public sealed class BinlogCliE2ETests : IDisposable
         cold.Gate.ShouldBe(GateAcquisition.Cold);
         cold.Err.ShouldNotContain("build capture"); // no capture notice on the --no-cache path
         (await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache))).ShouldBe(captureBefore);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, seededCache)).ShouldBeTrue();
+        File.Exists(CacheLocations.CaptureManifestPath(Sln, seededCache))
+            .ShouldBeTrue();
 
         // An explicit --binlog under --no-cache still replays for this run (an input, not persisted state) —
         // byte-identical to the cold run above, no design-time build, and it writes nothing anywhere.
@@ -208,9 +217,12 @@ public sealed class BinlogCliE2ETests : IDisposable
         replay.Exit.ShouldBe(cold.Exit);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
         replay.LoaderDelta.ShouldBe(0);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, freshCache)).ShouldBeFalse();
-        File.Exists(CacheLocations.CaptureBinlogPath(Sln, freshCache)).ShouldBeFalse();
-        File.Exists(CacheLocations.CacheFilePath(Sln, freshCache)).ShouldBeFalse();
+        File.Exists(CacheLocations.CaptureManifestPath(Sln, freshCache))
+            .ShouldBeFalse();
+        File.Exists(CacheLocations.CaptureBinlogPath(Sln, freshCache))
+            .ShouldBeFalse();
+        File.Exists(CacheLocations.CacheFilePath(Sln, freshCache))
+            .ShouldBeFalse();
     }
 
     // ── (6) graph parity ─────────────────────────────────────────────────────────────────────────────────
@@ -269,8 +281,10 @@ public sealed class BinlogCliE2ETests : IDisposable
         foreach (string commandName in new[] { "check", "status", "graph" })
         {
             Command command = root.Subcommands.First(c => c.Name == commandName);
-            command.Options.First(o => o.Name == "--binlog").Description.ShouldBe(binlogHelp);
-            command.Options.First(o => o.Name == "--no-cache").Description.ShouldBe(noCacheHelp);
+            command.Options.First(o => o.Name == "--binlog")
+                .Description.ShouldBe(binlogHelp);
+            command.Options.First(o => o.Name == "--no-cache")
+                .Description.ShouldBe(noCacheHelp);
         }
     }
 

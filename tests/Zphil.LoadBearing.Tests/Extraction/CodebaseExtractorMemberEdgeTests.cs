@@ -44,10 +44,12 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // The read and the write fold to the SAME property symbol — one P: edge, never M:get_P/M:set_P.
-        model.MemberEdges("N.User").Count.ShouldBe(1);
+        model.MemberEdges("N.User")
+            .Count.ShouldBe(1);
         MemberEdge edge = model.MemberEdge("N.User", "P:N.Model.P");
         edge.Member.Kind.ShouldBe(MemberKind.Property);
-        edge.Lines().ShouldBe([7, 8]);
+        edge.Lines()
+            .ShouldBe([7, 8]);
     }
 
     [Fact]
@@ -59,7 +61,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          public class D { public void Go(C c) { c.P += 1; } }
                                                          """);
 
-        model.MemberEdge("N.D", "P:N.C.P").Member.Kind.ShouldBe(MemberKind.Property);
+        model.MemberEdge("N.D", "P:N.C.P")
+            .Member.Kind.ShouldBe(MemberKind.Property);
     }
 
     [Fact]
@@ -71,7 +74,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          public class D { public string Go(C c) => c?.P; }
                                                          """);
 
-        model.MemberEdge("N.D", "P:N.C.P").Member.Kind.ShouldBe(MemberKind.Property);
+        model.MemberEdge("N.D", "P:N.C.P")
+            .Member.Kind.ShouldBe(MemberKind.Property);
     }
 
     [Fact]
@@ -84,9 +88,12 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // The §4.3 per-overload identity substrate: two distinct M: ids, one per resolved overload.
-        model.MemberEdges("N.Cli").Select(e => e.Member.SymbolId).OrderBy(id => id, StringComparer.Ordinal)
+        model.MemberEdges("N.Cli")
+            .Select(e => e.Member.SymbolId)
+            .OrderBy(id => id, StringComparer.Ordinal)
             .ShouldBe(["M:N.Svc.M(System.Int32)", "M:N.Svc.M(System.String)"]);
-        model.MemberEdge("N.Cli", "M:N.Svc.M(System.Int32)").Member.Kind.ShouldBe(MemberKind.Method);
+        model.MemberEdge("N.Cli", "M:N.Svc.M(System.Int32)")
+            .Member.Kind.ShouldBe(MemberKind.Method);
     }
 
     [Fact]
@@ -114,7 +121,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          public class Reader { public int Go(Box b) => b.Value; }
                                                          """);
 
-        model.MemberEdge("N.Reader", "F:N.Box.Value").Member.Kind.ShouldBe(MemberKind.Field);
+        model.MemberEdge("N.Reader", "F:N.Box.Value")
+            .Member.Kind.ShouldBe(MemberKind.Field);
     }
 
     [Fact]
@@ -142,7 +150,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          public class Wire { public Func<int, int> Go() => Helper.Square; }
                                                          """);
 
-        model.MemberEdge("N.Wire", "M:N.Helper.Square(System.Int32)").Member.Kind.ShouldBe(MemberKind.Method);
+        model.MemberEdge("N.Wire", "M:N.Helper.Square(System.Int32)")
+            .Member.Kind.ShouldBe(MemberKind.Method);
     }
 
     [Fact]
@@ -155,7 +164,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          public class Caller { public int Go() => Square(2); }
                                                          """);
 
-        model.MemberEdge("N.Caller", "M:N.Helper.Square(System.Int32)").Member.Kind.ShouldBe(MemberKind.Method);
+        model.MemberEdge("N.Caller", "M:N.Helper.Square(System.Int32)")
+            .Member.Kind.ShouldBe(MemberKind.Method);
     }
 
     [Fact]
@@ -168,8 +178,10 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // The pinned asymmetry: nameof mints the type edge but never a member edge (it does not use the member).
-        model.HasEdge("N.Namer", "N.Target").ShouldBeTrue();
-        model.MemberEdges("N.Namer").ShouldBeEmpty();
+        model.HasEdge("N.Namer", "N.Target")
+            .ShouldBeTrue();
+        model.MemberEdges("N.Namer")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -204,7 +216,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          }
                                                          """);
 
-        model.MemberEdges("N.Solo").ShouldBeEmpty();
+        model.MemberEdges("N.Solo")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -224,8 +237,10 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          }
                                                          """);
 
-        MemberReference external = model.MemberEdge("N.C", "M:System.Text.StringBuilder.Append(System.String)").Member;
-        MemberReference declared = model.MemberEdge("N.C", "F:N.Dep.Value").Member;
+        MemberReference external = model.MemberEdge("N.C", "M:System.Text.StringBuilder.Append(System.String)")
+            .Member;
+        MemberReference declared = model.MemberEdge("N.C", "F:N.Dep.Value")
+            .Member;
 
         external.ContainingType.IsExternal.ShouldBeTrue();
         declared.ContainingType.IsExternal.ShouldBeFalse();
@@ -245,8 +260,10 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // A constructor is not a §4.5 use: the type edge stands, the member channel is empty.
-        model.HasEdge("N.Bar", "N.Foo").ShouldBeTrue();
-        model.MemberEdges("N.Bar").ShouldBeEmpty();
+        model.HasEdge("N.Bar", "N.Foo")
+            .ShouldBeTrue();
+        model.MemberEdges("N.Bar")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -271,7 +288,8 @@ public sealed class CodebaseExtractorMemberEdgeTests
         // The documented syntax-walk boundary (GRAMMAR §4.5): await's GetAwaiter, using's Dispose, the
         // foreach enumerator pattern, and query-syntax translation are compiler-pattern consumption the
         // walk never sees as a member access — the member channel stays empty.
-        model.MemberEdges("N.Boundary").ShouldBeEmpty();
+        model.MemberEdges("N.Boundary")
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -285,7 +303,9 @@ public sealed class CodebaseExtractorMemberEdgeTests
 
         // The edge-side indexer exclusion (GRAMMAR §4.5, §11 growth): an element access binds no
         // SimpleNameSyntax, so the indexer never surfaces in the member channel; the type edge stands.
-        model.HasEdge("N.User", "N.Box").ShouldBeTrue();
-        model.MemberEdges("N.User").ShouldBeEmpty();
+        model.HasEdge("N.User", "N.Box")
+            .ShouldBeTrue();
+        model.MemberEdges("N.User")
+            .ShouldBeEmpty();
     }
 }

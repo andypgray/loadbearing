@@ -18,10 +18,19 @@ public sealed class StatusFormatterTests
     // One rule of each posture so the formatter can be pinned over real ArchRules.
     private static readonly ArchitectureModel Model = Checker.Model(arch =>
     {
-        arch.Rule("layering/billing-independent").Enforce(arch.Types.MustHaveSuffix("X")).Because("b");
-        arch.Rule("layering/domain-independent").Enforce(arch.Types.MustHaveSuffix("Y")).Because("b");
-        arch.Rule("data-access/no-inline-sql").Migrate("old", arch.Types.MustHaveSuffix("Z")).Because("b");
-        arch.Scope("legacy/billing").Quarantine(arch.Namespace("App.Legacy.*")).Dragons("d").Because("b");
+        arch.Rule("layering/billing-independent")
+            .Enforce(arch.Types.MustHaveSuffix("X"))
+            .Because("b");
+        arch.Rule("layering/domain-independent")
+            .Enforce(arch.Types.MustHaveSuffix("Y"))
+            .Because("b");
+        arch.Rule("data-access/no-inline-sql")
+            .Migrate("old", arch.Types.MustHaveSuffix("Z"))
+            .Because("b");
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("App.Legacy.*"))
+            .Dragons("d")
+            .Because("b");
     });
 
     private static ArchRule Rule(string id)
@@ -31,7 +40,8 @@ public sealed class StatusFormatterTests
 
     private static string Line(RuleResult result)
     {
-        return StatusFormatter.Lines(new CheckReport([result])).First();
+        return StatusFormatter.Lines(new CheckReport([result]))
+            .First();
     }
 
     [Fact]
@@ -131,8 +141,10 @@ public sealed class StatusFormatterTests
             Result(Rule("layering/domain-independent"), RuleStatus.Failed, 1)
         ]);
 
-        StatusFormatter.Lines(report).Last().ShouldBe(
-            "Checked 5 rules: 2 passed, 3 failed, 0 skipped. Burndown: 1 grandfathered remaining, 0 fixed awaiting acceptance.");
+        StatusFormatter.Lines(report)
+            .Last()
+            .ShouldBe(
+                "Checked 5 rules: 2 passed, 3 failed, 0 skipped. Burndown: 1 grandfathered remaining, 0 fixed awaiting acceptance.");
     }
 
     private static RuleResult Result(
@@ -143,7 +155,9 @@ public sealed class StatusFormatterTests
             rule,
             status,
             Dummies(violations),
-            Enumerable.Range(0, warnings).Select(_ => new CheckWarning(CheckWarningKind.InertTarget, "w")).ToList(),
+            Enumerable.Range(0, warnings)
+                .Select(_ => new CheckWarning(CheckWarningKind.InertTarget, "w"))
+                .ToList(),
             skipReason,
             Dummies(grandfathered),
             stale,
@@ -152,6 +166,8 @@ public sealed class StatusFormatterTests
 
     private static IReadOnlyList<Violation> Dummies(int count)
     {
-        return Enumerable.Range(0, count).Select(_ => Violation.RuleError("x")).ToList();
+        return Enumerable.Range(0, count)
+            .Select(_ => Violation.RuleError("x"))
+            .ToList();
     }
 }

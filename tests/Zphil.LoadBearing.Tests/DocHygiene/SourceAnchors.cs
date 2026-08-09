@@ -68,7 +68,8 @@ internal static class SourceAnchors
                 {
                     string file = match.Groups[1].Value;
                     int sourceLine = int.Parse(match.Groups[2].Value);
-                    string message = match.Groups[3].Value.Trim();
+                    string message = match.Groups[3]
+                        .Value.Trim();
                     anchors.Add(new SourceAnchor(doc, index + 1, file, sourceLine, message));
                 }
             }
@@ -164,7 +165,8 @@ internal static class SourceAnchors
         string token = DeriveToken(anchor.Message);
         bool contentMatch = anchor.Line >= 1
                             && anchor.Line <= lines.Count
-                            && lines[anchor.Line - 1].Contains(token, StringComparison.Ordinal);
+                            && lines[anchor.Line - 1]
+                                .Contains(token, StringComparison.Ordinal);
         if (contentMatch) return new AnchorResult(AnchorBucket.Content, null);
 
         AnchorKey key = new(exampleRoot, anchor.File, anchor.Line);
@@ -259,7 +261,8 @@ internal static class SourceAnchors
             return false;
         }
 
-        target = message[(index + key.Length)..].Trim();
+        target = message[(index + key.Length)..]
+            .Trim();
         return true;
     }
 

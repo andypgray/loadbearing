@@ -17,6 +17,7 @@ public sealed class BaselineConventionsTests
     [Fact]
     public void DefaultPath_SingleSegmentId_HasNoSubdirectory()
     {
-        BaselineConventions.DefaultPath("naming").ShouldBe("arch/baselines/naming.json");
+        BaselineConventions.DefaultPath("naming")
+            .ShouldBe("arch/baselines/naming.json");
     }
 }

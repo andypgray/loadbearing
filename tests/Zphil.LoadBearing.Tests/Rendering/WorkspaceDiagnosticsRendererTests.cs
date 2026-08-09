@@ -32,9 +32,12 @@ public sealed class WorkspaceDiagnosticsRendererTests
         var composed = new WorkspaceDiagnostics(["first failure", "second failure"], []).Rendered;
 
         composed.Count.ShouldBe(3);
-        composed[0].ShouldBe("first failure");
-        composed[1].ShouldBe("second failure");
-        composed[2].ShouldBe(MsBuildBootstrap.SelectionNote());
+        composed[0]
+            .ShouldBe("first failure");
+        composed[1]
+            .ShouldBe("second failure");
+        composed[2]
+            .ShouldBe(MsBuildBootstrap.SelectionNote());
     }
 
     [Fact]
@@ -55,9 +58,12 @@ public sealed class WorkspaceDiagnosticsRendererTests
             .RenderedWithMergeNotes;
 
         composed.Count.ShouldBe(3);
-        composed[0].ShouldBe("a load failure");
-        composed[1].ShouldBe("a conflation advisory");
-        composed[2].ShouldBe(MsBuildBootstrap.SelectionNote());
+        composed[0]
+            .ShouldBe("a load failure");
+        composed[1]
+            .ShouldBe("a conflation advisory");
+        composed[2]
+            .ShouldBe(MsBuildBootstrap.SelectionNote());
     }
 
     [Fact]
@@ -69,7 +75,8 @@ public sealed class WorkspaceDiagnosticsRendererTests
 
         WorkspaceDiagnosticsRenderer.Render(error, ["a load failure"]);
 
-        error.ToString().ShouldBe($"warning: a load failure{Environment.NewLine}");
+        error.ToString()
+            .ShouldBe($"warning: a load failure{Environment.NewLine}");
     }
 
     [Fact]
@@ -81,6 +88,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
 
         WorkspaceDiagnosticsRenderer.Render(error, ["a load failure"], true);
 
-        error.ToString().ShouldBe($"a load failure{Environment.NewLine}");
+        error.ToString()
+            .ShouldBe($"a load failure{Environment.NewLine}");
     }
 }

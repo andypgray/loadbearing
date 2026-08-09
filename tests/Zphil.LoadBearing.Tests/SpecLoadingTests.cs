@@ -27,7 +27,8 @@ public class SpecLoadingTests
 
             specs.ShouldNotBeEmpty();
             // Type identity across the ALC boundary — the shared-contract-to-Default delegation.
-            specs[0].ShouldBeAssignableTo<IArchitectureSpec>();
+            specs[0]
+                .ShouldBeAssignableTo<IArchitectureSpec>();
 
             ArchitectureModel model = ArchModelBuilder.Build(specs);
             ArchRule rule = model.Rules.Single(r => r.Id == "fixture/interfaces");
@@ -44,7 +45,8 @@ public class SpecLoadingTests
     {
         string? path = typeof(SpecLoadingTests).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(attribute => attribute.Key == "SpecFixturePath")?.Value;
+            .SingleOrDefault(attribute => attribute.Key == "SpecFixturePath")
+            ?.Value;
 
         path.ShouldNotBeNullOrEmpty();
         return path;

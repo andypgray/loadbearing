@@ -22,7 +22,8 @@ public sealed class BaselineEntryTests
         BaselineEntry b = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
 
         a.ShouldBe(b);
-        a.GetHashCode().ShouldBe(b.GetHashCode());
+        a.GetHashCode()
+            .ShouldBe(b.GetHashCode());
     }
 
     [Fact]
@@ -43,10 +44,14 @@ public sealed class BaselineEntryTests
             .BaselineIdentity()!;
 
         identity.ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget"));
-        identity.GetHashCode().ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget").GetHashCode());
+        identity.GetHashCode()
+            .ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget")
+                .GetHashCode());
         identity.Subject.ShouldBeNull();
         new HashSet<BaselineEntry> { identity }
-            .Contains(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget").WithBecause("INC-1")).ShouldBeTrue();
+            .Contains(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget")
+                .WithBecause("INC-1"))
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -61,10 +66,14 @@ public sealed class BaselineEntryTests
             .BaselineIdentity()!;
 
         identity.ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep"));
-        identity.GetHashCode().ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep").GetHashCode());
+        identity.GetHashCode()
+            .ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep")
+                .GetHashCode());
         identity.Subject.ShouldBeNull();
         new HashSet<BaselineEntry> { identity }
-            .Contains(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep").WithBecause("INC-1")).ShouldBeTrue();
+            .Contains(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep")
+                .WithBecause("INC-1"))
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -81,7 +90,8 @@ public sealed class BaselineEntryTests
         BaselineEntry b = BaselineEntry.ForSubject("T:N.Type");
 
         a.ShouldBe(b);
-        a.GetHashCode().ShouldBe(b.GetHashCode());
+        a.GetHashCode()
+            .ShouldBe(b.GetHashCode());
     }
 
     [Fact]
@@ -97,18 +107,22 @@ public sealed class BaselineEntryTests
     {
         var set = new HashSet<BaselineEntry> { BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt") };
 
-        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")).ShouldBeTrue();
-        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Other")).ShouldBeFalse();
+        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt"))
+            .ShouldBeTrue();
+        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Other"))
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void WithBecause_SameIdentity_AreEqualAndShareHashCode()
     {
         BaselineEntry plain = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
-        BaselineEntry attributed = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithBecause("INC-1234");
+        BaselineEntry attributed = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithBecause("INC-1234");
 
         attributed.ShouldBe(plain);
-        attributed.GetHashCode().ShouldBe(plain.GetHashCode());
+        attributed.GetHashCode()
+            .ShouldBe(plain.GetHashCode());
     }
 
     [Fact]
@@ -117,8 +131,10 @@ public sealed class BaselineEntryTests
         BaselineEntry plain = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
         BaselineEntry attributed = plain.WithBecause("INC-1234");
 
-        new HashSet<BaselineEntry> { plain }.Contains(attributed).ShouldBeTrue();
-        new HashSet<BaselineEntry> { attributed }.Contains(plain).ShouldBeTrue();
+        new HashSet<BaselineEntry> { plain }.Contains(attributed)
+            .ShouldBeTrue();
+        new HashSet<BaselineEntry> { attributed }.Contains(plain)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -140,10 +156,14 @@ public sealed class BaselineEntryTests
     {
         BaselineEntry entry = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
 
-        Should.Throw<ArgumentException>(() => entry.WithBecause("   ")).Message.ShouldContain("non-blank single line");
-        Should.Throw<ArgumentException>(() => entry.WithBecause("")).Message.ShouldContain("non-blank single line");
-        Should.Throw<ArgumentException>(() => entry.WithBecause("a\rb")).Message.ShouldContain("non-blank single line");
-        Should.Throw<ArgumentException>(() => entry.WithBecause("a\nb")).Message.ShouldContain("non-blank single line");
+        Should.Throw<ArgumentException>(() => entry.WithBecause("   "))
+            .Message.ShouldContain("non-blank single line");
+        Should.Throw<ArgumentException>(() => entry.WithBecause(""))
+            .Message.ShouldContain("non-blank single line");
+        Should.Throw<ArgumentException>(() => entry.WithBecause("a\rb"))
+            .Message.ShouldContain("non-blank single line");
+        Should.Throw<ArgumentException>(() => entry.WithBecause("a\nb"))
+            .Message.ShouldContain("non-blank single line");
     }
 
     // A shallow TypeNode whose SymbolId is `T:` + FullName — the construction identity reads only those.

@@ -34,7 +34,8 @@ public sealed class DeriveSpecPromptTests
         var prompts = await harness.Client.ListPromptsAsync(cancellationToken: Ct);
 
         // Assert — registering the prompt advertises the capability and lists it by name.
-        prompts.Select(prompt => prompt.Name).ShouldContain(ArchPrompts.DeriveSpecName);
+        prompts.Select(prompt => prompt.Name)
+            .ShouldContain(ArchPrompts.DeriveSpecName);
     }
 
     [Fact]
@@ -50,7 +51,8 @@ public sealed class DeriveSpecPromptTests
         // Assert — a string-returning prompt method maps to one Role.User text message.
         PromptMessage message = result.Messages.ShouldHaveSingleItem();
         message.Role.ShouldBe(Role.User);
-        string text = message.Content.ShouldBeOfType<TextContentBlock>().Text;
+        string text = message.Content.ShouldBeOfType<TextContentBlock>()
+            .Text;
         text.ShouldContain("does not infer"); // the server infers no architecture
         text.ShouldContain("do not guess"); // the curation gate belongs to the human
         text.ShouldContain("data, not failures"); // mid-derive reds are the evidence pass working
@@ -119,6 +121,7 @@ public sealed class DeriveSpecPromptTests
     {
         // A rename of the .md or its manifest id would otherwise surface only when a client calls
         // prompts/get; this load-time assertion turns manifest-id drift into a test failure instead.
-        ArchPrompts.DeriveSpec().Length.ShouldBeGreaterThan(500);
+        ArchPrompts.DeriveSpec()
+            .Length.ShouldBeGreaterThan(500);
     }
 }

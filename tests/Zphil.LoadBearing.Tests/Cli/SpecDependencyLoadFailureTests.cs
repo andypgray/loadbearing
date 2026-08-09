@@ -64,7 +64,8 @@ public sealed class SpecDependencyLoadFailureTests
     {
         var exception = new FileNotFoundException("File not found.", "config/settings.json");
 
-        SpecDependencyLoadFailure.IsAssemblyLoadFailure(exception).ShouldBeFalse();
+        SpecDependencyLoadFailure.IsAssemblyLoadFailure(exception)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -72,6 +73,7 @@ public sealed class SpecDependencyLoadFailureTests
     {
         var exception = new FileNotFoundException("File not found.");
 
-        SpecDependencyLoadFailure.IsAssemblyLoadFailure(exception).ShouldBeFalse();
+        SpecDependencyLoadFailure.IsAssemblyLoadFailure(exception)
+            .ShouldBeFalse();
     }
 }

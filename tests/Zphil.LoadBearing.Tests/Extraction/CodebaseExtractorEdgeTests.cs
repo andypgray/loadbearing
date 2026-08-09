@@ -20,7 +20,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class B {}
                                                          """);
 
-        model.Edge("N.A", "N.B").Lines().ShouldBe([2]);
+        model.Edge("N.A", "N.B")
+            .Lines()
+            .ShouldBe([2]);
     }
 
     [Fact]
@@ -32,7 +34,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class C : I {}
                                                          """);
 
-        model.Edge("N.C", "N.I").Lines().ShouldBe([3]);
+        model.Edge("N.C", "N.I")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -45,8 +49,12 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class S { public R M(P p) => null; }
                                                          """);
 
-        model.Edge("N.S", "N.R").Lines().ShouldBe([4]);
-        model.Edge("N.S", "N.P").Lines().ShouldBe([4]);
+        model.Edge("N.S", "N.R")
+            .Lines()
+            .ShouldBe([4]);
+        model.Edge("N.S", "N.P")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -59,8 +67,12 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class H { private F f; public G Prop { get; set; } }
                                                          """);
 
-        model.Edge("N.H", "N.F").Lines().ShouldBe([4]);
-        model.Edge("N.H", "N.G").Lines().ShouldBe([4]);
+        model.Edge("N.H", "N.F")
+            .Lines()
+            .ShouldBe([4]);
+        model.Edge("N.H", "N.G")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -74,7 +86,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Decorated {}
                                                          """);
 
-        model.Edge("N.Decorated", "N.MyAttribute").Lines().ShouldBe([4]);
+        model.Edge("N.Decorated", "N.MyAttribute")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -87,8 +101,10 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Holder { public List<Item> Items = null; }
                                                          """);
 
-        model.HasEdge("N.Holder", "System.Collections.Generic.List<T>").ShouldBeTrue();
-        model.HasEdge("N.Holder", "N.Item").ShouldBeTrue();
+        model.HasEdge("N.Holder", "System.Collections.Generic.List<T>")
+            .ShouldBeTrue();
+        model.HasEdge("N.Holder", "N.Item")
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -100,7 +116,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class U { public object M() => typeof(T); }
                                                          """);
 
-        model.Edge("N.U", "N.T").Lines().ShouldBe([3]);
+        model.Edge("N.U", "N.T")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -113,7 +131,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Caster { public object M(Base b) => (Derived)b; }
                                                          """);
 
-        model.Edge("N.Caster", "N.Derived").Lines().ShouldBe([4]);
+        model.Edge("N.Caster", "N.Derived")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -125,7 +145,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Maker { public object M() => new Thing(); }
                                                          """);
 
-        model.Edge("N.Maker", "N.Thing").Lines().ShouldBe([3]);
+        model.Edge("N.Maker", "N.Thing")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -142,7 +164,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         // Line 6 (the target-typed new()) is the only site contributed purely by implicit creation.
-        model.Edge("N.Factory", "N.Widget").Lines().ShouldContain(6);
+        model.Edge("N.Factory", "N.Widget")
+            .Lines()
+            .ShouldContain(6);
     }
 
     [Fact]
@@ -156,7 +180,8 @@ public sealed class CodebaseExtractorEdgeTests
 
         ReferenceEdge edge = model.Edge("N.User", "N.Config");
         edge.Sites.Count.ShouldBe(1);
-        edge.Lines().ShouldBe([3]);
+        edge.Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -174,7 +199,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          }
                                                          """);
 
-        model.Edge("N.Client", "N.Service").Lines().ShouldContain(7);
+        model.Edge("N.Client", "N.Service")
+            .Lines()
+            .ShouldContain(7);
     }
 
     [Fact]
@@ -186,7 +213,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Caller { public int M(int n) => n.Twice(); }
                                                          """);
 
-        model.Edge("N.Caller", "N.Ext").Lines().ShouldBe([3]);
+        model.Edge("N.Caller", "N.Ext")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -204,7 +233,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          }
                                                          """);
 
-        model.Edge("N.Reader", "N.Model").Lines().ShouldContain(7);
+        model.Edge("N.Reader", "N.Model")
+            .Lines()
+            .ShouldContain(7);
     }
 
     [Fact]
@@ -217,7 +248,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Wire { public Action M() => Handlers.Handle; }
                                                          """);
 
-        model.Edge("N.Wire", "N.Handlers").Lines().ShouldBe([4]);
+        model.Edge("N.Wire", "N.Handlers")
+            .Lines()
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -229,7 +262,9 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Namer { public string M() => nameof(Target); }
                                                          """);
 
-        model.Edge("N.Namer", "N.Target").Lines().ShouldBe([3]);
+        model.Edge("N.Namer", "N.Target")
+            .Lines()
+            .ShouldBe([3]);
     }
 
     [Fact]
@@ -240,7 +275,8 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Recursive { public Recursive Next; public Recursive Make() => new Recursive(); }
                                                          """);
 
-        model.HasEdge("N.Recursive", "N.Recursive").ShouldBeFalse();
+        model.HasEdge("N.Recursive", "N.Recursive")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -276,7 +312,8 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         // `var` binds to Other by inference; it must not produce an edge to the inferred type.
-        model.HasEdge("N.C", "N.Other").ShouldBeFalse();
+        model.HasEdge("N.C", "N.Other")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -317,8 +354,10 @@ public sealed class CodebaseExtractorEdgeTests
                                                          }
                                                          """);
 
-        model.HasEdge("N.Outer.Inner", "N.Dep").ShouldBeTrue();
-        model.HasEdge("N.Outer", "N.Dep").ShouldBeFalse();
+        model.HasEdge("N.Outer.Inner", "N.Dep")
+            .ShouldBeTrue();
+        model.HasEdge("N.Outer", "N.Dep")
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -330,7 +369,8 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class C { public void M() { Dep.A(); Dep.B(); } }
                                                          """);
 
-        model.Edge("N.C", "N.Dep").Sites.Count.ShouldBe(1);
+        model.Edge("N.C", "N.Dep")
+            .Sites.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -349,7 +389,9 @@ public sealed class CodebaseExtractorEdgeTests
 
         model.Edges.Select(e => (e.Source.FullName, e.Target.FullName))
             .ShouldBe([("N.C", "N.Alpha"), ("N.C", "N.Beta")]);
-        model.Edge("N.C", "N.Alpha").Lines().ShouldBe([6, 7]);
+        model.Edge("N.C", "N.Alpha")
+            .Lines()
+            .ShouldBe([6, 7]);
     }
 
     [Fact]
@@ -366,7 +408,8 @@ public sealed class CodebaseExtractorEdgeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([a, b]);
 
-        TypeNode target = model.Edge("B.Bar", "A.Foo").Target;
+        TypeNode target = model.Edge("B.Bar", "A.Foo")
+            .Target;
         target.IsExternal.ShouldBeFalse();
         target.ProjectName.ShouldBe("A");
     }
@@ -385,9 +428,12 @@ public sealed class CodebaseExtractorEdgeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Edges.Count(e => e.Source.FullName == "P.B" && e.Target.FullName == "P.A").ShouldBe(1);
-        model.Types.Count(t => t.FullName == "P.A").ShouldBe(1);
-        model.Edge("P.B", "P.A").Sites.Count.ShouldBe(1);
+        model.Edges.Count(e => e.Source.FullName == "P.B" && e.Target.FullName == "P.A")
+            .ShouldBe(1);
+        model.Types.Count(t => t.FullName == "P.A")
+            .ShouldBe(1);
+        model.Edge("P.B", "P.A")
+            .Sites.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -398,7 +444,8 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class C { public System.Exception E; }
                                                          """);
 
-        TypeNode target = model.Edge("N.C", "System.Exception").Target;
+        TypeNode target = model.Edge("N.C", "System.Exception")
+            .Target;
         target.IsExternal.ShouldBeTrue();
         target.ProjectName.ShouldNotBeNullOrEmpty();
     }

@@ -59,7 +59,9 @@ public sealed class MustNotThrowVerbTests
         // listed type, and the unlisted throw passing proves the ban enumerates rather than allow-lists.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-infra-throws")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Errors.*").WithSuffix("InfraError")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotThrow(arch.Namespace("Errors.*")
+                            .WithSuffix("InfraError")))
                     .Because("b"))
             .Single();
 
@@ -78,7 +80,9 @@ public sealed class MustNotThrowVerbTests
         // real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-domain-throws")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanService").MustNotThrow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .WithSuffix("CleanService")
+                        .MustNotThrow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -113,7 +117,8 @@ public sealed class MustNotThrowVerbTests
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ThrowPairs().ShouldBe(["App.Broad -> System.Exception"]);
+        result.ThrowPairs()
+            .ShouldBe(["App.Broad -> System.Exception"]);
     }
 
     [Fact]
@@ -140,12 +145,14 @@ public sealed class MustNotThrowVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/no-derived-throws")
-                    .Enforce(arch.Namespace("N.*").MustNotThrow(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*")
+                        .MustNotThrow(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ThrowPairs().ShouldBe(["N.Worker -> N.AppError"]);
+        result.ThrowPairs()
+            .ShouldBe(["N.Worker -> N.AppError"]);
     }
 
     [Fact]
@@ -156,7 +163,8 @@ public sealed class MustNotThrowVerbTests
         // is exactly where it parts company with MustOnlyThrow's never-warns rule.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotThrow(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -171,7 +179,8 @@ public sealed class MustNotThrowVerbTests
         // stays silent. This is the shape a forward tripwire takes: a ban nobody trips renders no noise.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-format-throws")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotThrow(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -184,10 +193,12 @@ public sealed class MustNotThrowVerbTests
         // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
         // other verb — the throw-ban verb takes the same subject gate.
         RuleResult result = Checker.Run(
-            "namespace App { public class Foo {} }",
-            arch => arch.Rule("ex/empty")
-                .Enforce(arch.Namespace("Nowhere.*").MustNotThrow(arch.Namespace("App.*")))
-                .Because("b")).Single();
+                "namespace App { public class Foo {} }",
+                arch => arch.Rule("ex/empty")
+                    .Enforce(arch.Namespace("Nowhere.*")
+                        .MustNotThrow(arch.Namespace("App.*")))
+                    .Because("b"))
+            .Single();
 
         result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
@@ -216,12 +227,14 @@ public sealed class MustNotThrowVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/no-throw")
-                    .Migrate("legacy bare throws", arch.Namespace("N.*").MustNotThrow(arch.Namespace("N.*")))
+                    .Migrate("legacy bare throws", arch.Namespace("N.*")
+                        .MustNotThrow(arch.Namespace("N.*")))
                     .Because("throw types a caller can dispatch on"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ThrowPairs().ShouldBe(["N.Worker -> N.Beta"]);
+        result.ThrowPairs()
+            .ShouldBe(["N.Worker -> N.Beta"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -242,12 +255,14 @@ public sealed class MustNotThrowVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/no-throw")
-                    .Migrate("legacy bare throws", arch.Namespace("N.*").MustNotThrow(arch.Namespace("N.*")))
+                    .Migrate("legacy bare throws", arch.Namespace("N.*")
+                        .MustNotThrow(arch.Namespace("N.*")))
                     .Because("throw types a caller can dispatch on"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ThrowPairs().ShouldBe(["N.NewWorker -> N.Boom"]);
+        result.ThrowPairs()
+            .ShouldBe(["N.NewWorker -> N.Boom"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -259,7 +274,9 @@ public sealed class MustNotThrowVerbTests
         // learn beside the allow-list's.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("ex/no-infra-throws")
-                .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Errors.*").WithSuffix("InfraError")))
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotThrow(arch.Namespace("Errors.*")
+                        .WithSuffix("InfraError")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("throw", "App.Service", "Errors.InfraError");

@@ -117,31 +117,36 @@ public class VocabularyFragmentTests
     [Fact]
     public void MustBeSealed_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.MustBeSealed()).ShouldBe("Types must be sealed.");
+        SentenceRenderer.Sentence(Arch.Types.MustBeSealed())
+            .ShouldBe("Types must be sealed.");
     }
 
     [Fact]
     public void MustBeStatic_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.MustBeStatic()).ShouldBe("Types must be static.");
+        SentenceRenderer.Sentence(Arch.Types.MustBeStatic())
+            .ShouldBe("Types must be static.");
     }
 
     [Fact]
     public void MustBeAbstract_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.MustBeAbstract()).ShouldBe("Types must be abstract.");
+        SentenceRenderer.Sentence(Arch.Types.MustBeAbstract())
+            .ShouldBe("Types must be abstract.");
     }
 
     [Fact]
     public void MustBePublic_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.MustBePublic()).ShouldBe("Types must be public.");
+        SentenceRenderer.Sentence(Arch.Types.MustBePublic())
+            .ShouldBe("Types must be public.");
     }
 
     [Fact]
     public void MustBeInternal_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.MustBeInternal()).ShouldBe("Types must be internal.");
+        SentenceRenderer.Sentence(Arch.Types.MustBeInternal())
+            .ShouldBe("Types must be internal.");
     }
 
     // ---- Member modal verbs (GRAMMAR §5.7): one pin per verb, all ten ----
@@ -170,39 +175,45 @@ public class VocabularyFragmentTests
     [Fact]
     public void Member_MustBePublic_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePublic()).ShouldBe("Methods of types must be public.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePublic())
+            .ShouldBe("Methods of types must be public.");
     }
 
     [Fact]
     public void Member_MustBeInternal_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeInternal()).ShouldBe("Methods of types must be internal.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeInternal())
+            .ShouldBe("Methods of types must be internal.");
     }
 
     [Fact]
     public void Member_MustBePrivate_RendersFragment()
     {
         // Member-only vocabulary (no type-side twin).
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePrivate()).ShouldBe("Methods of types must be private.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBePrivate())
+            .ShouldBe("Methods of types must be private.");
     }
 
     [Fact]
     public void Member_MustBeStatic_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeStatic()).ShouldBe("Methods of types must be static.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeStatic())
+            .ShouldBe("Methods of types must be static.");
     }
 
     [Fact]
     public void Member_MustBeAbstract_RendersFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeAbstract()).ShouldBe("Methods of types must be abstract.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeAbstract())
+            .ShouldBe("Methods of types must be abstract.");
     }
 
     [Fact]
     public void Member_MustBeVirtual_RendersFragment()
     {
         // Member-only vocabulary (no type-side twin).
-        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeVirtual()).ShouldBe("Methods of types must be virtual.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeVirtual())
+            .ShouldBe("Methods of types must be virtual.");
     }
 
     [Fact]
@@ -238,14 +249,16 @@ public class VocabularyFragmentTests
     public void Registered_WithLifetime_RendersLifetimePrefixedFragment(Lifetime lifetime, string expected)
     {
         // The per-lifetime noun fragment in reference position (GRAMMAR §5.1).
-        SentenceRenderer.Reference(Arch.Registered(lifetime)).ShouldBe(expected);
+        SentenceRenderer.Reference(Arch.Registered(lifetime))
+            .ShouldBe(expected);
     }
 
     [Fact]
     public void Registered_NoArg_RendersBareRegisteredFragment()
     {
         // The any-lifetime noun fragment (GRAMMAR §5.1).
-        SentenceRenderer.Reference(Arch.Registered()).ShouldBe("registered types");
+        SentenceRenderer.Reference(Arch.Registered())
+            .ShouldBe("registered types");
     }
 
     [Fact]
@@ -348,8 +361,10 @@ public class VocabularyFragmentTests
     public void AttributedWith_StringAnchor_RendersTheTypeofFragment()
     {
         // The adjective arm of the same equivalence, asserted against the typeof form directly.
-        SentenceRenderer.Sentence(Arch.Types.AttributedWith("Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute").MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)).MustBeSealed()));
+        SentenceRenderer.Sentence(Arch.Types.AttributedWith("Zphil.LoadBearing.Tests.Stubs.ApiControllerAttribute")
+                .MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.AttributedWith(typeof(ApiControllerAttribute))
+                .MustBeSealed()));
     }
 
     // ---- String hierarchy anchors (GRAMMAR §5.2–§5.3): the same escape hatch names an interface or a base
@@ -390,15 +405,19 @@ public class VocabularyFragmentTests
     public void Implementing_StringAnchor_RendersTheTypeofFragment()
     {
         // The adjective arms of the same equivalence, asserted against the typeof forms directly.
-        SentenceRenderer.Sentence(Arch.Types.Implementing("Zphil.LoadBearing.Tests.Stubs.IHandler<T>").MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.Implementing(typeof(IHandler<>)).MustBeSealed()));
+        SentenceRenderer.Sentence(Arch.Types.Implementing("Zphil.LoadBearing.Tests.Stubs.IHandler<T>")
+                .MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.Implementing(typeof(IHandler<>))
+                .MustBeSealed()));
     }
 
     [Fact]
     public void DerivedFrom_StringAnchor_RendersTheTypeofFragment()
     {
-        SentenceRenderer.Sentence(Arch.Types.DerivedFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase").MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.DerivedFrom(typeof(ControllerBase)).MustBeSealed()));
+        SentenceRenderer.Sentence(Arch.Types.DerivedFrom("Zphil.LoadBearing.Tests.Stubs.ControllerBase")
+                .MustBeSealed())
+            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.DerivedFrom(typeof(ControllerBase))
+                .MustBeSealed()));
     }
 
     // ---- The member attribute axis (GRAMMAR §5.7): one adjective and both verbs. The VERBS reuse the
@@ -410,7 +429,8 @@ public class VocabularyFragmentTests
     {
         // "`[X]`-attributed methods of …", not "methods of types attributed with `[X]`" — the latter is what
         // the TYPE-side adjective before a projection renders, and it names a different subject.
-        SentenceRenderer.Sentence(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute)).MustBePublic())
+        SentenceRenderer.Sentence(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute))
+                .MustBePublic())
             .ShouldBe("`[ApiController]`-attributed methods of types must be public.");
     }
 

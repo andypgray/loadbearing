@@ -64,7 +64,8 @@ public sealed class MemberUseVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-clock-read")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
                     .Because("b"))
             .Single();
 
@@ -85,14 +86,16 @@ public sealed class MemberUseVerbTests
     public void MustNotUse_HumanLine_AppendsParensForMethodNotForProperty()
     {
         string methodBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-advance")
-                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
                 .Because("b"))
             .Single()
             .HumanBlock();
         methodBlock.ShouldContain($"uses {T}Clock.Advance()");
 
         string propertyBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-ticks")
-                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
                 .Because("b"))
             .Single()
             .HumanBlock();
@@ -119,13 +122,15 @@ public sealed class MemberUseVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-advance")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
                     .Because("b"))
             .Single();
 
         // One ban on (Clock, Advance) covers both overloads; each resolved overload is a distinct identity
         // (GRAMMAR §4.3), so a grandfathered Advance() and Advance(int) ratchet independently.
-        result.Violations.Select(v => v.BaselineIdentity()!.Target).OrderBy(t => t, StringComparer.Ordinal)
+        result.Violations.Select(v => v.BaselineIdentity()!.Target)
+            .OrderBy(t => t, StringComparer.Ordinal)
             .ShouldBe([$"M:{T}Clock.Advance", $"M:{T}Clock.Advance(System.Int32)"]);
     }
 
@@ -136,18 +141,22 @@ public sealed class MemberUseVerbTests
         // source-visibility bans, not runtime-dispatch bans — GRAMMAR §4.5).
         RuleResult concrete = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-concrete")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Gauge), nameof(Gauge.Read))))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(arch.Member(typeof(Gauge), nameof(Gauge.Read))))
                     .Because("b"))
             .Single();
-        MemberIds(concrete).ShouldBe([$"M:{T}Gauge.Read"]);
+        MemberIds(concrete)
+            .ShouldBe([$"M:{T}Gauge.Read"]);
 
         // A ban on the interface member catches only the interface-typed call.
         RuleResult iface = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-iface")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(IGauge), nameof(IGauge.Read))))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(arch.Member(typeof(IGauge), nameof(IGauge.Read))))
                     .Because("b"))
             .Single();
-        MemberIds(iface).ShouldBe([$"M:{T}IGauge.Read"]);
+        MemberIds(iface)
+            .ShouldBe([$"M:{T}IGauge.Read"]);
     }
 
     [Fact]
@@ -155,7 +164,8 @@ public sealed class MemberUseVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/x")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
+                    .Enforce(arch.Namespace("Nowhere.*")
+                        .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
                     .Because("b"))
             .Single();
 
@@ -185,20 +195,23 @@ public sealed class MemberUseVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-clock")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(
-                        arch.Member(typeof(Clock), nameof(Clock.Ticks)),
-                        arch.Member(typeof(Clock), nameof(Clock.Advance))))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(
+                            arch.Member(typeof(Clock), nameof(Clock.Ticks)),
+                            arch.Member(typeof(Clock), nameof(Clock.Advance))))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
         // The Ticks read plus both Advance overloads — the ban spans both named members.
-        MemberIds(result).OrderBy(id => id, StringComparer.Ordinal).ShouldBe(
-        [
-            $"M:{T}Clock.Advance",
-            $"M:{T}Clock.Advance(System.Int32)",
-            $"P:{T}Clock.Ticks"
-        ]);
+        MemberIds(result)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ShouldBe(
+            [
+                $"M:{T}Clock.Advance",
+                $"M:{T}Clock.Advance(System.Int32)",
+                $"P:{T}Clock.Ticks"
+            ]);
     }
 
     [Fact]
@@ -234,7 +247,8 @@ public sealed class MemberUseVerbTests
 
         // Empty baseline → the blocking Wait() is red; capture its exact member identity.
         CodebaseModel before = CompilationFactory.Extract(WaitSource("t.Wait();"));
-        RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty).Single();
+        RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty)
+            .Single();
         red.Status.ShouldBe(RuleStatus.Failed);
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberUse);
         observed.Member!.SymbolId.ShouldBe("M:System.Threading.Tasks.Task.Wait");
@@ -250,22 +264,26 @@ public sealed class MemberUseVerbTests
         BaselineStore.Write(path, new BaselineDocument(sections));
 
         BaselineIndex loaded = BaselineStore.LoadForModel(model, dir.Path);
-        RuleResult grandfathered = ArchChecker.Check(model, before, loaded).Single();
+        RuleResult grandfathered = ArchChecker.Check(model, before, loaded)
+            .Single();
         grandfathered.ShouldHavePassed();
         grandfathered.ShouldHaveGrandfathered(1);
 
         // Change the used overload Wait() → Wait(timeout): identity is the specific member id, so the
         // grandfathered blessing does not cover it — NEW red.
         CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
-        RuleResult regressed = ArchChecker.Check(model, after, loaded).Single();
+        RuleResult regressed = ArchChecker.Check(model, after, loaded)
+            .Single();
         regressed.Status.ShouldBe(RuleStatus.Failed);
-        regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse).Member!.SymbolId
+        regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse)
+            .Member!.SymbolId
             .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
 
         // Hand-edit the member entry's target line without rebuilding the digest → tamper refusal,
         // proving the digest is computed over member ids too (prefix-agnostic, zero changes).
-        File.WriteAllText(path, File.ReadAllText(path).Replace(
-            "M:System.Threading.Tasks.Task.Wait", "M:System.Threading.Tasks.Task.Wait(System.TimeSpan)"));
+        File.WriteAllText(path, File.ReadAllText(path)
+            .Replace(
+                "M:System.Threading.Tasks.Task.Wait", "M:System.Threading.Tasks.Task.Wait(System.TimeSpan)"));
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("failed its integrity check");
     }
@@ -293,7 +311,8 @@ public sealed class MemberUseVerbTests
         // name), so it yields the identical member SymbolId — and the identical violation — as the typeof form.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("member/no-ticks")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member<Clock>(c => c.Ticks)))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(arch.Member<Clock>(c => c.Ticks)))
                     .Because("b"))
             .Single();
 
@@ -310,17 +329,20 @@ public sealed class MemberUseVerbTests
         // is peeled to recognise the parameter, but the resolved method is IGauge.Read, so the ban catches
         // only the interface-typed call — the same dispatch boundary as the typeof(IGauge) ban (GRAMMAR §4.5).
         RuleResult iface = Checker.Run(SceneModel, arch =>
-        {
-            // The (IGauge) cast is load-bearing: it moves the statically-resolved method the expression tree
-            // records from the concrete Gauge.Read to IGauge.Read, so it must survive cleanup's cast strip.
-            // ReSharper disable once RedundantCast
-            Member ifaceRead = arch.Member<Gauge>(g => ((IGauge)g).Read());
-            arch.Rule("member/no-iface")
-                .Enforce(arch.Namespace("App.*").MustNotUse(ifaceRead))
-                .Because("b");
-        }).Single();
+            {
+                // The (IGauge) cast is load-bearing: it moves the statically-resolved method the expression tree
+                // records from the concrete Gauge.Read to IGauge.Read, so it must survive cleanup's cast strip.
+                // ReSharper disable once RedundantCast
+                Member ifaceRead = arch.Member<Gauge>(g => ((IGauge)g).Read());
+                arch.Rule("member/no-iface")
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(ifaceRead))
+                    .Because("b");
+            })
+            .Single();
 
-        MemberIds(iface).ShouldBe([$"M:{T}IGauge.Read"]);
+        MemberIds(iface)
+            .ShouldBe([$"M:{T}IGauge.Read"]);
     }
 
     [Fact]
@@ -338,7 +360,8 @@ public sealed class MemberUseVerbTests
 
         RuleResult result = Checker.Run(model, arch =>
                 arch.Rule("member/no-now")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(() => DateTime.Now))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotUse(() => DateTime.Now))
                     .Because("b"))
             .Single();
 

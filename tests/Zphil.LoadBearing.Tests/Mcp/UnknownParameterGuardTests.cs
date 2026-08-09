@@ -15,7 +15,8 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 public sealed class UnknownParameterGuardTests
 {
     // Value is never inspected by the guard (only keys are), so a single shared dummy suffices.
-    private static readonly JsonElement DummyValue = JsonDocument.Parse("null").RootElement;
+    private static readonly JsonElement DummyValue = JsonDocument.Parse("null")
+        .RootElement;
 
     [Fact]
     public void Validate_UnknownKeyOnRealTool_NamesBadKeyToolAndValidList()
@@ -43,7 +44,8 @@ public sealed class UnknownParameterGuardTests
 
         foreach (MethodInfo method in ToolAttributeDiscovery.GetToolMethods())
         {
-            if (method.GetCustomAttribute<McpServerToolAttribute>()?.Name is not { } toolName) continue;
+            if (method.GetCustomAttribute<McpServerToolAttribute>()
+                    ?.Name is not { } toolName) continue;
 
             var arguments = method.GetParameters()
                 .Where(IsJsonBound)
@@ -114,13 +116,15 @@ public sealed class UnknownParameterGuardTests
     [Fact]
     public void Validate_NullArguments_ReturnsNull()
     {
-        UnknownParameterGuard.Validate("arch_check", null).ShouldBeNull();
+        UnknownParameterGuard.Validate("arch_check", null)
+            .ShouldBeNull();
     }
 
     [Fact]
     public void Validate_EmptyArguments_ReturnsNull()
     {
-        UnknownParameterGuard.Validate("arch_check", new Dictionary<string, JsonElement>()).ShouldBeNull();
+        UnknownParameterGuard.Validate("arch_check", new Dictionary<string, JsonElement>())
+            .ShouldBeNull();
     }
 
     [Theory]

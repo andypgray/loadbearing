@@ -15,7 +15,8 @@ public sealed class PathCanonicalizerTests : IDisposable
 {
     // Canonical so the "unchanged" and "real target" expectations are exact even on macOS (/var symlink).
     private readonly string _root =
-        PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-canon-").FullName);
+        PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-canon-")
+            .FullName);
 
     public void Dispose()
     {
@@ -32,16 +33,20 @@ public sealed class PathCanonicalizerTests : IDisposable
     [Fact]
     public void Resolve_PlainCanonicalPath_IsUnchanged()
     {
-        string dir = Directory.CreateDirectory(Path.Combine(_root, "plain")).FullName;
+        string dir = Directory.CreateDirectory(Path.Combine(_root, "plain"))
+            .FullName;
 
-        PathCanonicalizer.Resolve(dir).ShouldBe(dir);
+        PathCanonicalizer.Resolve(dir)
+            .ShouldBe(dir);
     }
 
     [Fact]
     public void Resolve_ThroughSymlinkedAncestor_ReturnsRealTarget()
     {
-        string real = Directory.CreateDirectory(Path.Combine(_root, "real")).FullName;
-        string sub = Directory.CreateDirectory(Path.Combine(real, "sub")).FullName;
+        string real = Directory.CreateDirectory(Path.Combine(_root, "real"))
+            .FullName;
+        string sub = Directory.CreateDirectory(Path.Combine(real, "sub"))
+            .FullName;
         string file = Path.Combine(sub, "solution.slnx");
         File.WriteAllText(file, "");
 
@@ -49,7 +54,8 @@ public sealed class PathCanonicalizerTests : IDisposable
         SymlinkSupport.CreateDirectorySymlink(link, real);
 
         // Reached through the symlinked ancestor 'link' → resolves to the real 'real/sub/solution.slnx'.
-        PathCanonicalizer.Resolve(Path.Combine(link, "sub", "solution.slnx")).ShouldBe(file);
+        PathCanonicalizer.Resolve(Path.Combine(link, "sub", "solution.slnx"))
+            .ShouldBe(file);
     }
 
     [Fact]
@@ -65,6 +71,7 @@ public sealed class PathCanonicalizerTests : IDisposable
     {
         string nonexistent = Path.Combine(_root, "does-not-exist", "Ghost.slnx");
 
-        PathCanonicalizer.Resolve(nonexistent).ShouldBe(Path.GetFullPath(nonexistent));
+        PathCanonicalizer.Resolve(nonexistent)
+            .ShouldBe(Path.GetFullPath(nonexistent));
     }
 }

@@ -80,7 +80,9 @@ internal static class Checker
     public static IReadOnlyList<string> Violators(
         this RuleResult result, ViolationKind kind, Func<Violation, string> identify)
     {
-        return result.Violations.Where(v => v.Kind == kind).Select(identify).ToList();
+        return result.Violations.Where(v => v.Kind == kind)
+            .Select(identify)
+            .ToList();
     }
 
     /// <summary>Reference violations rendered as <c>Source -&gt; Target</c>, in report order.</summary>
@@ -156,15 +158,28 @@ internal static class Checker
     public static void ShouldRenderEdgeViolation(this CheckReport report, string kind, string source, string target)
     {
         using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
+        document.RootElement.GetProperty("schemaVersion")
+            .GetInt32()
+            .ShouldBe(3);
         JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind").GetString().ShouldBe(kind);
-        violation.GetProperty("source").GetString().ShouldBe(source);
-        violation.GetProperty("target").GetString().ShouldBe(target);
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
+        violation.GetProperty("kind")
+            .GetString()
+            .ShouldBe(kind);
+        violation.GetProperty("source")
+            .GetString()
+            .ShouldBe(source);
+        violation.GetProperty("target")
+            .GetString()
+            .ShouldBe(target);
+        violation.TryGetProperty("targetMember", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("subject", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("subjectMember", out _)
+            .ShouldBeFalse();
+        violation.GetProperty("sites")
+            .GetArrayLength()
+            .ShouldBeGreaterThan(0);
     }
 
     /// <summary>
@@ -174,14 +189,25 @@ internal static class Checker
     public static void ShouldRenderMemberShapeViolation(this CheckReport report, string kind, string subjectMember)
     {
         using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(3);
+        document.RootElement.GetProperty("schemaVersion")
+            .GetInt32()
+            .ShouldBe(3);
         JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind").GetString().ShouldBe(kind);
-        violation.GetProperty("subjectMember").GetString().ShouldBe(subjectMember);
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.TryGetProperty("target", out _).ShouldBeFalse();
-        violation.TryGetProperty("targetMember", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
+        violation.GetProperty("kind")
+            .GetString()
+            .ShouldBe(kind);
+        violation.GetProperty("subjectMember")
+            .GetString()
+            .ShouldBe(subjectMember);
+        violation.TryGetProperty("subject", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("target", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("targetMember", out _)
+            .ShouldBeFalse();
+        violation.GetProperty("sites")
+            .GetArrayLength()
+            .ShouldBeGreaterThan(0);
     }
 
     /// <summary>
@@ -194,12 +220,22 @@ internal static class Checker
     {
         using JsonDocument document = JsonDocument.Parse(report.JsonReport());
         JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind").GetString().ShouldBe(kind);
-        violation.GetProperty("source").GetString().ShouldBe(source);
-        violation.GetProperty("targetMember").GetString().ShouldBe(targetMember);
-        violation.TryGetProperty("target", out _).ShouldBeFalse();
-        violation.TryGetProperty("subject", out _).ShouldBeFalse();
-        violation.GetProperty("sites").GetArrayLength().ShouldBeGreaterThan(0);
+        violation.GetProperty("kind")
+            .GetString()
+            .ShouldBe(kind);
+        violation.GetProperty("source")
+            .GetString()
+            .ShouldBe(source);
+        violation.GetProperty("targetMember")
+            .GetString()
+            .ShouldBe(targetMember);
+        violation.TryGetProperty("target", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("subject", out _)
+            .ShouldBeFalse();
+        violation.GetProperty("sites")
+            .GetArrayLength()
+            .ShouldBeGreaterThan(0);
     }
 
     private static string Pair(Violation v)
@@ -209,6 +245,7 @@ internal static class Checker
 
     private static JsonElement FirstViolation(JsonDocument document)
     {
-        return document.RootElement.GetProperty("rules")[0].GetProperty("violations")[0];
+        return document.RootElement.GetProperty("rules")[0]
+            .GetProperty("violations")[0];
     }
 }

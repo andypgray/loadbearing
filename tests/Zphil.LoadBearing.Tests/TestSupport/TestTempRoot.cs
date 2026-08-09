@@ -30,7 +30,8 @@ internal static class TestTempRoot
     private static readonly TimeSpan StaleAfter = TimeSpan.FromHours(4);
 
     // One id per test process: every category this run asks for lands under the same run directory.
-    private static readonly string RunId = Guid.NewGuid().ToString("N");
+    private static readonly string RunId = Guid.NewGuid()
+        .ToString("N");
 
     // The temp base, resolved through any symlinked ancestor once per run, so every path handed out shares
     // one spelling. See TempFixtureWorkspace.RealTempRoot for why the harness needs this beyond production.
@@ -60,7 +61,8 @@ internal static class TestTempRoot
     /// </summary>
     internal static TempDirectory Fresh(string category)
     {
-        string path = Path.Combine(For(category), Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(For(category), Guid.NewGuid()
+            .ToString("N"));
         Directory.CreateDirectory(path);
         return new TempDirectory(path);
     }
@@ -142,7 +144,10 @@ internal sealed class TempDirectory(string path) : IDisposable
     /// </summary>
     public string UniqueChildPath()
     {
-        return Under([Guid.NewGuid().ToString("N")]);
+        return Under([
+            Guid.NewGuid()
+                .ToString("N")
+        ]);
     }
 
     // Qualified because this type's own Path property shadows System.IO.Path for the whole class.

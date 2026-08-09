@@ -58,15 +58,17 @@ internal sealed class InlineNineSpec : IArchitectureSpec
         Selection host = arch.Namespace("Meridian.Interchange.Host.*");
 
         arch.Rule("http/reuse-httpclient")
-            .Enforce(arch.Types.Except(host).MustNotConstruct(typeof(HttpClient)))
+            .Enforce(arch.Types.Except(host)
+                .MustNotConstruct(typeof(HttpClient)))
             .Because("A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines")
             .Fix("Take a typed or named client from IHttpClientFactory; see how CarrierClient receives its HttpClient.");
 
         arch.Rule("di/no-service-locator")
-            .Enforce(arch.Types.Except(host).MustNotUse(
-                arch.Member<IServiceProvider>(sp => sp.GetService(typeof(object))),
-                arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetService)),
-                arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetRequiredService))))
+            .Enforce(arch.Types.Except(host)
+                .MustNotUse(
+                    arch.Member<IServiceProvider>(sp => sp.GetService(typeof(object))),
+                    arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetService)),
+                    arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetRequiredService))))
             .Because("Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
             .Fix("Take the dependency in the constructor; the composition root and its scope seam are the only sanctioned resolve sites.");
 
@@ -90,25 +92,31 @@ internal sealed class InlineNineSpec : IArchitectureSpec
             .Fix("Await the call and make the method async; the legacy corner is grandfathered until the SDK exposes async.");
 
         arch.Rule("di/no-captive-dependencies")
-            .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(
-                arch.Registered(Lifetime.Scoped),
-                arch.Registered(Lifetime.Transient)))
+            .Enforce(arch.Registered(Lifetime.Singleton)
+                .MustNotInject(
+                    arch.Registered(Lifetime.Scoped),
+                    arch.Registered(Lifetime.Transient)))
             .Because("A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
             .Fix("Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
 
         arch.Rule("naming/async-suffix")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async"))
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+                .Methods.Returning(typeof(Task), typeof(Task<>))
+                .MustHaveSuffix("Async"))
             .Because("Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Rename the method to end in Async.");
 
         arch.Rule("exceptions/no-general-catch")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Except(arch.Types.DerivedFrom<BackgroundService>())
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+                .Except(arch.Types.DerivedFrom<BackgroundService>())
                 .MustNotCatch(typeof(Exception)))
             .Because("Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle — https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types")
             .Fix("Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.");
 
         arch.Rule("async/accept-cancellation")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken)))
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
+                .Methods.Returning(typeof(Task), typeof(Task<>))
+                .MustAcceptParameter(typeof(CancellationToken)))
             .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
 

@@ -77,16 +77,21 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
-                .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/in")
-                .Enforce(arch.Namespace("C.*").MustNotBeReferencedBy(arch.Namespace("D.*"))).Because("x");
+                .Enforce(arch.Namespace("C.*")
+                    .MustNotBeReferencedBy(arch.Namespace("D.*")))
+                .Because("x");
         });
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — MustNotBeReferencedBy is the inbound voice: the operand is the source of the arrow.
-        Edges(block).ShouldBe(["s_A --x s_B", "s_D --x s_C"]);
+        Edges(block)
+            .ShouldBe(["s_A --x s_B", "s_D --x s_C"]);
     }
 
     [Fact]
@@ -97,10 +102,12 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
-                .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("A.*"), arch.Namespace("B.*")))
+                .Enforce(arch.Namespace("A.*")
+                    .MustOnlyReference(arch.Namespace("A.*"), arch.Namespace("B.*")))
                 .Because("x");
             arch.Rule("r/in")
-                .Enforce(arch.Namespace("C.*").MustOnlyBeReferencedBy(arch.Namespace("C.*"), arch.Namespace("D.*")))
+                .Enforce(arch.Namespace("C.*")
+                    .MustOnlyBeReferencedBy(arch.Namespace("C.*"), arch.Namespace("D.*")))
                 .Because("x");
         });
 
@@ -108,7 +115,8 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Edges(block).ShouldBe(["s_A -->|\"only\"| s_B", "s_D -->|\"only\"| s_C"]);
+        Edges(block)
+            .ShouldBe(["s_A -->|\"only\"| s_B", "s_D -->|\"only\"| s_C"]);
     }
 
     [Fact]
@@ -118,10 +126,12 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/ban")
-                .Migrate("Callers reach across.", arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*")))
+                .Migrate("Callers reach across.", arch.Namespace("A.*")
+                    .MustNotReference(arch.Namespace("B.*")))
                 .Because("x");
             arch.Rule("r/expose")
-                .Migrate("Engine types leak.", arch.Namespace("C.*").MustNotExpose(arch.Namespace("D.*")))
+                .Migrate("Engine types leak.", arch.Namespace("C.*")
+                    .MustNotExpose(arch.Namespace("D.*")))
                 .Because("x");
         });
 
@@ -129,10 +139,11 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — the verb word rides along, so "grandfathered" never has to stand for two different bans.
-        Edges(block).ShouldBe([
-            "s_A -.-x|\"grandfathered\"| s_B",
-            "s_C -.-x|\"grandfathered expose\"| s_D"
-        ]);
+        Edges(block)
+            .ShouldBe([
+                "s_A -.-x|\"grandfathered\"| s_B",
+                "s_C -.-x|\"grandfathered expose\"| s_D"
+            ]);
     }
 
     [Fact]
@@ -152,16 +163,17 @@ public sealed class LawDiagramRendererTests
 
         // Assert — the facades sit inside the box in the spec's own Boundary order, and no edge is drawn
         // at all: the box is the whole statement.
-        Diagram(block).ShouldBe([
-            "subgraph s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
-            "s_IPricingFacade[[\"IPricingFacade\"]]",
-            "s_PricingFacade[[\"PricingFacade\"]]",
-            "end",
-            "",
-            "subgraph l_legend[\"Legend\"]",
-            "l_quarantine[\"Quarantine box = a contained scope; the doubled boxes are its sanctioned surface\"]",
-            "end"
-        ]);
+        Diagram(block)
+            .ShouldBe([
+                "subgraph s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
+                "s_IPricingFacade[[\"IPricingFacade\"]]",
+                "s_PricingFacade[[\"PricingFacade\"]]",
+                "end",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_quarantine[\"Quarantine box = a contained scope; the doubled boxes are its sanctioned surface\"]",
+                "end"
+            ]);
         block.ShouldNotContain("only");
     }
 
@@ -179,7 +191,8 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block).ShouldContain("s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]");
+        Diagram(block)
+            .ShouldContain("s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]");
     }
 
     [Fact]
@@ -216,7 +229,8 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — nothing placed, so the fence keeps its shape through the placeholder.
-        Diagram(block).ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
+        Diagram(block)
+            .ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
         block.ShouldEndWith("Not drawn in full: `r/union`. Expand any of them with `loadbearing explain <rule-id>`.");
     }
 
@@ -226,16 +240,18 @@ public sealed class LawDiagramRendererTests
         // Arrange — one operand is a place and the other is a union, which is not.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/mixed")
-                .Enforce(arch.Namespace("A.*").MustNotReference(
-                    arch.Namespace("B.*"),
-                    arch.AnyOf(arch.Namespace("C.*"), arch.Namespace("D.*"))))
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(
+                        arch.Namespace("B.*"),
+                        arch.AnyOf(arch.Namespace("C.*"), arch.Namespace("D.*"))))
                 .Because("x"));
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — the arrow that can be drawn is drawn, and the list says the arrows are not all of it.
-        Edges(block).ShouldBe(["s_A --x s_B"]);
+        Edges(block)
+            .ShouldBe(["s_A --x s_B"]);
         block.ShouldEndWith("Not drawn in full: `r/mixed`. Expand any of them with `loadbearing explain <rule-id>`.");
     }
 
@@ -245,29 +261,36 @@ public sealed class LawDiagramRendererTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
         {
-            arch.Rule("r/one").Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("Z.*"))).Because("x");
-            arch.Rule("r/two").Enforce(arch.Namespace("A.B.*").MustNotReference(arch.Namespace("Z.*"))).Because("x");
+            arch.Rule("r/one")
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(arch.Namespace("A.B.*")
+                    .MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
         });
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block).ShouldBe([
-            "subgraph s_A[\"A.*\"]",
-            "s_A_B[\"A.B.*\"]",
-            "end",
-            "s_Z(\"Z.*\")",
-            "",
-            "s_A --x s_Z",
-            "s_A_B --x s_Z",
-            "",
-            "subgraph l_legend[\"Legend\"]",
-            "l_ban[\"--x = must not reference\"]",
-            "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-            "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
-            "end"
-        ]);
+        Diagram(block)
+            .ShouldBe([
+                "subgraph s_A[\"A.*\"]",
+                "s_A_B[\"A.B.*\"]",
+                "end",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_A --x s_Z",
+                "s_A_B --x s_Z",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
+                "end"
+            ]);
     }
 
     [Fact]
@@ -280,30 +303,37 @@ public sealed class LawDiagramRendererTests
             Layer wide = arch.Layer("Wide", "A.*");
             Layer split = arch.Layer("Split", "A.B.*", "Q.*");
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.B.C.*").MustNotReference(arch.Namespace("Z.*"))).Because("x");
-            arch.Rule("r/two").Enforce(wide.MustNotReference(arch.Namespace("Z.*"))).Because("x");
-            arch.Rule("r/three").Enforce(split.MustNotReference(arch.Namespace("Z.*"))).Because("x");
+                .Enforce(arch.Namespace("A.B.C.*")
+                    .MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(wide.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/three")
+                .Enforce(split.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
         });
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — flat rather than a hierarchy the spec never declared, and no nesting legend row.
-        Diagram(block).ShouldBe([
-            "s_A_B_C[\"A.B.C.*\"]",
-            "s_Z(\"Z.*\")",
-            "s_Wide[\"Wide\"]",
-            "s_Split[\"Split\"]",
-            "",
-            "s_A_B_C --x s_Z",
-            "s_Wide --x s_Z",
-            "s_Split --x s_Z",
-            "",
-            "subgraph l_legend[\"Legend\"]",
-            "l_ban[\"--x = must not reference\"]",
-            "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-            "end"
-        ]);
+        Diagram(block)
+            .ShouldBe([
+                "s_A_B_C[\"A.B.C.*\"]",
+                "s_Z(\"Z.*\")",
+                "s_Wide[\"Wide\"]",
+                "s_Split[\"Split\"]",
+                "",
+                "s_A_B_C --x s_Z",
+                "s_Wide --x s_Z",
+                "s_Split --x s_Z",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "end"
+            ]);
     }
 
     [Fact]
@@ -313,28 +343,33 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             Layer web = arch.Layer("Web", "MyApp.Web.*");
-            arch.Rule("r/one").Enforce(web.MustNotReference(arch.Namespace("Z.*"))).Because("x");
+            arch.Rule("r/one")
+                .Enforce(web.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
             arch.Rule("r/two")
-                .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("Y.*"))).Because("x");
+                .Enforce(arch.Namespace("MyApp.Web.*")
+                    .MustNotReference(arch.Namespace("Y.*")))
+                .Because("x");
         });
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — one node, named in the spec's own vocabulary.
-        Diagram(block).ShouldBe([
-            "s_Web[\"Web\"]",
-            "s_Z(\"Z.*\")",
-            "s_Y(\"Y.*\")",
-            "",
-            "s_Web --x s_Z",
-            "s_Web --x s_Y",
-            "",
-            "subgraph l_legend[\"Legend\"]",
-            "l_ban[\"--x = must not reference\"]",
-            "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-            "end"
-        ]);
+        Diagram(block)
+            .ShouldBe([
+                "s_Web[\"Web\"]",
+                "s_Z(\"Z.*\")",
+                "s_Y(\"Y.*\")",
+                "",
+                "s_Web --x s_Z",
+                "s_Web --x s_Y",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "end"
+            ]);
     }
 
     [Theory]
@@ -367,15 +402,19 @@ public sealed class LawDiagramRendererTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Project(reserved).MustNotReference(arch.Namespace("Z.*"))).Because("x"));
+                .Enforce(arch.Project(reserved)
+                    .MustNotReference(arch.Namespace("Z.*")))
+                .Because("x"));
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — and no ID may begin with the two letters the link rules read as an arrowhead.
-        Diagram(block).ShouldContain($"{expectedId}[\"{reserved}\"]");
-        IdsIn(block).ShouldAllBe(id => !id.StartsWith("o", StringComparison.Ordinal)
-                                       && !id.StartsWith("x", StringComparison.Ordinal));
+        Diagram(block)
+            .ShouldContain($"{expectedId}[\"{reserved}\"]");
+        IdsIn(block)
+            .ShouldAllBe(id => !id.StartsWith("o", StringComparison.Ordinal)
+                               && !id.StartsWith("x", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -385,14 +424,17 @@ public sealed class LawDiagramRendererTests
         // an entity reference. All go out as the entity Mermaid reads back as the character itself.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.*").MustNotReference(typeof(List<string>))).Because("x"));
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(typeof(List<string>)))
+                .Because("x"));
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block).ShouldContain(
-            "s_System_Collections_Generic_List_System_String_(\"System.Collections.Generic.List#lt;System.String#gt;\")");
+        Diagram(block)
+            .ShouldContain(
+                "s_System_Collections_Generic_List_System_String_(\"System.Collections.Generic.List#lt;System.String#gt;\")");
     }
 
     [Fact]
@@ -401,14 +443,17 @@ public sealed class LawDiagramRendererTests
         // Arrange — a naming rule has no direction to draw.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I")).Because("x"));
+                .Enforce(arch.Types.OfKind(TypeKind.Interface)
+                    .MustHavePrefix("I"))
+                .Because("x"));
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — the fence's shape stays stable, and the legend disappears with the constructs it
         // would have explained.
-        Diagram(block).ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
+        Diagram(block)
+            .ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
         block.ShouldNotContain("Legend");
     }
 
@@ -419,10 +464,14 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I")).Because("x");
+                .Enforce(arch.Types.OfKind(TypeKind.Interface)
+                    .MustHavePrefix("I"))
+                .Because("x");
             arch.Rule("naming/suffix")
-                .Migrate("Handlers are named freely.", arch.Types.MustHaveSuffix("Handler")).Because("x");
-            arch.Scope("legacy/pricing").Quarantine(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*")))
+                .Migrate("Handlers are named freely.", arch.Types.MustHaveSuffix("Handler"))
+                .Because("x");
+            arch.Scope("legacy/pricing")
+                .Quarantine(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*")))
                 .Dragons("Two trees, one set of dragons.")
                 .Because("x");
         });
@@ -476,17 +525,20 @@ public sealed class LawDiagramRendererTests
                 .Because("An engine type on a public signature forces every consumer to compile against it.");
 
             arch.Rule("packs/leaf")
-                .Enforce(arch.Namespace("Shop.Pack.*").MustOnlyReference(arch.Namespace("Shop.Pack.*"), domain))
+                .Enforce(arch.Namespace("Shop.Pack.*")
+                    .MustOnlyReference(arch.Namespace("Shop.Pack.*"), domain))
                 .Because("A pack that reaches past the domain drags the tool into its consumers.");
 
             arch.Rule("data/no-inline-sql")
                 .Migrate(
                     "Controllers build DataTables inline.",
-                    arch.Namespace("Shop.Web.Controllers.*").MustNotReference(typeof(DataTable)))
+                    arch.Namespace("Shop.Web.Controllers.*")
+                        .MustNotReference(typeof(DataTable)))
                 .Because("Repository pattern for testability.");
 
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I"))
+                .Enforce(arch.Types.OfKind(TypeKind.Interface)
+                    .MustHavePrefix("I"))
                 .Because("`I*` stays a reliable grep for the seams.");
 
             arch.Scope("legacy/pricing")
@@ -501,11 +553,14 @@ public sealed class LawDiagramRendererTests
     // the closing fence, so a test asserts on the drawing rather than re-pinning the frame each time.
     private static IReadOnlyList<string> Diagram(string block)
     {
-        var lines = block.Split('\n').ToList();
+        var lines = block.Split('\n')
+            .ToList();
         int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
         int end = lines.FindLastIndex(line => line == "```");
 
-        return lines.GetRange(start, end - start).Select(line => line.Trim()).ToList();
+        return lines.GetRange(start, end - start)
+            .Select(line => line.Trim())
+            .ToList();
     }
 
     // Just the edge lines, which is what a direction or posture pin is about.
@@ -524,7 +579,8 @@ public sealed class LawDiagramRendererTests
     {
         return Diagram(block)
             .Select(line => line.StartsWith("subgraph ", StringComparison.Ordinal) ? line.Substring(9) : line)
-            .Select(line => new string(line.TakeWhile(character => character is '_' or >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9').ToArray()))
+            .Select(line => new string(line.TakeWhile(character => character is '_' or >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9')
+                .ToArray()))
             .Where(id => id.Length > 0)
             .ToList();
     }

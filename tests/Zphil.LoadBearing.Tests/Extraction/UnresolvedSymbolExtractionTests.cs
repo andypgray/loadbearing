@@ -33,7 +33,9 @@ public sealed class UnresolvedSymbolExtractionTests
         // is informational, and a type reached across an assembly boundary is visibly-public surface.
         external.Accessibility.ShouldBe(Accessibility.Public);
         external.IsExternal.ShouldBeTrue();
-        model.Types.Single(t => t.FullName == "App.Widget").BaseType!.FullName().ShouldBe("Ghost.Base");
+        model.Types.Single(t => t.FullName == "App.Widget")
+            .BaseType!.FullName()
+            .ShouldBe("Ghost.Base");
     }
 
     [Fact]
@@ -46,9 +48,11 @@ public sealed class UnresolvedSymbolExtractionTests
         CodebaseModel model = CompilationFactory.Extract(
             "namespace App;\npublic interface IReal { }\npublic class Cache : IReal, Ghost.ICache { }\n");
 
-        model.Types.Single(t => t.FullName == "Ghost.ICache").Accessibility.ShouldBe(Accessibility.Public);
+        model.Types.Single(t => t.FullName == "Ghost.ICache")
+            .Accessibility.ShouldBe(Accessibility.Public);
         model.Types.Single(t => t.FullName == "App.Cache")
-            .Interfaces.Select(i => i.FullName()).ShouldContain("Ghost.ICache");
+            .Interfaces.Select(i => i.FullName())
+            .ShouldContain("Ghost.ICache");
     }
 
     [Fact]

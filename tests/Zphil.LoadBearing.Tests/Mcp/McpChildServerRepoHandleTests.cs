@@ -152,7 +152,8 @@ public sealed class McpChildServerRepoHandleTests
         {
             string? answer = answers.GetValueOrDefault(name);
             answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{diagnostics}");
-            ShouldHaveToolText(answer, name).ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
+            ShouldHaveToolText(answer, name)
+                .ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
         }
 
         alive.ShouldBeTrue(
@@ -160,7 +161,8 @@ public sealed class McpChildServerRepoHandleTests
 
         // arch_check must have genuinely run the whole diff path, spec load included — otherwise a server
         // that answered five errors would hold nothing and pass.
-        ShouldHaveToolText(answers["arch_check"]!, "arch_check").ShouldContain("quarantinedScopeTouched");
+        ShouldHaveToolText(answers["arch_check"]!, "arch_check")
+            .ShouldContain("quarantinedScopeTouched");
     }
 
     [Fact]
@@ -247,7 +249,8 @@ public sealed class McpChildServerRepoHandleTests
     private static string SourceTreeCliDll()
     {
         string configuration = typeof(McpChildServerRepoHandleTests).Assembly
-                                   .GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
+                                   .GetCustomAttribute<AssemblyConfigurationAttribute>()
+                                   ?.Configuration
                                ?? throw new InvalidOperationException(
                                    "The tests assembly carries no AssemblyConfigurationAttribute, so the "
                                    + "matching CLI build output cannot be located.");
@@ -276,7 +279,9 @@ public sealed class McpChildServerRepoHandleTests
             .ShouldBeFalse($"{toolName} returned a JSON-RPC error: {error}");
 
         JsonElement result = document.RootElement.GetProperty("result");
-        return result.GetProperty("content")[0].GetProperty("text").GetString() ?? string.Empty;
+        return result.GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString() ?? string.Empty;
     }
 
     private static string Format(IReadOnlyList<RetainedPath> retained)

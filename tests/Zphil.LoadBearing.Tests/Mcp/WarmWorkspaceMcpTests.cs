@@ -93,8 +93,10 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the warm re-check reflects the edit (the new red edge appears, and the payload changed)
         // and is byte-identical to the cold run on the edited tree.
         after.ShouldContain("MyApp.Legacy.Billing.BillingCalculator");
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (HomeController is in Web) plus its
         // reverse-dependent Domain — Billing was reused, not re-extracted.
@@ -127,10 +129,14 @@ public sealed class WarmWorkspaceMcpTests
 
         // Assert — the warm re-check reflects the new member-use site (the Now violation's site set grows from one
         // to two), the payload changed, and it is byte-identical to the cold run on the edited tree.
-        NowSiteCount(before).ShouldBe(1);
-        NowSiteCount(after).ShouldBe(2);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        NowSiteCount(before)
+            .ShouldBe(1);
+        NowSiteCount(after)
+            .ShouldBe(2);
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
@@ -165,11 +171,14 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the warm re-check reflects the new member-shape red (the async-suffix subject set grows from
         // {Save, Load} to {Save, Load, Delete}, the new one keying its own M: DocId), the payload changed, and
         // it is byte-identical to the cold run on the edited tree.
-        SubjectMembersOf(before, "naming/async-suffix").ShouldBe([SaveMemberId, LoadMemberId], true);
+        SubjectMembersOf(before, "naming/async-suffix")
+            .ShouldBe([SaveMemberId, LoadMemberId], true);
         SubjectMembersOf(after, "naming/async-suffix")
             .ShouldBe([SaveMemberId, LoadMemberId, DeleteMemberId], true);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
@@ -210,9 +219,12 @@ public sealed class WarmWorkspaceMcpTests
         // the warm result is byte-identical to the cold run on the edited tree.
         SubjectMembersOf(before, "async/accept-cancellation")
             .ShouldBe([SaveMemberId, LoadMemberId, SaveAsyncMemberId], true);
-        SubjectMembersOf(after, "async/accept-cancellation").ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        SubjectMembersOf(after, "async/accept-cancellation")
+            .ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (Web) plus its reverse-dependent Domain.
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
@@ -244,10 +256,14 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the warm re-check reflects the flipped lifetime (the captive set shrinks from
         // {IOrderFeed, IOrderFormatter} to just {IOrderFormatter}), the payload changed, and it is
         // byte-identical to the cold run on the edited tree — the registration pass re-ran for Web.
-        CaptiveInjectedTargets(before).ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
-        CaptiveInjectedTargets(after).ShouldBe(["MyApp.Web.IOrderFormatter"], true);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        CaptiveInjectedTargets(before)
+            .ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
+        CaptiveInjectedTargets(after)
+            .ShouldBe(["MyApp.Web.IOrderFormatter"], true);
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ServiceWiring is in Web) plus its
         // reverse-dependent Domain.
@@ -284,12 +300,18 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the violation identity is unchanged (still ONE catch violation for the (ReportEndpoint,
         // Exception) pair), its site set grows from one to two, the payload changed, and it is byte-identical
         // to the cold run on the edited tree.
-        CatchViolationCount(before).ShouldBe(1);
-        CatchViolationCount(after).ShouldBe(1);
-        CatchSiteCount(before).ShouldBe(1);
-        CatchSiteCount(after).ShouldBe(2);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        CatchViolationCount(before)
+            .ShouldBe(1);
+        CatchViolationCount(after)
+            .ShouldBe(1);
+        CatchSiteCount(before)
+            .ShouldBe(1);
+        CatchSiteCount(after)
+            .ShouldBe(2);
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
         // reverse-dependent Domain.
@@ -325,13 +347,20 @@ public sealed class WarmWorkspaceMcpTests
         // while the plain catch ban keeps ReportEndpoint red at the very same single site, because a `when`
         // filter never suppresses the catch edge — it only changes which of the edge's sites are recorded
         // unfiltered (GRAMMAR §4.8). And the warm answer is byte-identical to the cold one.
-        UnfilteredCatchSources(before).ShouldBe(["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"], true);
-        UnfilteredCatchSources(after).ShouldBe(["MyApp.Web.ReportPublisher"], true);
-        RuleStatusOf(before, "exceptions/no-general-catch").ShouldBe("failed");
-        RuleStatusOf(after, "exceptions/no-general-catch").ShouldBe("failed");
-        CatchSiteCount(after).ShouldBe(1);
-        after.NormalizedTrimmed().ShouldNotBe(before.NormalizedTrimmed());
-        after.NormalizedTrimmed().ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        UnfilteredCatchSources(before)
+            .ShouldBe(["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"], true);
+        UnfilteredCatchSources(after)
+            .ShouldBe(["MyApp.Web.ReportPublisher"], true);
+        RuleStatusOf(before, "exceptions/no-general-catch")
+            .ShouldBe("failed");
+        RuleStatusOf(after, "exceptions/no-general-catch")
+            .ShouldBe("failed");
+        CatchSiteCount(after)
+            .ShouldBe(1);
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
         // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
         // reverse-dependent Domain.
@@ -372,7 +401,8 @@ public sealed class WarmWorkspaceMcpTests
         (session.SweepContentReads - readsBefore).ShouldBe(0);
         (session.FullReloadCount - reloadsBefore).ShouldBe(0);
         store.LastReExtractedProjects.ShouldBeEmpty();
-        second.NormalizedTrimmed().ShouldBe(first.NormalizedTrimmed());
+        second.NormalizedTrimmed()
+            .ShouldBe(first.NormalizedTrimmed());
     }
 
     [Fact]
@@ -422,13 +452,16 @@ public sealed class WarmWorkspaceMcpTests
 
         // Act — fire two tool calls at once. The MCP SDK dispatches them in parallel; the session gate
         // serializes the concurrent first-load, and both callers share the one immutable snapshot.
-        var first = harness.Client.CallToolAsync("arch_check", cancellationToken: Ct).AsTask();
-        var second = harness.Client.CallToolAsync("arch_status", cancellationToken: Ct).AsTask();
+        var first = harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)
+            .AsTask();
+        var second = harness.Client.CallToolAsync("arch_status", cancellationToken: Ct)
+            .AsTask();
         var results = await Task.WhenAll(first, second);
 
         // Assert — both succeeded with content.
         results.ShouldAllBe(result => result.IsError != true);
-        results.Select(result => result.ShouldHaveTextContent()).ShouldAllBe(text => text.Length > 0);
+        results.Select(result => result.ShouldHaveTextContent())
+            .ShouldAllBe(text => text.Length > 0);
     }
 
     [Fact]
@@ -456,7 +489,9 @@ public sealed class WarmWorkspaceMcpTests
 
         // Assert — the tool errors with exactly the text the cold CLI wrote to stderr in the same state.
         check.IsError.ShouldBe(true);
-        check.ShouldHaveTextContent().NormalizedTrimmed().ShouldBe(coldCheck.Err.NormalizedTrimmed());
+        check.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(coldCheck.Err.NormalizedTrimmed());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
@@ -502,7 +537,8 @@ public sealed class WarmWorkspaceMcpTests
     private static IReadOnlyList<string> SubjectMembersOf(string checkJson, string ruleId)
     {
         return CheckJson.Violations(checkJson, ruleId)
-            .Select(violation => violation.GetProperty("subjectMember").GetString()!)
+            .Select(violation => violation.GetProperty("subjectMember")
+                .GetString()!)
             .ToList();
     }
 
@@ -510,7 +546,8 @@ public sealed class WarmWorkspaceMcpTests
     private static IReadOnlyList<string> CaptiveInjectedTargets(string checkJson)
     {
         return CheckJson.Violations(checkJson, "di/no-captive-dependencies")
-            .Select(violation => violation.GetProperty("target").GetString()!)
+            .Select(violation => violation.GetProperty("target")
+                .GetString()!)
             .ToList();
     }
 
@@ -518,8 +555,10 @@ public sealed class WarmWorkspaceMcpTests
     private static int NowSiteCount(string checkJson)
     {
         return CheckJson.Violations(checkJson, "time/inject-clock")
-            .Single(violation => violation.GetProperty("targetMember").GetString() == "P:System.DateTime.Now")
-            .GetProperty("sites").GetArrayLength();
+            .Single(violation => violation.GetProperty("targetMember")
+                .GetString() == "P:System.DateTime.Now")
+            .GetProperty("sites")
+            .GetArrayLength();
     }
 
     // The number of distinct catch violations ReportEndpoint contributes (one per (source, caught) type pair)
@@ -528,28 +567,34 @@ public sealed class WarmWorkspaceMcpTests
     private static int CatchViolationCount(string checkJson)
     {
         return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
-            .Count(violation => violation.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint");
+            .Count(violation => violation.GetProperty("source")
+                .GetString() == "MyApp.Web.ReportEndpoint");
     }
 
     // The number of catch sites reported for the (ReportEndpoint, System.Exception) swallow under exceptions/no-general-catch.
     private static int CatchSiteCount(string checkJson)
     {
         return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
-            .Single(violation => violation.GetProperty("source").GetString() == "MyApp.Web.ReportEndpoint")
-            .GetProperty("sites").GetArrayLength();
+            .Single(violation => violation.GetProperty("source")
+                .GetString() == "MyApp.Web.ReportEndpoint")
+            .GetProperty("sites")
+            .GetArrayLength();
     }
 
     // A named rule's reported status — "passed", "failed" or "skipped".
     private static string RuleStatusOf(string checkJson, string ruleId)
     {
-        return CheckJson.Rule(checkJson, ruleId).GetProperty("status").GetString()!;
+        return CheckJson.Rule(checkJson, ruleId)
+            .GetProperty("status")
+            .GetString()!;
     }
 
     // The catching types exceptions/no-unfiltered-catch reports, one per (source, caught) type pair.
     private static IReadOnlyList<string> UnfilteredCatchSources(string checkJson)
     {
         return CheckJson.Violations(checkJson, "exceptions/no-unfiltered-catch")
-            .Select(violation => violation.GetProperty("source").GetString()!)
+            .Select(violation => violation.GetProperty("source")
+                .GetString()!)
             .ToList();
     }
 }

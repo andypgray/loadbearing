@@ -64,10 +64,14 @@ public sealed class SourceAnchorTests
 
         // Assert
         anchors.Count.ShouldBe(2);
-        anchors[0].File.ShouldBe("src/One.cs");
-        anchors[0].DocLine.ShouldBe(2);
-        anchors[1].File.ShouldBe("src/Two.cs");
-        anchors[1].DocLine.ShouldBe(6);
+        anchors[0]
+            .File.ShouldBe("src/One.cs");
+        anchors[0]
+            .DocLine.ShouldBe(2);
+        anchors[1]
+            .File.ShouldBe("src/Two.cs");
+        anchors[1]
+            .DocLine.ShouldBe(6);
     }
 
     [Theory]

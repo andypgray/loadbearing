@@ -39,23 +39,29 @@ public sealed class LegacySpecLoadingTests
                 .ShouldBe(".NETFramework,Version=v4.8");
 
             // Type identity holds across the ALC boundary — the shared-contract-to-Default delegation.
-            specs.ShouldHaveSingleItem().ShouldBeAssignableTo<IArchitectureSpec>();
+            specs.ShouldHaveSingleItem()
+                .ShouldBeAssignableTo<IArchitectureSpec>();
 
             // The model builds, and the second sentence comes from a typeof() anchor on a net48 product type.
-            model.Rules.Single(rule => rule.Id == "legacy/interfaces").Sentence
+            model.Rules.Single(rule => rule.Id == "legacy/interfaces")
+                .Sentence
                 .ShouldBe("Interfaces in `Legacy.*` must be named `I*`.");
-            model.Rules.Single(rule => rule.Id == "legacy/gateway-through-interface").Sentence
+            model.Rules.Single(rule => rule.Id == "legacy/gateway-through-interface")
+                .Sentence
                 .ShouldBe("Types in `Legacy.*` must not construct `BillingGateway`.");
 
             // The load-bearing finding: a net48 build writes no .deps.json, so the AssemblyDependencyResolver
             // has nothing to consult and falls back to the spec's own output directory — where
             // CopyLocalLockFileAssemblies staged the product DLL. It lands in the spec ALC, not Default.
-            File.Exists(Path.ChangeExtension(specPath, ".deps.json")).ShouldBeFalse();
+            File.Exists(Path.ChangeExtension(specPath, ".deps.json"))
+                .ShouldBeFalse();
             File.Exists(Path.Combine(Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll"))
                 .ShouldBeTrue();
-            Assembly product = context.Assemblies.Single(loaded => loaded.GetName().Name == ProductAssemblyName);
+            Assembly product = context.Assemblies.Single(loaded => loaded.GetName()
+                .Name == ProductAssemblyName);
             AssemblyLoadContext.Default.Assemblies
-                .Select(loaded => loaded.GetName().Name)
+                .Select(loaded => loaded.GetName()
+                    .Name)
                 .ShouldNotContain(ProductAssemblyName);
 
             // The context loads dependencies from their bytes so a warm host leaves the spec's build output

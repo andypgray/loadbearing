@@ -50,9 +50,12 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // …folded in place, not reloaded: the generation holds, and only the edited file's project bumps —
         // the delta the incremental fragment store diffs. Money.cs is in Domain, so Web and Billing are still.
         after.Generation.ShouldBe(before.Generation);
-        after.ProjectEditVersions[Domain].ShouldBeGreaterThan(before.ProjectEditVersions[Domain]);
-        after.ProjectEditVersions[Web].ShouldBe(before.ProjectEditVersions[Web]);
-        after.ProjectEditVersions[Billing].ShouldBe(before.ProjectEditVersions[Billing]);
+        after.ProjectEditVersions[Domain]
+            .ShouldBeGreaterThan(before.ProjectEditVersions[Domain]);
+        after.ProjectEditVersions[Web]
+            .ShouldBe(before.ProjectEditVersions[Web]);
+        after.ProjectEditVersions[Billing]
+            .ShouldBe(before.ProjectEditVersions[Billing]);
     }
 
     [Fact]
@@ -118,7 +121,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
 
         // Assert — exactly one reload, and the deleted document is gone from the fresh solution.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
-        after.Solution.GetDocumentIdsWithFilePath(Path.GetFullPath(deleted)).ShouldBeEmpty();
+        after.Solution.GetDocumentIdsWithFilePath(Path.GetFullPath(deleted))
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -152,7 +156,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         WorkspaceSession session = shared.Session;
         await session.GetCurrentAsync(shared.SolutionPath, ct);
         long reloadsBefore = session.FullReloadCount;
-        File.Exists(shared.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs")).ShouldBeTrue();
+        File.Exists(shared.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"))
+            .ShouldBeTrue();
 
         // Act — two more reconcile sweeps with disk untouched.
         await session.GetCurrentAsync(shared.SolutionPath, ct);
@@ -300,7 +305,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
 
     private static async Task<string> DocumentTextAsync(WorkspaceSnapshot snapshot, string path, CancellationToken ct)
     {
-        DocumentId documentId = snapshot.Solution.GetDocumentIdsWithFilePath(Path.GetFullPath(path)).First();
+        DocumentId documentId = snapshot.Solution.GetDocumentIdsWithFilePath(Path.GetFullPath(path))
+            .First();
         SourceText text = await snapshot.Solution.GetDocument(documentId)!.GetTextAsync(ct);
         return text.ToString();
     }

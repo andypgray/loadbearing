@@ -195,13 +195,15 @@ public sealed class SpecExclusionTests : IDisposable
         string solutionPath = _temp.PathOf("Filtered.slnf");
         File.WriteAllText(solutionPath, """{ "solution": { "path": "App.slnx", "projects": [] } }""");
 
-        SpecExclusion.TryReadDeclaredMembers(solutionPath).ShouldBeNull();
+        SpecExclusion.TryReadDeclaredMembers(solutionPath)
+            .ShouldBeNull();
     }
 
     [Fact]
     public void TryReadDeclaredMembers_MissingFile_ReturnsNull()
     {
-        SpecExclusion.TryReadDeclaredMembers(_temp.PathOf("does-not-exist.slnx")).ShouldBeNull();
+        SpecExclusion.TryReadDeclaredMembers(_temp.PathOf("does-not-exist.slnx"))
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -211,15 +213,19 @@ public sealed class SpecExclusionTests : IDisposable
         string solutionPath = _temp.PathOf("Broken.slnx");
         File.WriteAllText(solutionPath, "<Solution><Project Path=\"a.csproj\">");
 
-        SpecExclusion.TryReadDeclaredMembers(solutionPath).ShouldBeNull();
+        SpecExclusion.TryReadDeclaredMembers(solutionPath)
+            .ShouldBeNull();
     }
 
     [Fact]
     public void IsDeclaredMember_UnreadableMembershipOrUnknownPath_IsTrue()
     {
-        SpecExclusion.IsDeclaredMember(null, "/repo/src/App.csproj").ShouldBeTrue();
-        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), null).ShouldBeTrue();
-        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), "/repo/src/App.csproj").ShouldBeFalse();
+        SpecExclusion.IsDeclaredMember(null, "/repo/src/App.csproj")
+            .ShouldBeTrue();
+        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), null)
+            .ShouldBeTrue();
+        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), "/repo/src/App.csproj")
+            .ShouldBeFalse();
     }
 
     private static IReadOnlySet<string> Declared(params string[] csprojPaths)

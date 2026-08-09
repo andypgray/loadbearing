@@ -43,7 +43,8 @@ public sealed class QuarantineContainmentTests
 
     private static string SymbolId(string fullName)
     {
-        return Codebase.Types.Single(t => t.FullName == fullName).SymbolId;
+        return Codebase.Types.Single(t => t.FullName == fullName)
+            .SymbolId;
     }
 
     private static BaselineIndex Index(params BaselineEntry[] entries)
@@ -53,7 +54,8 @@ public sealed class QuarantineContainmentTests
 
     private static RuleResult Containment(BaselineIndex baselines, Action<Arch> scope)
     {
-        return Checker.Run(Codebase, baselines, null, scope).ForRule(ContainmentId);
+        return Checker.Run(Codebase, baselines, null, scope)
+            .ForRule(ContainmentId);
     }
 
     [Fact]
@@ -62,8 +64,10 @@ public sealed class QuarantineContainmentTests
         RuleResult containment = Containment(BaselineIndex.Empty, BoundaryScope);
 
         containment.Status.ShouldBe(RuleStatus.Failed);
-        containment.ReferencePairs().ShouldContain("App.Client.User -> App.Legacy.Internal");
-        containment.ReferencePairs().ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
+        containment.ReferencePairs()
+            .ShouldContain("App.Client.User -> App.Legacy.Internal");
+        containment.ReferencePairs()
+            .ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
         containment.BaselineCaptured.ShouldBeFalse();
     }
 
@@ -90,7 +94,8 @@ public sealed class QuarantineContainmentTests
         RuleResult containment = Containment(baselines, HermeticScope);
 
         containment.Status.ShouldBe(RuleStatus.Failed);
-        containment.ReferencePairs().ShouldBe(["App.Client.User -> App.Legacy.IFacade"]);
+        containment.ReferencePairs()
+            .ShouldBe(["App.Client.User -> App.Legacy.IFacade"]);
         containment.ShouldHaveGrandfathered(1);
     }
 
@@ -116,10 +121,11 @@ public sealed class QuarantineContainmentTests
         RuleResult containment = Containment(BaselineIndex.Empty, HermeticScope);
 
         containment.Status.ShouldBe(RuleStatus.Failed);
-        containment.ReferencePairs().ShouldBe(
-        [
-            "App.Client.User -> App.Legacy.IFacade",
-            "App.Client.User -> App.Legacy.Internal"
-        ]);
+        containment.ReferencePairs()
+            .ShouldBe(
+            [
+                "App.Client.User -> App.Legacy.IFacade",
+                "App.Client.User -> App.Legacy.Internal"
+            ]);
     }
 }

@@ -28,7 +28,8 @@ public sealed class SerilogConfigurationTests
     [InlineData("   ")]
     public void ParseLogLevel_NullOrBlank_FallsBackToWarning(string? envValue)
     {
-        SerilogConfiguration.ParseLogLevel(envValue).ShouldBe(LogEventLevel.Warning);
+        SerilogConfiguration.ParseLogLevel(envValue)
+            .ShouldBe(LogEventLevel.Warning);
     }
 
     [Theory]
@@ -40,7 +41,8 @@ public sealed class SerilogConfigurationTests
     [InlineData("Critical", LogEventLevel.Fatal)]
     public void ParseLogLevel_MicrosoftLevelName_MapsToItsSerilogEquivalent(string envValue, LogEventLevel expected)
     {
-        SerilogConfiguration.ParseLogLevel(envValue).ShouldBe(expected);
+        SerilogConfiguration.ParseLogLevel(envValue)
+            .ShouldBe(expected);
     }
 
     [Theory]
@@ -49,7 +51,8 @@ public sealed class SerilogConfigurationTests
     public void ParseLogLevel_SerilogOnlyLevelName_IsAcceptedDirectly(string envValue, LogEventLevel expected)
     {
         // Verbose and Fatal have no Microsoft spelling, so they can only come through the second parse.
-        SerilogConfiguration.ParseLogLevel(envValue).ShouldBe(expected);
+        SerilogConfiguration.ParseLogLevel(envValue)
+            .ShouldBe(expected);
     }
 
     [Theory]
@@ -58,14 +61,16 @@ public sealed class SerilogConfigurationTests
     [InlineData("wArNiNg")]
     public void ParseLogLevel_IsCaseInsensitive(string envValue)
     {
-        SerilogConfiguration.ParseLogLevel(envValue).ShouldBe(LogEventLevel.Warning);
+        SerilogConfiguration.ParseLogLevel(envValue)
+            .ShouldBe(LogEventLevel.Warning);
     }
 
     [Fact]
     public void ParseLogLevel_None_SilencesLogging()
     {
         // Microsoft's LogLevel.None has no Serilog level; it converts to the off sentinel above Fatal.
-        SerilogConfiguration.ParseLogLevel("None").ShouldBe(LevelAlias.Off);
+        SerilogConfiguration.ParseLogLevel("None")
+            .ShouldBe(LevelAlias.Off);
     }
 
     [Theory]
@@ -77,7 +82,8 @@ public sealed class SerilogConfigurationTests
     {
         // Enum.TryParse binds any numeric string to an enum value, defined or not — "99" would otherwise
         // become a level nothing is ever logged at, silencing the log file without saying so.
-        SerilogConfiguration.ParseLogLevel(envValue).ShouldBe(LogEventLevel.Warning);
+        SerilogConfiguration.ParseLogLevel(envValue)
+            .ShouldBe(LogEventLevel.Warning);
     }
 
     [Fact]
@@ -96,6 +102,7 @@ public sealed class SerilogConfigurationTests
             "logs");
 
         SerilogConfiguration.LogDirectory.ShouldBe(expected);
-        Path.IsPathRooted(SerilogConfiguration.LogDirectory).ShouldBeTrue();
+        Path.IsPathRooted(SerilogConfiguration.LogDirectory)
+            .ShouldBeTrue();
     }
 }

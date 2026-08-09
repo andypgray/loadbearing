@@ -21,15 +21,25 @@ public sealed class LawPlaceClassifierTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/not-reference")
-                .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/not-referenced-by")
-                .Enforce(arch.Namespace("A.*").MustNotBeReferencedBy(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotBeReferencedBy(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/only-reference")
-                .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustOnlyReference(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/only-referenced-by")
-                .Enforce(arch.Namespace("A.*").MustOnlyBeReferencedBy(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustOnlyBeReferencedBy(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/not-expose")
-                .Enforce(arch.Namespace("A.*").MustNotExpose(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotExpose(arch.Namespace("B.*")))
+                .Because("x");
         });
 
         // Act + Assert
@@ -43,10 +53,18 @@ public sealed class LawPlaceClassifierTests
         // and an arrow would misrepresent it.
         ArchitectureModel model = Checker.Model(arch =>
         {
-            arch.Rule("r/prefix").Enforce(arch.Namespace("A.*").MustHavePrefix("I")).Because("x");
-            arch.Rule("r/sealed").Enforce(arch.Namespace("A.*").MustBeSealed()).Because("x");
+            arch.Rule("r/prefix")
+                .Enforce(arch.Namespace("A.*")
+                    .MustHavePrefix("I"))
+                .Because("x");
+            arch.Rule("r/sealed")
+                .Enforce(arch.Namespace("A.*")
+                    .MustBeSealed())
+                .Because("x");
             arch.Rule("r/construct")
-                .Enforce(arch.Namespace("A.*").MustNotConstruct(arch.Namespace("B.*"))).Because("x");
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotConstruct(arch.Namespace("B.*")))
+                .Because("x");
         });
 
         // Act + Assert
@@ -60,7 +78,9 @@ public sealed class LawPlaceClassifierTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             Layer domain = arch.Layer("Domain", "MyApp.Domain.*", "MyApp.Shared.*");
-            arch.Rule("r/one").Enforce(domain.MustNotReference(arch.Namespace("B.*"))).Because("x");
+            arch.Rule("r/one")
+                .Enforce(domain.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
         });
 
         // Act
@@ -82,9 +102,13 @@ public sealed class LawPlaceClassifierTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             Layer web = arch.Layer("Web", "MyApp.Web.*");
-            arch.Rule("r/one").Enforce(web.MustNotReference(arch.Namespace("B.*"))).Because("x");
+            arch.Rule("r/one")
+                .Enforce(web.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/two")
-                .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("C.*"))).Because("x");
+                .Enforce(arch.Namespace("MyApp.Web.*")
+                    .MustNotReference(arch.Namespace("C.*")))
+                .Because("x");
         });
 
         // Act
@@ -106,7 +130,8 @@ public sealed class LawPlaceClassifierTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("Microsoft.Build.*").MustNotReference(arch.Namespace("B.*")))
+                .Enforce(arch.Namespace("Microsoft.Build.*")
+                    .MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
 
         // Act
@@ -125,7 +150,8 @@ public sealed class LawPlaceClassifierTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Project("MyApp.Web").MustNotReference(arch.Namespace("B.*")))
+                .Enforce(arch.Project("MyApp.Web")
+                    .MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
 
         // Act
@@ -143,7 +169,8 @@ public sealed class LawPlaceClassifierTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.*").MustNotReference(typeof(Environment)))
+                .Enforce(arch.Namespace("A.*")
+                    .MustNotReference(typeof(Environment)))
                 .Because("x"));
 
         // Act
@@ -165,7 +192,8 @@ public sealed class LawPlaceClassifierTests
         // question of where, so they never move the node.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Types.InNamespace("MyApp.Web.*").OfKind(TypeKind.Interface)
+                .Enforce(arch.Types.InNamespace("MyApp.Web.*")
+                    .OfKind(TypeKind.Interface)
                     .Except(arch.Types.WithNameMatching("Legacy*"))
                     .MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
@@ -185,15 +213,21 @@ public sealed class LawPlaceClassifierTests
         // intersection of regions whose honest node is none.
         ArchitectureModel model = Checker.Model(arch =>
         {
-            arch.Rule("r/bare").Enforce(arch.Types.MustNotReference(arch.Namespace("B.*"))).Because("x");
+            arch.Rule("r/bare")
+                .Enforce(arch.Types.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
             arch.Rule("r/two")
-                .Enforce(arch.Types.InNamespace("A.*").InNamespace("A.B.*").MustNotReference(arch.Namespace("B.*")))
+                .Enforce(arch.Types.InNamespace("A.*")
+                    .InNamespace("A.B.*")
+                    .MustNotReference(arch.Namespace("B.*")))
                 .Because("x");
         });
 
         // Act + Assert
-        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers).ShouldBeNull();
-        LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers).ShouldBeNull();
+        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldBeNull();
+        LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers)
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -220,11 +254,13 @@ public sealed class LawPlaceClassifierTests
         // Arrange — a registration is a lifetime rather than a location.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Registered(Lifetime.Singleton).MustNotReference(arch.Namespace("B.*")))
+                .Enforce(arch.Registered(Lifetime.Singleton)
+                    .MustNotReference(arch.Namespace("B.*")))
                 .Because("x"));
 
         // Act + Assert
-        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers).ShouldBeNull();
+        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldBeNull();
     }
 
     private static Selection Subject(ArchitectureModel model, int rule = 0)

@@ -16,23 +16,32 @@ public class GenericsTests
     public void Definition_ConstructedGeneric_ReturnsOpenDefinition()
     {
         // A constructed generic collapses to its open definition (Task<int> → Task<>, Dictionary<,>).
-        Generics.Definition(typeof(Task<int>)).ShouldBe(typeof(Task<>));
-        Generics.Definition(typeof(Dictionary<string, int>)).ShouldBe(typeof(Dictionary<,>));
+        Generics.Definition(typeof(Task<int>))
+            .ShouldBe(typeof(Task<>));
+        Generics.Definition(typeof(Dictionary<string, int>))
+            .ShouldBe(typeof(Dictionary<,>));
 
         // An open definition and a non-generic type are returned unchanged.
-        Generics.Definition(typeof(Task<>)).ShouldBe(typeof(Task<>));
-        Generics.Definition(typeof(string)).ShouldBe(typeof(string));
+        Generics.Definition(typeof(Task<>))
+            .ShouldBe(typeof(Task<>));
+        Generics.Definition(typeof(string))
+            .ShouldBe(typeof(string));
     }
 
     [Fact]
     public void IsConstructed_DistinguishesClosedFromOpenAndNonGeneric()
     {
         // Only a closed/constructed generic is "constructed"; an open definition and a non-generic are not.
-        Generics.IsConstructed(typeof(Task<int>)).ShouldBeTrue();
-        Generics.IsConstructed(typeof(Dictionary<string, int>)).ShouldBeTrue();
+        Generics.IsConstructed(typeof(Task<int>))
+            .ShouldBeTrue();
+        Generics.IsConstructed(typeof(Dictionary<string, int>))
+            .ShouldBeTrue();
 
-        Generics.IsConstructed(typeof(Task<>)).ShouldBeFalse();
-        Generics.IsConstructed(typeof(string)).ShouldBeFalse();
-        Generics.IsConstructed(typeof(int)).ShouldBeFalse();
+        Generics.IsConstructed(typeof(Task<>))
+            .ShouldBeFalse();
+        Generics.IsConstructed(typeof(string))
+            .ShouldBeFalse();
+        Generics.IsConstructed(typeof(int))
+            .ShouldBeFalse();
     }
 }

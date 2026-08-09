@@ -42,7 +42,8 @@ public sealed class ServerInstructionsTests
     {
         // Reference equality, not just equal text: a bound server must pay nothing at all for the
         // unbound path existing.
-        ServerInstructions.For(null).ShouldBeSameAs(ServerInstructions.Text);
+        ServerInstructions.For(null)
+            .ShouldBeSameAs(ServerInstructions.Text);
     }
 
     [Fact]
@@ -76,7 +77,8 @@ public sealed class ServerInstructionsTests
         // why the file keeps its most droppable lines last. What must not happen silently is the banner
         // growing and pushing more of Text past the cut, so its own cost is pinned here.
         const string failure = "x";
-        int bannerLength = ServerInstructions.For(failure).Length - ServerInstructions.Text.Length - failure.Length;
+        int bannerLength = ServerInstructions.For(failure)
+            .Length - ServerInstructions.Text.Length - failure.Length;
 
         bannerLength.ShouldBeLessThanOrEqualTo(BannerBudget);
     }

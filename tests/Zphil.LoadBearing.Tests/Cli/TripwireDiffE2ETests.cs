@@ -61,7 +61,8 @@ public sealed class TripwireDiffE2ETests
         // symlink-spelled path while `git rev-parse --show-toplevel` returns the canonical one — the exact
         // divergence that silently defeated the tripwire's prefix match before the discovery-seam
         // canonicalization. This is the product-side proof of the fix; it would have caught the original bug.
-        string linkRoot = Path.Combine(Path.GetDirectoryName(repo.Root)!, "link-" + Guid.NewGuid().ToString("N"));
+        string linkRoot = Path.Combine(Path.GetDirectoryName(repo.Root)!, "link-" + Guid.NewGuid()
+            .ToString("N"));
         SymlinkSupport.CreateDirectorySymlink(linkRoot, repo.Root);
         try
         {

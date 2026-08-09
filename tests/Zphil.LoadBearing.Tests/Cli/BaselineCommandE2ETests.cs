@@ -46,10 +46,13 @@ public sealed class BaselineCommandE2ETests
 
         init.ShouldSucceed("wrote");
         // --init grandfathers the current state: both controllers' DataTable sites.
-        File.ReadAllText(file).NormalizedLines().ShouldBe(BothPairsComposed());
+        File.ReadAllText(file)
+            .NormalizedLines()
+            .ShouldBe(BothPairsComposed());
         // --init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
         // InvoiceController's two interior references into the quarantined billing scope. (The quarantine --init e2e.)
-        File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json")).NormalizedLines()
+        File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json"))
+            .NormalizedLines()
             .ShouldBe(ContainmentPairsComposed());
 
         // The survey ends by naming every failing Enforce rule, after the per-file lines, so a first --init
@@ -76,7 +79,8 @@ public sealed class BaselineCommandE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         init2.Out.ShouldContain("already captured (2 entries)");
         init2.Out.ShouldContain("unchanged");
-        File.ReadAllBytes(file).ShouldBe(afterFirst);
+        File.ReadAllBytes(file)
+            .ShouldBe(afterFirst);
     }
 
     [Fact]
@@ -93,7 +97,9 @@ public sealed class BaselineCommandE2ETests
         accept.ShouldSucceed("accepted 1 reduction");
         accept.Out.ShouldContain("refused 1 addition");
         // The Invoice entry is gone; the section is empty (with a fresh digest).
-        File.ReadAllText(workspace.PathOf(ConventionalFile)).NormalizedLines().ShouldBe(EmptySectionComposed());
+        File.ReadAllText(workspace.PathOf(ConventionalFile))
+            .NormalizedLines()
+            .ShouldBe(EmptySectionComposed());
 
         // The ratchet never gated: HomeController is still red, so check still fails.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
@@ -106,10 +112,11 @@ public sealed class BaselineCommandE2ETests
         using var workspace = new TempFixtureWorkspace();
         string file = workspace.PathOf(ConventionalFile);
         // Append a HomeController entry by hand without updating the digest — the tamper the ratchet refuses.
-        File.WriteAllText(file, File.ReadAllText(file).Replace(
-            "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n",
-            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\" },\n" +
-            "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n"));
+        File.WriteAllText(file, File.ReadAllText(file)
+            .Replace(
+                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n",
+                "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\" },\n" +
+                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n"));
 
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
         check.ShouldRefuseWith("failed its integrity check");

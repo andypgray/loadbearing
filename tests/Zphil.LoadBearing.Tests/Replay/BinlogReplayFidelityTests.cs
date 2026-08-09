@@ -53,7 +53,8 @@ public sealed class BinlogReplayFidelityTests
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
 
-        model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController").ShouldBeTrue();
+        model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
+            .ShouldBeTrue();
         model.ConstructorEdge("MyApp.Web.InvoiceController", "System.Data.DataTable")
             .Constructed.IsExternal.ShouldBeTrue();
     }
@@ -74,7 +75,8 @@ public sealed class BinlogReplayFidelityTests
             CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
 
             // Assert — the post-capture type is in the model, proving text is not embedded in the binlog.
-            model.Types.Select(t => t.FullName).ShouldContain("MyApp.Domain.ReplayFreshnessProbe");
+            model.Types.Select(t => t.FullName)
+                .ShouldContain("MyApp.Domain.ReplayFreshnessProbe");
         }
         finally
         {
@@ -84,7 +86,8 @@ public sealed class BinlogReplayFidelityTests
         // And the revert is visible to a fresh replay — the freshness contract cuts both ways.
         using ReplayedSolution reverted = BinlogReplayer.Replay(Fixture.BinlogPath);
         CodebaseModel afterRevert = await CodebaseExtractor.ExtractFromSolutionAsync(reverted.Solution);
-        afterRevert.Types.Select(t => t.FullName).ShouldNotContain("MyApp.Domain.ReplayFreshnessProbe");
+        afterRevert.Types.Select(t => t.FullName)
+            .ShouldNotContain("MyApp.Domain.ReplayFreshnessProbe");
     }
 
     [Fact]
@@ -111,18 +114,21 @@ public sealed class BinlogReplayFidelityTests
         // Assert — SolutionReader populates FilePath (csproj) and OutputFilePath (the obj-path intermediate
         // assembly) with no backfill needed; both must be real files on disk. Only the three C# projects
         // survive the C#-only replay filter, keyed on the extension-less MSBuild-parity names.
-        replayed.Solution.Projects.Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal)
+        replayed.Solution.Projects.Select(p => p.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
             .ShouldBe(["MyApp.Domain", "MyApp.Legacy.Billing", "MyApp.Web"]);
 
         foreach (Project project in replayed.Solution.Projects)
         {
             project.FilePath.ShouldNotBeNull();
             project.FilePath!.ShouldEndWith(".csproj");
-            File.Exists(project.FilePath).ShouldBeTrue($"csproj should exist on disk: {project.FilePath}");
+            File.Exists(project.FilePath)
+                .ShouldBeTrue($"csproj should exist on disk: {project.FilePath}");
 
             project.OutputFilePath.ShouldNotBeNull();
-            File.Exists(project.OutputFilePath!).ShouldBeTrue(
-                $"built output assembly should exist on disk: {project.OutputFilePath}");
+            File.Exists(project.OutputFilePath!)
+                .ShouldBeTrue(
+                    $"built output assembly should exist on disk: {project.OutputFilePath}");
         }
     }
 }

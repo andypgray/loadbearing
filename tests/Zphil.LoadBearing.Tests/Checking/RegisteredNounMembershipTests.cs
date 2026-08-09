@@ -42,13 +42,15 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton)
+                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.InjectionPairs().ShouldBe(
-            ["App.Consumer -> App.IBar", "App.Consumer -> App.Bar"], true);
+        result.InjectionPairs()
+            .ShouldBe(
+                ["App.Consumer -> App.IBar", "App.Consumer -> App.Bar"], true);
     }
 
     [Fact]
@@ -82,14 +84,16 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered()))
+                    .Enforce(arch.Registered(Lifetime.Singleton)
+                        .MustNotInject(arch.Registered()))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.InjectionPairs().ShouldBe(
-            ["App.Consumer -> App.ISingletonDep", "App.Consumer -> App.IScopedDep", "App.Consumer -> App.ITransientDep"],
-            true);
+        result.InjectionPairs()
+            .ShouldBe(
+                ["App.Consumer -> App.ISingletonDep", "App.Consumer -> App.IScopedDep", "App.Consumer -> App.ITransientDep"],
+                true);
     }
 
     [Fact]
@@ -117,12 +121,14 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton)
+                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.InjectionPairs().ShouldBe(["App.Consumer -> System.IDisposable"]);
+        result.InjectionPairs()
+            .ShouldBe(["App.Consumer -> System.IDisposable"]);
     }
 
     [Fact]
@@ -145,7 +151,8 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Scoped).MustNotInject(arch.Types))
+                    .Enforce(arch.Registered(Lifetime.Scoped)
+                        .MustNotInject(arch.Types))
                     .Because("b"))
             .Single();
 

@@ -32,7 +32,8 @@ public sealed class DiagramComposerTests
 
         // Assert — the codebase question first, then the spec's answer to it, each fenced and each
         // announcing its own source in an accessible title.
-        Fences(body).ShouldBe(2);
+        Fences(body)
+            .ShouldBe(2);
         body.ShouldContain($"    accTitle: Codebase survey: {SolutionName}");
         body.ShouldContain($"    accTitle: Architecture law: {SpecName}");
         body.IndexOf("Codebase survey:", StringComparison.Ordinal)
@@ -95,12 +96,14 @@ public sealed class DiagramComposerTests
     {
         return ArchModelBuilder.Build(new InlineSpec(arch =>
             arch.Rule("layering/lib-is-a-leaf")
-                .Enforce(arch.Namespace("Lib.*").MustNotReference(arch.Namespace("App.*")))
+                .Enforce(arch.Namespace("Lib.*")
+                    .MustNotReference(arch.Namespace("App.*")))
                 .Because("A library that reaches back into its caller is not a library.")));
     }
 
     private static int Fences(string body)
     {
-        return body.Split('\n').Count(line => line == "```mermaid");
+        return body.Split('\n')
+            .Count(line => line == "```mermaid");
     }
 }

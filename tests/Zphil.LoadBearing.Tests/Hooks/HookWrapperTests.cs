@@ -84,7 +84,8 @@ public sealed class HookWrapperTests
 
         // 2 is how a Claude Code hook blocks, and the report on stderr is what the agent reads to self-correct.
         run.Result.ExitCode.ShouldBe(2);
-        run.Result.StandardError.NormalizedLines().ShouldContain(CannedReport);
+        run.Result.StandardError.NormalizedLines()
+            .ShouldContain(CannedReport);
     }
 
     [Theory]
@@ -97,7 +98,8 @@ public sealed class HookWrapperTests
         // Not 2: LoadBearing's own error is a config problem the user sees, not a violation the agent is
         // told to "fix".
         run.Result.ExitCode.ShouldBe(1);
-        run.Result.StandardError.NormalizedLines().ShouldStartWith("loadbearing config error:");
+        run.Result.StandardError.NormalizedLines()
+            .ShouldStartWith("loadbearing config error:");
     }
 
     [Theory]
@@ -135,11 +137,12 @@ public sealed class HookWrapperTests
         string reference = ShouldHaveContractRegion(wrappers[0]);
 
         foreach (string wrapper in wrappers.Skip(1))
-            ShouldHaveContractRegion(wrapper).ShouldBe(
-                reference,
-                $"{wrapper} has drifted from {wrappers[0]} inside the wrapper contract region. Only the three "
-                + "config defaults and the invocation line may differ between wrappers; everything from "
-                + $"\"{ContractRegionStart}\" to end of file is one shared contract.");
+            ShouldHaveContractRegion(wrapper)
+                .ShouldBe(
+                    reference,
+                    $"{wrapper} has drifted from {wrappers[0]} inside the wrapper contract region. Only the three "
+                    + "config defaults and the invocation line may differ between wrappers; everything from "
+                    + $"\"{ContractRegionStart}\" to end of file is one shared contract.");
     }
 
     [Fact]
@@ -152,11 +155,12 @@ public sealed class HookWrapperTests
             ".claude/arch-hook.sh is absent — this checkout carries no local hook install, so the live "
             + "wrapper is outside the twin comparison on this run.");
 
-        ShouldHaveContractRegion(".claude/arch-hook.sh").ShouldBe(
-            ShouldHaveContractRegion("hooks/arch-hook.sh"),
-            ".claude/arch-hook.sh has drifted from hooks/arch-hook.sh inside the wrapper contract region. "
-            + "The local install may only differ from the committed wrapper on its invocation line (dotnet "
-            + "exec on the built HEAD CLI rather than the installed global tool).");
+        ShouldHaveContractRegion(".claude/arch-hook.sh")
+            .ShouldBe(
+                ShouldHaveContractRegion("hooks/arch-hook.sh"),
+                ".claude/arch-hook.sh has drifted from hooks/arch-hook.sh inside the wrapper contract region. "
+                + "The local install may only differ from the committed wrapper on its invocation line (dotnet "
+                + "exec on the built HEAD CLI rather than the installed global tool).");
     }
 
     /// <summary>
@@ -172,7 +176,8 @@ public sealed class HookWrapperTests
         start.ShouldBeGreaterThanOrEqualTo(
             0, $"{repoRelativePath} does not carry the wrapper contract region's opening line.");
 
-        return string.Join('\n', lines.Skip(start).Select(NormaliseLine));
+        return string.Join('\n', lines.Skip(start)
+            .Select(NormaliseLine));
     }
 
     /// <summary>
@@ -208,7 +213,8 @@ public sealed class HookWrapperTests
     private static HookRun Fire(string interpreter, string payload, int stubExit)
     {
         string interpreterPath = ShellInterpreter.Require(interpreter);
-        string root = Path.Combine(TestTempRoot.For("hook-wrappers"), Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(TestTempRoot.For("hook-wrappers"), Guid.NewGuid()
+            .ToString("N"));
         string projectDirectory = Path.Combine(root, "project");
         string stubDirectory = Path.Combine(root, "stub");
         Directory.CreateDirectory(projectDirectory);

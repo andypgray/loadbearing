@@ -20,7 +20,8 @@ public sealed class SymbolIdExtractionTests
                                                          public class Type {}
                                                          """);
 
-        model.Type("N.Type").SymbolId.ShouldBe("T:N.Type");
+        model.Type("N.Type")
+            .SymbolId.ShouldBe("T:N.Type");
     }
 
     [Fact]
@@ -44,7 +45,8 @@ public sealed class SymbolIdExtractionTests
                                                          public class Outer { public class Inner {} }
                                                          """);
 
-        model.Type("N.Outer.Inner").SymbolId.ShouldBe("T:N.Outer.Inner");
+        model.Type("N.Outer.Inner")
+            .SymbolId.ShouldBe("T:N.Outer.Inner");
     }
 
     [Fact]

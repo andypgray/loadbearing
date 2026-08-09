@@ -62,7 +62,8 @@ public sealed class CheckCacheE2ETests
         second.AcquireCount.ShouldBe(1);
 
         // --no-cache never writes: no cache.json exists anywhere under the root.
-        cache.HasCacheFile().ShouldBeFalse();
+        cache.HasCacheFile()
+            .ShouldBeFalse();
 
         second.Out.ShouldBe(first.Out);
         second.Err.ShouldBe(first.Err);
@@ -147,7 +148,8 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public void ResolveSpecOnHit_ConventionWithNoMatchingRecord_ReturnsNullForColdFallback()
     {
-        CodebaseSource.ResolveSpecOnHit(null, []).ShouldBeNull();
+        CodebaseSource.ResolveSpecOnHit(null, [])
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -295,7 +297,8 @@ public sealed class CheckCacheE2ETests
         public bool HasCacheFile()
         {
             return Directory.Exists(Root)
-                   && Directory.EnumerateFiles(Root, "cache.json", SearchOption.AllDirectories).Any();
+                   && Directory.EnumerateFiles(Root, "cache.json", SearchOption.AllDirectories)
+                       .Any();
         }
     }
 }

@@ -22,9 +22,12 @@ public sealed class AtomicFileTests
 
             AtomicFile.WriteAllBytes(path, [1, 2, 3]);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
             // The temp sibling is moved onto the target, never abandoned: the directory holds exactly it.
-            Directory.GetFiles(dir).Select(Path.GetFileName).ShouldBe(["target.bin"]);
+            Directory.GetFiles(dir)
+                .Select(Path.GetFileName)
+                .ShouldBe(["target.bin"]);
         });
     }
 
@@ -38,8 +41,11 @@ public sealed class AtomicFileTests
 
             AtomicFile.WriteAllBytes(path, [1, 2, 3]);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
-            Directory.GetFiles(dir).Select(Path.GetFileName).ShouldBe(["target.bin"]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
+            Directory.GetFiles(dir)
+                .Select(Path.GetFileName)
+                .ShouldBe(["target.bin"]);
         });
     }
 
@@ -52,7 +58,8 @@ public sealed class AtomicFileTests
 
             AtomicFile.WriteAllBytes(path, [1, 2, 3]);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
         });
     }
 
@@ -72,7 +79,8 @@ public sealed class AtomicFileTests
 
             // TryDelete ran on the failure path: the directory holds only the 'occupied' subdirectory — no
             // leftover "<target>.<guid>.tmp" sibling file.
-            Directory.GetFiles(dir).ShouldBeEmpty();
+            Directory.GetFiles(dir)
+                .ShouldBeEmpty();
         });
     }
 
@@ -87,10 +95,14 @@ public sealed class AtomicFileTests
 
             AtomicFile.Copy(source, path);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
             // The temp sibling is moved onto the target, never abandoned: beside the source, the directory holds
             // exactly it — no leftover "<target>.<guid>.tmp".
-            Directory.GetFiles(dir).Select(Path.GetFileName).OrderBy(name => name).ShouldBe(["source.bin", "target.bin"]);
+            Directory.GetFiles(dir)
+                .Select(Path.GetFileName)
+                .OrderBy(name => name)
+                .ShouldBe(["source.bin", "target.bin"]);
         });
     }
 
@@ -106,8 +118,12 @@ public sealed class AtomicFileTests
 
             AtomicFile.Copy(source, path);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
-            Directory.GetFiles(dir).Select(Path.GetFileName).OrderBy(name => name).ShouldBe(["source.bin", "target.bin"]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
+            Directory.GetFiles(dir)
+                .Select(Path.GetFileName)
+                .OrderBy(name => name)
+                .ShouldBe(["source.bin", "target.bin"]);
         });
     }
 
@@ -122,7 +138,8 @@ public sealed class AtomicFileTests
 
             AtomicFile.Copy(source, path);
 
-            File.ReadAllBytes(path).ShouldBe([1, 2, 3]);
+            File.ReadAllBytes(path)
+                .ShouldBe([1, 2, 3]);
         });
     }
 
@@ -144,7 +161,9 @@ public sealed class AtomicFileTests
 
             // TryDelete ran on the failure path: only the source file and the 'occupied' subdirectory remain —
             // no leftover "<target>.<guid>.tmp" sibling.
-            Directory.GetFiles(dir).Select(Path.GetFileName).ShouldBe(["source.bin"]);
+            Directory.GetFiles(dir)
+                .Select(Path.GetFileName)
+                .ShouldBe(["source.bin"]);
         });
     }
 

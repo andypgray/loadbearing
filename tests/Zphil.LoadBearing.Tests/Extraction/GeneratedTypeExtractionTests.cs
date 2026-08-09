@@ -87,7 +87,8 @@ public sealed class GeneratedTypeExtractionTests
     public void ExtractFacts_GeneratedCodeAttributeOnType_SetsIsGenerated()
     {
         // Arrange / Act / Assert
-        Model.Type("Gen.Emitted").IsGenerated.ShouldBeTrue();
+        Model.Type("Gen.Emitted")
+            .IsGenerated.ShouldBeTrue();
     }
 
     [Fact]
@@ -106,8 +107,10 @@ public sealed class GeneratedTypeExtractionTests
     public void ExtractFacts_AuthoredTypes_ReportIsGeneratedFalse()
     {
         // Arrange / Act / Assert — including the synthesized Program, which no attribute reaches.
-        Model.Type("App.Widget").IsGenerated.ShouldBeFalse();
-        Model.Type("Program").IsGenerated.ShouldBeFalse();
+        Model.Type("App.Widget")
+            .IsGenerated.ShouldBeFalse();
+        Model.Type("Program")
+            .IsGenerated.ShouldBeFalse();
     }
 
     [Fact]
@@ -124,7 +127,8 @@ public sealed class GeneratedTypeExtractionTests
 
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
     {
-        return types.Select(type => type.FullName).ToList();
+        return types.Select(type => type.FullName)
+            .ToList();
     }
 
     // Emits both halves of the fixture in one post-initialization output: an attributed container with an

@@ -196,7 +196,8 @@ public sealed class ReadmeAnchorGateTests
 
         // Act: guard against the scanner silently matching nothing if a doc's quoting style changes.
         foreach ((string doc, string _) in AnchorDocs)
-            if (ExtractDoc(doc).Count == 0)
+            if (ExtractDoc(doc)
+                    .Count == 0)
                 empty.Add(doc);
 
         // Assert
@@ -245,7 +246,8 @@ public sealed class ReadmeAnchorGateTests
             $"{MeridianRoot}/{BookingsController}".Replace('/', Path.DirectorySeparatorChar));
 
         // Act
-        int actual = File.ReadLines(path).Count();
+        int actual = File.ReadLines(path)
+            .Count();
 
         // Assert
         actual.ShouldBe(

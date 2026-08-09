@@ -121,13 +121,17 @@ public sealed class TypeNameFullDisplayTests
     // definition — the pair proves the two renderers agree without either side asserting itself.
     private static void AssertExtractedDefinition(Type type, string expected)
     {
-        TypeName.FullDisplay(type).ShouldBe(expected);
+        TypeName.FullDisplay(type)
+            .ShouldBe(expected);
         Model.Types.ShouldContain(t => t.FullName == expected);
     }
 
     private static void AssertExtractedInterface(string userTypeName, Type constructedInterface, string expected)
     {
-        TypeName.FullDisplay(constructedInterface).ShouldBe(expected);
-        Model.Type($"{Ns}.{userTypeName}").AllInterfaces.Select(c => c.FullName).ShouldContain(expected);
+        TypeName.FullDisplay(constructedInterface)
+            .ShouldBe(expected);
+        Model.Type($"{Ns}.{userTypeName}")
+            .AllInterfaces.Select(c => c.FullName)
+            .ShouldContain(expected);
     }
 }

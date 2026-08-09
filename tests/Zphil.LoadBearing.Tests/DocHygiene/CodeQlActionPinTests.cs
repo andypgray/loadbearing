@@ -46,11 +46,14 @@ public sealed class CodeQlActionPinTests
     public void CodeQlActionPins_WithinAWorkflow_NameOneRevision()
     {
         // Arrange
-        var byWorkflow = ReadPins().GroupBy(static pin => pin.Workflow);
+        var byWorkflow = ReadPins()
+            .GroupBy(static pin => pin.Workflow);
 
         // Act
         var split = byWorkflow
-            .Where(static workflow => workflow.Select(static pin => pin.Sha).Distinct(StringComparer.Ordinal).Count() > 1)
+            .Where(static workflow => workflow.Select(static pin => pin.Sha)
+                .Distinct(StringComparer.Ordinal)
+                .Count() > 1)
             .Select(Describe)
             .Order(StringComparer.Ordinal)
             .ToList();
@@ -94,7 +97,8 @@ public sealed class CodeQlActionPinTests
     {
         string text = File.ReadAllText(RepoRoot.Absolute(workflow));
 
-        return PinnedUse.Matches(text).Select(match => ToPin(workflow, match));
+        return PinnedUse.Matches(text)
+            .Select(match => ToPin(workflow, match));
     }
 
     private static Pin ToPin(string workflow, Match match)

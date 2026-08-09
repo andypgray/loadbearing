@@ -161,7 +161,8 @@ public sealed class PartialLoadWorkspaceE2ETests
         baseline.ShouldRefuseWith();
         baseline.Err.ShouldContain(BaselineGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
-        FilesUnder(workspace).ShouldBe(before);
+        FilesUnder(workspace)
+            .ShouldBe(before);
     }
 
     [Fact]
@@ -180,7 +181,8 @@ public sealed class PartialLoadWorkspaceE2ETests
         render.Err.ShouldContain(RenderGateLine);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
-        FilesUnder(workspace).ShouldBe(before);
+        FilesUnder(workspace)
+            .ShouldBe(before);
     }
 
     [Fact]
@@ -198,7 +200,8 @@ public sealed class PartialLoadWorkspaceE2ETests
         render.ShouldSucceed("wrote AGENTS.md");
         render.Err.ShouldContain("warning: Project file not found:"); // the diagnostics still render
         render.Err.ShouldNotContain("error: the model is incomplete"); // but the gate did not fire
-        File.Exists(rootAgents).ShouldBeTrue();
+        File.Exists(rootAgents)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -227,10 +230,13 @@ public sealed class PartialLoadWorkspaceE2ETests
         answer.ShouldNotContain(InvariantViolationFragment);
 
         // ... and the answer the partial model still supports follows, one blank line below the caveat.
-        string[] lines = answer.Replace("\r\n", "\n").TrimEnd().Split('\n');
+        string[] lines = answer.Replace("\r\n", "\n")
+            .TrimEnd()
+            .Split('\n');
         int pointer = Array.FindIndex(lines, line => line.StartsWith("No architecture scope covers", StringComparison.Ordinal));
         pointer.ShouldBeGreaterThan(0, answer);
-        lines[pointer - 1].ShouldBeEmpty();
+        lines[pointer - 1]
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -276,10 +282,11 @@ public sealed class PartialLoadWorkspaceE2ETests
         string missingProject = Path.Combine(
             Path.GetDirectoryName(workspace.SolutionPath)!, "BrokenApp.Contracts", "BrokenApp.Contracts.csproj");
 
-        File.Exists(missingProject).ShouldBeFalse(
-            customMessage:
-            $"The BrokenApp fixture healed: '{missingProject}' exists, so the solution now loads completely and "
-            + "every fact in PartialLoadWorkspaceE2ETests would pass without exercising the incomplete-model gate.");
+        File.Exists(missingProject)
+            .ShouldBeFalse(
+                customMessage:
+                $"The BrokenApp fixture healed: '{missingProject}' exists, so the solution now loads completely and "
+                + "every fact in PartialLoadWorkspaceE2ETests would pass without exercising the incomplete-model gate.");
 
         return workspace;
     }

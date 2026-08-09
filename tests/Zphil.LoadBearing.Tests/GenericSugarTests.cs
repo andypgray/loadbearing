@@ -18,29 +18,37 @@ public class GenericSugarTests
     [Fact]
     public void TypeSugar_Generic_ReifiesIdenticallyToTypeof()
     {
-        Sentence(arch => arch.Type<SugarType>().MustBeSealed())
-            .ShouldBe(Sentence(arch => arch.Type(typeof(SugarType)).MustBeSealed()));
+        Sentence(arch => arch.Type<SugarType>()
+                .MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.Type(typeof(SugarType))
+                .MustBeSealed()));
     }
 
     [Fact]
     public void Implementing_Generic_ReifiesIdenticallyToTypeof()
     {
-        Sentence(arch => arch.Types.Implementing<ISugarPort>().MustBeSealed())
-            .ShouldBe(Sentence(arch => arch.Types.Implementing(typeof(ISugarPort)).MustBeSealed()));
+        Sentence(arch => arch.Types.Implementing<ISugarPort>()
+                .MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.Types.Implementing(typeof(ISugarPort))
+                .MustBeSealed()));
     }
 
     [Fact]
     public void DerivedFrom_Generic_ReifiesIdenticallyToTypeof()
     {
-        Sentence(arch => arch.Types.DerivedFrom<SugarBase>().MustBeSealed())
-            .ShouldBe(Sentence(arch => arch.Types.DerivedFrom(typeof(SugarBase)).MustBeSealed()));
+        Sentence(arch => arch.Types.DerivedFrom<SugarBase>()
+                .MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.Types.DerivedFrom(typeof(SugarBase))
+                .MustBeSealed()));
     }
 
     [Fact]
     public void AttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Sentence(arch => arch.Types.AttributedWith<SugarAttribute>().MustBeSealed())
-            .ShouldBe(Sentence(arch => arch.Types.AttributedWith(typeof(SugarAttribute)).MustBeSealed()));
+        Sentence(arch => arch.Types.AttributedWith<SugarAttribute>()
+                .MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.Types.AttributedWith(typeof(SugarAttribute))
+                .MustBeSealed()));
     }
 
     [Fact]
@@ -92,8 +100,10 @@ public class GenericSugarTests
     [Fact]
     public void MemberAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>().MustBePublic())
-            .ShouldBe(Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute)).MustBePublic()));
+        Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>()
+                .MustBePublic())
+            .ShouldBe(Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic()));
     }
 
     [Fact]
@@ -101,8 +111,12 @@ public class GenericSugarTests
     {
         // The MethodSelection overload returns a MethodSelection, so `.Returning` chains off the sugar —
         // this would not compile against the MemberSelection overload alone.
-        Sentence(arch => arch.Types.Methods.AttributedWith<SugarAttribute>().Returning(typeof(Task)).MustBePublic())
-            .ShouldBe(Sentence(arch => arch.Types.Methods.AttributedWith(typeof(SugarAttribute)).Returning(typeof(Task)).MustBePublic()));
+        Sentence(arch => arch.Types.Methods.AttributedWith<SugarAttribute>()
+                .Returning(typeof(Task))
+                .MustBePublic())
+            .ShouldBe(Sentence(arch => arch.Types.Methods.AttributedWith(typeof(SugarAttribute))
+                .Returning(typeof(Task))
+                .MustBePublic()));
     }
 
     [Fact]
@@ -124,14 +138,19 @@ public class GenericSugarTests
     {
         // arch.AnyOf(typeof(A), typeof(B)) ≡ arch.AnyOf(arch.Type(a), arch.Type(b)) — the multi-type noun
         // that arch.Types(params Type[]) cannot be (CS0102 against the arch.Types property).
-        Sentence(arch => arch.AnyOf(typeof(SugarType), typeof(SugarBase)).MustBeSealed())
-            .ShouldBe(Sentence(arch => arch.AnyOf(arch.Type<SugarType>(), arch.Type<SugarBase>()).MustBeSealed()));
+        Sentence(arch => arch.AnyOf(typeof(SugarType), typeof(SugarBase))
+                .MustBeSealed())
+            .ShouldBe(Sentence(arch => arch.AnyOf(arch.Type<SugarType>(), arch.Type<SugarBase>())
+                .MustBeSealed()));
     }
 
     private static string Sentence(Func<Arch, Constraint> constraint)
     {
-        return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule").Enforce(constraint(arch)).Because("b")))
-            .Rules.Single().Sentence;
+        return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule")
+                .Enforce(constraint(arch))
+                .Because("b")))
+            .Rules.Single()
+            .Sentence;
     }
 
     // Local reification markers — the sugar-equality tests only need a non-generic interface, base class,

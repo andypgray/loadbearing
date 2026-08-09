@@ -228,7 +228,8 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
 
         result.ShouldReportViolations();
-        File.ReadAllText(sarifPath).ShouldMatchGolden("violated-check.sarif");
+        File.ReadAllText(sarifPath)
+            .ShouldMatchGolden("violated-check.sarif");
     }
 
     [Fact]
@@ -245,8 +246,10 @@ public sealed class CheckCommandE2ETests
         result.ShouldReportViolations();
         using JsonDocument _ = result.ShouldHaveJsonStdout();
         result.Out.ShouldNotContain("wrote");
-        File.Exists(sarifPath).ShouldBeTrue();
-        File.ReadAllText(sarifPath).ShouldContain("\"$schema\"");
+        File.Exists(sarifPath)
+            .ShouldBeTrue();
+        File.ReadAllText(sarifPath)
+            .ShouldContain("\"$schema\"");
     }
 
     [Fact]
@@ -303,9 +306,17 @@ public sealed class CheckCommandE2ETests
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement root = document.RootElement;
 
-        root.GetProperty("rulesFilter").EnumerateArray().Select(glob => glob.GetString()).ShouldBe(["exceptions/*"]);
-        root.GetProperty("rules").GetArrayLength().ShouldBe(5);
-        root.GetProperty("summary").GetProperty("rulesChecked").GetInt32().ShouldBe(5);
+        root.GetProperty("rulesFilter")
+            .EnumerateArray()
+            .Select(glob => glob.GetString())
+            .ShouldBe(["exceptions/*"]);
+        root.GetProperty("rules")
+            .GetArrayLength()
+            .ShouldBe(5);
+        root.GetProperty("summary")
+            .GetProperty("rulesChecked")
+            .GetInt32()
+            .ShouldBe(5);
     }
 
     [Fact]
@@ -318,7 +329,8 @@ public sealed class CheckCommandE2ETests
         // one before --rules existed (which the golden above pins).
         result.ShouldReportViolations();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.TryGetProperty("rulesFilter", out _).ShouldBeFalse();
+        document.RootElement.TryGetProperty("rulesFilter", out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -342,12 +354,14 @@ public sealed class CheckCommandE2ETests
     // whole-report ShouldNotContain.
     private static string RuleBlock(string report, string ruleId)
     {
-        string[] lines = report.NormalizedTrimmed().Split('\n');
+        string[] lines = report.NormalizedTrimmed()
+            .Split('\n');
         int start = Array.FindIndex(lines, line => line.Contains($" {ruleId} —", StringComparison.Ordinal));
         start.ShouldBeGreaterThanOrEqualTo(0, $"the report names no rule {ruleId}");
 
         int end = start + 1;
-        while (end < lines.Length && lines[end].StartsWith("  ", StringComparison.Ordinal)) end++;
+        while (end < lines.Length && lines[end]
+                   .StartsWith("  ", StringComparison.Ordinal)) end++;
 
         return string.Join("\n", lines[start..end]);
     }

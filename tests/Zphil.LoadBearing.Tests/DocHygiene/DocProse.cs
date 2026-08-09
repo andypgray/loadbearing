@@ -54,7 +54,8 @@ internal static class DocProse
     /// <summary>Counts whitespace-separated tokens (runs of non-whitespace characters).</summary>
     public static int CountWords(string text)
     {
-        return NonWhitespaceRun.Matches(text).Count;
+        return NonWhitespaceRun.Matches(text)
+            .Count;
     }
 
     /// <summary>Counts em-dash (U+2014) occurrences.</summary>
@@ -66,7 +67,8 @@ internal static class DocProse
     /// <summary>Counts case-insensitive occurrences of the house tic words.</summary>
     public static int CountTics(string text)
     {
-        return TicWords.Matches(text).Count;
+        return TicWords.Matches(text)
+            .Count;
     }
 
     /// <summary>
@@ -79,7 +81,8 @@ internal static class DocProse
         var patternList = patterns as Regex[] ?? patterns.ToArray();
         string normalized = text.Replace("\r\n", "\n");
 
-        var present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized)).ToArray();
+        var present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
+            .ToArray();
         if (present.Length == 0) return [];
 
         string[] lines = normalized.Split('\n');

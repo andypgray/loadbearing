@@ -44,7 +44,8 @@ internal static class CommentText
     /// </summary>
     public static string Mask(string source)
     {
-        SyntaxNode root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        SyntaxNode root = CSharpSyntaxTree.ParseText(source)
+            .GetRoot();
 
         var masked = new char[source.Length];
         for (var index = 0; index < source.Length; index++)

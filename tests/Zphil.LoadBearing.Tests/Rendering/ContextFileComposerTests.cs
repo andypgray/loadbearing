@@ -67,12 +67,16 @@ public class ContextFileComposerTests
 
         composition.Warnings.ShouldBeEmpty();
         composition.Files.Count.ShouldBe(1);
-        composition.Files[0].Path.ShouldBe(Path.Combine("/sln", "AGENTS.md"));
+        composition.Files[0]
+            .Path.ShouldBe(Path.Combine("/sln", "AGENTS.md"));
         // The root block still carries the module map (`### Layers`, a function of the spec); what the
         // missing codebase costs is the per-directory card, whose heading is `## Layer <name>`.
-        composition.Files[0].Body.ShouldContain("## Architecture (LoadBearing)");
-        composition.Files[0].Body.ShouldContain("### Layers");
-        composition.Files[0].Body.ShouldNotContain("## Layer `Web`");
+        composition.Files[0]
+            .Body.ShouldContain("## Architecture (LoadBearing)");
+        composition.Files[0]
+            .Body.ShouldContain("### Layers");
+        composition.Files[0]
+            .Body.ShouldNotContain("## Layer `Web`");
     }
 
     [Fact]
@@ -85,12 +89,15 @@ public class ContextFileComposerTests
             ArchModelBuilder.Build(WebLayerSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
-        composition.Files.Select(file => file.Path).ShouldBe(
-            [Path.Combine("/sln", "AGENTS.md"), Path.Combine("src/MyApp.Web", "AGENTS.md")]);
+        composition.Files.Select(file => file.Path)
+            .ShouldBe(
+                [Path.Combine("/sln", "AGENTS.md"), Path.Combine("src/MyApp.Web", "AGENTS.md")]);
 
         // A scoped-only file gets the provenance line prepended; the root file carries its own.
-        composition.Files[1].Body.ShouldStartWith(AgentContextRenderer.ProvenanceLine(SpecName));
-        composition.Files[1].Body.ShouldContain("## Layer `Web`");
+        composition.Files[1]
+            .Body.ShouldStartWith(AgentContextRenderer.ProvenanceLine(SpecName));
+        composition.Files[1]
+            .Body.ShouldContain("## Layer `Web`");
     }
 
     [Fact]
@@ -112,7 +119,8 @@ public class ContextFileComposerTests
             .ShouldBeLessThan(body.IndexOf("## Quarantined scope `legacy/billing`", StringComparison.Ordinal));
 
         // And exactly one provenance line for the merged file, not one per card.
-        Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName)).ShouldBe(1);
+        Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
+            .ShouldBe(1);
     }
 
     [Fact]

@@ -14,7 +14,8 @@ public class LayerDefinitionTests
     [Fact]
     public void Domain_RendersDefinitionFragment()
     {
-        LayerDefinition domain = BuildCanonical().Layers.Single(layer => layer.Name == "Domain");
+        LayerDefinition domain = BuildCanonical()
+            .Layers.Single(layer => layer.Name == "Domain");
 
         domain.DefinitionFragment.ShouldBe("**Domain** — `MyApp.Domain.*`");
         domain.Globs.ShouldBe(["MyApp.Domain.*"]);
@@ -23,6 +24,8 @@ public class LayerDefinitionTests
     [Fact]
     public void Layers_ExposedInAuthoringOrder()
     {
-        BuildCanonical().Layers.Select(layer => layer.Name).ShouldBe(["Domain", "Web"]);
+        BuildCanonical()
+            .Layers.Select(layer => layer.Name)
+            .ShouldBe(["Domain", "Web"]);
     }
 }

@@ -39,6 +39,7 @@ public sealed class BinlogReplayerUnitTests
     public void EnsureAssemblyExtension_AppendsKindExtension_UnlessOneIsAlreadyPresent(
         string outputPath, OutputKind? outputKind, string expected)
     {
-        BinlogReplayer.EnsureAssemblyExtension(outputPath, outputKind).ShouldBe(expected);
+        BinlogReplayer.EnsureAssemblyExtension(outputPath, outputKind)
+            .ShouldBe(expected);
     }
 }

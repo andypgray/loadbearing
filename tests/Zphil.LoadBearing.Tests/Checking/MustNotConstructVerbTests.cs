@@ -48,7 +48,8 @@ public sealed class MustNotConstructVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("b"))
             .Single();
 
@@ -67,7 +68,9 @@ public sealed class MustNotConstructVerbTests
         // though MustNotReference on the same subject would fire. The target resolves, so this is not inert.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("Consumer").MustNotConstruct(arch.Namespace("Widgets.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .WithSuffix("Consumer")
+                        .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("b"))
             .Single();
 
@@ -94,7 +97,8 @@ public sealed class MustNotConstructVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("b"))
             .Single();
 
@@ -115,13 +119,15 @@ public sealed class MustNotConstructVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").Except(arch.Namespace("App.Composition.*"))
+                    .Enforce(arch.Namespace("App.*")
+                        .Except(arch.Namespace("App.Composition.*"))
                         .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("b"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ConstructionPairs().ShouldBe(["App.WidgetFactory -> Widgets.Widget"]);
+        result.ConstructionPairs()
+            .ShouldBe(["App.WidgetFactory -> Widgets.Widget"]);
     }
 
     [Fact]
@@ -145,12 +151,14 @@ public sealed class MustNotConstructVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("di/no-new")
-                    .Migrate("legacy direct construction", arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
+                    .Migrate("legacy direct construction", arch.Namespace("App.*")
+                        .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("resolve via DI"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ConstructionPairs().ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
+        result.ConstructionPairs()
+            .ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -172,12 +180,14 @@ public sealed class MustNotConstructVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("di/no-new")
-                    .Migrate("legacy direct construction", arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
+                    .Migrate("legacy direct construction", arch.Namespace("App.*")
+                        .MustNotConstruct(arch.Namespace("Widgets.*")))
                     .Because("resolve via DI"))
             .Single();
 
         result.Status.ShouldBe(RuleStatus.Failed);
-        result.ConstructionPairs().ShouldBe(["App.NewFactory -> Widgets.Widget"]);
+        result.ConstructionPairs()
+            .ShouldBe(["App.NewFactory -> Widgets.Widget"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -188,7 +198,8 @@ public sealed class MustNotConstructVerbTests
         // pattern operand is the warning gate, exactly as MustNotReference's inert-target semantics (§4.5).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("di/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*")
+                        .MustNotConstruct(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -202,7 +213,8 @@ public sealed class MustNotConstructVerbTests
         // no new slot, schemaVersion stays 3, so member/subject slots stay omitted (null) as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("di/no-new-widget")
-                .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotConstruct(arch.Namespace("Widgets.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("construction", "App.WidgetFactory", "Widgets.Widget");
