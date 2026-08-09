@@ -4,6 +4,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     How much detail a <c>graph</c> survey carries. A ladder, not a set of independent switches: each rung
 ///     keeps everything the one below it keeps and elides one more section, so a coarser answer is always a
 ///     subset of a finer one and a reader can compare two surveys by their stamp alone.
+/// </summary>
+/// <remarks>
 ///     <para>
 ///         Grain is never scope. Every rung surveys the same projects — <c>--projects</c> is the knob that
 ///         narrows the subject — which is what makes an automatic degrade safe: the answer stays about the
@@ -15,7 +17,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         sections were chosen by measurement — on a 34-project solution the namespace inventories are the
 ///         first bulk and the external-reference rows are the largest single section by a wide margin.
 ///     </para>
-/// </summary>
+/// </remarks>
 internal enum GraphGrain
 {
     /// <summary>Everything: namespace inventories, project edges and external-reference rows.</summary>

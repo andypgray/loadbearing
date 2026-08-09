@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Model;
 
 /// <summary>
 ///     <c>.AttributedWith(typeof(ApiControllerAttribute))</c> → " attributed with `[ApiController]`"
-///     (GRAMMAR §5.2) — the <c>Attribute</c> suffix is stripped and the name bracketed. The anchor is an
+///     (GRAMMAR §5.2) — the <c>Attribute</c> suffix is stripped and the name bracketed. The anchor is a
 ///     <see cref="TypeAnchor" />, so the string form
 ///     (<c>.AttributedWith("MyPackage.ApiControllerAttribute")</c>) renders the identical fragment.
 /// </summary>

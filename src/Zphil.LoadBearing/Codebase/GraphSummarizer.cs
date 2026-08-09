@@ -4,16 +4,16 @@ namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
 ///     Summarizes a <see cref="CodebaseModel" /> into a <see cref="GraphSummary" /> — the pre-spec survey
-///     the derive flow orients on. Pure over an already-deterministic model (no I/O, no Roslyn):
-///     projects with namespace inventories, observed cross-project reference edges grouped by project
-///     pair, and external references grouped by namespace root. Every result list is ordinal-ordered, so
-///     both render targets (the human survey and <c>graph --json</c>) are byte-stable.
+///     the derive flow orients on. Pure over an already-deterministic model (no I/O, no Roslyn), and
+///     every result list is ordinal-ordered, so the survey is byte-stable across runs.
 /// </summary>
 public static class GraphSummarizer
 {
     private const string GlobalNamespaceLabel = "(global)";
 
     /// <summary>Builds the survey from an extracted model.</summary>
+    /// <param name="model">The extracted codebase to summarize.</param>
+    /// <returns>The survey over every project in <paramref name="model" />.</returns>
     public static GraphSummary Summarize(CodebaseModel model)
     {
         // One pass over the type universe rather than one per project: a per-project scan makes the survey
@@ -71,6 +71,7 @@ public static class GraphSummarizer
     /// </remarks>
     /// <param name="summary">The survey to narrow.</param>
     /// <param name="projectGlobs">The project-name globs; empty means every project.</param>
+    /// <returns>A survey of the matching projects, or <paramref name="summary" /> itself when nothing narrows.</returns>
     public static GraphSummary Scope(GraphSummary summary, IReadOnlyList<string> projectGlobs)
     {
         Guard.NotNull(summary, nameof(summary));

@@ -7,12 +7,14 @@ namespace Zphil.LoadBearing.Rendering;
 ///     Renders a <see cref="CheckReport" /> as human-readable text (stdout): one block per rule in
 ///     model order, an ASCII status marker (no ANSI), the rule ID and its sentence, then — for a
 ///     failed rule — its <c>because</c>/<c>fix</c> and each red violation site (solution-relative,
-///     forward-slash paths, ordered by file then line). A ratcheted rule (Migrate or Quarantine containment)
-///     also gets a grandfathered count (baselined violations pass, so they are not listed as red) and,
-///     when it fails uncaptured, the <c>baseline --init</c> bootstrap hint. Ends with a one-line summary.
-///     This is the acceptance surface: a failing rule shows ID, because, fix, and <c>file:line</c> together.
-///     Lives in Core so the CLI and the xUnit adapter share one failure-text renderer (<see cref="RuleBlock" />).
+///     forward-slash paths, ordered by file then line). Ends with a one-line summary.
 /// </summary>
+/// <remarks>
+///     A ratcheted rule (Migrate or Quarantine containment) also gets a grandfathered count (baselined
+///     violations pass, so they are not listed as red) and, when it fails uncaptured, the
+///     <c>baseline --init</c> bootstrap hint. This is the acceptance surface: a failing rule shows ID,
+///     because, fix, and <c>file:line</c> together.
+/// </remarks>
 public static class HumanReportRenderer
 {
     /// <summary>Renders the whole report (every rule block plus the summary line) to <paramref name="output" />.</summary>
@@ -66,9 +68,8 @@ public static class HumanReportRenderer
         foreach (CheckWarning warning in result.Warnings) output.WriteLine($"  warning: {warning.Message}");
     }
 
-    // The ratchet's human lines (Migrate and Quarantine containment): a grandfathered count (baselined
-    // violations pass, so they are not listed as red sites) and, when a failed rule has no captured
-    // baseline, the bootstrap hint.
+    // The ratchet's human lines (Migrate and Quarantine containment). Baselined violations pass, so they
+    // are never listed as red sites; the grandfathered count is the only place a reader sees them.
     private static void RenderRatchetLines(TextWriter output, RuleResult result)
     {
         if (result.Grandfathered.Count > 0)
@@ -121,6 +122,8 @@ public static class HumanReportRenderer
 
         foreach (string text in unlocated) yield return text;
 
+        // Ordinal, not culture-aware: the site order is part of the rendered output, which is diffed and
+        // pinned, so it must not shift with the machine's locale.
         foreach ((string path, int line, string text) in located
                      .OrderBy(l => l.Path, StringComparer.Ordinal)
                      .ThenBy(l => l.Line)
@@ -129,8 +132,8 @@ public static class HumanReportRenderer
     }
 
     // What each of the seven edge kinds says, with placement left to the shared site loop. The
-    // cross-renderer twin of this switch in SarifReportRenderer is a house convention (each renderer
-    // formats independently); the seven copies of the loop it replaced here were not.
+    // cross-renderer twin of this switch in SarifReportRenderer is a house convention: each renderer
+    // formats independently.
     private static string EdgeText(Violation violation)
     {
         return violation.Kind switch

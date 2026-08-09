@@ -10,12 +10,17 @@ namespace Zphil.LoadBearing.Cli;
 ///     <see cref="RenderRunner" /> consults too) → otherwise extract, ask
 ///     <see cref="ContextFileComposer.Placements" /> for the cards <c>render</c> would splice, and write the
 ///     ones whose resolved directory contains the query path (layer card(s) before quarantine card(s)). No
-///     card covers the path ⇒ the same pinned pointer line. Always exits 0 — context is a lookup, never a
-///     gate. The card body carries no provenance line (that is a <c>render</c> file-splice concern).
-///     An incomplete model never gates here — but it is announced: the answer opens with a caveat block
-///     naming the load failures, because a card whose project failed to load places nowhere and the pinned
-///     pointer line would otherwise read as a clean "not dragon territory".
+///     card covers the path ⇒ the same pinned pointer line.
 /// </summary>
+/// <remarks>
+///     <para>
+///         <b>Never a gate.</b> Context is a lookup, so it always exits 0 — an incomplete model included.
+///         That is announced rather than enforced: the answer opens with a caveat block naming the load
+///         failures, because a card whose project failed to load places nowhere and the pinned pointer line
+///         would otherwise read as a clean "not dragon territory".
+///     </para>
+///     <para>The card body carries no provenance line — that is a <c>render</c> file-splice concern.</para>
+/// </remarks>
 internal sealed class ContextRunner(TextWriter output, ISolutionSource? source = null) : WorkspaceRunner(source)
 {
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)

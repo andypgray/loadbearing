@@ -5,13 +5,16 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The methods-only member modal verb (GRAMMAR §5.7) as an extension that turns a
-///     <see cref="MethodSelection" /> into a terminal <see cref="Constraint" />. Like <c>.Returning</c>,
-///     it binds by receiver type to <see cref="MethodSelection" /> — the <c>.Methods</c> projection's
-///     selection — so it is uncompilable off <c>.Properties</c>/<c>.Fields</c>/<c>.Events</c>/
-///     <c>.Members</c>, which are plain <see cref="MemberSelection" /> (methods-only by construction,
-///     GRAMMAR §3.2). Single-<see cref="Type" /> arity is deliberate: a multi-type parameter list is
-///     all-vs-any ambiguous, so there is no <c>params</c> overload.
+///     <see cref="MethodSelection" /> into a terminal <see cref="Constraint" />.
 /// </summary>
+/// <remarks>
+///     Like <c>.Returning</c>, it binds by receiver type to <see cref="MethodSelection" /> — the
+///     <c>.Methods</c> projection's selection — so it is uncompilable off
+///     <c>.Properties</c>/<c>.Fields</c>/<c>.Events</c>/<c>.Members</c>, which are plain
+///     <see cref="MemberSelection" /> (methods-only by construction, GRAMMAR §3.2).
+///     Single-<see cref="Type" /> arity is deliberate: a multi-type parameter list is all-vs-any
+///     ambiguous, so there is no <c>params</c> overload.
+/// </remarks>
 public static class MethodSelectionConstraints
 {
     /// <summary>

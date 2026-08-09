@@ -7,15 +7,15 @@ namespace Zphil.LoadBearing.Rendering;
 ///     The triage behind the law diagram: which verbs draw as an edge, and which selections land on a
 ///     place a node can stand for. Everything it declines goes to the compact list under the fence, so a
 ///     rule this classifier cannot place is still visible — the drawing narrows, the law never does.
-///     <para>
-///         The honest approximation is noun-level. A noun names a region of the codebase; adjectives
-///         narrow which types inside it the rule governs, and no adjective moves the node, because a
-///         diagram has no room to say "except these four types" and <c>loadbearing explain</c> carries
-///         the exact subject. A union has no single noun (and <see cref="Selection.Noun" /> throws on
-///         one), a registration is a lifetime rather than a location, and bare <c>arch.Types</c> is the
-///         whole solution — none of the three is a place, so all three go to the list.
-///     </para>
 /// </summary>
+/// <remarks>
+///     The honest approximation is noun-level. A noun names a region of the codebase; adjectives narrow
+///     which types inside it the rule governs, and no adjective moves the node, because a diagram has no
+///     room to say "except these four types" and <c>loadbearing explain</c> carries the exact subject. A
+///     union has no single noun (and <see cref="Selection.Noun" /> throws on one), a registration is a
+///     lifetime rather than a location, and bare <c>arch.Types</c> is the whole solution — none of the
+///     three is a place, so all three go to the list.
+/// </remarks>
 internal static class LawPlaceClassifier
 {
     /// <summary>

@@ -7,12 +7,15 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Resolves a <see cref="Selection" /> to the set of <see cref="TypeNode" />s it names, given its
-///     <see cref="SelectionPosition" /> (GRAMMAR §4.1, §5.1–§5.2). Nouns pick the candidate set;
-///     adjectives narrow it; <c>Except</c> subtracts; the hierarchy adjectives read the
-///     construction lists (open definition matches <see cref="TypeConstruction.Definition" />, a
-///     closed construction matches <see cref="TypeConstruction.FullName" />). External nodes carry
-///     empty construction lists, so hierarchy adjectives never match them (documented boundary).
+///     <see cref="SelectionPosition" /> (GRAMMAR §4.1, §5.1–§5.2): nouns pick the candidate set,
+///     adjectives narrow it, <c>Except</c> subtracts.
 /// </summary>
+/// <remarks>
+///     The hierarchy adjectives read the construction lists (open definition matches
+///     <see cref="TypeConstruction.Definition" />, a closed construction matches
+///     <see cref="TypeConstruction.FullName" />). External nodes carry empty construction lists, so
+///     hierarchy adjectives never match them (documented boundary).
+/// </remarks>
 internal sealed class SelectionEvaluator
 {
     private readonly Dictionary<string, TypeNode> _byFullName;
@@ -57,13 +60,14 @@ internal sealed class SelectionEvaluator
     }
 
     /// <summary>
-    ///     The second half of the union arm: fold the already-evaluated operand sets together and apply
-    ///     the union's own adjectives. Union adjectives apply to the unioned set, never through each
-    ///     operand (GRAMMAR §5.1): <c>AnyOf(a, b).Except(c)</c> is (a ∪ b) − c. Exposed so a caller that
-    ///     has already evaluated the operands in the same position — the per-operand emptiness gate in
-    ///     <see cref="ConstraintEvaluator" /> (GRAMMAR §9) — can finish the union without evaluating them
-    ///     a second time.
+    ///     The second half of the union arm: folds the already-evaluated operand sets together and
+    ///     applies the union's own adjectives.
     /// </summary>
+    /// <remarks>
+    ///     Union adjectives apply to the unioned set, never through each operand (GRAMMAR §5.1):
+    ///     <c>AnyOf(a, b).Except(c)</c> is (a ∪ b) − c. Exposed so a caller that has already evaluated
+    ///     the operands in the same position can finish the union without evaluating them a second time.
+    /// </remarks>
     internal HashSet<TypeNode> Unite(UnionSelection union, IReadOnlyList<HashSet<TypeNode>> parts)
     {
         var members = new HashSet<TypeNode>();
@@ -204,16 +208,8 @@ internal sealed class SelectionEvaluator
     }
 
     // The three hierarchy matchers share one shape over one construction list each — interfaces, bases,
-    // attributes. Every anchor form reduces to one of two comparisons (GRAMMAR §5.2):
-    //
-    //   * a STRING anchor names a definition, so it matches every construction of that definition and a
-    //     constructed spelling matches nothing;
-    //   * an open-generic typeof matches on the definition FullName ("any construction") and a closed or
-    //     non-generic typeof on the constructed FullName ("that construction exactly").
-    //
-    // FullDisplay runs once, eagerly, so an unrepresentable typeof throws before any node is tested; a
-    // string anchor needs no reflection at all, which is the whole point of the hatch. Shared with the
-    // MustImplement/MustDeriveFrom/MustBeAttributedWith constraint verbs and their MustNot* twins.
+    // attributes. Which name each anchor form compares on, and why FullDisplay runs eagerly, is stated
+    // once on AnchorKey (GRAMMAR §5.2).
     internal static Func<TypeNode, bool> InterfaceMatcher(TypeAnchor anchor)
     {
         return ConstructionMatcher(anchor, t => t.AllInterfaces);
@@ -232,13 +228,16 @@ internal sealed class SelectionEvaluator
     /// <summary>
     ///     The name an anchor compares on, and whether it compares on the <em>definition</em> name — the
     ///     three-arm GRAMMAR §5.2 decision, stated once for every matcher that anchors on a
-    ///     <see cref="TypeAnchor" /> (the type-side construction matchers and the member-side attribute
-    ///     matcher). A string anchor names a definition; an open-generic <c>typeof</c> matches on the
-    ///     definition name ("any construction"); anything else on the constructed name ("that construction
-    ///     exactly"). <see cref="TypeName.FullDisplay" /> runs here, so an unrepresentable <c>typeof</c>
-    ///     throws while the matcher is being built — before any subject is tested — and a string anchor
-    ///     needs no reflection at all, which is the whole point of the hatch.
+    ///     <see cref="TypeAnchor" />.
     /// </summary>
+    /// <remarks>
+    ///     A string anchor names a definition, so it matches every construction of that definition and a
+    ///     constructed spelling matches nothing; an open-generic <c>typeof</c> matches on the definition
+    ///     name ("any construction"); anything else on the constructed name ("that construction exactly").
+    ///     <see cref="TypeName.FullDisplay" /> runs here, so an unrepresentable <c>typeof</c> throws while
+    ///     the matcher is being built — before any subject is tested — and a string anchor needs no
+    ///     reflection at all, which is the whole point of the hatch.
+    /// </remarks>
     internal static (string Key, bool OnDefinition) AnchorKey(TypeAnchor anchor)
     {
         if (anchor.DefinitionFullName is { } name) return (name, true);

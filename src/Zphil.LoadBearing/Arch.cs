@@ -7,22 +7,19 @@ using Zphil.LoadBearing.Validation;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The stage-machine entry point handed to <see cref="IArchitectureSpec.Define" /> (GRAMMAR
-///     §3.2). Noun factories mint <see cref="Selection" />s stamped with this owner; <c>Rule</c> and
+///     The stage-machine entry point handed to <see cref="IArchitectureSpec.Define" /> (GRAMMAR §3.2).
+/// </summary>
+/// <remarks>
+///     Noun factories mint <see cref="Selection" />s stamped with this owner; <c>Rule</c> and
 ///     <c>Scope</c> register an anchor immediately and return a builder whose trailers mutate the
 ///     registered node. One <see cref="Arch" /> is shared across all specs in a single build, so
 ///     duplicate IDs across spec classes are caught in one pass (GRAMMAR §8 item 1).
-/// </summary>
+/// </remarks>
 public sealed class Arch
 {
     private readonly List<LayerNoun> _layers = [];
     private readonly List<Registration> _registrations = [];
 
-    /// <summary>
-    ///     Constructed by <see cref="ArchModelBuilder" /> (one fresh instance per build). Exposed to
-    ///     tests via <c>InternalsVisibleTo</c> so a second <see cref="Arch" /> can be minted to
-    ///     exercise the foreign-selection validation (§8 item 10).
-    /// </summary>
     internal Arch()
     {
     }

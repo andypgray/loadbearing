@@ -6,13 +6,14 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The v1 member modal-constraint vocabulary (GRAMMAR §5.7) as extension methods that turn a
-///     <see cref="MemberSelection" /> into a terminal <see cref="Constraint" />. Polarity is lexical,
-///     exactly like the type-side verbs (GRAMMAR §2). The naming verbs reuse the type-side "must be
-///     named" / "must have a name matching" fragments; <see cref="MustBePrivate" /> and
-///     <see cref="MustBeVirtual" /> are new member-only vocabulary. These bind by receiver type (a
-///     <see cref="MemberSelection" /> is not a <see cref="Selection" />), so the identically-named
-///     type-side verbs never collide on overload resolution.
+///     <see cref="MemberSelection" /> into a terminal <see cref="Constraint" />.
 /// </summary>
+/// <remarks>
+///     Polarity is lexical, exactly like the type-side verbs (GRAMMAR §2), and the naming verbs reuse
+///     the type-side "must be named" / "must have a name matching" fragments. These bind by receiver
+///     type (a <see cref="MemberSelection" /> is not a <see cref="Selection" />), so the
+///     identically-named type-side verbs never collide on overload resolution.
+/// </remarks>
 public static class MemberSelectionConstraints
 {
     /// <summary>The subject members' names must end with a suffix.</summary>
@@ -154,8 +155,8 @@ public static class MemberSelectionConstraints
     }
 
     // The raw-Type anchor list of the negative attribute verb, minted as typeof TypeAnchors — the
-    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10), and
-    // literally it now: both project through the one shared (first, params more) builder.
+    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10);
+    // both project through the one shared (first, params more) builder.
     private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
     {
         return OperandList.OneOrMore(first, more, type => TypeAnchor.FromType(type));

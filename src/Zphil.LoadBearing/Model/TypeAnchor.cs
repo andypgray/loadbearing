@@ -9,17 +9,11 @@ namespace Zphil.LoadBearing.Model;
 ///     definition's fully-qualified name as a verbatim string
 ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>, <c>"MyApp.Web.IHandler&lt;T&gt;"</c>).
 ///     Exactly one arm is populated — <see cref="Type" /> xor <see cref="DefinitionFullName" />.
-///     <para>
-///         The string arm is the escape hatch for a type the spec project cannot compile against:
-///         without it, naming someone else's attribute or interface forces a package reference on the
-///         spec just to write the <c>typeof</c>. One union rather than a twin node per arm, and one
-///         union across both anchor families — every attribute-bearing node (the adjective and both
-///         verbs, on the type side and the member side) and every hierarchy-anchoring node
-///         (<c>Implementing</c>, <c>DerivedFrom</c>, and the four <c>Must[Not]Implement</c> /
-///         <c>Must[Not]DeriveFrom</c> verbs) anchors through this one type. What differs between the
-///         families is downstream and has nothing to do with the anchor: which facts list the matcher
-///         reads, and whether the prose brackets the name.
-///     </para>
+/// </summary>
+/// <remarks>
+///     The string arm is the escape hatch for a type the spec project cannot compile against:
+///     without it, naming someone else's attribute or interface forces a package reference on the
+///     spec just to write the <c>typeof</c>.
 ///     <para>
 ///         String matching is <em>definition-level, exact, and verbatim</em>: the name is the type
 ///         definition's FQN in extraction format — <c>Attribute</c> suffix included for an attribute,
@@ -32,7 +26,7 @@ namespace Zphil.LoadBearing.Model;
 ///         from the shape of the string: a dotless or suffix-less name is a legal spelling that simply
 ///         never matches.
 ///     </para>
-/// </summary>
+/// </remarks>
 internal sealed class TypeAnchor
 {
     private TypeAnchor(Type? type, string? definitionFullName)

@@ -30,11 +30,10 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 ///         MSBuild itself during project evaluation.
 ///     </para>
 ///     <para>
-///         <b>Why vswhere instead of MSBuildLocator.QueryVisualStudioInstances:</b> on .NET 5+
-///         (which the parent process runs on) MSBuildLocator's query returns only DotNetSdk and
-///         DevConsole entries, never VS Setup instances. The BuildHost subprocess sees them
-///         because it runs on .NET Framework 4.7.2 — but the parent can't enumerate them through
-///         the same API. <c>vswhere.exe</c> works regardless of host runtime.
+///         <b>Why vswhere instead of MSBuildLocator.QueryVisualStudioInstances:</b> see
+///         <see cref="VsWhereLocator" />. The asymmetry that matters here is that the BuildHost
+///         subprocess <em>does</em> see VS Setup instances through that API, because it runs on
+///         .NET Framework 4.7.2 — the parent process cannot.
 ///     </para>
 /// </remarks>
 public static class MsBuildBootstrap
@@ -49,8 +48,8 @@ public static class MsBuildBootstrap
     /// <summary>
     ///     The <see cref="MsBuildSelection.Source" /> of the most recent registration: which MSBuild this
     ///     process is running on and why that one, on one line. <see langword="null" /> until something
-    ///     registers. The CLI reads it back and prints it beside workspace-load diagnostics, so "which
-    ///     MSBuild did you pick" is answerable on a machine nobody can attach a debugger to.
+    ///     registers. Exists so "which MSBuild did you pick" is answerable on a machine nobody can attach
+    ///     a debugger to.
     /// </summary>
     /// <remarks>
     ///     A <see langword="string" /> rather than the <see cref="MsBuildSelection" /> itself, deliberately:
@@ -60,12 +59,10 @@ public static class MsBuildBootstrap
     internal static string? LastSelection { get; private set; }
 
     /// <summary>
-    ///     The MSBuild-selection line appended to every non-empty diagnostics list
-    ///     (<see cref="WorkspaceDiagnostics.Rendered" />) and carried inline by the refusals that bypass
-    ///     composed lists (<see cref="IncompleteModelGate.GraphRefusal" />). A project that fails to load is
-    ///     nearly always a question about which MSBuild opened it, so the line that answers lives beside the
-    ///     state it reads. A null selection means nothing registered MSBuild at all, which for a caller that
-    ///     just opened a workspace is itself worth saying.
+    ///     The MSBuild-selection line that rides along with workspace diagnostics. A project that fails to
+    ///     load is nearly always a question about which MSBuild opened it, so the line that answers lives
+    ///     beside the state it reads. A null selection means nothing registered MSBuild at all, which for a
+    ///     caller that just opened a workspace is itself worth saying.
     /// </summary>
     internal static string SelectionNote()
     {

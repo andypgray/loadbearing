@@ -11,25 +11,31 @@ namespace Zphil.LoadBearing.Cli;
 /// <summary>
 ///     The <c>baseline</c> pipeline: grandfather, shrink, or deliberately grow the
 ///     ratcheted baselines — both Migrate rules and Quarantine containment (GRAMMAR §7). Mode validation
-///     runs first (before the workspace cost). <c>--init</c> captures each <em>uncaptured</em>
-///     ratcheted rule's current violations (an empty section for a clean rule — "captured, zero
-///     debt"). <c>--accept-reductions</c> removes captured entries whose violation no longer occurs
-///     and <em>refuses</em> new ones. Both modes end by naming any rules failing with no baseline to
-///     capture — the reds the ratchet cannot absorb. <c>--add</c> is the ratchet's escape valve:
-///     it grandfathers exactly one currently observed violation of a captured rule, with mandatory
-///     attribution — growth is never silent, never bulk. Tamper (a hand-edited digest) refuses loudly with
-///     the restore hint, the same as <c>check</c>. Output/error writers are injected so the e2e tests can
-///     capture them.
+///     runs first (before the workspace cost).
 /// </summary>
 /// <remarks>
-///     <b>What it refuses.</b> A workspace-load failure refuses the whole command on <c>check</c>'s terms —
-///     exit 2, nothing written, opt-out <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />
-///     (<see cref="IncompleteModelGate" />). The gate fires before extraction and so before any mode does
-///     its work, because every mode is dangerous against a partial model: <c>--init</c> would capture "zero
-///     debt" for rules whose subjects live in projects that did not load, and <c>--accept-reductions</c>
-///     would delete real entries as violations that "no longer occur" when the only thing that stopped is a
-///     project loading. Short of that the command reports rather than gates — a red rule is the state to
-///     capture, not a failure, so it exits 0 on success.
+///     <para>
+///         <b>The three modes.</b> <c>--init</c> captures each <em>uncaptured</em> ratcheted rule's current
+///         violations (an empty section for a clean rule — "captured, zero debt").
+///         <c>--accept-reductions</c> removes captured entries whose violation no longer occurs and
+///         <em>refuses</em> new ones. Both modes end by naming any rules failing with no baseline to
+///         capture — the reds the ratchet cannot absorb. <c>--add</c> is the ratchet's escape valve: it
+///         grandfathers exactly one currently observed violation of a captured rule, with mandatory
+///         attribution — growth is never silent, never bulk.
+///     </para>
+///     <para>
+///         <b>What it refuses.</b> Tamper (a hand-edited digest) refuses loudly with the restore hint, the
+///         same as <c>check</c>. A workspace-load failure refuses the whole command on <c>check</c>'s
+///         terms — exit 2, nothing written, opt-out
+///         <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />
+///         (<see cref="IncompleteModelGate" />). The gate fires before extraction and so before any mode
+///         does its work, because every mode is dangerous against a partial model: <c>--init</c> would
+///         capture "zero debt" for rules whose subjects live in projects that did not load, and
+///         <c>--accept-reductions</c> would delete real entries as violations that "no longer occur" when
+///         the only thing that stopped is a project loading. Short of that the command reports rather than
+///         gates — a red rule is the state to capture, not a failure, so it exits 0 on success.
+///     </para>
+///     <para>Output/error writers are injected so the e2e tests can capture them.</para>
 /// </remarks>
 internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
     : WorkspaceRunner(source)

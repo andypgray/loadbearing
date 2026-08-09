@@ -7,8 +7,8 @@ namespace Zphil.LoadBearing.Cli;
 ///     (<see cref="ModelPipeline.DiscoverSolution" /> → <see cref="WorkspaceLoader.LoadAsync" />) behind the
 ///     <see cref="ISolutionSource" /> seam. Every <see cref="AcquireAsync" /> opens a fresh
 ///     <see cref="LoadedSolution" /> and hands it to the returned handle to own, so a <c>using</c> in the
-///     caller bounds the workspace to the call — the enforcement path's lifetime, unchanged. Stateless; the
-///     default source every runner falls back to when none is injected.
+///     caller bounds the workspace to the call — the enforcement path's lifetime. Stateless; the default
+///     source every runner falls back to when none is injected.
 /// </summary>
 internal sealed class ColdSolutionSource : ISolutionSource
 {

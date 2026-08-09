@@ -4,9 +4,8 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     The Mermaid text primitives both diagram renderers share: node-ID slugging with a
-///     collision-safe dedupe, and label escaping for the characters Mermaid reads as markup. Extracted
-///     from <see cref="GraphDiagramRenderer" /> when <see cref="LawDiagramRenderer" /> arrived — one
-///     escaping rule for two fences in one artifact, so a character that is safe in the survey cannot be
+///     collision-safe dedupe, and label escaping for the characters Mermaid reads as markup. One escaping
+///     rule serves both fences of one artifact, so a character that is safe in the survey cannot be
 ///     unsafe in the law.
 /// </summary>
 internal static class MermaidText
@@ -34,9 +33,12 @@ internal static class MermaidText
     ///     A label's text with the four characters Mermaid reads as markup sent out as the entities it
     ///     reads back as themselves: a double quote would end a quoted label early, angle brackets open
     ///     markup (a generic type name is full of them), and <c>#</c> opens an entity reference
-    ///     (<c>#35;</c> is the documented escape for a literal one). The <c>#</c> pass must run FIRST —
-    ///     reversed, it would rewrite the <c>#</c> of an emitted <c>#quot;</c> into <c>#35;quot;</c>.
+    ///     (<c>#35;</c> is the documented escape for a literal one).
     /// </summary>
+    /// <remarks>
+    ///     The <c>#</c> pass must run FIRST — reversed, it would rewrite the <c>#</c> of an emitted
+    ///     <c>#quot;</c> into <c>#35;quot;</c>.
+    /// </remarks>
     internal static string Label(string text)
     {
         return text
@@ -49,10 +51,13 @@ internal static class MermaidText
     /// <summary>
     ///     One node ID per name, in order: the prefix plus a deterministic slug, deduped with an ordinal
     ///     suffix so two names that slug alike (<c>MyApp.Web</c> and <c>MyApp-Web</c>) still get distinct
-    ///     nodes. The prefix is the caller's — it is what keeps a name from ever being lexed as something
-    ///     other than a node, and what keeps an ID from starting with the <c>o</c> or <c>x</c> Mermaid's
-    ///     link rules read as an arrowhead.
+    ///     nodes.
     /// </summary>
+    /// <remarks>
+    ///     The prefix is the caller's — it is what keeps a name from ever being lexed as something other
+    ///     than a node, and what keeps an ID from starting with the <c>o</c> or <c>x</c> Mermaid's link
+    ///     rules read as an arrowhead.
+    /// </remarks>
     internal static IReadOnlyList<string> UniqueIds(string prefix, IReadOnlyList<string> names)
     {
         var taken = new HashSet<string>(StringComparer.Ordinal);

@@ -2,15 +2,11 @@ using Zphil.LoadBearing.Baselines;
 
 namespace Zphil.LoadBearing.Checking;
 
-/// <summary>
-///     One rule's evaluation outcome: its <see cref="RuleStatus" />, the <em>red</em>
-///     <see cref="Violations" /> (ordered ordinal by source/subject then target FullName), any
-///     <see cref="Warnings" />, and a <see cref="SkipReason" /> for a skipped posture. For a Migrate
-///     rule the ratchet also fills <see cref="Grandfathered" /> (baselined violations that pass),
-///     <see cref="StaleBaselineEntries" /> (baseline entries no current violation matched), and
-///     <see cref="BaselineCaptured" />. An inert-target warning leaves the rule
-///     <see cref="RuleStatus.Passed" /> (GRAMMAR §4.1).
-/// </summary>
+/// <summary>One rule's evaluation outcome.</summary>
+/// <remarks>
+///     <see cref="Violations" /> is ordered ordinal by source/subject then target FullName. An
+///     inert-target warning leaves the rule <see cref="RuleStatus.Passed" /> (GRAMMAR §4.1).
+/// </remarks>
 public sealed class RuleResult
 {
     internal RuleResult(

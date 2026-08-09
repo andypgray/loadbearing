@@ -14,13 +14,16 @@ namespace Zphil.LoadBearing.Xunit;
 ///     output), and every post-desugar rule in the spec becomes its own named test — the rule ID
 ///     <em>is</em> the test's display name, so a failing architecture rule reads as a failing test in the
 ///     test explorer.
-///     A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
-///     a Quarantine tripwire (no diff context in a test run) is reported as skipped, and everything else passes.
-///     A workspace that fails to load completely fails one named test — <see cref="Workspace_LoadedCompletely" />,
-///     carrying the load diagnostics — and every rule case skips rather than pass against a partial model.
-///     Override <see cref="AllowWorkspaceDiagnostics" /> to opt into checking the partial model as it loaded.
 /// </summary>
 /// <remarks>
+///     <para>
+///         A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
+///         a Quarantine tripwire (no diff context in a test run) is reported as skipped, and everything else
+///         passes. A workspace that fails to load completely fails one named test —
+///         <see cref="Workspace_LoadedCompletely" />, carrying the load diagnostics — and every rule case skips
+///         rather than pass against a partial model. Override <see cref="AllowWorkspaceDiagnostics" /> to opt
+///         into checking the partial model as it loaded.
+///     </para>
 ///     <para>
 ///         Rules enumerate at <em>discovery</em> time from the spec alone (no Roslyn, no workspace), so the
 ///         test explorer lists one case per rule ID. The workspace load + extraction + check runs once per
@@ -40,22 +43,28 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
     /// <summary>
     ///     The spec's own project, when the spec is a solution member — the seed of the checked universe's
-    ///     exclusion (mirrors the CLI's spec-member exclusion). That project and the private plumbing only it
-    ///     references are dropped; projects the solution file declares stay in, even when the spec references
-    ///     them, because those are the code under law. Defaults to the spec assembly's name; override to
-    ///     <see langword="null" /> when the spec lives outside the target solution.
+    ///     exclusion (mirrors the CLI's spec-member exclusion).
     /// </summary>
+    /// <remarks>
+    ///     That project and the private plumbing only it references are dropped; projects the solution file
+    ///     declares stay in, even when the spec references them, because those are the code under law.
+    ///     Defaults to the spec assembly's name; override to <see langword="null" /> when the spec lives
+    ///     outside the target solution.
+    /// </remarks>
     protected virtual string? ExcludeProjectName => typeof(TSpec).Assembly.GetName().Name;
 
     /// <summary>
     ///     Opts the rule tests into a partially-loaded workspace — the adapter's spelling of the CLI's
-    ///     <c>--allow-workspace-diagnostics</c>. By default a load failure fails
-    ///     <see cref="Workspace_LoadedCompletely" /> and skips every rule case, because a rule whose subject
-    ///     lived in an unloaded project selects nothing and an empty subject passes — a green run against a
-    ///     partial model signs a verdict that was never reached. With <see langword="true" />, rule verdicts
-    ///     come from the partial model as it loaded, and <see cref="Workspace_LoadedCompletely" /> skips
-    ///     rather than pass under a name that would then be false.
+    ///     <c>--allow-workspace-diagnostics</c>.
     /// </summary>
+    /// <remarks>
+    ///     By default a load failure fails <see cref="Workspace_LoadedCompletely" /> and skips every rule
+    ///     case, because a rule whose subject lived in an unloaded project selects nothing and an empty
+    ///     subject passes — a green run against a partial model signs a verdict that was never reached. With
+    ///     <see langword="true" />, rule verdicts come from the partial model as it loaded, and
+    ///     <see cref="Workspace_LoadedCompletely" /> skips rather than pass under a name that would then be
+    ///     false.
+    /// </remarks>
     protected virtual bool AllowWorkspaceDiagnostics => false;
 
     /// <summary>
@@ -89,10 +98,13 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
     /// <summary>
     ///     The discovery-time row source: one row per post-desugar rule ID, its ID doubling as the test
-    ///     display name. Builds the model from the spec alone (no Roslyn). A spec-build failure collapses to
-    ///     one sentinel row so it lands red at run time — where the pipeline rebuild rethrows the real
-    ///     <c>SpecValidationException</c> — rather than as a silent discovery diagnostic.
+    ///     display name. Builds the model from the spec alone (no Roslyn).
     /// </summary>
+    /// <remarks>
+    ///     A spec-build failure collapses to one sentinel row so it lands red at run time — where the
+    ///     pipeline rebuild rethrows the real <c>SpecValidationException</c> — rather than as a silent
+    ///     discovery diagnostic.
+    /// </remarks>
     public static IEnumerable<ITheoryDataRow> RuleRows()
     {
         ArchitectureModel model;

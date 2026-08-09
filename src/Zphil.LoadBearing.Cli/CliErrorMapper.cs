@@ -4,14 +4,14 @@ using Zphil.LoadBearing.Validation;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     Maps a pipeline exception to stderr text and an exit code (always 2 — "everything else") for
-///     every command (check, explain, render). <see cref="UserErrorException" /> renders message-only;
-///     <see cref="SpecValidationException" /> lists every validation error at once (agents fix a spec
-///     in one pass); anything else is a bug and gets a full stack trace. Pure and Roslyn-free, so it
-///     unit-tests without a workspace. The user-facing text is factored into
-///     <see cref="UserFacingMessage" /> so the MCP <c>GlobalCallToolFilter</c> renders the identical
-///     multi-line body on its surface.
+///     Maps a pipeline exception to stderr text and an exit code — always 2, the "everything else" code.
+///     An expected error renders message-only; anything else is a bug and gets a full stack trace. Pure and
+///     Roslyn-free, so it unit-tests without a workspace.
 /// </summary>
+/// <remarks>
+///     The user-facing text is factored into <see cref="UserFacingMessage" /> so the MCP
+///     <c>GlobalCallToolFilter</c> renders the identical multi-line body on its surface.
+/// </remarks>
 internal static class CliErrorMapper
 {
     /// <summary>
@@ -19,7 +19,7 @@ internal static class CliErrorMapper
     ///     unexpected bug (which the CLI dumps as a stack trace and the MCP filter logs as a warning).
     ///     Both surfaces render this identical text — a <see cref="UserErrorException" />'s message
     ///     verbatim, or a <see cref="SpecValidationException" />'s "Spec validation failed:" header
-    ///     followed by one indented line per error.
+    ///     followed by one indented line per error, so every validation error is fixable in one pass.
     /// </summary>
     public static string? UserFacingMessage(Exception exception)
     {

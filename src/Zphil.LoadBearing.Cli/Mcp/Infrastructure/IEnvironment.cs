@@ -7,6 +7,6 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 /// </summary>
 internal interface IEnvironment
 {
-    /// <summary>Return the value of environment variable <paramref name="name" />, or <c>null</c> if unset.</summary>
+    /// <summary>Returns the value of environment variable <paramref name="name" />, or <c>null</c> if unset.</summary>
     string? GetVariable(string name);
 }

@@ -5,16 +5,15 @@ namespace Zphil.LoadBearing.Rendering;
 ///     namespace one glob matches also match the other? <see cref="NamespacePattern" /> answers the
 ///     namespace-vs-glob question and is the semantics mirrored here — a trailing <c>.*</c> is the
 ///     self-inclusive subtree operator, and its literal prefix is compared literally.
-///     <para>
-///         Only two glob shapes are containment-comparable: an exact name (<c>Zphil.LoadBearing</c>)
-///         and a subtree whose prefix carries no wildcard (<c>MyApp.Web.*</c>). Every other legal
-///         shape — an interior standalone <c>*</c>, a partial-segment <c>*</c>, the lone <c>*</c> —
-///         matches a set no prefix comparison can decide, so it is reported as not contained. That is
-///         the deliberate asymmetry: a false negative costs a drawing one flat node, and a false
-///         positive nests a node under a parent that does not contain it, which is the diagram
-///         telling the reader something untrue.
-///     </para>
 /// </summary>
+/// <remarks>
+///     Only two glob shapes are containment-comparable: an exact name (<c>Zphil.LoadBearing</c>) and a
+///     subtree whose prefix carries no wildcard (<c>MyApp.Web.*</c>). Every other legal shape — an
+///     interior standalone <c>*</c>, a partial-segment <c>*</c>, the lone <c>*</c> — matches a set no
+///     prefix comparison can decide, so it is reported as not contained. That is the deliberate
+///     asymmetry: a false negative costs a drawing one flat node, and a false positive nests a node under
+///     a parent that does not contain it, which is the diagram telling the reader something untrue.
+/// </remarks>
 internal static class NamespaceContainment
 {
     /// <summary>

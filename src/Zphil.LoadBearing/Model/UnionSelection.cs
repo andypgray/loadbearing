@@ -3,7 +3,10 @@ namespace Zphil.LoadBearing.Model;
 /// <summary>
 ///     The union of one or more selections — <c>arch.AnyOf(a, b, …)</c> (GRAMMAR §5.1) — and the
 ///     payload the Quarantine containment desugaring feeds into an <c>Except</c> as <c>sel ∪ F</c>
-///     (§7). Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is
+///     (§7).
+/// </summary>
+/// <remarks>
+///     Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is
 ///     <c>(a ∪ b) − c</c>, so the union carries its own adjective list and the evaluator applies it
 ///     after the set union.
 ///     <para>
@@ -11,7 +14,7 @@ namespace Zphil.LoadBearing.Model;
 ///         own §6 arm instead: collapsed to one head and locative when every operand shares a noun kind
 ///         that declares a collapse, or-joined operand by operand otherwise.
 ///     </para>
-/// </summary>
+/// </remarks>
 internal sealed class UnionSelection : Selection
 {
     internal UnionSelection(Arch owner, IReadOnlyList<Selection> parts)

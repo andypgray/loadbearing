@@ -6,7 +6,10 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     One candidate spec project reduced to the tuple the convention needs — so the core resolves without a
-///     workspace. <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em>
+///     workspace.
+/// </summary>
+/// <remarks>
+///     <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em>
 ///     the output paths of its direct project references: a spec project references the contract library as a
 ///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
 ///     convention must see both (the derive walk caught the P2P blind spot).
@@ -14,7 +17,7 @@ namespace Zphil.LoadBearing.Cli;
 ///     considers only solution material: a rule-pack library that a spec project drags into the workspace also
 ///     references the contract library, and would otherwise turn every composing solution into "Multiple spec
 ///     projects found".
-/// </summary>
+/// </remarks>
 internal sealed record SpecProjectCandidate(
     string Name,
     IReadOnlyList<string> ReferencePaths,

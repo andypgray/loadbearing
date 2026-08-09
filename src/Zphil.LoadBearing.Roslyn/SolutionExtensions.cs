@@ -3,9 +3,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Zphil.LoadBearing.Roslyn;
 
-/// <summary>
-///     Extension methods for <see cref="Solution" />.
-/// </summary>
 internal static class SolutionExtensions
 {
     /// <summary>
@@ -14,11 +11,11 @@ internal static class SolutionExtensions
     ///     cleaned solution and counts of each removed.
     /// </summary>
     /// <remarks>
-    ///     Called once at solution load. Unresolved analyzer references crash Roslyn cross-project
-    ///     traversal APIs (SymbolFinder, Renamer) with a switch-expression failure; unresolved
-    ///     metadata references are stripped defensively for the same reason. This is a read-only
-    ///     transform — the returned <see cref="Solution" /> is carried forward, never applied back to
-    ///     the workspace, so csproj files on disk are left untouched.
+    ///     Unresolved analyzer references crash Roslyn cross-project traversal APIs (SymbolFinder,
+    ///     Renamer) with a switch-expression failure; unresolved metadata references are stripped
+    ///     defensively for the same reason. This is a read-only transform — the returned
+    ///     <see cref="Solution" /> is carried forward, never applied back to the workspace, so csproj
+    ///     files on disk are left untouched.
     /// </remarks>
     public static (Solution Solution, int AnalyzerCount, int MetadataCount) StripUnresolvedReferences(this Solution solution)
     {

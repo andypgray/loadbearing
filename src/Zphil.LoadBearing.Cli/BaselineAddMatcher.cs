@@ -6,21 +6,30 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     Resolves the <c>--add</c> names against a rule's current violations (from the same
-///     empty-baseline check the whole <c>baseline</c> command runs on). A name matches a type when it
-///     ordinally equals the <see cref="TypeNode.FullName" /> or the <see cref="TypeNode.SymbolId" />;
-///     an edge's source and target must match the <em>same</em> violation. A member <c>--target</c>
-///     matches a <see cref="ViolationKind.MemberUse" /> when it equals the member's full name
-///     (no parens — <c>System.DateTime.Now</c>) or its member symbol ID (<c>P:System.DateTime.Now</c>);
-///     a full-name target naming an overloaded method matches every overload, so the ambiguity error
-///     lists the distinct member IDs to retry with (GRAMMAR §4.5). A <c>--subject</c> likewise matches a
-///     <see cref="ViolationKind.MemberShape" /> by the member's full name (no parens —
-///     <c>MyApp.Web.HomeController.Save</c>) or its member symbol ID (<c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c>),
-///     with the same overload-ambiguity behavior (GRAMMAR §4.6). Zero matches and ambiguous matches
-///     (two distinct identities) are loud <see cref="UserErrorException" />s listing the candidates —
-///     the baseline records observed reality, so the valve only admits what is actually red. Pure over
-///     the in-memory results, so ambiguity is unit-testable with synthetic nodes.
+///     Resolves the <c>--add</c> names against a rule's current violations, from the same
+///     empty-baseline check the whole <c>baseline</c> command runs on.
 /// </summary>
+/// <remarks>
+///     <para>
+///         <b>What matches what.</b> A name matches a type when it ordinally equals the
+///         <see cref="TypeNode.FullName" /> or the <see cref="TypeNode.SymbolId" />; an edge's source and
+///         target must match the <em>same</em> violation. A member <c>--target</c> matches a
+///         <see cref="ViolationKind.MemberUse" /> when it equals the member's full name
+///         (no parens — <c>System.DateTime.Now</c>) or its member symbol ID (<c>P:System.DateTime.Now</c>);
+///         a full-name target naming an overloaded method matches every overload, so the ambiguity error
+///         lists the distinct member IDs to retry with (GRAMMAR §4.5). A <c>--subject</c> likewise matches a
+///         <see cref="ViolationKind.MemberShape" /> by the member's full name (no parens —
+///         <c>MyApp.Web.HomeController.Save</c>) or its member symbol ID
+///         (<c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c>), with the same overload-ambiguity behavior
+///         (GRAMMAR §4.6).
+///     </para>
+///     <para>
+///         Zero matches and ambiguous matches (two distinct identities) are loud
+///         <see cref="UserErrorException" />s listing the candidates — the baseline records observed
+///         reality, so the valve only admits what is actually red. Pure over the in-memory results, so
+///         ambiguity is unit-testable with synthetic nodes.
+///     </para>
+/// </remarks>
 internal static class BaselineAddMatcher
 {
     public static Violation ResolveEdge(string ruleId, IReadOnlyList<Violation> violations, string source, string target)
@@ -73,14 +82,11 @@ internal static class BaselineAddMatcher
         return candidates[0];
     }
 
-    // A --source/--target pair matches a reference edge on both type endpoints, a construction edge on both
-    // type endpoints likewise (the constructed type rides the Target slot, GRAMMAR §4.5), an injection edge on
-    // both type endpoints likewise (the injected parameter type rides the Target slot, §4.7), a catch edge on
-    // both type endpoints likewise (the caught type rides the Target slot, §4.8), a throw edge on both type
-    // endpoints likewise (the thrown type rides the Target slot, §4.8), an exposure edge on both type endpoints
-    // likewise (the exposed type rides the Target slot, §4.9), or a member-use edge on the source type
-    // and the banned member (by full name or member symbol ID, §4.5). The construction/injection/catch/thrown/
-    // exposed types need no dedicated FullNameForm arm — the default `Source -> Target` covers them (verified by test).
+    // Every edge kind but MemberUse matches on both type endpoints, because the second type — constructed
+    // (GRAMMAR §4.5), injected (§4.7), caught or thrown (§4.8), exposed (§4.9) — rides the Target slot;
+    // MemberUse matches the source type and the banned member (by full name or member symbol ID, §4.5).
+    // Those Target-slot kinds need no dedicated FullNameForm arm either: the default `Source -> Target`
+    // covers them (verified by test).
     private static bool MatchesEdge(Violation violation, string source, string target)
     {
         return violation.Kind switch

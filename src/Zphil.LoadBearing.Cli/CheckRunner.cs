@@ -13,15 +13,24 @@ namespace Zphil.LoadBearing.Cli;
 ///     or JSON) → exit code (0 clean / 1 red violations; grandfathered Migrate violations do not fail
 ///     the run). A narrowed run is a smaller report of the same shape and the same exit contract, so its
 ///     verdict answers a smaller question — which is what the stamp and the document's <c>rulesFilter</c>
-///     say out loud. A workspace-load failure overrides that verdict: the model is incomplete, so <c>check</c>
-///     fails closed with exit 2 unless <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed —
-///     a rule that "passes" only because a project did not load is worse than no answer. That decision, its
-///     NuGetAudit carve-out, and the messages the other verbs use for the same condition all live in
-///     <see cref="IncompleteModelGate" />; <c>check</c> renders before it fires, so the verdict also rides
-///     the JSON document and the SARIF stamp. Expected failures surface as <see cref="UserErrorException" />;
-///     the top-level handler maps them to exit 2. Output/error writers are injected so the in-process e2e
-///     tests can capture them, and the <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     say out loud.
 /// </summary>
+/// <remarks>
+///     <para>
+///         <b>What it refuses.</b> A workspace-load failure overrides that verdict: the model is incomplete,
+///         so <c>check</c> fails closed with exit 2 unless
+///         <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed — a rule that "passes" only
+///         because a project did not load is worse than no answer. That decision, its NuGetAudit carve-out,
+///         and the messages the other verbs use for the same condition all live in
+///         <see cref="IncompleteModelGate" />; <c>check</c> renders before it fires, so the verdict also
+///         rides the JSON document and the SARIF stamp. Expected failures surface as
+///         <see cref="UserErrorException" />; the top-level handler maps them to exit 2.
+///     </para>
+///     <para>
+///         Output/error writers are injected so the in-process e2e tests can capture them, and the
+///         <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     </para>
+/// </remarks>
 internal sealed class CheckRunner(
     TextWriter output,
     TextWriter error,

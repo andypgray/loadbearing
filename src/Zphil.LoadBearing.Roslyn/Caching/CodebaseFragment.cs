@@ -2,15 +2,11 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
 ///     The extraction of one <see cref="CompilationInput" /> (one project, one target framework) as pure,
-///     self-contained data: the project's name and forward references, the types it declares, the
-///     externals it references, its reference edges, its member-use edges (GRAMMAR §4.5), its
-///     construction edges (§4.5), its constructor-injection edges (§4.7), its catch and throw edges (§4.8),
-///     its signature-exposure edges (§4.9), and its container-registration facts (§4.7). It holds no Roslyn
-///     types (no <c>ISymbol</c>,
-///     <c>Compilation</c>, or <c>Location</c>) so it is System.Text.Json-serializable by design — the
-///     persisted extraction cache stores exactly this — and
-///     <see cref="FragmentMerger.Merge" /> reconstructs a <see cref="Zphil.LoadBearing.Codebase.CodebaseModel" />
-///     from a set of fragments, reproducing the global cross-input semantics.
+///     self-contained data. It holds no Roslyn types (no <c>ISymbol</c>, <c>Compilation</c>, or
+///     <c>Location</c>) so it is System.Text.Json-serializable by design — the persisted extraction cache
+///     stores exactly this — and <see cref="FragmentMerger.Merge" /> reconstructs a
+///     <see cref="Zphil.LoadBearing.Codebase.CodebaseModel" /> from a set of fragments, reproducing the
+///     global cross-input semantics.
 /// </summary>
 /// <remarks>
 ///     A single fragment is one compilation's <em>narrow view</em>: a type another project declares still

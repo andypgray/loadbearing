@@ -6,10 +6,9 @@ using Zphil.LoadBearing.Cli.Rendering;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     Builds the command tree (System.CommandLine): the <c>check</c>, <c>explain</c>, <c>render</c>,
-///     <c>baseline</c>, <c>status</c>, <c>graph</c>, and <c>mcp</c> commands. Exposed so the in-process
-///     e2e tests drive the exact same tree the real entry point does, capturing output via a redirected
-///     <see cref="InvocationConfiguration" />.
+///     Builds the command tree (System.CommandLine): every verb the CLI exposes, each with its options and
+///     its action. Exposed so the in-process e2e tests drive the exact same tree the real entry point does,
+///     capturing output via a redirected <see cref="InvocationConfiguration" />.
 /// </summary>
 internal static class CommandFactory
 {

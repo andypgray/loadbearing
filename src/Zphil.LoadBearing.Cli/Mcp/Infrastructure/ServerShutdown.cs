@@ -11,11 +11,9 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 ///     <para>
 ///         Both <see cref="IdleTimeoutWatchdog" /> and <see cref="ParentProcessWatcher" /> route through
 ///         <see cref="ExitWith(string)" /> instead of calling <c>Environment.Exit</c> directly, so a
-///         mid-flight tool call drains and the logger flushes first. The warm MCP server
-///         registers the long-lived <see cref="Roslyn.WorkspaceSession" />'s async disposer here, so a
-///         watchdog-triggered teardown disposes its <c>MSBuildWorkspace</c> and out-of-process BuildHost
-///         before the process exits; the cold fallback (<c>LOADBEARING_DISABLE_WARM_WORKSPACE</c>) owns no
-///         long-lived workspace and registers none.
+///         mid-flight tool call drains and the logger flushes first. A registered disposer may own
+///         out-of-process state — a long-lived <see cref="Roslyn.WorkspaceSession" />'s
+///         <c>MSBuildWorkspace</c> and its BuildHost child — which a bare process exit would strand.
 ///     </para>
 ///     <para>
 ///         A per-disposer bound keeps shutdown deterministic even if a disposer hangs.
@@ -103,11 +101,13 @@ internal static class ServerShutdown
 
     /// <summary>
     ///     Blocks until no tool call is in flight or <paramref name="timeout" /> elapses, whichever
-    ///     comes first, then returns so shutdown can proceed. Waits on the completion source
-    ///     <see cref="IdleTimeoutWatchdog" /> signals when the in-flight count drops to zero — no
-    ///     busy-wait, and an already-idle server returns immediately. Synchronous by design: this is
-    ///     the terminal shutdown path, so blocking the caller is fine.
+    ///     comes first, then returns so shutdown can proceed.
     /// </summary>
+    /// <remarks>
+    ///     Waits on the completion source <see cref="IdleTimeoutWatchdog" /> signals when the in-flight
+    ///     count drops to zero — no busy-wait, and an already-idle server returns immediately.
+    ///     Synchronous by design: this is the terminal shutdown path, so blocking the caller is fine.
+    /// </remarks>
     private static void WaitForInFlightCalls(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero) return;

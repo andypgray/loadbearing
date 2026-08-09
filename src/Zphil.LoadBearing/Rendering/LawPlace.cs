@@ -2,14 +2,12 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     One node of the law diagram: a place the spec names, identified by a
-///     <see cref="Key" /> so two rules naming the same place draw one node. Places are minted by
-///     <see cref="LawPlaceClassifier" /> and registered in a <see cref="LawPlaces" />, which is what
-///     resolves nesting and what the renderer walks.
-///     <para>
-///         The mutable flags are accumulated as the rules are walked: a place is not yet known to be a
-///         subject, a quarantined scope, or a child when the first rule mints it.
-///     </para>
+///     <see cref="Key" /> so two rules naming the same place draw one node.
 /// </summary>
+/// <remarks>
+///     The mutable flags are accumulated as the rules are walked: a place is not yet known to be a
+///     subject, a quarantined scope, or a child when the first rule mints it.
+/// </remarks>
 internal sealed class LawPlace
 {
     internal LawPlace(string key, string label, string idSource, IReadOnlyList<string> globs, bool declaredLayer)

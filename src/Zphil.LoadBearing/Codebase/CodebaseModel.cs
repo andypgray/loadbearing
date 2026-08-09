@@ -1,23 +1,12 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     The extracted codebase: its types, the reference edges between them, the member-use edges
-///     (GRAMMAR §4.5), the construction edges (§4.5), the constructor-injection edges (§4.7), the catch and
-///     throw edges (§4.8), the signature-exposure edges (§4.9), the container-registration facts (§4.7), and
-///     its projects — the deterministic substrate the checker evaluates rules against. Every list is ordered
-///     for reproducibility:
-///     <see cref="Types" /> by <see cref="TypeNode.FullName" /> (ordinal), <see cref="Edges" /> by (source
-///     FullName, target FullName) (ordinal), <see cref="MemberEdges" /> by (source FullName, member
-///     <see cref="MemberReference.SymbolId" />) (ordinal), <see cref="ConstructorEdges" /> by (source
-///     FullName, constructed FullName) (ordinal), <see cref="InjectionEdges" /> by (source FullName,
-///     injected FullName) (ordinal), <see cref="CatchEdges" /> by (source FullName, caught FullName)
-///     (ordinal), <see cref="ThrowEdges" /> by (source FullName, thrown FullName) (ordinal),
-///     <see cref="ExposureEdges" /> by (source FullName, exposed FullName) (ordinal),
-///     <see cref="ServiceRegistrations" /> by (lifetime, service FullName,
-///     implementation FullName) (ordinal), and <see cref="Projects" /> by
-///     <see cref="ProjectNode.Name" /> (ordinal). <see cref="MergeNotes" /> carries the advisory
-///     diagnostics the fragment merge raised while assembling this model.
+///     The extracted codebase — its types, the dependency edges between them, the container-registration
+///     facts, and its projects: the deterministic substrate the checker evaluates rules against.
 /// </summary>
+/// <remarks>
+///     Every list is ordered ordinal for reproducibility; each property states the sort key it uses.
+/// </remarks>
 public sealed class CodebaseModel
 {
     internal CodebaseModel(
@@ -115,16 +104,22 @@ public sealed class CodebaseModel
 
     /// <summary>
     ///     Advisory notes the fragment merge raised while assembling this model, ordered by the
-    ///     fully-qualified name each keys on so the list is stable across runs. In v1 the sole source is
-    ///     same-FQN cross-project conflation: two or more <em>differently named</em> projects declaring one
-    ///     fully-qualified type name, where the first declarer wins the node's facts and
-    ///     <see cref="TypeNode.ProjectName" /> and every later declarer's copy is therefore invisible to
-    ///     <c>arch.Project</c> selections. One note per conflated type names all of them, so a type several
-    ///     projects shadow costs one line. Purely informational — the model is
+    ///     fully-qualified name each keys on so the list is stable across runs.
+    /// </summary>
+    /// <remarks>
+    ///     In v1 the sole source is same-FQN cross-project conflation: two or more
+    ///     <em>
+    ///         differently
+    ///         named
+    ///     </em>
+    ///     projects declaring one fully-qualified type name, where the first declarer wins the
+    ///     node's facts and <see cref="TypeNode.ProjectName" /> and every later declarer's copy is
+    ///     therefore invisible to <c>arch.Project</c> selections. One note per conflated type names all of
+    ///     them, so a type several projects shadow costs one line. Purely informational — the model is
     ///     complete and correct, just ambiguous in its project attribution — so these never denote a
     ///     failed load and never gate <c>check</c> (unlike workspace-load diagnostics). Empty for the
     ///     overwhelming common case, including a project's own several target frameworks (same name,
     ///     silent).
-    /// </summary>
+    /// </remarks>
     public IReadOnlyList<string> MergeNotes { get; }
 }

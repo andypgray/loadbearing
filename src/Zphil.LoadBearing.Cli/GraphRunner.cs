@@ -11,23 +11,30 @@ namespace Zphil.LoadBearing.Cli;
 ///     survey (human or JSON). Deliberately spec-free: the survey is a property of the codebase, and derive
 ///     runs before any spec exists — so unlike the other verbs there is no spec resolution here, only the
 ///     shared solution discovery and workspace acquisition through an <see cref="ISolutionSource" /> (cold by
-///     default), fronted by the persisted extraction cache. What the codebase <em>contains</em> never gates
-///     — the survey exits 0 however alarming the graph is. What gates is the survey not being of the
-///     codebase: a project that failed to load is missing from the map entirely, so the run refuses before
-///     extraction on <c>check</c>'s terms, opt-out <see cref="GraphRequest.AllowWorkspaceDiagnostics" />
-///     (<see cref="IncompleteModelGate" />). That refusal, like a discovery/workspace failure, surfaces as a
-///     <see cref="UserErrorException" /> — exit 2 on the CLI, an error result on MCP — which is why it is
-///     thrown rather than written: this is the one verb with no spec to resolve, so it is the first command
-///     a stranger runs and the first that must explain itself on whichever surface asked. Output/error
-///     writers are injected so the in-process e2e tests can capture them, and the
-///     <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     default), fronted by the persisted extraction cache.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <b>What it refuses.</b> What the codebase <em>contains</em> never gates — the survey exits 0
+///         however alarming the graph is. What gates is the survey not being of the codebase: a project that
+///         failed to load is missing from the map entirely, so the run refuses before extraction on
+///         <c>check</c>'s terms, opt-out <see cref="GraphRequest.AllowWorkspaceDiagnostics" />
+///         (<see cref="IncompleteModelGate" />). That refusal, like a discovery/workspace failure, surfaces
+///         as a <see cref="UserErrorException" /> — exit 2 on the CLI, an error result on MCP — which is why
+///         it is thrown rather than written: this is the one verb with no spec to resolve, so it is the
+///         first command a stranger runs and the first that must explain itself on whichever surface asked.
+///     </para>
 ///     <para>
 ///         Two knobs narrow what a caller reads, and they are independent: <see cref="GraphRequest.Projects" />
 ///         narrows the <em>subject</em> (which projects the survey is of), while
 ///         <see cref="GraphRequest.Grain" /> coarsens the <em>grain</em> (how much detail each one gets).
 ///         A filter matching no project refuses with the available names rather than surveying nothing.
 ///     </para>
-/// </summary>
+///     <para>
+///         Output/error writers are injected so the in-process e2e tests can capture them, and the
+///         <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     </para>
+/// </remarks>
 internal sealed class GraphRunner(
     TextWriter output,
     TextWriter error,

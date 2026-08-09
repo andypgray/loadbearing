@@ -17,13 +17,15 @@ namespace Zphil.LoadBearing.Cli;
 ///     with a solution-relative path. <c>--diagram &lt;path&gt;</c> adds a second, independent target: the
 ///     codebase graph and the law as two fences, composed by <see cref="DiagramComposer" />, on the same
 ///     wrote/unchanged stream.
-///     Render fails closed on an incomplete model like every verb that consumes it — exit 2 after the
-///     diagnostics and before the first byte hits disk, opt-out <c>--allow-workspace-diagnostics</c> —
-///     because its output is committed context: a card whose project failed to load cannot be placed and
-///     would be dropped from the committed files, and <c>--diagram</c> would draw the survey <c>graph</c>
-///     refuses. On a complete model it exits 0 on success; expected failures surface as
-///     <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </summary>
+/// <remarks>
+///     <b>What it refuses.</b> Render fails closed on an incomplete model like every verb that consumes it —
+///     exit 2 after the diagnostics and before the first byte hits disk, opt-out
+///     <c>--allow-workspace-diagnostics</c> — because its output is committed context: a card whose project
+///     failed to load cannot be placed and would be dropped from the committed files, and <c>--diagram</c>
+///     would draw the survey <c>graph</c> refuses. On a complete model it exits 0 on success; expected
+///     failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
+/// </remarks>
 internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
     : WorkspaceRunner(source)
 {

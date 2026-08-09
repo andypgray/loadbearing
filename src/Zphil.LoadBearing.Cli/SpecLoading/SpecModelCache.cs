@@ -7,8 +7,7 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 ///     server's answer to re-running the whole spec load — a fresh <see cref="SpecLoadContext" />, the DLL
 ///     re-read off disk, reflection over its types, the spec's own <c>Define()</c> executed, and a full
 ///     model build plus validation — on every single tool call, for something that changes only when the
-///     spec project is rebuilt. A singleton in the MCP host's DI graph, handed to
-///     <c>WarmSolutionSource</c>; the one-shot CLI keeps its per-process load untouched.
+///     spec project is rebuilt. The one-shot CLI keeps its per-process load untouched.
 /// </summary>
 /// <remarks>
 ///     <para>

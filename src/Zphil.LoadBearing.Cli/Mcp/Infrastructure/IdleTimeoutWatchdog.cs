@@ -5,12 +5,13 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 
 /// <summary>
 ///     Defensive idle-timeout shutdown, complementing <see cref="ParentProcessWatcher" />.
-///     When an MCP client drops/recreates a connection abnormally without closing this
-///     server's stdin pipe and the watched parent PID stays alive, the SDK's stdin-EOF
-///     detection is missed and the server orphans. Tracks time since the last tool call and
-///     exits after LOADBEARING_IDLE_TIMEOUT_MINUTES of inactivity.
+///     Tracks time since the last tool call and exits after
+///     LOADBEARING_IDLE_TIMEOUT_MINUTES of inactivity.
 /// </summary>
 /// <remarks>
+///     When an MCP client drops/recreates a connection abnormally without closing this
+///     server's stdin pipe and the watched parent PID stays alive, the SDK's stdin-EOF
+///     detection is missed and the server orphans; this is the backstop for that case.
 ///     Monotonic clock (Stopwatch) — does not advance during machine sleep, so an
 ///     overnight suspend does not trip on wake. A call in flight never counts as idle;
 ///     a server that never receives a call still exits, timed from process start.
@@ -29,10 +30,8 @@ internal static class IdleTimeoutWatchdog
 
     /// <summary>
     ///     The number of tool calls currently executing (bumped by <see cref="EnterCall" /> /
-    ///     <see cref="ExitCall" />). Read by the drain in <see cref="WhenAllCallsComplete" /> so a
-    ///     <see cref="ServerShutdown" /> can let an in-flight call finish before tearing the process
-    ///     down. Calls parked on an outer filter have not yet reached <see cref="EnterCall" />, so they
-    ///     are correctly uncounted.
+    ///     <see cref="ExitCall" />). Calls parked on an outer filter have not yet reached
+    ///     <see cref="EnterCall" />, so they are correctly uncounted.
     /// </summary>
     internal static int InFlightCount => Volatile.Read(ref s_inFlightCount);
 
@@ -170,10 +169,12 @@ internal static class IdleTimeoutWatchdog
         }
     }
 
-    /// <summary>
-    ///     null/blank/invalid/negative => default (watchdog stays ON; a typo must
-    ///     not silently disable leak protection). "0" => Zero (explicit, documented opt-out).
-    /// </summary>
+    /// <summary>Parses a raw <c>LOADBEARING_IDLE_TIMEOUT_MINUTES</c> value into an idle timeout.</summary>
+    /// <remarks>
+    ///     null/blank/invalid/negative => the default, so the watchdog stays on: a typo must
+    ///     not silently disable leak protection. <c>"0"</c> => <see cref="TimeSpan.Zero" />, the
+    ///     explicit, documented opt-out.
+    /// </remarks>
     internal static TimeSpan ParseTimeoutMinutes(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return TimeSpan.FromMinutes(DefaultTimeoutMinutes);

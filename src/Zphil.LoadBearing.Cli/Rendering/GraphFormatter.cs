@@ -5,12 +5,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <summary>
 ///     Formats a <see cref="GraphSummary" /> as the human <c>graph</c> survey — a project roster with
 ///     declared references and type counts, the observed cross-project reference edges, the namespace
-///     inventory, and external references grouped by namespace root. Pure over the summary, so the line
-///     shapes are unit-pinned. Mirrors <see cref="StatusFormatter" />'s terse, em-dashed voice; an empty
-///     section reads <c>(none)</c> rather than vanishing, so the survey's shape is stable — which is also
-///     why overview grain replaces the namespace inventory with an elision line instead of dropping the
-///     section: a reader can see what was left out and how to get it back.
+///     inventory, and external references grouped by namespace root.
 /// </summary>
+/// <remarks>
+///     Pure over the summary, so the line shapes are unit-pinned. Mirrors
+///     <see cref="StatusFormatter" />'s terse, em-dashed voice; an empty section reads <c>(none)</c> rather
+///     than vanishing, so the survey's shape is stable — which is also why overview grain replaces the
+///     namespace inventory with an elision line instead of dropping the section: a reader can see what was
+///     left out and how to get it back.
+/// </remarks>
 internal static class GraphFormatter
 {
     private const string OverviewElisionLine =

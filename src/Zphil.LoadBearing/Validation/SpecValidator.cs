@@ -8,13 +8,15 @@ namespace Zphil.LoadBearing.Validation;
 
 /// <summary>
 ///     Runs the whole GRAMMAR §8 catalog and collects <em>every</em> error in one pass (a
-///     deliberate divergence from EF Core's fail-fast validator). ID checks run over the
-///     post-desugar ID set; authored-field checks run over the original registrations, keyed to
-///     the rule or scope the author wrote. Every rule/scope/member-attributed error carries the
-///     offending anchor's spec-source location (GRAMMAR §8) so all-errors-at-once lands each one at a
-///     <c>file:line</c> jump target; spec-wide errors (duplicate layer name, layer globs) stay
-///     location-free by design.
+///     deliberate divergence from EF Core's fail-fast validator).
 /// </summary>
+/// <remarks>
+///     ID checks run over the post-desugar ID set; authored-field checks run over the original
+///     registrations, keyed to the rule or scope the author wrote. Every rule/scope/member-attributed
+///     error carries the offending anchor's spec-source location (GRAMMAR §8) so all-errors-at-once
+///     lands each one at a <c>file:line</c> jump target; spec-wide errors (duplicate layer name, layer
+///     globs) stay location-free by design.
+/// </remarks>
 internal static class SpecValidator
 {
     internal static IReadOnlyList<SpecValidationError> Validate(Arch arch)
@@ -48,7 +50,7 @@ internal static class SpecValidator
             // A layer's globs are validated here — their authoritative, use-independent home — so a bad
             // glob is caught whether or not the layer is ever used as a subject (§8 items 15–16). Like the
             // duplicate-name error above, these are spec-wide (null ID, named by layer in the message) and
-            // location-free: a layer name is a unique, trivially greppable string (the plan's Layer exclusion).
+            // location-free: a layer name is a unique, trivially greppable string.
             foreach (string glob in layer.Globs)
                 CheckPattern(glob, true, "namespace pattern", null, $"layer '{layer.Name}'", null, errors);
         }
@@ -278,13 +280,8 @@ internal static class SpecValidator
                 $"use typeof({TypeofForm(Generics.Definition(accept.ParameterType))}) (used by '{rule.Id}').", rule.Location));
     }
 
-    // GRAMMAR §8 item 21: a category-invalid hierarchy anchor, both polarities. A Must[Not]Implement anchor
-    // must be an interface; a Must[Not]DeriveFrom anchor must not be an interface; a Must[Not]BeAttributedWith
-    // anchor must derive from System.Attribute (typeof(Attribute) itself is refused — the declared-attribute
-    // matcher could never match it). A wrong-category anchor never matches, so a positive is an always-red rule
-    // and a negative an always-pass — both silent slips; the error names the anchor's FQN and steers to the
-    // right-category verb. Applies to the positives' single anchor and every anchor in a negative's list, all
-    // reported in the same all-at-once pass at the rule's spec-source location (one shared code, item-18 precedent).
+    // GRAMMAR §8 item 21, both polarities — Code.HierarchyAnchorWrongCategory carries the category rule per
+    // verb and why a wrong-category anchor is a silent slip.
     // A string anchor carries no reflected type, so it is filtered out (TypedAnchors) rather than guessed
     // at — in every family, hierarchy and attribute alike: there is no category to read off an FQN,
     // extraction facts are the only authority on what a name names, and refusing a spelling the host cannot

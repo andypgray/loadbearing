@@ -7,29 +7,37 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates a finalized <see cref="ArchitectureModel" /> against an extracted
-///     <see cref="CodebaseModel" /> — the pure-Core heart of <c>loadbearing check</c> and
-///     <c>status</c>. One <see cref="RuleResult" /> per rule, in model order: Enforce rules are
-///     evaluated; ratcheted rules — Migrate and Quarantine containment — are evaluated the same way and
-///     then <em>partitioned</em> against a <see cref="BaselineIndex" /> (in-baseline =
-///     grandfathered/pass, not-in-baseline = red, including new code in the old pattern); a Quarantine
-///     tripwire runs the diff-aware touch check (GRAMMAR §7), warning per changed file
-///     inside the scope and passing, or skipping when no <see cref="DiffContext" /> was supplied. Any
-///     evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather than aborting
-///     the run (all-errors philosophy).
+///     <see cref="CodebaseModel" />, yielding one <see cref="RuleResult" /> per rule in model order.
 /// </summary>
+/// <remarks>
+///     Enforce rules are evaluated; ratcheted rules — Migrate and Quarantine containment — are
+///     evaluated the same way and then <em>partitioned</em> against a <see cref="BaselineIndex" />
+///     (in-baseline = grandfathered/pass, not-in-baseline = red, including new code in the old
+///     pattern); a Quarantine tripwire runs the diff-aware touch check (GRAMMAR §7), warning per
+///     changed file inside the scope and passing, or skipping when no <see cref="DiffContext" /> was
+///     supplied. Any evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather
+///     than aborting the run (all-errors philosophy).
+/// </remarks>
 public static class ArchChecker
 {
     /// <summary>Pinned skip reason for a Quarantine tripwire when no <c>--diff-base</c> diff context is present.</summary>
     internal const string TripwireSkipReason =
         "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.";
 
-    /// <summary>Checks every rule with no baselines (every ratchet violation red). See the four-arg overload.</summary>
+    /// <summary>Checks every rule with no baselines, so every ratchet violation is red.</summary>
+    /// <param name="model">The finalized model whose rules to evaluate.</param>
+    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
+    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase)
     {
         return Check(model, codebase, BaselineIndex.Empty, null);
     }
 
     /// <summary>Checks every rule against <paramref name="baselines" /> with no diff context (tripwires skip).</summary>
+    /// <param name="model">The finalized model whose rules to evaluate.</param>
+    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
+    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
+    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines)
     {
         return Check(model, codebase, baselines, null);
@@ -43,6 +51,11 @@ public static class ArchChecker
     ///     <paramref name="diff" /> that declares a type in the quarantined scope, or skips when
     ///     <paramref name="diff" /> is null.
     /// </summary>
+    /// <param name="model">The finalized model whose rules to evaluate.</param>
+    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
+    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
+    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
     public static CheckReport Check(
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
@@ -62,6 +75,7 @@ public static class ArchChecker
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
     /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
     /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
@@ -91,6 +105,7 @@ public static class ArchChecker
     /// </remarks>
     /// <param name="model">The finalized model to select from.</param>
     /// <param name="ruleIdGlobs">The rule-ID globs; empty means every rule.</param>
+    /// <returns>The selected rules, in model order.</returns>
     public static IReadOnlyList<ArchRule> SelectRules(ArchitectureModel model, IReadOnlyList<string> ruleIdGlobs)
     {
         Guard.NotNull(model, nameof(model));

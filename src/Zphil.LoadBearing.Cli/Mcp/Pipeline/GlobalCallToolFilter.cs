@@ -19,16 +19,20 @@ internal static class GlobalCallToolFilter
     private const int MaxExceptionChainDepth = 8;
 
     /// <summary>
-    ///     Wraps every <c>tools/call</c> so that an expected user-facing error (a
-    ///     <see cref="UserErrorException" /> or a <see cref="Zphil.LoadBearing.Validation.SpecValidationException" />,
-    ///     rendered through <see cref="CliErrorMapper.UserFacingMessage" />) is returned to the client as
-    ///     an <see cref="CallToolResult.IsError" /> result <em>without</em> logging (it is expected, not a
-    ///     bug), any other exception is logged as exactly one warning before being surfaced, and
-    ///     successful text is passed through <see cref="ResponseTruncator" />. Before dispatch it runs
+    ///     Wraps every <c>tools/call</c> so an expected user-facing error comes back as an error result,
+    ///     anything unexpected is logged exactly once, and successful text is truncated to the client's budget.
+    /// </summary>
+    /// <remarks>
+    ///     An expected user-facing error — a <see cref="UserErrorException" /> or a
+    ///     <see cref="Zphil.LoadBearing.Validation.SpecValidationException" />, rendered through
+    ///     <see cref="CliErrorMapper.UserFacingMessage" /> — becomes an
+    ///     <see cref="CallToolResult.IsError" /> result <em>without</em> logging, because it is expected
+    ///     rather than a bug; any other exception is logged as exactly one warning before being surfaced.
+    ///     Successful text passes through <see cref="ResponseTruncator" />. Before dispatch the filter runs
     ///     <see cref="UnknownParameterGuard" /> so a hallucinated argument key becomes an actionable error
     ///     rather than a silently-dropped argument, and the whole body is bracketed by
     ///     <see cref="IdleTimeoutWatchdog.EnterCall" />/<see cref="IdleTimeoutWatchdog.ExitCall" />.
-    /// </summary>
+    /// </remarks>
     public static IMcpServerBuilder WithGlobalCallToolFilter(this IMcpServerBuilder builder)
     {
         return builder.WithRequestFilters(filters =>

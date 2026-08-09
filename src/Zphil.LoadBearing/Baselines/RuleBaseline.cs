@@ -2,8 +2,8 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Baselines;
 
-/// <summary>
-///     One rule's parsed baseline section: the set of grandfathered <see cref="BaselineEntry" />s.
+/// <summary>One rule's parsed baseline section: the set of grandfathered <see cref="BaselineEntry" />s.</summary>
+/// <remarks>
 ///     <see cref="Entries" /> is deduped and tuple-sorted (<c>((Source ?? Subject), (Target ?? ""))</c>,
 ///     ordinal); membership is answered in O(1) via an internal identity → entry map. Keying on the
 ///     Because-free <see cref="BaselineEntry" /> identity (equality excludes the attribution) means the
@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Baselines;
 ///     can carry a grandfathered violation's original <c>because</c> into a report. A present section with
 ///     zero entries (captured-empty) is distinct from an absent one (uncaptured) — the absence lives in
 ///     <see cref="BaselineIndex" />, not here.
-/// </summary>
+/// </remarks>
 public sealed class RuleBaseline
 {
     private readonly Dictionary<BaselineEntry, BaselineEntry> _lookup;

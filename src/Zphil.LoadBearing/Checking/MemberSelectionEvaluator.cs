@@ -7,16 +7,19 @@ namespace Zphil.LoadBearing.Checking;
 /// <summary>
 ///     Resolves a <see cref="MemberSelection" /> to the ordered list of <see cref="MemberNode" />s it
 ///     names (GRAMMAR §4.6): the declared members of its underlying type selection, narrowed by the
-///     projection's kind filter and then by each member adjective in authoring order. Nouns/adjectives on
-///     the <em>type</em> side are resolved by <see cref="SelectionEvaluator" /> (subject universe:
-///     solution-declared types, whose <see cref="TypeNode.Members" /> are populated; externals carry
-///     none). Name adjectives match ordinally (globs via <see cref="TypeNamePattern" />); <c>Returning</c>
+///     projection's kind filter and then by each member adjective in authoring order.
+/// </summary>
+/// <remarks>
+///     Nouns/adjectives on the <em>type</em> side are resolved by <see cref="SelectionEvaluator" />
+///     (subject universe: solution-declared types, whose <see cref="TypeNode.Members" /> are populated;
+///     externals carry none). Name adjectives match ordinally (globs via
+///     <see cref="TypeNamePattern" />); <c>Returning</c>
 ///     compares a method's <see cref="IMemberInfo.ReturnTypeFullName" /> against the anchors' definition
 ///     FQNs (<see cref="SelectionEvaluator.DefinitionFullName" /> — a closed-generic anchor throws the
 ///     check-time backstop, GRAMMAR §4.6); the member <c>Where</c> runs through the guarded predicate
 ///     invoke. The result is ordered by <c>(DeclaringType.FullName, SymbolId)</c> so violations are
 ///     deterministic.
-/// </summary>
+/// </remarks>
 internal sealed class MemberSelectionEvaluator
 {
     private readonly SelectionEvaluator _selections;
@@ -39,8 +42,7 @@ internal sealed class MemberSelectionEvaluator
 
     /// <summary>
     ///     The same resolution over a source-type set the caller has already evaluated in subject
-    ///     position — what <see cref="ConstraintEvaluator" /> passes when the union-operand gate has
-    ///     computed it already, so a union member subject is not evaluated twice.
+    ///     position, so a union member subject is not evaluated twice.
     /// </summary>
     internal IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
     {
@@ -99,8 +101,11 @@ internal sealed class MemberSelectionEvaluator
     /// <summary>
     ///     The declared-attribute matcher for a member (GRAMMAR §4.6, §5.7) — the member twin of
     ///     <see cref="SelectionEvaluator.AttributeMatcher" />, over <see cref="IMemberInfo.Attributes" />
-    ///     instead of a type's attribute constructions, and sharing its arms literally: the classification
-    ///     is <see cref="SelectionEvaluator.AnchorKey" />, so a <em>string</em> anchor is the
+    ///     instead of a type's attribute constructions.
+    /// </summary>
+    /// <remarks>
+    ///     It shares that matcher's arms literally: the classification is
+    ///     <see cref="SelectionEvaluator.AnchorKey" />, so a <em>string</em> anchor is the
     ///     open-definition arm (a name is a DEFINITION name, so it matches every construction of that
     ///     definition and a constructed spelling matches nothing), a <em>generic-definition</em>
     ///     <c>typeof</c> anchor matches the same way, and any other <c>typeof</c> matches the constructed
@@ -108,8 +113,8 @@ internal sealed class MemberSelectionEvaluator
     ///     only — no inheritance, and no accessor or <c>[return:]</c> attributes (they hang off other
     ///     symbols). <see cref="TypeName.FullDisplay" /> runs once, eagerly, so an unrepresentable anchor
     ///     throws before any member is tested and <see cref="ArchChecker" /> contains it per-rule as a
-    ///     <see cref="ViolationKind.RuleError" />. Shared with the two member attribute verbs.
-    /// </summary>
+    ///     <see cref="ViolationKind.RuleError" />.
+    /// </remarks>
     internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {
         (string key, bool onDefinition) = SelectionEvaluator.AnchorKey(anchor);

@@ -9,11 +9,12 @@ namespace Zphil.LoadBearing.Cli.Mcp.Prompts;
 ///     <c>derive-spec.md</c> recipe: an honest, tool-backed walkthrough for deriving a LoadBearing
 ///     architecture spec — the target (<c>Enforce</c>), the debt (<c>Migrate</c>), and the dragons
 ///     (<c>Quarantine</c>) — from an existing codebase, validating every claim with <c>arch_graph</c> and
-///     <c>arch_check</c>. The server does not infer the spec: the recipe has the executing agent derive a
-///     proposal from evidence, and the human curate and baseline it. Serving replaces the scaffold's
-///     <c>Version="..."</c> placeholder with the running build's version.
+///     <c>arch_check</c>.
 /// </summary>
 /// <remarks>
+///     The server does not infer the spec: the recipe has the executing agent derive a proposal from
+///     evidence, and the human curate and baseline it. Serving replaces the scaffold's
+///     <c>Version="..."</c> placeholder with the running build's version.
 ///     The class is deliberately non-static: <c>WithPrompts&lt;ArchPrompts&gt;()</c> takes it as a type
 ///     argument, and static classes cannot be type arguments. The prompt method is <c>static</c>, so no
 ///     instance is ever constructed. A <c>string</c>-returning method maps to a single <c>Role.User</c>

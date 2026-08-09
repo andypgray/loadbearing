@@ -14,12 +14,11 @@ namespace Zphil.LoadBearing.Internal;
 ///     before anything reads the anchor. Pure authoring sugar: the anchor is the tree's <em>resolved</em>
 ///     member — <see cref="MemberInfo.DeclaringType" /> (never <see cref="MemberInfo.ReflectedType" />),
 ///     with a constructed generic normalized to its definition — so an expression-minted member reifies,
-///     renders, and checks byte-identically to the <c>typeof</c>-minted one. First repo use of
-///     <see cref="System.Linq.Expressions" />.
+///     renders, and checks byte-identically to the <c>typeof</c>-minted one.
 /// </summary>
 internal static class MemberExpressionResolver
 {
-    // Eight poison messages, one code (the BlankPattern precedent). The resolver stores the core; the
+    // The poison messages share one code (the BlankPattern precedent). The resolver stores the core; the
     // validator appends " (used by '{id}')." Each names the shape that failed and steers to the cure.
     private const string NotMemberAccess =
         "A member anchor lambda must be a single property, field, or method access " +

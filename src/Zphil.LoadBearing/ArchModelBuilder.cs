@@ -16,12 +16,14 @@ namespace Zphil.LoadBearing;
 public static class ArchModelBuilder
 {
     /// <summary>Builds a model from the given specs (one shared <see cref="Arch" />).</summary>
+    /// <exception cref="SpecValidationException">The specs failed one or more validation checks.</exception>
     public static ArchitectureModel Build(params IArchitectureSpec[] specs)
     {
         return Build((IEnumerable<IArchitectureSpec>)specs);
     }
 
     /// <summary>Builds a model from the given specs (one shared <see cref="Arch" />).</summary>
+    /// <exception cref="SpecValidationException">The specs failed one or more validation checks.</exception>
     public static ArchitectureModel Build(IEnumerable<IArchitectureSpec> specs)
     {
         var arch = new Arch();

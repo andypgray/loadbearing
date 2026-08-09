@@ -4,18 +4,20 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Discovery;
 
 /// <summary>
-///     Reflection-only spec discovery (netstandard2.0-safe, so it runs in the Core). Finds
-///     publicly-visible (top-level public, or public nested through a public chain — <see cref="Type.IsVisible" />,
-///     not <see cref="Type.IsPublic" /> which is false for any nested type), non-abstract
-///     <see cref="IArchitectureSpec" /> classes, ordered deterministically by
-///     <see cref="Type.FullName" /> ordinal (GRAMMAR §9 — law must load predictably), and
-///     instantiates each. A zero result is loud (<see cref="SpecDiscoveryException" />). The
-///     <c>AssemblyLoadContext</c> that isolates a prebuilt spec DLL is a host concern (the test
-///     project or the CLI), not the Core's.
+///     Reflection-only spec discovery: finds the publicly-visible, non-abstract
+///     <see cref="IArchitectureSpec" /> classes in an assembly and instantiates each.
 /// </summary>
+/// <remarks>
+///     netstandard2.0-safe, so it runs in the Core. Visibility is <see cref="Type.IsVisible" /> —
+///     top-level public, or public nested through a public chain — not <see cref="Type.IsPublic" />,
+///     which is false for any nested type. Order is <see cref="Type.FullName" /> ordinal, because law
+///     must load predictably (GRAMMAR §9). The <c>AssemblyLoadContext</c> that isolates a prebuilt
+///     spec DLL is a host concern, not the Core's.
+/// </remarks>
 public static class SpecDiscovery
 {
     /// <summary>Discovers and instantiates every public spec in the assembly, in deterministic order.</summary>
+    /// <exception cref="SpecDiscoveryException">The assembly declares no public spec.</exception>
     public static IReadOnlyList<IArchitectureSpec> FindSpecs(Assembly assembly)
     {
         Guard.NotNull(assembly, nameof(assembly));

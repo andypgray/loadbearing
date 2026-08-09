@@ -3,11 +3,14 @@ namespace Zphil.LoadBearing.Cli.Replay;
 /// <summary>
 ///     The CLI-side user-facing text for the <c>--binlog</c> replay path: the loud refusals for
 ///     a user-supplied binlog that cannot be replayed, and the soft notice for a persisted capture whose copy
-///     fails to replay at runtime. The sibling of <see cref="Roslyn.Replay.BinlogCaptureStore" />'s own
-///     factories (which own the ingest refusals and the structural-invalidation notices); these three own the
-///     replay-failure surface the gate raises. Exposed as factories so tests pin the text without duplicating
-///     the format, and so the first-line extraction lives in exactly one place.
+///     fails to replay at runtime.
 /// </summary>
+/// <remarks>
+///     The sibling of <see cref="Roslyn.Replay.BinlogCaptureStore" />'s own factories (which own the ingest
+///     refusals and the structural-invalidation notices); these three own the replay-failure surface the
+///     gate raises. Exposed as factories so tests pin the text without duplicating the format, and so the
+///     first-line extraction lives in exactly one place.
+/// </remarks>
 internal static class BinlogReplayMessages
 {
     /// <summary>The refusal when the explicit <c>--binlog</c> path does not exist (exit 2); <c>{0}</c> is the as-typed value.</summary>

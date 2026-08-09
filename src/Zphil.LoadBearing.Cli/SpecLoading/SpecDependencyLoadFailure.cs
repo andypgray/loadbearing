@@ -3,27 +3,16 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.SpecLoading;
 
 /// <summary>
-///     Maps the two ways a <c>typeof()</c> anchor can fail to resolve while <c>Define()</c> runs into an
-///     actionable <see cref="UserErrorException" /> naming the spec, what could not be loaded, the cause,
-///     and the remedy that applies.
-///     <list type="bullet">
-///         <item>
-///             <see cref="FileNotFoundException" /> — the anchored type's <em>assembly</em> is not beside
-///             the spec DLL. Either a NuGet-packaged assembly a plain class-library build never stages into
-///             <c>bin</c> (where <c>CopyLocalLockFileAssemblies</c> is the fix), or a .NET Framework
-///             reference assembly that resolves from the targeting pack or the GAC and is never staged at
-///             all (where it is not).
-///         </item>
-///         <item>
-///             <see cref="TypeLoadException" /> — the assembly loaded but the <em>type</em> did not,
-///             because its closure reaches an assembly with no counterpart on .NET
-///             (<c>System.Web.IHttpHandler</c> as a base interface, say). No build setting reaches this
-///             one; the pattern anchor is the only route.
-///         </item>
-///     </list>
+///     Maps the two ways a <c>typeof()</c> anchor can fail to resolve while <c>Define()</c> runs — a
+///     <see cref="FileNotFoundException" /> for the anchored type's assembly, a
+///     <see cref="TypeLoadException" /> for the type itself — into an actionable
+///     <see cref="UserErrorException" /> naming the spec, what could not be loaded, the cause, and the
+///     remedy that applies.
+/// </summary>
+/// <remarks>
 ///     Both host surfaces render the result message-only (the CLI top-level handler to stderr, the MCP
 ///     <c>GlobalCallToolFilter</c> to the client) and exit 2 either way.
-/// </summary>
+/// </remarks>
 internal static class SpecDependencyLoadFailure
 {
     /// <summary>

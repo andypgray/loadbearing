@@ -4,25 +4,8 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     One concrete way a rule is broken (GRAMMAR §4.3). Which slots are populated is governed by
-///     <see cref="Kind" />: a <see cref="ViolationKind.Reference" /> carries <see cref="Source" /> and
-///     <see cref="Target" /> with the edge's reference <see cref="Sites" />; a
-///     <see cref="ViolationKind.MemberUse" /> carries <see cref="Source" /> and <see cref="Member" />
-///     with the member-use edge's <see cref="Sites" />; a <see cref="ViolationKind.Construction" /> carries
-///     <see cref="Source" /> and <see cref="Target" /> (the constructed type) with the construction edge's
-///     <see cref="Sites" />; a <see cref="ViolationKind.Injection" /> carries <see cref="Source" /> and
-///     <see cref="Target" /> (the injected parameter type) with the injection edge's <see cref="Sites" />;
-///     a <see cref="ViolationKind.Catch" /> carries <see cref="Source" /> and <see cref="Target" /> (the
-///     caught exception type) with the catch edge's <see cref="Sites" />; a
-///     <see cref="ViolationKind.Throw" /> carries <see cref="Source" /> and <see cref="Target" /> (the
-///     thrown exception type) with the throw edge's <see cref="Sites" />; a
-///     <see cref="ViolationKind.Expose" /> carries <see cref="Source" /> and <see cref="Target" /> (the
-///     exposed type) with the exposure edge's <see cref="Sites" />;
-///     a <see cref="ViolationKind.Shape" /> carries
-///     <see cref="Subject" /> with its declaration sites; a <see cref="ViolationKind.MemberShape" />
-///     carries <see cref="SubjectMember" /> with its declaration sites;
-///     <see cref="ViolationKind.EmptySubject" /> and <see cref="ViolationKind.RuleError" /> carry only
-///     <see cref="Detail" />.
+///     One concrete way a rule is broken (GRAMMAR §4.3). <see cref="Kind" /> governs which of the
+///     nullable slots are populated — <see cref="ViolationKind" /> documents the mapping per kind.
 /// </summary>
 public sealed class Violation
 {
@@ -78,22 +61,17 @@ public sealed class Violation
     /// <summary>Free text for EmptySubject/RuleError; null otherwise.</summary>
     public string? Detail { get; }
 
-    /// <summary>
-    ///     This violation's stable baseline identity (GRAMMAR §4.3): an edge key
-    ///     (<see cref="Source" />, <see cref="Target" /> symbol IDs) for a Reference, a Construction
-    ///     (the constructed type in <see cref="Target" />; all ctor overloads share the one type-pair
-    ///     identity), an Injection (the injected parameter type in <see cref="Target" />; every parameter
-    ///     typed on it shares the one type-pair identity), a Catch (the caught type in <see cref="Target" />;
-    ///     every catch clause of it shares the one type-pair identity), a Throw (the thrown type in
-    ///     <see cref="Target" />; every throw of it shares the one type-pair identity), or an Expose (the
-    ///     exposed type in <see cref="Target" />; every signature position of it shares the one type-pair
-    ///     identity), an edge key
-    ///     (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId) for a MemberUse, a
-    ///     subject key for a Shape, and a member-subject key (<see cref="SubjectMember" />'s member DocId)
-    ///     for a MemberShape (GRAMMAR §4.6). <see cref="ViolationKind.EmptySubject" /> and
-    ///     <see cref="ViolationKind.RuleError" /> have no stable identity and return null — they can
-    ///     never be grandfathered. Shared by the checker's ratchet and the <c>baseline</c> command's capture.
-    /// </summary>
+    /// <summary>This violation's stable baseline identity (GRAMMAR §4.3).</summary>
+    /// <remarks>
+    ///     An edge key for the dependency kinds — (<see cref="Source" />, <see cref="Target" />) symbol
+    ///     IDs, or (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId) for a
+    ///     MemberUse — and a subject key for a Shape (<see cref="Subject" />) or a MemberShape
+    ///     (<see cref="SubjectMember" />'s member DocId, GRAMMAR §4.6). Each kind's collapse rule — why
+    ///     every overload, parameter, catch clause, throw or signature position of one type pair shares
+    ///     a single identity — is documented on <see cref="ViolationKind" />.
+    ///     <see cref="ViolationKind.EmptySubject" /> and <see cref="ViolationKind.RuleError" /> have no
+    ///     stable identity and return null, so they can never be grandfathered.
+    /// </remarks>
     public BaselineEntry? BaselineIdentity()
     {
         return Kind switch

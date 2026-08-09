@@ -4,13 +4,16 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The member selection minted by the <c>.Methods</c> projection (GRAMMAR §4.6). A
+///     The member selection minted by the <c>.Methods</c> projection (GRAMMAR §4.6) — a
 ///     <see cref="MemberSelection" /> specialized to methods that additionally offers
-///     <see cref="Returning" /> — the return-type adjective is methods-only, so it lives here and is
-///     uncompilable on the other projections by construction (GRAMMAR §3.2). The shared member
-///     adjectives preserve this type (they are generic self-type extensions), so
-///     <c>.Methods.WithSuffix("Async").Returning(typeof(Task))</c> type-checks in any order.
+///     <see cref="Returning" />.
 /// </summary>
+/// <remarks>
+///     The return-type adjective is methods-only, so it lives here and is uncompilable on the other
+///     projections by construction (GRAMMAR §3.2). The shared member adjectives preserve this type
+///     (they are generic self-type extensions), so
+///     <c>.Methods.WithSuffix("Async").Returning(typeof(Task))</c> type-checks in any order.
+/// </remarks>
 public sealed class MethodSelection : MemberSelection
 {
     internal MethodSelection(Selection source, IReadOnlyList<MemberAdjective> adjectives)

@@ -8,7 +8,6 @@ namespace Zphil.LoadBearing.Validation;
 /// </summary>
 internal static class RuleIdSyntax
 {
-    /// <summary>The ID pattern: <c>^[a-z0-9-]+(/[a-z0-9-]+)*$</c>.</summary>
     internal const string Pattern = "^[a-z0-9-]+(/[a-z0-9-]+)*$";
 
     private static readonly Regex Matcher = new(Pattern, RegexOptions.CultureInvariant);

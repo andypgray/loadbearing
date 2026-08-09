@@ -9,14 +9,21 @@ namespace Zphil.LoadBearing.Cli;
 ///     The <c>status</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) → run
 ///     the shared <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render the burndown
 ///     (human or JSON). Unlike <c>check</c>, status <em>reports</em> — it exits 0 even with red rules; only an
-///     error (a tampered baseline, an unresolvable spec) exits 2 via the top-level handler. The one thing it
-///     does gate on is the model not being the codebase: a project that failed to load declares no types, so
-///     every burndown count reads low and a ratchet read against it looks like progress that never happened.
-///     That fails closed on <c>check</c>'s terms — the burndown still renders, then exit 2, opt-out
-///     <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />). Output/error
-///     writers are injected for the in-process e2e tests, and the <see cref="IEnvironment" /> seam supplies
-///     the cache-root override.
+///     error (a tampered baseline, an unresolvable spec) exits 2 via the top-level handler.
 /// </summary>
+/// <remarks>
+///     <para>
+///         <b>What it refuses.</b> The one thing status gates on is the model not being the codebase: a
+///         project that failed to load declares no types, so every burndown count reads low and a ratchet
+///         read against it looks like progress that never happened. That fails closed on <c>check</c>'s
+///         terms — the burndown still renders, then exit 2, opt-out
+///         <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />).
+///     </para>
+///     <para>
+///         Output/error writers are injected for the in-process e2e tests, and the
+///         <see cref="IEnvironment" /> seam supplies the cache-root override.
+///     </para>
+/// </remarks>
 internal sealed class StatusRunner(
     TextWriter output,
     TextWriter error,

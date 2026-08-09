@@ -1,12 +1,11 @@
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The CLI's "you named something that is not there" refusals. Three commands raise one — an
-///     unmatched <c>check --rules</c> filter, an unknown <c>explain</c> rule ID, an unmatched
-///     <c>graph --projects</c> filter — and a reader who meets two of them should meet one format: name
-///     what did not match, then list what was available, so the next command is one edit away. Each
-///     caller keeps its own lead and its own label; the shape they share lives here, as does the ordinal
-///     sort that makes a rule-ID list read the same on every machine.
+///     The CLI's "you named something that is not there" refusals — an unmatched filter, an unknown ID. A
+///     reader who meets two of them should meet one format: name what did not match, then list what was
+///     available, so the next command is one edit away. Each caller keeps its own lead and its own label;
+///     the shape they share lives here, as does the ordinal sort that makes a rule-ID list read the same on
+///     every machine.
 /// </summary>
 internal static class Refusals
 {

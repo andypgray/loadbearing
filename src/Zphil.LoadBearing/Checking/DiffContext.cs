@@ -5,15 +5,15 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     The set of files changed relative to a git ref — the substrate the Quarantine tripwire checks
-///     against (GRAMMAR §7). Paths are normalized to forward slashes on the way in and compared with the
-///     platform's file-name comparison (<see cref="PathComparison" />: case-insensitive on Windows and
-///     macOS, ordinal on Linux); <see cref="Contains" /> answers "was this declaration-site file
-///     changed", and <see cref="SolutionRelative" /> renders the agent-facing path in a tripwire
-///     warning. Built by the CLI's git integration and passed to
-///     <see cref="ArchChecker.Check(ArchitectureModel, Codebase.CodebaseModel, Baselines.BaselineIndex, DiffContext?)" />;
-///     a null <see cref="DiffContext" /> means no <c>--diff-base</c> was supplied and every tripwire skips.
-///     Pure string logic only — no <c>Path.GetRelativePath</c>/Span (unavailable on netstandard2.0).
+///     against (GRAMMAR §7).
 /// </summary>
+/// <remarks>
+///     Paths are normalized to forward slashes on the way in and compared with the platform's
+///     file-name comparison (<see cref="PathComparison" />: case-insensitive on Windows and macOS,
+///     ordinal on Linux). A null context means no <c>--diff-base</c> was supplied, and every tripwire
+///     skips. Pure string logic only — no <c>Path.GetRelativePath</c>/Span (unavailable on
+///     netstandard2.0).
+/// </remarks>
 public sealed class DiffContext
 {
     private readonly HashSet<string> _changed;

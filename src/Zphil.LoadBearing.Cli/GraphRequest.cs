@@ -8,6 +8,9 @@ namespace Zphil.LoadBearing.Cli;
 ///     <c>--json</c>). Deliberately no <c>Spec</c>: the survey is a property of the codebase, and derive
 ///     runs before any spec exists.
 /// </summary>
+/// <param name="Solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>
+/// <param name="Json">Whether to emit the machine-readable JSON survey document instead of human output.</param>
+/// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
 /// <param name="NoCache">Whether to bypass the persisted extraction cache entirely (no read, no write).</param>
 /// <param name="Binlog">The explicit <c>--binlog</c> to replay instead of a design-time build, or null to auto-select.</param>
 /// <param name="AllowWorkspaceDiagnostics">

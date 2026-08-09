@@ -486,7 +486,9 @@ public sealed class LawDiagramRendererTests
             "`legacy/pricing/containment` (Quarantine), `legacy/pricing/tripwire` (Quarantine). " +
             "Expand any of them with `loadbearing explain <rule-id>`.");
 
-        // The caption and the list are prose in the file this lands in, where the em-dash budget is spent.
+        // The caption and the list are prose in the file this lands in, whose em-dash allowance the survey
+        // caption above them already spends. DocHygieneTests gates the rendered file; this gates the block,
+        // so a caption respelled to match its siblings reds at the renderer rather than three docs away.
         block.ShouldNotContain("—");
     }
 

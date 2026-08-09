@@ -29,10 +29,12 @@ internal enum CacheOutcome
 
 /// <summary>
 ///     The result of <see cref="ExtractionCacheStore.ReadAndValidate" />: what to reuse and what to redo.
-///     Carries everything a caller needs to finish a run without re-reading the cache — the reusable
-///     fragments, the dirty project set, and the recorded spec resolutions and workspace diagnostics
-///     (replayed on a hit so cached and cold output are byte-identical on diagnostic-bearing solutions).
+///     Carries everything a caller needs to finish a run without re-reading the cache.
 /// </summary>
+/// <remarks>
+///     The recorded spec resolutions and workspace diagnostics are replayed on a hit, so cached and cold
+///     output are byte-identical on diagnostic-bearing solutions.
+/// </remarks>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
     IReadOnlyList<CodebaseFragment> ReusableFragments,
@@ -129,15 +131,10 @@ internal sealed record ExtractionResult(
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
-    // v14 adds the catch edge's swallowing-site subset (FragmentCatchEdge.SwallowingSites, GRAMMAR §4.8), the
-    // fact a rethrow-aware catch rule reads: the one on-disk format this covers is this per-solution cache file,
-    // where `Fragments[*].CatchEdges[*]` gains a `SwallowingSites` array under JsonOptions. A v13 record has no
-    // such field, so every catch edge would deserialize with a null subset and the rethrow fact would read wrong
-    // on a hit. It degrades to a clean Miss instead, as does a record from any earlier version — the cache is
-    // disposable derived data, so a schema it cannot read is rebuilt, never a loud error. Nothing else moves:
-    // baselines, the `--json` report, SARIF, and the binlog replay store are untouched formats, and a warm
-    // session's fragments never leave memory. Bump this whenever a fragment gains a fact, or a hit would
-    // deserialize the new field as its default and answer with a fact the extraction never recorded.
+    // The on-disk schema of this per-solution cache file. A record written under any other version degrades to
+    // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
+    // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
+    // default and answer with a fact the extraction never recorded.
     private const int CurrentSchemaVersion = 14;
 
     /// <summary>
@@ -200,9 +197,10 @@ internal sealed class ExtractionCacheStore
             string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
 
             // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
-            // full paths). Hardcoding adds=[] here was a real bug: a *.cs on disk under the project but
-            // excluded from compilation is a validation-time add, so an empty capture never validated and the
-            // project stayed dirty forever. With capture and validation running the one routine, they agree.
+            // full paths). Hardcoding an empty adds list here would be wrong: a *.cs on disk under the
+            // project but excluded from compilation is a validation-time add, so the capture would never
+            // validate and the project would stay dirty forever. With capture and validation running the one
+            // routine, they agree.
             var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
             var adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
             contentKeys[project.ProjectName] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
@@ -388,8 +386,8 @@ internal sealed class ExtractionCacheStore
     // (csproj + assets hashes), and any cone-add paths. Changes iff P's own content changes. Sorted by path so
     // capture and validation agree regardless of input order. Fed to the digest a line at a time rather than
     // as one assembled string: a large project's key would otherwise materialize a megabyte-scale string and
-    // its UTF-8 copy, both LOH-bound, per project per run. The byte sequence and its order are unchanged, so
-    // the digest is unchanged and cache files written before this stay valid.
+    // its UTF-8 copy, both LOH-bound, per project per run. The byte sequence and its order are load-bearing:
+    // change either and every persisted cache file stops matching.
     private static string ComputeContentKey(
         string projectName,
         IReadOnlyList<(string Path, string? Sha)> documents,
@@ -400,8 +398,8 @@ internal sealed class ExtractionCacheStore
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         Append(hash, $"project\0{projectName}\n");
 
-        // Folded once per document, then sorted on the folded form — the same order the fold used to be
-        // recomputed for on every comparison.
+        // Folded once per document, then sorted on the folded form — one fold per document rather than one
+        // per comparison.
         var keyed = documents
             .Select(d => (Path: PathComparison.Fold(d.Path), d.Sha))
             .OrderBy(d => d.Path, StringComparer.Ordinal);

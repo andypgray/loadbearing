@@ -6,8 +6,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     The dependabot-style managed block: a marker-delimited region LoadBearing owns inside an
 ///     <c>AGENTS.md</c> file, everything outside preserved byte-for-byte. A pure
 ///     string function — <c>existing text × LF-internal body → new text</c> — so it is
-///     netstandard2.0-safe and deterministic; the CLI file adapter layers on BOM/bytes handling and
-///     wrote/unchanged reporting.
+///     netstandard2.0-safe and deterministic.
 /// </summary>
 /// <remarks>
 ///     Markers are matched as whole lines by trimmed exact text. There is exactly one managed block
@@ -29,12 +28,18 @@ public static class ManagedBlock
 
     /// <summary>
     ///     Splices <paramref name="body" /> (composed LF-internally, no surrounding newlines) into
-    ///     <paramref name="existing" />, returning the whole new file text. A null or whitespace-only
-    ///     <paramref name="existing" /> counts as absent: the result is the block plus a single
-    ///     trailing newline, LF. With no markers, the block is appended after the preserved content
-    ///     and exactly one blank-line separator. With one marker pair, only the text strictly between
-    ///     the markers is replaced; everything else — marker lines included — is preserved verbatim.
+    ///     <paramref name="existing" />, returning the whole new file text.
     /// </summary>
+    /// <exception cref="MalformedManagedBlockException">
+    ///     <paramref name="existing" /> carries a malformed marker state; nothing is spliced.
+    /// </exception>
+    /// <remarks>
+    ///     A null or whitespace-only <paramref name="existing" /> counts as absent: the result is the
+    ///     block plus a single trailing newline, LF. With no markers, the block is appended after the
+    ///     preserved content and exactly one blank-line separator. With one marker pair, only the text
+    ///     strictly between the markers is replaced; everything else — marker lines included — is
+    ///     preserved verbatim.
+    /// </remarks>
     public static string Splice(string? existing, string body)
     {
         Guard.NotNull(body, nameof(body));
@@ -59,9 +64,12 @@ public static class ManagedBlock
 
     /// <summary>
     ///     Returns the LF-normalized body strictly between the single marker pair, or null when the
-    ///     file has no markers. Throws <see cref="MalformedManagedBlockException" /> on any malformed
-    ///     marker state — so a successful non-null return also proves exactly one marker pair exists.
+    ///     file has no markers.
     /// </summary>
+    /// <exception cref="MalformedManagedBlockException">
+    ///     The markers are in any malformed state — so a successful non-null return also proves exactly
+    ///     one marker pair exists.
+    /// </exception>
     public static string? ExtractBody(string existing)
     {
         Guard.NotNull(existing, nameof(existing));

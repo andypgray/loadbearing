@@ -59,10 +59,11 @@ public sealed class ArchRule
 
     /// <summary>
     ///     The effective ratchet baseline path for this rule, or null when the rule is not ratcheted.
-    ///     Both Migrate rules and Quarantine containment rules grandfather their violations against a
-    ///     baseline (GRAMMAR §7); a Quarantine tripwire and an Enforce rule have none. The
-    ///     one accessor every renderer/store consults to ask "is this a ratcheted rule".
     /// </summary>
+    /// <remarks>
+    ///     Both Migrate rules and Quarantine containment rules grandfather their violations against a
+    ///     baseline (GRAMMAR §7); a Quarantine tripwire and an Enforce rule have none.
+    /// </remarks>
     public string? BaselinePath => Migrate?.BaselinePath
                                    ?? (Quarantine is { Role: QuarantineRole.Containment } quarantine ? quarantine.BaselinePath : null);
 }

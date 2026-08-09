@@ -11,16 +11,19 @@ namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 ///     The MCP tool surface: the five <c>arch_*</c> tools, each a thin shell that runs the
 ///     same internal runner its CLI verb uses against the bound solution + spec, captures stdout into a
 ///     <see cref="StringWriter" />, and returns the text — so CLI and MCP output are identical by
-///     construction (pinned by <c>CliMcpParityTests</c>). Violations are data, never tool errors. Tool
-///     methods never <c>try/catch</c>: they throw, and <see cref="GlobalCallToolFilter" /> shapes
-///     any <see cref="Roslyn.UserErrorException" /> or spec-validation failure into an error result.
+///     construction (pinned by <c>CliMcpParityTests</c>).
+/// </summary>
+/// <remarks>
+///     Violations are data, never tool errors. Tool methods never <c>try/catch</c>: they throw, and
+///     <see cref="GlobalCallToolFilter" /> shapes any <see cref="Roslyn.UserErrorException" /> or
+///     spec-validation failure into an error result.
 ///     Reaching a Roslyn workspace type only through the runners keeps the MSBuildLocator JIT quarantine
 ///     intact — these methods are first JITted at the first tool call, after registration has run. Every
 ///     runner is handed the injected <see cref="ISolutionSource" /> so tool calls acquire the solution the
 ///     same way: warm (a session reconciled across calls) by default, or cold when the warm workspace is
 ///     disabled — the CLI's own default source. The injected <see cref="IEnvironment" /> is how a tool
 ///     learns the client's response budget without reading process state directly.
-/// </summary>
+/// </remarks>
 [McpServerToolType]
 internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source, IEnvironment environment)
 {

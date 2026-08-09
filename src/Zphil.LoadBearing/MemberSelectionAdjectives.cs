@@ -5,13 +5,16 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The v1 member-adjective vocabulary (GRAMMAR §5.7) as <b>generic self-type</b> extension methods
-///     on <see cref="MemberSelection" />. The <c>TSelf</c> shape preserves the concrete member-selection
-///     type, so refining a <see cref="MethodSelection" /> returns a <see cref="MethodSelection" /> and
-///     <c>.Returning</c> stays reachable after any adjective. Each call appends one closed-vocabulary
-///     adjective and returns a fresh selection (member selections are immutable values). These live on
-///     a hierarchy disjoint from <see cref="Selection" />, so the identically-named type-side adjectives
-///     never collide on overload resolution — the receiver type decides.
+///     on <see cref="MemberSelection" />.
 /// </summary>
+/// <remarks>
+///     The <c>TSelf</c> shape preserves the concrete member-selection type, so refining a
+///     <see cref="MethodSelection" /> returns a <see cref="MethodSelection" /> and <c>.Returning</c>
+///     stays reachable after any adjective. Each call appends one closed-vocabulary adjective and
+///     returns a fresh selection (member selections are immutable values). These live on a hierarchy
+///     disjoint from <see cref="Selection" />, so the identically-named type-side adjectives never
+///     collide on overload resolution — the receiver type decides.
+/// </remarks>
 public static class MemberSelectionAdjectives
 {
     /// <summary>Narrows to members whose name ends with a suffix: " named `*Async`".</summary>

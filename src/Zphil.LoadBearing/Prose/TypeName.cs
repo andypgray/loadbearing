@@ -4,12 +4,8 @@ namespace Zphil.LoadBearing.Prose;
 
 /// <summary>
 ///     Renders a <see cref="Type" /> to prose (GRAMMAR §5–6). Simple names are generic-aware and
-///     use declared type-parameter names (<c>IHandler&lt;T&gt;</c>,
-///     <c>
-///         IDictionary&lt;TKey,
-///         TValue&gt;
-///     </c>
-///     ); the full-path helpers back the colliding-simple-name qualification rule.
+///     use declared type-parameter names (<c>IHandler&lt;T&gt;</c>, <c>IDictionary&lt;TKey, TValue&gt;</c>);
+///     the full-path helpers back the colliding-simple-name qualification rule.
 /// </summary>
 internal static class TypeName
 {
@@ -35,8 +31,14 @@ internal static class TypeName
     ///     The extraction-format fully-qualified name for a reflection type — byte-identical to what
     ///     Roslyn's <c>SymbolDisplayFormat</c> (omitted global namespace, name-and-containing-types-
     ///     and-namespaces, include-type-parameters, no special-type keywords) produces for the
-    ///     equivalent symbol. This is the load-bearing correspondence that lets a spec's
-    ///     <c>typeof(...)</c> match an extracted <see cref="Codebase.TypeNode.FullName" /> /
+    ///     equivalent symbol.
+    /// </summary>
+    /// <exception cref="UnrepresentableTypeException">
+    ///     The type is a pointer, by-ref, or partially-open construction — no source-level form exists.
+    /// </exception>
+    /// <remarks>
+    ///     This is the load-bearing correspondence that lets a spec's <c>typeof(...)</c> match an
+    ///     extracted <see cref="Codebase.TypeNode.FullName" /> /
     ///     <see cref="Codebase.TypeConstruction.FullName" /> (GRAMMAR §4.1, §5.2). Forms:
     ///     <list type="bullet">
     ///         <item>non-generic: namespace + <see cref="Type.DeclaringType" /> chain dotted (<c>MyApp.Domain.Order.Line</c>)</item>
@@ -47,10 +49,7 @@ internal static class TypeName
     ///         </item>
     ///         <item>arrays: <c>Elem[]</c>; global-namespace types: bare simple name</item>
     ///     </list>
-    /// </summary>
-    /// <exception cref="UnrepresentableTypeException">
-    ///     The type is a pointer, by-ref, or partially-open construction — no source-level form exists.
-    /// </exception>
+    /// </remarks>
     internal static string FullDisplay(Type type)
     {
         if (type.IsByRef || type.IsPointer) throw new UnrepresentableTypeException(type);
@@ -112,11 +111,13 @@ internal static class TypeName
 
     /// <summary>
     ///     The type's dot-separated path — namespace segments then the simple name — which the
-    ///     colliding-simple-name rule widens outward along (GRAMMAR §6). This is the reflection arm of
-    ///     that rule's input; a string anchor supplies the same shape from its own FQN
-    ///     (<see cref="Model.TypeAnchor" />), so the widening algorithm itself
-    ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
+    ///     colliding-simple-name rule widens outward along (GRAMMAR §6).
     /// </summary>
+    /// <remarks>
+    ///     This is the reflection arm of that rule's input; a string anchor supplies the same shape from
+    ///     its own FQN (<see cref="Model.TypeAnchor" />), so the widening algorithm itself
+    ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
+    /// </remarks>
     internal static IReadOnlyList<string> PathSegments(Type type)
     {
         var segments = new List<string>();

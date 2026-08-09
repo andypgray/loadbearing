@@ -5,11 +5,12 @@ namespace Zphil.LoadBearing.Rendering;
 /// <summary>
 ///     The one per-OS rule for comparing file-system path segments: case-insensitive on Windows and
 ///     macOS, ordinal (case-sensitive) on Linux — the file-name reality of each platform. Shared by
-///     every path compare across the codebase (<see cref="PathFormat" />, the diff tripwire, scope
-///     placement, AGENTS.md dedupe, spec resolution) so they cannot drift apart. Core is
-///     netstandard2.0, so the platform test uses <see cref="RuntimeInformation.IsOSPlatform" /> rather
-///     than the net5+ <c>OperatingSystem.IsWindows()</c> helpers.
+///     every path compare across the codebase so they cannot drift apart.
 /// </summary>
+/// <remarks>
+///     Core is netstandard2.0, so the platform test uses <see cref="RuntimeInformation.IsOSPlatform" />
+///     rather than the net5+ <c>OperatingSystem.IsWindows()</c> helpers.
+/// </remarks>
 public static class PathComparison
 {
     private static readonly bool CaseInsensitive =
@@ -25,11 +26,14 @@ public static class PathComparison
 
     /// <summary>
     ///     <paramref name="path" /> case-folded by the same rule — lowercased where this OS ignores case,
-    ///     returned as-is where it does not. The form to key on when the key must be a <em>string</em> rather
-    ///     than a comparer: a hashed cache identity, a path baked into a content key. Sharing the fold with
-    ///     <see cref="Comparison" /> and <see cref="Comparer" /> is what stops a cache splitting or colliding
-    ///     against the comparisons made elsewhere about the same path.
+    ///     returned as-is where it does not.
     /// </summary>
+    /// <remarks>
+    ///     The form to key on when the key must be a <em>string</em> rather than a comparer: a hashed
+    ///     cache identity, a path baked into a content key. Sharing the fold with
+    ///     <see cref="Comparison" /> and <see cref="Comparer" /> is what stops a cache splitting or
+    ///     colliding against the comparisons made elsewhere about the same path.
+    /// </remarks>
     public static string Fold(string path)
     {
         return CaseInsensitive ? path.ToLowerInvariant() : path;

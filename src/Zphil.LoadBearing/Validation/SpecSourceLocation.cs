@@ -3,11 +3,14 @@ namespace Zphil.LoadBearing.Validation;
 /// <summary>
 ///     The spec-source position of an anchor — the file name and 1-based line where a rule, scope, or
 ///     member anchor was authored, captured via <c>[CallerFilePath]</c>/<c>[CallerLineNumber]</c> on the
-///     anchor factories (GRAMMAR §8). Diagnostics metadata only: it never enters the reified model or any
-///     render target, so the model stays location-free and deterministic by construction. Rendered
-///     <em>file name only</em> — never the machine-specific full compile-time path — so goldens stay
-///     byte-identical across build machines (fixture specs build in temp directories).
+///     anchor factories (GRAMMAR §8).
 /// </summary>
+/// <remarks>
+///     Diagnostics metadata only: it never enters the reified model or any render target, so the model
+///     stays location-free and deterministic by construction. Rendered <em>file name only</em> — never
+///     the machine-specific full compile-time path — so goldens stay byte-identical across build
+///     machines (fixture specs build in temp directories).
+/// </remarks>
 public sealed class SpecSourceLocation
 {
     internal SpecSourceLocation(string file, int line)

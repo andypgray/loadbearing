@@ -17,9 +17,8 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     </para>
 ///     <para>
 ///         <b>No tamper story.</b> Unlike a baseline file (which carries a digest and treats a hand edit as
-///         loud tamper), this cache is disposable local derived data. A garbled, truncated, or hand-edited
-///         file degrades to a parse-error <em>miss</em> and the run falls back to the cold path — never an
-///         exception, never a wrong answer. See <see cref="ExtractionCacheStore" />.
+///         loud tamper), this cache is disposable local derived data: a garbled, truncated, or hand-edited
+///         file degrades to a miss rather than an error — see <see cref="ExtractionCacheStore" />.
 ///     </para>
 /// </remarks>
 internal sealed record CacheManifest(
@@ -95,10 +94,8 @@ internal sealed record ProjectCacheEntry(
 /// <summary>
 ///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the spec
 ///     project, the projects to drop from the checked universe, and the Debug-evaluated output path. Stored
-///     faithfully so a cache hit can replay spec resolution without a workspace (the hit path consumes these —
-///     it re-runs the built-output check over <see cref="OutputFilePath" /> for a convention/csproj spec, so
-///     the hit path resolves identically to a cold run, including the sibling-configuration fallback and its
-///     error text).
+///     faithfully so a cache hit can replay spec resolution without a workspace, resolving identically to a
+///     cold run — including the sibling-configuration fallback and its error text.
 /// </summary>
 /// <param name="NormalizedSpecArgument">
 ///     The normalized <c>--spec</c> value this record resolves (an absolute csproj/dll path, or the empty

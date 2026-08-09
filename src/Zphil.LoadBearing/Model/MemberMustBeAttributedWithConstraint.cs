@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Model;
 ///     `[McpServerTool]`" (GRAMMAR §5.7) — the type-side verb phrase reused verbatim. Verb position is
 ///     unambiguous (nothing else can occupy it), so there is nothing to disambiguate and no reason for the
 ///     member wording to diverge from <see cref="MustBeAttributedWithConstraint" />; only the
-///     <em>adjective</em> had to move (<see cref="MemberAttributedWithAdjective" />). The anchor is an
+///     <em>adjective</em> had to move (<see cref="MemberAttributedWithAdjective" />). The anchor is a
 ///     <see cref="TypeAnchor" />, so the string form renders the identical verb phrase.
 /// </summary>
 internal sealed class MemberMustBeAttributedWithConstraint(MemberSelection subject, TypeAnchor anchor) : MemberConstraint(subject)

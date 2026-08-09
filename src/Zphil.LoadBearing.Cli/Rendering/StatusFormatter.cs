@@ -4,12 +4,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
 ///     Formats a <see cref="CheckReport" /> as the human <c>status</c> report — one line per rule plus a
-///     burndown summary. Pure over the report (no workspace), so the line shapes are unit-pinned. Enforce
+///     burndown summary.
+/// </summary>
+/// <remarks>
+///     Pure over the report (no workspace), so the line shapes are unit-pinned. Enforce
 ///     rules read <c>pass</c>/<c>FAIL</c> with violation/warning counts; a ratcheted rule (Migrate or
 ///     Quarantine containment) reads the ratchet state — grandfathered remaining, new (red), and
 ///     fixed-awaiting-acceptance; a Quarantine tripwire reads <c>skip</c> (diff-aware). Only Migrate surfaces
 ///     the promotion suggestion when the baseline has burned to zero — Quarantine→Migrate is a human decision.
-/// </summary>
+/// </remarks>
 internal static class StatusFormatter
 {
     public static IReadOnlyList<string> Lines(CheckReport report)

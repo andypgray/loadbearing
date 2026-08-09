@@ -9,10 +9,13 @@ namespace Zphil.LoadBearing.Rendering;
 ///     evaluates the raw quarantined selection in <see cref="SelectionPosition.Subject" /> position (so it
 ///     ranges over solution-declared types), collects those types' declaration-site file paths, and
 ///     picks their <em>deepest common ancestor directory</em> — the directory whose <c>AGENTS.md</c>
-///     receives the scope card. A scope that matches no types resolves to a null directory with a
-///     skip reason. This is the one placement concern that needs the codebase; it stays in Core so it
-///     can use the internal <see cref="SelectionEvaluator" />, and the CLI sees only the public result.
+///     receives the scope card.
 /// </summary>
+/// <remarks>
+///     A scope that matches no types resolves to a null directory with a skip reason. This is the one
+///     placement concern that needs the codebase, so it stays beside the internal
+///     <see cref="SelectionEvaluator" /> and returns a public result.
+/// </remarks>
 public static class ScopedContextResolver
 {
     /// <summary>Resolves a placement for every quarantined scope in the model, in model order.</summary>
@@ -24,8 +27,8 @@ public static class ScopedContextResolver
         return Resolve(model, new SelectionEvaluator(codebase));
     }
 
-    // The shared-evaluator entry point, the twin of LayerContextResolver's: the composer resolves both
-    // emission keys for one codebase, and one evaluator serves both rather than each materializing the
+    // The shared-evaluator entry point, the twin of LayerContextResolver's: a caller resolving both
+    // emission keys for one codebase hands one evaluator to both, rather than each materializing the
     // solution-declared type list for itself.
     internal static IReadOnlyList<ScopePlacement> Resolve(ArchitectureModel model, SelectionEvaluator evaluator)
     {

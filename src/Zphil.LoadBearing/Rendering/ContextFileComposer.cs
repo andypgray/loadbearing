@@ -8,22 +8,29 @@ namespace Zphil.LoadBearing.Rendering;
 ///     Composes every agent-context file one render writes, from the model plus (optionally) the
 ///     codebase: the root block in the solution directory, each anchored layer's local-rules card, and
 ///     each quarantined scope's card, grouped by target directory so a directory receiving several
-///     cards gets one merged managed block (layer cards before quarantine cards). This is the single
-///     composition path — <c>render</c> splices what it returns and the card-drift gate compares
-///     against it, so the gate cannot drift from the command it gates. Pure: no file system access and
-///     no output channel; skip warnings come back as data.
+///     cards gets one merged managed block (layer cards before quarantine cards).
 /// </summary>
+/// <remarks>
+///     This is the single composition path — <c>render</c> splices what it returns and the card-drift
+///     gate compares against it, so the gate cannot drift from the command it gates. Pure: no file
+///     system access and no output channel; skip warnings come back as data.
+/// </remarks>
 public static class ContextFileComposer
 {
     /// <summary>The file name every managed context block is spliced into.</summary>
     public const string FileName = "AGENTS.md";
 
-    /// <summary>
-    ///     Composes the context files for <paramref name="model" />. Pass the extracted
-    ///     <paramref name="codebase" /> to place scoped cards, or null to compose the root block alone —
-    ///     the caller owns the decision, because extraction is the expensive half and only
-    ///     <see cref="HasAnythingToPlace" /> can say whether it is worth paying.
-    /// </summary>
+    /// <summary>Composes the context files for <paramref name="model" />.</summary>
+    /// <param name="model">The reified spec whose layers, rules and quarantined scopes are rendered.</param>
+    /// <param name="codebase">
+    ///     The extracted codebase the scoped cards are placed against, or null to compose the root block alone.
+    /// </param>
+    /// <param name="solutionDirectory">The directory whose <c>AGENTS.md</c> receives the root block.</param>
+    /// <param name="specName">The spec assembly name written into each file's provenance line.</param>
+    /// <remarks>
+    ///     Whether to pass a <paramref name="codebase" /> is the caller's decision, because extraction is
+    ///     the expensive half and only <see cref="HasAnythingToPlace" /> can say whether it is worth paying.
+    /// </remarks>
     public static ContextComposition Compose(
         ArchitectureModel model, CodebaseModel? codebase, string solutionDirectory, string specName)
     {
@@ -44,10 +51,13 @@ public static class ContextFileComposer
 
     /// <summary>
     ///     Whether this model places anything scoped at all — a quarantined scope, or a layer carrying
-    ///     anchored rules. The cost gate every caller consults before extracting: extraction is the
-    ///     expensive half, and with nothing scoped to place there is nothing for it to place. Pure over
-    ///     the model, so it is answered before a codebase exists.
+    ///     anchored rules.
     /// </summary>
+    /// <remarks>
+    ///     The cost gate to consult before extracting: extraction is the expensive half, and with nothing
+    ///     scoped to place there is nothing for it to place. Pure over the model, so it is answered before
+    ///     a codebase exists.
+    /// </remarks>
     public static bool HasAnythingToPlace(ArchitectureModel model)
     {
         Guard.NotNull(model, nameof(model));
@@ -60,13 +70,16 @@ public static class ContextFileComposer
     ///     Every scoped card this model places against <paramref name="codebase" />, rendered and paired
     ///     with its directory: layer local-rules cards in declaration order ahead of quarantine cards in
     ///     model order, and an unplaceable card carried as a null directory with its skip reason rather
-    ///     than dropped. This is the composition decision itself, so <see cref="Compose" /> and any other
-    ///     consumer of scoped context — a lookup that filters the cards by which one covers a path, say —
-    ///     agree on the card kinds, their order, and what an unplaceable card means, instead of each
-    ///     walking the two resolvers and deciding again.
+    ///     than dropped.
     /// </summary>
     /// <param name="model">The reified spec whose layers and quarantined scopes place the cards.</param>
     /// <param name="codebase">The extracted codebase the placements are resolved against.</param>
+    /// <remarks>
+    ///     This is the composition decision itself, so <see cref="Compose" /> and any other consumer of
+    ///     scoped context — a lookup that filters the cards by which one covers a path, say — agree on the
+    ///     card kinds, their order, and what an unplaceable card means, instead of each walking the two
+    ///     resolvers and deciding again.
+    /// </remarks>
     public static IReadOnlyList<ContextCard> Placements(ArchitectureModel model, CodebaseModel codebase)
     {
         Guard.NotNull(model, nameof(model));

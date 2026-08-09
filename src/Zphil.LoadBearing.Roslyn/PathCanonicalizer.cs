@@ -2,21 +2,26 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     A managed <c>realpath</c>: resolves a path to a symlink-free, fully-qualified spelling so that
-///     paths of different provenance can be compared. <c>git rev-parse --show-toplevel</c> returns a
-///     canonical (symlink-resolved) path, but <see cref="System.IO.Path.GetFullPath(string)" /> — and
-///     MSBuildWorkspace's document paths — keep whatever spelling the solution was opened with. On a
-///     symlinked root (macOS's <c>/var</c> → <c>/private/var</c>, a symlinked home, a Windows junction)
-///     the two disagree, and the Quarantine tripwire's prefix match silently misses. Canonicalizing once at
-///     the discovery seam makes the git-derived and workspace-derived paths agree.
+///     paths of different provenance can be compared.
 /// </summary>
 /// <remarks>
-///     Lives in <c>.Roslyn</c> (net-current) rather than Core, because
-///     <see cref="System.IO.DirectoryInfo.ResolveLinkTarget(bool)" /> is net6+ and Core is
-///     netstandard2.0. The resolution is a fixed-point walk: <see cref="System.IO.Path.GetFullPath(string)" />
-///     first, then repeatedly find the deepest symlinked ancestor, follow it to its final target, and
-///     reattach the remainder until no symlink remains. It is a no-op on ordinary (non-symlinked) paths
-///     and falls back to <c>GetFullPath</c> when the path does not exist — callers keep their own
-///     existence checks.
+///     <para>
+///         <c>git rev-parse --show-toplevel</c> returns a canonical (symlink-resolved) path, but
+///         <see cref="System.IO.Path.GetFullPath(string)" /> — and MSBuildWorkspace's document paths — keep
+///         whatever spelling the solution was opened with. On a symlinked root (macOS's <c>/var</c> →
+///         <c>/private/var</c>, a symlinked home, a Windows junction) the two disagree, and the Quarantine
+///         tripwire's prefix match silently misses. Canonicalizing once at the discovery seam makes the
+///         git-derived and workspace-derived paths agree.
+///     </para>
+///     <para>
+///         Lives in <c>.Roslyn</c> (net-current) rather than Core, because
+///         <see cref="System.IO.DirectoryInfo.ResolveLinkTarget(bool)" /> is net6+ and Core is
+///         netstandard2.0. The resolution is a fixed-point walk:
+///         <see cref="System.IO.Path.GetFullPath(string)" /> first, then repeatedly find the deepest
+///         symlinked ancestor, follow it to its final target, and reattach the remainder until no symlink
+///         remains. It is a no-op on ordinary (non-symlinked) paths and falls back to <c>GetFullPath</c>
+///         when the path does not exist — callers keep their own existence checks.
+///     </para>
 /// </remarks>
 public static class PathCanonicalizer
 {

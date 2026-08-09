@@ -3,16 +3,15 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The one place the CLI writes workspace diagnostics to stderr, shared by the six verbs that render
-///     them there — <c>check</c>, <c>status</c>, <c>graph</c>, <c>baseline</c>, <c>render</c> and
-///     <c>explain</c>. Diagnostics carry the <c>warning:</c> prefix in human mode and go bare under
+///     The one place the CLI writes workspace diagnostics to stderr.
+/// </summary>
+/// <remarks>
+///     Diagnostics carry the <c>warning:</c> prefix in human mode and go bare under
 ///     <c>--json</c>, where they also ride the document's <c>workspaceDiagnostics</c> array on stdout;
 ///     stdout purity is why nothing here ever writes to it. <c>context</c> is the deliberate exception to
 ///     that rule and so does not route through this class: it has no CLI verb and no <c>--json</c>, its
 ///     body is its only channel, and <c>ContextRunner</c> writes its own caveat
 ///     (<c>IncompleteModelGate.ContextCaveat</c>) straight to stdout, ahead of its answer.
-/// </summary>
-/// <remarks>
 ///     What gets written is <see cref="WorkspaceDiagnostics.Rendered" /> (or, for <c>check</c>,
 ///     <see cref="WorkspaceDiagnostics.RenderedWithMergeNotes" />) — composed once by the caller and handed
 ///     to <em>both</em> surfaces, stderr and the JSON document, so the MSBuild-selection note reaches the

@@ -2,12 +2,14 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The declared accessibility of a type, exposed on <see cref="ITypeInfo" /> and tested by
-///     <c>.MustBePublic()</c> / <c>.MustBeInternal()</c> (GRAMMAR §5.3, §5.6). This is
+///     <c>.MustBePublic()</c> / <c>.MustBeInternal()</c> (GRAMMAR §5.3, §5.6).
+/// </summary>
+/// <remarks>
 ///     LoadBearing's own enum — deliberately NOT <c>Microsoft.CodeAnalysis.Accessibility</c>;
 ///     Roslyn must not enter Core. Members carry C# keyword names, not Roslyn's boolean-algebra
 ///     names: <c>ProtectedOrInternal</c> maps to <see cref="ProtectedInternal" />,
 ///     <c>ProtectedAndInternal</c> to <see cref="PrivateProtected" />.
-/// </summary>
+/// </remarks>
 public enum Accessibility
 {
     /// <summary><c>public</c>.</summary>

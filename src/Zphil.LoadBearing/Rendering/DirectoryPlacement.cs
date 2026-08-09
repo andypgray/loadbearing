@@ -5,17 +5,16 @@ namespace Zphil.LoadBearing.Rendering;
 /// <summary>
 ///     Scoped context placement, end to end: given a selection, where does its card go? The whole step —
 ///     collecting the solution-declared types' declaration-site file paths, then collapsing those to their
-///     <em>
-///         deepest common ancestor
-///         directory
-///     </em>
-///     — the directory whose <c>AGENTS.md</c> receives that selection's card. Both
-///     <see cref="ScopedContextResolver" /> (quarantined scopes) and <see cref="LayerContextResolver" />
-///     (layer local-rules cards) place through this one helper, so the two emission keys land a co-located
-///     card in exactly the same directory. Sharing only the arithmetic would leave the more valuable half —
-///     <em>which</em> paths get collapsed — free to diverge, with the shared collapse still faithfully
-///     collapsing two different inputs.
+///     <em>deepest common ancestor directory</em> — the directory whose <c>AGENTS.md</c> receives that
+///     selection's card.
 /// </summary>
+/// <remarks>
+///     Both <see cref="ScopedContextResolver" /> (quarantined scopes) and
+///     <see cref="LayerContextResolver" /> (layer local-rules cards) place through this one helper, so the
+///     two emission keys land a co-located card in exactly the same directory. Sharing only the arithmetic
+///     would leave the more valuable half — <em>which</em> paths get collapsed — free to diverge, with the
+///     shared collapse still faithfully collapsing two different inputs.
+/// </remarks>
 internal static class DirectoryPlacement
 {
     /// <summary>

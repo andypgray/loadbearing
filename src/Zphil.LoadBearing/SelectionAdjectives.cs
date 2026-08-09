@@ -5,10 +5,12 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The v1 adjective vocabulary (GRAMMAR §5.2) as extension methods on <see cref="Selection" />.
+/// </summary>
+/// <remarks>
 ///     Each appends one closed-vocabulary adjective and returns a fresh selection re-stamped with
 ///     the same <see cref="Arch" /> owner. Selections are immutable values; each call yields a new
 ///     one, so a selection can be reused and refined in different directions.
-/// </summary>
+/// </remarks>
 public static class SelectionAdjectives
 {
     /// <summary>Narrows to types declared in a namespace glob: " in `MyApp.Web.*`".</summary>

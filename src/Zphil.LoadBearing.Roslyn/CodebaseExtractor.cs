@@ -18,6 +18,7 @@ public static class CodebaseExtractor
     ///     reference is walked, so a type referenced across compilations unifies to its declaring
     ///     node by fully-qualified name.
     /// </summary>
+    /// <param name="inputs">The compilations to extract from, in the order they are declared.</param>
     public static CodebaseModel ExtractFromCompilations(IReadOnlyList<CompilationInput> inputs)
     {
         return CodebaseModelBuilder.Build(inputs);

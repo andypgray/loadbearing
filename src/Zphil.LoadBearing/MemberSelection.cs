@@ -5,13 +5,13 @@ namespace Zphil.LoadBearing;
 /// <summary>
 ///     An immutable, reusable selection over the declared <em>members</em> of a type selection
 ///     (GRAMMAR §4.6). Minted by the projections on <see cref="Selection" />
-///     (<c>.Members</c>/<c>.Methods</c>/<c>.Properties</c>/<c>.Fields</c>/<c>.Events</c>). A closed
-///     class hierarchy with a <c>private protected</c> constructor, <b>disjoint</b> from
+///     (<c>.Members</c>/<c>.Methods</c>/<c>.Properties</c>/<c>.Fields</c>/<c>.Events</c>).
+/// </summary>
+/// <remarks>
+///     A closed class hierarchy with a <c>private protected</c> constructor, <b>disjoint</b> from
 ///     <see cref="Selection" /> — that disjointness is what keeps the shared adjective/verb names
 ///     (<c>WithSuffix</c>, <c>MustBeStatic</c>, …) from colliding on overload resolution: a call binds
 ///     to the type-side or member-side vocabulary purely by receiver type.
-/// </summary>
-/// <remarks>
 ///     A member selection is a composite: the underlying <see cref="Source" /> type selection, the
 ///     <see cref="Kind" /> filter that named it, and an ordered list of <see cref="MemberAdjective" />
 ///     refinements (GRAMMAR §6 member-subject assembly reads exactly these three). Member modal-verb

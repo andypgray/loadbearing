@@ -34,22 +34,30 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
 
     /// <summary>
     ///     Loads an assembly from its bytes, so the file is not locked for the rest of this process's
-    ///     lifetime. In the long-lived MCP server a path load pinned the spec's build output — the spec
-    ///     DLL and the five dependencies beside it — and every <c>dotnet build</c> of the spec project
-    ///     then failed with MSB3021/MSB3027 until the server was killed. Killing it is terminal for a
-    ///     stdio server (the client never reconnects one), which silently disarmed the per-edit
-    ///     <c>arch_check</c> hook for the rest of the session.
+    ///     lifetime.
     /// </summary>
     /// <remarks>
-    ///     A path that is not on disk is handed to the loader rather than opened as a stream, so the failure
-    ///     is the loader's own <see cref="FileNotFoundException" /> naming that path. That is the spec DLL
-    ///     itself going missing between resolution and load — a rebuild landing underneath a warm host — and
-    ///     not the missing-dependency case: <see cref="AssemblyDependencyResolver" /> re-checks the disk, so a
-    ///     dependency that has gone resolves to null and the Default context's own failure is what surfaces,
-    ///     carrying the assembly display identity <c>SpecDependencyLoadFailure.IsAssemblyLoadFailure</c> keys
-    ///     on. Both shapes are pinned by <c>SpecLoadContextFallbackTests</c>.
-    ///     <see cref="FileShare" /> admits writers and deleters: a concurrent build may replace the file
-    ///     while these bytes are in flight, and the copy already read stays valid.
+    ///     <para>
+    ///         In the long-lived MCP server a path load pinned the spec's build output — the spec DLL and the
+    ///         five dependencies beside it — and every <c>dotnet build</c> of the spec project then failed
+    ///         with MSB3021/MSB3027 until the server was killed. Killing it is terminal for a stdio server
+    ///         (the client never reconnects one), which silently disarmed the per-edit <c>arch_check</c> hook
+    ///         for the rest of the session.
+    ///     </para>
+    ///     <para>
+    ///         A path that is not on disk is handed to the loader rather than opened as a stream, so the
+    ///         failure is the loader's own <see cref="FileNotFoundException" /> naming that path. That is the
+    ///         spec DLL itself going missing between resolution and load — a rebuild landing underneath a
+    ///         warm host — and not the missing-dependency case: <see cref="AssemblyDependencyResolver" />
+    ///         re-checks the disk, so a dependency that has gone resolves to null and the Default context's
+    ///         own failure is what surfaces, carrying the assembly display identity
+    ///         <c>SpecDependencyLoadFailure.IsAssemblyLoadFailure</c> keys on. Both shapes are pinned by
+    ///         <c>SpecLoadContextFallbackTests</c>.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="FileShare" /> admits writers and deleters: a concurrent build may replace the file
+    ///         while these bytes are in flight, and the copy already read stays valid.
+    ///     </para>
     /// </remarks>
     internal Assembly LoadWithoutLocking(string path)
     {

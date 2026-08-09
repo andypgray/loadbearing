@@ -7,12 +7,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     Renders a <see cref="GraphSummary" /> as the <c>graph --json</c> document (its own schemaVersion 1)
 ///     — the pre-spec codebase survey. Uses the shared <see cref="LoadBearingJson.Options" />;
 ///     machine-independent (<c>solution</c> is a file name). Grouped counts only, no per-site dumps.
-///     <para>
-///         Composing the document and writing it are separate calls so a caller with a response budget can
-///         measure the full survey and, if it overruns, re-compose it at overview grain from the same
-///         summary — one extraction, two renders, and never a document cut mid-array.
-///     </para>
 /// </summary>
+/// <remarks>
+///     Composing the document and writing it are separate calls so a caller with a response budget can
+///     measure the full survey and, if it overruns, re-compose it at overview grain from the same
+///     summary — one extraction, two renders, and never a document cut mid-array.
+/// </remarks>
 internal static class GraphJsonRenderer
 {
     /// <summary>

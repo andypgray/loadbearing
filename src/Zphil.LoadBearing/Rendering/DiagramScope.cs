@@ -10,9 +10,9 @@ namespace Zphil.LoadBearing.Rendering;
 ///     and not a dotted namespace path.
 /// </summary>
 /// <remarks>
-///     The guardrail doc-001 records — diagrams stop reading above roughly twenty nodes — is a product
-///     option rather than a caveat: a solution whose fixture or sample projects outnumber its shipping ones
-///     names the six it wants drawn and the committed artifact stays stable while the rest churn.
+///     Diagrams stop reading above roughly twenty nodes, and that guardrail is a product option rather
+///     than a caveat: a solution whose fixture or sample projects outnumber its shipping ones names the
+///     six it wants drawn and the committed artifact stays stable while the rest churn.
 /// </remarks>
 public sealed class DiagramScope
 {

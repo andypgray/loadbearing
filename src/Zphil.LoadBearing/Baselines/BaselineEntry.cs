@@ -6,12 +6,14 @@ namespace Zphil.LoadBearing.Baselines;
 ///     One grandfathered violation's identity in a baseline (GRAMMAR §4.3). A dependency-verb entry
 ///     carries <see cref="Source" /> and <see cref="Target" /> symbol IDs; a shape/naming/inheritance/
 ///     attribute/escape-hatch entry carries only <see cref="Subject" />. The unused slots are null.
+/// </summary>
+/// <remarks>
 ///     IDs are Roslyn <c>DocumentationCommentId</c> strings — <c>T:</c> forms for type subjects and
 ///     edges, and <c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c> forms for member subjects (§4.6) — so an entry
 ///     is stable across file moves and formatting. Value equality is ordinal over all three slots.
 ///     An optional <see cref="Because" /> attribution rides along but is excluded from equality —
 ///     identity is the ID slots only, so ratchet set operations never fork on annotation.
-/// </summary>
+/// </remarks>
 public sealed class BaselineEntry : IEquatable<BaselineEntry>
 {
     private BaselineEntry(string? source, string? target, string? subject, string? because)
@@ -58,6 +60,7 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
     }
 
     /// <summary>A copy of this entry carrying <paramref name="because" /> — same identity, new attribution.</summary>
+    /// <exception cref="ArgumentException"><paramref name="because" /> is blank or spans more than one line.</exception>
     public BaselineEntry WithBecause(string because)
     {
         bool blankOrMultiline = string.IsNullOrWhiteSpace(because)

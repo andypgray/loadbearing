@@ -6,17 +6,14 @@ namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
-///     §4.5, §4.7, §4.8, §4.9, §5.3). Dependency verbs walk <see cref="CodebaseModel.Edges" />; the member verb
-///     (<c>MustNotUse</c>) walks <see cref="CodebaseModel.MemberEdges" />; the construction verb
-///     (<c>MustNotConstruct</c>) walks <see cref="CodebaseModel.ConstructorEdges" />; the injection verb
-///     (<c>MustNotInject</c>) walks <see cref="CodebaseModel.InjectionEdges" />; the catch verbs
-///     (<c>MustNotCatch</c>, <c>MustNotCatchUnfiltered</c>, <c>MustNotSwallow</c>) walk
-///     <see cref="CodebaseModel.CatchEdges" />; the
-///     throw verbs (<c>MustOnlyThrow</c>, <c>MustNotThrow</c>) walk <see cref="CodebaseModel.ThrowEdges" />;
-///     the exposure verb (<c>MustNotExpose</c>) walks <see cref="CodebaseModel.ExposureEdges" />; shape verbs
-///     test each subject. Every verb first requires a non-empty subject set — an empty subject fails the rule
-///     by default (GRAMMAR §4.1). Returns violations (unordered; the caller sorts) and any inert-target warnings.
+///     §4.5, §4.7, §4.8, §4.9, §5.3): each dependency verb walks the <see cref="CodebaseModel" /> edge
+///     list its family is extracted into, and each shape verb tests every subject directly.
 /// </summary>
+/// <remarks>
+///     Every verb first requires a non-empty subject set — an empty subject fails the rule by default
+///     (GRAMMAR §4.1). Violations come back unordered (the caller sorts), alongside any inert-target
+///     warnings.
+/// </remarks>
 internal sealed class ConstraintEvaluator
 {
     /// <summary>The pinned message on an empty-subject failure (ArchUnit precedent, GRAMMAR §4.1).</summary>
@@ -294,10 +291,7 @@ internal sealed class ConstraintEvaluator
     ///     subject AND the constructed type is a forbidden operand — the "you may use it; you may not
     ///     create it" ban. Extraction already collapses every <c>new</c> of one type into one (source,
     ///     constructed) edge with its sites aggregated, so one edge yields one Construction violation
-    ///     keyed on the type pair (overload-indifferent, §4.3). Inert-target warning semantics mirror
-    ///     ForbiddenReference exactly: a forbidden set that resolves empty from a pattern operand can
-    ///     never fire, so it is loudly flagged inert (a bare <c>typeof</c> absent from the codebase is the
-    ///     win condition, not a warning).
+    ///     keyed on the type pair (overload-indifferent, §4.3).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenConstruction(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
@@ -332,10 +326,7 @@ internal sealed class ConstraintEvaluator
     ///     Matching is exact definition-level FQN on the operand set (the family's shared node
     ///     membership): <c>MustNotCatch(typeof(Exception))</c> flags only <c>catch (System.Exception)</c>
     ///     and bare-catch edges (a bare catch already synthesized System.Exception at extraction), never a
-    ///     narrower <c>catch (IOException)</c>. Inert-target warning semantics mirror ForbiddenConstruction
-    ///     exactly: a forbidden set that resolves empty from a pattern operand can never fire, so it is
-    ///     loudly flagged inert (a bare <c>typeof</c> absent from the codebase is the win condition, not a
-    ///     warning).
+    ///     narrower <c>catch (IOException)</c>.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
@@ -411,9 +402,6 @@ internal sealed class ConstraintEvaluator
     ///     your public API" ban. Matching is exact definition-level FQN on the operand set (the family's
     ///     shared node membership): <c>MustNotExpose(typeof(DataTable))</c> flags only a <c>DataTable</c>
     ///     signature position, never a narrower <c>DataView</c> one (no hierarchy-aware matching).
-    ///     Inert-target warning semantics mirror ForbiddenCatch exactly: a forbidden set that resolves
-    ///     empty from a pattern operand can never fire, so it is loudly flagged inert (a bare
-    ///     <c>typeof</c> absent from the codebase is the win condition, not a warning).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)

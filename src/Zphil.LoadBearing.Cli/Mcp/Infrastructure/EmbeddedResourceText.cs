@@ -4,9 +4,7 @@ namespace Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 
 /// <summary>
 ///     Reads a UTF-8 text resource embedded in this assembly by its manifest (logical) name — so a
-///     renamed file or drifted resource id fails loudly. Shared by the two consumers that embed a markdown
-///     file and read it to a string at load time: the server instructions
-///     (<see cref="ServerInstructions" />) and the <c>derive_spec</c> prompt body (<c>ArchPrompts</c>).
+///     renamed file or drifted resource id fails loudly rather than yielding empty text.
 /// </summary>
 internal static class EmbeddedResourceText
 {

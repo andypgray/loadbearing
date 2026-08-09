@@ -2,11 +2,14 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     A complete, reified constraint sentence — a subject <see cref="Selection" /> plus a modal
-///     verb phrase (GRAMMAR §3.1). A closed class hierarchy with a <c>private protected</c>
-///     constructor: foreign assemblies cannot introduce constraint nodes, so every constraint is
-///     walkable and renderable. Nothing on a constraint executes — it is data
-///     (GRAMMAR §2); evaluation is bolted on without reshaping these nodes.
+///     verb phrase (GRAMMAR §3.1).
 /// </summary>
+/// <remarks>
+///     A closed class hierarchy with a <c>private protected</c> constructor: foreign assemblies
+///     cannot introduce constraint nodes, so every constraint is walkable and renderable. Nothing
+///     on a constraint executes — it is data (GRAMMAR §2); evaluation is bolted on without
+///     reshaping these nodes.
+/// </remarks>
 public abstract class Constraint
 {
     private protected Constraint(Selection subject)

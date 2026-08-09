@@ -8,10 +8,12 @@ public static class SymbolIds
     /// <summary>
     ///     A human-facing rendering of a symbol ID: the leading <c>DocumentationCommentId</c> prefix —
     ///     <c>T:</c> for a type, <c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c> for a member (GRAMMAR §4.5) —
-    ///     stripped, leaving the full name; everything else verbatim (an <c>unresolved:{FullName}</c>
-    ///     fallback, which carries no such prefix, prints as-is). Used for <c>status</c> and other human
-    ///     output; the stored key is always the raw ID.
+    ///     stripped, leaving the full name; everything else verbatim.
     /// </summary>
+    /// <remarks>
+    ///     An <c>unresolved:{FullName}</c> fallback carries no such prefix and prints as-is. The
+    ///     rendering is display-only: the stored key is always the raw ID.
+    /// </remarks>
     public static string Display(string symbolId)
     {
         Guard.NotNull(symbolId, nameof(symbolId));

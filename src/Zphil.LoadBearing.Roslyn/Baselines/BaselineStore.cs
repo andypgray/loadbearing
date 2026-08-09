@@ -8,6 +8,8 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 
 /// <summary>
 ///     The baseline I/O boundary of the host layer (Core owns the format and digest; this owns the disk).
+/// </summary>
+/// <remarks>
 ///     Reads a baseline file with a strict JSON walk (exact properties, <c>schemaVersion == 1</c>,
 ///     well-formed entries, each optionally attributed with a <c>because</c>), then <em>recanonicalizes</em>
 ///     the parsed entries and re-derives the digest — a mismatch is loud tamper. A missing file
@@ -15,7 +17,7 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 ///     sections preserved), UTF-8 no BOM, LF, and report wrote/unchanged on a CRLF-normalized compare so
 ///     an autocrlf checkout is a true zero-diff.
 ///     Lives in the Roslyn host project so both the CLI and the xUnit adapter share it.
-/// </summary>
+/// </remarks>
 internal static class BaselineStore
 {
     /// <summary>

@@ -5,16 +5,16 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Baselines;
 
-/// <summary>
-///     The canonical on-disk baseline format and its integrity digest. A
-///     baseline file is line-oriented JSON — UTF-8 no BOM, LF endings, a trailing newline, 2-space
+/// <summary>The canonical on-disk baseline format and its integrity digest.</summary>
+/// <remarks>
+///     A baseline file is line-oriented JSON — UTF-8 no BOM, LF endings, a trailing newline, 2-space
 ///     indent, one entry object per line — so a burndown diff removes exactly one line. An entry may
 ///     carry an optional <c>because</c> attribution as its last property, folded into the digest.
 ///     Rules sort ordinal by ID; entries sort ordinal by <c>((Source ?? Subject), (Target ?? ""))</c>. The
 ///     <c>digest</c> is SHA-256 over a separate line-oriented rendering of the parsed entries
 ///     (<see cref="DigestInput" />), so formatting or line-ending changes (an autocrlf checkout) are
 ///     invisible while entry changes are not — tamper-<em>evident</em>, with git review the human gate.
-/// </summary>
+/// </remarks>
 public static class BaselineFormat
 {
     /// <summary>The baseline file schema version.</summary>
@@ -26,7 +26,7 @@ public static class BaselineFormat
     /// <summary>
     ///     Composes the canonical file bytes-as-string for the given rule sections: sorts rules and
     ///     entries, computes and embeds a fresh <c>digest</c>, and emits the line-oriented JSON. The
-    ///     input's own order and duplicates do not matter (the composer sorts; upstream stores dedupe).
+    ///     input's own order and duplicates do not matter.
     /// </summary>
     public static string ComposeFile(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
@@ -62,12 +62,14 @@ public static class BaselineFormat
     /// <summary>
     ///     The line-oriented digest input for the given rules: a fixed preamble line, then a
     ///     <c>rule &lt;id&gt;</c> line per rule (ordinal) and an <c>edge &lt;src&gt; -&gt; &lt;tgt&gt;</c>
-    ///     or <c>subject &lt;id&gt;</c> line per entry (tuple-sorted). An attributed entry adds a
-    ///     <c>because &lt;text&gt;</c> line immediately after its own line; the encoding stays injective
-    ///     because digest-input lines only ever start with <c>rule </c>/<c>edge </c>/<c>subject </c>/
-    ///     <c>because </c> and because-text is single-line by invariant. Every line is LF-terminated,
-    ///     including the last. Exposed for the self-verifying digest test.
+    ///     or <c>subject &lt;id&gt;</c> line per entry (tuple-sorted).
     /// </summary>
+    /// <remarks>
+    ///     An attributed entry adds a <c>because &lt;text&gt;</c> line immediately after its own line;
+    ///     the encoding stays injective because digest-input lines only ever start with
+    ///     <c>rule </c>/<c>edge </c>/<c>subject </c>/<c>because </c> and because-text is single-line by
+    ///     invariant. Every line is LF-terminated, including the last.
+    /// </remarks>
     public static string DigestInput(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
         return DigestInput(SortRules(rules));

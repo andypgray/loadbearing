@@ -6,8 +6,7 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///     The solution + spec this MCP server is bound to for its lifetime, captured once at
 ///     <c>loadbearing mcp</c> startup, and the run policy every tool call applies on top of them.
 ///     Resolution (solution discovery, spec load, workspace open) happens per tool call, not here, so any
-///     resolution error text matches the CLI exactly. A singleton in the host's DI graph, injected into
-///     <c>ArchTools</c>.
+///     resolution error text matches the CLI exactly.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -25,9 +24,8 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///         and must never race on the file); never replays a build capture (latency-critical callers ride the
 ///         session); and reports an incomplete model inside its answer rather than refusing to produce one,
 ///         because this surface has no exit code to carry the verdict — <c>workspaceDiagnostics</c> and
-///         <c>modelIncomplete</c> do. Written as bare positional <c>true</c>/<c>null</c> arguments in five
-///         tool bodies, that policy was decodable only from prose, nothing caught a tool that got one leg
-///         wrong, and changing a leg meant editing every body. The factories below name each constant once.
+///         <c>modelIncomplete</c> do. The factories below name each leg once, as a named constant, so no
+///         tool body can spell one wrong and no leg can change in one place only.
 ///     </para>
 /// </remarks>
 /// <param name="Solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>

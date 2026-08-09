@@ -11,18 +11,12 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     file.
 /// </summary>
 /// <remarks>
-///     This is the committed-file sibling of the disposable caches' private atomic writers
-///     (<see cref="ExtractionCacheStore" />'s <c>TryWriteAtomic</c>,
-///     <see cref="Zphil.LoadBearing.Roslyn.Replay.BinlogCaptureStore" />'s <c>TryWriteManifestAtomic</c>),
-///     which now wrap it, and it also owns that store's binlog copy through <see cref="Copy" />. The one
-///     deliberate difference is failure semantics: this <em>throws</em> rather than swallowing to a bool. Its
-///     direct callers write user-owned, version-controlled files — the managed <c>AGENTS.md</c> block and
-///     baseline files — where a silently-dropped write would be a lie; a cache write that fails is simply
-///     rebuilt next run, so the store wrappers re-swallow the throw themselves. The temp file is deleted on
-///     the failure path.
+///     Failure semantics are deliberate: this <em>throws</em> rather than swallowing to a bool, because a
+///     silently-dropped write to a user-owned, version-controlled file would be a lie. A caller persisting
+///     disposable derived data — which is simply rebuilt next run — wraps this and re-swallows the throw
+///     itself. The temp file is deleted on the failure path.
 ///     Lives in the Roslyn (net10.0) project because the overwriting
-///     <see cref="File.Move(string,string,bool)" /> overload does not exist on Core's netstandard2.0;
-///     both consumers (Roslyn's baseline store, the CLI's render adapter) reach this project.
+///     <see cref="File.Move(string,string,bool)" /> overload does not exist on Core's netstandard2.0.
 /// </remarks>
 internal static class AtomicFile
 {

@@ -7,12 +7,15 @@ namespace Zphil.LoadBearing;
 
 /// <summary>
 ///     The v1 modal-constraint vocabulary (GRAMMAR §5.3) as extension methods that turn a
-///     <see cref="Selection" /> into a terminal <see cref="Constraint" />. Polarity is lexical —
-///     negation lives in the verb name, never a <c>Not()</c> combinator (GRAMMAR §2). The four
-///     dependency verbs carry both overloads (GRAMMAR §3.3): a <see cref="Selection" /> list and a
-///     <see cref="Type" /> list (sugar that wraps each type as a single-type selection). The
-///     <c>(first, params more)</c> shape makes a zero-target call uncompilable.
+///     <see cref="Selection" /> into a terminal <see cref="Constraint" />.
 /// </summary>
+/// <remarks>
+///     Polarity is lexical — negation lives in the verb name, never a <c>Not()</c> combinator
+///     (GRAMMAR §2). The dependency verbs carry both overloads (GRAMMAR §3.3): a
+///     <see cref="Selection" /> list and a <see cref="Type" /> list (sugar that wraps each type as a
+///     single-type selection). The <c>(first, params more)</c> shape makes a zero-target call
+///     uncompilable.
+/// </remarks>
 public static class SelectionConstraints
 {
     /// <summary>The subject must not reference any of the targets.</summary>

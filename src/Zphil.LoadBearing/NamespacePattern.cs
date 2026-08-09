@@ -2,13 +2,13 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing;
 
-/// <summary>
-///     A dot-segment-aware, case-sensitive namespace matcher (GRAMMAR §4.2) — deliberately not
-///     <c>Microsoft.Extensions.FileSystemGlobbing</c>, which is path-segment based and stays for
-///     file paths. Trailing <c>.*</c> is the self-inclusive subtree operator; an interior
-///     standalone <c>*</c> matches exactly one segment; a partial-segment <c>*</c> matches within a
-///     segment and never crosses a dot; a lone <c>*</c> matches everything.
-/// </summary>
+/// <summary>A dot-segment-aware, case-sensitive namespace matcher (GRAMMAR §4.2).</summary>
+/// <remarks>
+///     Deliberately not <c>Microsoft.Extensions.FileSystemGlobbing</c>, which is path-segment based
+///     and stays for file paths. Trailing <c>.*</c> is the self-inclusive subtree operator; an
+///     interior standalone <c>*</c> matches exactly one segment; a partial-segment <c>*</c> matches
+///     within a segment and never crosses a dot; a lone <c>*</c> matches everything.
+/// </remarks>
 public sealed class NamespacePattern
 {
     /// <summary>The subtree operator's spelling (GRAMMAR §4.2), so the literal and its length live in one place.</summary>
@@ -46,17 +46,19 @@ public sealed class NamespacePattern
         _patternSegments = _pattern.Split('.');
     }
 
-    /// <summary>
-    ///     Validates a namespace glob at spec-build time (GRAMMAR §8 items 15–16): returns a human
-    ///     reason when the glob is unusable, or <c>null</c> when it is well-formed. Two failure modes —
-    ///     a blank/whitespace glob, and a <em>dead subtree pattern</em>: a trailing <c>.*</c> whose
-    ///     literal prefix carries a <c>*</c>. The subtree operator compares that prefix literally (see
-    ///     <see cref="Matches" />), so <c>MyApp.*.Controllers.*</c> can never match; the reason steers
-    ///     the author to anchor the subtree on a literal prefix. An interior standalone <c>*</c> with no
-    ///     trailing subtree operator (<c>MyApp.*.Orders</c>) is legitimate segment matching (§4.2), and a
-    ///     lone <c>*</c> matches everything — both return <c>null</c>. Reason knowledge lives here, not in
-    ///     the validator, so the matcher and its build-time gate cannot drift apart.
-    /// </summary>
+    /// <summary>Validates a namespace glob at spec-build time (GRAMMAR §8 items 15–16).</summary>
+    /// <param name="pattern">The namespace glob to check.</param>
+    /// <returns>A human reason when the glob is unusable, or <c>null</c> when it is well-formed.</returns>
+    /// <remarks>
+    ///     Two failure modes — a blank/whitespace glob, and a <em>dead subtree pattern</em>: a trailing
+    ///     <c>.*</c> whose literal prefix carries a <c>*</c>. The subtree operator compares that prefix
+    ///     literally (see <see cref="Matches" />), so <c>MyApp.*.Controllers.*</c> can never match; the
+    ///     reason steers the author to anchor the subtree on a literal prefix. An interior standalone
+    ///     <c>*</c> with no trailing subtree operator (<c>MyApp.*.Orders</c>) is legitimate segment
+    ///     matching (§4.2), and a lone <c>*</c> matches everything — both return <c>null</c>. Reason
+    ///     knowledge lives here, not in the validator, so the matcher and its build-time gate cannot
+    ///     drift apart.
+    /// </remarks>
     public static string? Validate(string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern)) return "is blank";
@@ -95,8 +97,7 @@ public sealed class NamespacePattern
     /// <summary>
     ///     Decomposes the trailing-<c>.*</c> subtree operator (GRAMMAR §4.2): true with the literal prefix
     ///     when <paramref name="glob" /> carries it, false with the glob itself when it does not. The one
-    ///     home for the operator's spelling — the matcher, its build-time gate, the diagram's nesting
-    ///     decision and the diagram's node slug all ask here rather than each stripping two characters.
+    ///     home for the operator's spelling, so nothing else strips two characters by hand.
     /// </summary>
     internal static bool TryParseSubtree(string glob, out string prefix)
     {

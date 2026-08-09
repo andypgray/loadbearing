@@ -4,10 +4,15 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 
 /// <summary>
 ///     The last line of defence on a tool response's character count, so a large result cannot exhaust the
-///     client's context window. It is deliberately a backstop and not the answer: a document cut at a line
-///     boundary is corrupt JSON, which evicts a client from the tool rather than narrowing what it reads.
-///     When truncation does fire, the footer says how much was dropped and — for the tools that have a
-///     narrowing knob — names the knobs that would have avoided it.
+///     client's context window.
+/// </summary>
+/// <remarks>
+///     <para>
+///         It is deliberately a backstop and not the answer: a document cut at a line boundary is corrupt
+///         JSON, which evicts a client from the tool rather than narrowing what it reads. When truncation
+///         does fire, the footer says how much was dropped and — for the tools that have a narrowing knob —
+///         names the knobs that would have avoided it.
+///     </para>
 ///     <para>
 ///         <c>arch_graph</c> degrades itself down a grain ladder against this same budget before reaching
 ///         here, so on any solution whose skeleton fits it never arrives. That is a ladder with a last rung,
@@ -15,7 +20,7 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         other response. Reaching that point is the signal to narrow the <em>subject</em> — the knob the
 ///         footer names — because no grain left will help.
 ///     </para>
-/// </summary>
+/// </remarks>
 internal static class ResponseTruncator
 {
     private const int DefaultMaxChars = 62_500;

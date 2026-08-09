@@ -9,11 +9,13 @@ namespace Zphil.LoadBearing.Cli;
 ///     fields (<see cref="ExplainFormatter" />) → exit 0. An unknown ID is a <see cref="UserErrorException" />
 ///     listing every available (post-desugar) ID, ordinal-sorted → exit 2. A missing ID argument never
 ///     reaches here — System.CommandLine rejects it as a parse error, remapped to exit 2.
-///     A workspace opened for resolution can fail partially; explain renders the composed diagnostics to
-///     stderr and still answers, because the model it dumps comes from the spec, not the codebase — a load
-///     failure cannot make the answer wrong. The DLL fast path never opens a workspace, so it stays silent
-///     by construction.
 /// </summary>
+/// <remarks>
+///     <b>Never a gate.</b> A workspace opened for resolution can fail partially; explain renders the
+///     composed diagnostics to stderr and still answers, because the model it dumps comes from the spec, not
+///     the codebase — a load failure cannot make the answer wrong. The DLL fast path never opens a
+///     workspace, so it stays silent by construction.
+/// </remarks>
 internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
     : WorkspaceRunner(source)
 {

@@ -2,10 +2,8 @@ namespace Zphil.LoadBearing.Internal;
 
 /// <summary>
 ///     The one <c>(first, params more)</c> operand-list builder behind the fluent surface. Every verb
-///     overload that takes at least one operand — selections, wrapped types, <c>typeof</c> and string
-///     anchors on both the type and member sides, members, resolved member lambdas — differs only in what
-///     it projects each operand into, and the shape that makes a zero-operand call uncompilable is the
-///     same in all of them.
+///     overload that takes at least one operand differs only in what it projects each operand into, and
+///     the shape that makes a zero-operand call uncompilable is the same in all of them.
 /// </summary>
 /// <remarks>
 ///     The parameters are named <c>first</c> and <c>more</c> deliberately: the guards spell

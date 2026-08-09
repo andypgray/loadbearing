@@ -5,13 +5,13 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 
 /// <summary>
 ///     A binlog-replayed solution paired with the in-memory workspace it was loaded into — the replay
-///     analog of <see cref="LoadedSolution" />. Unlike that type there is no MSBuild
-///     <c>BuildHost</c> to release, because no design-time build ran: the structure came from a real
-///     build's binlog and the source text is read from current disk. <see cref="Solution" /> is the
-///     unresolved-reference-stripped snapshot the extractor reads, identical in kind to the MSBuild
-///     path's output so downstream extraction, caching, and rendering are unaffected.
+///     analog of <see cref="LoadedSolution" />. <see cref="Solution" /> is the
+///     unresolved-reference-stripped snapshot, identical in kind to the MSBuild path's output.
 /// </summary>
 /// <remarks>
+///     Unlike <see cref="LoadedSolution" /> there is no MSBuild <c>BuildHost</c> to release, because no
+///     design-time build ran: the structure came from a real build's binlog and the source text is read
+///     from current disk.
 ///     Owns two disposables: the <see cref="AdhocWorkspace" /> and the <see cref="SolutionReader" />
 ///     whose lazy per-document text loaders back the solution's source (and whose analyzer host holds
 ///     the on-disk analyzer assemblies). A Roslyn <see cref="Solution" /> outlives the workspace that

@@ -15,15 +15,24 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 /// <summary>
 ///     The <c>loadbearing mcp</c> entry point: a stdio MCP server bound to one solution + spec, exposing
 ///     the <c>arch_*</c> tools (thin shells over the same runners the CLI commands use).
+/// </summary>
+/// <remarks>
 ///     A human who runs it at a terminal gets a hint and exit 2 rather than a hung silent server; a real
 ///     MCP client over piped stdio gets the file logger, the orphan-server watchdogs, MSBuild
 ///     registration (JIT-quarantined behind <see cref="EnsureMsBuildRegistered" />), and the host.
 ///     A launch whose optional solution argument was omitted and whose walk-up then found nothing still
 ///     starts — unbound, announcing the reason in its <c>initialize</c> instructions and returning it from
 ///     every tool call (<see cref="ResolveBoundSolution" />).
-/// </summary>
+/// </remarks>
 internal static class McpServerCommand
 {
+    /// <summary>
+    ///     Runs the stdio server until <paramref name="ct" /> is cancelled or the transport closes,
+    ///     returning the process exit code.
+    /// </summary>
+    /// <param name="binding">The solution + spec this server answers for, and the run policy its tools apply.</param>
+    /// <param name="error">Where the interactive-launch refusal is written; never stdout, which carries JSON-RPC.</param>
+    /// <param name="ct">Cancels the host run.</param>
     public static async Task<int> RunAsync(McpServerBinding binding, TextWriter error, CancellationToken ct)
     {
         if (!Console.IsInputRedirected)
@@ -85,20 +94,19 @@ internal static class McpServerCommand
     }
 
     /// <summary>
-    ///     Registers the warm-workspace services shared by the production server and the in-process test
-    ///     harness, so the two compose the same graph: the long-lived <see cref="WorkspaceSession" /> (its
-    ///     reconcile log routed to the host logger), the session-scoped <see cref="SessionFragmentStore" />
-    ///     that reuses clean projects' fragments across tool calls, the <see cref="SpecModelCache" /> that
-    ///     does the same for the spec's model, and the
-    ///     <see cref="ISolutionSource" /> the tools acquire the solution through. The source is warm by
-    ///     default — one session reconciled per call across the server's lifetime, one store paired with it —
-    ///     unless <see cref="LoadBearingEnvVars.DisableWarmWorkspace" /> is <c>true</c>, which resolves the
-    ///     cold one-shot <see cref="ColdSolutionSource" /> instead. Read through the
+    ///     Registers the warm-workspace services, in one place so the production server and the in-process
+    ///     test harness compose the same graph.
+    /// </summary>
+    /// <remarks>
+    ///     The <see cref="ISolutionSource" /> is warm by default — one session reconciled per call across the
+    ///     server's lifetime, one store paired with it — unless
+    ///     <see cref="LoadBearingEnvVars.DisableWarmWorkspace" /> is <c>true</c>, which resolves the cold
+    ///     one-shot <see cref="ColdSolutionSource" /> instead. That flag is read through the
     ///     <see cref="IEnvironment" /> seam, never <c>System.Environment</c>, so the test harness can drive
     ///     both paths without touching real process state. The warm branch registers the session's disposer with
     ///     <see cref="ServerShutdown" /> lazily, from inside the factory, so a run that never builds a warm
     ///     source wires no disposer.
-    /// </summary>
+    /// </remarks>
     internal static void AddWorkspaceSolutionSource(IServiceCollection services)
     {
         services.AddSingleton(provider =>

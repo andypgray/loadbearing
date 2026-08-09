@@ -39,32 +39,35 @@ namespace Zphil.LoadBearing.Roslyn;
 ///             <c>throw</c>". A bare rethrow (<c>throw;</c>) throws nothing.
 ///         </item>
 ///     </list>
-///     The member channel is <see langword="null" /> whenever the name is not a §4.5 use: type-only
-///     references, constructors, operators/conversions, local functions and accessors reached as methods,
-///     and — the pinned asymmetry — <c>nameof</c> operands (which still mint their type edge; a
-///     <c>nameof</c> never <em>uses</em> the member it names). The construct channel is non-<see langword="null" />
-///     only on the two object-creation arms; every other node leaves it null (attribute applications,
-///     <c>base(…)</c>/<c>this(…)</c> initializers, <c>with</c> expressions, and array creation carry no
-///     object-creation expression, so their exclusion falls out of the syntax). The caught channel is
-///     non-<see langword="null" /> only on the <c>catch</c>-clause arm and the thrown channel only on the
-///     two throw arms; both catch bits ride beside the caught channel and are meaningful only
-///     there, every other arm leaving them <see langword="false" />; a typed catch rides the caught channel
-///     with a null type channel (its type-name syntax
-///     mints the §4.1 reference on its own visit — no double-mint, the explicit-<c>new</c> precedent), and a
-///     bare catch names no type at all so mints no reference edge. The type channel is exactly the tuple
-///     this walker yielded before member edges existed, unchanged for every input — an explicit
-///     <c>new Foo()</c> still mints its type edge from the inner <c>Foo</c> name, never re-minted here.
 /// </summary>
 /// <remarks>
-///     Nested type declarations are a hard boundary: <c>descendIntoChildren</c> refuses to descend
-///     into a <see cref="BaseTypeDeclarationSyntax" />/<see cref="DelegateDeclarationSyntax" /> other
-///     than the root, so a nested type's references belong to the nested node (walked independently)
-///     and file-level <c>using</c> directives — which sit outside any type — are never attributed to
-///     a type. Type targets are normalized to their <c>OriginalDefinition</c> and gated by
-///     <see cref="TypeKindMapper" />; member symbols are normalized to definition level too (a reduced
-///     extension through <c>ReducedFrom</c>, then every member through <c>OriginalDefinition</c>), so a
-///     yielded member's <c>ContainingType</c> agrees with the type channel's target for that node. A
-///     repeated bind on one line yields duplicate tuples that the caller dedupes by (file, line).
+///     <para>
+///         The member channel is <see langword="null" /> whenever the name is not a §4.5 use: type-only
+///         references, constructors, operators/conversions, local functions and accessors reached as methods,
+///         and — the pinned asymmetry — <c>nameof</c> operands (which still mint their type edge; a
+///         <c>nameof</c> never <em>uses</em> the member it names). The construct channel is
+///         non-<see langword="null" /> only on the two object-creation arms; every other node leaves it null
+///         (attribute applications, <c>base(…)</c>/<c>this(…)</c> initializers, <c>with</c> expressions, and
+///         array creation carry no object-creation expression, so their exclusion falls out of the syntax).
+///         The caught channel is non-<see langword="null" /> only on the <c>catch</c>-clause arm and the
+///         thrown channel only on the two throw arms; both catch bits ride beside the caught channel and are
+///         meaningful only there, every other arm leaving them <see langword="false" />; a typed catch rides
+///         the caught channel with a null type channel (its type-name syntax mints the §4.1 reference on its
+///         own visit — no double-mint, the explicit-<c>new</c> precedent), and a bare catch names no type at
+///         all so mints no reference edge. An explicit <c>new Foo()</c> still mints its type edge from the
+///         inner <c>Foo</c> name, never re-minted here.
+///     </para>
+///     <para>
+///         Nested type declarations are a hard boundary: <c>descendIntoChildren</c> refuses to descend
+///         into a <see cref="BaseTypeDeclarationSyntax" />/<see cref="DelegateDeclarationSyntax" /> other
+///         than the root, so a nested type's references belong to the nested node (walked independently)
+///         and file-level <c>using</c> directives — which sit outside any type — are never attributed to
+///         a type. Type targets are normalized to their <c>OriginalDefinition</c> and gated by
+///         <see cref="TypeKindMapper" />; member symbols are normalized to definition level too (a reduced
+///         extension through <c>ReducedFrom</c>, then every member through <c>OriginalDefinition</c>), so a
+///         yielded member's <c>ContainingType</c> agrees with the type channel's target for that node. A
+///         repeated bind on one line yields duplicate tuples that the caller dedupes by (file, line).
+///     </para>
 /// </remarks>
 internal static class ReferenceWalker
 {

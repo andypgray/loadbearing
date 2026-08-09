@@ -3,13 +3,9 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Model;
 
 /// <summary>
-///     A named layer defined by one or more namespace globs —
-///     <c>
-///         arch.Layer("Domain",
-///         "MyApp.Domain.*")
-///     </c>
-///     . Reference fragment: "the Domain layer" (GRAMMAR §5.1). A bare
-///     <see cref="Layer" /> subject with zero adjectives speaks in the collective voice (GRAMMAR §6).
+///     A named layer defined by one or more namespace globs — <c>arch.Layer("Domain", "MyApp.Domain.*")</c>.
+///     Reference fragment: "the Domain layer" (GRAMMAR §5.1). A bare <see cref="Layer" /> subject with zero
+///     adjectives speaks in the collective voice (GRAMMAR §6).
 /// </summary>
 internal sealed class LayerNoun(string name, IReadOnlyList<string> globs) : SelectionNoun
 {

@@ -21,11 +21,12 @@ public sealed class MigrateData
     /// <summary>The rendered law sentence of the target constraint (the <c>to</c> argument).</summary>
     public string ToSentence { get; }
 
-    /// <summary>
-    ///     The baseline store path — never null post-build. When <c>.Baseline(path)</c> is omitted the
-    ///     model is filled with the conventional default derived from the rule ID (GRAMMAR §4.4). Stored
-    ///     forward-slash; the CLI resolves it against the solution directory.
-    /// </summary>
+    /// <summary>The baseline store path.</summary>
+    /// <remarks>
+    ///     Never null post-build: when <c>.Baseline(path)</c> is omitted the model is filled with the
+    ///     conventional default derived from the rule ID (GRAMMAR §4.4). Stored forward-slash and
+    ///     relative to the solution directory.
+    /// </remarks>
     public string BaselinePath { get; }
 
     /// <summary>The boy-scout policy (defaults to <see cref="MigrationPolicy.MigrateIfSmall" />).</summary>

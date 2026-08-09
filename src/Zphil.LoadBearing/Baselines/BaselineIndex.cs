@@ -4,10 +4,8 @@ namespace Zphil.LoadBearing.Baselines;
 
 /// <summary>
 ///     The parsed baseline sections for a whole check run, keyed by rule ID. A present key is a
-///     captured section (which the checker partitions violations against); an absent key is an
-///     uncaptured rule (every violation red plus a bootstrap hint). <see cref="Empty" /> is the
-///     no-baselines index the two-argument checker overload and the <c>baseline --init</c> current-state
-///     pass use.
+///     captured section, whose entries are grandfathered; an absent key is an uncaptured rule, whose
+///     violations are all red.
 /// </summary>
 public sealed class BaselineIndex
 {

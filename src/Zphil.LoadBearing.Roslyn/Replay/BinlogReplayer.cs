@@ -20,11 +20,7 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 ///         <c>Basic.CompilerLog.Util</c>) binds <c>Microsoft.Build.Framework</c> at runtime, resolved through
 ///         the host's <c>MSBuildLocator</c> registration. That is a load-bearing constraint, not an
 ///         implementation detail to simplify away:
-///         <b>
-///             a caller must register MSBuildLocator before
-///             replaying
-///         </b>
-///         (the CLI's <c>MsBuildGate</c> does, once up front), or the parser fails to load
+///         <b>a caller must register MSBuildLocator before replaying</b>, or the parser fails to load
 ///         <c>Microsoft.Build.Framework</c> at runtime.
 ///     </para>
 ///     <para>
@@ -51,8 +47,7 @@ internal static class BinlogReplayer
     /// <returns>The replayed, stripped solution with its owning workspace and reader.</returns>
     /// <remarks>
     ///     Synchronous, because the underlying <see cref="SolutionReader" /> API is synchronous.
-    ///     Exception surface (the CLI wraps these; this method does not reference
-    ///     that mapping):
+    ///     Exception surface:
     ///     <list type="bullet">
     ///         <item><see cref="ArgumentException" /> — <paramref name="binlogPath" /> is null or blank.</item>
     ///         <item><see cref="FileNotFoundException" /> — no file exists at <paramref name="binlogPath" />.</item>

@@ -5,15 +5,15 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Building;
 
 /// <summary>
-///     Desugars a quarantined scope into two ordinary posture-bearing rule nodes (GRAMMAR §7): a
-///     containment rule (<c>{id}/containment</c>) carrying the boundary/baseline and the
-///     <c>sel.Except(F).MustOnlyBeReferencedBy(sel ∪ F)</c> predicate, and a tripwire rule
-///     (<c>{id}/tripwire</c>) that carries the quarantined selection for diff-touch matching but has no
-///     closed-vocabulary constraint. Clause distribution follows §7: Because and dragons go to both
-///     children; BoundaryOnlyVia and Baseline go to containment. An omitted <c>.Baseline</c> fills the
-///     containment child with the conventional default <c>arch/baselines/{id}/containment.json</c>
-///     (GRAMMAR §4.4/§7), so the containment baseline is never null post-build; the tripwire's stays null.
+///     Desugars a quarantined scope into two ordinary posture-bearing rule nodes (GRAMMAR §7).
 /// </summary>
+/// <remarks>
+///     A containment rule (<c>{id}/containment</c>) carries the boundary/baseline and the
+///     <c>sel.Except(F).MustOnlyBeReferencedBy(sel ∪ F)</c> predicate; a tripwire rule
+///     (<c>{id}/tripwire</c>) carries the quarantined selection for diff-touch matching but has no
+///     closed-vocabulary constraint. Clause distribution follows §7: Because and dragons go to both
+///     children; BoundaryOnlyVia and Baseline go to containment.
+/// </remarks>
 internal static class QuarantineDesugarer
 {
     internal static IReadOnlyList<ArchRule> Desugar(ScopeRegistration scope)

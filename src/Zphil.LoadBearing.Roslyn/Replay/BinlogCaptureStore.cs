@@ -21,8 +21,8 @@ internal enum CaptureState
 /// <summary>
 ///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="BinlogCopyPath" /> is set only on
 ///     <see cref="CaptureState.Usable" /> (the copy to replay); <see cref="Notice" /> only on
-///     <see cref="CaptureState.Invalid" /> — the complete user-facing line the CLI prints to stderr behind its
-///     <c>warning: </c> prefix.
+///     <see cref="CaptureState.Invalid" /> — a complete user-facing line, carrying no <c>warning: </c> prefix
+///     of its own.
 /// </summary>
 internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyPath, string? Notice)
 {
@@ -46,10 +46,7 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 ///     The ingest/validate boundary over one solution's persisted <b>build capture</b> — a copied binlog plus
 ///     a structure-only-keyed manifest that lets a later run replay the build with no design-time build, as
 ///     long as the tree's structure has not moved. It is the sibling of the
-///     <see cref="ExtractionCacheStore" /> and mirrors its disciplines exactly: atomic temp-file-then-move
-///     writes, <see cref="FileStamp" /> content-hash tolerance of a bare mtime touch, stamp promotion so the
-///     steady state validates on stat alone, "any failure degrades, never a wrong answer", and an internal
-///     <see cref="ContentHashCount" /> observable for the promotion pin.
+///     <see cref="ExtractionCacheStore" /> and mirrors its disciplines exactly.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -63,16 +60,16 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 ///         which replay cannot regenerate, so the capture must go invalid rather than drift).
 ///     </para>
 ///     <para>
-///         <b>Ingest is explicit and sanity-checked</b> (the CLI calls it right after a successful
-///         <c>--binlog</c> replay). A binlog older than the tree's structural files, or one that does not
-///         cover exactly the solution's csproj set, is a loud <see cref="UserErrorException" /> refusal — the
+///         <b>Ingest is explicit and sanity-checked.</b> A binlog older than the tree's structural files, or
+///         one that does not cover exactly the solution's csproj set, is a loud
+///         <see cref="UserErrorException" /> refusal — the
 ///         capture contract is "from a build of the current tree", and a subset binlog would silently shrink
 ///         the model forever. A capture invalidated <em>later</em> is not loud: <see cref="Validate" />
 ///         reports an <see cref="CaptureState.Invalid" /> notice and the run falls back to a design-time
 ///         build, because a hard error would break CI on any csproj change until re-capture.
 ///     </para>
 ///     <para>
-///         <b>Persistence is best-effort.</b> The CLI's run already holds its replayed solution, so an I/O
+///         <b>Persistence is best-effort.</b> The caller already holds its replayed solution, so an I/O
 ///         failure while persisting must not fail the run — <see cref="Ingest" /> returns whether it
 ///         persisted. The binlog copy is written <em>before</em> the manifest, so a torn write leaves a
 ///         manifest-less orphan (validated as <see cref="CaptureState.Absent" />), never a manifest pointing
@@ -81,10 +78,8 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 /// </remarks>
 internal sealed class BinlogCaptureStore
 {
-    // Each project entry records its cone-file membership at ingest, so the cone scan does not read an
-    // excluded stray *.cs as a perpetual add. A manifest from an earlier schema carries no ConeFiles, so it
-    // degrades to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a
-    // wrong answer.
+    // The manifest schema this store reads and writes. A manifest written under any other version degrades
+    // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
     private const int CurrentSchemaVersion = 2;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
@@ -106,8 +101,8 @@ internal sealed class BinlogCaptureStore
     ///     Creates a store for <paramref name="solutionPath" />'s capture. The files live under
     ///     <paramref name="cacheRootOverride" /> when given, else the default cache root — either way in the
     ///     per-solution subdirectory <see cref="CacheLocations" /> derives. Never reads an environment
-    ///     variable itself: the CLI passes <c>LOADBEARING_CACHE_DIR</c> through its <c>IEnvironment</c> seam
-    ///     (self-spec <c>mcp/env-through-seam</c>).
+    ///     variable itself: <c>LOADBEARING_CACHE_DIR</c> arrives here already resolved through an
+    ///     <c>IEnvironment</c> seam (self-spec <c>mcp/env-through-seam</c>).
     /// </summary>
     public BinlogCaptureStore(string solutionPath, string? cacheRootOverride = null)
     {

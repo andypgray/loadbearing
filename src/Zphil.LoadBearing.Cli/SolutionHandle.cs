@@ -6,12 +6,12 @@ namespace Zphil.LoadBearing.Cli;
 /// <summary>
 ///     What an <see cref="ISolutionSource" /> hands back: the loaded, unresolved-reference-stripped
 ///     <see cref="Solution" />, the discovered solution path, and the workspace-load diagnostics — plus
-///     an optional <see cref="IDisposable" /> the handle owns. The cold source owns the underlying MSBuild
-///     workspace, so disposing the handle disposes it; the warm source owns nothing, so disposal is a
-///     no-op (the session outlives the call and keeps the snapshot). A <see cref="Solution" /> stays usable
-///     after its workspace is disposed, so a handle read in flight is safe even once a later call has
-///     reloaded.
+///     an optional <see cref="IDisposable" /> the handle owns (see <see cref="Dispose" />).
 /// </summary>
+/// <remarks>
+///     A <see cref="Solution" /> stays usable after its workspace is disposed, so a handle read in flight is
+///     safe even once a later call has reloaded.
+/// </remarks>
 internal sealed class SolutionHandle(
     Solution solution,
     string solutionPath,
@@ -41,7 +41,10 @@ internal sealed class SolutionHandle(
     public Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? WarmCodebase { get; } =
         warmCodebase;
 
-    /// <summary>Disposes the owned workspace on the cold path; a no-op when the source owns nothing.</summary>
+    /// <summary>
+    ///     Disposes the owned workspace on the cold path; a no-op when the source owns nothing — a warm
+    ///     session outlives the call and keeps its snapshot.
+    /// </summary>
     public void Dispose()
     {
         owned?.Dispose();

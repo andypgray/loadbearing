@@ -5,7 +5,7 @@ namespace Zphil.LoadBearing.Model;
 /// <summary>
 ///     <c>.MustBeAttributedWith(typeof(ApiControllerAttribute))</c> → "must be attributed with
 ///     `[ApiController]`" (GRAMMAR §5.3) — <c>Attribute</c> suffix stripped, name bracketed. The anchor is
-///     an <see cref="TypeAnchor" />, so the string form renders the identical verb phrase.
+///     a <see cref="TypeAnchor" />, so the string form renders the identical verb phrase.
 /// </summary>
 internal sealed class MustBeAttributedWithConstraint(Selection subject, TypeAnchor anchor) : Constraint(subject)
 {

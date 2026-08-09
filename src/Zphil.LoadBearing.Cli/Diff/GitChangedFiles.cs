@@ -8,16 +8,23 @@ namespace Zphil.LoadBearing.Cli.Diff;
 
 /// <summary>
 ///     Resolves the files changed since a git ref into a <see cref="DiffContext" /> for the Quarantine
-///     tripwire (GRAMMAR §7). Runs three git commands rooted at the solution directory (<c>git -C</c>):
-///     <c>rev-parse --show-toplevel</c> (the repo root the paths are relative to),
-///     <c>diff --name-only -z &lt;ref&gt; --</c> (tracked changes — committed since the ref, staged, and
-///     unstaged worktree), and <c>ls-files --others --exclude-standard --full-name -z</c> (untracked
-///     files — the agent-hook case, an agent writing a brand-new file into dragon territory). Both
-///     path-listing commands are forced toplevel-relative (<c>diff</c> is by default; <c>ls-files</c>
-///     needs <c>--full-name</c>), then rebased onto the toplevel. Every failure is loud: git missing on
-///     PATH, not a repository, a bad ref, or a timeout all throw <see cref="UserErrorException" />
-///     (exit 2). The parse/compose halves are pure and unit-pinned.
+///     tripwire (GRAMMAR §7).
 /// </summary>
+/// <remarks>
+///     <para>
+///         Three git commands run rooted at the solution directory (<c>git -C</c>):
+///         <c>rev-parse --show-toplevel</c> (the repo root the paths are relative to),
+///         <c>diff --name-only -z &lt;ref&gt; --</c> (tracked changes — committed since the ref, staged, and
+///         unstaged worktree), and <c>ls-files --others --exclude-standard --full-name -z</c> (untracked
+///         files — the agent-hook case, an agent writing a brand-new file into dragon territory). Both
+///         path-listing commands are forced toplevel-relative (<c>diff</c> is by default; <c>ls-files</c>
+///         needs <c>--full-name</c>), then rebased onto the toplevel.
+///     </para>
+///     <para>
+///         Every failure is loud: git missing on PATH, not a repository, a bad ref, or a timeout all throw
+///         <see cref="UserErrorException" /> (exit 2). The parse/compose halves are pure and unit-pinned.
+///     </para>
+/// </remarks>
 internal static class GitChangedFiles
 {
     private const int TimeoutSeconds = 30;

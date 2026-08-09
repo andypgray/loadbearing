@@ -4,14 +4,15 @@ namespace Zphil.LoadBearing.Internal;
 ///     The shared iterative <c>*</c>-glob matcher behind both simple-name and namespace-segment
 ///     matching (GRAMMAR §4.2, §5.2). <c>*</c> matches any run of characters including the empty run;
 ///     every other character is an ordinal (case-sensitive) match. It has no notion of a dot
-///     separator — dot-crossing is the caller's concern: <see cref="TypeNamePattern" /> feeds the whole
-///     simple name as a single token, while <see cref="NamespacePattern" /> splits on dots and matches
-///     one segment at a time, so a <c>*</c> never crosses a dot there.
+///     separator — dot-crossing is decided by whoever tokenizes the input before calling in.
 /// </summary>
 internal static class Wildcard
 {
     internal static bool Match(string pattern, string text)
     {
+        // star/mark remember the last '*' seen and how far the text had advanced when it was taken, so a
+        // dead end backtracks by letting that '*' swallow one more character instead of rescanning from
+        // the start; star = -1 means no '*' is available to backtrack to, so the mismatch is final.
         var p = 0;
         var t = 0;
         int star = -1;

@@ -4,13 +4,13 @@ namespace Zphil.LoadBearing.Rendering;
 ///     The set of places one law drawing names, in first-seen order, plus the nesting between them.
 ///     Registration deduplicates on <see cref="LawPlace.Key" />, so the same place named by four rules is
 ///     one node that accumulates all four rules' facts.
-///     <para>
-///         Nesting is namespace containment and nothing else: a place is drawn inside the most specific
-///         other place whose glob set strictly covers its own. When two candidate parents are
-///         incomparable — neither covers the other — there is no "most specific" answer, and the node
-///         stays flat rather than picking one and implying a hierarchy the spec never declared.
-///     </para>
 /// </summary>
+/// <remarks>
+///     Nesting is namespace containment and nothing else: a place is drawn inside the most specific other
+///     place whose glob set strictly covers its own. When two candidate parents are incomparable —
+///     neither covers the other — there is no "most specific" answer, and the node stays flat rather than
+///     picking one and implying a hierarchy the spec never declared.
+/// </remarks>
 internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 {
     private readonly Dictionary<string, LawPlace> _byKey = new(StringComparer.Ordinal);

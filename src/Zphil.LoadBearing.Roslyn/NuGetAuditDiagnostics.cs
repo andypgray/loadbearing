@@ -4,17 +4,20 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     Recognises the NuGet audit diagnostic family (NU19xx) so the <c>check</c> fail-closed gate can carve
-///     it out. NuGetAudit re-raises NVD/GHSA advisories as restore warnings, which are replayed on every
-///     later build from the assets file and which MSBuildWorkspace then surfaces as workspace diagnostics —
-///     but an advisory's publication and the audit fetch's network reachability are external, time-varying
-///     inputs, not a statement that the model failed to build. Letting them reach a deterministic gate means
-///     a freshly published advisory (or an offline run) flips the exit code with no source change, and
-///     vulnerability response already has owned lanes (Dependabot, NuGetAudit itself,
-///     <c>dotnet list package --vulnerable</c>). So the family is filtered out of the gate input only: the
-///     messages still render everywhere (stderr warnings, the JSON <c>workspaceDiagnostics</c> array, SARIF
-///     notifications) — render-but-don't-gate.
+///     it out.
 /// </summary>
 /// <remarks>
+///     <para>
+///         NuGetAudit re-raises NVD/GHSA advisories as restore warnings, which are replayed on every
+///         later build from the assets file and which MSBuildWorkspace then surfaces as workspace diagnostics —
+///         but an advisory's publication and the audit fetch's network reachability are external, time-varying
+///         inputs, not a statement that the model failed to build. Letting them reach a deterministic gate means
+///         a freshly published advisory (or an offline run) flips the exit code with no source change, and
+///         vulnerability response already has owned lanes (Dependabot, NuGetAudit itself,
+///         <c>dotnet list package --vulnerable</c>). So the family is filtered out of the gate input only: the
+///         messages still render everywhere (stderr warnings, the JSON <c>workspaceDiagnostics</c> array, SARIF
+///         notifications) — render-but-don't-gate.
+///     </para>
 ///     <para>
 ///         <b>The code is not in the text, so the text is what this matches.</b> Roslyn's
 ///         <c>MSBuildDiagnosticLogger</c> records <c>BuildEventArgs.Message</c> and never <c>.Code</c>, so

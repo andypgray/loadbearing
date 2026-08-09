@@ -12,7 +12,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <summary>
 ///     Renders a <see cref="CheckReport" /> as a SARIF 2.1.0 file — a third render target over the same
 ///     result model (human and <c>--json</c> untouched) for GitHub/ADO code scanning and IDE problem
-///     imports. One run: a driver whose <c>rules[]</c> is every rule in model order (metadata only), and
+///     imports.
+/// </summary>
+/// <remarks>
+///     One run: a driver whose <c>rules[]</c> is every rule in model order (metadata only), and
 ///     one result per violation <em>site</em> — a red violation as <c>error</c> / <c>baselineState: new</c>
 ///     with no suppression, a grandfathered violation as <c>note</c> / <c>baselineState: unchanged</c>
 ///     carrying an external suppression whose justification is the baseline entry's <c>because</c> (or a
@@ -21,7 +24,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     solution-relative against the <c>SRCROOT</c> URI base — no absolute path is ever emitted.
 ///     Serialization is the shared <see cref="LoadBearingJson.Options" />, so the SARIF golden and the JSON
 ///     golden cannot drift in escaping or casing. Pinned by the golden <c>Cli/Golden/violated-check.sarif</c>.
-/// </summary>
+/// </remarks>
 internal static class SarifReportRenderer
 {
     private const string SchemaUri = "https://json.schemastore.org/sarif-2.1.0.json";

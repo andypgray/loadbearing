@@ -6,16 +6,13 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     Composes the agent-context block bodies from the reified model — the second render target.
+/// </summary>
+/// <remarks>
 ///     Pure and codebase-independent: the root block is a function of
 ///     <c>(model, specName)</c> (plus an optional grandfathered-count provider), a scope card a function
 ///     of one containment rule. Output is LF-internal always (never <c>Environment.NewLine</c>); the
-///     splicer applies the target file's line ending. The always-on root block carries the module map,
-///     the Enforce "must" laws, the Migrate counter-prior paragraphs, and the Quarantine containment laws
-///     (the quarantined-scopes section — the containment law binds code <em>outside</em> the quarantined directory,
-///     which the per-directory scope card never reaches); dragons prose stays scoped-only (progressive
-///     disclosure). The Migrate voice explicitly counters the statistical prior — "most
-///     code here follows the OLD pattern".
-/// </summary>
+///     splicer applies the target file's line ending.
+/// </remarks>
 public static class AgentContextRenderer
 {
     private const string Heading = "## Architecture (LoadBearing)";
@@ -58,6 +55,11 @@ public static class AgentContextRenderer
     ///     spec deterministically (assembly file name without extension) so the pin is
     ///     machine-independent; carries no timestamp or tool version (idempotence).
     /// </summary>
+    /// <remarks>
+    ///     The em-dash is free here and is not in <see cref="LawDiagramRenderer" />'s caption: managed
+    ///     blocks land in <c>AGENTS.md</c> files, which sit outside the prose-budget gate that
+    ///     <c>ARCHITECTURE.md</c> is inside. The two spellings diverge for that reason, not by accident.
+    /// </remarks>
     public static string ProvenanceLine(string specName)
     {
         Guard.NotNullOrWhiteSpace(specName, nameof(specName));
@@ -71,11 +73,13 @@ public static class AgentContextRenderer
     ///     (GRAMMAR §4.1, once), then — each omitted when empty — the module map (Layers), the Enforce
     ///     laws (Rules), the Migrate counter-prior paragraphs (Migrations), and the Quarantine containment
     ///     laws (Quarantined scopes — the containment law + sanctioned surface; dragons prose stays scoped).
+    /// </summary>
+    /// <remarks>
     ///     <paramref name="grandfatheredCounts" /> is an optional live-count provider: when it returns a
     ///     value for a Migrate rule, the "Grandfathered sites remaining: {n}." sentence is appended. The
-    ///     default (null) renders no counts — the maintainer decision, where the burndown
-    ///     lives in <c>status</c>/<c>explain</c>, not the block.
-    /// </summary>
+    ///     default (<c>null</c>) renders no counts, so the burndown lives in <c>status</c>/<c>explain</c>
+    ///     rather than in the block.
+    /// </remarks>
     public static string RootBlock(
         ArchitectureModel model, string specName, Func<ArchRule, int?>? grandfatheredCounts = null)
     {
@@ -161,9 +165,11 @@ public static class AgentContextRenderer
     ///     once per file): the scope heading, the containment law and rationale, the load-bearing-
     ///     weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a linked <c>Dragons doc</c>
     ///     bullet — one of the two is spec-guaranteed), the sanctioned surface (omitted for
-    ///     a hermetic quarantine), and the <c>explain</c> pointer. This is the scoped, per-directory story the
-    ///     agents editing dragon territory read.
+    ///     a hermetic quarantine), and the <c>explain</c> pointer.
     /// </summary>
+    /// <remarks>
+    ///     This is the scoped, per-directory story the agents editing dragon territory read.
+    /// </remarks>
     public static string ScopeCard(ArchRule containmentRule)
     {
         Guard.NotNull(containmentRule, nameof(containmentRule));
@@ -197,11 +203,13 @@ public static class AgentContextRenderer
     /// <summary>
     ///     A layer's "local rules" context card, placed in the layer's directory (without
     ///     the provenance line, which the splice pipeline adds once per file): the layer heading, a
-    ///     one-line lede, then one bullet per anchored rule — the very same Rules/Migrations composer
-    ///     the root block uses, so a rule reads identically in both places — closed by a generic
-    ///     drill-down pointer. No Fix lines (progressive disclosure; <c>explain</c> serves the fix).
-    ///     This is the scoped, per-directory rule digest an agent editing the layer reads.
+    ///     one-line lede, then one bullet per anchored rule, closed by a generic drill-down pointer.
     /// </summary>
+    /// <remarks>
+    ///     The bullets use the very same Rules/Migrations composer the root block uses, so a rule reads
+    ///     identically in both places. No Fix lines (progressive disclosure; <c>explain</c> serves the
+    ///     fix). This is the scoped, per-directory rule digest an agent editing the layer reads.
+    /// </remarks>
     public static string LayerCard(string layerName, IReadOnlyList<ArchRule> rules)
     {
         Guard.NotNullOrWhiteSpace(layerName, nameof(layerName));

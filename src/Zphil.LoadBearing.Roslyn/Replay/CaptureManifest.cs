@@ -5,9 +5,8 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 /// <summary>
 ///     The persisted build capture as a single serializable document: a self-describing manifest recording
 ///     exactly what makes the copied binlog (<c>capture.binlog</c>) a faithful stand-in for a design-time
-///     build of the current tree. <see cref="BinlogCaptureStore" /> writes one of these
-///     atomically beside the binlog copy and later validates it with zero MSBuild — stat plus a selective
-///     re-hash of the recorded structural inputs, and an existence sweep over the recorded documents.
+///     build of the current tree. <see cref="BinlogCaptureStore" /> writes one of these atomically beside
+///     the binlog copy.
 /// </summary>
 /// <remarks>
 ///     Why the capture keys on structure alone, and why a manifest it cannot read degrades rather than

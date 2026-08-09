@@ -17,8 +17,8 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// </remarks>
 internal static class BuildOutputDirectories
 {
-    // Case-sensitive by design: the historical relative-segment skip matched "bin"/"obj" ordinally, so a
-    // differently-cased directory (e.g. "BIN") was never treated as build output. Kept exactly.
+    // Matched ordinally, deliberately: a differently-cased directory (e.g. "BIN") is not treated as build
+    // output.
     private static readonly string[] Names = ["bin", "obj"];
 
     /// <summary>

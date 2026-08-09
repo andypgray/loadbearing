@@ -3,10 +3,8 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The one line every file-writing verb reports a target on. <c>render</c> and <c>baseline</c> both
-///     end each write with it, and both words plus the solution-relative path are pinned stdout — so the
-///     format is stated once here rather than four times across the two runners, where a third verb that
-///     writes a file would state it a fifth.
+///     The one line every file-writing verb reports a target on. Both words and the solution-relative path
+///     are pinned stdout, so the format is owned here rather than restated by each runner that writes a file.
 /// </summary>
 internal static class WriteReport
 {

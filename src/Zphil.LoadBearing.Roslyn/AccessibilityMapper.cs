@@ -7,13 +7,15 @@ namespace Zphil.LoadBearing.Roslyn;
 /// <summary>
 ///     Maps Roslyn's <see cref="RoslynAccessibility" /> onto LoadBearing's Core
 ///     <see cref="CoreAccessibility" /> (the two enums are deliberately distinct — Roslyn must
-///     not enter Core; the alias pattern matches <see cref="TypeKindMapper" />). Core uses C#
-///     keyword names: ProtectedOrInternal → ProtectedInternal, ProtectedAndInternal →
-///     PrivateProtected. <c>NotApplicable</c> is the one value with no C# declaration meaning, so the
-///     two entry points differ in what they do with it: <see cref="TryMap" /> reports failure and lets
-///     the caller choose a fallback, while <see cref="Map(ISymbol)" /> throws.
+///     not enter Core; the alias pattern matches <see cref="TypeKindMapper" />).
 /// </summary>
 /// <remarks>
+///     <para>
+///         Core uses C# keyword names: ProtectedOrInternal → ProtectedInternal, ProtectedAndInternal →
+///         PrivateProtected. <c>NotApplicable</c> is the one value with no C# declaration meaning, so the
+///         two entry points differ in what they do with it: <see cref="TryMap" /> reports failure and lets
+///         the caller choose a fallback, while <see cref="Map(ISymbol)" /> throws.
+///     </para>
 ///     <para>
 ///         <b>Where the hard invariant actually holds.</b> GRAMMAR §4.6 scopes "always carries a real
 ///         declared accessibility" to the <em>declared members</em> of solution-declared types — an

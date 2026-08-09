@@ -30,6 +30,9 @@ internal static class ProjectCone
     {
         if (!Directory.Exists(projectDirectory)) return [];
 
+        // Ordinal, not the Matcher's default OrdinalIgnoreCase, so the exclude globs match build-output
+        // directories exactly as BuildOutputDirectories.IsUnderBuildOutput does — the two probes must not
+        // disagree about what counts as build output.
         var matcher = new Matcher(StringComparison.Ordinal);
         matcher.AddInclude("**/*.cs");
         foreach (string glob in BuildOutputDirectories.ExcludeGlobs) matcher.AddExclude(glob);

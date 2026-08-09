@@ -9,13 +9,15 @@ namespace Zphil.LoadBearing;
 ///     <see cref="Arch.Member(System.Type,System.String,System.String,System.Int32)" /> (or the expression-anchor
 ///     overloads
 ///     <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> / <c>arch.Member(() =&gt; Type.M)</c>, which desugar at
-///     mint to the same leaf) for <see cref="SelectionConstraints.MustNotUse(Selection,Member,Member[])" />. A target-only
-///     leaf, deliberately <em>not</em> a <see cref="Selection" />: it never enters the selection
-///     hierarchy, so adjectives and modal verbs are uncompilable on it by construction (GRAMMAR §3.2).
-///     Matching is by declaring type + member name, so one ban covers every overload — there is no
-///     signature form. Owner-stamped like a selection and reusable across rules on the same
-///     <see cref="Arch" /> (the fresh-instance contract covers it, GRAMMAR §8 item 13).
+///     mint to the same leaf) for <see cref="SelectionConstraints.MustNotUse(Selection,Member,Member[])" />.
 /// </summary>
+/// <remarks>
+///     A target-only leaf, deliberately <em>not</em> a <see cref="Selection" />: it never enters the
+///     selection hierarchy, so adjectives and modal verbs are uncompilable on it by construction
+///     (GRAMMAR §3.2). Matching is by declaring type + member name, so one ban covers every overload —
+///     there is no signature form. Owner-stamped like a selection and reusable across rules on the same
+///     <see cref="Arch" /> (the fresh-instance contract covers it, GRAMMAR §8 item 13).
+/// </remarks>
 public sealed class Member
 {
     private const BindingFlags MemberFlags =
@@ -39,9 +41,8 @@ public sealed class Member
     // MemberExpressionResolver could not reduce the lambda to a declared (type, name). It records only the
     // diagnostic core and leaves the DeclaringType/Name/IsMethod backing fields at their defaults — reading
     // any of the three now throws (fail closed, enforced not merely documented), so a poisoned Member can
-    // never be mistaken for a resolved one. Nothing reads them anyway: SpecValidator.CheckMember
-    // short-circuits on PoisonError, and ArchModelBuilder.Build validates the whole spec before it projects
-    // or renders any node, so a poisoned Member is caught before anything reaches for its anchor. Owner is
+    // never be mistaken for a resolved one. Nothing reaches for the anchor in practice either: the whole
+    // spec is validated before any node is projected or rendered, so the poison is reported first. Owner is
     // stamped so the foreign-Arch check (§8 item 13) still precedes the poison report.
     internal Member(Arch owner, string poisonError, SpecSourceLocation? location = null)
     {
@@ -84,9 +85,8 @@ public sealed class Member
     /// </summary>
     internal bool IsMethod => PoisonError is null ? _isMethod : throw PoisonRead();
 
-    // A poisoned member anchor never populated its resolved fields; reading one is a caller bug (every real
-    // reader runs after SpecValidator.CheckMember has reported the PoisonError). Fail closed rather than hand
-    // back a default that could masquerade as a resolved anchor.
+    // A poisoned member anchor never populated its resolved fields; reading one is a caller bug. Fail closed
+    // rather than hand back a default that could masquerade as a resolved anchor.
     private InvalidOperationException PoisonRead()
     {
         return new InvalidOperationException(
