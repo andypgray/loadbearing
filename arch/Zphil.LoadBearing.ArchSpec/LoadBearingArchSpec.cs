@@ -324,8 +324,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("packs/depends-on-core-only")
             .Enforce(pack.MustOnlyReference(core, pack))
-            .Because("The rule pack ships as its own package for spec projects to reference, and the whole " +
-                     "of what it needs is the Arch it composes onto. A reference to the extraction host or " +
+            .Because("A spec project takes the rule pack as a reference of its own, and the whole of what " +
+                     "the pack needs is the Arch it composes onto. A reference to the extraction host or " +
                      "the CLI would pull MSBuild and the rest of the tool into the closure of every spec " +
                      "project that takes the pack — and nothing in the project graph stops it, because the " +
                      "pack is a leaf and no reference out of it would be circular.")

@@ -104,6 +104,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anywhere" arm lists the solutions it found one level down. Naming `src\Storefront.sln` turns a dead
   end into one copy-paste. The README and the registry manifest say the same thing now: the argument
   is optional, and most repositories should pass it.
+- **The rule pack is no longer sold as something a reader can install.**
+  `Zphil.LoadBearing.Packs.DotNet` is unpackable by design: it is the demonstrator that a pack is an
+  ordinary class library, and keeping it out of the release keeps `dotnet pack` at the four nupkgs the
+  workflows count. The public material had drifted from that, recommending a thing nobody outside a
+  clone could obtain. The README's rule-pack paragraph and both example READMEs now say the pack ships
+  in this repository rather than as a package to install; the adoption walkthrough says its
+  `src/`-relative `ProjectReference` resolves in a source checkout and nowhere else, and that on your
+  own solution the pack is one you write; and the self-spec's `packs/depends-on-core-only` reason,
+  which renders into the committed `AGENTS.md` files, no longer claims the pack "ships as its own
+  package".
+- **The adoption walkthrough's reset step left the sandbox holding five projects, not the four it
+  claimed.** `dotnet sln add` follows the spec's project references and adds both the LoadBearing
+  contract library and the rule pack, which the walkthrough states a few paragraphs earlier and its
+  own captured output shows. The "Try it yourself" removal dropped only the contract library, so the
+  `dotnet sln list` count a reader was told to expect could not be the count they got. It removes both
+  now.
 - The MSBuild-selection note rides the documents now, not stderr alone. It was appended at write time,
   which made it the one line the MCP tools lost when they pass a null error writer, and "which MSBuild
   opened it" is the next question after any load failure. Composing it into the list both renderers

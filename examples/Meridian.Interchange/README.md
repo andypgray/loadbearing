@@ -40,7 +40,7 @@ Twelve rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeAr
 
 Eleven rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`): the current blocking is grandfathered, and any new blocking is red.
 
-Nine of the twelve say nothing this worker makes special, so they are not written here at all. They come from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. The pack owns each rule's citation-bearing `Because`, since the reason to reuse an `HttpClient` is the same in every codebase; this spec picks the posture, the selections, and the `Fix` where remediation names a real type. The three rules that name Meridian's own types are written out in full. Both forms sit in the same `Define`:
+Nine of the twelve say nothing this worker makes special, so they are not written here at all. They come from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. The pack ships inside this repository rather than as a package to install; on your own solution it is a class library you write. The pack owns each rule's citation-bearing `Because`, since the reason to reuse an `HttpClient` is the same in every codebase; this spec picks the posture, the selections, and the `Fix` where remediation names a real type. The three rules that name Meridian's own types are written out in full. Both forms sit in the same `Define`:
 
 ```csharp
 DotNetGuidance.ReuseHttpClient(arch, arch.Types, host, PackPosture.Enforce,

@@ -147,6 +147,8 @@ The one line worth calling out is `CopyLocalLockFileAssemblies`: it stages NuGet
 
 The second `ProjectReference` is that rule pack, `DotNetGuidance`. A pack is an ordinary class library of static methods that declare rules onto your `Arch`; you reference it and call the ones you want. Nothing is discovered and nothing is implicit, so this reference on its own adds no rules. Step 3 is where the calls go in.
 
+`DotNetGuidance` is not a package you can install. It ships inside the LoadBearing repository as a working example, which is why the reference above is a relative path into `src/`: it resolves in a source checkout and nowhere else. On your solution the pack is one you write, and its [README](../../src/Zphil.LoadBearing.Packs.DotNet/README.md) is the shape to copy. What the steps below do with `DotNetGuidance` is what your spec will do with yours.
+
 The class starts empty and grows in step 3:
 
 ```csharp
@@ -178,7 +180,7 @@ In a source checkout like this repository, `dotnet sln add` follows the spec's p
 
 On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence that decides it. Write the already-true directions too, the ones the edge matrix showed clean, because a clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone: a boundary has no `Enforce` form, so you draft it as a `Quarantine` scope directly.
 
-Before you write any of them, check what you can take instead. Canonical .NET guidance is the same in every codebase, so a rule pack ships those rules with their reasons already written and their citations attached, and calling one costs a line. Take the ones that could plausibly apply to your estate and leave the rest: opting out is not calling the method. Draft the taken rules as `Enforce` too, for the same reason as the ones you write, and let step 4 tell you which of them your code already obeys.
+Before you write any of them, check what you can take instead. Canonical .NET guidance is the same in every codebase, so those rules belong in a pack, written once with their reasons and citations attached, and every spec that wants one afterwards spends a line on it. This walk takes them from `DotNetGuidance`; on your solution the first pack is yours to write, and it starts paying at the second spec that calls it. Take the ones that could plausibly apply to your estate and leave the rest: opting out is not calling the method. Draft the taken rules as `Enforce` too, for the same reason as the ones you write, and let step 4 tell you which of them your code already obeys.
 
 Meridian's survey produced four direction-and-convention candidates plus one quarantined scope, and two rules come from the pack: the `Async` naming convention, because Web and Domain are full of `Task`-returning methods, and the `BuildServiceProvider` antipattern, because the app has a composition root worth guarding.
 
@@ -396,10 +398,11 @@ Reset to day zero inside the sandbox: delete `examples/Meridian/arch/` and remov
 
 One substitution applies throughout. This repository is a source checkout rather than a package install, so each `loadbearing <verb> …` line above runs as `dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- <verb> …` from the repository root (build the CLI first: `dotnet build src/Zphil.LoadBearing.Cli`). To use the real `loadbearing` command instead, install the global tool per the [README](README.md#run-it-yourself).
 
-Two SDK behaviors the walk hits; neither affects what `check` reports. First, `dotnet sln add` follows the spec's project references and adds the LoadBearing contract library to the solution; remove it and confirm four projects remain:
+Two SDK behaviors the walk hits; neither affects what `check` reports. First, `dotnet sln add` follows the spec's project references and adds both the LoadBearing contract library and the rule pack to the solution; remove the two of them and confirm four projects remain:
 
 ```bash
 dotnet sln examples/Meridian/Meridian.slnx remove src/Zphil.LoadBearing/Zphil.LoadBearing.csproj
+dotnet sln examples/Meridian/Meridian.slnx remove src/Zphil.LoadBearing.Packs.DotNet/Zphil.LoadBearing.Packs.DotNet.csproj
 ```
 
 The path resolves against your working directory, not the solution file, and a path that matches nothing is reported and ignored; re-run `dotnet sln examples/Meridian/Meridian.slnx list` and expect exactly four projects. Second, `dotnet sln add` reformats the solution file, so a little `Meridian.slnx` churn in your final diff is expected.

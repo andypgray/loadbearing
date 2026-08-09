@@ -14,7 +14,7 @@ Thirty-three current violations are grandfathered: twelve inline-SQL references,
 
 ## The spec
 
-The architecture is seven statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Five are written there; two are taken from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. Each statement carries a posture, a reason, and a fix. (The quarantined scope desugars into two checked rules, so `check` reports eight.)
+The architecture is seven statements of ordinary C# in [arch/Meridian.ArchSpec/MeridianArchSpec.cs](arch/Meridian.ArchSpec/MeridianArchSpec.cs). Five are written there; two are taken from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references, and that ships in this repository rather than as a package to install. Each statement carries a posture, a reason, and a fix. (The quarantined scope desugars into two checked rules, so `check` reports eight.)
 
 | Rule | Posture | What it says |
 |---|---|---|
