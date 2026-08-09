@@ -335,6 +335,65 @@ jobs:
             exit 1
           }
 
+  # The one thing release.yml structurally cannot check. It cross-checks the tag against
+  # `Directory.Build.props` and both `.mcp/server.json` fields — but only at tag time, so nothing
+  # looks at the window between a bumped manifest landing on `main` and the tag arriving behind it.
+  # That window is not hypothetical: at 0.3.0 the bump reached the public branch, the tag never
+  # followed, and for weeks the manifest nuget.org scans told every MCP registry client to fetch a
+  # package version that 404s.
+  #
+  # The property held here is the reader's, not the maintainer's: a version this repository
+  # advertises must be one a stranger can actually resolve. Either nuget.org already serves it, or
+  # the tag that publishes it is in this repository — which is why the release flow pushes both refs
+  # in one command (`git push origin main v<x.y.z>`), so the tag is on the server before this job
+  # checks out. A bump pushed alone is exactly the state this reddens on.
+  #
+  # fetch-depth: 0 is load-bearing: the default single-commit checkout fetches no tags, so every
+  # released version would read as untagged and the job would ask nuget.org about all of them.
+  manifest-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Three outcomes, deliberately worded apart. A manifest defect names the fix; a registry that
+      # could not be reached says so and asks for a re-run, because a network blip that reads as a
+      # manifest defect trains people to ignore this job. Whether the two version fields agree with
+      # each other and with the props file is ManifestVersionTests' question, not this one — but the
+      # cheap half of it is repeated here so a partial bump cannot be answered about the wrong field.
+      - name: The advertised version is published, or tagged for publication
+        run: |
+          version="$(jq -r '.version' .mcp/server.json)"
+          package="$(jq -r '.packages[0].version' .mcp/server.json)"
+          if [ "$version" != "$package" ]; then
+            echo "::error::.mcp/server.json advertises $version at .version and $package at .packages[0].version. A registry client reads both, so a half-finished bump points it at two different packages."
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is tagged here, so release.yml has published it or is publishing it now."
+            exit 0
+          fi
+
+          index='https://api.nuget.org/v3-flatcontainer/zphil.loadbearing.cli/index.json'
+          body="$RUNNER_TEMP/flatcontainer.json"
+          code="$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors --max-time 30 -o "$body" -w '%{http_code}' "$index")" || code=''
+          if [ "$code" != '200' ]; then
+            echo "::error::nuget.org did not answer $index (${code:-no response}), so whether $version is published is unknown. That is a registry or network failure, not a manifest defect — re-run this job."
+            exit 1
+          fi
+
+          if jq -e --arg v "$version" '.versions | index($v)' "$body" > /dev/null; then
+            echo "$version is on nuget.org and carries no v$version tag here — a release tagged before this gate existed, or a tag that was never pushed."
+            exit 0
+          fi
+
+          echo "::error::.mcp/server.json advertises $version, which nuget.org does not serve and no v$version tag here will publish. Every MCP registry client reading this manifest would ask dnx for a version that 404s. Push the tag alongside the branch — 'git push origin main v$version' — or return the manifest to the published version."
+          jq -r '"published: " + (.versions | join(", "))' "$body"
+          exit 1
+
   # Self-scan: LoadBearing checks its own solution and publishes the result to GitHub code
   # scanning as SARIF. The self-spec exits 0 today, so the job is green; a future violation
   # reddens the check step and the alerts still upload (if: always()). Forked-PR and

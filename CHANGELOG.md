@@ -120,6 +120,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own captured output shows. The "Try it yourself" removal dropped only the contract library, so the
   `dotnet sln list` count a reader was told to expect could not be the count they got. It removes both
   now.
+- **The published MCP manifest can no longer advertise a version that does not exist.**
+  `.mcp/server.json` is the file nuget.org reads to generate a client's MCP configuration, and its
+  version is bumped when a release is *prepared* rather than when one happens. So a branch pushed
+  without the tag behind it left every registry client following that manifest asking `dnx` for a
+  package version that answers 404 — which is what happened at 0.3.0, and it stood until the next
+  release replaced it. CI now holds the property a reader actually depends on: a version this
+  repository advertises is either already on nuget.org or carries the tag that publishes it.
 - The MSBuild-selection note rides the documents now, not stderr alone. It was appended at write time,
   which made it the one line the MCP tools lost when they pass a null error writer, and "which MSBuild
   opened it" is the next question after any load failure. Composing it into the list both renderers
