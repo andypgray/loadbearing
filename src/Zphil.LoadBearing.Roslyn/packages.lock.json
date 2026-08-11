@@ -4,9 +4,9 @@
     "net10.0": {
       "Basic.CompilerLog.Util": {
         "type": "Direct",
-        "requested": "[0.9.49, )",
-        "resolved": "0.9.49",
-        "contentHash": "UJGwJSJhypjss1OWPrMPNwG9A3ZD0sweChTjtNGHKHP/CohbVRK/SbjfG42+tMSYd9FrUn49JWYVvPhyHA3oJQ==",
+        "requested": "[0.9.50, )",
+        "resolved": "0.9.50",
+        "contentHash": "Nyoy+cDcrTLiZ8ZBL7kyUo6e08KOXLdcA9I5cIv0R0VFV7vR4MAZ8F7nMMzNdHtvNn362ls8gcyFxMna5uvyNQ==",
         "dependencies": {
           "MSBuild.StructuredLogger": "2.3.213",
           "MessagePack": "3.1.8",
