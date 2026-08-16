@@ -11,11 +11,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>The workspace-diagnostics contract on <c>check</c>.</summary>
 /// <remarks>
 ///     <para>
-///         Five parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>).
+///         Six parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>).
 ///         Driven through <see cref="CheckRunner" /> with an injected source that wraps the real cold load
-///         and adds synthetic diagnostics, synthetic failed projects and/or synthetic unchecked ones — the
-///         one way to exercise the gate without a genuinely broken project, and the one way to put the
-///         inputs in front of it <em>separately</em>, which is the whole subject of the last two parts below.
+///         and adds synthetic diagnostics, synthetic failed projects, synthetic restore-failed ones and/or
+///         synthetic unchecked ones — the one way to exercise the gate without a genuinely broken project,
+///         and the one way to put the inputs in front of it <em>separately</em>, which is the whole subject
+///         of the last three parts below.
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
@@ -52,6 +53,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             the clean spec still exits 0 and neither incomplete-model slot appears — the separation the
 ///             product makes between a model that is wrong and one that is merely smaller.
 ///         </item>
+///         <item>
+///             <b>A failed NuGet restore gates on the same terms, in its own words.</b> The project loaded
+///             completely, so nothing in the loaded structure blames it — but its package edges are missing,
+///             which was measured to turn a failing rule green. It exits 2 with a lede naming restore rather
+///             than the build, takes the same opt-out, and when both causes hold the load block leads.
+///         </item>
 ///     </list>
 /// </remarks>
 [Collection("Serial")]
@@ -66,6 +73,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // The project the run is told a solution filter left out. The third input, separate again: this one
     // neither renders as a warning nor decides anything — it scopes the answer.
     private const string UncheckedProject = "C:/repo/MyApp.Skipped/MyApp.Skipped.csproj";
+
+    // The project the gate is told restored badly — the fourth input, and the second that decides. It loaded
+    // completely, which is exactly why it needs its own slot: nothing about the loaded solution says so.
+    private const string RestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
 
     // The NU1510 pruning advisory, captured verbatim from a restore of a net10.0 project referencing a
     // package the shared framework now carries. It is an ordinary restore warning, it says nothing about
@@ -105,6 +116,11 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     private const string GateLine =
         "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
+
+    private const string RestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 1 project, so check cannot pass: "
+        + "package references that resolved to nothing produce no edges, so a rule about a package is "
+        + "measured against a model that never saw it:";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -375,6 +391,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeFalse();
         document.RootElement.TryGetProperty("uncheckedProjects", out _)
             .ShouldBeFalse();
+        document.RootElement.TryGetProperty("restoreFailedProjects", out _)
+            .ShouldBeFalse();
         result.Out.ShouldContain("will not be pruned"); // it still rides workspaceDiagnostics
     }
 
@@ -451,6 +469,145 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         sarif.ShouldContain("MyApp.Skipped/MyApp.Skipped.csproj");
     }
 
+    // ── a failed NuGet restore gates on the same terms as a failed load ───────────────────────────────
+
+    [Fact]
+    public async Task Check_RestoreFailedProject_NoFlag_FailsClosedWithItsOwnGateLine()
+    {
+        // The measured silent pass, closed. The project loaded completely — full document set, both output
+        // paths — so nothing in the loaded structure blames it and the old gate saw a clean solution, while
+        // every package edge it declares was missing from the model and a rule over one reported itself inert.
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false);
+
+        result.ShouldRefuseWith(RestoreGateLine, RestoreFailedProject);
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProject_NamesRestoreRatherThanBuildAsTheRemedy()
+    {
+        // The whole reason this is a second slot and not an extra entry in failedProjects: the repair differs.
+        // A reader sent to `dotnet build` for a feed that could not be reached learns nothing.
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false);
+
+        result.Err.ShouldContain("Restore the solution (dotnet restore)");
+        // The remedy leads and the warnings are offered conditionally, because this block now also covers a
+        // restore that never ran — which wrote no NuGet logs for the SDK to replay above it.
+        result.Err.ShouldContain("any NuGet errors behind a restore that ran are in the warnings above");
+        result.Err.ShouldNotContain("failed to load"); // and it does not claim the project failed to load
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProject_WithFlag_RestoresPriorExit()
+    {
+        // The same escape hatch, deliberately: one flag for one question — is a partial model acceptable —
+        // rather than one flag per way the model can come up short.
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, true, false);
+
+        result.ShouldSucceed();
+        result.Err.ShouldNotContain("error: the model is incomplete");
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProject_ViolatedSpecNoFlag_GateTakesPrecedenceOverExitOne()
+    {
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.ViolatedSpecDll, false, false);
+
+        result.ShouldRefuseWith(RestoreGateLine, RestoreFailedProject);
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProjectJson_CarriesTheRestoreFailedProjectsBesideTheVerdict()
+    {
+        // Its own slot, not a second entry in failedProjects: these projects loaded, so calling them failed
+        // loads would be false, and the remedy a client should surface is a different command. Solution-relative
+        // and forward-slashed, like every other path in the document.
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, true);
+
+        result.ShouldRefuseWith();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.GetProperty("modelIncomplete")
+            .GetBoolean()
+            .ShouldBeTrue();
+        document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse();
+        ProjectsAt(document, "restoreFailedProjects")
+            .ShouldHaveSingleItem()
+            .ShouldEndWith("MyApp.Unrestored/MyApp.Unrestored.csproj");
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProjectJsonWithTheOptOut_StillStampsTheModelIncomplete()
+    {
+        // The opt-out changes the exit code, never the truth about the model — which is the whole reason the
+        // document stamps a fact rather than echoing a verdict.
+        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, true, true);
+
+        result.ShouldSucceed();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.GetProperty("modelIncomplete")
+            .GetBoolean()
+            .ShouldBeTrue();
+        ProjectsAt(document, "restoreFailedProjects")
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Check_RestoreFailedProjectSarif_RecordsExecutionUnsuccessfulAndNamesTheCause()
+    {
+        // Code scanning has no exit code, so the one channel that can carry a refusal there is
+        // executionSuccessful — which follows the gate rather than the cause, and so needed no edit. The
+        // notification is what needed adding: until it existed the cause reached SARIF only as MSBuild's
+        // replayed prose, where a fatal failure and a restore warning are the same shape.
+        using TempDirectory temp = TestTempRoot.Fresh("restore-gate-sarif");
+        string sarifPath = temp.PathOf("restore-gate.sarif");
+
+        CliResult result = await RunWithInjectedRestoreFailureAsync(
+            CliRunner.CleanSpecDll, false, false, sarifPath);
+
+        result.ShouldRefuseWith();
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.ShouldContain("\"executionSuccessful\": false");
+        sarif.ShouldContain(
+            "The model is incomplete: NuGet packages did not resolve for 1 project, so these results were "
+            + "reached against a codebase whose package references resolved to nothing: ");
+        sarif.ShouldContain("MyApp.Unrestored/MyApp.Unrestored.csproj");
+        sarif.ShouldContain("\"level\": \"error\"");
+    }
+
+    [Fact]
+    public async Task Check_WorkspaceLoadDiagnosticSarif_NamesTheFailedProjectsToo()
+    {
+        // The gap this closed on the way past: failedProjects had no SARIF notification either, so the one
+        // surface that names a cause could name neither. Both are added together rather than leaving the
+        // channel able to explain half an incomplete model.
+        using TempDirectory temp = TestTempRoot.Fresh("load-gate-sarif");
+        string sarifPath = temp.PathOf("load-gate.sarif");
+
+        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
+
+        result.ShouldRefuseWith();
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.ShouldContain(
+            "The model is incomplete: 1 project failed to load, so these results were reached against a "
+            + "codebase missing whole projects: ");
+        sarif.ShouldContain("MyApp.Broken/MyApp.Broken.csproj");
+    }
+
+    [Fact]
+    public async Task Check_LoadFailureAndRestoreFailure_WritesTheLoadBlockFirst()
+    {
+        // Both causes at once. A project that never loaded is more fundamentally broken than one that loaded
+        // without its packages, and the two ask for different repairs, so the run is told about both — in that
+        // order, and never merged into one list that would name the wrong remedy for half of it.
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, false, null, [BrokenProject],
+            restoreFailedProjects: [RestoreFailedProject]);
+
+        result.ShouldRefuseWith(GateLine, BrokenProject, RestoreGateLine, RestoreFailedProject);
+        result.Err.IndexOf(RestoreGateLine, StringComparison.Ordinal)
+            .ShouldBeGreaterThan(result.Err.IndexOf(GateLine, StringComparison.Ordinal));
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     private static string[] WorkspaceDiagnosticsOf(JsonDocument document)
@@ -461,6 +618,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ToArray();
     }
 
+    private static List<string> ProjectsAt(JsonDocument document, string slot)
+    {
+        return document.RootElement.GetProperty(slot)
+            .EnumerateArray()
+            .Select(element => element.GetString() ?? "")
+            .ToList();
+    }
+
     // The load-failure shape: the diagnostic renders, and the project beside it is what gates.
     private static Task<CliResult> RunWithInjectedDiagnosticAsync(
         string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
@@ -469,16 +634,29 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             [LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif, [BrokenProject]);
     }
 
+    // The restore-failure shape: no diagnostic at all, because the SDK's replay of NuGet's own logs is not
+    // this product's to synthesize — the project beside it is the whole gate input.
+    private static Task<CliResult> RunWithInjectedRestoreFailureAsync(
+        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
+    {
+        return RunWithInjectedDiagnosticAsync(
+            [], spec, allowWorkspaceDiagnostics, json, sarif,
+            restoreFailedProjects: [RestoreFailedProject]);
+    }
+
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
         IReadOnlyList<string> diagnostics, string spec, bool allowWorkspaceDiagnostics, bool json,
         string? sarif = null, IReadOnlyList<string>? failedProjects = null,
-        IReadOnlyList<string>? uncheckedProjects = null)
+        IReadOnlyList<string>? uncheckedProjects = null,
+        IReadOnlyList<string>? restoreFailedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         string solution = CliRunner.MyAppSolution;
         var runner = new CheckRunner(
-            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects, uncheckedProjects),
+            output, error,
+            new DiagnosticInjectingSolutionSource(
+                diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects),
             new FakeEnvironment());
 
         int exit = await runner.RunAsync(

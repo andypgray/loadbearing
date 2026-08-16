@@ -10,6 +10,8 @@ Writes go through a command bus that opens a unit of work only around a handler 
 
 Time enters through `IClock`. `SystemClock` is the single adapter that reads the machine clock, so a quote's 14-day validity window is computed from an injected instant and can be checked at a fixed moment in a test.
 
+[ARCHITECTURE.md](ARCHITECTURE.md) draws both halves of that: the four layers as the code actually references them, beside the law the spec holds them to. The law fence is nearly empty, which is the point it makes.
+
 ## The block beside the rules
 
 Three rules from [arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs](arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs):
@@ -111,7 +113,7 @@ dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
 loadbearing check examples/Meridian.Quoting/Meridian.Quoting.slnx
 ```
 
-`check` exits 0: every rule holds. `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj` runs the nine named rule tests.
+`check` exits 0: every rule holds. `loadbearing render` regenerates the `AGENTS.md` block and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings from the spec, and `dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj` runs the nine named rule tests.
 
 ## From here
 

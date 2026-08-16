@@ -248,7 +248,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
             return new ArchCheckRun(
                 byId, solutionDirectory, fullSolutionPath,
                 new WorkspaceDiagnostics(
-                    diagnostics, [], opened?.FailedProjects ?? [], opened?.UncheckedProjects ?? []));
+                    diagnostics, [], opened?.FailedProjects ?? [], opened?.UncheckedProjects ?? [],
+                    opened?.RestoreFailedProjects ?? []));
         }
         finally
         {

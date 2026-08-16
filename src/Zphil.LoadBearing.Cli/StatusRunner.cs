@@ -57,7 +57,8 @@ internal sealed class StatusRunner(
             StatusJsonRenderer.Render(
                 output, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
                 Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects, diagnostics.UncheckedProjects);
+                diagnostics.FailedProjects, diagnostics.UncheckedProjects,
+                diagnostics.RestoreFailedProjects);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);

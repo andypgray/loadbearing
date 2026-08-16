@@ -3,6 +3,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
@@ -11,7 +12,8 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
-///     The MSBuild-selection note on the MCP surface, which is the one line this surface used to destroy.
+///     The MSBuild-selection note on the MCP surface, which is the one line this surface used to destroy —
+///     and the incomplete-model verdict beside it, which is the whole refusal a surface with no exit code has.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -33,6 +35,8 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 public sealed class ArchToolsWorkspaceDiagnosticsTests
 {
     private const string LoadDiagnostic = "Project 'MyApp.Broken' failed to load: simulated workspace-load failure.";
+
+    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -58,6 +62,65 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
         WorkspaceDiagnosticsOf(document)
             .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ArchCheck_RestoreFailedProject_StampsTheModelIncompleteVerdict()
+    {
+        // The MCP surface has no exit code, so <c>modelIncomplete</c> is the whole refusal a client can read.
+        // It follows the gate rather than either cause, which is exactly why a second cause could be added
+        // without touching a single tool.
+        var tools = new ArchTools(
+            Binding(),
+            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new FakeEnvironment());
+
+        string document = await tools.CheckAsync(cancellationToken: Ct);
+
+        using JsonDocument parsed = JsonDocument.Parse(document);
+        parsed.RootElement.GetProperty("modelIncomplete")
+            .GetBoolean()
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ArchGraph_RestoreFailedProject_RefusesWithTheRestoreWordingAndBothDialectsOfTheOptOut()
+    {
+        // graph carries its evidence inline because there is nothing above it here — this tool discards its
+        // error writer — and it is the entry point a stranger reaches for first, so the refusal names the
+        // remedy and the opt-out in both dialects rather than assuming which surface asked.
+        var tools = new ArchTools(
+            Binding(),
+            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new FakeEnvironment());
+
+        var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
+
+        error.Message.ShouldContain(
+            "the model is incomplete — NuGet packages did not resolve for 1 project, so graph cannot survey "
+            + "the codebase: the external references a survey exists to show are exactly what did not "
+            + "resolve:");
+        error.Message.ShouldContain(UnrestoredProject);
+        error.Message.ShouldContain("Restore the solution first (dotnet restore)");
+        error.Message.ShouldContain("allowWorkspaceDiagnostics: true (arch_graph)");
+    }
+
+    [Fact]
+    public async Task ArchGraph_RestoreFailedProjectWithTheOptOut_SurveysThePartialModel()
+    {
+        // The opt-out the refusal names, taken: one flag for one question, whichever way the model came up
+        // short.
+        var tools = new ArchTools(
+            Binding(),
+            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new FakeEnvironment());
+
+        string document = await tools.GraphAsync(true, cancellationToken: Ct);
+
+        using JsonDocument parsed = JsonDocument.Parse(document);
+        parsed.RootElement.GetProperty("modelIncomplete")
+            .GetBoolean()
+            .ShouldBeTrue();
     }
 
     private static McpServerBinding Binding()

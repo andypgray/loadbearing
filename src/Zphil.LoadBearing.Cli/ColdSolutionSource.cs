@@ -20,6 +20,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
         LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
         return new SolutionHandle(
             loaded.Solution, solutionPath, diagnostics, loaded, targetFrameworks: loaded.TargetFrameworks,
-            failedProjects: loaded.FailedProjects, uncheckedProjects: loaded.UncheckedProjects);
+            failedProjects: loaded.FailedProjects, uncheckedProjects: loaded.UncheckedProjects,
+            restoreFailedProjects: loaded.RestoreFailedProjects);
     }
 }

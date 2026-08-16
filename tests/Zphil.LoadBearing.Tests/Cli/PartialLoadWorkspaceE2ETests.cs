@@ -21,7 +21,15 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         a project the tree does not contain, so the load reports real failures and the project that does
 ///         load carries Roslyn error symbols where its reference to the absent one should be. See
 ///         <c>BrokenApp.Web.csproj</c>'s header for why "just leave it unrestored" was measured and does
-///         not reproduce this, and for the siting constraints that keep the fixture broken.
+///         not reproduce <em>that</em>, and for the siting constraints that keep the fixture broken.
+///     </para>
+///     <para>
+///         <b>It is also the only bed where both causes compose.</b> The tree is never restored — the fixture
+///         forbids an <c>obj/</c>, and <c>BrokenApp.Web</c> could not be restored in isolation anyway, since it
+///         references the deliberately-absent project — so its two SDK-style projects carry the restore cause
+///         while the third carries the load cause. Every refusal below therefore writes two blocks, and the
+///         order they come in is asserted rather than assumed: nothing else in the suite reaches the
+///         composition over a real tree, because the cheaper beds inject one list or the other.
 ///     </para>
 ///     <para>
 ///         Cold invocations throughout (<see cref="CliRunner.InvokeColdAsync(string[])" />), never the warm pool: a
@@ -51,6 +59,28 @@ public sealed class PartialLoadWorkspaceE2ETests
         + "project failed to load cannot be placed and would be dropped from the committed files, and "
         + "--diagram would draw a survey missing whole projects:";
 
+    // The restore lede each of the four verbs writes below its load block. Only the count and the noun phrase
+    // are shared; what each says is at stake is not, which is why they are separate strings in production too.
+    private const string CheckRestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so check cannot pass: "
+        + "package references that resolved to nothing produce no edges, so a rule about a package is measured "
+        + "against a model that never saw it:";
+
+    private const string StatusRestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so status cannot "
+        + "report the burndown: a rule about a package the model never saw contributes no violations, so every "
+        + "count reads low:";
+
+    private const string BaselineRestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so no baseline was "
+        + "written: every violation resting on a package edge is absent from this model, so the baseline would "
+        + "sign off debt it could not see:";
+
+    private const string RenderRestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so nothing was "
+        + "rendered: a card would be committed describing dependencies the model never resolved, and --diagram "
+        + "would draw a survey with the external edges missing:";
+
     // The project BrokenApp declares and the tree does not contain — the whole reason this fixture exists,
     // and now the thing every refusal in this class names.
     private const string MissingProject = "BrokenApp.Contracts.csproj";
@@ -58,6 +88,11 @@ public sealed class PartialLoadWorkspaceE2ETests
     // The message shape of the crash this whole change exists to remove. Asserted absent, never present:
     // a refusal that names a symbol the caller never wrote is the failure, not the fix.
     private const string InvariantViolationFragment = "has no C# declaration meaning";
+
+    // The two projects that do load, out of a tree that was never restored. They carry the second cause, so
+    // this fixture is also the only bed where both blocks are composed on a real tree — which is what the
+    // ordering assertions below are for.
+    private static readonly string[] UnrestoredProjects = ["BrokenApp.Core.csproj", "BrokenApp.Web.csproj"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -83,6 +118,13 @@ public sealed class PartialLoadWorkspaceE2ETests
         graph.Err.ShouldContain("Restore and build the solution first");
         graph.Err.ShouldContain("--allow-workspace-diagnostics");
         graph.Err.ShouldContain("allowWorkspaceDiagnostics");
+        // ... and the second cause, which on a survey is the sharper of the two: these projects are all
+        // present with all their types, so a reader has nothing to notice as absent.
+        ShouldTellBothCausesLoadFirst(
+            graph,
+            "the model is incomplete — 1 project failed to load, so graph cannot survey the codebase:",
+            "the model is incomplete — NuGet packages did not resolve for 2 projects, so graph cannot survey "
+            + "the codebase: the external references a survey exists to show are exactly what did not resolve:");
 
         graph.Err.ShouldNotContain(InvariantViolationFragment);
         graph.Err.ShouldNotContain("NotApplicable");
@@ -129,6 +171,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult check = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         check.ShouldRefuseWith(CheckGateLine, MissingProject);
+        ShouldTellBothCausesLoadFirst(check, CheckGateLine, CheckRestoreGateLine);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
         CliResult checkAllowed = await CliRunner.InvokeColdAsync(
@@ -140,6 +183,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult status = await CliRunner.InvokeColdAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         status.ShouldRefuseWith(StatusGateLine, MissingProject);
+        ShouldTellBothCausesLoadFirst(status, StatusGateLine, StatusRestoreGateLine);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
         CliResult statusAllowed = await CliRunner.InvokeColdAsync(
@@ -181,6 +225,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--init");
 
         baseline.ShouldRefuseWith(BaselineGateLine, MissingProject);
+        ShouldTellBothCausesLoadFirst(baseline, BaselineGateLine, BaselineRestoreGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         FilesUnder(workspace)
             .ShouldBe(before);
@@ -199,6 +244,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         render.ShouldRefuseWith(RenderGateLine, MissingProject);
+        ShouldTellBothCausesLoadFirst(render, RenderGateLine, RenderRestoreGateLine);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
         FilesUnder(workspace)
@@ -247,6 +293,12 @@ public sealed class PartialLoadWorkspaceE2ETests
         answer.ShouldContain(MissingProject); // naming what failed, inline: there is no stderr here
         answer.ShouldContain("MSBuild for this run:");
         answer.ShouldContain("Restore and build the solution first (dotnet build), then retry for a whole answer.");
+        // Both causes ride the body, load first, because the caveat is the whole of what this verb can say —
+        // and the path being looked up is under one of the projects the second cause names.
+        answer.ShouldContain(
+            "caveat: the model is incomplete — NuGet packages did not resolve for 2 projects, so a rule about "
+            + "a package cannot be trusted to have been measured for paths under them:");
+        answer.ShouldContain("Restore the solution first (dotnet restore), then retry for a whole answer.");
         answer.ShouldNotContain(InvariantViolationFragment);
 
         // ... and the answer the partial model still supports follows, one blank line below the caveat.
@@ -276,6 +328,10 @@ public sealed class PartialLoadWorkspaceE2ETests
         refusal.ShouldContain(MissingProject); // the evidence, inline: there is no stderr here
         refusal.ShouldContain("Restore and build the solution first");
         refusal.ShouldContain("allowWorkspaceDiagnostics");
+        // The second cause reaches the agent too, and inline for the same reason as the first: this surface
+        // has no stderr, so a block that pointed at warnings above would name nothing reachable.
+        refusal.ShouldContain("NuGet packages did not resolve for 2 projects");
+        foreach (string project in UnrestoredProjects) refusal.ShouldContain(project);
         refusal.ShouldNotContain(InvariantViolationFragment);
         // A UserErrorException is expected input, not a bug, so the server logs nothing about it.
         harness.Logs.Warnings.ShouldBeEmpty();
@@ -309,6 +365,29 @@ public sealed class PartialLoadWorkspaceE2ETests
                 + "every fact in PartialLoadWorkspaceE2ETests would pass without exercising the incomplete-model gate.");
 
         return workspace;
+    }
+
+    /// <summary>
+    ///     Asserts one refusal carries <em>both</em> causes, each naming its own projects, with the load block
+    ///     above the restore block.
+    /// </summary>
+    /// <remarks>
+    ///     The ordering is a rule, not an accident: a project that never loaded is more fundamentally broken
+    ///     than one that loaded without its packages, and the two ask for different repairs. Nothing else in
+    ///     the suite composes both blocks over a real tree — the cheaper beds inject one list or the other —
+    ///     so this is where the composition is measured rather than assembled.
+    /// </remarks>
+    private static void ShouldTellBothCausesLoadFirst(CliResult result, string loadLede, string restoreLede)
+    {
+        string channel = result.Err;
+        channel.ShouldContain(loadLede);
+        channel.ShouldContain(restoreLede);
+        foreach (string project in UnrestoredProjects) channel.ShouldContain(project);
+
+        channel.IndexOf(loadLede, StringComparison.Ordinal)
+            .ShouldBeLessThan(
+                channel.IndexOf(restoreLede, StringComparison.Ordinal),
+                $"The restore block should follow the load block.{Environment.NewLine}{channel}");
     }
 
     // Every file under the solution root, ordered, excluding build output — the "wrote nothing" oracle.

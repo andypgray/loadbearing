@@ -43,7 +43,8 @@ public static class WorkspaceLoader
     ///     Optional sink for workspace-failure diagnostics. Failures are surfaced but never abort the
     ///     load: MSBuildWorkspace reports partial-load problems as diagnostics, and a partial load
     ///     still yields a usable model. These render; they do not decide anything — whether the model is
-    ///     incomplete is <see cref="LoadedSolution.FailedProjects" />'s answer.
+    ///     incomplete is <see cref="LoadedSolution.FailedProjects" />'s and
+    ///     <see cref="LoadedSolution.RestoreFailedProjects" />'s answer.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
@@ -70,10 +71,12 @@ public static class WorkspaceLoader
 
         // What the load did and did not produce is read off the loaded structure here, at the boundary, so
         // every consumer downstream is handed the same answer rather than re-deriving one from the
-        // diagnostic text.
+        // diagnostic text. The restore verdict is the same idea one file further out: a project whose restore
+        // failed loads completely, so nothing in the loaded structure says so and only its assets file can.
         ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
+        var restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
 
-        return new LoadedSolution(workspace, normalized, targetFrameworks, report);
+        return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
     }
 
     /// <summary>

@@ -9,9 +9,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
 // without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects`,
-// `uncheckedProjects` and `rulesFilter` slots are additive the same way: null (omitted) on every run whose
-// workspace loaded, that no solution filter narrowed, and that checked the whole spec — so a clean document
-// is unchanged.
+// `restoreFailedProjects`, `uncheckedProjects` and `rulesFilter` slots are additive the same way: null
+// (omitted) on every run whose workspace loaded, whose NuGet packages resolved, that no solution filter
+// narrowed, and that checked the whole spec — so a clean document is unchanged.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
 /// <param name="RulesFilter">
@@ -20,17 +20,28 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     clean narrowed document is not a clean solution.
 /// </param>
 /// <param name="ModelIncomplete">
-///     <see langword="true" /> when a project failed to load, so every verdict below was reached against a
-///     partial model; null (and so omitted) otherwise. The fact, not the exit code: it is stamped whether or
-///     not <c>--allow-workspace-diagnostics</c> opted out of failing closed, which is what lets
-///     <c>arch_check</c> tell a client the answer is untrustworthy on a surface that has no exit code.
+///     <see langword="true" /> when a project failed to load or a project's NuGet packages are not in the
+///     model, so every verdict below was reached against a partial model; null (and so omitted) otherwise.
+///     The fact, not the exit code: it is stamped whether or not <c>--allow-workspace-diagnostics</c> opted
+///     out of failing closed, which is what lets <c>arch_check</c> tell a client the answer is untrustworthy
+///     on a surface that has no exit code.
 /// </param>
 /// <param name="FailedProjects">
 ///     Which projects failed to load — solution-relative, forward-slashed <c>.csproj</c> paths — or null
-///     (omitted) when none did. The evidence behind <see cref="ModelIncomplete" />, and the reason it needs
-///     its own slot: <c>workspaceDiagnostics</c> carries MSBuild's words about the load, which name a
+///     (omitted) when none did. Half the evidence behind <see cref="ModelIncomplete" />, and the reason it
+///     needs its own slot: <c>workspaceDiagnostics</c> carries MSBuild's words about the load, which name a
 ///     failure and an ordinary restore warning in exactly the same shape, so a client cannot recover this
 ///     from them. Absent on a clean run, so a clean document is unchanged.
+/// </param>
+/// <param name="RestoreFailedProjects">
+///     Which projects' NuGet packages are not in the model — solution-relative, forward-slashed
+///     <c>.csproj</c> paths — or null (omitted) when none are. The other evidence behind
+///     <see cref="ModelIncomplete" />, and beside <see cref="FailedProjects" /> rather than folded in because
+///     these projects <em>loaded</em>: every type they declare is in the model and only their package edges
+///     are missing, so a rule about a package reads as inert rather than as violated. The remedy differs too
+///     — <c>dotnet restore</c>, rather than <c>dotnet build</c>. One slot covers both ways the packages can be
+///     absent, a restore that ran and failed and one that never ran, because a consumer told which could do
+///     nothing different with the answer.
 /// </param>
 /// <param name="UncheckedProjects">
 ///     Which projects the solution declares that this run never checked — solution-relative,
@@ -53,6 +64,7 @@ internal sealed record CheckJson(
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
+    IReadOnlyList<string>? RestoreFailedProjects,
     SummaryJson Summary);
 
 /// <summary>

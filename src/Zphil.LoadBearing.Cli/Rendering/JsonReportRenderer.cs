@@ -28,6 +28,7 @@ internal static class JsonReportRenderer
         bool modelIncomplete,
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects,
         IReadOnlyList<string> rulesFilter)
     {
         // One relativizer for the whole document: the base directory is the same string for every site,
@@ -45,6 +46,7 @@ internal static class JsonReportRenderer
             modelIncomplete ? true : null,
             RelativeProjects(failedProjects, relativizer),
             RelativeProjects(uncheckedProjects, relativizer),
+            RelativeProjects(restoreFailedProjects, relativizer),
             new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -59,8 +61,9 @@ internal static class JsonReportRenderer
     /// <summary>
     ///     A project list as the documents carry it — solution-relative and forward-slashed, like every
     ///     other path in them, so a machine path never lands in a document a golden pins — or null when the
-    ///     list is empty, which omits the key entirely. Shared by all three documents and by both of their
-    ///     project slots: what failed to load, and what a solution filter left unchecked.
+    ///     list is empty, which omits the key entirely. Shared by all three documents and by all three of
+    ///     their project slots: what failed to load, what failed to restore, and what a solution filter left
+    ///     unchecked.
     /// </summary>
     internal static IReadOnlyList<string>? RelativeProjects(
         IReadOnlyList<string> projects, PathFormat.Relativizer relativizer)

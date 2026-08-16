@@ -78,6 +78,28 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
+    public void ReadAndValidate_PriorSchemaVersion18_ReturnsMiss()
+    {
+        // Arrange — a v18 cache predates RestoreFailedProjects (schema bumped 18→19): it records which
+        // projects failed to load but not which projects' NuGet packages were missing, so a hit would
+        // deserialize an empty list and answer green on a model missing every package edge — the exact silent
+        // pass this field was added to close. The version it was written under has to be enough to reject it.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+
+        // Act
+        solution.MutateCacheJson(root => root["SchemaVersion"] = 18);
+
+        // Assert
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
     public void ReadAndValidate_PriorSchemaSpecResolutionShape_IsACleanMissNotADeserializationCrash()
     {
         // The manifest is parsed before its schema version is checked, so a genuinely v9-shaped spec record —
@@ -91,6 +113,7 @@ public sealed class ExtractionCacheStoreTests
             solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
                 .ToList(),
             [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
+            [],
             [],
             [],
             []);
@@ -396,7 +419,8 @@ public sealed class ExtractionCacheStoreTests
             specs,
             ["load-diag-1", "load-diag-2"],
             ["/repo/Broken/Broken.csproj"],
-            []);
+            [],
+            ["/repo/Unrestored/Unrestored.csproj"]);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -419,9 +443,10 @@ public sealed class ExtractionCacheStoreTests
         // cold run refused, which is the whole reason it is persisted rather than recomputed.
         replayed.IntermediateAssemblyPath.ShouldBe("/obj/A.dll");
         result.Diagnostics.ShouldBe(["load-diag-1", "load-diag-2"]);
-        // And the gate's own input round-trips beside them. A hit owns no workspace to recompute it from,
-        // so a manifest that lost this would answer green exactly where the cold run refuses.
+        // And both halves of the gate's own input round-trip beside them. A hit owns no workspace to recompute
+        // either from, so a manifest that lost one would answer green exactly where the cold run refuses.
         result.FailedProjects.ShouldBe(["/repo/Broken/Broken.csproj"]);
+        result.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
     }
 
     [Fact]
@@ -440,6 +465,7 @@ public sealed class ExtractionCacheStoreTests
                 new CodebaseFragment("A", "net10.0", [], [], [], [], [], [], [], [], [], [], []),
                 new CodebaseFragment("A", "netstandard2.0", [], [], [], [], [], [], [], [], [], [], [])
             ],
+            [],
             [],
             [],
             [],
@@ -467,7 +493,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], ["diag"], [], []);
+        return new ExtractionResult(fragments, [], ["diag"], [], [], []);
     }
 
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
@@ -475,7 +501,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], [diagnostic], [], []);
+        return new ExtractionResult(fragments, [], [diagnostic], [], [], []);
     }
 
     /// <summary>

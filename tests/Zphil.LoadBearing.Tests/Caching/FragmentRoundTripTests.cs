@@ -31,8 +31,8 @@ public sealed class FragmentRoundTripTests
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
 
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the member-attribute fact is non-vacuous here: without a member that actually carries one,
@@ -58,7 +58,7 @@ public sealed class FragmentRoundTripTests
         // rename degrades to a parse-error miss rather than a wrong value.
         var fragments = ExtractRichSolution();
 
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
 
         json.ShouldContain("\"Kind\":\"Interface\"");
         json.ShouldContain("\"Accessibility\":\"Public\"");
@@ -96,13 +96,13 @@ public sealed class FragmentRoundTripTests
                            private void OnEvt() {}
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the member kinds serialize as names, the edges are present, and the round-trip is invisible.
@@ -138,13 +138,13 @@ public sealed class FragmentRoundTripTests
                            private static void H() {}
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the ctor edges are present (explicit+target-typed union to Widget, generic normalized to the
@@ -177,13 +177,13 @@ public sealed class FragmentRoundTripTests
                                                                                        }
                                                                                    }
                                                                                    """));
-        var fragments = new[] { app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { app }.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the lifetime enum serializes as a name, both fact families are present, and the round-trip
@@ -234,13 +234,13 @@ public sealed class FragmentRoundTripTests
                            }
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — both families present (declared + external endpoints, bare catch → System.Exception), the
@@ -302,13 +302,13 @@ public sealed class FragmentRoundTripTests
                            public event N.Notify Ev;
                        }
                        """));
-        var fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — every signature position surfaced (the constructed generic split to open definition + argument,
@@ -340,13 +340,13 @@ public sealed class FragmentRoundTripTests
             .Compilation, "P", [], "net10.0");
         var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
             .Compilation, "P", [], "netstandard2.0");
-        var fragments = new[] { modern, legacy }
+        IReadOnlyList<CodebaseFragment> fragments = new[] { modern, legacy }
             .Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
-        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
 
         // Assert — the field itself, and then the observable that depends on it. The merge's
         // multi-framework note is a pure function of the fragments' frameworks, so a dropped field would

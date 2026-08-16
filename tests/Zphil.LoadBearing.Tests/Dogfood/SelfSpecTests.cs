@@ -334,13 +334,14 @@ public sealed class SelfSpecTests
     ///     between the CLI project noun and the same selection narrowed to authored types is knowable
     ///     exactly. The JSON generator carries its attribute on the generated class, and partial
     ///     declarations merge onto one symbol, so <c>LoadBearingJsonContext</c> lands on the generated side
-    ///     even though its declaration is hand-written — the arm of the partial-type rule this project still
-    ///     works. The other arm, <c>[GeneratedRegex]</c>'s attribute-on-the-generated-method shape, left the
-    ///     CLI with <c>NuGetAuditDiagnostics</c> when the incomplete-model gate moved down to the Roslyn
-    ///     project, and is pinned there by
-    ///     <see cref="RoslynProject_MinusAuthored_IsExactlyTheRegexGeneratorEmittedTypes" />. Asserted as an
-    ///     equality rather than a containment, because a contract that quietly took one authored type with
-    ///     it would be a worse failure than one that missed a generated one.
+    ///     even though its declaration is hand-written — the attribute-on-the-generated-class arm of the
+    ///     partial-type rule, which this project was the first to work and
+    ///     <see cref="RoslynProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes" /> now works too. That
+    ///     test carries the other arm as well, <c>[GeneratedRegex]</c>'s attribute-on-the-generated-method
+    ///     shape, which left the CLI with <c>NuGetAuditDiagnostics</c> when the incomplete-model gate moved
+    ///     down to the Roslyn project. Asserted as an equality rather than a containment, because a contract
+    ///     that quietly took one authored type with it would be a worse failure than one that missed a
+    ///     generated one.
     /// </summary>
     [Fact]
     public async Task CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes()
@@ -363,19 +364,23 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
-    ///     The same contract's other arm, against the same real solution: <c>[GeneratedRegex]</c> carries its
-    ///     attribute on the generated <em>method</em>, so <c>NuGetAuditDiagnostics</c> — the author's own
-    ///     partial class, which the generator completes — stays authored while the three types each regex
-    ///     emits, plus the single <c>Utilities</c> class they share, do not. Two of every three are nested and
-    ///     carry no attribute of their own, which is what makes the containing-type walk load-bearing rather
-    ///     than defensive; the <c>_N</c> suffix is the generator's declaration index within the file, so
-    ///     reordering the partial methods renumbers them and moves this pin with them. It lives here rather
+    ///     The same contract against the same real solution, on a project that carries <em>both</em> arms of
+    ///     the rule at once. <c>[GeneratedRegex]</c> carries its attribute on the generated <em>method</em>,
+    ///     so <c>NuGetAuditDiagnostics</c> — the author's own partial class, which the generator completes —
+    ///     stays authored while the three types each regex emits, plus the single <c>Utilities</c> class they
+    ///     share, do not. Two of every three are nested and carry no attribute of their own, which is what
+    ///     makes the containing-type walk load-bearing rather than defensive; the <c>_N</c> suffix is the
+    ///     generator's declaration index within the file, so reordering the partial methods renumbers them and
+    ///     moves this pin with them. Beside them sits the attribute-on-the-generated-<em>class</em> shape:
+    ///     <c>ManifestJsonContext</c>, whose declaration is hand-written and whose partial halves merge onto
+    ///     one symbol, lands on the generated side exactly as the CLI's <c>LoadBearingJsonContext</c> does
+    ///     (<see cref="CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes" />). Both live here rather
     ///     than only in <c>GeneratedTypeExtractionTests</c>' synthetic generator because a hand-written
-    ///     generator can only prove the rule as its author understood it, and the shape this arm exists for is
-    ///     one the real toolchain emits.
+    ///     generator can only prove the rule as its author understood it, and the shapes these arms exist for
+    ///     are ones the real toolchain emits.
     /// </summary>
     [Fact]
-    public async Task RoslynProject_MinusAuthored_IsExactlyTheRegexGeneratorEmittedTypes()
+    public async Task RoslynProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes()
     {
         CodebaseModel codebase = await WholeCodebase.Value;
 
@@ -395,7 +400,8 @@ public sealed class SelfSpecTests
                 "System.Text.RegularExpressions.Generated.AuditText_0",
                 "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
                 "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
-                "System.Text.RegularExpressions.Generated.Utilities"
+                "System.Text.RegularExpressions.Generated.Utilities",
+                "Zphil.LoadBearing.Roslyn.Caching.ManifestJsonContext"
             ], ignoreOrder: true);
 
         // The type the generator completed rather than emitted. Its own declaration is hand-written, the

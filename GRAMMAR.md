@@ -916,6 +916,8 @@ Nothing infers "generated" from a file path, an `obj/` directory, or a naming co
 vary per generator and per build, and a spec whose subject set moved with the output directory
 would be a worse lie than the one this adjective fixes.
 
+### 5.3 Constraint verbs
+
 | Combinator | Fragment |
 |---|---|
 | `.MustNotReference(target, ...)` | "must not reference {list}" |

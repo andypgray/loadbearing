@@ -11,8 +11,8 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     house voice rather than describing a codebase in off-voice terms; and the reader-facing docs
 ///     hold the house prose budgets — a bounded em-dash count and a bounded count of the
 ///     "deliberately" and "intentionally" tics, both measured over prose outside fenced code blocks,
-///     because a fenced block quotes tool output whose idiom belongs to the tool. An inventory check
-///     keeps every example and package README inside the budgeted set.
+///     because a fenced block quotes tool output whose idiom belongs to the tool. Two inventory checks
+///     keep every reader doc a directory can carry inside the budgeted set.
 /// </summary>
 public sealed class DocHygieneTests
 {
@@ -38,12 +38,23 @@ public sealed class DocHygieneTests
         "examples/README.md",
         "examples/Meridian/README.md",
         "examples/Meridian/ADOPTING.md",
+        "examples/Meridian/ARCHITECTURE.md",
         "examples/Meridian/hooks/README.md",
         "examples/Meridian.Quoting/README.md",
+        "examples/Meridian.Quoting/ARCHITECTURE.md",
         "examples/Meridian.Operations/README.md",
+        "examples/Meridian.Operations/ARCHITECTURE.md",
         "examples/Meridian.Interchange/README.md",
+        "examples/Meridian.Interchange/ARCHITECTURE.md",
         "hooks/README.md"
     ];
+
+    /// <summary>
+    ///     The reader-facing filenames a directory can carry. Both inventory checks below sweep for
+    ///     these rather than for <c>README.md</c> alone, which is what keeps a per-directory doc of any
+    ///     of these names from shipping outside the budget gate.
+    /// </summary>
+    private static readonly string[] BudgetedFileNames = ["README.md", "ARCHITECTURE.md", "ADOPTING.md"];
 
     private static readonly string[] VoiceDocs =
     [
@@ -172,53 +183,48 @@ public sealed class DocHygieneTests
     }
 
     [Fact]
-    public void ExampleAndPackageReadmes_AreAllInsideTheBudgetGate()
+    public void ExampleAndPackageReaderDocs_AreAllInsideTheBudgetGate()
     {
         // Arrange
         List<string> uncovered = new();
 
-        // Act: every immediate child of examples/ and src/ that carries a top-level README must be
-        // budgeted, so a new example or package README cannot slip past the gate unnoticed.
+        // Act: every immediate child of examples/ and src/ that carries a top-level reader doc must be
+        // budgeted, so a new example or package doc cannot slip past the gate unnoticed.
         foreach (string parent in new[] { "examples", "src" })
         {
             string parentDirectory = RepoRoot.Absolute(parent);
             if (!Directory.Exists(parentDirectory)) continue;
 
             foreach (string childDirectory in Directory.GetDirectories(parentDirectory))
+            foreach (string fileName in BudgetedFileNames)
             {
-                string readme = Path.Combine(childDirectory, "README.md");
-                if (!File.Exists(readme)) continue;
+                string readerDoc = Path.Combine(childDirectory, fileName);
+                if (!File.Exists(readerDoc)) continue;
 
-                string relativePath = RepoRoot.Relative(readme);
+                string relativePath = RepoRoot.Relative(readerDoc);
                 if (!BudgetDocs.Contains(relativePath)) uncovered.Add(relativePath);
             }
         }
 
         // Assert
         uncovered.ShouldBeEmpty(
-            $"README(s) under examples/ or src/ are outside the budgeted set:\n{string.Join("\n", uncovered)}");
-
-        const string adopting = "examples/Meridian/ADOPTING.md";
-        if (File.Exists(RepoRoot.Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
+            $"Reader doc(s) under examples/ or src/ are outside the budgeted set:\n{string.Join("\n", uncovered)}");
     }
 
     [Fact]
-    public void EveryTrackedReadme_IsInsideTheBudgetGate()
+    public void EveryTrackedReaderDoc_IsInsideTheBudgetGate()
     {
-        // Act: the walk above descends one level under examples/ and src/, which is how a README at
+        // Act: the walk above descends one level under examples/ and src/, which is how a reader doc at
         // a new top-level directory stayed invisible to it. Asking git for the set closes that blind
         // spot without another directory name to keep up to date.
         var uncovered = TrackedFiles.All
-            .Where(static path => path == "README.md" || path.EndsWith("/README.md", StringComparison.Ordinal))
+            .Where(static path => BudgetedFileNames.Contains(Path.GetFileName(path)))
             .Where(static path => !BudgetDocs.Contains(path))
             .ToList();
 
         // Assert
         uncovered.ShouldBeEmpty(
-            $"Tracked README(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
-
-        const string adopting = "examples/Meridian/ADOPTING.md";
-        if (File.Exists(RepoRoot.Absolute(adopting))) BudgetDocs.ShouldContain(adopting, $"{adopting} exists but is outside the budgeted set.");
+            $"Tracked reader doc(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
     }
 
     private static string ReadDoc(string relativePath)

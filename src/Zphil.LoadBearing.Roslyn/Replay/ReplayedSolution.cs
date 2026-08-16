@@ -65,6 +65,25 @@ internal sealed class ReplayedSolution : IDisposable
     /// </remarks>
     public IReadOnlyList<string> FailedProjects { get; }
 
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model — the
+    ///     same fact <see cref="LoadedSolution.RestoreFailedProjects" /> carries, so the gate reads one thing
+    ///     on both paths.
+    /// </summary>
+    /// <remarks>
+    ///     Empty by construction on this path, and pinned so for a different reason than
+    ///     <see cref="FailedProjects" />: there is no moment to read. A replay answers from a build that was
+    ///     recorded, while <c>project.assets.json</c> — present, absent, or carrying an error — describes the
+    ///     restore as it stands on disk <em>now</em>, so reading it here would stamp today's restore onto
+    ///     yesterday's model, which is a claim neither file supports. That covers the never-restored arm as
+    ///     well as the failed one, and more plainly: a tree cleaned since the capture has no assets files at
+    ///     all, and blaming every SDK-style project in a replay for that would be reading disk to describe a
+    ///     build that is not on it. A capture that was replayed because it was structurally valid is also, by
+    ///     construction, a capture of a build that compiled, and a build does not compile through a resolution
+    ///     failure of the kind this detects.
+    /// </remarks>
+    public IReadOnlyList<string> RestoreFailedProjects { get; } = [];
+
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
     public void Dispose()
     {

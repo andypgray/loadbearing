@@ -78,11 +78,28 @@ internal sealed record ProjectLoadReport(
 ///         removed nothing in any bed measured.
 ///     </para>
 ///     <para>
-///         <b>Known limit: an unrestored solution is invisible here.</b> A project with no
-///         <c>project.assets.json</c> still completes the design-time build and loads with its full document
-///         and reference set, both output paths included — and raises no workspace diagnostic either, so it
-///         gated under the message-matching predicate no more than it does under this one. Nothing detects
-///         it today; <c>check</c> answers against whatever the load produced.
+///         <b>The restore half is <see cref="RestoreFailures" />', not this predicate's.</b> A project whose
+///         NuGet packages did not resolve still completes the design-time build and loads with its full
+///         document and reference set, both output paths included, so it presents neither arm above — while
+///         every edge its package references would have produced is missing from the model, which was
+///         measured to turn a failing rule green. That is read off the project's own
+///         <c>project.assets.json</c> — which a failed restore does write, and which a restore that never ran
+///         leaves absent — by a sibling that reads disk where this one reads only the loaded
+///         <see cref="Solution" />. Both feed one gate; the lists stay separate because these projects loaded
+///         and the remedy differs.
+///     </para>
+///     <para>
+///         <b>A <em>never</em>-restored solution is invisible to this predicate, and no longer to its sibling.</b>
+///         A project with no <c>project.assets.json</c> at all loads exactly as a restored one
+///         does and raises no workspace diagnostic, so it gated under the message-matching predicate no more
+///         than it does under this one. What changed is what its absent assets file means to
+///         <see cref="RestoreFailures" />: absence asserts nothing for a non-SDK-style .NET Framework project,
+///         which never writes one and which this product explicitly supports, and asserts "the restore never
+///         ran" for an SDK-style one, which writes one on every restore. Reading
+///         <see cref="SdkStyleProject.IsSdkStyle" /> tells the two apart, so the sibling blames the second and
+///         still leaves the first alone. What stays invisible is narrower: a non-SDK-style project using
+///         <c>PackageReference</c> that was never restored, whose absent assets file cannot be told from a
+///         <c>packages.config</c> project's.
 ///     </para>
 ///     <para>
 ///         <b>A solution filter narrows arm 1 rather than disabling it.</b> A <c>.slnf</c> legitimately

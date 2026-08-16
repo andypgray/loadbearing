@@ -6,8 +6,8 @@ namespace Zphil.LoadBearing.Cli;
 /// <summary>
 ///     What an <see cref="ISolutionSource" /> hands back: the loaded, unresolved-reference-stripped
 ///     <see cref="Solution" />, the discovered solution path, the workspace-load diagnostics, the projects
-///     that failed to load and the ones a filter left unchecked — plus an optional
-///     <see cref="IDisposable" /> the handle owns (see <see cref="Dispose" />).
+///     that failed to load, the ones whose NuGet packages are not in the model and the ones a filter left
+///     unchecked — plus an optional <see cref="IDisposable" /> the handle owns (see <see cref="Dispose" />).
 /// </summary>
 /// <remarks>
 ///     A <see cref="Solution" /> stays usable after its workspace is disposed, so a handle read in flight is
@@ -21,7 +21,8 @@ internal sealed class SolutionHandle(
     Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
     IReadOnlyList<string>? failedProjects = null,
-    IReadOnlyList<string>? uncheckedProjects = null) : IDisposable
+    IReadOnlyList<string>? uncheckedProjects = null,
+    IReadOnlyList<string>? restoreFailedProjects = null) : IDisposable
 {
     private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
         new Dictionary<ProjectId, string>();
@@ -43,10 +44,18 @@ internal sealed class SolutionHandle(
     public IReadOnlyList<string> Diagnostics { get; } = diagnostics;
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects that failed to load — the fail-closed gate's
-    ///     whole input, where <see cref="Diagnostics" /> is only what gets rendered beside it.
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load — half the fail-closed gate's
+    ///     input, where <see cref="Diagnostics" /> is only what gets rendered beside it.
     /// </summary>
     public IReadOnlyList<string> FailedProjects { get; } = failedProjects ?? [];
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model —
+    ///     restore ran and failed, or never ran. The gate's other input, carried separately from
+    ///     <see cref="FailedProjects" /> because these projects loaded and only their package edges are
+    ///     missing.
+    /// </summary>
+    public IReadOnlyList<string> RestoreFailedProjects { get; } = restoreFailedProjects ?? [];
 
     /// <summary>
     ///     The absolute <c>.csproj</c> paths the solution declares that this run did not check — non-empty

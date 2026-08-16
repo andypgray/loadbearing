@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     every construct at once, and then the pieces that can move independently: each verb's direction,
 ///     the Migrate switch, the quarantine box and its two degenerate cases, the double-render guard the
 ///     triage order exists for, the union guard, containment nesting and the collapse and incomparable
-///     cases around it, the partial rule that both draws and lists, the compact list's format, the
+///     cases around it, the partial rule that both draws and lists, the rule whose every operand was
+///     skipped and so is listed rather than left invisible, the compact list's format, the
 ///     node-ID prefix that keeps a place name out of Mermaid's grammar, label escaping, the empty law,
 ///     and determinism. Every model is built from an inline spec — no workspace, no extraction.
 /// </summary>
@@ -117,6 +118,26 @@ public sealed class LawDiagramRendererTests
         // Assert
         Edges(block)
             .ShouldBe(["s_A -->|\"only\"| s_B", "s_D -->|\"only\"| s_C"]);
+    }
+
+    [Fact]
+    public void Block_AnOnlyVerbNamingNothingButItself_DrawsNoEdgeAndIsListed()
+    {
+        // Arrange — a leaf of the reference graph, said the only way the language says it: the sole
+        // permitted target is the subject.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaf")
+                .Enforce(arch.Namespace("A.*")
+                    .MustOnlyReference(arch.Namespace("A.*")))
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — the self-arrow stays omitted, and the rule lands in the list rather than vanishing.
+        Edges(block)
+            .ShouldBeEmpty();
+        block.ShouldEndWith("Not drawn in full: `r/leaf`. Expand any of them with `loadbearing explain <rule-id>`.");
     }
 
     [Fact]

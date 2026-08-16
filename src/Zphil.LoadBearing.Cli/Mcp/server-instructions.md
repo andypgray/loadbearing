@@ -13,5 +13,5 @@ One prompt, `derive_spec` — the onboarding recipe to run when spec resolution 
 - A response over the client budget wants a narrower call (`rules`; `overview`/`projects`), not paging.
 - The server is bound to one solution + one spec at start; the tools take no solution argument.
 - The first call loads the workspace — seconds on a large solution — then it stays warm, reconciled against disk per call. The server never builds: build first or results are stale.
-- A failed project load makes the model wrong, not smaller: `arch_graph` errors naming the projects (a build precondition, not a fault); `arch_check`/`arch_status` return their document stamped `modelIncomplete: true` + `failedProjects` — report that, never plain green. A filter makes it smaller: `uncheckedProjects`.
+- A failed load or restore makes the model wrong, not smaller: `arch_graph` errors naming the projects (a build/restore precondition); `arch_check`/`arch_status` stamp `modelIncomplete: true` + `failedProjects`/`restoreFailedProjects` — report that, never plain green. A filter makes it smaller: `uncheckedProjects`.
 - Drill down with `arch_explain <rule-id>`; the always-on summary lives in the root `AGENTS.md` managed block.

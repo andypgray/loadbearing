@@ -191,7 +191,7 @@ public sealed class SpecResolverTests
         // The strongest arm: the project that would have matched may be one of the ones that failed, and no
         // --spec argument repairs a load. The projects are the evidence, because that is what the gate
         // itself now keys on — a set of paths rather than a set of sentences.
-        var diagnostics = new WorkspaceDiagnostics([], [], [BrokenProject], []);
+        var diagnostics = new WorkspaceDiagnostics([], [], [BrokenProject], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -212,7 +212,7 @@ public sealed class SpecResolverTests
         // diagnostics is legitimate exactly because it gates nothing — it chooses between two spellings of
         // one refusal, and the reader is sent to repair the restore rather than to write an argument that
         // cannot help.
-        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [], []);
+        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -230,7 +230,7 @@ public sealed class SpecResolverTests
         // An advisory's publication date says nothing about whether this solution's references resolved, so
         // a solution that genuinely has no spec project must not be told to go and fix its restore. This is
         // the one job the audit classifier still has, and it decides no verdict: nothing here gates.
-        var diagnostics = new WorkspaceDiagnostics([Advisory], [], [], []);
+        var diagnostics = new WorkspaceDiagnostics([Advisory], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -264,7 +264,7 @@ public sealed class SpecResolverTests
         // A workspace that fails to load rarely fails once. Quoting all of them buries the remedy under a
         // wall nobody reads to the end of, so the quote is bounded and says how much it left out.
         var diagnostics = new WorkspaceDiagnostics(
-            ["failure one", "failure two", "failure three", "failure four", "failure five"], [], [], []);
+            ["failure one", "failure two", "failure three", "failure four", "failure five"], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -282,7 +282,8 @@ public sealed class SpecResolverTests
         // The same bound over the stronger evidence: a solution rarely loses one project either, and the
         // remedy has to survive to the end of the message.
         var diagnostics = new WorkspaceDiagnostics(
-            [], [], ["C:/repo/one.csproj", "C:/repo/two.csproj", "C:/repo/three.csproj", "C:/repo/four.csproj"], []);
+            [], [], ["C:/repo/one.csproj", "C:/repo/two.csproj", "C:/repo/three.csproj", "C:/repo/four.csproj"],
+            [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -300,7 +301,7 @@ public sealed class SpecResolverTests
         // What forces the quote to skip the advisories: three freshly published ones arriving first would
         // fill a bounded quote and push the one actionable line out of it — the same defect this refusal
         // exists to remove, wearing a new costume.
-        var diagnostics = new WorkspaceDiagnostics([Advisory, Advisory, Advisory, LockFileFailure], [], [], []);
+        var diagnostics = new WorkspaceDiagnostics([Advisory, Advisory, Advisory, LockFileFailure], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -316,7 +317,7 @@ public sealed class SpecResolverTests
     {
         // Both arms have evidence; the projects win, because they are what the reader can act on and what
         // the gate itself decided on. The diagnostics still render on whatever channel the surface has.
-        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [BrokenProject], []);
+        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [BrokenProject], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(

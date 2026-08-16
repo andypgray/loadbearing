@@ -17,6 +17,8 @@ The parts the rules act on:
 - `Dispatch` holds `OutboxDispatcher`, a `BackgroundService`. A hosted service is a singleton, so it captures no scoped service itself: it delegates each poll to a seam in the composition root.
 - `Host` is that composition root. `InterchangeServiceCollectionExtensions` wires every service, and `ScopedDispatchRunner` opens a DI scope per poll and resolves the scoped processor inside it. Construction and service-location live here and nowhere else, which is why three of the rules except this one namespace.
 
+[ARCHITECTURE.md](ARCHITECTURE.md) draws the worker beside its law, and it is the thinnest pair in the example set on purpose: eleven of the twelve rules here are about how a type is built, called or named, so they are listed under the fence rather than drawn in it.
+
 That last point is the crux the app is built around. The dispatcher is a singleton that must run scoped work; the sanctioned way to do that is an `IServiceScopeFactory` scope, and the resolve inside it (`scope.ServiceProvider.GetRequiredService<IOutboxProcessor>()`) is the service-locator call rule 3 bans. Confining both to `Meridian.Interchange.Host.*` lets the ban stay total everywhere else while the one legitimate resolve site is excepted.
 
 ## The spec
@@ -340,7 +342,7 @@ dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
 loadbearing check examples/Meridian.Interchange/Meridian.Interchange.slnx
 ```
 
-`check` exits 0 here: `Checked 12 rules: 12 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
+`check` exits 0 here: `Checked 12 rules: 12 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `loadbearing status` prints the burndown, `loadbearing render` regenerates the `AGENTS.md` block and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings from the spec, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
 
 ## From here
 

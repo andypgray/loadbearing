@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A run narrowed by a solution filter now says so on every surface.** `check`, `status` and `graph` stamp which declared projects the filtered run never checked, and the JSON documents carry them as `uncheckedProjects` beside `failedProjects` — absent when nothing was narrowed, so unfiltered output does not move a byte. SARIF carries one warning-level tool notification, and the `arch_check`, `arch_status` and `arch_graph` MCP tools inherit the slot, which the stdout stamp could never reach. The set is measured from the load rather than read from the filter: a selection whose transitive project references pull the rest of the solution in narrows nothing and says nothing. `context` writes the same caveat above its answer. `baseline --init`, `baseline --accept-reductions` and `render` refuse under a narrowing filter — exit 2, nothing written: a baseline captured through a filter signs off debt in projects it never measured, `--accept-reductions` would delete real entries, and rendered files would silently drop every card from an unchecked project. `baseline --add` keeps working. In the xUnit adapter, rule cases keep their verdicts — a narrowed universe is a smaller true answer — and `Workspace_LoadedCompletely` reports as skipped, naming what was not checked, rather than pass under a name the filtered run cannot vouch for. A filtered run anchors every convention-relative path at the solution the filter references rather than at the filter's own directory — committed baselines, render targets, `context --path`, diff resolution, and the stamped project paths, which read solution-relative rather than `../`-prefixed — so a filter that narrows nothing answers exactly as its solution does, instead of missing the committed baseline and failing rules that are green over the whole solution. And a rule all of whose findings are the empty-selection defaults skips under a narrowing filter, with one line naming the filter and the unchecked count, rather than reding as a typo'd spec: a filter that erases a rule's whole subject no longer turns a green spec red, while unfiltered runs keep the fail-closed empty-selection defaults exactly as they were.
 
+- **The four example solutions now ship their architecture as a committed drawing.** `Meridian`,
+  `Meridian.Quoting`, `Meridian.Operations` and `Meridian.Interchange` each carry an `ARCHITECTURE.md`
+  holding the pair this repository's own root file does: a codebase survey drawn from what the code
+  does, beside a law fence drawn from what its spec forbids. CI renders all four and folds them into
+  the same single zero diff across `examples/` that already gates the agent-context cards, so a
+  drawing cannot go stale without the build saying so, and a shape gate over the committed files runs
+  on every OS because that examples job is ubuntu-only. Every render line carries
+  `--diagram-only "Meridian*"`: the survey fence extracts with no exclusions so that it agrees with
+  `graph`, so unscoped each example would draw the LoadBearing projects its spec references under a
+  caption reading "Projects in this solution". What the four are *for* differs, which is the point of
+  shipping all of them. Meridian puts three postures on one page as shapes — a solid ban, two dotted
+  grandfathered arrows into `SqlConnection` and `SqlCommand`, and a quarantine box entered only
+  through its doubled facades. Meridian.Quoting is the tidiest law in the set with the emptiest
+  fence, because seven of its nine rules are about a name, a shape or an attribute rather than a
+  direction. Meridian.Operations is a two-node survey beside a ten-node law: its modules are
+  namespace subtrees inside one project, so MSBuild cannot see them and the law fence *is* the module
+  map. Meridian.Interchange is the honest-limits page, where eleven of twelve rules are canonical
+  .NET guidance with nothing to draw and the list under the fence is the law.
+
 ### Changed
 
 - **The string anchor is now stated where an author is reading, and demonstrated where an adopter is
@@ -30,6 +49,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anchor matches — including through an intermediate external base.
 
 ### Fixed
+
+- **A rule every operand of which was skipped is now listed under the law fence instead of vanishing
+  from the page.** The drawing omits the self-arrow an `only`-verb produces when it names its own
+  subject, because that is the permission for a place to reference itself and no reader needs an
+  arrow to believe it. A rule whose *sole* operand was that subject therefore drew nothing and was
+  never listed either, so a real law left no trace anywhere on the page. The compact list now counts
+  the edges a rule actually contributed and names any rule that contributed none, which restores the
+  guarantee the whole artifact rests on: every rule is drawn or listed, never dropped. Four of
+  `Meridian.Operations`' nine rules are that shape, including the one saying tracking is the leaf of
+  the module graph.
+
+- **A failed NuGet restore no longer turns a red rule green.** Measured on a purpose-built bed with one
+  tree, one spec and the feed as the only variable, with no rebuild between the runs: restored, `check`
+  exited 1 on a rule forbidding a package namespace; with the feed unreachable it exited **0**, and the
+  rule reported itself inert — its target selection matched no types. `graph --json` settled which half was
+  wrong: the external edge the violation rests on was in the restored run's survey and absent from the
+  broken one. The violation was not missed; the edge it rests on was never extracted. Nothing detected it,
+  because a project whose restore failed *loads completely* — full document set, both output paths — so the
+  structural load predicate has nothing to blame and the run reads as a clean solution. It is now read off
+  the one place that records it without a message match: `project.assets.json`, which a failed restore does
+  write, with an empty `libraries` section and the failure in its `logs` array as a `code`/`level` pair.
+  Both fields are invariant, so a project whose assets file carries a `level: Error` entry is a project
+  whose restore failed in any UI language — a file read, not a diagnostic parse, and so compatible with the
+  gate having stopped reading diagnostics altogether. Those projects feed the same fail-closed gate as a
+  failed load and take the same `--allow-workspace-diagnostics` opt-out, but keep their own slot and their
+  own wording throughout: they *did* load, so naming them among "projects that failed to load" would be
+  false, and the remedy is `dotnet restore` plus the NuGet error behind it rather than `dotnet build`.
+  `check`, `status`, `graph`, `render`, `baseline`, `context` and the xUnit adapter each state it in their
+  own terms; a run with both causes writes the load block first, then the restore block, since a project
+  that never loaded is more fundamentally broken than one that loaded without its packages. The three JSON
+  documents gain a `restoreFailedProjects` slot beside `failedProjects` — solution-relative, forward-slashed
+  and omitted when empty, so every schema version and every clean document is unchanged — and SARIF gains a
+  structured notification for it *and* for `failedProjects`, which had none either, so the one surface that
+  can name a cause no longer names half of one. The NuGet audit family (NU19xx) is carved out by `code`,
+  the exact match that was impossible on Roslyn's diagnostic stream: an advisory promoted to an error by
+  `TreatWarningsAsErrors` is an external, time-varying input, and refusing a complete model on one is the
+  defect issue #19 was about. A solution that was **never restored at all** is caught by the same gate, for
+  the same reason and in the same slot: it has no assets file to read, and absence asserts nothing on its own
+  — a non-SDK-style .NET Framework project, which this product exists to support, never writes one — but it
+  asserts "the restore never ran" for an SDK-style project, which writes one every time. Whether a project is
+  SDK-style is read off its own `.csproj` (an `Sdk` attribute, an `Sdk` element, or an `Import` carrying one),
+  and that discriminator was measured before it was allowed to gate: every project in this repository and its
+  fixture trees, classified and paired against whether an assets file is really on disk, agreeing everywhere
+  except the beds deliberately left unrestored. The refusals say "NuGet packages did not resolve", which is
+  true whether the restore ran and failed or never ran, and point at the warnings above conditionally,
+  because a restore that never ran wrote no NuGet logs for the SDK to replay. What remains out of scope is
+  narrower and stated where it is claimed: a non-SDK-style project using `PackageReference` that was never
+  restored, whose absent assets file cannot be told from a `packages.config` project's.
 
 - **A spec whose `typeof()` anchor lives in a .NET shared framework is told so, instead of being sent to a
   build setting that cannot work.** The failure names an assembly, and the message asked the reader to
@@ -63,8 +130,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0. Every refusal now names the projects rather than pointing at a wall of diagnostics, and `check`,
   `status` and `graph` carry them as `failedProjects` beside `modelIncomplete` — the evidence an MCP client
   had no way to recover from the diagnostics array. What this deliberately does not change: a solution that
-  was never restored still loads completely and is still not detected, exactly as before — measured, not
-  assumed; a solution filter's dropped members are not treated as failures (they now ride
+  was never restored still loads completely and raises no diagnostic, exactly as before — measured, not
+  assumed, and caught since by the restore predicate rather than by anything this bullet changed;
+  a solution filter's dropped members are not treated as failures (they now ride
   `uncheckedProjects` rather than going unreported); and a real load failure riding
   alongside an advisory still fails closed.
 - **A workspace that failed to load no longer reports itself as a missing spec project.** A broken

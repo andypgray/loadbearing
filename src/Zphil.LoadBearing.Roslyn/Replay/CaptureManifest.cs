@@ -69,7 +69,6 @@ internal sealed record CaptureManifest(
 // directory, csproj, and document set rather than reading the stored name back. The two evaluated paths
 // are recorded for the same reason — they decide which structural paths the capture stamped, so a manifest
 // diff that shows the stamps should show what produced them.
-// ReSharper disable NotAccessedPositionalProperty.Global
 internal sealed record CaptureProjectEntry(
     string ProjectName,
     string CsprojPath,
@@ -78,5 +77,3 @@ internal sealed record CaptureProjectEntry(
     IReadOnlyList<string> ConeFiles,
     string? EvaluatedOutputPath = null,
     string? IntermediateAssemblyPath = null);
-
-// ReSharper restore NotAccessedPositionalProperty.Global

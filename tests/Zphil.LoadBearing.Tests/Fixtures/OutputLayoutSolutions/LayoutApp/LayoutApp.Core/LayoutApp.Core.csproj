@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+      The checked universe of the output-layout bed (Cli/OutputLayoutSpecResolutionE2ETests). Two projects
+      rather than one: SpecExclusion drops the spec project from the universe, and a model with no subject
+      left is a refusal rather than a green — so the bed needs a project that is not the spec.
+
+      SITING, and it is not a preference. This fixture is NOT under Fixtures/TestSolutions/, because
+      FixtureRestorer.RestoreAll restores every .sln/.slnx under that root unconditionally at startup, and
+      both layouts this bed drives redirect the build output away from where the rest of the fixture
+      machinery expects it. Fixtures/PartialLoadSolutions/ and Fixtures/RestoreFailureSolutions/ are the
+      same move. In the test output this project is only ever content: each arm copies the tree to %TEMP%,
+      writes its own root Directory.Build.props there (the output layout IS the variable), then restores and
+      really builds the copy. Nothing restores or builds it in place, which is why its row in
+      Roslyn/SdkStyleProjectTests.GroundTruth reads "no assets file".
+
+      Deliberately package-free: the whole restore resolves from the SDK, so an arm costs no network.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+</Project>

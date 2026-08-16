@@ -78,7 +78,8 @@ internal sealed class GraphRunner(
         if (request.Json)
             WriteJson(
                 request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects, diagnostics.UncheckedProjects, projectGlobs);
+                diagnostics.FailedProjects, diagnostics.UncheckedProjects,
+                diagnostics.RestoreFailedProjects, projectGlobs);
         else
             WriteHuman(request, summary, scoped, solutionName, projectGlobs);
 
@@ -113,7 +114,8 @@ internal sealed class GraphRunner(
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionDirectory, string solutionName,
         IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects, IReadOnlyList<string> projectGlobs)
+        IReadOnlyList<string> uncheckedProjects, IReadOnlyList<string> restoreFailedProjects,
+        IReadOnlyList<string> projectGlobs)
     {
         GraphGrain grain = request.Grain;
         string document = Compose(grain);
@@ -131,7 +133,7 @@ internal sealed class GraphRunner(
         {
             return GraphJsonRenderer.Document(
                 scoped, solutionDirectory, solutionName, renderedDiagnostics, modelIncomplete, failedProjects,
-                uncheckedProjects, at, projectGlobs);
+                uncheckedProjects, restoreFailedProjects, at, projectGlobs);
         }
     }
 

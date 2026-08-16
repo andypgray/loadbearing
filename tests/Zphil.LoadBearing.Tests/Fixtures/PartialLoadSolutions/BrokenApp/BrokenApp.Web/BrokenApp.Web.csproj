@@ -14,11 +14,19 @@
       interface and the attribute class, which is where a survey over such a tree used to die with an
       invariant violation naming a symbol nobody wrote.
 
-  WHY NOT SIMPLY LEAVE IT UNRESTORED. Measured, and it does not work: an SDK-style project with no
-  obj/project.assets.json still completes MSBuildWorkspace's design-time build and loads with ZERO
-  workspace diagnostics. Neither does a missing MSBuild <Import> — Roslyn's build host evaluates
-  projects with missing imports ignored, so that produces no diagnostic either. A project file the
-  solution names but the tree does not contain is the failure the loader actually reports.
+  WHY NOT SIMPLY LEAVE IT UNRESTORED, to get the LOAD failure. Measured, and it does not work: an
+  SDK-style project with no obj/project.assets.json still completes MSBuildWorkspace's design-time
+  build and loads with ZERO workspace diagnostics. Neither does a missing MSBuild <Import> — Roslyn's
+  build host evaluates projects with missing imports ignored, so that produces no diagnostic either. A
+  project file the solution names but the tree does not contain is the failure the loader actually
+  reports.
+
+  THE TREE IS ALSO UNRESTORED, AND THAT NOW COUNTS — as the other cause. RestoreFailures blames an
+  SDK-style project with no assets file, because such a project writes one on every restore, so this
+  project and BrokenApp.Core carry the restore cause while BrokenApp.Contracts carries the load one.
+  That makes this the only bed where both blocks of a refusal are composed over a real tree, which
+  PartialLoadWorkspaceE2ETests asserts the ordering of. Do not "fix" it by restoring: constraint 3
+  below forbids the obj/, and this project could not be restored in isolation anyway.
 
   THREE SITING CONSTRAINTS. Do not "tidy" any of them away.
 

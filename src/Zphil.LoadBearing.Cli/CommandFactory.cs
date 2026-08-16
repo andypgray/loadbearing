@@ -52,8 +52,8 @@ internal static class CommandFactory
                 "A git ref; files changed since it are checked against quarantined scopes (Quarantine tripwire) — warnings only, never failures."
         };
         var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
-            "Check against the partial model even when some projects fail to load, instead of failing the run "
-            + "with exit 2.");
+            "Check against the partial model even when some projects fail to load or to restore, instead of "
+            + "failing the run with exit 2.");
         Option<string?> sarif = new("--sarif")
         {
             Description =
@@ -71,8 +71,8 @@ internal static class CommandFactory
 
         Command check = new(
             "check",
-            "Evaluate rules against a target solution; a project that fails to load fails the run (exit 2) unless "
-            + "--allow-workspace-diagnostics is passed.")
+            "Evaluate rules against a target solution; a project that fails to load, or whose NuGet packages did "
+            + "not resolve, fails the run (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
@@ -137,8 +137,8 @@ internal static class CommandFactory
         var solution = SolutionArgument();
         var spec = SpecOption();
         var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
-            "Render from the partial model even when some projects fail to load, instead of refusing the "
-            + "command with exit 2.");
+            "Render from the partial model even when some projects fail to load or to restore, instead of refusing "
+            + "the command with exit 2.");
         Option<string?> diagram = new("--diagram")
         {
             Description =
@@ -161,8 +161,9 @@ internal static class CommandFactory
 
         Command render = new(
             "render",
-            "Render the managed AGENTS.md block(s) from the spec; a project that fails to load refuses the "
-            + "command (exit 2) unless --allow-workspace-diagnostics is passed.")
+            "Render the managed AGENTS.md block(s) from the spec; a project that fails to load, or whose NuGet "
+            + "packages did not resolve, refuses the command (exit 2) unless --allow-workspace-diagnostics is "
+            + "passed.")
         {
             solution,
             spec,
@@ -226,13 +227,14 @@ internal static class CommandFactory
             Description = "The offending type of the shape violation to grandfather — a full type name or 'T:' symbol ID (with --add)."
         };
         var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
-            "Write baselines from the partial model even when some projects fail to load, instead of refusing "
-            + "the command with exit 2.");
+            "Write baselines from the partial model even when some projects fail to load or to restore, instead of "
+            + "refusing the command with exit 2.");
 
         Command baseline = new(
             "baseline",
             "Grandfather, shrink, or add one attributed exception to the ratcheted baselines; a project that fails "
-            + "to load refuses the command (exit 2) unless --allow-workspace-diagnostics is passed.")
+            + "to load, or whose NuGet packages did not resolve, refuses the command (exit 2) unless "
+            + "--allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
@@ -276,15 +278,15 @@ internal static class CommandFactory
             Description = "Emit the machine-readable JSON burndown document instead of human-readable output."
         };
         var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
-            "Report the burndown from the partial model even when some projects fail to load, instead of "
-            + "exiting 2 after rendering it.");
+            "Report the burndown from the partial model even when some projects fail to load or to restore, "
+            + "instead of exiting 2 after rendering it.");
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
         Command status = new(
             "status",
             "Report per-rule burndown and promotion suggestions; red rules never fail the run, but a project that "
-            + "fails to load does (exit 2) unless --allow-workspace-diagnostics is passed.")
+            + "fails to load or to restore does (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             spec,
@@ -318,7 +320,8 @@ internal static class CommandFactory
             Description = "Emit the machine-readable JSON survey document instead of human-readable output."
         };
         var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
-            "Survey the partial model even when some projects fail to load, instead of refusing with exit 2.");
+            "Survey the partial model even when some projects fail to load or to restore, instead of refusing with "
+            + "exit 2.");
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
         Option<bool> overview = new("--overview")
@@ -348,8 +351,8 @@ internal static class CommandFactory
         Command graph = new(
             "graph",
             "Summarize the codebase: projects, declared vs observed project references, namespace inventory, and "
-            + "grouped external references. Needs no spec; a project that fails to load refuses the survey (exit 2) "
-            + "unless --allow-workspace-diagnostics is passed.")
+            + "grouped external references. Needs no spec; a project that fails to load or to restore refuses the "
+            + "survey (exit 2) unless --allow-workspace-diagnostics is passed.")
         {
             solution,
             json,

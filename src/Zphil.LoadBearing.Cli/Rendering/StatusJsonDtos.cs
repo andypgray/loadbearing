@@ -3,9 +3,9 @@ using Zphil.LoadBearing.Checking;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `status --json` — its own document with its own schemaVersion (2), distinct from
-// `check --json`. Serialized camelCase, indented, nulls omitted. The four workspace slots below are
-// additive and null (omitted) on every run whose workspace loaded and that no solution filter narrowed, so
-// the schema stays version 2 and a clean document is byte-identical.
+// `check --json`. Serialized camelCase, indented, nulls omitted. The five workspace slots below are
+// additive and null (omitted) on every run whose workspace loaded, whose NuGet packages resolved and that no
+// solution filter narrowed, so the schema stays version 2 and a clean document is byte-identical.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="WorkspaceDiagnostics">
@@ -13,15 +13,23 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     <c>check --json</c> carries, so <c>arch_status</c> stops being a surface where they are destroyed.
 /// </param>
 /// <param name="ModelIncomplete">
-///     <see langword="true" /> when a project failed to load, so the burndown below counts only what did
-///     load; null (omitted) otherwise. Stamped whether or not <c>--allow-workspace-diagnostics</c> opted out
-///     of failing closed — it states the fact about the model, not the exit code.
+///     <see langword="true" /> when a project failed to load or a project's NuGet packages are not in the
+///     model, so the burndown below counts only what the model holds; null (omitted) otherwise. Stamped
+///     whether or not <c>--allow-workspace-diagnostics</c> opted out of failing closed — it states the fact
+///     about the model, not the exit code.
 /// </param>
 /// <param name="FailedProjects">
 ///     Which projects failed to load — solution-relative, forward-slashed <c>.csproj</c> paths — or null
-///     (omitted) when none did: the evidence behind <see cref="ModelIncomplete" />, which
+///     (omitted) when none did: half the evidence behind <see cref="ModelIncomplete" />, which
 ///     <c>workspaceDiagnostics</c> cannot be read for, since MSBuild's words about a fatal failure and about
 ///     an ordinary restore warning arrive in the same shape.
+/// </param>
+/// <param name="RestoreFailedProjects">
+///     Which projects' NuGet packages are not in the model — solution-relative, forward-slashed
+///     <c>.csproj</c> paths — or null (omitted) when none are. The burndown reads low in a quieter way here
+///     than it does for <see cref="FailedProjects" />: these projects declare all their types, so the rules
+///     over them run and report — a rule whose target is a package the restore never fetched simply finds
+///     nothing to count.
 /// </param>
 /// <param name="UncheckedProjects">
 ///     Which projects the solution declares that this run never checked — solution-relative,
@@ -40,6 +48,7 @@ internal sealed record StatusJson(
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
+    IReadOnlyList<string>? RestoreFailedProjects,
     StatusSummaryJson Summary);
 
 /// <summary>

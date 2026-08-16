@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+      The spec project of the output-layout bed (Cli/OutputLayoutSpecResolutionE2ETests): the project the
+      convention has to find, and whose built DLL each arm hides from the path MSBuild evaluates.
+
+      THE CONTRACT ARRIVES AS A HINT PATH, not a ProjectReference into src/. Each arm copies this tree to
+      %TEMP% and builds it there, and a relative project reference cannot survive that copy.
+      $(LoadBearingContractPath) is supplied by the root Directory.Build.props the arm writes beside the
+      solution — the same file that carries the output layout under test.
+
+      SITING: see LayoutApp.Core.csproj's header. Same reason, same consequence — nothing restores or builds
+      this project in the test output tree.
+
+      The namespace is deliberately not LayoutApp.Arch: an <Anything>.Arch namespace shadows the contract's
+      own Arch type, and the spec then does not compile.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="Zphil.LoadBearing">
+            <HintPath>$(LoadBearingContractPath)</HintPath>
+        </Reference>
+    </ItemGroup>
+</Project>

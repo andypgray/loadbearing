@@ -47,6 +47,14 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
     private const string CheckGateLine =
         "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
 
+    // The project the gate is told restored badly. It loaded completely, so only its assets file says so.
+    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+
+    private const string RestoreGateLine =
+        "error: the model is incomplete — NuGet packages did not resolve for 1 project, so no baseline was "
+        + "written: every violation resting on a package edge is absent from this model, so the baseline "
+        + "would sign off debt it could not see:";
+
     private static readonly string[] ConventionalBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -163,6 +171,43 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
             .ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task BaselineInit_RestoreFailedProject_FailsClosedAndWritesNothing()
+    {
+        // The same signature, the other way to be missing what you are signing for. A baseline captured while
+        // a project's packages resolved to nothing records every violation resting on a package edge as
+        // absent — and the team has then signed off debt no run ever measured.
+        using var workspace = new TempFixtureWorkspace();
+        string baselineFile = workspace.PathOf(ConventionalBaselineFile);
+        File.Delete(baselineFile);
+
+        CliResult init = await RunBaselineAsync(
+            workspace, [], InitRequest, false, restoreFailedProjects: [UnrestoredProject]);
+
+        init.ShouldRefuseWith(RestoreGateLine, UnrestoredProject);
+        init.Out.ShouldBeEmpty();
+        File.Exists(baselineFile)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task BaselineAcceptReductions_RestoreFailedProject_FailsClosedBeforeShrinkingAnything()
+    {
+        // The dangerous mode, on the cause that reaches it most quietly: a package that stopped resolving
+        // looks exactly like a violation that stopped occurring, and --accept-reductions would delete the
+        // real entry on the strength of it.
+        using var workspace = new TempFixtureWorkspace();
+        string baselineFile = workspace.PathOf(ConventionalBaselineFile);
+        byte[] before = File.ReadAllBytes(baselineFile);
+
+        CliResult accept = await RunBaselineAsync(
+            workspace, [], AcceptReductionsRequest, false, restoreFailedProjects: [UnrestoredProject]);
+
+        accept.ShouldRefuseWith(RestoreGateLine, UnrestoredProject);
+        File.ReadAllBytes(baselineFile)
+            .ShouldBe(before);
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     private static BaselineRequest InitRequest(string solution, bool allowWorkspaceDiagnostics)
@@ -201,12 +246,15 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string> diagnostics,
         Func<string, bool, BaselineRequest> request,
         bool allowWorkspaceDiagnostics,
-        IReadOnlyList<string>? failedProjects = null)
+        IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? restoreFailedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var runner = new BaselineRunner(
-            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects));
+            output, error,
+            new DiagnosticInjectingSolutionSource(
+                diagnostics, failedProjects, restoreFailedProjects: restoreFailedProjects));
 
         int exit = await runner.RunAsync(request(workspace.SolutionPath, allowWorkspaceDiagnostics), Ct);
 

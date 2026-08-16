@@ -63,7 +63,8 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
 
     /// <summary>
     ///     The absolute <c>.csproj</c> paths of the projects that failed to load, from the load that produced
-    ///     this snapshot — what the fail-closed gate keys on, where <see cref="Diagnostics" /> only renders.
+    ///     this snapshot — half of what the fail-closed gate keys on, where <see cref="Diagnostics" /> only
+    ///     renders.
     /// </summary>
     /// <remarks>
     ///     Refreshed wholesale on each full (re)load and stable across the in-place content edits folded into
@@ -82,4 +83,17 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     change it.
     /// </remarks>
     internal IReadOnlyList<string> UncheckedProjects { get; init; } = [];
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model, from
+    ///     the load that produced this snapshot — the gate's other input.
+    /// </summary>
+    /// <remarks>
+    ///     Generation-scoped like its two siblings, and for a reason worth stating: a restore that repairs the
+    ///     hole writes <c>project.assets.json</c>, which is a structural input the reconcile sweep already
+    ///     watches — appearing where there was none is the same existence flip as changing — so it forces a
+    ///     full reload, and the fact is recomputed there rather than going stale inside a generation. A
+    ///     content edit folded into one generation cannot change it.
+    /// </remarks>
+    internal IReadOnlyList<string> RestoreFailedProjects { get; init; } = [];
 }

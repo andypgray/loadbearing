@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LayoutApp.Core/LayoutApp.Core.csproj" />
+  <Project Path="LayoutApp.Spec/LayoutApp.Spec.csproj" />
+</Solution>

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -32,9 +31,9 @@ internal enum CacheOutcome
 ///     Carries everything a caller needs to finish a run without re-reading the cache.
 /// </summary>
 /// <remarks>
-///     The recorded spec resolutions, workspace diagnostics and failed projects are replayed on a hit, so
-///     cached and cold output — and the fail-closed verdict — are identical on a solution that does not load
-///     completely.
+///     The recorded spec resolutions, workspace diagnostics, failed projects and restore-failed projects are
+///     replayed on a hit, so cached and cold output — and the fail-closed verdict — are identical on a solution
+///     that does not load completely or did not restore.
 /// </remarks>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
@@ -43,13 +42,14 @@ internal sealed record CacheReadResult(
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> FailedProjects,
-    IReadOnlyList<string> UncheckedProjects)
+    IReadOnlyList<string> UncheckedProjects,
+    IReadOnlyList<string> RestoreFailedProjects)
 {
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
 
     internal static CacheReadResult Miss()
     {
-        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], [], []);
+        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], [], [], []);
     }
 
     internal static CacheReadResult Hit(
@@ -57,11 +57,12 @@ internal sealed record CacheReadResult(
         IReadOnlyList<SpecResolutionRecord> specResolutions,
         IReadOnlyList<string> diagnostics,
         IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects)
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects)
     {
         return new CacheReadResult(
             CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics, failedProjects,
-            uncheckedProjects);
+            uncheckedProjects, restoreFailedProjects);
     }
 
     internal static CacheReadResult Partial(
@@ -70,11 +71,12 @@ internal sealed record CacheReadResult(
         IReadOnlyList<SpecResolutionRecord> specResolutions,
         IReadOnlyList<string> diagnostics,
         IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects)
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects)
     {
         return new CacheReadResult(
             CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics, failedProjects,
-            uncheckedProjects);
+            uncheckedProjects, restoreFailedProjects);
     }
 }
 
@@ -118,7 +120,8 @@ internal sealed record ExtractionResult(
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> FailedProjects,
-    IReadOnlyList<string> UncheckedProjects);
+    IReadOnlyList<string> UncheckedProjects,
+    IReadOnlyList<string> RestoreFailedProjects);
 
 /// <summary>
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
@@ -156,14 +159,7 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
     // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 18;
-
-    /// <summary>
-    ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
-    ///     their names (readability over the few bytes, and rename-safe: an unrecognized name degrades to a
-    ///     parse-error miss). Exposed for the round-trip pin.
-    /// </summary>
-    internal static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+    private const int CurrentSchemaVersion = 19;
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;
@@ -278,6 +274,7 @@ internal sealed class ExtractionCacheStore
             extraction.Diagnostics,
             extraction.FailedProjects,
             extraction.UncheckedProjects,
+            extraction.RestoreFailedProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -354,13 +351,13 @@ internal sealed class ExtractionCacheStore
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects);
             return CacheReadResult.Hit(
                 manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
-                manifest.UncheckedProjects);
+                manifest.UncheckedProjects, manifest.RestoreFailedProjects);
         }
 
         var reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
         return CacheReadResult.Partial(
             reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
-            manifest.UncheckedProjects);
+            manifest.UncheckedProjects, manifest.RestoreFailedProjects);
     }
 
     // ── structural + document checks ────────────────────────────────────────────────────────────────────
@@ -491,7 +488,7 @@ internal sealed class ExtractionCacheStore
     {
         try
         {
-            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJson.Context.CacheManifest);
             AtomicFile.WriteAllBytes(cacheFilePath, bytes);
             return true;
         }
@@ -508,7 +505,7 @@ internal sealed class ExtractionCacheStore
         try
         {
             byte[] bytes = File.ReadAllBytes(cacheFilePath);
-            return JsonSerializer.Deserialize<CacheManifest>(bytes, JsonOptions);
+            return JsonSerializer.Deserialize(bytes, ManifestJson.Context.CacheManifest);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -574,12 +571,5 @@ internal sealed class ExtractionCacheStore
             if (!FileStamping.StampsEqual(left[i].Documents, right[i].Documents))
                 return false;
         return true;
-    }
-
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions { WriteIndented = false };
-        options.Converters.Add(new JsonStringEnumConverter());
-        return options;
     }
 }

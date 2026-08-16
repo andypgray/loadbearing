@@ -17,13 +17,15 @@ public sealed class LoadedSolution : IDisposable
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        ProjectLoadReport? report = null)
+        ProjectLoadReport? report = null,
+        IReadOnlyList<string>? restoreFailedProjects = null)
     {
         Workspace = workspace;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
         FailedProjects = (report ?? ProjectLoadReport.Empty).Failed;
         UncheckedProjects = (report ?? ProjectLoadReport.Empty).Unchecked;
+        RestoreFailedProjects = restoreFailedProjects ?? [];
     }
 
     /// <summary>The MSBuild workspace that produced <see cref="Solution" />.</summary>
@@ -41,11 +43,28 @@ public sealed class LoadedSolution : IDisposable
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted — what the
-    ///     fail-closed gate keys on, computed at this boundary by
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted — one of the
+    ///     two facts the fail-closed gate keys on, computed at this boundary by
     ///     <see cref="ProjectLoadFailures.Detect" />. Empty for a solution that loaded completely.
     /// </summary>
     public IReadOnlyList<string> FailedProjects { get; }
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model —
+    ///     restore ran and failed, or never ran — ordinal-sorted. The gate's other input, computed at this
+    ///     boundary by <see cref="RestoreFailures.Detect" />. Empty for a solution that restored cleanly, and
+    ///     disjoint from <see cref="FailedProjects" /> by construction.
+    /// </summary>
+    /// <remarks>
+    ///     Carried in its own slot rather than folded into <see cref="FailedProjects" /> because these projects
+    ///     <em>did</em> load — naming them as "failed to load" would be false — and because the remedy differs:
+    ///     <c>dotnet restore</c>, rather than <c>dotnet build</c>. The two causes share this one slot for the
+    ///     same reason, from the other direction: they ask for the same command and leave the same hole, and a
+    ///     consumer that could tell them apart would have nothing different to do about it. What they share
+    ///     with each other is the consequence: every package edge these projects declare is missing from the
+    ///     model, so a rule over one is measured against edges that were never extracted.
+    /// </remarks>
+    public IReadOnlyList<string> RestoreFailedProjects { get; }
 
     /// <summary>
     ///     The absolute <c>.csproj</c> paths this solution declares that the run did not check, ordinal-sorted

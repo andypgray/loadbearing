@@ -62,7 +62,7 @@ internal sealed class CheckRunner(
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
         var renderedDiagnostics = diagnostics.RenderedWithMergeNotes;
 
-        // Fail closed on an incomplete model (a project failed to load): a workspace-load diagnostic makes
+        // Fail closed on an incomplete model (a project failed to load, or to restore): a workspace-load diagnostic makes
         // exit 2 take precedence over 0/1, unless the operator opted into the partial model. The NuGetAudit
         // carve-out lives with the rest of the shared answer. Both computed above Render so the document and
         // the SARIF stamp carry the same verdict the gate below returns.
@@ -72,7 +72,8 @@ internal sealed class CheckRunner(
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
             Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete,
-            diagnostics.FailedProjects, diagnostics.UncheckedProjects, ruleGlobs);
+            diagnostics.FailedProjects, diagnostics.UncheckedProjects, diagnostics.RestoreFailedProjects,
+            ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
@@ -122,7 +123,7 @@ internal sealed class CheckRunner(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
         IReadOnlyList<string> diagnostics, bool executionSuccessful, bool modelIncomplete,
         IReadOnlyList<string> failedProjects, IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> ruleGlobs)
+        IReadOnlyList<string> restoreFailedProjects, IReadOnlyList<string> ruleGlobs)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
@@ -131,7 +132,7 @@ internal sealed class CheckRunner(
         if (request.Json)
             JsonReportRenderer.Render(
                 output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
-                modelIncomplete, failedProjects, uncheckedProjects, ruleGlobs);
+                modelIncomplete, failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 
@@ -140,7 +141,8 @@ internal sealed class CheckRunner(
         if (request.Sarif is { } sarifPath)
         {
             SarifReportRenderer.Render(
-                sarifPath, report, solutionDirectory, executionSuccessful, diagnostics, uncheckedProjects);
+                sarifPath, report, solutionDirectory, executionSuccessful, diagnostics, failedProjects,
+                restoreFailedProjects, uncheckedProjects);
             if (!request.Json) output.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
         }
     }

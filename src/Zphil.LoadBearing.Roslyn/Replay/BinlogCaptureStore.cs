@@ -435,7 +435,7 @@ internal sealed class BinlogCaptureStore
         try
         {
             byte[] bytes = File.ReadAllBytes(captureManifestPath);
-            return JsonSerializer.Deserialize<CaptureManifest>(bytes, ExtractionCacheStore.JsonOptions);
+            return JsonSerializer.Deserialize(bytes, ManifestJson.Context.CaptureManifest);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -447,7 +447,7 @@ internal sealed class BinlogCaptureStore
     {
         try
         {
-            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ExtractionCacheStore.JsonOptions);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJson.Context.CaptureManifest);
             AtomicFile.WriteAllBytes(captureManifestPath, bytes);
             return true;
         }

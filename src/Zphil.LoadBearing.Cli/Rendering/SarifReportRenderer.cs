@@ -52,10 +52,13 @@ internal static class SarifReportRenderer
         string solutionDirectory,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? restoreFailedProjects = null,
         IReadOnlyList<string>? uncheckedProjects = null)
     {
         string json = Serialize(
-            report, solutionDirectory, executionSuccessful, workspaceDiagnostics, uncheckedProjects);
+            report, solutionDirectory, executionSuccessful, workspaceDiagnostics, failedProjects,
+            restoreFailedProjects, uncheckedProjects);
         AtomicFile.WriteAllBytes(sarifPath, Utf8NoBom.GetBytes(json + "\n"));
     }
 
@@ -65,14 +68,17 @@ internal static class SarifReportRenderer
     ///     every site path solution-relative; <paramref name="executionSuccessful" /> becomes the
     ///     invocation verdict (false when the incomplete-model gate will exit 2); and
     ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty).
-    ///     <paramref name="uncheckedProjects" /> adds one further notification when a solution filter narrowed
-    ///     the run; omitting it renders exactly what an unfiltered run always rendered.
+    ///     <paramref name="failedProjects" />, <paramref name="restoreFailedProjects" /> and
+    ///     <paramref name="uncheckedProjects" /> each add one further structured notification when non-empty;
+    ///     omitting them all renders exactly what a whole, healthy run always rendered.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
         string solutionDirectory,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? restoreFailedProjects = null,
         IReadOnlyList<string>? uncheckedProjects = null)
     {
         // One relativizer for the whole log: the solution directory is the same string for every site, and
@@ -80,13 +86,15 @@ internal static class SarifReportRenderer
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
 
         var driver = new SarifDriver(DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report));
-        var narrowed = (uncheckedProjects ?? [])
-            .Select(relativizer.Relative)
-            .ToList();
 
         var run = new SarifRun(
             new SarifTool(driver),
-            BuildInvocations(executionSuccessful, workspaceDiagnostics, narrowed),
+            BuildInvocations(
+                executionSuccessful,
+                workspaceDiagnostics,
+                Relative(failedProjects, relativizer),
+                Relative(restoreFailedProjects, relativizer),
+                Relative(uncheckedProjects, relativizer)),
             BuildOriginalUriBaseIds(),
             BuildResults(report, relativizer));
         var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
@@ -111,20 +119,60 @@ internal static class SarifReportRenderer
     }
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
-    // the diagnostics themselves ride as warning-level notifications, and a narrowed universe adds one more
-    // after them. The block is omitted when there is nothing to say, so an unfiltered clean run is unchanged.
+    // the diagnostics themselves ride as warning-level notifications, and the three structured facts add one
+    // notification each after them, in the order the CLI refusals state them: the model being wrong outranks
+    // the model being small, and a failed load outranks a failed restore. The block is omitted when there is
+    // nothing to say, so a whole clean run is unchanged.
     private static IReadOnlyList<SarifInvocation> BuildInvocations(
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> restoreFailedProjects,
         IReadOnlyList<string> uncheckedProjects)
     {
         var notifications = workspaceDiagnostics
             .Select(diagnostic => new SarifNotification(new SarifMessage(diagnostic), WarningLevel))
             .ToList();
 
+        if (failedProjects.Count > 0) notifications.Add(LoadFailureNotification(failedProjects));
+        if (restoreFailedProjects.Count > 0) notifications.Add(RestoreFailureNotification(restoreFailedProjects));
         if (uncheckedProjects.Count > 0) notifications.Add(NarrowingNotification(uncheckedProjects));
 
         return new[] { new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null) };
+    }
+
+    // An incomplete model reached SARIF only as MSBuild's replayed prose, in which a fatal evaluation failure
+    // and an ordinary restore warning are indistinguishable — so the one channel that could name the cause
+    // named neither. Error rather than warning, and independent of executionSuccessful: the opt-out buys a
+    // different exit code, not a different truth about the model.
+    private static SarifNotification LoadFailureNotification(IReadOnlyList<string> failedProjects)
+    {
+        string subject = failedProjects.Count == 1 ? "1 project" : $"{failedProjects.Count} projects";
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"The model is incomplete: {subject} failed to load, so these results were reached against a "
+                + $"codebase missing whole projects: {string.Join(", ", failedProjects)}"),
+            ErrorLevel);
+    }
+
+    // The quieter half of the same fact, and the one a reader cannot recover by noticing something absent:
+    // these projects are all present with all their types, and only the edges their package references would
+    // have produced are gone — which is how a failing rule was measured turning green. Worded for both ways
+    // that happens, a restore that ran and failed and one that never ran, because the remedy and the
+    // consequence are identical and this channel has no room to say which.
+    private static SarifNotification RestoreFailureNotification(IReadOnlyList<string> restoreFailedProjects)
+    {
+        string subject = restoreFailedProjects.Count == 1
+            ? "1 project"
+            : $"{restoreFailedProjects.Count} projects";
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"The model is incomplete: NuGet packages did not resolve for {subject}, so these results were "
+                + "reached against a codebase whose package references resolved to nothing: "
+                + string.Join(", ", restoreFailedProjects)),
+            ErrorLevel);
     }
 
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
@@ -143,6 +191,14 @@ internal static class SarifReportRenderer
                 $"A solution filter narrowed this run: {subject}, so these results cover part of the "
                 + $"solution: {string.Join(", ", uncheckedProjects)}"),
             WarningLevel);
+    }
+
+    private static IReadOnlyList<string> Relative(
+        IReadOnlyList<string>? projects, PathFormat.Relativizer relativizer)
+    {
+        return (projects ?? [])
+            .Select(relativizer.Relative)
+            .ToList();
     }
 
     // {"SRCROOT": {}} — the one solution-root URI base every artifact location resolves against, so no

@@ -3,11 +3,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
-// The six optional slots below — grain, projectsScope, and the four workspace ones — are additive and null
-// (omitted) on a full, unscoped survey whose workspace loaded and that no solution filter narrowed, so the
-// schema stays version 1 and the default document is byte-identical to the one before they existed. A run
-// whose workspace did not load reaches this document only under --allow-workspace-diagnostics, since graph
-// otherwise refuses before extraction.
+// The seven optional slots below — grain, projectsScope, and the five workspace ones — are additive and null
+// (omitted) on a full, unscoped survey whose workspace loaded, whose NuGet packages resolved and that no
+// solution filter narrowed, so the schema stays version 1 and the default document is byte-identical to the
+// one before they existed. A run whose model is incomplete reaches this document only under
+// --allow-workspace-diagnostics, since graph otherwise refuses before extraction.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
 /// <param name="Grain">
@@ -25,13 +25,22 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     The workspace-load diagnostics, or null (omitted) when there were none.
 /// </param>
 /// <param name="ModelIncomplete">
-///     <see langword="true" /> when a project failed to load, so the survey below covers only what did load
-///     — projects, types, and edges are all missing, not merely fewer; null (omitted) otherwise.
+///     <see langword="true" /> when a project failed to load or a project's NuGet packages are not in the
+///     model, so the survey below covers only what the model actually holds — projects, types, and edges are
+///     all missing, not merely fewer; null (omitted) otherwise.
 /// </param>
 /// <param name="FailedProjects">
 ///     Which projects are missing from the survey — solution-relative, forward-slashed <c>.csproj</c> paths
-///     — or null (omitted) when none are. On a survey this is the most useful slot of the three: it names
+///     — or null (omitted) when none are. On a survey this is the most useful slot of the four: it names
 ///     precisely what a reader would otherwise have to notice was absent.
+/// </param>
+/// <param name="RestoreFailedProjects">
+///     Which projects' NuGet packages are not in the model — solution-relative, forward-slashed
+///     <c>.csproj</c> paths — or null (omitted) when none are. The slot a survey needs most sharply of the
+///     four, because this is the document where the damage is directly visible and still deniable: these
+///     projects are present with all their types, so nothing looks absent — but <see cref="ExternalEdges" />
+///     is missing precisely the rows their package references would have produced, and a short external-edge
+///     list reads as a codebase with few dependencies.
 /// </param>
 /// <param name="UncheckedProjects">
 ///     Which projects the solution declares that this survey never loaded — solution-relative,
@@ -63,7 +72,8 @@ internal sealed record GraphJson(
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
-    IReadOnlyList<string>? UncheckedProjects);
+    IReadOnlyList<string>? UncheckedProjects,
+    IReadOnlyList<string>? RestoreFailedProjects);
 
 /// <summary>
 ///     One project: its declared references, solution-declared type count, and namespace inventory — the

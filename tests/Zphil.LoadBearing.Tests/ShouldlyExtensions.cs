@@ -58,6 +58,13 @@ internal static class ShouldlyExtensions
 
     // ReSharper disable once InvokeAsExtensionMethod
     // ReSharper disable once InvokeAsExtensionMember
+    internal static void ShouldNotContain(this string actual, string expected, string? customMessage)
+    {
+        ShouldBeStringTestExtensions.ShouldNotContain(actual, expected, Case.Sensitive, customMessage);
+    }
+
+    // ReSharper disable once InvokeAsExtensionMethod
+    // ReSharper disable once InvokeAsExtensionMember
     internal static void ShouldStartWith(this string actual, string expected)
     {
         ShouldBeStringTestExtensions.ShouldStartWith(actual, expected, Case.Sensitive);

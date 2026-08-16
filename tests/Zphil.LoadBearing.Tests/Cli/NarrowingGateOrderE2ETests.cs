@@ -7,7 +7,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     What a run says when it is <em>both</em> broken and narrowed — a filter-selected project that failed
-///     to load, which is one command away from ordinary.
+///     to load, which is one command away from ordinary — and what it says when the model is broken in both
+///     of the ways it can be.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -16,6 +17,13 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         a narrowed universe is a smaller true answer and says so, while a partial model is a wrong one and
 ///         its refusal names the build that would fix it. <c>context</c>, which refuses nothing, writes both
 ///         blocks in that same order.
+///     </para>
+///     <para>
+///         <b>And within the broken model, the load failure outranks the failed restore.</b> A project that
+///         never loaded declares nothing at all; one whose packages did not resolve loaded completely and is
+///         merely missing its package edges. Both blocks print rather than the first winning, because they name
+///         different repairs — <c>dotnet build</c> and <c>dotnet restore</c> — and a reader who ran only the
+///         one they were told about would still be stuck.
 ///     </para>
 ///     <para>
 ///         <b>And the narrowing has no opt-out.</b> <c>--allow-workspace-diagnostics</c> buys the operator a
@@ -45,6 +53,13 @@ public sealed class NarrowingGateOrderE2ETests
         "error: the model is incomplete — 1 project failed to load, so nothing was rendered: a card whose "
         + "project failed to load cannot be placed and would be dropped from the committed files, and "
         + "--diagram would draw a survey missing whole projects:";
+
+    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+
+    private const string RenderRestoreGateLede =
+        "error: the model is incomplete — NuGet packages did not resolve for 1 project, so nothing was "
+        + "rendered: a card would be committed describing dependencies the model never resolved, and "
+        + "--diagram would draw a survey with the external edges missing:";
 
     // The one fragment that says the narrowing spoke, whichever block it spoke in.
     private const string AnyNarrowing = "narrowed this run";
@@ -138,6 +153,34 @@ public sealed class NarrowingGateOrderE2ETests
         answer.ShouldContain("  MyApp.Skipped/MyApp.Skipped.csproj");
         answer.IndexOf(AnyNarrowing, StringComparison.Ordinal)
             .ShouldBeGreaterThan(answer.IndexOf(BrokenProject, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Render_BrokenAndUnrestoredAndNarrowed_WritesTheLoadBlockThenTheRestoreBlockAndStopsThere()
+    {
+        // Three conditions, one command, and a total order over all of them: the load block leads because a
+        // project that never loaded is the most fundamentally broken thing here; the restore block follows
+        // because it is still the model being wrong rather than small; and the narrowing — a smaller true
+        // answer — never speaks while either is live. Both blocks print rather than one winning, because
+        // they name different repairs and a reader who ran only the one they were told about would still be
+        // stuck.
+        using var workspace = new TempFixtureWorkspace();
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var source = new DiagnosticInjectingSolutionSource(
+            [], [BrokenProject], [SkippedProject(workspace)], [UnrestoredProject]);
+        var request = new RenderRequest(
+            workspace.SolutionPath, CliRunner.CleanSpecDll,
+            Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, false);
+
+        int exit = await new RenderRunner(output, error, source).RunAsync(request, Ct);
+
+        var render = new CliResult(exit, output.ToString(), error.ToString());
+        render.ShouldRefuseWith(RenderGateLede, BrokenProject, RenderRestoreGateLede, UnrestoredProject);
+        render.Err.IndexOf(RenderRestoreGateLede, StringComparison.Ordinal)
+            .ShouldBeGreaterThan(render.Err.IndexOf(RenderGateLede, StringComparison.Ordinal));
+        render.Err.ShouldNotContain(AnyNarrowing);
+        render.Out.ShouldBeEmpty();
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

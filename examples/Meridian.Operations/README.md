@@ -63,6 +63,8 @@ The three law modules each publish a `Contracts` namespace and keep the rest to 
 
 Those allow-lists are the module graph. v1 has no cycle-detection combinator: the graph is acyclic because each module's `MustOnlyReference` lists its outbound arrows by hand, and none of them point back. Draw an arrow the spec does not list, and `check` goes red.
 
+[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes; the codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule and the three `internals` rules name a single place at both ends, so they are listed under the fence instead of drawn as arrows to themselves.
+
 ## One edit, two rules
 
 An agent working in Dispatch wants a quick invoice preview and constructs Invoicing's internal `InvoiceAssembler` directly. It compiles: `internal` is assembly-wide in a monolith, so nothing at the language level stops one module from reaching into another's internals. `dotnet build` is green. `check` is not, and it fails twice on the one reference:
@@ -130,7 +132,7 @@ dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
 loadbearing check examples/Meridian.Operations/Meridian.Operations.slnx
 ```
 
-Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here: `Checked 10 rules: 9 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. `loadbearing render` regenerates the root block and all five module cards, `loadbearing status` prints the quarantine burndown, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the reach from "One edit, two rules" and `check` exits 1 with the two blocks shown there.
+Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here: `Checked 10 rules: 9 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. `loadbearing render` regenerates the root block, all five module cards and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings, `loadbearing status` prints the quarantine burndown, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the reach from "One edit, two rules" and `check` exits 1 with the two blocks shown there.
 
 ## From here
 

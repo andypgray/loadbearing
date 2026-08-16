@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FieldMini: the bed for the silent edge a failed NuGet restore used to open.
+
+  ONE PROJECT, ONE PACKAGE REFERENCE, ONE USE SITE. JsonUser.cs calls a static method on a type from
+  Contoso.Json, and the spec forbids types in this project from referencing Contoso.*. With the feed
+  reachable, `check` reds at the use site; with the feed unreachable it used to exit 0 reporting the rule
+  INERT — its target selection matched no types — because the package edge the violation rests on was
+  never extracted. Not missed: never present. A restore that NEVER RAN leaves the identical hole with no
+  assets file to read it off, and used to exit 0 the same way; it is caught now because this project is
+  SDK-style and so would have written one. See RestoreFailureSilentEdgeE2ETests for all three arms — the
+  third needs no feed and no restore at all, only this tree as it is committed.
+
+  THE PACKAGE IS MANUFACTURED AT TEST TIME, not committed. The test writes a .nupkg into ./feed/ and
+  points NUGET_PACKAGES at a private directory of its own, so the operator's warm global package folder
+  cannot silently satisfy a restore this bed needs to fail. That confound is why "just break the feed" is
+  not enough on its own.
+
+  THREE SITING CONSTRAINTS, the same three BrokenApp.Web.csproj states, for the same reasons.
+
+  1. It lives under Fixtures/RestoreFailureSolutions/, NOT Fixtures/TestSolutions/. FixtureRestorer
+     restores every .sln under TestSolutions/** at pipeline startup, keyed on "any csproj missing
+     obj/project.assets.json". A solution whose restore is the subject, sited there, would be restored
+     out from under its own test — and, failing, would make every test process believe the whole tree is
+     unrestored.
+
+  2. It is NOT a member of Zphil.LoadBearing.slnx and is NOT ProjectReference'd from the tests csproj:
+     either would try to build it, against a package that does not exist until a test manufactures one.
+
+  3. Source only — no bin/, no obj/, no feed/, and above all no committed .nupkg. The feed is written
+     into a private copy of this tree, never into the fixture.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <!-- No audit: an unreachable feed raises NU1900 warnings, and the detector's audit carve-out would
+             then be deciding what the resolution failure is supposed to decide. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Contoso.Json" Version="1.0.0" />
+    </ItemGroup>
+</Project>

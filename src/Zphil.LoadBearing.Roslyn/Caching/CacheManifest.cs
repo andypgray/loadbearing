@@ -32,10 +32,18 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     back as a bare green would be exactly the silence this field exists to break.
 /// </param>
 /// <param name="FailedProjects">
-///     The absolute <c>.csproj</c> paths of the projects that failed to load on the recorded run — the
+///     The absolute <c>.csproj</c> paths of the projects that failed to load on the recorded run — half the
 ///     fail-closed gate's input. Persisted rather than recomputed because a hit owns no workspace to read the
 ///     loaded structure from, and a hit that answered green where the cold run refuses would be the one thing
 ///     this cache promises it cannot do.
+/// </param>
+/// <param name="RestoreFailedProjects">
+///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages were not in the model on the
+///     recorded run — the gate's other input, persisted for exactly the reason above. It could in principle
+///     be recomputed on a hit, since the assets files (and the project files behind the ones with no assets
+///     file at all) are still on disk, but it must not be: a hit means every one of those paths stamped
+///     identical, so recomputing can only ever agree — at the cost of a parse per project on the path whose
+///     whole promise is that it opens nothing.
 /// </param>
 internal sealed record CacheManifest(
     int SchemaVersion,
@@ -46,6 +54,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
+    IReadOnlyList<string> RestoreFailedProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>
@@ -98,7 +107,6 @@ internal sealed record FileStamp(
 // ContentKey is persisted schema: validation recomputes keys bottom-up from documents rather than reading
 // the stored value, which exists so a manifest diff shows whether a project's own content or only its
 // dependency cone moved.
-// ReSharper disable NotAccessedPositionalProperty.Global
 internal sealed record ProjectCacheEntry(
     string ProjectName,
     string CsprojPath,
@@ -107,8 +115,6 @@ internal sealed record ProjectCacheEntry(
     IReadOnlyList<FileStamp> Documents,
     string ContentKey,
     string MerkleKey);
-
-// ReSharper restore NotAccessedPositionalProperty.Global
 
 /// <summary>
 ///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the spec

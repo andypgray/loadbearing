@@ -31,15 +31,17 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Run the architecture spec against the bound solution and return the JSON check report " +
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
         "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
-        "only those. If projects fail to load the report still returns, stamped modelIncomplete: true and " +
-        "failedProjects — a verdict reached against a partial model; report that, never plain green. " +
+        "only those. If projects fail to load, or their NuGet packages did not resolve, the report still " +
+        "returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — a verdict reached " +
+        "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
         "checked — a clean report then covers a subset; say so.";
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
-        "promotion suggestions. If projects fail to load the burndown still returns, stamped modelIncomplete: " +
-        "true and failedProjects — counts from a partial model; report that rather than quoting them as whole. " +
+        "promotion suggestions. If projects fail to load, or their NuGet packages did not resolve, the " +
+        "burndown still returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — " +
+        "counts from a partial model; report that rather than quoting them as whole. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
         "they contribute no violations, so every count reads low.";
 
@@ -48,9 +50,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
 
     private const string ContextDescription =
         "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
-        "or a layer's local rules — or a pointer line when none apply. If projects fail to load, the answer opens " +
-        "with a caveat naming them: cards from unloaded projects cannot be placed, so treat a no-coverage answer " +
-        "as unproven there. A .slnf solution filter gets the same caveat for the declared projects it left " +
+        "or a layer's local rules — or a pointer line when none apply. If projects fail to load or to restore, the " +
+        "answer opens with a caveat naming them: cards from unloaded projects cannot be placed, and a rule about " +
+        "a package the restore never fetched was never measured, so treat a no-coverage answer as unproven " +
+        "there. A .slnf solution filter gets the same caveat for the declared projects it left " +
         "unchecked: treat a no-coverage answer as unproven under them as well.";
 
     private const string GraphDescription =
@@ -58,7 +61,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "projectEdges[] (source/target, declared vs observed dependencies), and externalEdges[] grouped by " +
         "namespace root. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
-        "built: if projects fail to load it returns an error naming them rather than a survey missing them. " +
+        "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
+        "them rather than a survey missing them or missing their external edges. " +
         "Narrow with overview or skeleton (coarser grain) or projects (fewer projects); an over-budget survey " +
         "coarsens its own grain, as far as skeleton, rather than being cut. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never loaded — " +
@@ -83,7 +87,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     {
         var output = new StringWriter();
         // Exit code and error writer deliberately discarded — everything they would carry is in the document.
-        // Violations ride in rules[]; which projects failed to load rides in failedProjects, and the load's
+        // Violations ride in rules[]; which projects failed to load or to restore rides in failedProjects and
+        // restoreFailedProjects, and the load's
         // own diagnostics ride in workspaceDiagnostics along with the MSBuild-selection note, which
         // WorkspaceDiagnostics puts in the list both surfaces read rather than appending at write time (it
         // was the one line TextWriter.Null used to swallow, and "which MSBuild opened it" is the next

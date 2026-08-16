@@ -24,7 +24,8 @@ internal static class StatusJsonRenderer
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
         IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects)
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects)
     {
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
 
@@ -37,6 +38,7 @@ internal static class StatusJsonRenderer
             modelIncomplete ? true : null,
             JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
             JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer),
+            JsonReportRenderer.RelativeProjects(restoreFailedProjects, relativizer),
             new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,

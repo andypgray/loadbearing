@@ -39,6 +39,7 @@ internal static class GraphJsonRenderer
         bool modelIncomplete,
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects,
         GraphGrain grain,
         IReadOnlyList<string> projectsScope)
     {
@@ -59,7 +60,8 @@ internal static class GraphJsonRenderer
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             modelIncomplete ? true : null,
             JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
-            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer));
+            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer),
+            JsonReportRenderer.RelativeProjects(restoreFailedProjects, relativizer));
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
     }

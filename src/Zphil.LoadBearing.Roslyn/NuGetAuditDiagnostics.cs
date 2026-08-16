@@ -13,9 +13,18 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         the family was filtered out of the gate input while still rendering everywhere. That boundary is
 ///         gone, because the gate no longer reads diagnostics at all:
 ///         <see cref="ProjectLoadFailures" /> reads which projects failed to load off the loaded solution's
-///         own structure, and <see cref="WorkspaceDiagnostics.FailedProjects" /> is the whole gate input. So
-///         an advisory cannot flip an exit code whether this recognises it or not, and neither can any other
-///         message.
+///         own structure, <see cref="RestoreFailures" /> reads which projects' packages are not in the model
+///         off their assets files, and those two lists are the whole gate input. So an advisory cannot flip an
+///         exit code whether this recognises it or not, and neither can any other message.
+///     </para>
+///     <para>
+///         <b>Except through <see cref="IsAuditCode" />, where it is load-bearing again — and exact.</b>
+///         An assets file records a NuGet <c>code</c> as a field of its own, so the carve-out
+///         that could never be performed on the diagnostic stream is a string equality there rather than a
+///         guess at wording. It matters because <c>TreatWarningsAsErrors</c> promotes an advisory to
+///         <c>level: Error</c>, and a solution whose resolution succeeded and whose model is complete must not
+///         be refused because a vulnerability was published this morning. That is the whole of issue #19,
+///         reappearing on a surface where it can actually be closed.
 ///     </para>
 ///     <para>
 ///         <b>Why it still exists.</b> Two refusals have nothing but text to offer — <c>SpecResolver</c>'s
@@ -60,6 +69,24 @@ internal static partial class NuGetAuditDiagnostics
     internal static bool IsAudit(string diagnostic)
     {
         return AuditText().IsMatch(diagnostic) || AuditCode().IsMatch(diagnostic);
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="code" /> is a NuGet audit code — the same NU19xx family
+    ///     <see cref="IsAudit" /> recognises, matched on the code alone.
+    /// </summary>
+    /// <remarks>
+    ///     For the one caller that has a real code to match rather than a sentence:
+    ///     <see cref="RestoreFailures" /> reads <c>project.assets.json</c>, where NuGet records <c>code</c> and
+    ///     <c>level</c> as separate invariant fields. That makes the carve-out this class could never perform
+    ///     on the diagnostic stream — where <c>.Code</c> is discarded before a host sees it — exact and
+    ///     language-independent there, and it is load-bearing there in a way it is not here: it keeps an
+    ///     advisory promoted to an error by <c>TreatWarningsAsErrors</c> from refusing a solution whose
+    ///     resolution succeeded and whose model is complete.
+    /// </remarks>
+    internal static bool IsAuditCode(string code)
+    {
+        return AuditCode().IsMatch(code);
     }
 
     /// <summary>

@@ -13,10 +13,20 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     keys, the exclusions, the intermediate-assembly refusal, and the narrowing that pays for all of it.
 /// </summary>
 /// <remarks>
-///     The intermediate-root derivation the refusal rests on is pinned by
-///     <c>Roslyn/IntermediateOutputTreeTests</c>, beside the type that owns it — the cache probes derive the
-///     assets file's location from the same primitive, and a rule two subsystems depend on should not be
-///     pinned only through one of them.
+///     <para>
+///         The intermediate-root derivation the refusal rests on is pinned by
+///         <c>Roslyn/IntermediateOutputTreeTests</c>, beside the type that owns it — the cache probes derive
+///         the assets file's location from the same primitive, and a rule two subsystems depend on should not
+///         be pinned only through one of them.
+///     </para>
+///     <para>
+///         Every tree here is fabricated <em>after</em> any load, so one axis sits structurally outside this
+///         class: the design-time build <c>check</c>'s own workspace load runs creates the evaluated output
+///         directory — empty — before resolution reads the disk. Both field layouts are covered against a
+///         real SDK restore, a real <c>-c Release</c> build and a live workspace load by
+///         <c>Cli/OutputLayoutSpecResolutionE2ETests</c>, which is where that axis is measured rather than
+///         described.
+///     </para>
 /// </remarks>
 public sealed class BuiltOutputProbeTests
 {

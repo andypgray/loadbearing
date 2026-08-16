@@ -8,6 +8,8 @@ An agent dropped into a repository reads the files around its task and copies wh
 
 Meridian handles bookings, rating, customs, invoicing, and dispatch. Eight controllers sit at the front of it. Six of them (Shipments, Rates, Invoices, Customs, Drivers, and Manifests) open a `SqlConnection`, run inline SQL, and read the wall clock straight from `DateTime.Now` or `DateTime.UtcNow` for cutoffs, demurrage days, and ETA stamps. Two of them (Bookings and Quotes) have already moved to constructor-injected repositories and an `IClock`. That six-to-two split is the whole point: the majority pattern is the one being retired, which is exactly the arrangement an agent reads as house style.
 
+[ARCHITECTURE.md](ARCHITECTURE.md) draws that shape: the projects and their references beside the law the spec holds them to, both written by `render` rather than by hand.
+
 Behind `IClearanceGateway`, the `Meridian.Clearance` module validates container numbers. Its `ContainerCheckDigit` computes the ISO 6346 check digit, the calculation that decides whether `CSQU3054383` is a real container number or a typo. That module is quarantined.
 
 Thirty-three current violations are grandfathered: twelve inline-SQL references, seven wall-clock reads, thirteen `Task`-returning methods missing the `Async` suffix, and one reach into the quarantined module. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems the tool is built for: long-lived, business-critical, too important to rewrite on a whim.
@@ -141,7 +143,7 @@ dotnet build examples/Meridian/Meridian.slnx
 loadbearing check examples/Meridian/Meridian.slnx
 ```
 
-`check` exits 0 here, because every current violation is on the baseline. `loadbearing status` prints the burndown above, and `loadbearing render` regenerates the `AGENTS.md` block from the spec. Introduce one of the violations from this page and `check` exits 1 with the message shown.
+`check` exits 0 here, because every current violation is on the baseline. `loadbearing status` prints the burndown above, and `loadbearing render` regenerates the `AGENTS.md` block and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings from the spec. Introduce one of the violations from this page and `check` exits 1 with the message shown.
 
 ## In the agent's loop
 

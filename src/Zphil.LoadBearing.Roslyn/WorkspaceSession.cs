@@ -101,6 +101,12 @@ public sealed class WorkspaceSession : IAsyncDisposable
     // produces. Non-empty only when the session is bound to a solution filter; it scopes, never gates.
     private IReadOnlyList<string> uncheckedProjects = [];
 
+    // The projects whose NuGet packages were not in the model at the current generation's load, carried onto
+    // every snapshot it produces. Generation-scoped for the same reason as failedProjects, and safely so: a
+    // repairing restore writes an assets file the reconcile sweep already stamps — present or absent, so its
+    // first appearance counts too — which forces a full reload.
+    private IReadOnlyList<string> restoreFailedProjects = [];
+
     // Workspace-load diagnostics of the current generation, carried onto every snapshot it produces.
     private IReadOnlyList<string> loadDiagnostics = [];
 
@@ -229,6 +235,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loadDiagnostics = [];
         failedProjects = [];
         uncheckedProjects = [];
+        restoreFailedProjects = [];
         targetFrameworks = NoTargetFrameworks;
         documentFingerprints.Clear();
         documentIds.Clear();
@@ -251,6 +258,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loadDiagnostics = collected;
         failedProjects = freshlyLoaded.FailedProjects;
         uncheckedProjects = freshlyLoaded.UncheckedProjects;
+        restoreFailedProjects = freshlyLoaded.RestoreFailedProjects;
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         generation++;
         SeedEditVersions(materialized);
@@ -407,6 +415,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
             Generation = generation,
             FailedProjects = failedProjects,
             UncheckedProjects = uncheckedProjects,
+            RestoreFailedProjects = restoreFailedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };

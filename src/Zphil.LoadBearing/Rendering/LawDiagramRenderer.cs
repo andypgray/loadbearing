@@ -177,6 +177,7 @@ public static class LawDiagramRenderer
         bool inbound = constraint is MustNotBeReferencedByConstraint or MustOnlyBeReferencedByConstraint;
         bool only = constraint is MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint;
         var partial = false;
+        var drawn = 0;
 
         foreach (Selection operand in constraint.Operands)
         {
@@ -194,9 +195,12 @@ public static class LawDiagramRenderer
             if (only && ReferenceEquals(other, subject)) continue;
 
             edges.Add(inbound ? (other, subject, arrow) : (subject, other, arrow));
+            drawn++;
         }
 
-        if (partial) unplaced.Add(rule);
+        // A rule every one of whose operands was skipped drew nothing at all. Listing it is what keeps
+        // "drawn or listed" total, rather than leaving a real law invisible on the page.
+        if (partial || drawn == 0) unplaced.Add(rule);
     }
 
     private static void WalkQuarantine(ArchRule rule, LawPlaces places, List<ArchRule> unplaced)

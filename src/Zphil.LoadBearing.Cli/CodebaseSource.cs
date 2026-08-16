@@ -83,6 +83,7 @@ internal sealed class CodebaseSource : IDisposable
     private readonly ArchitectureModel? model;
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
+    private readonly IReadOnlyList<string> restoreFailedProjects;
     private readonly ExtractionCacheStore? store;
     private readonly IReadOnlyList<string> uncheckedProjects;
 
@@ -99,6 +100,7 @@ internal sealed class CodebaseSource : IDisposable
         IReadOnlyList<string> diagnostics,
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects,
         ArchitectureModel? model,
         SpecResolution? resolution,
         SolutionHandle? handle,
@@ -112,6 +114,7 @@ internal sealed class CodebaseSource : IDisposable
         loadFailures = diagnostics;
         this.failedProjects = failedProjects;
         this.uncheckedProjects = uncheckedProjects;
+        this.restoreFailedProjects = restoreFailedProjects;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -132,13 +135,14 @@ internal sealed class CodebaseSource : IDisposable
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
     /// <summary>
-    ///     How well the workspace loaded: the projects that failed to load and the load-failure diagnostics —
-    ///     both freshly collected on a cold run and replayed from the cache on a hit — plus the merge notes
-    ///     the last <see cref="ExtractAsync" /> produced (empty before it runs). Read per call rather than
-    ///     captured, so a verb that renders after extracting sees the notes and one that gates before it does
-    ///     not have to wait for them.
+    ///     How well the workspace loaded: the projects that failed to load, the ones whose NuGet packages are
+    ///     not in the model, and the load-failure diagnostics — all freshly collected on a cold run and
+    ///     replayed from the cache on a hit — plus the merge notes the last <see cref="ExtractAsync" />
+    ///     produced (empty before it runs). Read per call rather than captured, so a verb that renders after
+    ///     extracting sees the notes and one that gates before it does not have to wait for them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes, failedProjects, uncheckedProjects);
+    public WorkspaceDiagnostics Diagnostics =>
+        new(loadFailures, mergeNotes, failedProjects, uncheckedProjects, restoreFailedProjects);
 
     /// <summary>
     ///     Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.
@@ -198,7 +202,8 @@ internal sealed class CodebaseSource : IDisposable
             ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
             return new CodebaseSource(
                 CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
-                read.UncheckedProjects, hitModel, hitResolution, null, store, read, normalized);
+                read.UncheckedProjects, read.RestoreFailedProjects, hitModel, hitResolution, null, store, read,
+                normalized);
         }
 
         // A miss, a partial, or a hit whose spec was not recorded: acquire the workspace and resolve cold.
@@ -252,7 +257,7 @@ internal sealed class CodebaseSource : IDisposable
         if (read.Outcome == CacheOutcome.Hit)
             return new CodebaseSource(
                 CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
-                read.UncheckedProjects, null, null, null, store, read, "");
+                read.UncheckedProjects, read.RestoreFailedProjects, null, null, null, store, read, "");
 
         CodebaseSourceOutcome coldOutcome =
             read.Outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
@@ -349,12 +354,13 @@ internal sealed class CodebaseSource : IDisposable
             // Merge notes are empty by construction here: extraction has not run, and only extraction
             // produces them. What spec resolution needs from this value is the load's own verdict.
             var diagnostics = new WorkspaceDiagnostics(
-                handle.Diagnostics, [], handle.FailedProjects, handle.UncheckedProjects);
+                handle.Diagnostics, [], handle.FailedProjects, handle.UncheckedProjects,
+                handle.RestoreFailedProjects);
             SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec, diagnostics);
             ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
                 outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
-                model, resolution, handle,
+                handle.RestoreFailedProjects, model, resolution, handle,
                 store, cacheRead, normalizedSpec);
         }
         catch
@@ -371,7 +377,7 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
         return new CodebaseSource(
             outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
-            null, null, handle, store,
+            handle.RestoreFailedProjects, null, null, handle, store,
             cacheRead, "");
     }
 
@@ -431,7 +437,9 @@ internal sealed class CodebaseSource : IDisposable
             var records = BuildWriteSpecRecords(solution);
             store!.Write(
                 fingerprint,
-                new ExtractionResult(allFragments, records, loadFailures, failedProjects, uncheckedProjects), ct);
+                new ExtractionResult(
+                    allFragments, records, loadFailures, failedProjects, uncheckedProjects,
+                    restoreFailedProjects), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
