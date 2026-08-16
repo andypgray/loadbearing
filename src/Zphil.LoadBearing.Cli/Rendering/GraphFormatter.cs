@@ -27,7 +27,7 @@ internal static class GraphFormatter
     ///     them: the namespace inventory becomes one elision line at overview grain, the external references
     ///     become one more at skeleton grain, and no section ever disappears.
     /// </summary>
-    public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName, GraphGrain grain)
+    public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName, DocumentGrain grain)
     {
         var lines = new List<string> { $"Codebase survey: {solutionName}", "" };
 
@@ -49,9 +49,9 @@ internal static class GraphFormatter
         return lines;
     }
 
-    private static IEnumerable<string> NamespaceLines(GraphSummary summary, GraphGrain grain)
+    private static IEnumerable<string> NamespaceLines(GraphSummary summary, DocumentGrain grain)
     {
-        return grain >= GraphGrain.Overview ? [OverviewElisionLine] : summary.Projects.Select(NamespaceLine);
+        return grain >= DocumentGrain.Overview ? [OverviewElisionLine] : summary.Projects.Select(NamespaceLine);
     }
 
     private static string ProjectLine(ProjectSummary project)
@@ -75,9 +75,9 @@ internal static class GraphFormatter
             : ["  (none)"];
     }
 
-    private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, GraphGrain grain)
+    private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, DocumentGrain grain)
     {
-        if (grain >= GraphGrain.Skeleton) return [SkeletonElisionLine];
+        if (grain >= DocumentGrain.Skeleton) return [SkeletonElisionLine];
 
         return summary.ExternalEdges.Count > 0
             ? summary.ExternalEdges.Select(e => $"  {e.Source} -> {e.TargetNamespaceRoot}: {e.References}")

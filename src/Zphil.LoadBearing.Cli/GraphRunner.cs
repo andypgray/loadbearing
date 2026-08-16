@@ -31,15 +31,18 @@ namespace Zphil.LoadBearing.Cli;
 ///         A filter matching no project refuses with the available names rather than surveying nothing.
 ///     </para>
 ///     <para>
-///         Output/error writers are injected so the in-process e2e tests can capture them, and the
-///         <see cref="IEnvironment" /> seam supplies the cache-root override.
+///         Output/error writers are injected so the in-process e2e tests can capture them, the
+///         <see cref="IEnvironment" /> seam supplies the cache-root override, and the
+///         <see cref="IResponseFitter" /> decides which rung of the grain ladder a caller with a response
+///         budget actually gets (default: the grain they asked for).
 ///     </para>
 /// </remarks>
 internal sealed class GraphRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource? source = null,
-    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
+    IEnvironment? environment = null,
+    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)
     {
@@ -100,36 +103,29 @@ internal sealed class GraphRunner(
                 NarrowedUniverseNotice.Relative(diagnostics.UncheckedProjects, source.SolutionDirectory)));
     }
 
-    // The JSON survey, degraded rather than cut. A caller whose transport has a response budget declares it,
-    // and a document that overruns is re-composed one rung coarser from the summary already in hand — no
-    // second extraction, and byte-identical to what that grain's own flag would have written, so the two
-    // surfaces cannot drift. Degrading coarsens the grain and never touches the scope: the answer stays about
-    // the codebase the caller asked about, and every rung carries the same narrowing.
-    //
-    // It walks the whole ladder rather than stepping once, because one step is not enough on a real solution:
-    // on a 34-project codebase the full survey is ~147k characters and the overview it degrades to is still
-    // ~82k, over any default budget. Stopping there handed the truncator exactly the document this method
-    // exists to avoid producing — a survey cut mid-array, unparseable, which is worse for a reader than a
-    // whole answer in less detail. The loop cannot spin: every rung is strictly coarser and Skeleton is last.
+    // The JSON survey, degraded rather than cut. The runner offers every grain from the requested floor down
+    // to the coarsest as a lazy ladder and the fitter picks; a caller whose transport has a response budget
+    // gets the first rung that fits, re-composed from the summary already in hand — no second extraction, and
+    // byte-identical to what that grain's own flag would have written, so the two surfaces cannot drift.
+    // Degrading coarsens the grain and never touches the scope: the answer stays about the codebase the
+    // caller asked about, and every rung carries the same narrowing.
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionDirectory, string solutionName,
         IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects, IReadOnlyList<string> restoreFailedProjects,
         IReadOnlyList<string> projectGlobs)
     {
-        GraphGrain grain = request.Grain;
-        string document = Compose(grain);
-
-        while (Overruns(document, request) && grain < GraphGrain.Skeleton)
-        {
-            grain++;
-            document = Compose(grain);
-        }
-
-        GraphJsonRenderer.Render(output, document);
+        GraphJsonRenderer.Render(output, (fitter ?? ResponseFitter.FirstRung).Fit(Ladder(request.Grain)));
         return;
 
-        string Compose(GraphGrain at)
+        // Lazy on purpose: each rung costs a full serialization, so a fitter that stops at the first pays for
+        // exactly one. The ladder cannot spin — every rung is strictly coarser and Skeleton is last.
+        IEnumerable<string> Ladder(DocumentGrain floor)
+        {
+            for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return Compose(at);
+        }
+
+        string Compose(DocumentGrain at)
         {
             return GraphJsonRenderer.Document(
                 scoped, solutionDirectory, solutionName, renderedDiagnostics, modelIncomplete, failedProjects,
@@ -152,14 +148,6 @@ internal sealed class GraphRunner(
 
         foreach (string line in GraphFormatter.Lines(scoped, solutionName, request.Grain))
             output.WriteLine(line);
-    }
-
-    // No "unless the caller asked for this grain" guard: an explicit --overview that still overruns is the
-    // exact case that used to reach the truncator, and the caller asking for overview grain is asking for a
-    // floor on detail, not a promise to hand back a document their own transport cannot carry.
-    private static bool Overruns(string document, GraphRequest request)
-    {
-        return request.ResponseBudgetChars is { } budget && document.Length > budget;
     }
 
     private static string ScopeStamp(IReadOnlyList<string> projectGlobs, GraphSummary summary, GraphSummary scoped)

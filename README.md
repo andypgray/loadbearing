@@ -117,30 +117,30 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
             .Fix("Inject IEnvironment (see SystemEnvironment); read via GetVariable.");
 ```
 
-Its four baselined sites keep the rule green at the command line and still reach code scanning, as note-level results marked suppressed, so the burndown is visible to anyone reviewing without ever failing a build. One result object from a fresh run:
+Its two baselined sites keep the rule green at the command line and still reach code scanning, as note-level results marked suppressed, so the burndown is visible to anyone reviewing without ever failing a build. One result object from a fresh run:
 
 ```json
 {
   "ruleId": "mcp/env-through-seam",
   "level": "note",
   "message": {
-    "text": "Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog references System.Environment"
+    "text": "Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration references System.Environment"
   },
   "locations": [
     {
       "physicalLocation": {
         "artifactLocation": {
-          "uri": "src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/IdleTimeoutWatchdog.cs",
+          "uri": "src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/SerilogConfiguration.cs",
           "uriBaseId": "SRCROOT"
         },
         "region": {
-          "startLine": 109
+          "startLine": 21
         }
       }
     }
   ],
   "partialFingerprints": {
-    "loadBearingViolationIdentity/v1": "v1|T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog|T:System.Environment||src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/IdleTimeoutWatchdog.cs|0"
+    "loadBearingViolationIdentity/v1": "v1|T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration|T:System.Environment||src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/SerilogConfiguration.cs|0"
   },
   "baselineState": "unchanged",
   "suppressions": [
@@ -173,7 +173,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, w
   "fix": "Inject IEnvironment (see SystemEnvironment); read via GetVariable.",
   "baseline": {
     "path": "arch/baselines/mcp/env-through-seam.json",
-    "grandfathered": 4,
+    "grandfathered": 2,
     "stale": 0
   },
   "violations": [],
@@ -278,7 +278,7 @@ The line under the fence is the honest part. A diagram can only draw a rule whos
 
 ## This page is tested
 
-The excerpts above are under gate. [`RootReadmeQuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/RootReadmeQuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The five fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the check document and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
+The excerpts above are under gate. [`QuoteSyncTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/QuoteSyncTests.cs) holds each quoted excerpt to the committed file it was cut from, every line in order as a verbatim substring: change the spec and leave this page alone, and the suite goes red. [`ReadmeAnchorGateTests`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves the `file:line` anchors inside the quoted reports against the sources they name. The five fences that are captured tool output with no committed counterpart, the hook report and the SARIF object and the check document and the graph survey and the Framework check, are registered as such and held to their place on the page, so an exemption cannot quietly go dead.
 
 The page is the tool's output, and the [CI badge](https://github.com/andypgray/loadbearing/actions/workflows/ci.yml) at the top is what keeps it that way.
 

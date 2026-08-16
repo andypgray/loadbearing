@@ -20,17 +20,14 @@ namespace Zphil.LoadBearing.Cli;
 ///     (<see cref="IncompleteModelGate" />).
 /// </param>
 /// <param name="Grain">
-///     The floor on how much detail to render: the survey is never finer than this, and a response budget
-///     may take it coarser still. Coarser, never narrower — grain and scope are separate knobs.
+///     The floor on how much detail to render: the survey is never finer than this, and a caller whose
+///     transport has a response budget may take it coarser still (<see cref="IResponseFitter" />). Coarser,
+///     never narrower — grain and scope are separate knobs. No budget rides this record: what a channel can
+///     carry is a property of the caller, not of the question asked.
 /// </param>
 /// <param name="Projects">
 ///     The <c>--projects</c> allow-list — project-name globs, semicolon-separated — or null for every
 ///     project. A filter that matches nothing refuses the run rather than surveying an empty codebase.
-/// </param>
-/// <param name="ResponseBudgetChars">
-///     A response budget in characters: when the JSON document would exceed it, the survey re-renders one
-///     rung coarser — and again, as far as the ladder goes — from the summary already in hand. Null on every
-///     CLI parse path: a terminal has no response budget, so this belongs to a caller whose transport does.
 /// </param>
 internal sealed record GraphRequest(
     string? Solution,
@@ -39,6 +36,5 @@ internal sealed record GraphRequest(
     bool NoCache,
     string? Binlog,
     bool AllowWorkspaceDiagnostics,
-    GraphGrain Grain,
-    string? Projects,
-    int? ResponseBudgetChars);
+    DocumentGrain Grain,
+    string? Projects);

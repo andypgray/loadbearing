@@ -156,10 +156,9 @@ internal static class Checker
     /// </remarks>
     public static string JsonReport(this CheckReport report)
     {
-        var writer = new StringWriter();
-        JsonReportRenderer.Render(
-            writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], [], [], []);
-        return writer.ToString();
+        return JsonReportRenderer.Document(
+            report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], [], [], [],
+            DocumentGrain.Full);
     }
 
     /// <summary>

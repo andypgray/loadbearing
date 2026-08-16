@@ -14,11 +14,11 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         names the knobs that would have avoided it.
 ///     </para>
 ///     <para>
-///         <c>arch_graph</c> degrades itself down a grain ladder against this same budget before reaching
-///         here, so on any solution whose skeleton fits it never arrives. That is a ladder with a last rung,
-///         not a guarantee: a survey still over budget at its coarsest grain lands here and is cut like any
-///         other response. Reaching that point is the signal to narrow the <em>subject</em> — the knob the
-///         footer names — because no grain left will help.
+///         <c>arch_graph</c> and <c>arch_check</c> both degrade down a grain ladder against this same budget
+///         before reaching here, so on any solution whose skeleton fits neither arrives. That is a ladder
+///         with a last rung, not a guarantee: a document still over budget at its coarsest grain lands here
+///         and is cut like any other response. Reaching that point is the signal to narrow the
+///         <em>subject</em> — the knob each footer names — because no grain left will help.
 ///     </para>
 /// </remarks>
 internal static class ResponseTruncator
@@ -30,19 +30,21 @@ internal static class ResponseTruncator
     // must not pull the MSBuildLocator-quarantined tool type into it. arch_status, arch_explain and
     // arch_context are absent on purpose — they have no knob, so a hint would be noise at the exact moment a
     // reader is looking for something to do.
+    //
+    // Neither hint names a grain. Both tools coarsen their own grain against this same budget before a
+    // response can reach here, so anything that still overruns has already been through the ladder and
+    // overview: true would only name a rung it took. What is left in each case is the subject.
     private static readonly FrozenDictionary<string, string> NarrowingHints = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        // Deliberately not a grain hint. arch_graph coarsens its own grain against this same budget before a
-        // response can reach here, so a survey that still overruns has already been through the ladder and
-        // overview: true would only name a rung it took. What is left is the subject.
         [ArchToolNames.Graph] =
             "Narrow the subject rather than read half a survey: the grain ladder is already exhausted, so "
             + "projects: \"<name globs>\" surveys part of the solution and is the knob left. On the CLI, "
             + "loadbearing graph --projects <globs> --json, or redirect loadbearing graph --json to a file "
             + "and slice it there.",
         [ArchToolNames.Check] =
-            "Narrow the call rather than read half a report: rules: \"<rule-id globs>\" checks a subset, and "
-            + "arch_explain returns one rule whole. For the report entire, redirect "
+            "Narrow the subject rather than read half a report: the grain ladder is already exhausted, so "
+            + "rules: \"<rule-id globs>\" checks part of the spec and is the knob left — and arch_explain "
+            + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json, or redirect "
             + "loadbearing check --json to a file and slice it there."
     }.ToFrozenDictionary(StringComparer.Ordinal);
 

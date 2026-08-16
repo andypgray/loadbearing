@@ -2,6 +2,7 @@
   "schemaVersion": 3,
   "solution": "MyApp.sln",
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
+  "grain": "skeleton",
   "summary": {
     "rulesChecked": 18,
     "rulesPassed": 2,
@@ -18,38 +19,7 @@
       "sentence": "The Domain layer must not reference the Web layer.",
       "because": "Domain is UI-agnostic; transaction boundaries live in services.",
       "fix": "Define an abstraction in Domain and implement it in Web.",
-      "violations": [
-        {
-          "kind": "reference",
-          "source": "MyApp.Domain.OrderService",
-          "target": "MyApp.Web.HomeController",
-          "sites": [
-            {
-              "file": "MyApp.Domain/OrderService.cs",
-              "line": 9
-            },
-            {
-              "file": "MyApp.Domain/OrderService.cs",
-              "line": 10
-            },
-            {
-              "file": "MyApp.Domain/OrderService.cs",
-              "line": 13
-            }
-          ]
-        },
-        {
-          "kind": "reference",
-          "source": "MyApp.Domain.OrderService",
-          "target": "MyApp.Web.WebTextExtensions",
-          "sites": [
-            {
-              "file": "MyApp.Domain/OrderService.cs",
-              "line": 10
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -58,7 +28,7 @@
       "status": "passed",
       "sentence": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`.",
       "because": "Billing must not reach up into the web layer.",
-      "violations": [],
+      "violationCount": 0,
       "warnings": []
     },
     {
@@ -73,23 +43,7 @@
         "grandfathered": 1,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "reference",
-          "source": "MyApp.Web.HomeController",
-          "target": "System.Data.DataTable",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 24
-            },
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 26
-            }
-          ]
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     },
     {
@@ -104,30 +58,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "memberUse",
-          "source": "MyApp.Web.HomeController",
-          "targetMember": "P:System.DateTime.Now",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 32
-            }
-          ]
-        },
-        {
-          "kind": "memberUse",
-          "source": "MyApp.Web.HomeController",
-          "targetMember": "P:System.DateTime.UtcNow",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 37
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -142,28 +73,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "memberShape",
-          "subjectMember": "M:MyApp.Web.HomeController.Load",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 48
-            }
-          ]
-        },
-        {
-          "kind": "memberShape",
-          "subjectMember": "M:MyApp.Web.HomeController.Save",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 43
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -178,19 +88,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "construction",
-          "source": "MyApp.Web.InvoiceService",
-          "target": "MyApp.Web.InvoiceCreatedHandler",
-          "sites": [
-            {
-              "file": "MyApp.Web/InvoiceService.cs",
-              "line": 8
-            }
-          ]
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     },
     {
@@ -205,30 +103,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "injection",
-          "source": "MyApp.Web.ReportScheduler",
-          "target": "MyApp.Web.IOrderFeed",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportScheduler.cs",
-              "line": 7
-            }
-          ]
-        },
-        {
-          "kind": "injection",
-          "source": "MyApp.Web.ReportScheduler",
-          "target": "MyApp.Web.IOrderFormatter",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportScheduler.cs",
-              "line": 8
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -237,7 +112,7 @@
       "status": "passed",
       "sentence": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`.",
       "because": "Nothing should reference the (nonexistent) ghost layer.",
-      "violations": [],
+      "violationCount": 0,
       "warnings": [
         {
           "kind": "inertTarget",
@@ -251,13 +126,7 @@
       "status": "failed",
       "sentence": "Types in `MyApp.Nowhere.*` must be named `*Service`.",
       "because": "A subject that matches nothing must fail loudly.",
-      "violations": [
-        {
-          "kind": "emptySubject",
-          "detail": "The subject selection matched no solution-declared types.",
-          "sites": []
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     },
     {
@@ -272,34 +141,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "reference",
-          "source": "MyApp.Web.InvoiceController",
-          "target": "MyApp.Legacy.Billing.BillingCalculator",
-          "sites": [
-            {
-              "file": "MyApp.Web/InvoiceController.cs",
-              "line": 9
-            },
-            {
-              "file": "MyApp.Web/InvoiceController.cs",
-              "line": 10
-            }
-          ]
-        },
-        {
-          "kind": "reference",
-          "source": "MyApp.Web.InvoiceController",
-          "target": "MyApp.Legacy.Billing.RoundingMode",
-          "sites": [
-            {
-              "file": "MyApp.Web/InvoiceController.cs",
-              "line": 10
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -309,7 +151,7 @@
       "sentence": "",
       "because": "Replacement scheduled; not worth stabilizing.",
       "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.",
-      "violations": [],
+      "violationCount": 0,
       "warnings": []
     },
     {
@@ -324,30 +166,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "catch",
-          "source": "MyApp.Web.ReportEndpoint",
-          "target": "System.Exception",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportEndpoint.cs",
-              "line": 15
-            }
-          ]
-        },
-        {
-          "kind": "catch",
-          "source": "MyApp.Web.ReportPublisher",
-          "target": "System.Exception",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportPublisher.cs",
-              "line": 22
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -357,19 +176,7 @@
       "sentence": "The Domain layer must throw only `OrderRuleViolation`.",
       "because": "Domain code signals rule failures with the domain's own exception, not a generic BCL type.",
       "fix": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.",
-      "violations": [
-        {
-          "kind": "throw",
-          "source": "MyApp.Domain.OrderApproval",
-          "target": "System.InvalidOperationException",
-          "sites": [
-            {
-              "file": "MyApp.Domain/OrderApproval.cs",
-              "line": 17
-            }
-          ]
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     },
     {
@@ -379,38 +186,7 @@
       "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.",
       "because": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.",
       "fix": "Add a CancellationToken parameter and flow it to the calls you await.",
-      "violations": [
-        {
-          "kind": "memberShape",
-          "subjectMember": "M:MyApp.Web.HomeController.Load",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 48
-            }
-          ]
-        },
-        {
-          "kind": "memberShape",
-          "subjectMember": "M:MyApp.Web.HomeController.Save",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 43
-            }
-          ]
-        },
-        {
-          "kind": "memberShape",
-          "subjectMember": "M:MyApp.Web.HomeController.SaveAsync",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 53
-            }
-          ]
-        }
-      ],
+      "violationCount": 3,
       "warnings": []
     },
     {
@@ -425,30 +201,7 @@
         "grandfathered": 0,
         "stale": 0
       },
-      "violations": [
-        {
-          "kind": "expose",
-          "source": "MyApp.Web.HomeController",
-          "target": "System.Data.DataTable",
-          "sites": [
-            {
-              "file": "MyApp.Web/HomeController.cs",
-              "line": 24
-            }
-          ]
-        },
-        {
-          "kind": "expose",
-          "source": "MyApp.Web.InvoiceController",
-          "target": "System.Data.DataTable",
-          "sites": [
-            {
-              "file": "MyApp.Web/InvoiceController.cs",
-              "line": 14
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -458,30 +211,7 @@
       "sentence": "The Web or Domain layers must not catch `Exception` without a `when` filter.",
       "because": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.",
       "fix": "Add a `when` filter naming the exceptions you can handle, or catch those types directly.",
-      "violations": [
-        {
-          "kind": "catch",
-          "source": "MyApp.Web.ReportEndpoint",
-          "target": "System.Exception",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportEndpoint.cs",
-              "line": 15
-            }
-          ]
-        },
-        {
-          "kind": "catch",
-          "source": "MyApp.Web.ReportPublisher",
-          "target": "System.Exception",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportPublisher.cs",
-              "line": 22
-            }
-          ]
-        }
-      ],
+      "violationCount": 2,
       "warnings": []
     },
     {
@@ -491,19 +221,7 @@
       "sentence": "The Web or Domain layers must not swallow `Exception`.",
       "because": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling.",
       "fix": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle.",
-      "violations": [
-        {
-          "kind": "catch",
-          "source": "MyApp.Web.ReportEndpoint",
-          "target": "System.Exception",
-          "sites": [
-            {
-              "file": "MyApp.Web/ReportEndpoint.cs",
-              "line": 15
-            }
-          ]
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     },
     {
@@ -513,19 +231,7 @@
       "sentence": "The Domain layer must not throw `InvalidOperationException`.",
       "because": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
       "fix": "Throw OrderRuleViolation instead of System.InvalidOperationException.",
-      "violations": [
-        {
-          "kind": "throw",
-          "source": "MyApp.Domain.OrderApproval",
-          "target": "System.InvalidOperationException",
-          "sites": [
-            {
-              "file": "MyApp.Domain/OrderApproval.cs",
-              "line": 17
-            }
-          ]
-        }
-      ],
+      "violationCount": 1,
       "warnings": []
     }
   ],

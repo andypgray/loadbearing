@@ -1,12 +1,12 @@
 using System.Text.Json;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Cli;
-using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -43,7 +43,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     [Fact]
     public async Task ArchCheck_WorkspaceLoadDiagnostic_CarriesTheMsBuildNoteLastInTheDocument()
     {
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([LoadDiagnostic]), new FakeEnvironment());
+        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([LoadDiagnostic]), ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -56,7 +56,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The negative control that keeps the note diagnostic context rather than a banner: an empty
         // composition stays empty, so a clean call's document says nothing about MSBuild at all.
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([]), new FakeEnvironment());
+        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([]), ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -73,7 +73,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             Binding(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new FakeEnvironment());
+            ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -92,7 +92,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             Binding(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new FakeEnvironment());
+            ResponseFitter.FirstRung);
 
         var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
 
@@ -113,7 +113,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             Binding(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new FakeEnvironment());
+            ResponseFitter.FirstRung);
 
         string document = await tools.GraphAsync(true, cancellationToken: Ct);
 

@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -274,7 +275,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
             new CheckRequest(
                 workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, null,
                 Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, true, null,
-                allowWorkspaceDiagnostics, null, null),
+                allowWorkspaceDiagnostics, null, null, DocumentGrain.Full),
             Ct);
 
         return new CliResult(exit, output.ToString(), error.ToString());

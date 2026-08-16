@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **An over-budget check report now comes back whole at a coarser grain instead of cut in half.**
+  `check --overview` elides each violation's sites, reporting them as `siteCount`; `check --skeleton`
+  elides the violations themselves, reporting them as `violationCount` and keeping every rule with its
+  verdict, prose, baseline and warnings. The `arch_check` MCP tool takes both as parameters and, over
+  the client's `MAX_MCP_OUTPUT_TOKENS` budget, walks down the ladder on its own until a whole document
+  fits — byte-identical to what that grain's own flag writes, so a reader can trust the `grain` stamp
+  rather than diffing two reports. `arch_graph` has degraded this way since 0.4.0; check is the tool
+  agents are told to call before finishing work and its bulk driver is an uncapped per-site dump, so it
+  is the response most likely to overrun on a legacy migration — and a report cut mid-array is corrupt
+  JSON that costs a client the whole tool surface, not merely some detail. What survives every rung is
+  chosen rather than incidental: rule prose scales with the rule count, which is authored and small,
+  while sites scale with the codebase, which is what actually overruns a channel — so the coarsest
+  report is still a verdict a reader can act on. `schemaVersion` stays 3 and the three new keys are
+  absent at full grain, so a consumer that never asks for a coarser report sees the same bytes it
+  always did. Underneath, the ladder stopped being graph's private loop: both verbs now offer their
+  rungs to one `IResponseFitter` that lives beside the truncator, the budget is one service read per
+  call, and the transport concern that used to be threaded through a CLI request record — with every
+  parse path passing a `null` it had to explain — is gone.
+
 - **A run narrowed by a solution filter now says so on every surface.** `check`, `status` and `graph` stamp which declared projects the filtered run never checked, and the JSON documents carry them as `uncheckedProjects` beside `failedProjects` — absent when nothing was narrowed, so unfiltered output does not move a byte. SARIF carries one warning-level tool notification, and the `arch_check`, `arch_status` and `arch_graph` MCP tools inherit the slot, which the stdout stamp could never reach. The set is measured from the load rather than read from the filter: a selection whose transitive project references pull the rest of the solution in narrows nothing and says nothing. `context` writes the same caveat above its answer. `baseline --init`, `baseline --accept-reductions` and `render` refuse under a narrowing filter — exit 2, nothing written: a baseline captured through a filter signs off debt in projects it never measured, `--accept-reductions` would delete real entries, and rendered files would silently drop every card from an unchecked project. `baseline --add` keeps working. In the xUnit adapter, rule cases keep their verdicts — a narrowed universe is a smaller true answer — and `Workspace_LoadedCompletely` reports as skipped, naming what was not checked, rather than pass under a name the filtered run cannot vouch for. A filtered run anchors every convention-relative path at the solution the filter references rather than at the filter's own directory — committed baselines, render targets, `context --path`, diff resolution, and the stamped project paths, which read solution-relative rather than `../`-prefixed — so a filter that narrows nothing answers exactly as its solution does, instead of missing the committed baseline and failing rules that are green over the whole solution. And a rule all of whose findings are the empty-selection defaults skips under a narrowing filter, with one line naming the filter and the unchecked count, rather than reding as a typo'd spec: a filter that erases a rule's whole subject no longer turns a green spec red, while unfiltered runs keep the fail-closed empty-selection defaults exactly as they were.
 
 - **The four example solutions now ship their architecture as a committed drawing.** `Meridian`,
@@ -31,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   .NET guidance with nothing to draw and the list under the fence is the law.
 
 ### Changed
+
+- **The check report now leads with its verdict.** `check --json` and `arch_check` serialize `summary` and
+  every trust stamp — `modelIncomplete`, `failedProjects`, `restoreFailedProjects`, `uncheckedProjects` —
+  above `rules`, which used to carry all of them below it. A reader with a response budget cuts at the last
+  newline that fits, and past the grain ladder's coarsest rung that cut lands inside `rules`, the bulk of the
+  document: the roll-up and every caveat that stops a report reading as plain green were the first things
+  lost, and check only overruns when it is red-heavy — exactly when the verdict matters most. Other
+  harnesses' limits are not knowable from here, so most-important-first is the right shape regardless. The
+  stamps precede `summary` so a caveat never arrives after the counts it invalidates, and
+  `workspaceDiagnostics` stays last on purpose: it is MSBuild's evidence rather than the verdict, it has no
+  ceiling, and the actionable half of it is already hoisted into `failedProjects` and
+  `restoreFailedProjects`. Key order and nothing else — `schemaVersion` stays 3, nulls stay omitted, and a
+  clean document differs from the one before it only in the sequence of its keys.
 
 - **The string anchor is now stated where an author is reading, and demonstrated where an adopter is
   looking.** The shared-framework load failure already offered `.DerivedFrom("…ControllerBase")` as its

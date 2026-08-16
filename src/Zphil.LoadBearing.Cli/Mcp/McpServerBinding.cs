@@ -60,11 +60,12 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     /// </summary>
     /// <param name="diffBase">The git ref the Quarantine tripwire compares against, or null to skip it.</param>
     /// <param name="rules">Rule-ID globs narrowing what runs, or null for every rule.</param>
-    internal CheckRequest CheckRequest(string? diffBase, string? rules)
+    /// <param name="grain">The floor on detail — coarser, never narrower.</param>
+    internal CheckRequest CheckRequest(string? diffBase, string? rules, DocumentGrain grain)
     {
         return new CheckRequest(
             Solution, Spec, AsJsonDocument, diffBase, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
-            ReportPartialModels, NoSarifFile, rules);
+            ReportPartialModels, NoSarifFile, rules, grain);
     }
 
     /// <summary>The <c>arch_status</c> run: the whole burndown, which carries no narrowing knob.</summary>
@@ -99,12 +100,10 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     /// <param name="allowWorkspaceDiagnostics">Whether to survey the partial model instead of refusing.</param>
     /// <param name="grain">The floor on detail — coarser, never narrower.</param>
     /// <param name="projects">Project-name globs narrowing the subject, or null for every project.</param>
-    /// <param name="responseBudgetChars">The transport's response budget, which the runner degrades against.</param>
-    internal GraphRequest GraphRequest(
-        bool allowWorkspaceDiagnostics, GraphGrain grain, string? projects, int responseBudgetChars)
+    internal GraphRequest GraphRequest(bool allowWorkspaceDiagnostics, DocumentGrain grain, string? projects)
     {
         return new GraphRequest(
             Solution, AsJsonDocument, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
-            allowWorkspaceDiagnostics, grain, projects, responseBudgetChars);
+            allowWorkspaceDiagnostics, grain, projects);
     }
 }

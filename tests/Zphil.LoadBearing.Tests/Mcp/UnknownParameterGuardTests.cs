@@ -74,10 +74,17 @@ public sealed class UnknownParameterGuardTests
     [Fact]
     public void Validate_KnownKeysOnCheck_ReturnsNull()
     {
-        // Act — arch_check's real optional parameters: the tripwire diff ref and the rule-ID filter.
+        // Act — arch_check's real optional parameters: the tripwire diff ref, the rule-ID filter, and the
+        // two grain knobs.
         string? message = UnknownParameterGuard.Validate(
             "arch_check",
-            new Dictionary<string, JsonElement> { ["diffBase"] = DummyValue, ["rules"] = DummyValue });
+            new Dictionary<string, JsonElement>
+            {
+                ["diffBase"] = DummyValue,
+                ["rules"] = DummyValue,
+                ["overview"] = DummyValue,
+                ["skeleton"] = DummyValue
+            });
 
         // Assert
         message.ShouldBeNull();

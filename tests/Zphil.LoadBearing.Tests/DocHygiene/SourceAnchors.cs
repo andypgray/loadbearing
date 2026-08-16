@@ -32,91 +32,106 @@ internal static class SourceAnchors
         new($@"^\s*(src/\S+\.cs):(\d+) {EmDash} (.+)$", RegexOptions.CultureInvariant);
 
     /// <summary>
-    ///     Extracts every anchor from the fenced code blocks of <paramref name="docText" />. Fence state
-    ///     is tracked exactly as the prose checker strips fences — a fence opens on a line whose first
-    ///     non-whitespace content is a run of three or more backticks or tildes and closes on the next
-    ///     line with at least as long a run of the same character and nothing after it but whitespace —
-    ///     but here the fenced content is kept and scanned. Anchors outside fences are ignored, because
-    ///     inline prose short-forms restate the fenced anchors and are commentary rather than the pin.
+    ///     Extracts every anchor from the fenced code blocks of <paramref name="docText" />. Anchors
+    ///     outside fences are ignored, because inline prose short-forms restate the fenced anchors and are
+    ///     commentary rather than the pin.
     /// </summary>
     public static IReadOnlyList<SourceAnchor> Extract(string doc, string docText)
     {
-        string normalized = docText.Replace("\r\n", "\n");
-        string[] lines = normalized.Split('\n');
         List<SourceAnchor> anchors = new();
-        var insideFence = false;
-        var fenceChar = '\0';
-        var fenceLength = 0;
 
-        for (var index = 0; index < lines.Length; index++)
+        foreach ((string text, int number) in FencedLines(docText))
         {
-            string line = lines[index];
-            if (!insideFence)
-            {
-                if (TryOpenFence(line, out fenceChar, out fenceLength)) insideFence = true;
-            }
-            else if (ClosesFence(line, fenceChar, fenceLength))
-            {
-                insideFence = false;
-                fenceChar = '\0';
-                fenceLength = 0;
-            }
-            else
-            {
-                Match match = AnchorLine.Match(line);
-                if (match.Success)
-                {
-                    string file = match.Groups[1].Value;
-                    int sourceLine = int.Parse(match.Groups[2].Value);
-                    string message = match.Groups[3]
-                        .Value.Trim();
-                    anchors.Add(new SourceAnchor(doc, index + 1, file, sourceLine, message));
-                }
-            }
+            Match match = AnchorLine.Match(text);
+            if (!match.Success) continue;
+
+            string file = match.Groups[1].Value;
+            int sourceLine = int.Parse(match.Groups[2].Value);
+            string message = match.Groups[3]
+                .Value.Trim();
+            anchors.Add(new SourceAnchor(doc, number, file, sourceLine, message));
         }
 
         return anchors;
     }
 
     /// <summary>
-    ///     Splits <paramref name="docText" /> into the content lines of each fenced code block, one list
-    ///     per block in document order. Fence state is tracked exactly as <see cref="Extract" /> tracks it
-    ///     — a fence opens on a line whose first non-whitespace content is a run of three or more backticks
-    ///     or tildes and closes on the next line with at least as long a run of the same character and
-    ///     nothing after it but whitespace — but here the opening and closing fence lines are dropped and
-    ///     the lines between them are kept verbatim, so a caller can hold a quoted block to the source it
-    ///     was cut from. An unclosed fence keeps every line to the end of the text as its final block.
-    ///     Input newlines are normalized to <c>"\n"</c> first.
+    ///     Splits <paramref name="docText" /> into the content of each fenced code block, one list per
+    ///     block in document order, each line paired with its 1-based line number in the doc so a caller
+    ///     can name the exact place a quote lives. A fence opens on a line whose first non-whitespace
+    ///     content is a run of three or more backticks or tildes and closes on the next line with at least
+    ///     as long a run of the same character and nothing after it but whitespace; the fence lines
+    ///     themselves are dropped and the lines between them are kept verbatim. An unclosed fence keeps
+    ///     every line to the end of the text as its final block. Input newlines are normalized to
+    ///     <c>"\n"</c> first, so a <c>\r</c> never reaches the caller.
     /// </summary>
-    public static IReadOnlyList<IReadOnlyList<string>> Fences(string docText)
+    /// <remarks>
+    ///     This is the one fence scanner the quote gates share, and the only place the state machine
+    ///     lives: <see cref="FencedLines" /> flattens it, <see cref="Fences" /> drops the line numbers,
+    ///     <see cref="Extract" /> filters it for anchor lines and <c>RuleQuotes.Extract</c> for
+    ///     rule-header lines. A caller needing both block identity and position — a
+    ///     <c>grandfathered: N</c> sub-line takes its rule id from the header line above it
+    ///     <em>in the same fence</em>, and must still fail naming <c>doc:line</c> — reads this directly.
+    /// </remarks>
+    public static IReadOnlyList<IReadOnlyList<(string Text, int Number)>> FencedBlocks(string docText)
     {
         string normalized = docText.Replace("\r\n", "\n");
         string[] lines = normalized.Split('\n');
-        List<IReadOnlyList<string>> fences = new();
-        List<string>? current = null;
+        List<IReadOnlyList<(string Text, int Number)>> blocks = new();
+        List<(string Text, int Number)>? current = null;
         var fenceChar = '\0';
         var fenceLength = 0;
 
-        foreach (string line in lines)
+        for (var index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index];
             if (current is null)
             {
-                if (TryOpenFence(line, out fenceChar, out fenceLength)) current = new List<string>();
+                if (TryOpenFence(line, out fenceChar, out fenceLength)) current = new List<(string, int)>();
             }
             else if (ClosesFence(line, fenceChar, fenceLength))
             {
-                fences.Add(current);
+                blocks.Add(current);
                 current = null;
                 fenceChar = '\0';
                 fenceLength = 0;
             }
             else
             {
-                current.Add(line);
+                current.Add((line, index + 1));
             }
+        }
 
-        if (current is not null) fences.Add(current);
+        if (current is not null) blocks.Add(current);
 
-        return fences;
+        return blocks;
+    }
+
+    /// <summary>
+    ///     Every line of <paramref name="docText" /> that sits inside a fenced code block, paired with its
+    ///     1-based line number in the doc — <see cref="FencedBlocks" /> flattened, for the callers that
+    ///     want positions and do not care which block a line came from.
+    /// </summary>
+    public static IReadOnlyList<(string Text, int Number)> FencedLines(string docText)
+    {
+        return FencedBlocks(docText)
+            .SelectMany(static block => block)
+            .ToArray();
+    }
+
+    /// <summary>
+    ///     The content lines of each fenced code block of <paramref name="docText" />, one list per block
+    ///     in document order — <see cref="FencedBlocks" /> without the line numbers, for the callers that
+    ///     hold a quoted block to the source it was cut from and locate it by a marker rather than by
+    ///     position.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<string>> Fences(string docText)
+    {
+        return FencedBlocks(docText)
+            .Select(static block => (IReadOnlyList<string>)block
+                .Select(static line => line.Text)
+                .ToArray())
+            .ToArray();
     }
 
     /// <summary>

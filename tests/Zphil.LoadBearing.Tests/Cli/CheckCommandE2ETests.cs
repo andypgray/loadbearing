@@ -17,6 +17,14 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         <c>rulesFilter</c>) is what stops a green subset of a red spec reading as a green solution. A
 ///         filter matching no rule refuses before extraction, since rule IDs come from the spec model.
 ///     </para>
+///     <para>
+///         The grain rows pin the other knob, and the two are independent: <c>--rules</c> narrows the
+///         <em>subject</em> (which rules are evaluated at all), while <c>--overview</c> and
+///         <c>--skeleton</c> coarsen the <em>grain</em> (how much of each evaluated rule is written). Every
+///         rung is a whole verdict over the same rules — which is what makes an over-budget MCP call safe to
+///         degrade automatically — and full grain stamps nothing, so the document a consumer read before the
+///         ladder existed is byte-identical to the one it reads now.
+///     </para>
 /// </summary>
 [Collection("Serial")]
 public sealed class CheckCommandE2ETests
@@ -213,6 +221,101 @@ public sealed class CheckCommandE2ETests
 
         result.ShouldReportViolations();
         result.Out.ShouldMatchGolden("violated-check.json");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJson_StampsNoGrain()
+    {
+        // The negative control that keeps the ladder additive: a full report says nothing about grain, so a
+        // consumer reading the document before the ladder existed reads the same bytes after it.
+        CliResult result = await ViolatedJson.Value;
+
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("grain", out _)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecOverviewJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--overview");
+
+        // Assert — the whole report at coarser grain: every rule and every violation still here with its
+        // prose and its edge, each violation's sites replaced by their count, and the grain stamped so a
+        // reader knows which document this is.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-overview.json");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecSkeletonJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton");
+
+        // Assert — the verdict alone: every rule with its prose, status, baseline and warnings, its
+        // violations replaced by their count. Still a verdict, which is what distinguishes it from status's
+        // burndown over the same rules.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-skeleton.json");
+    }
+
+    [Fact]
+    public async Task Check_OverviewAndSkeletonTogether_TakesTheCoarserGrain()
+    {
+        // Arrange & Act — the two name a floor on detail rather than competing modes, so asking for both is
+        // not a conflict to refuse over. Same rule as graph's, from the same mapper.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--overview",
+            "--skeleton");
+
+        // Assert
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-skeleton.json");
+    }
+
+    [Fact]
+    public async Task Check_SkeletonJson_ReportsAPassingRulesElidedViolationsAsZeroRatherThanOmittingThem()
+    {
+        // Arrange — an elided array must not read as an empty one, and the case that proves it is the rule
+        // with nothing to elide: a passing rule renders violationCount 0, so "not rendered at this grain"
+        // and "none found" stay distinguishable at the one place they would otherwise collapse.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton");
+
+        // Act
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        JsonElement passing = document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .First(rule => rule.GetProperty("status")
+                .GetString() == "passed");
+
+        // Assert
+        passing.TryGetProperty("violations", out _)
+            .ShouldBeFalse();
+        passing.GetProperty("violationCount")
+            .GetInt32()
+            .ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Check_HumanOutput_IgnoresTheGrainFlags()
+    {
+        // Arrange — grain is a property of the JSON document alone: a terminal has no response budget to
+        // overrun, and the human block is what a developer reads to fix something.
+        CliResult plain = await ViolatedHuman.Value;
+
+        // Act
+        CliResult skeleton = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--skeleton");
+
+        // Assert
+        skeleton.ShouldReportViolations();
+        skeleton.Out.NormalizedTrimmed()
+            .ShouldBe(plain.Out.NormalizedTrimmed());
     }
 
     [Fact]

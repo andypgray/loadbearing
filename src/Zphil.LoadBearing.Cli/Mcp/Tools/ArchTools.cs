@@ -1,9 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
-using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
-using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 
@@ -21,17 +19,22 @@ namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 ///     intact — these methods are first JITted at the first tool call, after registration has run. Every
 ///     runner is handed the injected <see cref="ISolutionSource" /> so tool calls acquire the solution the
 ///     same way: warm (a session reconciled across calls) by default, or cold when the warm workspace is
-///     disabled — the CLI's own default source. The injected <see cref="IEnvironment" /> is how a tool
-///     learns the client's response budget without reading process state directly.
+///     disabled — the CLI's own default source. The injected <see cref="IResponseFitter" /> is how a
+///     document-shaped tool answers a client whose channel is smaller than the answer: the runner offers its
+///     coarsening ladder and the fitter takes the first rung that fits, rather than a tool reading process
+///     state to decide.
 /// </remarks>
 [McpServerToolType]
-internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source, IEnvironment environment)
+internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source, IResponseFitter fitter)
 {
     private const string CheckDescription =
         "Run the architecture spec against the bound solution and return the JSON check report " +
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
         "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
-        "only those. If projects fail to load, or their NuGet packages did not resolve, the report still " +
+        "only those. " +
+        "Narrow with overview or skeleton (coarser grain) or rules (fewer rules); an over-budget report " +
+        "coarsens its own grain, as far as skeleton, rather than being cut. " +
+        "If projects fail to load, or their NuGet packages did not resolve, the report still " +
         "returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — a verdict reached " +
         "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
@@ -83,6 +86,15 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             "Rule-ID globs, semicolon-separated ('*' spans '/'). Only matching rules run, so rules[] "
             + "and summary cover that subset alone. Matching no rule is an error listing the available IDs.")]
         string? rules = null,
+        [Description(
+            "Elide each violation's sites, keeping every rule and every violation and reporting the sites "
+            + "as siteCount. Coarser grain, never a narrower subject.")]
+        bool overview = false,
+        [Description(
+            "Elide the violations too, keeping every rule with its verdict, prose, baseline and warnings; "
+            + "the elided violations are reported as violationCount. Coarser than overview, still not a "
+            + "narrower subject.")]
+        bool skeleton = false,
         CancellationToken cancellationToken = default)
     {
         var output = new StringWriter();
@@ -94,8 +106,14 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // was the one line TextWriter.Null used to swallow, and "which MSBuild opened it" is the next
         // question after any load failure). The gate verdict the exit code would have expressed rides in
         // modelIncomplete, and an unmatched --rules filter surfaces as an error result rather than exit 2.
-        await new CheckRunner(output, TextWriter.Null, source).RunAsync(
-            binding.CheckRequest(diffBase, rules), cancellationToken);
+        //
+        // The fitter carries this surface's response budget, as it does for arch_graph: over it, the report
+        // comes back whole at a coarser grain instead of cut mid-array. It matters more here than there —
+        // this is the tool agents are told to call before finishing work, and its bulk driver is a per-site
+        // dump with no ceiling, so a legacy migration burndown scales it without limit.
+        await new CheckRunner(output, TextWriter.Null, source, fitter: fitter).RunAsync(
+            binding.CheckRequest(diffBase, rules, DocumentGrains.Coarsest(overview, skeleton)),
+            cancellationToken);
         return output.ToString();
     }
 
@@ -188,28 +206,16 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // default — graph refuses before there is one — so the refusal throws and GlobalCallToolFilter
         // returns it as a clean un-logged error result.
         //
-        // The response budget is this surface's alone: over it, the runner walks down the grain ladder until a
-        // whole document fits instead of handing the truncator one to cut in half. One extraction, and the
-        // degraded answer is byte-identical to an explicit call at the grain it landed on, so a reader can
-        // trust the grain stamp rather than diffing two surveys. The cap is the truncator's, so degrading
-        // fires against exactly the number that would otherwise have truncated.
-        await new GraphRunner(output, TextWriter.Null, source).RunAsync(
-            binding.GraphRequest(allowWorkspaceDiagnostics, Grain(overview, skeleton), projects, ResponseBudget()),
+        // The response budget is this surface's alone, and the fitter is what carries it: over budget, the
+        // ladder the runner offers is walked until a whole document fits instead of handing the truncator one
+        // to cut in half. One extraction, and the degraded answer is byte-identical to an explicit call at the
+        // grain it landed on, so a reader can trust the grain stamp rather than diffing two surveys. The cap
+        // is the truncator's, so degrading fires against exactly the number that would otherwise have
+        // truncated.
+        await new GraphRunner(output, TextWriter.Null, source, fitter: fitter).RunAsync(
+            binding.GraphRequest(
+                allowWorkspaceDiagnostics, DocumentGrains.Coarsest(overview, skeleton), projects),
             cancellationToken);
         return output.ToString();
-    }
-
-    // The coarsest flag wins: the two name a floor on detail rather than competing modes, so a caller that
-    // passes both is asking for the coarser one, not making an error worth refusing over.
-    private static GraphGrain Grain(bool overview, bool skeleton)
-    {
-        if (skeleton) return GraphGrain.Skeleton;
-
-        return overview ? GraphGrain.Overview : GraphGrain.Full;
-    }
-
-    private int ResponseBudget()
-    {
-        return ResponseTruncator.ComputeMaxChars(environment.GetVariable(LoadBearingEnvVars.MaxMcpOutputTokens));
     }
 }

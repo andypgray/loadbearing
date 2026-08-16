@@ -12,8 +12,29 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // `restoreFailedProjects`, `uncheckedProjects` and `rulesFilter` slots are additive the same way: null
 // (omitted) on every run whose workspace loaded, whose NuGet packages resolved, that no solution filter
 // narrowed, and that checked the whole spec — so a clean document is unchanged.
+// The grain slots — `grain`, `violationCount`, `siteCount` — are additive in the same sense and absent from
+// every full-grain report, which is every report the CLI writes unless asked otherwise. They hold the schema
+// at version 3, as the survey's own ladder held it at 1: a consumer reading a full document cannot tell
+// these exist.
+// CheckJson's slot order is the verdict first, and deliberately: the request echo, then the trust stamps,
+// then `summary`, then `rules`, with `workspaceDiagnostics` last. System.Text.Json writes a record's
+// declaration order verbatim, so this list is the wire order. Below the ladder's coarsest rung a reader with
+// a response budget cuts at the last newline that fits, and that cut lands inside `rules` — the bulk — so a
+// trailing roll-up was amputated exactly when it mattered most, check overrunning only when it is red-heavy.
+// The stamps precede `summary` so a caveat never arrives after the counts it invalidates.
+// `workspaceDiagnostics` stays trailing because it is MSBuild's evidence rather than the verdict, it has no
+// ceiling, and the actionable half of it is already hoisted into `failedProjects` and
+// `restoreFailedProjects`. On a clean run every stamp is omitted, so ordering them costs the unchanged
+// document nothing: key order, not shape, and schemaVersion stays 3.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
+/// <param name="Grain">
+///     <c>overview</c> when each violation's sites were elided, <c>skeleton</c> when the violations went with
+///     them, or null (omitted) at full grain — so a document that says nothing about grain is the complete
+///     one, and a consumer can tell a coarser report from a cleaner solution without diffing it. A coarser
+///     report is never a narrower one: every rule the run selected is here at every rung, with its verdict
+///     and its prose, which is what makes an automatic degrade safe on a surface the caller cannot re-ask.
+/// </param>
 /// <param name="RulesFilter">
 ///     The rule-ID globs the run was narrowed to, or null (omitted) when it checked the whole spec. Present,
 ///     it says that <c>rules</c> and <c>summary</c> below cover a subset — the counts are of what ran, so a
@@ -57,15 +78,16 @@ internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
     string SpecAssembly,
+    string? Grain,
     string? DiffBase,
     IReadOnlyList<string>? RulesFilter,
-    IReadOnlyList<RuleJson> Rules,
-    IReadOnlyList<string> WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
-    SummaryJson Summary);
+    SummaryJson Summary,
+    IReadOnlyList<RuleJson> Rules,
+    IReadOnlyList<string> WorkspaceDiagnostics);
 
 /// <summary>
 ///     One rule's result. <see cref="Baseline" /> is populated for ratcheted rules (Migrate and Quarantine
@@ -73,6 +95,17 @@ internal sealed record CheckJson(
 ///     camelCase wire spelling is <see cref="LoadBearingJson.Options" />'s to apply, so a renderer cannot
 ///     write a value no member names.
 /// </summary>
+/// <param name="Violations">
+///     This rule's violations, or null (omitted) at skeleton grain — the one thing that grain elides beyond
+///     overview's. Null here is "not rendered at this grain", never "none found": a passing rule renders an
+///     empty array, and <see cref="ViolationCount" /> tells the two apart.
+/// </param>
+/// <param name="ViolationCount">
+///     How many violations the elision dropped, present only when <see cref="Violations" /> is elided.
+///     Rendered even when zero, because that is precisely the case a reader must not confuse with a rule
+///     whose violations were merely not written here — a skeleton report is still a verdict, and a count of
+///     0 beside <c>status: passed</c> is what makes it one.
+/// </param>
 internal sealed record RuleJson(
     string Id,
     Posture Posture,
@@ -82,13 +115,24 @@ internal sealed record RuleJson(
     string? Fix,
     string? SkipReason,
     BaselineJson? Baseline,
-    IReadOnlyList<ViolationJson> Violations,
+    IReadOnlyList<ViolationJson>? Violations,
+    int? ViolationCount,
     IReadOnlyList<WarningJson> Warnings);
 
 /// <summary>A ratcheted rule's state: its baseline path and the grandfathered/stale counts.</summary>
 internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 
 /// <summary>One violation; the null slots are omitted per kind.</summary>
+/// <param name="Sites">
+///     Where the violation occurs, or null (omitted) from overview grain down — the first thing the ladder
+///     elides, because sites scale with the codebase while everything above them scales with the spec. Null
+///     is "not rendered at this grain", never "none found"; <see cref="SiteCount" /> carries the number.
+/// </param>
+/// <param name="SiteCount">
+///     How many sites the elision dropped, present only when <see cref="Sites" /> is elided — so a coarser
+///     report still says how much work each violation is, which is the one thing a reader would otherwise
+///     have to re-run the check at full grain to learn.
+/// </param>
 internal sealed record ViolationJson(
     ViolationKind Kind,
     string? Source,
@@ -97,7 +141,8 @@ internal sealed record ViolationJson(
     string? Subject,
     string? SubjectMember,
     string? Detail,
-    IReadOnlyList<SiteJson> Sites);
+    IReadOnlyList<SiteJson>? Sites,
+    int? SiteCount);
 
 /// <summary>A single reference or declaration site (relative, forward-slash path).</summary>
 internal sealed record SiteJson(string File, int Line);

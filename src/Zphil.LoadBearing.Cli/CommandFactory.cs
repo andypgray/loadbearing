@@ -66,6 +66,19 @@ internal static class CommandFactory
                 + "spans '/'); the report, the summary counts and the 0/1 verdict then cover that subset alone. "
                 + "A filter matching no rule refuses the run (exit 2) and lists the available rule IDs."
         };
+        Option<bool> overview = new("--overview")
+        {
+            Description =
+                "Summarize the --json report at overview grain: every rule and every violation, with each "
+                + "violation's sites replaced by their count — coarser, not narrower."
+        };
+        Option<bool> skeleton = new("--skeleton")
+        {
+            Description =
+                "Summarize the --json report at skeleton grain: the verdict alone — every rule with its "
+                + "prose, status, baseline and warnings, its violations replaced by their count. Coarser "
+                + "than --overview, and still not narrower."
+        };
         var noCache = NoCacheOption();
         var binlog = BinlogOption();
 
@@ -81,6 +94,8 @@ internal static class CommandFactory
             allowWorkspaceDiagnostics,
             sarif,
             rules,
+            overview,
+            skeleton,
             noCache,
             binlog
         };
@@ -97,7 +112,8 @@ internal static class CommandFactory
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(sarif),
-                parseResult.GetValue(rules)),
+                parseResult.GetValue(rules),
+                DocumentGrains.Coarsest(parseResult.GetValue(overview), parseResult.GetValue(skeleton))),
             (request, output, error, ct) =>
                 MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
 
@@ -373,16 +389,8 @@ internal static class CommandFactory
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
-                // The coarsest flag wins: the two name a floor on detail, so asking for both is not a
-                // conflict to refuse over.
-                parseResult.GetValue(skeleton) ? GraphGrain.Skeleton
-                : parseResult.GetValue(overview) ? GraphGrain.Overview
-                : GraphGrain.Full,
-                parseResult.GetValue(projects),
-                // The auto-degrade budget is a property of the caller's transport, and a terminal has none:
-                // named here so its absence reads as a decision rather than an omission.
-                // ReSharper disable once ArgumentsStyleNamedExpression
-                ResponseBudgetChars: null),
+                DocumentGrains.Coarsest(parseResult.GetValue(overview), parseResult.GetValue(skeleton)),
+                parseResult.GetValue(projects)),
             (request, output, error, ct) =>
                 MsBuildGate.RunGraphAsync(request, output, error, hostSource, environment, ct));
 

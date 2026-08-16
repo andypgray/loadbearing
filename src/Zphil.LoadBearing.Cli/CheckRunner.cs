@@ -27,15 +27,18 @@ namespace Zphil.LoadBearing.Cli;
 ///         <see cref="UserErrorException" />; the top-level handler maps them to exit 2.
 ///     </para>
 ///     <para>
-///         Output/error writers are injected so the in-process e2e tests can capture them, and the
-///         <see cref="IEnvironment" /> seam supplies the cache-root override.
+///         Output/error writers are injected so the in-process e2e tests can capture them, the
+///         <see cref="IEnvironment" /> seam supplies the cache-root override, and the
+///         <see cref="IResponseFitter" /> decides which rung of the grain ladder a caller with a response
+///         budget actually gets (default: the grain they asked for).
 ///     </para>
 /// </remarks>
 internal sealed class CheckRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource? source = null,
-    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
+    IEnvironment? environment = null,
+    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
     {
@@ -130,9 +133,9 @@ internal sealed class CheckRunner(
         WorkspaceDiagnosticsRenderer.Render(error, diagnostics, request.Json);
 
         if (request.Json)
-            JsonReportRenderer.Render(
-                output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
-                modelIncomplete, failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs);
+            WriteJson(
+                request, report, solutionDirectory, solutionName, specAssembly, diagnostics, modelIncomplete,
+                failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 
@@ -144,6 +147,36 @@ internal sealed class CheckRunner(
                 sarifPath, report, solutionDirectory, executionSuccessful, diagnostics, failedProjects,
                 restoreFailedProjects, uncheckedProjects);
             if (!request.Json) output.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
+        }
+    }
+
+    // The JSON report, degraded rather than cut. The runner offers every grain from the requested floor down
+    // to the coarsest as a lazy ladder and the fitter picks; a caller whose transport has a response budget
+    // gets the first rung that fits, re-composed from the result model already in hand — no second check, and
+    // byte-identical to what that grain's own flag would have written, so the two surfaces cannot drift.
+    // Degrading coarsens the grain and never touches the selection: every rule the run evaluated is still
+    // here with its verdict, and the summary counts still cover exactly what ran.
+    private void WriteJson(
+        CheckRequest request, CheckReport report, string solutionDirectory, string solutionName,
+        string specAssembly, IReadOnlyList<string> diagnostics, bool modelIncomplete,
+        IReadOnlyList<string> failedProjects, IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects, IReadOnlyList<string> ruleGlobs)
+    {
+        JsonReportRenderer.Render(output, (fitter ?? ResponseFitter.FirstRung).Fit(Ladder(request.Grain)));
+        return;
+
+        // Lazy on purpose: each rung costs a full serialization of the report, so a fitter that stops at the
+        // first pays for exactly one. The ladder cannot spin — every rung is strictly coarser, Skeleton last.
+        IEnumerable<string> Ladder(DocumentGrain floor)
+        {
+            for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return Compose(at);
+        }
+
+        string Compose(DocumentGrain at)
+        {
+            return JsonReportRenderer.Document(
+                report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
+                modelIncomplete, failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs, at);
         }
     }
 }

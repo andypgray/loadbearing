@@ -20,8 +20,9 @@ public sealed class ResponseTruncatorTests
         + "and slice it there.";
 
     private const string CheckHint =
-        "Narrow the call rather than read half a report: rules: \"<rule-id globs>\" checks a subset, and "
-        + "arch_explain returns one rule whole. For the report entire, redirect "
+        "Narrow the subject rather than read half a report: the grain ladder is already exhausted, so "
+        + "rules: \"<rule-id globs>\" checks part of the spec and is the knob left — and arch_explain "
+        + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json, or redirect "
         + "loadbearing check --json to a file and slice it there.";
 
     [Fact]
@@ -129,6 +130,22 @@ public sealed class ResponseTruncatorTests
         string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "arch_check", 20);
 
         result.ShouldEndWith($"The results above are incomplete.\n{CheckHint}");
+    }
+
+    [Theory]
+    [InlineData("arch_graph")]
+    [InlineData("arch_check")]
+    public void TruncateIfNeeded_ToolWithAGrainLadder_FooterNamesTheSubjectAndNeverAGrain(string toolName)
+    {
+        // Both laddered tools coarsen their own grain against this same budget before a response can reach
+        // here, so anything that still overruns has already walked the ladder to the bottom. Naming a grain
+        // would send a reader back down it; what is left in each case is the subject.
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
+
+        result.ShouldContain("Narrow the subject");
+        result.ShouldContain("the grain ladder is already exhausted");
+        result.ShouldNotContain("overview:");
+        result.ShouldNotContain("skeleton:");
     }
 
     [Theory]

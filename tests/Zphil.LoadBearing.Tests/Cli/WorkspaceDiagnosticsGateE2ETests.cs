@@ -2,6 +2,7 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -662,7 +663,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         int exit = await runner.RunAsync(
             new CheckRequest(
                 solution, spec, json, null, Path.GetDirectoryName(Path.GetFullPath(solution))!, true, null,
-                allowWorkspaceDiagnostics, sarif, null),
+                allowWorkspaceDiagnostics, sarif, null, DocumentGrain.Full),
             Ct);
 
         return new CliResult(exit, output.ToString(), error.ToString());

@@ -20,13 +20,13 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
 ///     <para>
 ///         The narrowing rows extend the same contract to the knobs — each tool argument produces exactly
-///         what its CLI option produces — and the budget row covers the one behaviour with no CLI spelling:
-///         over the client's declared response budget, <c>arch_graph</c> re-renders one rung coarser, and
-///         what it returns is byte-identical to what that grain's own flag writes. It walks the ladder, not
-///         one step of it: a budget between the full and overview documents returns
-///         <c>graph --overview --json</c>, one between overview and skeleton returns
-///         <c>graph --skeleton --json</c>. That identity is the whole claim, because it is what makes a
-///         degraded answer a complete document rather than a cut one.
+///         what its CLI option produces — and the two budget rows cover the one behaviour with no CLI
+///         spelling: over the client's declared response budget, <c>arch_graph</c> and <c>arch_check</c>
+///         each re-render one rung coarser, and what comes back is byte-identical to what that grain's own
+///         flag writes. Each walks the ladder, not one step of it: a budget between the full and overview
+///         documents returns the <c>--overview</c> document, one between overview and skeleton returns the
+///         <c>--skeleton</c> document. That identity is the whole claim, because it is what makes a degraded
+///         answer a complete document rather than a cut one.
 ///     </para>
 /// </summary>
 /// <remarks>
@@ -78,6 +78,21 @@ public sealed class CliMcpParityTests
 
     private static readonly Lazy<Task<CliResult>> ColdGraphSkeleton =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--skeleton"));
+
+    // The three cold check documents, memoized for the same reason and against the same spec every row here
+    // binds to. The full one is not among them: HarnessA already runs it inline, and it is the one document
+    // the diff-base row would invalidate if it were shared.
+    private static readonly Lazy<Task<CliResult>> ColdCheckFull =
+        new(() => CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
+
+    private static readonly Lazy<Task<CliResult>> ColdCheckOverview =
+        new(() => CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--overview"));
+
+    private static readonly Lazy<Task<CliResult>> ColdCheckSkeleton =
+        new(() => CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton"));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -263,6 +278,23 @@ public sealed class CliMcpParityTests
         mcpRules.ShouldHaveTextContent()
             .NormalizedTrimmed()
             .ShouldBe(cliRules.Out.NormalizedTrimmed());
+
+        // arch_check overview ≡ check --overview --json: the whole report with each violation's sites as a
+        // count.
+        CliResult cliCheckOverview = await ColdCheckOverview.Value;
+        CallToolResult mcpCheckOverview = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?> { ["overview"] = true }, cancellationToken: Ct);
+        mcpCheckOverview.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliCheckOverview.Out.NormalizedTrimmed());
+
+        // arch_check skeleton ≡ check --skeleton --json: the verdict alone, violations as a count.
+        CliResult cliCheckSkeleton = await ColdCheckSkeleton.Value;
+        CallToolResult mcpCheckSkeleton = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?> { ["skeleton"] = true }, cancellationToken: Ct);
+        mcpCheckSkeleton.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliCheckSkeleton.Out.NormalizedTrimmed());
     }
 
     [Fact]
@@ -317,6 +349,66 @@ public sealed class CliMcpParityTests
         harness.Environment.SetVariable(
             LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
         CallToolResult mcpSkeleton = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+
+        string skeletonText = mcpSkeleton.ShouldHaveTextContent();
+        skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+        skeletonText.NormalizedTrimmed()
+            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+    }
+
+    [Fact]
+    public async Task HarnessH_CheckOverTheResponseBudget_ReturnsExactlyTheCliDocumentForTheGrainItLandsOn()
+    {
+        // Arrange — HarnessG's twin, and the row that matters most of the two: arch_check is the tool agents
+        // are told to call before finishing work, and its bulk driver is an uncapped per-site dump, so this
+        // is the response most likely to overrun on the codebases the product is for. Budgets are derived
+        // from the CLI documents either side of the rung under test rather than guessed.
+        CliResult cliFull = await ColdCheckFull.Value;
+        CliResult cliOverview = await ColdCheckOverview.Value;
+        CliResult cliSkeleton = await ColdCheckSkeleton.Value;
+        cliFull.ShouldReportViolations();
+        cliOverview.ShouldReportViolations();
+        cliSkeleton.ShouldReportViolations();
+
+        int fullChars = cliFull.Out.TrimEnd('\r', '\n')
+            .Length;
+        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n')
+            .Length;
+        int skeletonChars = cliSkeleton.Out.TrimEnd('\r', '\n')
+            .Length;
+        var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
+        int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
+
+        budget.ShouldBeGreaterThanOrEqualTo(overviewChars + Environment.NewLine.Length);
+        budget.ShouldBeLessThan(fullChars);
+
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+        harness.Environment.SetVariable(
+            LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
+
+        // Act — the plain call, with no grain argument: the degrade is the server's own decision.
+        CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+
+        // Assert — a complete document at coarser grain, byte-identical to what --overview writes. Nothing
+        // was cut, so the JSON still parses; the client reads a whole verdict rather than half of one, which
+        // is the failure this exists for — a cut report evicts an agent from the tool surface entirely.
+        string text = mcpCheck.ShouldHaveTextContent();
+        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+        text.NormalizedTrimmed()
+            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
+
+        // The rung below, on the same harness — the budget is re-read per call, so a tighter one takes effect
+        // without a second server. The claim is ladder-wide, not overview-shaped.
+        var skeletonTokens = (int)Math.Ceiling((overviewChars + skeletonChars) / 2.0 / CharsPerToken);
+        int skeletonBudget = ResponseTruncator.ComputeMaxChars(skeletonTokens.ToString(CultureInfo.InvariantCulture));
+
+        skeletonBudget.ShouldBeGreaterThanOrEqualTo(skeletonChars + Environment.NewLine.Length);
+        skeletonBudget.ShouldBeLessThan(overviewChars);
+
+        harness.Environment.SetVariable(
+            LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
+        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
 
         string skeletonText = mcpSkeleton.ShouldHaveTextContent();
         skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");

@@ -255,7 +255,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null, null),
+            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
             Ct);
 
         return new CacheRun(
@@ -270,7 +270,7 @@ public sealed class CheckCacheE2ETests
         var runner = new GraphRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false, GraphGrain.Full, null, null), Ct);
+            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false, DocumentGrain.Full, null), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

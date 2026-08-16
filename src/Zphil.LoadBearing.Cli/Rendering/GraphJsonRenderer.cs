@@ -17,16 +17,6 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 internal static class GraphJsonRenderer
 {
     /// <summary>
-    ///     The wire spelling of each coarsened grain. <see cref="GraphGrain.Full" /> has none on purpose: a
-    ///     document that says nothing about grain is the complete one.
-    /// </summary>
-    private static readonly Dictionary<GraphGrain, string> GrainNames = new()
-    {
-        [GraphGrain.Overview] = "overview",
-        [GraphGrain.Skeleton] = "skeleton"
-    };
-
-    /// <summary>
     ///     The survey document as a string. <paramref name="grain" /> decides how much of each project is
     ///     rendered and stamps itself on the document; <paramref name="projectsScope" /> is the filter the
     ///     summary was already narrowed by, recorded so the document says what it covers.
@@ -40,16 +30,16 @@ internal static class GraphJsonRenderer
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
         IReadOnlyList<string> restoreFailedProjects,
-        GraphGrain grain,
+        DocumentGrain grain,
         IReadOnlyList<string> projectsScope)
     {
-        bool elideExternalEdges = grain >= GraphGrain.Skeleton;
+        bool elideExternalEdges = grain >= DocumentGrain.Skeleton;
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
 
         var document = new GraphJson(
             1,
             solutionName,
-            GrainNames.GetValueOrDefault(grain),
+            DocumentGrains.Wire(grain),
             projectsScope.Count > 0 ? projectsScope : null,
             summary.Projects.Select(project => ToProject(project, grain)).ToList(),
             summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
@@ -72,13 +62,13 @@ internal static class GraphJsonRenderer
         output.WriteLine(document);
     }
 
-    private static GraphProjectJson ToProject(ProjectSummary project, GraphGrain grain)
+    private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
         return new GraphProjectJson(
             project.Name,
             project.ProjectReferences,
             project.Types,
-            grain >= GraphGrain.Overview
+            grain >= DocumentGrain.Overview
                 ? null
                 : project.Namespaces.Select(n => new GraphNamespaceJson(n.Namespace, n.Types)).ToList());
     }

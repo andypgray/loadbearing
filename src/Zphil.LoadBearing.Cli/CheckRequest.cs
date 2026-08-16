@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Cli.Rendering;
+
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>The parsed inputs to a <c>check</c> run — free of Roslyn types so it crosses the MSBuild gate.</summary>
@@ -30,6 +32,12 @@ namespace Zphil.LoadBearing.Cli;
 ///     spec. It narrows what <em>runs</em>, not what is displayed, so the summary and the 0/1 verdict cover
 ///     the subset alone. A filter that matches no rule refuses the run rather than checking nothing.
 /// </param>
+/// <param name="Grain">
+///     The floor on how much of each rule the JSON document renders: never finer than this, and a caller
+///     whose transport has a response budget may take it coarser still (<see cref="IResponseFitter" />).
+///     The opposite knob to <see cref="Rules" /> and independent of it — every selected rule is reported at
+///     every rung, in less detail. Human output ignores it: a terminal has no budget to overrun.
+/// </param>
 internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
@@ -40,4 +48,5 @@ internal sealed record CheckRequest(
     string? Binlog,
     bool AllowWorkspaceDiagnostics,
     string? Sarif,
-    string? Rules);
+    string? Rules,
+    DocumentGrain Grain);

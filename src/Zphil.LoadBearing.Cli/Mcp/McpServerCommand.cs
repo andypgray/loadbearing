@@ -71,7 +71,7 @@ internal static class McpServerCommand
 
         builder.Services.AddSingleton<IEnvironment>(environment);
         builder.Services.AddSingleton(binding);
-        AddWorkspaceSolutionSource(builder.Services);
+        AddToolServices(builder.Services);
 
         builder.Services
             .AddMcpServer(options =>
@@ -94,21 +94,35 @@ internal static class McpServerCommand
     }
 
     /// <summary>
-    ///     Registers the warm-workspace services, in one place so the production server and the in-process
-    ///     test harness compose the same graph.
+    ///     Registers everything the <c>arch_*</c> tools resolve — the warm-workspace services and the
+    ///     response-fitting pair — in one place, so the production server and the in-process test harness
+    ///     compose the same graph. A service added here reaches both; a service added at a call site reaches
+    ///     one, which is the drift this method exists to prevent.
     /// </summary>
     /// <remarks>
-    ///     The <see cref="ISolutionSource" /> is warm by default — one session reconciled per call across the
-    ///     server's lifetime, one store paired with it — unless
-    ///     <see cref="LoadBearingEnvVars.DisableWarmWorkspace" /> is <c>true</c>, which resolves the cold
-    ///     one-shot <see cref="ColdSolutionSource" /> instead. That flag is read through the
-    ///     <see cref="IEnvironment" /> seam, never <c>System.Environment</c>, so the test harness can drive
-    ///     both paths without touching real process state. The warm branch registers the session's disposer with
-    ///     <see cref="ServerShutdown" /> lazily, from inside the factory, so a run that never builds a warm
-    ///     source wires no disposer.
+    ///     <para>
+    ///         The <see cref="ISolutionSource" /> is warm by default — one session reconciled per call across the
+    ///         server's lifetime, one store paired with it — unless
+    ///         <see cref="LoadBearingEnvVars.DisableWarmWorkspace" /> is <c>true</c>, which resolves the cold
+    ///         one-shot <see cref="ColdSolutionSource" /> instead. That flag is read through the
+    ///         <see cref="IEnvironment" /> seam, never <c>System.Environment</c>, so the test harness can drive
+    ///         both paths without touching real process state. The warm branch registers the session's disposer with
+    ///         <see cref="ServerShutdown" /> lazily, from inside the factory, so a run that never builds a warm
+    ///         source wires no disposer.
+    ///     </para>
+    ///     <para>
+    ///         The <see cref="IResponseFitter" /> is the budgeted one — this is the surface with a channel to
+    ///         overrun — and it reads the cap through <see cref="IResponseBudget" /> per call, so a client that
+    ///         moves <see cref="LoadBearingEnvVars.MaxMcpOutputTokens" /> mid-session moves it for the next
+    ///         call. Singletons both, like everything else here: <c>di/no-captive-dependencies</c> holds
+    ///         because they depend only on the singleton <see cref="IEnvironment" />.
+    ///     </para>
     /// </remarks>
-    internal static void AddWorkspaceSolutionSource(IServiceCollection services)
+    internal static void AddToolServices(IServiceCollection services)
     {
+        services.AddSingleton<IResponseBudget, ResponseBudget>();
+        services.AddSingleton<IResponseFitter, BudgetedResponseFitter>();
+
         services.AddSingleton(provider =>
         {
             ILogger logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger<WorkspaceSession>();

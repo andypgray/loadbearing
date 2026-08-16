@@ -113,7 +113,7 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
         // environment exercises the real cold/warm selection.
         builder.Services.AddSingleton<IEnvironment>(environment);
         builder.Services.AddSingleton(binding);
-        McpServerCommand.AddWorkspaceSolutionSource(builder.Services);
+        McpServerCommand.AddToolServices(builder.Services);
 
         builder.Services
             .AddMcpServer(options =>

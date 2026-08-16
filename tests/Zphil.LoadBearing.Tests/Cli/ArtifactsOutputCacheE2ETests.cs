@@ -107,7 +107,7 @@ public sealed class ArtifactsOutputCacheE2ETests
 
         int exit = await runner.RunAsync(
             new GraphRequest(
-                workspace.SolutionPath, true, workingDirectory, false, null, false, GraphGrain.Full, null, null),
+                workspace.SolutionPath, true, workingDirectory, false, null, false, DocumentGrain.Full, null),
             Ct);
 
         exit.ShouldBe(0, error.ToString());

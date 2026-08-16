@@ -4,6 +4,7 @@ using Xunit;
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -25,8 +26,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         narrows the subject, keeping every edge that touches the scope in either direction — which is
 ///         why <c>graph-scoped.json</c> names MyApp.Domain and MyApp.Legacy.Billing in its edges and
 ///         neither in its roster. A filter matching nothing refuses rather than surveying an empty
-///         solution, and a caller-declared response budget degrades the grain instead of cutting the
-///         document.
+///         solution, and a fitter carrying the caller's response budget walks the ladder the runner offers,
+///         degrading the grain instead of cutting the document.
 ///     </para>
 /// </summary>
 [Collection("Serial")]
@@ -219,13 +220,13 @@ public sealed class GraphCommandTests
         // first rung that fits rather than dropping to its coarsest.
         var degraded = new StringWriter();
         var overview = new StringWriter();
-        int overviewLength = await LengthAt(GraphGrain.Overview);
+        int overviewLength = await LengthAt(DocumentGrain.Overview);
 
         // Act
-        await Runner(degraded)
-            .RunAsync(Request(budget: overviewLength), Ct);
+        await Runner(degraded, Budgeted(overviewLength))
+            .RunAsync(Request(), Ct);
         await Runner(overview)
-            .RunAsync(Request(GraphGrain.Overview), Ct);
+            .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert — parseable (nothing was truncated), stamped, and byte-identical both to what --overview
         // writes here and to the pinned --overview document, which is what keeps the degraded answer honest
@@ -250,10 +251,10 @@ public sealed class GraphCommandTests
         var skeleton = new StringWriter();
 
         // Act
-        await Runner(degraded)
-            .RunAsync(Request(budget: 500), Ct);
+        await Runner(degraded, Budgeted(500))
+            .RunAsync(Request(), Ct);
         await Runner(skeleton)
-            .RunAsync(Request(GraphGrain.Skeleton), Ct);
+            .RunAsync(Request(DocumentGrain.Skeleton), Ct);
 
         // Assert — it walked past overview to the last rung, and the answer is still a whole document.
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
@@ -273,8 +274,8 @@ public sealed class GraphCommandTests
         var degraded = new StringWriter();
 
         // Act
-        await Runner(degraded)
-            .RunAsync(Request(GraphGrain.Overview, budget: 500), Ct);
+        await Runner(degraded, Budgeted(500))
+            .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
@@ -291,8 +292,8 @@ public sealed class GraphCommandTests
         var withoutBudget = new StringWriter();
 
         // Act
-        await Runner(withBudget)
-            .RunAsync(Request(budget: 100_000), Ct);
+        await Runner(withBudget, Budgeted(100_000))
+            .RunAsync(Request(), Ct);
         await Runner(withoutBudget)
             .RunAsync(Request(), Ct);
 
@@ -314,7 +315,7 @@ public sealed class GraphCommandTests
 
         // Act
         await Runner(skeleton)
-            .RunAsync(Request(GraphGrain.Skeleton), Ct);
+            .RunAsync(Request(DocumentGrain.Skeleton), Ct);
         await Runner(full)
             .RunAsync(Request(), Ct);
 
@@ -343,12 +344,12 @@ public sealed class GraphCommandTests
         // deliberately emitted an over-budget document and the filter behind it then cut that very document
         // at the same number. Budgets are taken from the skeleton's own size upward, because that is the
         // range where the ladder can deliver a whole answer and therefore must.
-        int budget = await LengthAt(GraphGrain.Skeleton) + headroom;
+        int budget = await LengthAt(DocumentGrain.Skeleton) + headroom;
         var output = new StringWriter();
 
         // Act — the runner degrades against the budget, then the truncator sees what it produced.
-        await Runner(output)
-            .RunAsync(Request(budget: budget), Ct);
+        await Runner(output, Budgeted(budget))
+            .RunAsync(Request(), Ct);
         string document = output.ToString()
             .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, budget);
@@ -365,12 +366,12 @@ public sealed class GraphCommandTests
     {
         // Arrange — the ladder's floor, pinned so it stays a known limit rather than a surprise. Below the
         // coarsest grain there is no rung left, so the backstop fires like it does for any other response.
-        int belowSkeleton = await LengthAt(GraphGrain.Skeleton) - 1;
+        int belowSkeleton = await LengthAt(DocumentGrain.Skeleton) - 1;
         var output = new StringWriter();
 
         // Act
-        await Runner(output)
-            .RunAsync(Request(budget: belowSkeleton), Ct);
+        await Runner(output, Budgeted(belowSkeleton))
+            .RunAsync(Request(), Ct);
         string document = output.ToString()
             .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, belowSkeleton);
@@ -384,16 +385,24 @@ public sealed class GraphCommandTests
     }
 
     // The runner directly, because the response budget has no CLI spelling: it belongs to a caller whose
-    // transport has one, and a terminal does not.
-    private static GraphRunner Runner(TextWriter output)
+    // transport has one, and a terminal does not. No fitter is the CLI's own default — the requested grain,
+    // never degraded — which is what makes the un-budgeted rows below the control for the budgeted ones.
+    private static GraphRunner Runner(TextWriter output, IResponseFitter? fitter = null)
     {
-        return new GraphRunner(output, TextWriter.Null, WarmWorkspacePool.Source);
+        return new GraphRunner(output, TextWriter.Null, WarmWorkspacePool.Source, fitter: fitter);
+    }
+
+    // The MCP server's fitter at a budget named in characters, which is what these rows reason in: the
+    // production budget arrives in tokens and cannot express "one character below the skeleton document".
+    private static IResponseFitter Budgeted(int maxChars)
+    {
+        return new BudgetedResponseFitter(new FixedResponseBudget(maxChars));
     }
 
     // The composed document's length, not the writer's: the runner measures the document against the budget
     // before Render appends a line terminator, so counting that terminator here would shift every budget
     // these tests derive by the width of one newline — and on Windows that is two characters, not one.
-    private static async Task<int> LengthAt(GraphGrain grain)
+    private static async Task<int> LengthAt(DocumentGrain grain)
     {
         var output = new StringWriter();
         await Runner(output)
@@ -403,10 +412,10 @@ public sealed class GraphCommandTests
             .Length;
     }
 
-    private static GraphRequest Request(GraphGrain grain = GraphGrain.Full, int? budget = null)
+    private static GraphRequest Request(DocumentGrain grain = DocumentGrain.Full)
     {
         string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!;
         return new GraphRequest(
-            CliRunner.MyAppSolution, true, workingDirectory, false, null, false, grain, null, budget);
+            CliRunner.MyAppSolution, true, workingDirectory, false, null, false, grain, null);
     }
 }
