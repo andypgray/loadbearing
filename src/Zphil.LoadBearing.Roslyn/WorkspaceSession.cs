@@ -446,6 +446,12 @@ public sealed class WorkspaceSession : IAsyncDisposable
     ///     set (solution, csprojs, per-project assets, and the props/targets/global.json probe chain from each
     ///     project directory up to the filesystem root, absence included).
     /// </summary>
+    /// <remarks>
+    ///     The structural chain is recorded per <see cref="Project" /> rather than per project directory,
+    ///     because where the restore assets file lands follows the project's own evaluated output paths and
+    ///     not its directory. Recording is idempotent, so a multi-target-framework project's several
+    ///     <see cref="Project" />s contributing the same paths costs nothing.
+    /// </remarks>
     private void RecordAllFingerprints(string solutionPath, Solution solution)
     {
         foreach (Document document in solution.Projects.SelectMany(p => p.Documents))
@@ -472,17 +478,17 @@ public sealed class WorkspaceSession : IAsyncDisposable
             string projectFile = Path.GetFullPath(project.FilePath);
             RecordStructural(projectFile);
 
-            projectDirectories.Add(Path.GetDirectoryName(projectFile)!);
+            string projectDirectory = Path.GetDirectoryName(projectFile)!;
+            projectDirectories.Add(projectDirectory);
+
+            foreach (string path in ProjectCone.StructuralPaths(
+                         projectDirectory, project.OutputFilePath, project.CompilationOutputInfo.AssemblyPath))
+                RecordStructural(path);
         }
 
         foreach (string projectDirectory in projectDirectories)
-        {
-            foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))
-                knownConeFiles.Add(coneFile);
-
-            foreach (string path in ProjectCone.StructuralPaths(projectDirectory))
-                RecordStructural(path);
-        }
+        foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))
+            knownConeFiles.Add(coneFile);
     }
 
     private void RecordStructural(string path)

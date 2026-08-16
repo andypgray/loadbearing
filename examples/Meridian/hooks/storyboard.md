@@ -86,7 +86,7 @@ red rule, and exits 2, feeding this report to the agent on stderr:
 
 ```text
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
-pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named `*Controller`.
+pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
   because: Data access behind a repository can be tested and swapped; SQL in the request path cannot.
   fix: Move the SQL into a repository; see BookingRepository.
@@ -139,7 +139,7 @@ The next `Edit` runs the hook again. The check is green, the wrapper exits 0, an
 
 ```text
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
-pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named `*Controller`.
+pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.

@@ -41,6 +41,9 @@ internal static class CliRunner
 
     public static string DerivedSpecDll => Metadata("DerivedSpecPath");
 
+    /// <summary>The net10 spec whose <c>Define()</c> anchors a type from a .NET shared framework.</summary>
+    public static string SharedFrameworkSpecDll => Metadata("SharedFrameworkSpecPath");
+
     /// <summary>The net48 product assembly the legacy spec <c>typeof()</c>s.</summary>
     public static string LegacyProductDll => Metadata("LegacyProductPath");
 

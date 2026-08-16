@@ -43,7 +43,14 @@ internal static class SolutionCacheInputs
 
             if (!byName.TryGetValue(project.Name, out Accumulator? accumulator))
             {
-                accumulator = new Accumulator(project.Name, Path.GetFullPath(project.FilePath));
+                // The first framework's evaluated pair, not a union across them: the intermediate root is
+                // derived from the prefix the pair shares, and that root is the same whichever framework's
+                // pair it starts from.
+                accumulator = new Accumulator(
+                    project.Name,
+                    Path.GetFullPath(project.FilePath),
+                    project.OutputFilePath,
+                    project.CompilationOutputInfo.AssemblyPath);
                 byName[project.Name] = accumulator;
             }
 
@@ -67,7 +74,11 @@ internal static class SolutionCacheInputs
             .ToList();
     }
 
-    private sealed class Accumulator(string projectName, string csprojPath)
+    private sealed class Accumulator(
+        string projectName,
+        string csprojPath,
+        string? evaluatedOutputPath,
+        string? intermediateAssemblyPath)
     {
         public string ProjectName { get; } = projectName;
         public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
@@ -80,7 +91,9 @@ internal static class SolutionCacheInputs
                 csprojPath,
                 Path.GetDirectoryName(csprojPath)!,
                 References.ToList(),
-                Documents.ToList());
+                Documents.ToList(),
+                evaluatedOutputPath,
+                intermediateAssemblyPath);
         }
     }
 }

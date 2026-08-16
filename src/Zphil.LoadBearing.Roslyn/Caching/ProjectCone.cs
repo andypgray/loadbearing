@@ -58,20 +58,31 @@ internal static class ProjectCone
 
     /// <summary>
     ///     Every non-source file whose state changes what a build of the project in
-    ///     <paramref name="projectDirectory" /> produces: its <c>obj/project.assets.json</c>, then each
+    ///     <paramref name="projectDirectory" /> produces: every place the layout in force could put its
+    ///     <see cref="IntermediateOutputTree.AssetsPathsOf">restore assets file</see>, then each
     ///     <see cref="Ancestors">ancestor</see> crossed with
     ///     <see cref="FileStamping.StructuralProbeFileNames">every probe name</see> — absent ones included,
     ///     because a probe that later appears is itself the change.
     /// </summary>
     /// <remarks>
-    ///     The composition, not just its two primitives, is what the consumers must agree on: they are
+    ///     The composition, not just its primitives, is what the consumers must agree on: they are
     ///     deciding whether a cached model is still valid, and a probe one of them stamps and another does not
     ///     is a stale answer served confidently, with nothing red. The order is the order stamps are recorded
     ///     in, so a persisted stamp list keeps its shape.
     /// </remarks>
-    public static IEnumerable<string> StructuralPaths(string projectDirectory)
+    /// <param name="projectDirectory">The directory holding the project file.</param>
+    /// <param name="evaluatedOutputPath">
+    ///     The project's evaluated output path, or null when the caller has none. Together with
+    ///     <paramref name="intermediateAssemblyPath" /> it is what lets the assets file be found under a
+    ///     non-default output layout; with either absent the default location is all that is stamped.
+    /// </param>
+    /// <param name="intermediateAssemblyPath">The project's intermediate assembly path, or null when unknown.</param>
+    public static IEnumerable<string> StructuralPaths(
+        string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)
     {
-        yield return FileStamping.AssetsPathOf(projectDirectory);
+        foreach (string assets in
+                 IntermediateOutputTree.AssetsPathsOf(projectDirectory, evaluatedOutputPath, intermediateAssemblyPath))
+            yield return assets;
 
         foreach (string ancestor in Ancestors(projectDirectory))
         foreach (string probe in FileStamping.StructuralProbeFileNames)

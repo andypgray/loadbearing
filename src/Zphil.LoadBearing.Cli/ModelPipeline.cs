@@ -102,6 +102,13 @@ internal static class ModelPipeline
     ///     spec discovery: the <em>distinct</em> loader messages (deduped, ordinal-sorted so the output is
     ///     deterministic) under a naming/fix frame. Internal so a fabricated exception can pin the shape.
     /// </summary>
+    /// <remarks>
+    ///     The remedy names both worlds rather than asserting the packaging one, because a shared-framework
+    ///     anchor reaches this arm too and no build setting can stage it. It does not pick between them the
+    ///     way <see cref="SpecDependencyLoadFailure" /> does: this failure aggregates several loader
+    ///     exceptions that need not carry assembly identities at all, so one remedy line cannot honestly
+    ///     branch per assembly. Naming both is what that costs.
+    /// </remarks>
     internal static string LoaderFailureMessage(ReflectionTypeLoadException ex, string specDllPath)
     {
         var messages = ex.LoaderExceptions
@@ -118,8 +125,11 @@ internal static class ModelPipeline
 
         return $"Could not load spec assembly '{Path.GetFileName(specDllPath)}'; one or more types failed to load:\n"
                + detail
-               + "\nBuild the spec project and restore its dependencies, then retry. If it is already built, the"
-               + " assembly named above is a dependency a class-library build does not stage beside the spec DLL:"
-               + " add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.";
+               + "\nBuild the spec project and restore its dependencies, then retry. If it is already built, an"
+               + " assembly named above is one the spec's own build does not put where the loader can reach it:"
+               + " for a NuGet package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to"
+               + " the spec .csproj and rebuild; for a .NET shared framework (<FrameworkReference>) or a .NET"
+               + " Framework reference assembly, no build setting stages it — name the type as a string rather"
+               + " than a typeof(), which needs no assembly load.";
     }
 }

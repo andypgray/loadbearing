@@ -12,6 +12,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     <c>UseArtifactsOutput</c> built in one configuration); the rest pin the anchor rule, the two ranking
 ///     keys, the exclusions, the intermediate-assembly refusal, and the narrowing that pays for all of it.
 /// </summary>
+/// <remarks>
+///     The intermediate-root derivation the refusal rests on is pinned by
+///     <c>Roslyn/IntermediateOutputTreeTests</c>, beside the type that owns it — the cache probes derive the
+///     assets file's location from the same primitive, and a rule two subsystems depend on should not be
+///     pinned only through one of them.
+/// </remarks>
 public sealed class BuiltOutputProbeTests
 {
     private const string Assembly = "MyApp.Arch.dll";
@@ -269,31 +275,6 @@ public sealed class BuiltOutputProbeTests
                 temp.PathOf("artifacts", "bin", "MyApp.Arch"),
                 temp.PathOf("artifacts", "bin")
             ]);
-    }
-
-    [Theory]
-    // The three measured layouts, plus a BaseIntermediateOutputPath redirected to a repository-level obj.
-    [InlineData("/r/P/bin/Debug/net10.0/A.dll", "/r/P/obj/Debug/net10.0/A.dll", "/r/P/obj")]
-    [InlineData("/r/P/bin/A.dll", "/r/P/obj/Debug/A.dll", "/r/P/obj")]
-    [InlineData("/r/artifacts/bin/P/debug/A.dll", "/r/artifacts/obj/P/debug/A.dll", "/r/artifacts/obj")]
-    [InlineData("/r/src/P/bin/Debug/net10.0/A.dll", "/r/obj/P/Debug/net10.0/A.dll", "/r/obj")]
-    // The degenerate cases one guard collapses: the same path, no path, an empty path, and a sibling file in
-    // the very directory the output lives in. None of them adds a directory that could be excluded.
-    [InlineData("/r/P/bin/A.dll", "/r/P/bin/A.dll", null)]
-    [InlineData("/r/P/bin/A.dll", null, null)]
-    [InlineData("/r/P/bin/A.dll", "", null)]
-    [InlineData("/r/P/bin/A.dll", "/r/P/bin/B.dll", null)]
-    // Two paths that cannot share a tree derive no root. On Windows that is the differing-path-root guard; on
-    // a POSIX file system a drive-lettered path is not rooted at all and the rootedness guard answers first.
-    [InlineData("C:/a/bin/A.dll", "D:/a/obj/A.dll", null)]
-    public void IntermediateRootOf_DerivesTheRootWithoutNamingObj(
-        string evaluatedPath, string? intermediatePath, string? expectedRoot)
-    {
-        // Pure strings, no disk: the derivation is segment arithmetic over two paths from one MSBuild
-        // evaluation. The rows are written rooted at `/` so they mean the same thing on every platform —
-        // Path.GetFullPath maps them onto the current drive on Windows, on both sides of the comparison.
-        BuiltOutputProbe.IntermediateRootOf(evaluatedPath, intermediatePath)
-            .ShouldBe(expectedRoot is null ? null : Path.GetFullPath(expectedRoot));
     }
 
     // A zero-byte assembly at the given path, with its directory created.

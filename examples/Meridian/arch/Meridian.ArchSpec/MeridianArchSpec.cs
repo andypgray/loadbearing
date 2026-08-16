@@ -26,8 +26,12 @@ public sealed class MeridianArchSpec : IArchitectureSpec
             .Because("Domain holds the booking and rate model the rest of the system depends on; it must not reach up into the web tier.")
             .Fix("Define the abstraction in Meridian.Domain and implement it in Meridian.Web.");
 
+        // The subject is the hierarchy, not the folder: a request handler is a ControllerBase deriver
+        // wherever it lives. This spec is a plain class library with no <FrameworkReference>, so it cannot
+        // write typeof(ControllerBase) at all — the string overload names the anchor by fully-qualified
+        // name and needs no reference to it, which is the adopter's position on any MVC codebase.
         arch.Rule("naming/controllers")
-            .Enforce(arch.Types.InNamespace("Meridian.Web.Controllers.*").MustHaveSuffix("Controller"))
+            .Enforce(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase").MustHaveSuffix("Controller"))
             .Because("Request handlers are found by their `*Controller` name — by routing and by agents reading the code; keep the convention total.");
 
         arch.Rule("data-access/no-inline-sql")

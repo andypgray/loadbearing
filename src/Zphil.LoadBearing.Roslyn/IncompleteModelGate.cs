@@ -175,9 +175,9 @@ internal static class IncompleteModelGate
             $"the model is incomplete — {Failed(diagnostics)} failed to load, so every rule test was skipped:",
             diagnostics,
             true,
-            "A rule whose subject lives in an unloaded project selects nothing, and an empty subject passes — a "
-            + "green run against a partial model would sign a verdict that was never reached. Restore and build "
-            + "the solution first (dotnet build), then retry. To check the partial model as it loaded, override "
+            "Every rule would be measured over a codebase missing whole projects — a green run against a "
+            + "partial model would sign verdicts that were never reached. Restore and build the solution "
+            + "first (dotnet build), then retry. To check the partial model as it loaded, override "
             + "AllowWorkspaceDiagnostics to true on the test class.");
     }
 

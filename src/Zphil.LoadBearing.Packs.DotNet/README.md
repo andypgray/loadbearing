@@ -27,11 +27,16 @@ public sealed class MyArchSpec : IArchitectureSpec
 }
 ```
 
-Add a `ProjectReference` to this project alongside the one to `Zphil.LoadBearing`. If your spec
-project has no `PackageReference` of its own, also set
-`<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`: the checker loads a spec
-through a resolver rooted at the spec's own DLL, so the pack's package dependencies have to sit
-beside it or the load fails at check time rather than at build time.
+Add a `ProjectReference` to this project alongside the one to `Zphil.LoadBearing`. Also set
+`<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`: the checker loads a spec through
+a resolver rooted at the spec's own DLL, and staging the pack's package dependencies beside it makes
+that resolution independent of what the checking machine has restored. Note where the failure would
+land if it is missing — at check time, not at build time.
+
+A `typeof()` anchor on a **.NET shared framework** type is the one case no build setting reaches: an
+ASP.NET Core or WPF type arriving through `<FrameworkReference>` is never staged into a class
+library's output, so anchor those by string (`.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`,
+which renders identically) rather than by `typeof()`.
 
 ## The nine rules
 

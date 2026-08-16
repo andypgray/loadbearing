@@ -89,6 +89,21 @@ internal static class Sources
                                               """;
 
     /// <summary>
+    ///     The external-anchor fixture (GRAMMAR §5.2): subjects whose base chain leaves the compilation —
+    ///     one deriving from a BCL type directly, one reaching it through an intermediate <em>external</em>
+    ///     base (<c>ArgumentException : SystemException : Exception</c>) — plus a non-deriver. The shallow
+    ///     hierarchy external types carry is a fact about the <em>subject</em> position: a declared type's
+    ///     base chain is walked through metadata, so an external <em>anchor</em> is matchable in both anchor
+    ///     forms. Its own compilation because the <see cref="Hierarchy" /> pins assert exact selected sets.
+    /// </summary>
+    public const string ExternalBaseHierarchy = """
+                                                namespace Zphil.LoadBearing.Tests.Checking.Targets;
+                                                public class DirectDeriver : System.Exception {}
+                                                public class IndirectDeriver : System.ArgumentException {}
+                                                public class Unrelated {}
+                                                """;
+
+    /// <summary>
     ///     The generic-attribute fixture for string attribute anchors (GRAMMAR §5.2): one generic attribute
     ///     applied at two constructions, plus a non-generic one and a bare type. A definition-name anchor
     ///     must reach both constructions while a constructed spelling reaches neither. Its own compilation

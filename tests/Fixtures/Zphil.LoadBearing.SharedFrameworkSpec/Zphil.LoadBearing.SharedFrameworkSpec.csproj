@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A spec whose typeof() anchor is a .NET *shared framework* type — the third world the
+         dependency-load diagnostic used to have no word for, and the one the field actually hit
+         (an agent anchoring typeof(ControllerBase) on a real ASP.NET codebase: two failed checks,
+         recovered only by dropping the anchors).
+
+         CopyLocalLockFileAssemblies is deliberately ON, and must stay on. The property being on and
+         the load still failing IS the refutation this fixture exists to hold: the earlier record
+         blamed "a class-library build does not stage package assemblies", so the remedy on offer was
+         this property. Measured both ways — on and off fail identically, because a FrameworkReference
+         contributes no entry to the spec's .deps.json and no file to its output, so the property has
+         nothing to copy. Turning it off here would still reproduce the failure and would quietly stop
+         encoding why. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+    <!-- The repository's only FrameworkReference. Referenced solely so Define() can name an ASP.NET
+         Core type in a typeof(); the targeting pack it resolves against ships with the .NET SDK. -->
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+</Project>

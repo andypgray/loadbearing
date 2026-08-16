@@ -14,25 +14,82 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///     identity across the load boundary. The emitted DLL needs no <c>.deps.json</c> because it depends
 ///     only on the core and the BCL — both resolvable from the running runtime.
 /// </summary>
+/// <remarks>
+///     The <see cref="EmitSpecDll(string,string,string,MetadataReference)" /> overload <em>swaps</em> the
+///     contract instead of adding to it, for the one subject that needs a spec built against a contract
+///     identity this host does not carry (<see cref="SkewedContract" />). Its reference set is
+///     <see cref="PlatformReferences" /> — the same closure with the in-process core filtered out — because
+///     leaving the real core beside a stand-in makes every contract type ambiguous at compile time.
+/// </remarks>
 internal static class SpecAssemblyCompiler
 {
-    private static readonly MetadataReference[] References = BuildReferences();
+    private static readonly string CorePath = typeof(Arch).Assembly.Location;
+
+    // The shared-framework + deployed-assembly reference closure (the same TRUSTED_PLATFORM_ASSEMBLIES set
+    // CompilationFactory uses) minus the in-process core, so a caller supplying its own Zphil.LoadBearing
+    // never faces two of them. Initialized before HostContract, which is built on top of it.
+    private static readonly MetadataReference[] Platform = BuildPlatformReferences();
+
+    private static readonly MetadataReference[] HostContract =
+        [..Platform, MetadataReference.CreateFromFile(CorePath)];
+
+    /// <summary>
+    ///     The reference closure with the in-process <c>Zphil.LoadBearing</c> removed — what a compilation
+    ///     that brings its own contract must build against.
+    /// </summary>
+    internal static IReadOnlyList<MetadataReference> PlatformReferences => Platform;
 
     /// <summary>
     ///     Compiles <paramref name="source" /> to a spec DLL at <paramref name="outputPath" /> under
-    ///     <paramref name="assemblyName" />; throws <see cref="InvalidOperationException" /> listing every
-    ///     compile error on failure.
+    ///     <paramref name="assemblyName" />, against the contract this host carries; throws
+    ///     <see cref="InvalidOperationException" /> listing every compile error on failure.
     /// </summary>
     public static void EmitSpecDll(string source, string outputPath, string assemblyName)
     {
+        EmitSpecDll(source, outputPath, assemblyName, HostContract);
+    }
+
+    /// <summary>
+    ///     <see cref="EmitSpecDll(string,string,string)" /> against <paramref name="contract" /> in place of
+    ///     the host's own — the spec's assembly ref then carries whatever identity that reference declares.
+    /// </summary>
+    public static void EmitSpecDll(string source, string outputPath, string assemblyName, MetadataReference contract)
+    {
+        EmitSpecDll(source, outputPath, assemblyName, [..Platform, contract]);
+    }
+
+    /// <summary>
+    ///     Compiles <paramref name="source" /> against <paramref name="references" /> and hands back the
+    ///     emitted image, for a caller that <em>references</em> the result rather than loads it.
+    /// </summary>
+    internal static byte[] EmitImage(string source, string assemblyName, IReadOnlyList<MetadataReference> references)
+    {
+        using var stream = new MemoryStream();
+        EmitResult result = Compile(source, assemblyName, references)
+            .Emit(stream);
+        ThrowOnFailure(result, assemblyName);
+        return stream.ToArray();
+    }
+
+    private static void EmitSpecDll(string source, string outputPath, string assemblyName, IReadOnlyList<MetadataReference> references)
+    {
+        EmitResult result = Compile(source, assemblyName, references)
+            .Emit(outputPath);
+        ThrowOnFailure(result, assemblyName);
+    }
+
+    private static CSharpCompilation Compile(string source, string assemblyName, IReadOnlyList<MetadataReference> references)
+    {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source);
-        var compilation = CSharpCompilation.Create(
+        return CSharpCompilation.Create(
             assemblyName,
             [tree],
-            References,
+            references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
 
-        EmitResult result = compilation.Emit(outputPath);
+    private static void ThrowOnFailure(EmitResult result, string assemblyName)
+    {
         if (result.Success) return;
 
         string errors = string.Join(
@@ -40,24 +97,16 @@ internal static class SpecAssemblyCompiler
             result.Diagnostics
                 .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
                 .Select(diagnostic => diagnostic.ToString()));
-        throw new InvalidOperationException($"Spec compilation failed:\n{errors}");
+        throw new InvalidOperationException($"Compilation of '{assemblyName}' failed:\n{errors}");
     }
 
-    // The shared-framework + deployed-assembly reference closure (the same TRUSTED_PLATFORM_ASSEMBLIES set
-    // CompilationFactory uses), with the in-process core added if the runtime did not already list it — so
-    // typeof(Arch)'s assembly is always resolvable and never duplicated.
-    private static MetadataReference[] BuildReferences()
+    private static MetadataReference[] BuildPlatformReferences()
     {
-        var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        return ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Where(path => path.Length > 0)
-            .ToList();
-
-        string corePath = typeof(Arch).Assembly.Location;
-        if (!paths.Any(path => string.Equals(path, corePath, StringComparison.OrdinalIgnoreCase)))
-            paths.Add(corePath);
-
-        return paths.Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .Where(path => !string.Equals(path, CorePath, StringComparison.OrdinalIgnoreCase))
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToArray();
     }
 }

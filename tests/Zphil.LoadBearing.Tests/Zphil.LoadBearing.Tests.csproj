@@ -88,6 +88,12 @@
                           ReferenceOutputAssembly="false"
                           OutputItemType="DerivedSpecAssembly"
                           Private="false" />
+        <!-- The spec whose typeof() anchor lives in a .NET shared framework — the load failure no build
+             setting can fix. Its own csproj explains why CopyLocalLockFileAssemblies is on there. -->
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.SharedFrameworkSpec\Zphil.LoadBearing.SharedFrameworkSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="SharedFrameworkSpecAssembly"
+                          Private="false" />
         <!-- The net48 legacy trio, same discipline. LegacyProduct is the Framework product assembly the
              legacy spec typeof()s; the tests need its path to assert which load context resolved it.
              These are why NU1702 is suppressed above. -->
@@ -166,6 +172,10 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>DerivedSpecPath</_Parameter1>
                 <_Parameter2>@(DerivedSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>SharedFrameworkSpecPath</_Parameter1>
+                <_Parameter2>@(SharedFrameworkSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
             <!-- The net48 legacy trio's DLL paths. -->
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">

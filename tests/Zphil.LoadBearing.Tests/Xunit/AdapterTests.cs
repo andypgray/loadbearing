@@ -120,9 +120,9 @@ public sealed class AdapterTests
     [Fact]
     public async Task PartialWorkspace_SkipsEveryRuleCase()
     {
-        // The bug this exists to close: a rule whose subject lived in the unloaded project selects nothing, an
-        // empty subject passes, and the run goes green into CI's most-trusted signal. The reason is constant and
-        // points at the named test rather than repeating the diagnostics once per rule.
+        // The bug this exists to close: the run measures a codebase missing whole projects, nothing says so, and
+        // the run goes green into CI's most-trusted signal. The reason is constant and points at the named test
+        // rather than repeating the diagnostics once per rule.
         Exception? exception = await CaughtAsync(() => new BrokenAppArchTests().Rule_Holds(BrokenAppRuleId));
 
         var skip = exception.ShouldBeOfType<SkipException>();

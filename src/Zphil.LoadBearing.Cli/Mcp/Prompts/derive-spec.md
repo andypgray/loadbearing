@@ -221,11 +221,17 @@ Errors you may see, verbatim, and what they mean:
   A project that multi-targets is listed once: its frameworks are one spec project.
 - `The spec project '…' has no built output … Build the solution first (dotnet build).` —
   the CLI and this server **never build**; build before every check, or the results are stale.
-- `The spec assembly '…' failed to load its dependency '…' while running Define().` — the spec
-  names a NuGet-packaged type via `typeof()`, and that package assembly is not in the spec's
-  build output. Add `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>` to the
-  spec csproj (the scaffold above carries it) and rebuild, or switch the target to a
-  namespace pattern.
+- `The spec assembly '…' failed to load its dependency '…' while running Define().` — a
+  `typeof()` anchor names a type whose assembly the loader cannot reach. The message says which
+  of two situations you are in, so read its second line rather than reaching for the setting.
+  If the assembly is a **NuGet package**, `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`
+  in the spec csproj (the scaffold above carries it) plus a rebuild stages it. If it is a **.NET
+  shared framework** — anything reached through `<FrameworkReference Include="Microsoft.AspNetCore.App" />`,
+  such as an MVC `ControllerBase` or a `Microsoft.WindowsDesktop.App` type — **no build setting
+  can help**: that assembly is never staged into a spec's output and the tool's own host does not
+  carry it. Anchor those by string instead — `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`
+  renders exactly like the `typeof()` form and needs no assembly load — or target a namespace
+  pattern.
 
 If discovery still cannot find your spec project, do not stall: pass
 `--spec path/to/YourSpec.csproj` to every verb and continue — nothing downstream depends on
@@ -470,10 +476,23 @@ anchor those with the `typeof`/`nameof` form.)
 
 **Adjectives** (chain onto any selection) — `.InNamespace(glob)` · `.OfKind(TypeKind.Class |
 Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
-`.WithNameMatching(glob)` · `.Implementing(type)` / `.Implementing<T>()` · `.DerivedFrom(type)` /
-`.DerivedFrom<T>()` · `.AttributedWith(attributeType)` / `.AttributedWith<T>()` ·
+`.WithNameMatching(glob)` · `.Implementing(type)` / `.Implementing<T>()` / `.Implementing("Fully.Qualified.Name")` ·
+`.DerivedFrom(type)` / `.DerivedFrom<T>()` / `.DerivedFrom("Fully.Qualified.Name")` ·
+`.AttributedWith(attributeType)` / `.AttributedWith<T>()` / `.AttributedWith("Fully.Qualified.NameAttribute")` ·
 `.Except(selection)` · `.Where(pred, description:)` · `.Authored()` (drops source-generated
 types — `[GeneratedCode]` on the type or its container; a project noun otherwise names them).
+
+The **string overload** on every hierarchy and attribute anchor position — the three adjectives
+above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttributedWith` verbs
+below — is the escape hatch for a type the spec project cannot compile against, and it renders
+byte-identically to the `typeof()` form. Reach for it whenever a reference on the spec project
+would be the only reason to add one, and *always* for a **.NET shared framework** type such as an
+MVC `ControllerBase`, which no build setting can stage into a spec's output (see the load-failure
+message in step 2). It anchors fine either way: only an external **subject** carries a shallow
+hierarchy, while a declared subject's base chain and interface closure are walked through metadata,
+so `arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects your controllers. A
+string always names the **definition**, so it reads like the open-generic `typeof` form
+(`"IHandler<T>"` matches every construction) and a constructed spelling matches nothing.
 
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes
@@ -518,7 +537,9 @@ each with a generic twin — `MustNotImplement<T>()`, `MustNotDeriveFrom<T>()`,
 The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>()` /
 `.AttributedWith<T>()`, the six `Must[Not]*<T>` hierarchy verbs, the `arch.Member<X>(x => x.M)` /
 `arch.Member(() => X.M)` anchors, and the static `MustNotUse(() => X.M)` verb forms — are pure
-sugar for the `typeof`/`nameof` form and reify identically. An **open** generic has no
+sugar for the `typeof`/`nameof` form and reify identically; a generic twin needs the same
+compile-time reference the `typeof` does, so where you cannot have one, use the string overload
+above rather than reaching for `<T>`. An **open** generic has no
 type-argument form, so it stays `typeof` (`Implementing(typeof(IHandler<>))`,
 `.Returning(typeof(Task<>))`). The dependency verbs take
 `typeof` or a wrapping `arch.Type<X>()` (never a generic verb); `.Returning` and

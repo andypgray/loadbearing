@@ -11,8 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A run narrowed by a solution filter now says so on every surface.** `check`, `status` and `graph` stamp which declared projects the filtered run never checked, and the JSON documents carry them as `uncheckedProjects` beside `failedProjects` — absent when nothing was narrowed, so unfiltered output does not move a byte. SARIF carries one warning-level tool notification, and the `arch_check`, `arch_status` and `arch_graph` MCP tools inherit the slot, which the stdout stamp could never reach. The set is measured from the load rather than read from the filter: a selection whose transitive project references pull the rest of the solution in narrows nothing and says nothing. `context` writes the same caveat above its answer. `baseline --init`, `baseline --accept-reductions` and `render` refuse under a narrowing filter — exit 2, nothing written: a baseline captured through a filter signs off debt in projects it never measured, `--accept-reductions` would delete real entries, and rendered files would silently drop every card from an unchecked project. `baseline --add` keeps working. In the xUnit adapter, rule cases keep their verdicts — a narrowed universe is a smaller true answer — and `Workspace_LoadedCompletely` reports as skipped, naming what was not checked, rather than pass under a name the filtered run cannot vouch for. A filtered run anchors every convention-relative path at the solution the filter references rather than at the filter's own directory — committed baselines, render targets, `context --path`, diff resolution, and the stamped project paths, which read solution-relative rather than `../`-prefixed — so a filter that narrows nothing answers exactly as its solution does, instead of missing the committed baseline and failing rules that are green over the whole solution. And a rule all of whose findings are the empty-selection defaults skips under a narrowing filter, with one line naming the filter and the unchecked count, rather than reding as a typo'd spec: a filter that erases a rule's whole subject no longer turns a green spec red, while unfiltered runs keep the fail-closed empty-selection defaults exactly as they were.
 
+### Changed
+
+- **The string anchor is now stated where an author is reading, and demonstrated where an adopter is
+  looking.** The shared-framework load failure already offered `.DerivedFrom("…ControllerBase")` as its
+  remedy, but `derive_spec`'s authoring reference — the section that page calls canonical — listed only
+  the `typeof` and generic forms, so an agent reading it top to bottom learned the hatch existed only by
+  also reading the error list. The adjectives block now carries the string overload beside each `typeof`
+  form, with a paragraph on when to reach for it and the note that a generic `<T>` twin needs the same
+  compile-time reference a `typeof` does. The Meridian example's `naming/controllers` rule moves from a
+  namespace pattern to `arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`: its spec
+  project is a plain class library with no `<FrameworkReference>`, so it is exactly the position that
+  cannot write the `typeof` — and the rule now says what it means (a request handler is a `ControllerBase`
+  deriver, not a folder) while selecting the identical eight controllers. GRAMMAR §5.2's
+  "the hierarchy adjectives never match an external type" said no position, and reads naturally as the
+  claim that a shared-framework anchor is pointless; it now names the **subject** position and states that
+  a declared type's base chain and interface closure are walked straight through metadata, so an external
+  anchor matches — including through an intermediate external base.
+
 ### Fixed
 
+- **A spec whose `typeof()` anchor lives in a .NET shared framework is told so, instead of being sent to a
+  build setting that cannot work.** The failure names an assembly, and the message asked the reader to
+  classify it: "if it is a package" → add `CopyLocalLockFileAssemblies`; "if it is a .NET Framework
+  assembly" → use a namespace pattern. A .NET *shared* framework — an ASP.NET Core `ControllerBase`, a
+  `Microsoft.WindowsDesktop.App` type — is a third world that sentence had no word for, and it reads as a
+  package, which is the one answer that cannot help: measured both ways, the load fails identically with
+  `CopyLocalLockFileAssemblies` on and off, because a `<FrameworkReference>` contributes no entry to the
+  spec's dependency manifest and no file to its output, so the property has nothing to copy. The remedy is
+  now chosen by structure already on disk rather than by the reader: the spec's own `.deps.json` is the
+  manifest the resolver just failed to resolve through, so an assembly it names is a package asset and
+  staging it is the fix, while one it does not name cannot be staged by anything and wants a string anchor
+  — `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`, which renders byte-identically to the
+  `typeof()` form and needs no assembly load — or a namespace pattern. A manifest that cannot be read falls
+  back to the previous both-worlds wording rather than guessing. The discovery-time variant of the same
+  failure, which aggregates several loader errors and so cannot honestly branch per assembly, now names both
+  worlds instead of asserting the packaging one.
 - **A directory holding both a solution and a filter over it resolves to the solution.** Discovery treated `.sln`, `.slnx` and `.slnf` as equal candidates, so the common layout of a filter beside its solution refused as ambiguous. A `.slnf` now drops out of the candidate set wherever a `.sln` or `.slnx` stands beside it; several full solutions still refuse as ambiguous, and the message names only the surviving candidates.
 - **A NuGet restore warning no longer refuses a solution whose rules all pass — in any language.** The
   fail-closed gate decided "did the model fail to build" by matching the text of MSBuild's project-load
@@ -96,6 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   express a global-tool install or override a consumer repository's SDK pin, so the manifest
   serves the repositories that can use it and the prose carries the boundary.
 
+## [0.4.0] - 2026-08-09
+
 ### Added
 
 - **Both querying surfaces can narrow, so a big solution answers whole.** `graph` takes two
@@ -175,12 +211,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The xUnit adapter no longer turns a project that fails to load into a green test run.** The
   adapter never passed the loader a diagnostic log, which is the only way load failures leave
-  it, so they were dropped: every rule whose subject lived in an unloaded project selected
-  nothing, an empty subject passes, and the green landed in a CI report. The adapter now gives
-  `check`'s answer in test dress: a new `Workspace_LoadedCompletely` test fails carrying the
-  diagnostics inline, every rule case skips rather than report a verdict that was never
-  reached, and a `protected virtual bool AllowWorkspaceDiagnostics` override opts into the
-  partial model, flipping the named test to a skip so its name never asserts something false.
+  it, so they were dropped: the run measured a codebase missing whole projects, no surface said
+  so, and the green landed in a CI report. The adapter now gives `check`'s answer in test dress:
+  a new `Workspace_LoadedCompletely` test fails carrying the diagnostics inline, every rule case
+  skips rather than report a verdict that was never reached, and a
+  `protected virtual bool AllowWorkspaceDiagnostics` override opts into the partial model,
+  flipping the named test to a skip so its name never asserts something false.
 - **A registry launch that cannot find a solution now starts and says why, instead of dying during
   `initialize`.** The manifest's `dnx` entry passes the bare `mcp` verb with no solution argument, so
   the server walks up from its working directory. That resolves nothing where the solution sits under

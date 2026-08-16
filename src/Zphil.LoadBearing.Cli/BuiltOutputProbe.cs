@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli;
 
@@ -79,7 +80,7 @@ internal static class BuiltOutputProbe
         if (string.IsNullOrWhiteSpace(evaluatedOutputPath) || !Path.IsPathRooted(evaluatedOutputPath)) return null;
 
         string assemblyFileName = Path.GetFileName(evaluatedOutputPath);
-        string? intermediateRoot = IntermediateRootOf(evaluatedOutputPath, intermediateAssemblyPath);
+        string? intermediateRoot = IntermediateOutputTree.RootOf(evaluatedOutputPath, intermediateAssemblyPath);
 
         // AttributesToSkip is left at its Hidden | System default deliberately: nothing a build means to be
         // loaded is marked either, and the default keeps a recursive walk out of system directories.
@@ -153,49 +154,6 @@ internal static class BuiltOutputProbe
         return [];
     }
 
-    /// <summary>
-    ///     The root of the project's intermediate tree, derived by peeling the shared prefix off the
-    ///     evaluated and intermediate assembly paths — so the rule never has to name <c>obj</c>, and holds
-    ///     for a <c>BaseIntermediateOutputPath</c> redirected anywhere. Null when the two paths share no
-    ///     path root, or when the intermediate path adds no directory of its own (it is the evaluated path,
-    ///     or a sibling of it, or unknown).
-    /// </summary>
-    internal static string? IntermediateRootOf(string evaluatedOutputPath, string? intermediateAssemblyPath)
-    {
-        if (string.IsNullOrWhiteSpace(intermediateAssemblyPath) || !Path.IsPathRooted(intermediateAssemblyPath))
-            return null;
-        if (string.IsNullOrWhiteSpace(evaluatedOutputPath) || !Path.IsPathRooted(evaluatedOutputPath)) return null;
-
-        // Path.GetFullPath, not PathCanonicalizer.Resolve: both paths come from one MSBuild evaluation of one
-        // project so they already share a spelling, and a symlink walk on the failure path costs syscalls per
-        // ancestor while risking a root spelled differently from the anchor.
-        string evaluated = Path.GetFullPath(evaluatedOutputPath);
-        string intermediate = Path.GetFullPath(intermediateAssemblyPath);
-
-        // Peeling the path root off both is what makes UNC and drive-relative input safe with no
-        // leading-empty-segment special case: two different roots share nothing worth comparing.
-        string evaluatedRoot = Path.GetPathRoot(evaluated) ?? "";
-        string intermediateRoot = Path.GetPathRoot(intermediate) ?? "";
-        if (!string.Equals(evaluatedRoot, intermediateRoot, PathComparison.Comparison)) return null;
-
-        string[] evaluatedSegments = SegmentsBelow(evaluated, evaluatedRoot);
-        string[] intermediateSegments = SegmentsBelow(intermediate, intermediateRoot);
-
-        var shared = 0;
-        while (shared < evaluatedSegments.Length
-               && shared < intermediateSegments.Length
-               && string.Equals(evaluatedSegments[shared], intermediateSegments[shared], PathComparison.Comparison))
-            shared++;
-
-        // One guard collapses every degenerate case: the intermediate path equal to the evaluated one, the
-        // same directory under a different file name, and an intermediate assembly sitting directly beside
-        // the output. In each the intermediate tree adds no directory of its own, so there is nothing to
-        // exclude and excluding the shared directory would refuse the real output.
-        if (shared >= intermediateSegments.Length - 1) return null;
-
-        return Path.Combine([evaluatedRoot, .. intermediateSegments.Take(shared + 1)]);
-    }
-
     private static bool IsOutputRootDirectory(string directory)
     {
         string name = Path.GetFileName(directory);
@@ -230,11 +188,6 @@ internal static class BuiltOutputProbe
     private static string[] RelativeSegments(string anchor, string candidatePath)
     {
         return SplitSegments(Path.GetRelativePath(anchor, candidatePath));
-    }
-
-    private static string[] SegmentsBelow(string fullPath, string pathRoot)
-    {
-        return SplitSegments(fullPath.Substring(pathRoot.Length));
     }
 
     private static string[] SplitSegments(string path)

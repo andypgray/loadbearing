@@ -855,9 +855,13 @@ inheritance matches) and the whole base-type chain, arguments substituted. A cla
 definition name); a closed construction matches that construction exactly (on the constructed
 name); a **string** anchor is always the definition arm (string anchors, below). `AttributedWith`
 is **declared attributes only** — no inheritance. External (metadata)
-types carry a **shallow** hierarchy: extraction records their identity but not their
-bases/interfaces/attributes, so the hierarchy adjectives never match an external type (a
-documented boundary; pattern and name adjectives still work on externals). The same three
+types carry a **shallow** hierarchy: extraction records their identity but not their own
+bases/interfaces/attributes, so the hierarchy adjectives never match an external **subject** (a
+documented boundary; pattern and name adjectives still work on externals). The **anchor**
+position is not bounded that way: a *declared* type's base chain and interface closure are walked
+straight through metadata, so `DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects a
+declared controller — and reaches it through an intermediate external base too — even though the
+anchor is a type the spec never compiles against. The same three
 matchers back the `MustImplement` / `MustDeriveFrom` / `MustBeAttributedWith`
 constraint verbs and, negated per subject over the anchor list, their `MustNot*` twins (§5.3).
 Under a negative the shallow-external boundary reads in the passing direction: an anchor

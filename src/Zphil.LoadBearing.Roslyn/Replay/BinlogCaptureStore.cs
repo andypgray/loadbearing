@@ -80,7 +80,7 @@ internal sealed class BinlogCaptureStore
 {
     // The manifest schema this store reads and writes. A manifest written under any other version degrades
     // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
     internal const string UnreadableNotice =
@@ -378,7 +378,12 @@ internal sealed class BinlogCaptureStore
             string csprojFull = Path.GetFullPath(project.FilePath);
             if (!byName.TryGetValue(project.Name, out Accumulator? accumulator))
             {
-                accumulator = new Accumulator(project.Name, csprojFull, Path.GetDirectoryName(csprojFull)!);
+                accumulator = new Accumulator(
+                    project.Name,
+                    csprojFull,
+                    Path.GetDirectoryName(csprojFull)!,
+                    project.OutputFilePath,
+                    project.CompilationOutputInfo.AssemblyPath);
                 byName[project.Name] = accumulator;
             }
 
@@ -417,7 +422,8 @@ internal sealed class BinlogCaptureStore
             // The assets file then the ancestor × probe cross-product, in ProjectCone's order — the same
             // recipe and the same order the fragment cache stamps, so the two cannot disagree about what
             // "the structure moved" means.
-            foreach (string path in ProjectCone.StructuralPaths(project.ProjectDirectory))
+            foreach (string path in ProjectCone.StructuralPaths(
+                         project.ProjectDirectory, project.EvaluatedOutputPath, project.IntermediateAssemblyPath))
                 yield return path;
         }
     }
@@ -459,7 +465,12 @@ internal sealed class BinlogCaptureStore
     }
 
     // Accumulates one project's identity and its unioned, ordinal-sorted document set across frameworks.
-    private sealed class Accumulator(string projectName, string csprojPath, string projectDirectory)
+    private sealed class Accumulator(
+        string projectName,
+        string csprojPath,
+        string projectDirectory,
+        string? evaluatedOutputPath,
+        string? intermediateAssemblyPath)
     {
         public string ProjectName { get; } = projectName;
         public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
@@ -468,7 +479,14 @@ internal sealed class BinlogCaptureStore
         {
             // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
             var coneFiles = ProjectCone.Enumerate(projectDirectory).OrderBy(p => p, StringComparer.Ordinal).ToList();
-            return new CaptureProjectEntry(ProjectName, csprojPath, projectDirectory, Documents.ToList(), coneFiles);
+            return new CaptureProjectEntry(
+                ProjectName,
+                csprojPath,
+                projectDirectory,
+                Documents.ToList(),
+                coneFiles,
+                evaluatedOutputPath,
+                intermediateAssemblyPath);
         }
     }
 }

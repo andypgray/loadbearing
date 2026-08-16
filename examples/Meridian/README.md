@@ -47,7 +47,7 @@ The same `naming/async-suffix` is `Enforce` in the [Interchange example](../Meri
 ```markdown
 ### Rules
 - `layering/domain-independent` — The Domain layer must not reference the Web layer. Domain holds the booking and rate model the rest of the system depends on; it must not reach up into the web tier.
-- `naming/controllers` — Types in `Meridian.Web.Controllers.*` must be named `*Controller`. Request handlers are found by their `*Controller` name — by routing and by agents reading the code; keep the convention total.
+- `naming/controllers` — Types derived from `ControllerBase` must be named `*Controller`. Request handlers are found by their `*Controller` name — by routing and by agents reading the code; keep the convention total.
 - `di/no-buildserviceprovider` — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`. Calling BuildServiceProvider while configuring services builds a second container with its own singletons — a duplicate-instance trap — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
 
 ### Migrations

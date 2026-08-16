@@ -56,15 +56,27 @@ internal sealed record CaptureManifest(
 ///     run. A file the scan finds that is in neither <see cref="ConeFiles" /> nor <see cref="DocumentPaths" />
 ///     is a genuine post-ingest add.
 /// </param>
+/// <param name="EvaluatedOutputPath">
+///     The project's evaluated output path as the replayed solution carried it, or null. Paired with
+///     <paramref name="IntermediateAssemblyPath" /> it is what locates the restore assets file under a
+///     non-default output layout (see <see cref="IntermediateOutputTree" />). A replayed solution often
+///     carries neither, and then the default location is all the capture stamps — the same set it stamped
+///     before this pair existed.
+/// </param>
+/// <param name="IntermediateAssemblyPath">The project's intermediate assembly path as replayed, or null.</param>
 // ProjectName is persisted schema: the self-describing manifest records each project's identity for a
 // readable manifest diff, though validation re-collects projects from the solution and keys on the
-// directory, csproj, and document set rather than reading the stored name back.
+// directory, csproj, and document set rather than reading the stored name back. The two evaluated paths
+// are recorded for the same reason — they decide which structural paths the capture stamped, so a manifest
+// diff that shows the stamps should show what produced them.
 // ReSharper disable NotAccessedPositionalProperty.Global
 internal sealed record CaptureProjectEntry(
     string ProjectName,
     string CsprojPath,
     string ProjectDirectory,
     IReadOnlyList<string> DocumentPaths,
-    IReadOnlyList<string> ConeFiles);
+    IReadOnlyList<string> ConeFiles,
+    string? EvaluatedOutputPath = null,
+    string? IntermediateAssemblyPath = null);
 
 // ReSharper restore NotAccessedPositionalProperty.Global

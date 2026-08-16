@@ -37,9 +37,12 @@ public sealed class ModelPipelineLoaderFailureTests
             "Could not load spec assembly 'Meridian.ArchSpec.dll'; one or more types failed to load:\n"
             + "  Could not load file or assembly 'Acme'.\n"
             + "  Could not load type 'Zebra'.\n"
-            + "Build the spec project and restore its dependencies, then retry. If it is already built, the "
-            + "assembly named above is a dependency a class-library build does not stage beside the spec "
-            + "DLL: add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, an "
+            + "assembly named above is one the spec's own build does not put where the loader can reach it: "
+            + "for a NuGet package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to "
+            + "the spec .csproj and rebuild; for a .NET shared framework (<FrameworkReference>) or a .NET "
+            + "Framework reference assembly, no build setting stages it — name the type as a string rather "
+            + "than a typeof(), which needs no assembly load.");
     }
 
     [Fact]
@@ -52,8 +55,11 @@ public sealed class ModelPipelineLoaderFailureTests
         message.ShouldBe(
             "Could not load spec assembly 'Spec.dll'; one or more types failed to load:\n"
             + "  (the runtime reported no loader detail)\n"
-            + "Build the spec project and restore its dependencies, then retry. If it is already built, the "
-            + "assembly named above is a dependency a class-library build does not stage beside the spec "
-            + "DLL: add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, an "
+            + "assembly named above is one the spec's own build does not put where the loader can reach it: "
+            + "for a NuGet package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to "
+            + "the spec .csproj and rebuild; for a .NET shared framework (<FrameworkReference>) or a .NET "
+            + "Framework reference assembly, no build setting stages it — name the type as a string rather "
+            + "than a typeof(), which needs no assembly load.");
     }
 }

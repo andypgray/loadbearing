@@ -110,6 +110,55 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
+    public void ReadAndValidate_ArtifactsLayoutAssetsFileChanged_ReturnsMiss()
+    {
+        // The defect this pins was measured in the field, not read off the code: under
+        // UseArtifactsOutput the assets file lands outside the project directory, the probe watched
+        // <projectDirectory>/obj/project.assets.json — a path no build ever creates — and a re-restore that
+        // changed the model was served from cache as though nothing had moved.
+        using var solution = new SyntheticSolution();
+        solution.AddArtifactsLayoutProject("A", ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+
+        // The control: with nothing touched, this layout hits like any other.
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit);
+
+        // A restore rewrote the assets file, and nothing else on disk moved — no source edit, no csproj
+        // edit, no probe-chain file. The assets file is the only input carrying the change.
+        File.WriteAllText(solution.ArtifactsAssetsPathOf("A"), "{\"libraries\":{}}\n");
+
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void CaptureFingerprint_ArtifactsLayout_StampsTheAssetsFileWhereTheLayoutPutIt()
+    {
+        // The mechanism behind the fact above, so a regression names its cause rather than only its effect:
+        // the default location is still stamped (absent — that is what makes an appearing file a flip), and
+        // the location the layout actually used is stamped too, present.
+        using var solution = new SyntheticSolution();
+        solution.AddArtifactsLayoutProject("A", ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+
+        var stamps = solution.StructuralStampsByPath();
+
+        stamps.ShouldContainKey(solution.ArtifactsAssetsPathOf("A"));
+        stamps[solution.ArtifactsAssetsPathOf("A")]
+            .ShouldBeTrue();
+        stamps.ShouldContainKey(solution.DefaultLayoutAssetsPathOf("A"));
+        stamps[solution.DefaultLayoutAssetsPathOf("A")]
+            .ShouldBeFalse();
+    }
+
+    [Fact]
     public void ReadAndValidate_ExcludedStrayInCone_StillHits()
     {
         // Arrange — a *.cs on disk in the project cone but not among the project's documents (a <Compile
@@ -481,6 +530,57 @@ public sealed class ExtractionCacheStoreTests
 
             var inputs = new ProjectInputs(name, csproj, directory, references, documentPaths);
             projects.Add(inputs);
+        }
+
+        // A project built under UseArtifactsOutput: its intermediate tree — project.assets.json included —
+        // lives under a solution-level artifacts/ directory, not beside the project. The two evaluated paths
+        // are what a loaded workspace hands the store, and they are the only way the assets file's real
+        // location can be derived.
+        public void AddArtifactsLayoutProject(string name, params (string File, string Content)[] documents)
+        {
+            string directory = Path.Combine(Root, "src", name);
+            Directory.CreateDirectory(directory);
+            string csproj = Path.Combine(directory, $"{name}.csproj");
+            File.WriteAllText(csproj, "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+
+            string intermediateDirectory = Path.Combine(Root, "artifacts", "obj", name, "debug");
+            Directory.CreateDirectory(intermediateDirectory);
+            File.WriteAllText(ArtifactsAssetsPathOf(name), "{}\n");
+
+            var documentPaths = new List<string>();
+            foreach ((string file, string content) in documents)
+            {
+                string documentPath = Path.Combine(directory, file);
+                File.WriteAllText(documentPath, content);
+                documentPaths.Add(documentPath);
+            }
+
+            projects.Add(new ProjectInputs(
+                name,
+                csproj,
+                directory,
+                [],
+                documentPaths,
+                Path.Combine(Root, "artifacts", "bin", name, "debug", $"{name}.dll"),
+                Path.Combine(intermediateDirectory, $"{name}.dll")));
+        }
+
+        public string ArtifactsAssetsPathOf(string name)
+        {
+            return Path.GetFullPath(Path.Combine(Root, "artifacts", "obj", name, "project.assets.json"));
+        }
+
+        public string DefaultLayoutAssetsPathOf(string name)
+        {
+            return Path.GetFullPath(Path.Combine(Root, "src", name, "obj", "project.assets.json"));
+        }
+
+        // Every structural stamp the written manifest carries, path -> whether the file existed at capture.
+        public IReadOnlyDictionary<string, bool> StructuralStampsByPath()
+        {
+            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            return root["StructuralStamps"]!.AsArray()
+                .ToDictionary(stamp => stamp!["Path"]!.GetValue<string>(), stamp => stamp!["Exists"]!.GetValue<bool>());
         }
 
         // Writes a *.cs into an existing project's directory WITHOUT recording it as a document — the

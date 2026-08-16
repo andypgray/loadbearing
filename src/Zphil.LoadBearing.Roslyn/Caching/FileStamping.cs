@@ -28,9 +28,9 @@ internal static class FileStamping
     /// </summary>
     /// <remarks>
     ///     <c>Directory.Packages.props</c> is here on the contract above rather than on a measured miss: a
-    ///     concrete central-package-management edit usually also rewrites <c>obj/project.assets.json</c>, which
-    ///     <see cref="AssetsPathOf" /> already stamps. That file is a proxy, and only after a restore — so the
-    ///     probe is what holds the invariant, not the coincidence.
+    ///     concrete central-package-management edit usually also rewrites <c>project.assets.json</c>, which
+    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" /> already stamps. That file is a proxy, and only
+    ///     after a restore — so the probe is what holds the invariant, not the coincidence.
     /// </remarks>
     internal static readonly string[] StructuralProbeFileNames =
         ["Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "global.json"];
@@ -116,10 +116,19 @@ internal static class FileStamping
         return true;
     }
 
-    /// <summary>The absolute path of a project's restore assets file (<c>obj/project.assets.json</c>) — a structural input.</summary>
+    /// <summary>
+    ///     The absolute path of a project's restore assets file in the <em>default</em> output layout
+    ///     (<c>obj/project.assets.json</c>) — a structural input. Every layout's candidate locations come from
+    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" />, which is what the structural stamp set uses;
+    ///     this single default-layout spelling stays because the per-project content key names one assets
+    ///     hash, and that key is a manifest-diff aid rather than the invalidation mechanism — an assets file
+    ///     that changes is a structural change, and the structural sweep misses the whole cache before any
+    ///     content key is recomputed.
+    /// </summary>
     internal static string AssetsPathOf(string projectDirectory)
     {
-        return Path.GetFullPath(Path.Combine(projectDirectory, "obj", "project.assets.json"));
+        return Path.GetFullPath(
+            Path.Combine(projectDirectory, "obj", IntermediateOutputTree.AssetsFileName));
     }
 
     /// <summary>

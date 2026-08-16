@@ -83,6 +83,85 @@ jobs:
       - name: Build
         run: dotnet build Zphil.LoadBearing.slnx --no-restore
 
+      # Which MSBuild each image actually hands the tool, asserted rather than assumed. Everything this
+      # repository knows about MSBuild skew was measured on one developer machine — VS 17.14, via vswhere —
+      # and the two Windows legs exist precisely because the images are expected to disagree. Nothing checked
+      # that they still disagree the way the comment at the top of this job says they do, so a reimaged runner
+      # would move the whole matrix onto an MSBuild nobody chose and every result would quietly re-measure
+      # against it. This is the step that says so instead.
+      #
+      # The selection note is diagnostic context by design, not a banner: a clean run says nothing about
+      # MSBuild on any surface, so an assertion has to give the note something to ride on. A solution naming a
+      # project the tree does not contain is the smallest thing that does — the load is partial, graph refuses
+      # (graph, because it is the verb that needs no spec), and the refusal carries the selection line.
+      # Nothing is restored and nothing is built, so the step costs seconds and has no failure mode of its own.
+      #
+      # No patch version is pinned. The line is echoed on every run, so the version is always on the record;
+      # what reddens is a change of kind — VS or SDK, and which side of MsBuildBootstrap's VS 16/17 preference
+      # the image fell on.
+      - name: Assert which MSBuild this runner selects
+        shell: bash
+        env:
+          IMAGE: ${{ matrix.os }}
+        run: |
+          root="$RUNNER_TEMP/msbuild-selection"
+          mkdir -p "$root"
+          cat > "$root/Selection.slnx" <<'SLNX'
+          <Solution>
+            <Project Path="Absent/Absent.csproj" />
+          </Solution>
+          SLNX
+
+          log="$root/graph.log"
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- graph "$root/Selection.slnx" --no-cache \
+            > /dev/null 2> "$log" || true
+
+          selection="$(sed -n 's/^ *MSBuild for this run: \(.*\)\. Set LOADBEARING_VS_INSTALL_PATH.*$/\1/p' "$log")"
+          echo "MSBuild on $IMAGE: ${selection:-<nothing reported>}"
+
+          if [ -z "$selection" ]; then
+            echo "::error::graph reported no MSBuild selection at all on $IMAGE. Either the refusal stopped carrying MsBuildBootstrap.SelectionNote(), or the workspace failed on this image before it could refuse — this leg exists to surface both."
+            cat "$log"
+            exit 1
+          fi
+
+          # 'via vswhere)' is the VS-or-SDK answer; the envelope tail is which side of the VS 16/17 preference
+          # the image landed on. The tail is matched without its leading em dash so the comparison stays ASCII.
+          outside='outside the tested VS 2019/2022 envelope'
+          sdk='MSBuildLocator default (no Visual Studio install detected via vswhere)'
+          bad=''
+          case "$IMAGE" in
+            windows-2022)
+              # The leg that gives the suite a VS 17 machine, which is what keeps the README's legacy claim
+              # proven on an MSBuild inside the tested envelope.
+              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild and this leg no longer tests VS 17'
+              elif grep -Fq "$outside" <<<"$selection"; then
+                bad='the selected Visual Studio is outside the VS 16/17 preference, so this is no longer the VS 2022 leg'
+              fi
+              ;;
+            windows-latest)
+              # The VS-2026-only image. The comment at the top of this job asserts that in prose; this is the
+              # line that checks it, and green here means the gap is still exposed rather than quietly closed.
+              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild'
+              elif ! grep -Fq "$outside" <<<"$selection"; then
+                bad='a VS 2019/2022 turned up on the image this job describes as shipping VS 2026 alone'
+              fi
+              ;;
+            *)
+              # No Visual Studio to find, so the SDK MSBuild is the whole answer — the other half of the
+              # VS-or-SDK question, and the arm every non-Windows measurement in this repository rests on.
+              if [ "$selection" != "$sdk" ]; then bad="expected '$sdk'"; fi
+              ;;
+          esac
+
+          if [ -n "$bad" ]; then
+            echo "::error::MSBuild selection on $IMAGE is not what this workflow assumes: $bad. It reported: $selection"
+            echo "If GitHub reimaged the runner, update the expectation here and re-read the two-Windows-legs comment at the top of this job: it says what each leg is for, and the answer may be that this leg has stopped doing its job rather than that the expectation is stale."
+            exit 1
+          fi
+
       - name: Test
         run: dotnet test Zphil.LoadBearing.slnx --no-build --logger "console;verbosity=normal"
 
@@ -383,6 +462,64 @@ jobs:
           if [ "$rc" -eq 0 ] || ! grep -q NU1008 "$RUNNER_TEMP/cpm-without-opt-out.log"; then
             echo "::error::Removing ManagePackageVersionsCentrally from the scaffold csproj did not produce NU1008 (build exited $rc) — that line is no longer what makes the published scaffold valid under central package management, so the leg above proves nothing"
             cat "$RUNNER_TEMP/cpm-without-opt-out.log"
+            exit 1
+          fi
+
+      # The refusal a reader is most likely to meet first, on a real runner rather than only in unit tests.
+      # `loadbearing check` with no argument walks up from the working directory, and a repository whose root
+      # holds several solutions is a normal layout rather than an exotic one — so this text is the tool's
+      # first impression, and it is the one message the suite pins only against a synthesized filesystem.
+      #
+      # What is asserted is the whole refusal, because each part earns its place: exit 2, the directory that
+      # held them (a refusal that will not say where is a dead end), both candidates by name, the .slnf
+      # absent — a filter is a view of a solution standing beside it, and naming it would invite a fix that
+      # resolves nothing — the fix line in both dialects, and a stdout nothing wrote to, which is what makes
+      # --json parseable on every other path.
+      #
+      # The walk-up climbs to the filesystem root, so a single solution file in any ancestor of $RUNNER_TEMP
+      # would resolve and this assertion would be testing nothing. That shows up here as a plain red; the
+      # ancestor listing below is what turns it into a diagnosis rather than a puzzle.
+      - name: Assert the walk-up refusal when a directory holds several solutions
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          root="$RUNNER_TEMP/walk-up-ambiguity/repo"
+          mkdir -p "$root"
+          touch "$root/Storefront.sln" "$root/Storefront.Legacy.slnx" "$root/BillingOnly.slnf"
+          cd "$root"
+          here="$(pwd -P)"
+
+          rc=0
+          loadbearing check > stdout.txt 2> stderr.txt || rc=$?
+          cat stderr.txt
+
+          bad=''
+          if [ "$rc" -ne 2 ]; then
+            bad="check exited $rc, and a refusal is exit 2"
+          elif ! grep -Fq "Multiple solution files found in '$here':" stderr.txt; then
+            bad='the refusal does not name the directory that held them'
+          # Substrings carrying the indentation, never whole-line matches: the CLI's console writes CRLF on
+          # Windows, so a -Fx here would pass on this runner and fail anyone verifying the same line by hand.
+          elif ! grep -Fq '  Storefront.sln' stderr.txt || ! grep -Fq '  Storefront.Legacy.slnx' stderr.txt; then
+            bad='the refusal does not list both candidates, one indented line each'
+          elif grep -Fq 'BillingOnly.slnf' stderr.txt; then
+            bad='the refusal names the .slnf, which is a view of the solutions beside it rather than a rival candidate'
+          elif ! grep -Fq "Pass the solution as the argument (loadbearing <command> <solution>, or in your MCP client config's args), or set LOADBEARING_SOLUTION_PATH to it." stderr.txt; then
+            bad='the refusal does not carry the fix line naming the argument, the MCP client config and the environment variable'
+          elif [ -s stdout.txt ]; then
+            bad='the refusal wrote to stdout, which every --json consumer parses'
+          fi
+
+          if [ -n "$bad" ]; then
+            echo "::error::The walk-up ambiguity refusal is not what SolutionDiscovery publishes: $bad"
+            echo "Solution files in the ancestors of $here — any one of them standing alone wins the walk-up and makes this assertion vacuous:"
+            d="$here"
+            while :; do
+              ls -1 "$d"/*.sln "$d"/*.slnf "$d"/*.slnx 2>/dev/null || true
+              p="$(dirname "$d")"
+              if [ "$p" = "$d" ]; then break; fi
+              d="$p"
+            done
             exit 1
           fi
 

@@ -143,7 +143,9 @@ Here is Meridian's spec project, exactly as committed:
 </Project>
 ```
 
-The one line worth calling out is `CopyLocalLockFileAssemblies`: it stages NuGet package assemblies (here SqlClient) into the spec's build output, so `check` can load the `typeof()` targets that live in those packages. It is harmless when every target is a project type or a namespace pattern, and it becomes necessary again the moment a rule pack brings packages of its own.
+The one line worth calling out is `CopyLocalLockFileAssemblies`: it stages NuGet package assemblies (here SqlClient) into the spec's build output, which is where `check` looks for the `typeof()` targets that live in those packages. Strictly it is insurance rather than a requirement — the loader also reads the spec's `.deps.json` and will resolve a package assembly out of the machine's NuGet folder — but it makes the spec's output self-contained, so a check does not depend on what a given machine happens to have restored. It is harmless when every target is a project type or a namespace pattern.
+
+What it cannot do is reach a **.NET shared framework**. An ASP.NET Core `ControllerBase`, or anything else arriving through `<FrameworkReference>`, is never staged into a class library's output and is not in the NuGet folder either, so a `typeof()` anchor on one fails however the spec project is built. Anchor those by string — `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` renders exactly like the `typeof()` form and loads no assembly at all.
 
 The second `ProjectReference` is that rule pack, `DotNetGuidance`. A pack is an ordinary class library of static methods that declare rules onto your `Arch`; you reference it and call the ones you want. Nothing is discovered and nothing is implicit, so this reference on its own adds no rules. Step 3 is where the calls go in.
 
@@ -204,8 +206,8 @@ public sealed class MeridianArchSpec : IArchitectureSpec
             .Because("Candidate: Domain looked self-contained in the survey; nothing should pull it up into Web.");
 
         arch.Rule("naming/controllers")
-            .Enforce(arch.Types.InNamespace("Meridian.Web.Controllers.*").MustHaveSuffix("Controller"))
-            .Because("Candidate: every type under the Controllers namespace looks like an MVC controller.");
+            .Enforce(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase").MustHaveSuffix("Controller"))
+            .Because("Candidate: the eight types under the Controllers namespace look like MVC controllers, so the base type is the real subject.");
 
         arch.Rule("data-access/no-inline-sql")
             .Enforce(arch.Namespace("Meridian.Web.Controllers.*")
@@ -233,7 +235,7 @@ public sealed class MeridianArchSpec : IArchitectureSpec
 }
 ```
 
-That is five candidate rules you wrote plus two you took. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report eight. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
+That is five candidate rules you wrote plus two you took. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report eight. The controllers rule anchors `ControllerBase` by string rather than by `typeof`, which is the shared-framework case step 2 flagged: the spec project cannot reference that type at all, so the rule names it by fully-qualified name and the check resolves it out of the codebase it is reading. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis; letting the check find the one type that legitimately reads the clock is the whole job of the next step.
 
 The two pack calls carry no `Because` here because they do not need one: the pack wrote it, with the learn.microsoft.com citation attached, and it reads the same in every codebase that takes the rule. What you choose is the posture and the selections. The naming rule takes the two layers rather than a project so it reaches Domain's interfaces without sweeping `Program.cs`'s top-level statements.
 
@@ -246,7 +248,7 @@ On your solution, run `check`. Exit 1 is the expected outcome here, because the 
 ```text
 $ loadbearing check examples/Meridian/Meridian.slnx
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
-pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named `*Controller`.
+pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
   because: Candidate: externalEdges shows Microsoft.Data.SqlClient reached straight from controllers.
   src/Meridian.Web/Controllers/CustomsController.cs:26 — Meridian.Web.Controllers.CustomsController references Microsoft.Data.SqlClient.SqlConnection
@@ -354,7 +356,7 @@ Four baselines, one per ratcheted rule, holding twelve inline-SQL references, se
 ```text
 $ loadbearing check examples/Meridian/Meridian.slnx
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
-pass naming/controllers — Types in `Meridian.Web.Controllers.*` must be named `*Controller`.
+pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
 pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
 pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.

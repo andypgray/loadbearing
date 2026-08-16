@@ -87,12 +87,20 @@ internal sealed record CacheReadResult(
 /// <param name="ProjectDirectory">The project directory (its cone is scanned for added <c>*.cs</c>).</param>
 /// <param name="ProjectReferences">The names of the projects this one references (Merkle dependency edges).</param>
 /// <param name="DocumentPaths">The project's source-document paths.</param>
+/// <param name="EvaluatedOutputPath">
+///     The project's evaluated output path, or null when the workspace carried none. Paired with
+///     <paramref name="IntermediateAssemblyPath" /> it is what locates the restore assets file under a
+///     non-default output layout (see <see cref="IntermediateOutputTree" />).
+/// </param>
+/// <param name="IntermediateAssemblyPath">The project's intermediate assembly path, or null when unknown.</param>
 internal sealed record ProjectInputs(
     string ProjectName,
     string CsprojPath,
     string ProjectDirectory,
     IReadOnlyList<string> ProjectReferences,
-    IReadOnlyList<string> DocumentPaths);
+    IReadOnlyList<string> DocumentPaths,
+    string? EvaluatedOutputPath = null,
+    string? IntermediateAssemblyPath = null);
 
 /// <summary>
 ///     A pre-extraction fingerprint of the workspace's files: the structural stamps and per-project entries
@@ -542,7 +550,10 @@ internal sealed class ExtractionCacheStore
         {
             yield return Path.GetFullPath(project.CsprojPath);
 
-            foreach (string path in ProjectCone.StructuralPaths(Path.GetFullPath(project.ProjectDirectory)))
+            foreach (string path in ProjectCone.StructuralPaths(
+                         Path.GetFullPath(project.ProjectDirectory),
+                         project.EvaluatedOutputPath,
+                         project.IntermediateAssemblyPath))
                 yield return path;
         }
     }

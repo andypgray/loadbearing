@@ -38,11 +38,11 @@ override `ExcludeProjectName` to return `null`.
 ## When the workspace does not load completely
 
 A project that fails to load would otherwise vanish from the checked universe: every rule
-whose subject lived there selects nothing, and an empty subject passes. The adapter refuses to
-let that read as green. One named test, `Workspace_LoadedCompletely`, fails carrying the load
-diagnostics and the MSBuild selection that produced them, and every rule case skips rather
-than report a verdict that was never reached. Restore and build the target solution, then
-rerun.
+would be measured over a codebase missing whole projects, and nothing in a green verdict would
+say what was missing. The adapter refuses to let that read as green. One named test,
+`Workspace_LoadedCompletely`, fails carrying the load diagnostics and the MSBuild selection
+that produced them, and every rule case skips rather than report a verdict that was never
+reached. Restore and build the target solution, then rerun.
 
 To check whatever did load anyway, opt in:
 

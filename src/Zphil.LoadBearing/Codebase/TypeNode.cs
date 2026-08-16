@@ -76,15 +76,19 @@ public sealed class TypeNode : ITypeInfo
     ///     The full transitive, substituted interface closure (<c>symbol.AllInterfaces</c>
     ///     semantics) — interfaces reached through base classes and interface inheritance, with type
     ///     arguments substituted. Ordered ordinal by <see cref="TypeConstruction.FullName" />. Empty
-    ///     for external types (hierarchy adjectives never match external targets — a documented
-    ///     boundary). Backs <c>Implementing</c> / <c>MustImplement</c> in the checker (GRAMMAR §5.2).
+    ///     for external types, so a hierarchy adjective never matches an external <em>subject</em> — a
+    ///     documented boundary, and one that binds the subject position only: this list is built from a
+    ///     declared type's own closure, which runs through metadata, so an external <em>anchor</em>
+    ///     matches. Backs <c>Implementing</c> / <c>MustImplement</c> in the checker (GRAMMAR §5.2).
     /// </summary>
     public IReadOnlyList<TypeConstruction> AllInterfaces { get; internal set; }
 
     /// <summary>
     ///     The transitive base-type chain in <em>nearest-first</em> derivation order (the order is
     ///     meaningful, so it is not sorted), terminating at <c>System.Object</c>. Empty for
-    ///     interfaces and external types. Backs <c>DerivedFrom</c> / <c>MustDeriveFrom</c>.
+    ///     interfaces and external types — a declared type's chain is walked straight through the
+    ///     metadata ones, so an external base is a matchable anchor even though its own chain is empty.
+    ///     Backs <c>DerivedFrom</c> / <c>MustDeriveFrom</c>.
     /// </summary>
     public IReadOnlyList<TypeConstruction> BaseTypeChain { get; internal set; }
 

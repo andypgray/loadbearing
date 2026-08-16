@@ -19,6 +19,7 @@ public sealed class HierarchyVerbTests
     private static readonly CodebaseModel Model = CompilationFactory.Extract(Sources.Hierarchy);
     private static readonly CodebaseModel TransitiveModel = CompilationFactory.Extract(Sources.HierarchyTransitive);
     private static readonly CodebaseModel GenericAttributeModel = CompilationFactory.Extract(Sources.GenericAttributes);
+    private static readonly CodebaseModel ExternalBaseModel = CompilationFactory.Extract(Sources.ExternalBaseHierarchy);
 
     [Fact]
     public void Implementing_OpenGeneric_SelectsEveryConstruction()
@@ -611,5 +612,41 @@ public sealed class HierarchyVerbTests
             .Single()
             .ShapeSubjects()
             .ShouldBe([$"{T}SubstHandler"]);
+    }
+
+    // ── external anchors (GRAMMAR §5.2): the shallow hierarchy external types carry is a fact about the
+    //    SUBJECT position, not the anchor position. A declared subject's base chain is walked straight
+    //    through metadata, so a base the spec's own universe does not declare is matchable — which is what
+    //    makes the string hatch a real answer for a spec that cannot compile against the anchor at all ──
+
+    [Fact]
+    public void DerivedFrom_ExternalAnchor_StringArmSelectsExactlyWhatTheTypeofArmSelects()
+    {
+        // Both arms in ONE model, asserted against EACH OTHER rather than against their own literals:
+        // a string anchor always matches on TypeConstruction.Definition.FullName while a non-generic typeof
+        // anchor matches on TypeConstruction.FullName (SelectionEvaluator.AnchorKey). Different fields that
+        // coincide for a non-generic type — so only comparing the two results catches them diverging.
+        CheckReport report = Checker.Run(ExternalBaseModel, arch =>
+        {
+            arch.Rule("h/typed")
+                .Enforce(arch.Types.DerivedFrom(typeof(Exception))
+                    .MustHavePrefix("ZZZ"))
+                .Because("b");
+            arch.Rule("h/string")
+                .Enforce(arch.Types.DerivedFrom("System.Exception")
+                    .MustHavePrefix("ZZZ"))
+                .Because("b");
+        });
+
+        var typed = report.ForRule("h/typed")
+            .ShapeSubjects();
+        var stringed = report.ForRule("h/string")
+            .ShapeSubjects();
+
+        stringed.ShouldBe(typed);
+
+        // Non-vacuous, and the selection is not merely the direct deriver: IndirectDeriver reaches the anchor
+        // through System.ArgumentException, so both arms walked a chain of external constructions to get there.
+        typed.ShouldBe([$"{T}DirectDeriver", $"{T}IndirectDeriver"]);
     }
 }

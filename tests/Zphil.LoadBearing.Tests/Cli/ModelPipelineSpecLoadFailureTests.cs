@@ -26,6 +26,13 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         staging it intact fails it during <c>Define()</c>. See <see cref="SpecOutputStager" /> for why
 ///         withholding a real build beats committing a corrupt one.
 ///     </para>
+///     <para>
+///         The missing-dependency arm reaches two different remedies, and both are driven here from real
+///         builds rather than from fabricated exceptions, because which remedy the reader is handed is the
+///         part that was wrong in the field. <c>Zphil.LoadBearing.SharedFrameworkSpec</c> is the one no
+///         build setting can fix — it needs no staging trick at all, because a shared framework is absent
+///         from a spec's output however the spec project is written.
+///     </para>
 /// </remarks>
 public sealed class ModelPipelineSpecLoadFailureTests
 {
@@ -63,7 +70,7 @@ public sealed class ModelPipelineSpecLoadFailureTests
             + "one or more types failed to load:\n");
         thrown.Message.ShouldContain("Zphil.LoadBearing.LegacyProduct");
         thrown.Message.ShouldEndWith(
-            "add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to the spec .csproj.");
+            "name the type as a string rather than a typeof(), which needs no assembly load.");
     }
 
     [Fact]
@@ -76,13 +83,47 @@ public sealed class ModelPipelineSpecLoadFailureTests
         // Act
         var thrown = Should.Throw<UserErrorException>(() => ModelPipeline.LoadModel(stagedSpec));
 
-        // Assert
+        // Assert: a net48 spec has no .deps.json, so the remedy keys on an absent manifest — this pin
+        // moved deliberately off the packaging remedy it used to assert, which was only ever right for a
+        // package the manifest names.
         thrown.InnerException.ShouldBeOfType<FileNotFoundException>();
         thrown.Message.ShouldStartWith(
             "The spec assembly 'Zphil.LoadBearing.LegacySpec' failed to load its dependency "
             + "'Zphil.LoadBearing.LegacyProduct,");
         thrown.Message.ShouldContain("while running Define().");
-        thrown.Message.ShouldContain("<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>");
+        thrown.Message.ShouldContain("a .NET Framework spec has no manifest at all");
+        thrown.Message.ShouldNotContain("<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>");
+    }
+
+    [Fact]
+    public void LoadModel_SpecAnchoringASharedFrameworkType_NamesTheFrameworkAndWithholdsThePackagingRemedy()
+    {
+        // Arrange: the fixture exactly as built, CopyLocalLockFileAssemblies already on. Guard the
+        // precondition first — on a host that happened to carry ASP.NET Core the anchor would resolve and
+        // this fixture would prove nothing, so say that rather than leave a bare "expected an exception".
+        Should.Throw<FileNotFoundException>(
+            () => Assembly.Load(new AssemblyName("Microsoft.AspNetCore.Mvc.Core")),
+            "This test host can load Microsoft.AspNetCore.Mvc.Core itself, so the fixture's anchor would "
+            + "resolve through the default context and could not reproduce the failure it exists for.");
+
+        // Act
+        var thrown = Should.Throw<UserErrorException>(() => ModelPipeline.LoadModel(CliRunner.SharedFrameworkSpecDll));
+
+        // Assert: the third world named by name. The packaging remedy is mentioned only to be ruled out —
+        // the field agent had already applied it before the failure, so silence about it would read as an
+        // omission rather than an answer.
+        thrown.InnerException.ShouldBeOfType<FileNotFoundException>();
+        thrown.Message.ShouldStartWith(
+            "The spec assembly 'Zphil.LoadBearing.SharedFrameworkSpec' failed to load its dependency "
+            + "'Microsoft.AspNetCore.Mvc.Core,");
+        thrown.Message.ShouldContain("a .NET shared framework pulled in by <FrameworkReference>");
+        thrown.Message.ShouldContain("CopyLocalLockFileAssemblies has nothing to copy");
+        thrown.Message.ShouldNotContain("<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>");
+
+        // And the remedy the whole fixture exists to advertise: naming the world is only half an answer if
+        // the reader is not handed the hatch out of it, spelled on the very type that failed.
+        thrown.Message.ShouldContain(
+            ".DerivedFrom(\"Microsoft.AspNetCore.Mvc.ControllerBase\") renders identically to the typeof() form");
     }
 
     [Fact]
