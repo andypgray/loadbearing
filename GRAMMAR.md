@@ -273,7 +273,12 @@ lands only where the whole list is static and one form:
   (ArchUnit and ArchUnitNET precedent, with a pinned message). For a **union** subject the
   default sharpens per operand: every operand must match at least one type, and each empty one
   fails the rule in its own right with the operand named, so a typo'd operand is never masked by
-  its siblings (§5.1, §9). An empty resolved *operand* set
+  its siblings (§5.1, §9). A run a solution filter (§4.4) narrowed skips instead: a rule *all* of
+  whose violations are these empty-selection failures reports **skipped**, one line naming the
+  filter and the unchecked-project count, because under a narrowing filter an empty selection is
+  the expected consequence of the narrowing rather than evidence of a typo'd spec. The cost is
+  deliberate: a genuinely typo'd selection goes quiet under a filter until an unfiltered run reds
+  it. Unfiltered runs keep the fail-closed default untouched. An empty resolved *operand* set
   warns **"rule is inert"** only on a forbidden-set dependency verb (`MustNotReference` /
   `MustNotBeReferencedBy` / `MustNotConstruct` / `MustNotCatch` / `MustNotCatchUnfiltered` /
   `MustNotSwallow` / `MustNotThrow` / `MustNotExpose`) whose operand is a
@@ -385,7 +390,9 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   where the rule ID's `/` separators become subdirectories (IDs match §8's
   `^[a-z0-9-]+(/[a-z0-9-]+)*$`, so the result is filesystem-safe). The path is filled into the model
   at build time — `MigrateData.BaselinePath` is never null post-build — stored forward-slash, and
-  resolved by the CLI against the solution directory (an absolute spec path wins).
+  resolved by the CLI against the solution directory (an absolute spec path wins). A run through a
+  solution filter (`.slnf`) resolves against the directory of the solution the filter references,
+  so the filter and its solution find the same committed file.
 - `.WhileYoureThere(policy)` omitted ⇒ `MigrationPolicy.MigrateIfSmall`, and the default
   renders in the counter-prior prose (the boy-scout sentence always has content).
 
@@ -512,7 +519,8 @@ desugaring (§7) — keeps working unchanged on the type side.
 - **An empty member subject fails the rule** by default, the member analog of the empty-type
   subject (§4.1), with its own pinned message *"The subject selection matched no
   solution-declared members."* (a selection that matches types none of whose members survive the
-  kind filter is the ordinary way to hit it).
+  kind filter is the ordinary way to hit it). Under a narrowed run it skips exactly as the type
+  analog does (§4.1).
 - **Violation identity is `(ruleId, member DocumentationCommentId)`** via `BaselineEntry.ForSubject`
   — the member's own `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and
   a renamed or newly-added member is a NEW red. This reuses the shape-verb identity

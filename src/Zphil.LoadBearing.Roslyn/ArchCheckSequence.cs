@@ -1,6 +1,5 @@
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Baselines;
 
 namespace Zphil.LoadBearing.Roslyn;
@@ -33,13 +32,21 @@ internal static class ArchCheckSequence
     /// <summary>
     ///     Runs the sequence and returns the report: the baselines for <paramref name="model" /> load from
     ///     <paramref name="solutionDirectory" />, then <paramref name="resolveDiff" /> (when given) produces
-    ///     the changed-file context, then <paramref name="extract" /> produces the codebase, then
-    ///     <paramref name="rules" /> are evaluated against it.
+    ///     the changed-file context, then <paramref name="extract" /> produces the codebase and the projects
+    ///     it left unchecked, then <paramref name="rules" /> are evaluated against it — over the whole
+    ///     solution, or over the narrowed universe a <c>.slnf</c> left.
     /// </summary>
     /// <param name="model">The finalized architecture model whose baseline files are loaded.</param>
     /// <param name="rules">The rules to evaluate — the whole model's, or a narrowed selection.</param>
+    /// <param name="solutionPath">
+    ///     The solution — or the <c>.slnf</c> over one — this run was pointed at. Its file name is what a
+    ///     narrowing skip names, so the operator reads back the file they passed.
+    /// </param>
     /// <param name="solutionDirectory">The directory the rules' baseline paths resolve against.</param>
-    /// <param name="extract">Produces the codebase to check. Invoked only once the baselines are in hand.</param>
+    /// <param name="extract">
+    ///     Produces the codebase to check and the declared projects this run did not. Invoked only once the
+    ///     baselines are in hand.
+    /// </param>
     /// <param name="resolveDiff">
     ///     Produces the changed-file context a Quarantine tripwire warns from, or <see langword="null" /> when
     ///     the run has no diff base and its tripwires skip.
@@ -49,8 +56,9 @@ internal static class ArchCheckSequence
     internal static async Task<CheckReport> ExecuteAsync(
         ArchitectureModel model,
         IReadOnlyList<ArchRule> rules,
+        string solutionPath,
         string solutionDirectory,
-        Func<CancellationToken, Task<CodebaseModel>> extract,
+        Func<CancellationToken, Task<ExtractedCodebase>> extract,
         Func<CancellationToken, Task<DiffContext>>? resolveDiff,
         CancellationToken ct)
     {
@@ -58,8 +66,21 @@ internal static class ArchCheckSequence
 
         DiffContext? diff = resolveDiff is null ? null : await resolveDiff(ct);
 
-        CodebaseModel codebase = await extract(ct);
+        ExtractedCodebase extracted = await extract(ct);
+        NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.UncheckedProjects);
 
-        return ArchChecker.Check(rules, codebase, baselines, diff);
+        return ArchChecker.Check(rules, extracted.Codebase, baselines, diff, narrowing);
+    }
+
+    // Null unless this run actually checked less than the solution declares — measured from the load, never
+    // read off the filter text, for the reason NarrowedUniverseNotice's remarks give. The prose is composed
+    // there too, beside the stamp that carries the projects this reason only counts.
+    private static NarrowedUniverse? Narrowing(string solutionPath, IReadOnlyList<string> uncheckedProjects)
+    {
+        if (uncheckedProjects.Count == 0) return null;
+
+        string filterName = Path.GetFileName(solutionPath);
+        string reason = NarrowedUniverseNotice.RuleSkipReason(filterName, uncheckedProjects.Count);
+        return new NarrowedUniverse(filterName, uncheckedProjects.Count, reason);
     }
 }

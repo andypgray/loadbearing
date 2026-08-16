@@ -70,6 +70,26 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the run reached no verdict for the rule and said why: <see cref="RuleStatus.Skipped" />
+    ///     carrying <paramref name="reason" />, with nothing red to show for it.
+    /// </summary>
+    /// <remarks>
+    ///     Says nothing about the ratchet counts — a skip that zeroed them and a skip that did not are both
+    ///     Skipped, so the rows whose subject is those counts read them in their own right.
+    /// </remarks>
+    internal static RuleResult ShouldHaveSkipped(this RuleResult result, string reason)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Skipped, report);
+
+        result.ShouldSatisfyAllConditions(
+            () => result.SkipReason.ShouldBe(reason, report),
+            () => result.Violations.ShouldBeEmpty(report));
+
+        return result;
+    }
+
+    /// <summary>
     ///     Asserts the ratchet grandfathered exactly <paramref name="count" /> violations (GRAMMAR §4.6).
     ///     Says nothing about status: a grandfathered rule that also has a new red is Failed and still
     ///     carries its blessed debt.

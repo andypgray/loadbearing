@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The solution-format fixture: the suite's only solution in the XML format, and the one thing
+         FixtureRestorer's startup sweep and TempFixtureWorkspace's lease reset can be pointed at to prove
+         they see a .slnx at all. Self-contained on purpose — the .slnx beside this file names its member
+         by a local relative path, so a leased copy of the directory stays coherent and restores in place.
+         Deliberately package-free: the whole restore resolves from the SDK, so the sweep costs no network. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+</Project>

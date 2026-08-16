@@ -4,6 +4,29 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
+///     What one load produced, in the two shapes a verdict has to distinguish: the projects that
+///     <see cref="Failed" /> — which gates — and the declared members left <see cref="Unchecked" /> by a
+///     solution filter, which narrows the verdict without invalidating it.
+/// </summary>
+/// <param name="Failed">
+///     Absolute <c>.csproj</c> paths of the projects that failed to load. A non-empty list makes the model
+///     wrong rather than smaller, so it is what <c>WorkspaceDiagnostics.IsIncomplete</c> keys on.
+/// </param>
+/// <param name="Unchecked">
+///     Absolute <c>.csproj</c> paths the solution declares that this run neither loaded nor blamed — empty
+///     unless the run went through a solution filter. A narrowed universe is a smaller true answer, not a
+///     broken one, so this must never gate; it exists so a green cannot be mistaken for a green over the
+///     whole solution.
+/// </param>
+internal sealed record ProjectLoadReport(
+    IReadOnlyList<string> Failed,
+    IReadOnlyList<string> Unchecked)
+{
+    /// <summary>The report for a load with nothing to say — no failures, no narrowing.</summary>
+    internal static ProjectLoadReport Empty { get; } = new([], []);
+}
+
+/// <summary>
 ///     Which projects failed to load, answered from the <em>structure</em> of the loaded
 ///     <see cref="Solution" /> rather than from the text of any MSBuild message — the fact the fail-closed
 ///     gate keys on.
@@ -62,18 +85,35 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         it today; <c>check</c> answers against whatever the load produced.
 ///     </para>
 ///     <para>
-///         <b>Known limit: arm 1 skips a solution filter.</b> A <c>.slnf</c> legitimately loads a subset —
-///         measured: a filter naming one of two members loads exactly that one — so treating its dropped
-///         members as failures would refuse every filtered solution. The arm is therefore guarded by
-///         <see cref="SolutionProjectFileParser.OwnsFormat" /> and simply does not run for a filter. That a
-///         narrowed universe is announced nowhere is a separate, tracked gap, not this type's to close.
+///         <b>A solution filter narrows arm 1 rather than disabling it.</b> A <c>.slnf</c> legitimately
+///         loads a subset, so its unselected members are not failures — but the arm used to be skipped
+///         wholesale for a filter, which meant a selected project that genuinely failed to load was invisible
+///         to the gate. Reading <see cref="SolutionMembership.Required" /> instead of the raw member list
+///         keeps the false positives out <em>and</em> restores the arm: what a filter asked for and did not
+///         get is a failure like any other. That is sound only because Roslyn refuses a filter naming a
+///         non-member outright — measured, both for a <c>.csproj</c> absent from disk and for one present but
+///         outside the solution — so every project a well-formed filter selects is one the load was obliged
+///         to produce.
+///     </para>
+///     <para>
+///         <b>The same subtraction names the narrowing.</b> Against
+///         <see cref="SolutionMembership.Declared" /> — every member, filter or no filter — what neither
+///         loaded nor failed is what the run simply did not check. That set is
+///         <see cref="ProjectLoadReport.Unchecked" />, and it is deliberately <em>not</em> derived from the
+///         filter text: Roslyn loads a filter's projects plus their transitive <c>ProjectReference</c>
+///         closure, so a filter naming two of three projects routinely checks all three. Naming the third as
+///         skipped would be a false claim of a gap, which is worse than announcing no narrowing at all. The
+///         set is empty for every unfiltered solution, where <see cref="SolutionMembership.Required" /> and
+///         <see cref="SolutionMembership.Declared" /> are the same list and anything missing has already been
+///         blamed.
 ///     </para>
 /// </remarks>
 internal static class ProjectLoadFailures
 {
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted and
-    ///     deduplicated by this OS's path rule — empty for a solution that loaded completely.
+    ///     What the load did and did not produce: the projects that failed, and the declared members a
+    ///     solution filter left unchecked. Both are absolute <c>.csproj</c> paths, ordinal-sorted and
+    ///     deduplicated by this OS's path rule; both are empty for a solution that loaded completely.
     /// </summary>
     /// <param name="solution">The loaded solution.</param>
     /// <param name="solutionPath">
@@ -81,7 +121,7 @@ internal static class ProjectLoadFailures
     ///     (a binlog replay, which reconstructs a solution from compiler invocations). Arm 1 needs a solution
     ///     file and is skipped without one; arm 2 runs either way.
     /// </param>
-    internal static IReadOnlyList<string> Detect(Solution solution, string? solutionPath)
+    internal static ProjectLoadReport Detect(Solution solution, string? solutionPath)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
 
@@ -91,6 +131,8 @@ internal static class ProjectLoadFailures
             if (LoadedEmpty(project) && project.FilePath is { } filePath)
                 failed.Add(Path.GetFullPath(filePath));
 
+        var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
+
         if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
         {
             var loadedFiles = solution.Projects
@@ -99,12 +141,24 @@ internal static class ProjectLoadFailures
                 .Select(filePath => Path.GetFullPath(filePath!))
                 .ToHashSet(PathComparison.Comparer);
 
-            foreach (string declared in SolutionProjectFileParser.ReadCsprojMembers(solutionPath))
-                if (!loadedFiles.Contains(declared))
-                    failed.Add(declared);
+            SolutionMembership membership = SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
+
+            foreach (string required in membership.Required)
+                if (!loadedFiles.Contains(required))
+                    failed.Add(required);
+
+            // Declared, not loaded, and not blamed — the only thing left for it to be is out of scope.
+            foreach (string declared in membership.Declared)
+                if (!loadedFiles.Contains(declared) && !failed.Contains(declared))
+                    uncheckedMembers.Add(declared);
         }
 
-        return failed
+        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers));
+    }
+
+    private static IReadOnlyList<string> Sorted(HashSet<string> paths)
+    {
+        return paths
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
     }

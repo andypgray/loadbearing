@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A run narrowed by a solution filter now says so on every surface.** `check`, `status` and `graph` stamp which declared projects the filtered run never checked, and the JSON documents carry them as `uncheckedProjects` beside `failedProjects` — absent when nothing was narrowed, so unfiltered output does not move a byte. SARIF carries one warning-level tool notification, and the `arch_check`, `arch_status` and `arch_graph` MCP tools inherit the slot, which the stdout stamp could never reach. The set is measured from the load rather than read from the filter: a selection whose transitive project references pull the rest of the solution in narrows nothing and says nothing. `context` writes the same caveat above its answer. `baseline --init`, `baseline --accept-reductions` and `render` refuse under a narrowing filter — exit 2, nothing written: a baseline captured through a filter signs off debt in projects it never measured, `--accept-reductions` would delete real entries, and rendered files would silently drop every card from an unchecked project. `baseline --add` keeps working. In the xUnit adapter, rule cases keep their verdicts — a narrowed universe is a smaller true answer — and `Workspace_LoadedCompletely` reports as skipped, naming what was not checked, rather than pass under a name the filtered run cannot vouch for. A filtered run anchors every convention-relative path at the solution the filter references rather than at the filter's own directory — committed baselines, render targets, `context --path`, diff resolution, and the stamped project paths, which read solution-relative rather than `../`-prefixed — so a filter that narrows nothing answers exactly as its solution does, instead of missing the committed baseline and failing rules that are green over the whole solution. And a rule all of whose findings are the empty-selection defaults skips under a narrowing filter, with one line naming the filter and the unchecked count, rather than reding as a typo'd spec: a filter that erases a rule's whole subject no longer turns a green spec red, while unfiltered runs keep the fail-closed empty-selection defaults exactly as they were.
+
 ### Fixed
 
+- **A directory holding both a solution and a filter over it resolves to the solution.** Discovery treated `.sln`, `.slnx` and `.slnf` as equal candidates, so the common layout of a filter beside its solution refused as ambiguous. A `.slnf` now drops out of the candidate set wherever a `.sln` or `.slnx` stands beside it; several full solutions still refuse as ambiguous, and the message names only the surviving candidates.
 - **A NuGet restore warning no longer refuses a solution whose rules all pass — in any language.** The
   fail-closed gate decided "did the model fail to build" by matching the text of MSBuild's project-load
   messages, and that was never something text could answer: Roslyn reports every project-load log item as a
@@ -25,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `status` and `graph` carry them as `failedProjects` beside `modelIncomplete` — the evidence an MCP client
   had no way to recover from the diagnostics array. What this deliberately does not change: a solution that
   was never restored still loads completely and is still not detected, exactly as before — measured, not
-  assumed; a solution filter's dropped members are not treated as failures; and a real load failure riding
+  assumed; a solution filter's dropped members are not treated as failures (they now ride
+  `uncheckedProjects` rather than going unreported); and a real load failure riding
   alongside an advisory still fails closed.
 - **A workspace that failed to load no longer reports itself as a missing spec project.** A broken
   `--locked-mode` restore leaves the spec project's reference to the contract library unresolved, so

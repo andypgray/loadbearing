@@ -23,7 +23,10 @@ namespace Zphil.LoadBearing.Cli;
 ///     exit 2 after the diagnostics and before the first byte hits disk, opt-out
 ///     <c>--allow-workspace-diagnostics</c> — because its output is committed context: a card whose project
 ///     failed to load cannot be placed and would be dropped from the committed files, and <c>--diagram</c>
-///     would draw the survey <c>graph</c> refuses. On a complete model it exits 0 on success; expected
+///     would draw the survey <c>graph</c> refuses. A solution filter that left declared projects unchecked
+///     refuses in the same position and on the same reasoning
+///     (<see cref="NarrowedUniverseNotice.RenderRefusal" />), with no opt-out: the fix is to run against the
+///     solution the filter references. On a complete model it exits 0 on success; expected
 ///     failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
 /// </remarks>
 internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
@@ -46,6 +49,20 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
             foreach (string line in IncompleteModelGate.RenderMessage(diagnostics).Split('\n'))
+                error.WriteLine(line);
+            return 2;
+        }
+
+        // And the narrowing refusal in the same position, for the same reason one step over: a card from a
+        // project the filter left unchecked places nowhere and would be dropped from files that outlive the
+        // run, and --diagram would draw a survey missing whole projects.
+        if (diagnostics.UncheckedProjects.Count > 0)
+        {
+            var uncheckedProjects = NarrowedUniverseNotice.Relative(
+                diagnostics.UncheckedProjects, source.SolutionDirectory);
+            string refusal = NarrowedUniverseNotice.RenderRefusal(
+                Path.GetFileName(source.SolutionPath), uncheckedProjects);
+            foreach (string line in refusal.Split('\n'))
                 error.WriteLine(line);
             return 2;
         }

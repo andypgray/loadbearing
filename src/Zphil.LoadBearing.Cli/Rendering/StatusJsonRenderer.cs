@@ -23,8 +23,11 @@ internal static class StatusJsonRenderer
         string specAssembly,
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
-        IReadOnlyList<string> failedProjects)
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects)
     {
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+
         var document = new StatusJson(
             2,
             solutionName,
@@ -32,7 +35,8 @@ internal static class StatusJsonRenderer
             report.Results.Select(ToRule).ToList(),
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             modelIncomplete ? true : null,
-            JsonReportRenderer.RelativeProjects(failedProjects, new PathFormat.Relativizer(solutionDirectory)),
+            JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
+            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer),
             new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -56,13 +60,17 @@ internal static class StatusJsonRenderer
     }
 
     // The burndown block for any ratcheted rule (Migrate or Quarantine containment). Promotable is populated
-    // for Migrate only — omitted (null) for quarantine, since Quarantine→Migrate is a human decision.
+    // for Migrate only — omitted (null) for quarantine, since Quarantine→Migrate is a human decision — and
+    // never for a rule the run reached no verdict on: a narrowing skip keeps BaselineCaptured truthful and
+    // zeroes the counts, which is burned-to-zero's exact shape, so arch_status would suggest promoting to
+    // Enforce a rule whose subject a filter had merely erased.
     private static RatchetStatusJson? ToRatchet(RuleResult result)
     {
         if (result.Rule.BaselinePath is not { } path) return null;
 
         bool? promotable = result.Rule.Posture == Posture.Migrate
-            ? result.BaselineCaptured
+            ? result.Status != RuleStatus.Skipped
+              && result.BaselineCaptured
               && result.Grandfathered.Count == 0
               && result.Violations.Count == 0
               && result.StaleBaselineEntries == 0

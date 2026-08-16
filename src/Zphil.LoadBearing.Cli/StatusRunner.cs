@@ -48,6 +48,7 @@ internal sealed class StatusRunner(
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
         var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
+        WriteNarrowingStamp(request, source, diagnostics);
 
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
         bool modelIncomplete = diagnostics.IsIncomplete;
@@ -56,7 +57,7 @@ internal sealed class StatusRunner(
             StatusJsonRenderer.Render(
                 output, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
                 Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects);
+                diagnostics.FailedProjects, diagnostics.UncheckedProjects);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);
@@ -69,5 +70,19 @@ internal sealed class StatusRunner(
         }
 
         return 0;
+    }
+
+    // The human narrowing stamp, byte-silent on every run that narrowed nothing and suppressed under --json,
+    // where the document carries the same fact in uncheckedProjects. Sited in the runner for the rules-filter
+    // stamp's reason: an unfiltered run's output stays byte-identical to what it always was.
+    private void WriteNarrowingStamp(StatusRequest request, CodebaseSource source, WorkspaceDiagnostics diagnostics)
+    {
+        if (diagnostics.UncheckedProjects.Count == 0 || request.Json) return;
+
+        NarrowedUniverseNotice.Write(
+            output,
+            NarrowedUniverseNotice.StatusStamp(
+                Path.GetFileName(source.SolutionPath),
+                NarrowedUniverseNotice.Relative(diagnostics.UncheckedProjects, source.SolutionDirectory)));
     }
 }

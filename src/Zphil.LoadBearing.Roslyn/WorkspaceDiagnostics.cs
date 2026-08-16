@@ -5,8 +5,8 @@ namespace Zphil.LoadBearing.Roslyn;
 /// <summary>
 ///     Everything a run knows about how well its workspace loaded, as one value: the
 ///     <see cref="FailedProjects" /> that gate, the <see cref="LoadFailures" /> and
-///     <see cref="MergeNotes" /> that never do, plus the rendering both surfaces read and the gate decision
-///     every verb makes.
+///     <see cref="MergeNotes" /> that never do, the <see cref="UncheckedProjects" /> that scope the verdict
+///     instead of deciding it, plus the rendering both surfaces read and the gate decision every verb makes.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -54,13 +54,19 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted — the
 ///     fail-closed gate's whole input, and the evidence a refusal names.
 /// </param>
+/// <param name="UncheckedProjects">
+///     The absolute <c>.csproj</c> paths the solution declares that this run did not check, ordinal-sorted —
+///     non-empty only under a solution filter that left members out. It scopes the verdict rather than
+///     invalidating it, so it never reaches <see cref="Gates" />.
+/// </param>
 internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> LoadFailures,
     IReadOnlyList<string> MergeNotes,
-    IReadOnlyList<string> FailedProjects)
+    IReadOnlyList<string> FailedProjects,
+    IReadOnlyList<string> UncheckedProjects)
 {
     /// <summary>A run with nothing to report — nothing failed to load, and no diagnostics or merge notes.</summary>
-    internal static WorkspaceDiagnostics None { get; } = new([], [], []);
+    internal static WorkspaceDiagnostics None { get; } = new([], [], [], []);
 
     /// <summary>
     ///     The load failures with the MSBuild-selection note appended, or empty for a clean load. What five

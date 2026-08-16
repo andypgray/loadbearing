@@ -1,0 +1,9 @@
+{
+  "solution": {
+    "path": "../TestSolutions/MyApp/MyApp.sln",
+    "projects": [
+      "MyApp.Domain/MyApp.Domain.csproj",
+      "MyApp.Web/MyApp.Web.csproj"
+    ]
+  }
+}

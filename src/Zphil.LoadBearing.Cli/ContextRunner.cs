@@ -17,7 +17,9 @@ namespace Zphil.LoadBearing.Cli;
 ///         <b>Never a gate.</b> Context is a lookup, so it always exits 0 — an incomplete model included.
 ///         That is announced rather than enforced: the answer opens with a caveat block naming the load
 ///         failures, because a card whose project failed to load places nowhere and the pinned pointer line
-///         would otherwise read as a clean "not dragon territory".
+///         would otherwise read as a clean "not dragon territory". A solution filter that left declared
+///         projects unchecked is announced the same way and for the same reason, in a
+///         <see cref="NarrowedUniverseNotice" /> stamp below that caveat.
 ///     </para>
 ///     <para>The card body carries no provenance line — that is a <c>render</c> file-splice concern.</para>
 /// </remarks>
@@ -36,6 +38,18 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
             foreach (string line in IncompleteModelGate.ContextCaveat(diagnostics).Split('\n'))
                 output.WriteLine(line);
             output.WriteLine();
+        }
+
+        // Beside that caveat rather than instead of it — both can be true of one run, and a broken model
+        // outranks a small one, so the gate's block goes first. Context still exits 0: a narrowed universe is
+        // a smaller true answer, and this says which paths the pointer line below cannot speak for.
+        if (diagnostics.UncheckedProjects.Count > 0)
+        {
+            var uncheckedProjects = NarrowedUniverseNotice.Relative(
+                diagnostics.UncheckedProjects, source.SolutionDirectory);
+            string stamp = NarrowedUniverseNotice.ContextStamp(
+                Path.GetFileName(source.SolutionPath), uncheckedProjects);
+            NarrowedUniverseNotice.Write(output, stamp);
         }
 
         // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost

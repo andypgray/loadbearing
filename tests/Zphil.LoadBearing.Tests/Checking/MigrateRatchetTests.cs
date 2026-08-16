@@ -22,6 +22,9 @@ public sealed class MigrateRatchetTests
                                          namespace App.Data { public class Db {} }
                                          """;
 
+    // A stand-in for the reason a filtered run composes; its wording is pinned where it is minted.
+    private const string NarrowingSkipReason = "'BillingOnly.slnf' narrowed this run: 2 projects were not checked.";
+
     // The same source's rule: Web controllers must not reference the data layer.
     private static void NoDataAccess(Arch arch)
     {
@@ -192,6 +195,36 @@ public sealed class MigrateRatchetTests
         result.Violations.ShouldHaveSingleItem()
             .Kind.ShouldBe(ViolationKind.EmptySubject);
         result.Grandfathered.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Check_MigrateEmptySubjectUnderNarrowing_SkipsWithoutStalingTheSection()
+    {
+        // The ratchet's half of the narrowing skip. Ratchet would match nothing against the captured
+        // section and report both entries as fixed awaiting acceptance — for a rule this run never
+        // measured — which is exactly the reduction 'baseline --accept-reductions' would then delete. So
+        // the skip is minted before the ratchet fork and forces the counts to nothing, while
+        // BaselineCaptured stays truthful: the section is real, it simply went unmeasured.
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
+            BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+        var narrowing = new NarrowedUniverse("BillingOnly.slnf", 2, NarrowingSkipReason);
+
+        RuleResult result = Checker.Run("namespace App { public class X {} }", index, narrowing, arch =>
+                arch.Rule("data/x")
+                    .Migrate(
+                        "old",
+                        arch.Namespace("App.Nowhere.*")
+                            .WithSuffix("Controller")
+                            .MustNotReference(arch.Namespace("App.Data.*")))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveSkipped(NarrowingSkipReason);
+        result.ShouldHaveGrandfathered(0);
+        result.StaleBaselineEntries.ShouldBe(0);
+        result.BaselineCaptured.ShouldBeTrue();
     }
 
     [Fact]

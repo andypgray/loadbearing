@@ -29,13 +29,19 @@ internal sealed record SpecExclusionProject(string Name, string? FilePath, IRead
 ///     </para>
 ///     <para>
 ///         <b>Never fail open into an empty universe.</b> When membership cannot be read — an unreadable or
-///         malformed solution file, or a format
-///         <see cref="SolutionProjectFileParser.OwnsFormat">the parser does not own</see> (a <c>.slnf</c>,
-///         which <see cref="SolutionDiscovery" /> accepts) — the answer degrades to <c>{spec project}</c>
-///         alone. An unparsed solution reads as zero declared members, so
+///         malformed solution file, a malformed filter, or a format
+///         <see cref="SolutionProjectFileParser.OwnsFormat">the parser does not own</see> — the answer
+///         degrades to <c>{spec project}</c> alone. An unparsed solution reads as zero declared members, so
 ///         the alternative would subtract the whole closure. For the same reason a project whose path is
 ///         unknown counts as declared: keeping a project in the universe is the safe direction, because
 ///         wrongly excluding one shrinks the codebase under law silently.
+///     </para>
+///     <para>
+///         <b>A solution filter reads through to the solution it filters</b>, and against that solution's
+///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's selection.
+///         Membership answers "is this project solution material?", which a filter does not change: a member
+///         the filter left out but a reference dragged in anyway is still the codebase under law, not spec
+///         plumbing. Selecting instead would exclude it — the silent shrink this type exists to prevent.
 ///     </para>
 /// </remarks>
 internal static class SpecExclusion
@@ -126,7 +132,7 @@ internal static class SpecExclusion
     /// <summary>
     ///     The solution's declared <c>.csproj</c> members, canonicalized for comparison, or
     ///     <see langword="null" /> when membership cannot be read — an unowned format or any read/parse
-    ///     failure. Null is the fallback signal, never an empty set.
+    ///     failure, a malformed solution filter included. Null is the fallback signal, never an empty set.
     /// </summary>
     internal static IReadOnlySet<string>? TryReadDeclaredMembers(string solutionPath)
     {
@@ -134,7 +140,7 @@ internal static class SpecExclusion
 
         try
         {
-            return CanonicalMemberSet(SolutionProjectFileParser.ReadCsprojMembers(solutionPath));
+            return CanonicalMemberSet(SolutionProjectFileParser.ReadDeclaredMembership(solutionPath).Declared);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

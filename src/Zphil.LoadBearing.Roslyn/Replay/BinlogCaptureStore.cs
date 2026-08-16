@@ -182,9 +182,13 @@ internal sealed class BinlogCaptureStore
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
 
         // A solution filter narrows a build to a subset; a capture keyed on it would silently shrink the
-        // model. Refuse it explicitly and early — the coverage check would otherwise report a misleading
-        // "zero members" mismatch (the .slnf parses to no csproj members). The cold .slnf path via
-        // MSBuildWorkspace is unaffected: this guard is only about persisting a build capture.
+        // model, and a replay owns no workspace to announce the narrowing from. Refuse it explicitly and
+        // early. The cold .slnf path via MSBuildWorkspace is unaffected — it loads honestly and declares
+        // what it left out — because this guard is only about persisting a build capture.
+        //
+        // The early refusal is also what keeps RefuseIfCoverageMismatch's unguarded ReadCsprojMembers below
+        // safe: that is deliberately the raw-membership reader, which runs the classic-.sln regex over a
+        // filter's JSON and gets zero members. Reaching it with a .slnf would refuse for a nonsense reason.
         if (solutionPath.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 

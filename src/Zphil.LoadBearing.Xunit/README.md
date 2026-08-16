@@ -58,6 +58,17 @@ Rule verdicts then come from the partial model, and `Workspace_LoadedCompletely`
 skipped, still carrying the diagnostics, rather than pass under a name the run cannot vouch
 for.
 
+## When a solution filter narrows the run
+
+A `.slnf` solution path checks the projects the filter selects plus everything they reference,
+which can be fewer than the solution declares. Rule cases still report: a narrowed universe is
+a smaller true answer, and every verdict reached is real. What cannot pass is the completeness
+claim: `Workspace_LoadedCompletely` reports as skipped, naming the declared projects the run
+never checked, rather than pass under a name the filtered run cannot vouch for. Point
+`SolutionPath` at the solution the filter references to get the whole answer. A filter whose
+selection pulls in every declared project narrows nothing, and the run is indistinguishable
+from one over the solution.
+
 ## Requirements
 
 - **xunit.v3 3.2.2 or later.** The adapter is built against the xunit.v3 authoring libraries;

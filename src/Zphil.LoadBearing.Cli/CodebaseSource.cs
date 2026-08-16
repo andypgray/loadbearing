@@ -84,6 +84,7 @@ internal sealed class CodebaseSource : IDisposable
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
     private readonly ExtractionCacheStore? store;
+    private readonly IReadOnlyList<string> uncheckedProjects;
 
     // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
     // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
@@ -97,6 +98,7 @@ internal sealed class CodebaseSource : IDisposable
         string solutionPath,
         IReadOnlyList<string> diagnostics,
         IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects,
         ArchitectureModel? model,
         SpecResolution? resolution,
         SolutionHandle? handle,
@@ -106,8 +108,10 @@ internal sealed class CodebaseSource : IDisposable
     {
         Outcome = outcome;
         SolutionPath = solutionPath;
+        SolutionDirectory = SolutionProjectFileParser.AnchorDirectory(solutionPath);
         loadFailures = diagnostics;
         this.failedProjects = failedProjects;
+        this.uncheckedProjects = uncheckedProjects;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -134,13 +138,22 @@ internal sealed class CodebaseSource : IDisposable
     ///     captured, so a verb that renders after extracting sees the notes and one that gates before it does
     ///     not have to wait for them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes, failedProjects);
+    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes, failedProjects, uncheckedProjects);
 
-    /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>.</summary>
+    /// <summary>
+    ///     Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.
+    /// </summary>
     public string SolutionPath { get; }
 
-    /// <summary>The solution directory — baselines and diff resolution anchor here.</summary>
-    public string SolutionDirectory => Path.GetDirectoryName(SolutionPath)!;
+    /// <summary>
+    ///     The solution directory — baselines, render targets, diff resolution, <c>context --path</c> and every
+    ///     relativized evidence path anchor here. Under a <c>.slnf</c> that is the directory of the solution the
+    ///     filter <em>references</em>, not the filter's own: a filter is a lens on a solution, so a run through
+    ///     one must resolve the same conventions and write to the same places as a run over the solution itself.
+    /// </summary>
+    // Assigned once in the ctor, never computed per read: under a .slnf the computation costs a file
+    // read, and the property is read 2-16 times a run.
+    public string SolutionDirectory { get; }
 
     /// <summary>
     ///     The projects extracted from the workspace on this run (all of them on a miss, only the dirty set
@@ -184,8 +197,8 @@ internal sealed class CodebaseSource : IDisposable
         {
             ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
             return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects, hitModel,
-                hitResolution, null, store, read, normalized);
+                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
+                read.UncheckedProjects, hitModel, hitResolution, null, store, read, normalized);
         }
 
         // A miss, a partial, or a hit whose spec was not recorded: acquire the workspace and resolve cold.
@@ -238,8 +251,8 @@ internal sealed class CodebaseSource : IDisposable
         CacheReadResult read = store.ReadAndValidate(ct);
         if (read.Outcome == CacheOutcome.Hit)
             return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects, null, null,
-                null, store, read, "");
+                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
+                read.UncheckedProjects, null, null, null, store, read, "");
 
         CodebaseSourceOutcome coldOutcome =
             read.Outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
@@ -335,11 +348,13 @@ internal sealed class CodebaseSource : IDisposable
         {
             // Merge notes are empty by construction here: extraction has not run, and only extraction
             // produces them. What spec resolution needs from this value is the load's own verdict.
-            var diagnostics = new WorkspaceDiagnostics(handle.Diagnostics, [], handle.FailedProjects);
+            var diagnostics = new WorkspaceDiagnostics(
+                handle.Diagnostics, [], handle.FailedProjects, handle.UncheckedProjects);
             SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec, diagnostics);
             ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
-                outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, model, resolution, handle,
+                outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
+                model, resolution, handle,
                 store, cacheRead, normalizedSpec);
         }
         catch
@@ -355,7 +370,8 @@ internal sealed class CodebaseSource : IDisposable
     {
         SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
         return new CodebaseSource(
-            outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, null, null, handle, store,
+            outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
+            null, null, handle, store,
             cacheRead, "");
     }
 
@@ -414,7 +430,8 @@ internal sealed class CodebaseSource : IDisposable
         {
             var records = BuildWriteSpecRecords(solution);
             store!.Write(
-                fingerprint, new ExtractionResult(allFragments, records, loadFailures, failedProjects), ct);
+                fingerprint,
+                new ExtractionResult(allFragments, records, loadFailures, failedProjects, uncheckedProjects), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

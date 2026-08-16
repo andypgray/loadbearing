@@ -32,12 +32,16 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
         "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
         "only those. If projects fail to load the report still returns, stamped modelIncomplete: true and " +
-        "failedProjects — a verdict reached against a partial model; report that, never plain green.";
+        "failedProjects — a verdict reached against a partial model; report that, never plain green. " +
+        "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
+        "checked — a clean report then covers a subset; say so.";
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
         "promotion suggestions. If projects fail to load the burndown still returns, stamped modelIncomplete: " +
-        "true and failedProjects — counts from a partial model; report that rather than quoting them as whole.";
+        "true and failedProjects — counts from a partial model; report that rather than quoting them as whole. " +
+        "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
+        "they contribute no violations, so every count reads low.";
 
     private const string ExplainDescription =
         "Return one rule's because, fix, posture payload, and linked prose as text.";
@@ -46,7 +50,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
         "or a layer's local rules — or a pointer line when none apply. If projects fail to load, the answer opens " +
         "with a caveat naming them: cards from unloaded projects cannot be placed, so treat a no-coverage answer " +
-        "as unproven there.";
+        "as unproven there. A .slnf solution filter gets the same caveat for the declared projects it left " +
+        "unchecked: treat a no-coverage answer as unproven under them as well.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
@@ -55,7 +60,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load it returns an error naming them rather than a survey missing them. " +
         "Narrow with overview or skeleton (coarser grain) or projects (fewer projects); an over-budget survey " +
-        "coarsens its own grain, as far as skeleton, rather than being cut.";
+        "coarsens its own grain, as far as skeleton, rather than being cut. " +
+        "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never loaded — " +
+        "a project absent from the survey may simply be out of view.";
 
     [McpServerTool(
         Name = ArchToolNames.Check,

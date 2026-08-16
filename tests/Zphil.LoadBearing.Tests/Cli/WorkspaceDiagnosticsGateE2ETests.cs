@@ -11,11 +11,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>The workspace-diagnostics contract on <c>check</c>.</summary>
 /// <remarks>
 ///     <para>
-///         Four parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>).
+///         Five parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>).
 ///         Driven through <see cref="CheckRunner" /> with an injected source that wraps the real cold load
-///         and adds synthetic diagnostics and/or synthetic failed projects — the one way to exercise the
-///         gate without a genuinely broken project, and the one way to put the two inputs in front of it
-///         <em>separately</em>, which is the whole subject of the last part below.
+///         and adds synthetic diagnostics, synthetic failed projects and/or synthetic unchecked ones — the
+///         one way to exercise the gate without a genuinely broken project, and the one way to put the
+///         inputs in front of it <em>separately</em>, which is the whole subject of the last two parts below.
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
@@ -46,6 +46,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///             decision — which is what makes the fix language-independent rather than one more phrase in a
 ///             matcher.
 ///         </item>
+///         <item>
+///             <b>A narrowed universe scopes, never gates.</b> Unchecked projects injected on their own put
+///             <c>uncheckedProjects</c> in the document and one warning-level notification in the SARIF while
+///             the clean spec still exits 0 and neither incomplete-model slot appears — the separation the
+///             product makes between a model that is wrong and one that is merely smaller.
+///         </item>
 ///     </list>
 /// </remarks>
 [Collection("Serial")]
@@ -56,6 +62,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // The project the gate is told failed to load, and the only thing that makes it fire. Injected apart
     // from the diagnostic above because the product separates them: the diagnostic renders, this decides.
     private const string BrokenProject = "C:/repo/MyApp.Broken/MyApp.Broken.csproj";
+
+    // The project the run is told a solution filter left out. The third input, separate again: this one
+    // neither renders as a warning nor decides anything — it scopes the answer.
+    private const string UncheckedProject = "C:/repo/MyApp.Skipped/MyApp.Skipped.csproj";
 
     // The NU1510 pruning advisory, captured verbatim from a restore of a net10.0 project referencing a
     // package the shared framework now carries. It is an ordinary restore warning, it says nothing about
@@ -348,11 +358,12 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_RestoreWarningWithNoFailedProjectJson_StampsNeitherIncompleteNorFailedProjects()
+    public async Task Check_RestoreWarningWithNoFailedProjectJson_StampsNoneOfTheWorkspaceVerdictSlots()
     {
         // The document half. A restore warning is data worth carrying, but it is not a verdict: an
         // arch_check client reading modelIncomplete must not be told the answer is untrustworthy because a
-        // package could stand to be removed from a csproj.
+        // package could stand to be removed from a csproj. uncheckedProjects rides here too, because absent
+        // is what every unfiltered run must render — a slot present-but-empty would move every golden.
         CliResult result = await RunWithInjectedDiagnosticAsync(
             [PruningAdvisory], CliRunner.CleanSpecDll, false, true);
 
@@ -361,6 +372,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.TryGetProperty("modelIncomplete", out _)
             .ShouldBeFalse();
         document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse();
+        document.RootElement.TryGetProperty("uncheckedProjects", out _)
             .ShouldBeFalse();
         result.Out.ShouldContain("will not be pruned"); // it still rides workspaceDiagnostics
     }
@@ -389,6 +402,55 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldEndWith("MyApp.Broken/MyApp.Broken.csproj");
     }
 
+    // ── a narrowed universe rides the document and the SARIF, and gates neither ────────────────────────
+
+    [Fact]
+    public async Task Check_NarrowedUniverseJson_CarriesTheUncheckedProjectsWithoutMarkingTheModelIncomplete()
+    {
+        // The channel the human stamp can never reach: --json owns stdout, so the surface an agent reads is
+        // the one with no stamp on it. What rides it must scope the verdict and not overturn it — the rules
+        // all ran and all answered — so the clean spec still exits 0 and neither incomplete-model slot
+        // appears beside it.
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, true, uncheckedProjects: [UncheckedProject]);
+
+        result.ShouldSucceed();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("modelIncomplete", out _)
+            .ShouldBeFalse();
+        document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse();
+        // Solution-relative and forward-slashed, like failedProjects beside it and every other path here.
+        var uncheckedProjects = document.RootElement.GetProperty("uncheckedProjects")
+            .EnumerateArray()
+            .Select(element => element.GetString() ?? "")
+            .ToList();
+        uncheckedProjects.ShouldHaveSingleItem()
+            .ShouldEndWith("MyApp.Skipped/MyApp.Skipped.csproj");
+    }
+
+    [Fact]
+    public async Task Check_NarrowedUniverseSarif_AddsOneWarningNotificationToASuccessfulInvocation()
+    {
+        // Code scanning has no exit code and no stdout: a clean SARIF over a filter would close every alert
+        // the unchecked projects would have raised. Warning rather than error, and executionSuccessful stays
+        // true, because the results are true — they are simply not the whole solution's.
+        using TempDirectory temp = TestTempRoot.Fresh("narrowed-sarif");
+        string sarifPath = temp.PathOf("narrowed.sarif");
+
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, false, sarifPath, uncheckedProjects: [UncheckedProject]);
+
+        result.ShouldSucceed();
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.ShouldContain("\"executionSuccessful\": true");
+        sarif.ShouldContain("\"level\": \"warning\"");
+        sarif.ShouldContain(
+            "A solution filter narrowed this run: 1 project the solution declares was not checked, so these "
+            + "results cover part of the solution: ");
+        sarif.ShouldContain("MyApp.Skipped/MyApp.Skipped.csproj");
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     private static string[] WorkspaceDiagnosticsOf(JsonDocument document)
@@ -409,13 +471,15 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
         IReadOnlyList<string> diagnostics, string spec, bool allowWorkspaceDiagnostics, bool json,
-        string? sarif = null, IReadOnlyList<string>? failedProjects = null)
+        string? sarif = null, IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? uncheckedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         string solution = CliRunner.MyAppSolution;
         var runner = new CheckRunner(
-            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects), new FakeEnvironment());
+            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects, uncheckedProjects),
+            new FakeEnvironment());
 
         int exit = await runner.RunAsync(
             new CheckRequest(

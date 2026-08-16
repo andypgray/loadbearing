@@ -32,8 +32,12 @@ namespace Zphil.LoadBearing.Cli;
 ///         does its work, because every mode is dangerous against a partial model: <c>--init</c> would
 ///         capture "zero debt" for rules whose subjects live in projects that did not load, and
 ///         <c>--accept-reductions</c> would delete real entries as violations that "no longer occur" when
-///         the only thing that stopped is a project loading. Short of that the command reports rather than
-///         gates — a red rule is the state to capture, not a failure, so it exits 0 on success.
+///         the only thing that stopped is a project loading. A solution filter that left declared projects
+///         unchecked refuses in the same position and on the same reasoning
+///         (<see cref="NarrowedUniverseNotice.BaselineRefusal" />), but only for those two modes:
+///         <c>--add</c> records one violation the run did see and claims nothing about what it did not.
+///         Short of that the command reports rather than gates — a red rule is the state to capture, not a
+///         failure, so it exits 0 on success.
 ///     </para>
 ///     <para>Output/error writers are injected so the e2e tests can capture them.</para>
 /// </remarks>
@@ -62,9 +66,26 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
             return 2;
         }
 
+        // Then the narrowing refusal, on the gate's own terms and in the same position — before extraction,
+        // so nothing is written. Both modes below read absence as evidence: --init captures "zero debt" for
+        // rules whose subjects the filter left out, and --accept-reductions deletes real entries as
+        // violations that stopped occurring. --add rides through: it records what the run did see.
+        if ((request.Init || request.AcceptReductions) && diagnostics.UncheckedProjects.Count > 0)
+        {
+            var uncheckedProjects = NarrowedUniverseNotice.Relative(
+                diagnostics.UncheckedProjects, source.SolutionDirectory);
+            string refusal = NarrowedUniverseNotice.BaselineRefusal(
+                Path.GetFileName(source.SolutionPath), uncheckedProjects);
+            foreach (string line in refusal.Split('\n'))
+                error.WriteLine(line);
+            return 2;
+        }
+
         CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
 
         // Evaluate against an empty baseline so every current violation surfaces as the state to capture.
+        // No narrowing goes down: this report is a capture survey rather than a verdict, the two modes that
+        // read absence as evidence have already refused above, and --add branches out before the survey.
         CheckReport report = ArchChecker.Check(source.Model, codebase, BaselineIndex.Empty);
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.

@@ -46,6 +46,18 @@ internal static class Checker
         return ArchChecker.Check(ArchModelBuilder.Build(new InlineSpec(define)), codebase, baselines, diff);
     }
 
+    /// <summary>
+    ///     Checks over a run a solution filter narrowed — the internal overload the CLI and the adapter
+    ///     reach through <c>ArchCheckSequence</c>, so a test can put a rule's empty subject in front of a
+    ///     universe that is smaller than the solution.
+    /// </summary>
+    public static CheckReport Run(
+        string source, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
+    {
+        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(define));
+        return ArchChecker.Check(model.Rules, CompilationFactory.Extract(source), baselines, null, narrowing);
+    }
+
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
     public static ArchitectureModel Model(Action<Arch> define)
     {
@@ -146,7 +158,7 @@ internal static class Checker
     {
         var writer = new StringWriter();
         JsonReportRenderer.Render(
-            writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], []);
+            writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], [], []);
         return writer.ToString();
     }
 

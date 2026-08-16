@@ -242,6 +242,21 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_SkippedRatchetedRule_IsTheHeaderAndTheReasonAndNothingElse()
+    {
+        // A ratcheted rule the run reached no verdict for has no burndown to print: the grandfathered count
+        // and the baseline --init hint are both claims about a check that never happened. Pinned as the
+        // whole block rather than as two absences, so any line that ever creeps in below the reason reds.
+        const string reason = "'BillingOnly.slnf' narrowed this run.";
+        ArchRule rule = MigrateRule("data/x");
+        var result = new RuleResult(rule, RuleStatus.Skipped, [], [], reason, [], 0, true);
+
+        string block = result.HumanBlock();
+
+        block.ShouldBe($"skip {rule.Id} — {rule.Sentence}\n  skipped: {reason}");
+    }
+
+    [Fact]
     public void Render_MultiRuleReport_WritesSummaryTail()
     {
         var report = new CheckReport(
@@ -262,6 +277,17 @@ public sealed class HumanReportRendererTests
     private static ArchRule EnforceRule(string id)
     {
         return new ArchRule(id, Posture.Enforce, "b", null, "s", null, null, null);
+    }
+
+    // A ratcheted rule, built through the spec so it carries a real BaselinePath — the one thing that makes
+    // the renderer's ratchet lines reachable at all.
+    private static ArchRule MigrateRule(string id)
+    {
+        return Checker.Model(arch => arch.Rule(id)
+                .Migrate("old", arch.Namespace("App.*")
+                    .MustHaveSuffix("X"))
+                .Because("b"))
+            .Rules.Single();
     }
 
     // A shallow TypeNode standing in for a Shape subject: the renderer reads only its FullName and

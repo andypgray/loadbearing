@@ -5,9 +5,9 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     What an <see cref="ISolutionSource" /> hands back: the loaded, unresolved-reference-stripped
-///     <see cref="Solution" />, the discovered solution path, the workspace-load diagnostics and the
-///     projects that failed to load — plus an optional <see cref="IDisposable" /> the handle owns (see
-///     <see cref="Dispose" />).
+///     <see cref="Solution" />, the discovered solution path, the workspace-load diagnostics, the projects
+///     that failed to load and the ones a filter left unchecked — plus an optional
+///     <see cref="IDisposable" /> the handle owns (see <see cref="Dispose" />).
 /// </summary>
 /// <remarks>
 ///     A <see cref="Solution" /> stays usable after its workspace is disposed, so a handle read in flight is
@@ -20,7 +20,8 @@ internal sealed class SolutionHandle(
     IDisposable? owned,
     Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-    IReadOnlyList<string>? failedProjects = null) : IDisposable
+    IReadOnlyList<string>? failedProjects = null,
+    IReadOnlyList<string>? uncheckedProjects = null) : IDisposable
 {
     private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
         new Dictionary<ProjectId, string>();
@@ -35,7 +36,7 @@ internal sealed class SolutionHandle(
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; } = targetFrameworks ?? NoTargetFrameworks;
 
-    /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>.</summary>
+    /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.</summary>
     public string SolutionPath { get; } = solutionPath;
 
     /// <summary>Workspace-load failure diagnostics, surfaced to stderr / the JSON document by the caller.</summary>
@@ -46,6 +47,13 @@ internal sealed class SolutionHandle(
     ///     whole input, where <see cref="Diagnostics" /> is only what gets rendered beside it.
     /// </summary>
     public IReadOnlyList<string> FailedProjects { get; } = failedProjects ?? [];
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths the solution declares that this run did not check — non-empty
+    ///     only under a solution filter. It scopes the verdict and never gates it, which is exactly why it is
+    ///     carried separately from <see cref="FailedProjects" /> rather than folded in.
+    /// </summary>
+    public IReadOnlyList<string> UncheckedProjects { get; } = uncheckedProjects ?? [];
 
     /// <summary>
     ///     The warm path's incremental codebase producer, or null on the cold/one-shot path. When present

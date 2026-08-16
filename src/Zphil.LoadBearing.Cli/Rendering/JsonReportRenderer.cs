@@ -27,6 +27,7 @@ internal static class JsonReportRenderer
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
         IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects,
         IReadOnlyList<string> rulesFilter)
     {
         // One relativizer for the whole document: the base directory is the same string for every site,
@@ -43,6 +44,7 @@ internal static class JsonReportRenderer
             workspaceDiagnostics,
             modelIncomplete ? true : null,
             RelativeProjects(failedProjects, relativizer),
+            RelativeProjects(uncheckedProjects, relativizer),
             new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -55,16 +57,17 @@ internal static class JsonReportRenderer
     }
 
     /// <summary>
-    ///     The failed projects as the document carries them — solution-relative and forward-slashed, like
-    ///     every other path in it, so a machine path never lands in a document a golden pins — or null when
-    ///     nothing failed, which omits the key entirely.
+    ///     A project list as the documents carry it — solution-relative and forward-slashed, like every
+    ///     other path in them, so a machine path never lands in a document a golden pins — or null when the
+    ///     list is empty, which omits the key entirely. Shared by all three documents and by both of their
+    ///     project slots: what failed to load, and what a solution filter left unchecked.
     /// </summary>
     internal static IReadOnlyList<string>? RelativeProjects(
-        IReadOnlyList<string> failedProjects, PathFormat.Relativizer relativizer)
+        IReadOnlyList<string> projects, PathFormat.Relativizer relativizer)
     {
-        return failedProjects.Count == 0
+        return projects.Count == 0
             ? null
-            : failedProjects.Select(relativizer.Relative)
+            : projects.Select(relativizer.Relative)
                 .ToList();
     }
 

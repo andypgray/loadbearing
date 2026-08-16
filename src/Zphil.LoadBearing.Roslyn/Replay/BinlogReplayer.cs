@@ -112,7 +112,7 @@ internal static class BinlogReplayer
             // No solution file to read declared membership from, so only the loaded-but-empty arm can fire —
             // and it cannot, because every replayed project came from a compiler invocation that ran. Asked
             // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
-            var failedProjects = ProjectLoadFailures.Detect(stripped, null);
+            var failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
 
             return new ReplayedSolution(workspace, reader, stripped, targetFrameworks, failedProjects);
         }

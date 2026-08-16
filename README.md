@@ -365,6 +365,8 @@ The machine running it needs a .NET 10 SDK: commands that load a solution (`chec
 
 A project that fails to load is treated as a wrong model rather than a smaller one: `check`, `baseline`, `render`, `graph` and `status` all exit 2 and say which projects failed, and `--allow-workspace-diagnostics` opts into the partial model. The xUnit adapter answers the same way in test dress: one named test fails carrying the load failures, every rule case skips, and an `AllowWorkspaceDiagnostics` override opts in.
 
+A solution filter is the opposite case: a smaller model rather than a wrong one. `check`, `status`, `graph` and `context` still answer, stamping which declared projects the filtered run never checked, and the JSON documents carry them as `uncheckedProjects`; a green over a subset can no longer read as a green over the solution. The verbs that read absence as evidence refuse instead: `baseline --init`, `baseline --accept-reductions` and `render` exit 2 rather than write files that vouch for projects the run never measured, and the fix they name is to run against the solution the filter references. The narrowing is measured from what actually loaded, not from the filter's text: a selection whose references pull in the whole solution narrows nothing and prints nothing. The xUnit adapter keeps every rule verdict and skips `Workspace_LoadedCompletely`, naming what was not checked. Committed baselines, render targets, `context --path`, diff resolution and the reported project paths all resolve against the solution the filter references, never against the filter's own directory: a filter kept apart from its solution answers with the same paths as the solution itself. A rule whose whole selection lives in the unchecked projects reports as skipped, naming the filter, rather than failed for matching nothing; the fail-on-empty defaults stand untouched for unfiltered runs.
+
 The command is `loadbearing`. Four lockstep-versioned packages make up a release:
 
 | Package | What it is |
@@ -398,14 +400,15 @@ claude mcp add --scope project loadbearing -- loadbearing mcp MyApp.sln
 
 The solution argument is optional, and most repositories should still pass it. Without it the
 server reads `LOADBEARING_SOLUTION_PATH`, and when that is unset too it walks up from its
-working directory to the first ancestor holding exactly one `.sln`, `.slnf` or `.slnx`. That
-resolves nothing where the solution sits under `src/`, and refuses as ambiguous where several
-sit side by side, which between them covers most real repositories. A solution file passed as
-the argument beats both. When it cannot bind, the server starts anyway and every tool call
-returns the reason, naming any solution it saw one level down; the failure is readable in the
-client rather than arriving as a server that would not start. However the server is launched,
-the rule from Installing still applies: restore and build the solution first; the checker
-never builds, and a stale build gives stale verdicts.
+working directory to the first ancestor holding exactly one solution file, where a `.slnf`
+filter counts only when no `.sln` or `.slnx` stands beside it. That resolves nothing where the
+solution sits under `src/`, and refuses as ambiguous where several sit side by side, which
+between them covers most real repositories. A solution file passed as the argument beats both.
+When it cannot bind, the server starts anyway and every tool call returns the reason, naming
+any solution it saw one level down; the failure is readable in the client rather than arriving
+as a server that would not start. However the server is launched, the rule from Installing
+still applies: restore and build the solution first; the checker never builds, and a stale
+build gives stale verdicts.
 
 `dnx` launches the server straight from nuget.org without the global install; the `--` hands
 everything after it to the tool:

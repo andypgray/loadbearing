@@ -25,6 +25,12 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     The workspace-load diagnostics the recorded run collected, replayed verbatim on a hit so cached and
 ///     cold output are byte-identical on a diagnostic-bearing solution.
 /// </param>
+/// <param name="UncheckedProjects">
+///     The absolute <c>.csproj</c> paths the recorded run did not check — non-empty only when it went
+///     through a solution filter. Persisted for the same reason as <see cref="FailedProjects" /> and no
+///     other: a hit owns no workspace to recompute it from, and a filtered run whose cached verdict came
+///     back as a bare green would be exactly the silence this field exists to break.
+/// </param>
 /// <param name="FailedProjects">
 ///     The absolute <c>.csproj</c> paths of the projects that failed to load on the recorded run — the
 ///     fail-closed gate's input. Persisted rather than recomputed because a hit owns no workspace to read the
@@ -39,6 +45,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> FailedProjects,
+    IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>

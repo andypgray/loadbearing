@@ -1,0 +1,8 @@
+{
+  "solution": {
+    "path": "../TestSolutions/MyApp/MyApp.sln",
+    "projects": [
+      "MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj"
+    ]
+  }
+}

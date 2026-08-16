@@ -17,12 +17,13 @@ public sealed class LoadedSolution : IDisposable
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        IReadOnlyList<string>? failedProjects = null)
+        ProjectLoadReport? report = null)
     {
         Workspace = workspace;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
-        FailedProjects = failedProjects ?? [];
+        FailedProjects = (report ?? ProjectLoadReport.Empty).Failed;
+        UncheckedProjects = (report ?? ProjectLoadReport.Empty).Unchecked;
     }
 
     /// <summary>The MSBuild workspace that produced <see cref="Solution" />.</summary>
@@ -45,6 +46,15 @@ public sealed class LoadedSolution : IDisposable
     ///     <see cref="ProjectLoadFailures.Detect" />. Empty for a solution that loaded completely.
     /// </summary>
     public IReadOnlyList<string> FailedProjects { get; }
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths this solution declares that the run did not check, ordinal-sorted
+    ///     — non-empty only when the load went through a <c>.slnf</c> that left members out. A narrowed
+    ///     universe is a smaller true answer rather than a broken one, so unlike
+    ///     <see cref="FailedProjects" /> this never gates; it is what keeps a green over a subset from
+    ///     reading as a green over the solution.
+    /// </summary>
+    public IReadOnlyList<string> UncheckedProjects { get; }
 
     /// <summary>Disposes the underlying workspace.</summary>
     public void Dispose()

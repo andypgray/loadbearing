@@ -38,10 +38,12 @@ internal static class GraphJsonRenderer
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
         IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects,
         GraphGrain grain,
         IReadOnlyList<string> projectsScope)
     {
         bool elideExternalEdges = grain >= GraphGrain.Skeleton;
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
 
         var document = new GraphJson(
             1,
@@ -56,7 +58,8 @@ internal static class GraphJsonRenderer
             elideExternalEdges ? summary.ExternalEdges.Count : null,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             modelIncomplete ? true : null,
-            JsonReportRenderer.RelativeProjects(failedProjects, new PathFormat.Relativizer(solutionDirectory)));
+            JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
+            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer));
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
     }

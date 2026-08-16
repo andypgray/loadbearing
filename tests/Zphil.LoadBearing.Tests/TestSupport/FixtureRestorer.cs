@@ -16,6 +16,8 @@ internal static class FixtureRestorer
     // concurrent entry; repeat calls are free.
     private static readonly Lazy<bool> RestoreGate = new(RestoreAll);
 
+    private static readonly string[] SolutionExtensions = [".sln", ".slnx"];
+
     /// <summary>Restores every fixture solution once, the first time it is called; free on repeat.</summary>
     internal static void EnsureRestored()
     {
@@ -33,11 +35,27 @@ internal static class FixtureRestorer
                 Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json")));
         if (!anyUnrestored) return true;
 
-        foreach (string solutionPath in Directory
-                     .EnumerateFiles(testSolutionsDir, "*.sln", SearchOption.AllDirectories))
-            Restore(solutionPath);
+        var solutions = Directory
+            .EnumerateFiles(testSolutionsDir, "*", SearchOption.AllDirectories)
+            .Where(IsSolutionFile);
+        foreach (string solutionPath in solutions) Restore(solutionPath);
 
         return true;
+    }
+
+    /// <summary>
+    ///     Whether a fixture file is a solution this sweep restores: both full formats, and deliberately not
+    ///     <c>.slnf</c>. Restoring a filter is restoring the selected projects of the solution it references,
+    ///     and every solution a fixture filter references already stands under this root — while a filter
+    ///     fixture whose whole job is to be unreadable would fail a restore, and startup must not depend on
+    ///     one. Internal so the accepted set pins without shelling the SDK; matched on the extension rather
+    ///     than through a search pattern because a three-character pattern is documented to match longer
+    ///     extensions too, which would sweep the filters back in.
+    /// </summary>
+    internal static bool IsSolutionFile(string path)
+    {
+        string extension = Path.GetExtension(path);
+        return SolutionExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

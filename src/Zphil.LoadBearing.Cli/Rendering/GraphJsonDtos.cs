@@ -3,11 +3,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
-// The five optional slots below — grain, projectsScope, and the three workspace ones — are additive and null
-// (omitted) on a full, unscoped survey whose workspace loaded, so the schema stays version 1 and the
-// default document is byte-identical to the one before they existed. A run whose workspace did not load
-// reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses before
-// extraction.
+// The six optional slots below — grain, projectsScope, and the four workspace ones — are additive and null
+// (omitted) on a full, unscoped survey whose workspace loaded and that no solution filter narrowed, so the
+// schema stays version 1 and the default document is byte-identical to the one before they existed. A run
+// whose workspace did not load reaches this document only under --allow-workspace-diagnostics, since graph
+// otherwise refuses before extraction.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
 /// <param name="Grain">
@@ -33,6 +33,14 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     — or null (omitted) when none are. On a survey this is the most useful slot of the three: it names
 ///     precisely what a reader would otherwise have to notice was absent.
 /// </param>
+/// <param name="UncheckedProjects">
+///     Which projects the solution declares that this survey never loaded — solution-relative,
+///     forward-slashed <c>.csproj</c> paths — or null (omitted) when it covers the whole solution.
+///     Non-empty only under a <c>.slnf</c> solution filter, and the survey's counterpart to
+///     <see cref="FailedProjects" /> for a universe that is smaller rather than wrong: a project or edge
+///     absent from a survey carrying this slot may simply be out of view. Measured as what the solution
+///     declares minus what loaded, so a filter that narrows nothing omits the key.
+/// </param>
 /// <param name="ExternalEdges">
 ///     The external-reference rows, or null (omitted) at skeleton grain — the one thing that grain elides
 ///     beyond overview's. Null here is "not rendered at this grain", never "none found": a solution with no
@@ -54,7 +62,8 @@ internal sealed record GraphJson(
     int? ExternalEdgeCount,
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
-    IReadOnlyList<string>? FailedProjects);
+    IReadOnlyList<string>? FailedProjects,
+    IReadOnlyList<string>? UncheckedProjects);
 
 /// <summary>
 ///     One project: its declared references, solution-declared type count, and namespace inventory — the

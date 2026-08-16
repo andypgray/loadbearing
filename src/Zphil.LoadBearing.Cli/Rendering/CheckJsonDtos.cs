@@ -8,9 +8,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
-// without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects` and `rulesFilter`
-// slots are additive the same way: null (omitted) on every run whose workspace loaded and that checked the
-// whole spec, so a clean document is unchanged.
+// without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects`,
+// `uncheckedProjects` and `rulesFilter` slots are additive the same way: null (omitted) on every run whose
+// workspace loaded, that no solution filter narrowed, and that checked the whole spec — so a clean document
+// is unchanged.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
 /// <param name="RulesFilter">
@@ -31,6 +32,16 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     failure and an ordinary restore warning in exactly the same shape, so a client cannot recover this
 ///     from them. Absent on a clean run, so a clean document is unchanged.
 /// </param>
+/// <param name="UncheckedProjects">
+///     Which projects the solution declares that this run never checked — solution-relative,
+///     forward-slashed <c>.csproj</c> paths — or null (omitted) when the run covered the whole solution.
+///     Non-empty only under a <c>.slnf</c> solution filter, and beside <see cref="FailedProjects" /> rather
+///     than folded into it because it scopes the verdict instead of invalidating it: the rules below all ran
+///     and all answered, over less. A clean report carrying this slot covers a subset of the solution, which
+///     is the reading no exit code can give a client. Measured as what the solution declares minus what
+///     loaded, never read from the filter's own selection — a filter whose transitive project references
+///     pull the rest of the solution in narrows nothing and omits the key.
+/// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
@@ -41,6 +52,7 @@ internal sealed record CheckJson(
     IReadOnlyList<string> WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
+    IReadOnlyList<string>? UncheckedProjects,
     SummaryJson Summary);
 
 /// <summary>

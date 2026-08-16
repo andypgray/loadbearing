@@ -188,12 +188,37 @@ public sealed class SpecExclusionTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDeclaredMembers_SolutionFilter_ReturnsNullRatherThanAnEmptySet()
+    public void TryReadDeclaredMembers_SolutionFilter_ReadsThroughToTheFilteredSolutionsWholeMembership()
     {
-        // A .slnf is JSON that SolutionDiscovery accepts and the classic-.sln regex reads as zero members.
-        // Reporting "nothing is declared" would subtract the spec's whole closure; null is the fallback.
+        // A filter used to degrade to null here, which subtracted the spec's whole closure. It now resolves
+        // to the solution it points at — and to that solution's WHOLE membership, not the filter's
+        // selection: a member left out of the selection is still solution material, so excluding it would
+        // silently shrink the codebase under law.
+        File.WriteAllText(_temp.PathOf("App.slnx"), """
+                                                    <Solution>
+                                                      <Project Path="src/App/App.csproj" />
+                                                      <Project Path="src/Unselected/Unselected.csproj" />
+                                                    </Solution>
+                                                    """);
         string solutionPath = _temp.PathOf("Filtered.slnf");
-        File.WriteAllText(solutionPath, """{ "solution": { "path": "App.slnx", "projects": [] } }""");
+        File.WriteAllText(
+            solutionPath,
+            """{ "solution": { "path": "App.slnx", "projects": [ "src/App/App.csproj" ] } }""");
+
+        var members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+
+        members.ShouldNotBeNull();
+        members.ShouldContain(_temp.PathOf("src", "App", "App.csproj"));
+        members.ShouldContain(_temp.PathOf("src", "Unselected", "Unselected.csproj"));
+    }
+
+    [Fact]
+    public void TryReadDeclaredMembers_MalformedSolutionFilter_ReturnsNullRatherThanAnEmptySet()
+    {
+        // The "never fail open" pin, kept alive at the one site that can still reach it. Reporting "nothing
+        // is declared" for an unreadable filter would subtract the spec's whole closure; null is the fallback.
+        string solutionPath = _temp.PathOf("Malformed.slnf");
+        File.WriteAllText(solutionPath, "{ this is not json");
 
         SpecExclusion.TryReadDeclaredMembers(solutionPath)
             .ShouldBeNull();

@@ -3,9 +3,9 @@ using Zphil.LoadBearing.Checking;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `status --json` — its own document with its own schemaVersion (2), distinct from
-// `check --json`. Serialized camelCase, indented, nulls omitted. The three workspace slots below are
-// additive and null (omitted) on every run whose workspace loaded, so the schema stays version 2 and a clean
-// document is byte-identical.
+// `check --json`. Serialized camelCase, indented, nulls omitted. The four workspace slots below are
+// additive and null (omitted) on every run whose workspace loaded and that no solution filter narrowed, so
+// the schema stays version 2 and a clean document is byte-identical.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="WorkspaceDiagnostics">
@@ -23,6 +23,14 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     <c>workspaceDiagnostics</c> cannot be read for, since MSBuild's words about a fatal failure and about
 ///     an ordinary restore warning arrive in the same shape.
 /// </param>
+/// <param name="UncheckedProjects">
+///     Which projects the solution declares that this run never checked — solution-relative,
+///     forward-slashed <c>.csproj</c> paths — or null (omitted) when the burndown covers the whole solution.
+///     Non-empty only under a <c>.slnf</c> solution filter. An unchecked project declares no types and so
+///     contributes no violations, which reads as burndown rather than as absence: every count below is low
+///     by whatever these projects hold. Measured as what the solution declares minus what loaded, so a
+///     filter that narrows nothing omits the key.
+/// </param>
 internal sealed record StatusJson(
     int SchemaVersion,
     string Solution,
@@ -31,6 +39,7 @@ internal sealed record StatusJson(
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
+    IReadOnlyList<string>? UncheckedProjects,
     StatusSummaryJson Summary);
 
 /// <summary>

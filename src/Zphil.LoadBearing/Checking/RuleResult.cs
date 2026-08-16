@@ -43,7 +43,10 @@ public sealed class RuleResult
     /// <summary>The non-fatal warnings (e.g. an inert forbidden-set target).</summary>
     public IReadOnlyList<CheckWarning> Warnings { get; }
 
-    /// <summary>Why the rule was skipped, or null when it was evaluated.</summary>
+    /// <summary>
+    ///     Why the run reached no verdict for this rule — a tripwire with no diff context, or a solution
+    ///     filter that left its subject out of the checked universe — or null when it was evaluated.
+    /// </summary>
     public string? SkipReason { get; }
 
     /// <summary>

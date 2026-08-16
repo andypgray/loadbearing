@@ -182,9 +182,14 @@ internal static class WarmWorkspacePool
         {
             string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
             WorkspaceSnapshot snapshot = await GetCurrentAsync(solutionPath, ct);
+            // Every field the snapshot carries, including the two load-report ones: composed without them,
+            // no warm-pool test could ever observe a failed project, a narrowed universe, or the stamps and
+            // refusals keyed on either — the pool would silently answer "nothing to report" for both.
             return new SolutionHandle(
                 snapshot.Solution, solutionPath, snapshot.Diagnostics, null,
-                targetFrameworks: snapshot.TargetFrameworks);
+                targetFrameworks: snapshot.TargetFrameworks,
+                failedProjects: snapshot.FailedProjects,
+                uncheckedProjects: snapshot.UncheckedProjects);
         }
     }
 }

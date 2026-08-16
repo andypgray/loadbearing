@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Xunit;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
@@ -22,7 +23,9 @@ namespace Zphil.LoadBearing.Xunit;
 ///         passes. A workspace that fails to load completely fails one named test —
 ///         <see cref="Workspace_LoadedCompletely" />, carrying the load diagnostics — and every rule case skips
 ///         rather than pass against a partial model. Override <see cref="AllowWorkspaceDiagnostics" /> to opt
-///         into checking the partial model as it loaded.
+///         into checking the partial model as it loaded. A solution filter is the opposite case — a smaller
+///         model rather than a wrong one — so the rule cases keep their verdicts and only
+///         <see cref="Workspace_LoadedCompletely" /> skips.
 ///     </para>
 ///     <para>
 ///         Rules enumerate at <em>discovery</em> time from the spec alone (no Roslyn, no workspace), so the
@@ -38,7 +41,12 @@ namespace Zphil.LoadBearing.Xunit;
 /// <typeparam name="TSpec">The architecture spec to check — must be default-constructible.</typeparam>
 public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new()
 {
-    /// <summary>The solution (<c>.sln</c>/<c>.slnx</c>) to check the spec against.</summary>
+    /// <summary>
+    ///     The solution (<c>.sln</c>/<c>.slnx</c>) to check the spec against, or a <c>.slnf</c> filter over
+    ///     one — which checks the projects it selects plus their transitive references, and so answers over
+    ///     part of the solution: every rule case still reports its verdict, and
+    ///     <see cref="Workspace_LoadedCompletely" /> skips naming the declared projects the run never checked.
+    /// </summary>
     protected abstract string SolutionPath { get; }
 
     /// <summary>
@@ -59,8 +67,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     /// </summary>
     /// <remarks>
     ///     By default a load failure fails <see cref="Workspace_LoadedCompletely" /> and skips every rule
-    ///     case, because a rule whose subject lived in an unloaded project selects nothing and an empty
-    ///     subject passes — a green run against a partial model signs a verdict that was never reached. With
+    ///     case, because a rule whose subject lived in an unloaded project selects nothing and every other
+    ///     rule was measured over a codebase missing whole projects — a run against a partial model reports
+    ///     verdicts it never reached. With
     ///     <see langword="true" />, rule verdicts come from the partial model as it loaded, and
     ///     <see cref="Workspace_LoadedCompletely" /> skips rather than pass under a name that would then be
     ///     false.
@@ -157,13 +166,28 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     (the rule cases then skip — no verdict is reached against a partial model), skips naming them when
     ///     <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes silently on a complete load.
     /// </summary>
+    /// <remarks>
+    ///     A <c>.slnf</c> <see cref="SolutionPath" /> that left declared projects unchecked also skips it,
+    ///     naming them (<see cref="NarrowedUniverseNotice.AdapterSkip" />). The rule cases keep reporting
+    ///     there — a narrowed universe is a smaller true answer, unlike a partial model — but this test is
+    ///     the completeness claim itself, and a filtered run cannot make it.
+    /// </remarks>
     [Fact]
     public async Task Workspace_LoadedCompletely()
     {
         ArchCheckRun run = await GetRunAsync();
-        if (!run.Diagnostics.IsIncomplete) return;
-        if (AllowWorkspaceDiagnostics) Assert.Skip(IncompleteModelGate.AdapterOptedIn(run.Diagnostics));
-        Assert.Fail(IncompleteModelGate.AdapterRefusal(run.Diagnostics));
+        if (run.Diagnostics.IsIncomplete)
+        {
+            if (AllowWorkspaceDiagnostics) Assert.Skip(IncompleteModelGate.AdapterOptedIn(run.Diagnostics));
+            Assert.Fail(IncompleteModelGate.AdapterRefusal(run.Diagnostics));
+        }
+
+        // Only ever a clean load by here: a broken model outranks a small one, and it has already answered.
+        if (run.Diagnostics.UncheckedProjects.Count == 0) return;
+
+        var uncheckedProjects = NarrowedUniverseNotice.Relative(
+            run.Diagnostics.UncheckedProjects, run.SolutionDirectory);
+        Assert.Skip(NarrowedUniverseNotice.AdapterSkip(Path.GetFileName(run.SolutionPath), uncheckedProjects));
     }
 
     // Lazily start (and then share) the one check run for this closed TSpec, seeded by the first case's
@@ -190,14 +214,14 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         ArchitectureModel model = ArchModelBuilder.Build(new TSpec());
         string fullSolutionPath = Path.GetFullPath(solutionPath);
-        string solutionDirectory = Path.GetDirectoryName(fullSolutionPath)!;
+        string solutionDirectory = SolutionProjectFileParser.AnchorDirectory(fullSolutionPath);
 
         var diagnostics = new List<string>();
         LoadedSolution? opened = null;
         try
         {
             CheckReport report = await ArchCheckSequence.ExecuteAsync(
-                model, model.Rules, solutionDirectory,
+                model, model.Rules, fullSolutionPath, solutionDirectory,
                 async ct =>
                 {
                     LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add, ct);
@@ -209,18 +233,22 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                     var exclude = excludeProjectName is null
                         ? null
                         : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
-                    return await CodebaseExtractor.ExtractFromSolutionAsync(
+                    CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
                         loaded.Solution, exclude, loaded.TargetFrameworks, ct);
+                    // The unchecked projects come out of this load, which is why they ride the extraction
+                    // rather than the call: nothing above this line has opened a workspace to measure them.
+                    return new ExtractedCodebase(codebase, loaded.UncheckedProjects);
                 },
                 null, CancellationToken.None);
 
             var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
             // No merge notes: the adapter has no channel that renders them, so its diagnostics are the load
-            // failures alone. The failed projects come off the load itself — null only where no load happened,
-            // which is also the case where there is nothing to have failed.
+            // failures alone. The failed and unchecked projects come off the load itself — null only where no
+            // load happened, which is also the case where there is nothing to have failed or skipped.
             return new ArchCheckRun(
-                byId, solutionDirectory,
-                new WorkspaceDiagnostics(diagnostics, [], opened?.FailedProjects ?? []));
+                byId, solutionDirectory, fullSolutionPath,
+                new WorkspaceDiagnostics(
+                    diagnostics, [], opened?.FailedProjects ?? [], opened?.UncheckedProjects ?? []));
         }
         finally
         {
@@ -237,6 +265,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     private sealed record ArchCheckRun(
         IReadOnlyDictionary<string, RuleResult> ResultsById,
         string SolutionDirectory,
+        string SolutionPath,
         WorkspaceDiagnostics Diagnostics);
 
     // Per-closed-generic statics are load-bearing: each ArchRuleTests<TSpec> caches ITS spec's single check

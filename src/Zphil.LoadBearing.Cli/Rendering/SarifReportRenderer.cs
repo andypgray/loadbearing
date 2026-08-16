@@ -35,6 +35,7 @@ internal static class SarifReportRenderer
     private const string FingerprintKey = "loadBearingViolationIdentity/v1";
     private const string ErrorLevel = "error";
     private const string NoteLevel = "note";
+    private const string WarningLevel = "warning";
 
     // UTF-8 without a BOM: SARIF consumers read UTF-8, and a leading BOM would churn the byte-level golden.
     private static readonly UTF8Encoding Utf8NoBom = new(false);
@@ -50,9 +51,11 @@ internal static class SarifReportRenderer
         CheckReport report,
         string solutionDirectory,
         bool executionSuccessful,
-        IReadOnlyList<string> workspaceDiagnostics)
+        IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string>? uncheckedProjects = null)
     {
-        string json = Serialize(report, solutionDirectory, executionSuccessful, workspaceDiagnostics);
+        string json = Serialize(
+            report, solutionDirectory, executionSuccessful, workspaceDiagnostics, uncheckedProjects);
         AtomicFile.WriteAllBytes(sarifPath, Utf8NoBom.GetBytes(json + "\n"));
     }
 
@@ -62,21 +65,28 @@ internal static class SarifReportRenderer
     ///     every site path solution-relative; <paramref name="executionSuccessful" /> becomes the
     ///     invocation verdict (false when the incomplete-model gate will exit 2); and
     ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty).
+    ///     <paramref name="uncheckedProjects" /> adds one further notification when a solution filter narrowed
+    ///     the run; omitting it renders exactly what an unfiltered run always rendered.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
         string solutionDirectory,
         bool executionSuccessful,
-        IReadOnlyList<string> workspaceDiagnostics)
+        IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string>? uncheckedProjects = null)
     {
         // One relativizer for the whole log: the solution directory is the same string for every site, and
         // normalizing plus splitting it is the constant half of the walk.
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
 
         var driver = new SarifDriver(DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report));
+        var narrowed = (uncheckedProjects ?? [])
+            .Select(relativizer.Relative)
+            .ToList();
+
         var run = new SarifRun(
             new SarifTool(driver),
-            BuildInvocations(executionSuccessful, workspaceDiagnostics),
+            BuildInvocations(executionSuccessful, workspaceDiagnostics, narrowed),
             BuildOriginalUriBaseIds(),
             BuildResults(report, relativizer));
         var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
@@ -101,14 +111,38 @@ internal static class SarifReportRenderer
     }
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
-    // the diagnostics themselves ride as warning-level notifications, the block omitted when there are none.
+    // the diagnostics themselves ride as warning-level notifications, and a narrowed universe adds one more
+    // after them. The block is omitted when there is nothing to say, so an unfiltered clean run is unchanged.
     private static IReadOnlyList<SarifInvocation> BuildInvocations(
-        bool executionSuccessful, IReadOnlyList<string> workspaceDiagnostics)
+        bool executionSuccessful,
+        IReadOnlyList<string> workspaceDiagnostics,
+        IReadOnlyList<string> uncheckedProjects)
     {
-        IReadOnlyList<SarifNotification>? notifications = workspaceDiagnostics.Count > 0
-            ? workspaceDiagnostics.Select(d => new SarifNotification(new SarifMessage(d), "warning")).ToList()
-            : null;
-        return new[] { new SarifInvocation(executionSuccessful, notifications) };
+        var notifications = workspaceDiagnostics
+            .Select(diagnostic => new SarifNotification(new SarifMessage(diagnostic), WarningLevel))
+            .ToList();
+
+        if (uncheckedProjects.Count > 0) notifications.Add(NarrowingNotification(uncheckedProjects));
+
+        return new[] { new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null) };
+    }
+
+    // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
+    // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
+    // raised. Warning rather than error: the results are true, they are simply not the whole solution's.
+    // Composed here rather than shared with the human stamp, per this file's convention that each renderer
+    // formats independently; the paths arrive already solution-relative, like every other path in the log.
+    private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
+    {
+        string subject = uncheckedProjects.Count == 1
+            ? "1 project the solution declares was not checked"
+            : $"{uncheckedProjects.Count} projects the solution declares were not checked";
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"A solution filter narrowed this run: {subject}, so these results cover part of the "
+                + $"solution: {string.Join(", ", uncheckedProjects)}"),
+            WarningLevel);
     }
 
     // {"SRCROOT": {}} — the one solution-root URI base every artifact location resolves against, so no

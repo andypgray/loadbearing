@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     Resolves the target solution file: an explicit path, then the
 ///     <see cref="LoadBearingEnvVars.SolutionPath" /> environment variable, then a walk up from the
 ///     working directory matching <c>.sln</c>/<c>.slnf</c>/<c>.slnx</c>. The first ancestor holding
-///     exactly one solution wins.
+///     exactly one solution wins, where a <c>.slnf</c> counts only when no full solution stands beside it.
 /// </summary>
 /// <remarks>
 ///     When the walk-up finds nothing it refuses; it never widens the search and picks. Both refusals
@@ -143,13 +143,36 @@ public static class SolutionDiscovery
         }
     }
 
+    /// <summary>
+    ///     The solution files in one directory, ordered, with filters demoted: a <c>.slnf</c> standing beside
+    ///     a <c>.sln</c> or <c>.slnx</c> drops out of the candidate set entirely. A filter is a view of a
+    ///     solution, so the two together is a normal layout rather than a question — and a refusal naming a
+    ///     filter would invite a fix (delete it, pass it explicitly) that changes nothing. Where no full
+    ///     solution stands beside them, filters resolve and refuse each other exactly as before.
+    /// </summary>
     private static string[] FindSlnFiles(string directory)
     {
-        return Directory.EnumerateFiles(directory)
-            .Where(f => f.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
-                        || f.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase)
-                        || f.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
+        string[] candidates = Directory.EnumerateFiles(directory)
+            .Where(IsSolutionFile)
             .Order(StringComparer.Ordinal)
             .ToArray();
+
+        string[] fullSolutions = candidates
+            .Where(path => !IsFilter(path))
+            .ToArray();
+
+        return fullSolutions.Length > 0 ? fullSolutions : candidates;
+    }
+
+    private static bool IsSolutionFile(string path)
+    {
+        return path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+               || IsFilter(path)
+               || path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFilter(string path)
+    {
+        return path.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase);
     }
 }

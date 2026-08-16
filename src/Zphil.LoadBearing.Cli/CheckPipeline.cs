@@ -41,15 +41,18 @@ internal static class CheckPipeline
     public static Task<CheckReport> ExecuteAsync(
         CodebaseSource source, string? diffBase, IReadOnlyList<ArchRule> rules, CancellationToken ct)
     {
-        Func<CancellationToken, Task<CodebaseModel>> extract =
-            token => source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
+        Func<CancellationToken, Task<ExtractedCodebase>> extract = async token =>
+        {
+            CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
+            return new ExtractedCodebase(codebase, source.Diagnostics.UncheckedProjects);
+        };
 
         Func<CancellationToken, Task<DiffContext>>? resolveDiff = diffBase is null
             ? null
             : token => GitChangedFiles.ResolveAsync(diffBase, source.SolutionDirectory, token);
 
         return ArchCheckSequence.ExecuteAsync(
-            source.Model, rules, source.SolutionDirectory, extract, resolveDiff, ct);
+            source.Model, rules, source.SolutionPath, source.SolutionDirectory, extract, resolveDiff, ct);
     }
 
     // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal and graph's

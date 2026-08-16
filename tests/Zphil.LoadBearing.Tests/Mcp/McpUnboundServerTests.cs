@@ -61,8 +61,10 @@ public sealed class McpUnboundServerTests : IDisposable
         conversation.Instructions.ShouldContain("not bound to a solution");
         conversation.Instructions.ShouldContain("Multiple solution files found");
         conversation.Instructions.ShouldContain("Alpha.sln");
-        conversation.Instructions.ShouldContain("Beta.slnf");
         conversation.Instructions.ShouldContain("Gamma.slnx");
+        // The filter is a candidate discovery already demoted, so the client is told about the two files a
+        // choice actually stands between. Naming it would offer a third answer that resolves nothing.
+        conversation.Instructions.ShouldNotContain("Beta.slnf");
         conversation.Instructions.ShouldContain("Pass the solution as the argument");
         // The banner is a prefix, never a replacement: the tool surface is described in the same words a
         // bound server describes it in.

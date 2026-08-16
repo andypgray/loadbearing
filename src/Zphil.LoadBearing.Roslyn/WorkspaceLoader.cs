@@ -34,7 +34,11 @@ public static class WorkspaceLoader
     ///     Opens <paramref name="solutionPath" /> through a fresh <see cref="MSBuildWorkspace" /> and
     ///     returns the loaded, stripped solution.
     /// </summary>
-    /// <param name="solutionPath">Absolute path to the <c>.sln</c>/<c>.slnx</c> to load.</param>
+    /// <param name="solutionPath">
+    ///     Absolute path to the <c>.sln</c>/<c>.slnx</c> to load, or to a <c>.slnf</c> filter over one. A
+    ///     filter loads the projects it selects plus their transitive references, and what it leaves out is
+    ///     reported as <see cref="LoadedSolution.UncheckedProjects" /> rather than as a failure.
+    /// </param>
     /// <param name="diagnosticLog">
     ///     Optional sink for workspace-failure diagnostics. Failures are surfaced but never abort the
     ///     load: MSBuildWorkspace reports partial-load problems as diagnostics, and a partial load
@@ -59,15 +63,50 @@ public static class WorkspaceLoader
             if (e.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure) diagnosticLog?.Invoke(e.Diagnostic.Message);
         });
 
-        Solution solution = await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+        Solution solution = await OpenAsync(workspace, solutionPath, ct);
         (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
         (Solution normalized, var targetFrameworks) =
             stripped.NormalizeProjectNames();
 
-        // Which projects failed is read off the loaded structure here, at the boundary, so every consumer
-        // downstream is handed the same answer rather than re-deriving one from the diagnostic text.
-        var failedProjects = ProjectLoadFailures.Detect(normalized, solutionPath);
+        // What the load did and did not produce is read off the loaded structure here, at the boundary, so
+        // every consumer downstream is handed the same answer rather than re-deriving one from the
+        // diagnostic text.
+        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
 
-        return new LoadedSolution(workspace, normalized, targetFrameworks, failedProjects);
+        return new LoadedSolution(workspace, normalized, targetFrameworks, report);
+    }
+
+    /// <summary>
+    ///     The refusal when a solution filter cannot be read. Pure, and internal so the text pins without a
+    ///     filesystem — the same split <see cref="SolutionDiscovery.AmbiguousMessage" /> makes.
+    /// </summary>
+    /// <param name="filterPath">The <c>.slnf</c> that could not be read.</param>
+    internal static string UnreadableFilterMessage(string filterPath)
+    {
+        return $"Could not read the solution filter '{filterPath}'.\n"
+               + "A filter must be well-formed JSON whose 'solution' path resolves to a .sln or .slnx, and "
+               + "every project it lists must be a member of that solution.";
+    }
+
+    // Roslyn's SolutionFilterReader signals every filter fault by throwing a bare Exception out of
+    // OpenSolutionAsync — measured as the same "Failed to load solution filter" for malformed JSON, a
+    // missing 'solution' key, a solution path that does not resolve, and a project entry naming a
+    // non-member. Unmapped it reaches the user as a stack trace. The gate is the extension, never the
+    // message: matching wording is the mistake ProjectLoadFailures exists to undo. The original is kept as
+    // the inner exception, so a fault that is genuinely not the filter's is still recoverable from a log.
+    private static async Task<Solution> OpenAsync(
+        MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
+    {
+        if (!SolutionProjectFileParser.IsFilterFormat(solutionPath))
+            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+
+        try
+        {
+            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new UserErrorException(UnreadableFilterMessage(solutionPath), ex);
+        }
     }
 }

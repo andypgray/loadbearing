@@ -42,23 +42,26 @@ internal sealed record CacheReadResult(
     IReadOnlySet<string> DirtyProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
-    IReadOnlyList<string> FailedProjects)
+    IReadOnlyList<string> FailedProjects,
+    IReadOnlyList<string> UncheckedProjects)
 {
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
 
     internal static CacheReadResult Miss()
     {
-        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], []);
+        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], [], []);
     }
 
     internal static CacheReadResult Hit(
         IReadOnlyList<CodebaseFragment> fragments,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
         IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string> failedProjects)
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects)
     {
         return new CacheReadResult(
-            CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics, failedProjects);
+            CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics, failedProjects,
+            uncheckedProjects);
     }
 
     internal static CacheReadResult Partial(
@@ -66,10 +69,12 @@ internal sealed record CacheReadResult(
         IReadOnlySet<string> dirtyProjects,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
         IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string> failedProjects)
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects)
     {
         return new CacheReadResult(
-            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics, failedProjects);
+            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics, failedProjects,
+            uncheckedProjects);
     }
 }
 
@@ -104,7 +109,8 @@ internal sealed record ExtractionResult(
     IReadOnlyList<CodebaseFragment> Fragments,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
-    IReadOnlyList<string> FailedProjects);
+    IReadOnlyList<string> FailedProjects,
+    IReadOnlyList<string> UncheckedProjects);
 
 /// <summary>
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
@@ -142,7 +148,7 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
     // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 17;
+    private const int CurrentSchemaVersion = 18;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
@@ -263,6 +269,7 @@ internal sealed class ExtractionCacheStore
             extraction.SpecResolutions,
             extraction.Diagnostics,
             extraction.FailedProjects,
+            extraction.UncheckedProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -338,12 +345,14 @@ internal sealed class ExtractionCacheStore
         {
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects);
             return CacheReadResult.Hit(
-                manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects);
+                manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
+                manifest.UncheckedProjects);
         }
 
         var reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
         return CacheReadResult.Partial(
-            reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects);
+            reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
+            manifest.UncheckedProjects);
     }
 
     // ── structural + document checks ────────────────────────────────────────────────────────────────────
@@ -521,6 +530,13 @@ internal sealed class ExtractionCacheStore
     {
         string fullSolution = Path.GetFullPath(solutionPath);
         yield return fullSolution;
+
+        // Under a .slnf the file above is the filter, not the solution. Editing the solution changes what a
+        // run loads — adding a member the filter selects, or any member at all when its projects array is
+        // empty — while leaving the filter's own bytes and timestamp untouched, so without this the edit
+        // never dirties the cache and the stale answer is served indefinitely.
+        if (SolutionProjectFileParser.TryReadReferencedSolution(fullSolution) is { } referencedSolution)
+            yield return referencedSolution;
 
         foreach (ProjectInputs project in projects)
         {

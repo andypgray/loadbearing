@@ -97,6 +97,10 @@ public sealed class WorkspaceSession : IAsyncDisposable
     // Beside loadDiagnostics rather than derived from them: the diagnostics render, this decides.
     private IReadOnlyList<string> failedProjects = [];
 
+    // The declared members the current generation's load did not check, carried onto every snapshot it
+    // produces. Non-empty only when the session is bound to a solution filter; it scopes, never gates.
+    private IReadOnlyList<string> uncheckedProjects = [];
+
     // Workspace-load diagnostics of the current generation, carried onto every snapshot it produces.
     private IReadOnlyList<string> loadDiagnostics = [];
 
@@ -178,7 +182,9 @@ public sealed class WorkspaceSession : IAsyncDisposable
     ///     document demands it. An in-place edit is folded into a fresh snapshot; an unchanged tree returns
     ///     the same snapshot instance.
     /// </summary>
-    /// <param name="solutionPath">Absolute path to the <c>.sln</c>/<c>.slnx</c> to load.</param>
+    /// <param name="solutionPath">
+    ///     Absolute path to the <c>.sln</c>/<c>.slnx</c> to load, or to a <c>.slnf</c> filter over one.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>An immutable snapshot: the reconciled <see cref="Solution" /> and its load diagnostics.</returns>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
@@ -222,6 +228,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         snapshot = null;
         loadDiagnostics = [];
         failedProjects = [];
+        uncheckedProjects = [];
         targetFrameworks = NoTargetFrameworks;
         documentFingerprints.Clear();
         documentIds.Clear();
@@ -243,6 +250,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loadedSolutionPath = solutionPath;
         loadDiagnostics = collected;
         failedProjects = freshlyLoaded.FailedProjects;
+        uncheckedProjects = freshlyLoaded.UncheckedProjects;
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         generation++;
         SeedEditVersions(materialized);
@@ -398,6 +406,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         {
             Generation = generation,
             FailedProjects = failedProjects,
+            UncheckedProjects = uncheckedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };

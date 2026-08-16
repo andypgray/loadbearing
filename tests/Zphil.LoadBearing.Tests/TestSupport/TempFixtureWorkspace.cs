@@ -46,6 +46,11 @@ internal sealed class TempFixtureWorkspace : IDisposable
 
     private const string DefaultSolutionFileName = "MyApp.sln";
 
+    // Spelled out rather than left to a search pattern: a three-character pattern is documented to match
+    // longer extensions too, so ".sln" alone is not a reliable way to include — or exclude — its siblings.
+    private static readonly string[] RestoreRelevantExtensions =
+        [".csproj", ".sln", ".slnx", ".slnf", ".props", ".targets"];
+
     private static readonly Lock LeaseGate = new();
 
     // Lease key -> the directory that key owns. Held for the process; reset, never deleted, between tests.
@@ -275,13 +280,16 @@ internal sealed class TempFixtureWorkspace : IDisposable
         return projectsChanged;
     }
 
-    private static bool IsProjectFile(string path)
+    /// <summary>
+    ///     Whether a changed file obliges the copy to re-restore: the project itself, any of the three
+    ///     solution formats, and the MSBuild imports that can add a package reference. Internal so the
+    ///     accepted set pins without leasing a tree — a format missing here fails silently, leaving the copy
+    ///     on a stale <c>project.assets.json</c> rather than reporting anything.
+    /// </summary>
+    internal static bool IsProjectFile(string path)
     {
         string extension = Path.GetExtension(path);
-        return extension.Equals(".csproj", StringComparison.OrdinalIgnoreCase)
-               || extension.Equals(".sln", StringComparison.OrdinalIgnoreCase)
-               || extension.Equals(".props", StringComparison.OrdinalIgnoreCase)
-               || extension.Equals(".targets", StringComparison.OrdinalIgnoreCase);
+        return RestoreRelevantExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool SameContent(string source, string target)

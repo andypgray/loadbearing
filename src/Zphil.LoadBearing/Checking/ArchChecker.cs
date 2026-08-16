@@ -16,7 +16,10 @@ namespace Zphil.LoadBearing.Checking;
 ///     pattern); a Quarantine tripwire runs the diff-aware touch check (GRAMMAR §7), warning per
 ///     changed file inside the scope and passing, or skipping when no <see cref="DiffContext" /> was
 ///     supplied. Any evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather
-///     than aborting the run (all-errors philosophy).
+///     than aborting the run (all-errors philosophy). The run's universe is accounted for here too: the
+///     evaluator reports what it evaluated and says nothing about the run it ran in, so a rule that
+///     selected nothing under a <see cref="NarrowedUniverse" /> is skipped by this type rather than
+///     reported differently by that one.
 /// </remarks>
 public static class ArchChecker
 {
@@ -79,6 +82,35 @@ public static class ArchChecker
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
+        return Check(rules, codebase, baselines, diff, null);
+    }
+
+    /// <summary>
+    ///     Checks exactly <paramref name="rules" /> over a run whose universe may be smaller than the
+    ///     solution: with <paramref name="narrowing" /> supplied, a rule whose whole subject lives in the
+    ///     projects a solution filter left out is <see cref="RuleStatus.Skipped" /> rather than red, because
+    ///     its empty subject is that filter's doing and not a defect in the spec.
+    /// </summary>
+    /// <remarks>
+    ///     Internal, so the narrowing can be: the public surface is the four overloads above, and a run
+    ///     with no filter behaves byte for byte as it always did (they pass <see langword="null" />). Only a
+    ///     rule whose <em>every</em> violation is <see cref="ViolationKind.EmptySubject" /> skips — a
+    ///     <see cref="ViolationKind.RuleError" /> is a real defect whatever the universe, and every edge and
+    ///     shape kind is a positive finding over types that did load.
+    /// </remarks>
+    /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
+    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
+    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
+    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <param name="narrowing">
+    ///     The solution filter that answered this run over part of the solution, or null when the run's
+    ///     universe is the whole of it.
+    /// </param>
+    /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
+    internal static CheckReport Check(
+        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
+        NarrowedUniverse? narrowing)
+    {
         Guard.NotNull(rules, nameof(rules));
         Guard.NotNull(codebase, nameof(codebase));
         Guard.NotNull(baselines, nameof(baselines));
@@ -88,7 +120,9 @@ public static class ArchChecker
         // second would repeat a full pass over the model; it holds no per-rule mutable state.
         var selections = new SelectionEvaluator(codebase);
         var evaluator = new ConstraintEvaluator(codebase, selections);
-        var results = rules.Select(rule => CheckRule(rule, evaluator, selections, baselines, diff)).ToList();
+        var results = rules
+            .Select(rule => CheckRule(rule, evaluator, selections, baselines, diff, narrowing))
+            .ToList();
         return new CheckReport(results);
     }
 
@@ -119,7 +153,8 @@ public static class ArchChecker
     }
 
     private static RuleResult CheckRule(
-        ArchRule rule, ConstraintEvaluator evaluator, SelectionEvaluator selections, BaselineIndex baselines, DiffContext? diff)
+        ArchRule rule, ConstraintEvaluator evaluator, SelectionEvaluator selections, BaselineIndex baselines,
+        DiffContext? diff, NarrowedUniverse? narrowing)
     {
         // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never
         // reach the evaluator); it is a diff-aware warning check, not a red-producing rule (GRAMMAR §7).
@@ -128,6 +163,11 @@ public static class ArchChecker
         try
         {
             var (violations, warnings) = evaluator.Evaluate(rule.Constraint!);
+            // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
+            // view at all — is asked of the raw violations and is the same one for both branches.
+            if (narrowing is not null && SelectedNothing(violations))
+                return NarrowedSkip(rule, warnings, baselines, narrowing);
+
             // A ratcheted rule — Migrate, or Quarantine containment (which reifies a real
             // MustOnlyBeReferencedBy constraint and so evaluates exactly like Enforce) — partitions
             // against its baseline; everything else is plain Enforce law (GRAMMAR §7).
@@ -225,6 +265,28 @@ public static class ArchChecker
     {
         return $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
                $"require editing dragon territory? Dragons: loadbearing explain {scopeId}/tripwire.";
+    }
+
+    // A rule the narrowed run never had in view: its subject selection matched nothing, and nothing is
+    // exactly what a filter that dropped whole projects would produce. Only "every violation is an empty
+    // subject" qualifies — one real finding means types did load and the rule was measured.
+    private static bool SelectedNothing(IReadOnlyList<Violation> violations)
+    {
+        return violations.Count > 0 && violations.All(violation => violation.Kind == ViolationKind.EmptySubject);
+    }
+
+    // The narrowing skip, minted apart from Skipped() above, which drops warnings and hardcodes an
+    // uncaptured baseline. Here the warnings still hold (they are facts about the projects that did load),
+    // BaselineCaptured stays truthful — and the ratchet counts are forced to nothing, because Ratchet would
+    // otherwise report the whole captured section as "fixed awaiting acceptance" for a rule this run never
+    // measured, which is precisely the reduction 'baseline --accept-reductions' must never be offered.
+    private static RuleResult NarrowedSkip(
+        ArchRule rule, IReadOnlyList<CheckWarning> warnings, BaselineIndex baselines, NarrowedUniverse narrowing)
+    {
+        bool captured = rule.BaselinePath is not null && baselines.TryGet(rule.Id, out _);
+        return new RuleResult(
+            rule, RuleStatus.Skipped, Array.Empty<Violation>(), warnings, narrowing.RuleSkipReason,
+            Array.Empty<Violation>(), 0, captured);
     }
 
     private static RuleResult Skipped(ArchRule rule, string reason)

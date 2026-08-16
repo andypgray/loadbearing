@@ -146,6 +146,37 @@ public sealed class SolutionDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void DiscoverSolution_AFilterBesideItsSolution_ResolvesTheSolution()
+    {
+        // The layout a filter normally arrives in. It is a view of the solution standing next to it, not a
+        // rival candidate, so this directory is not ambiguous — and a refusal naming the filter would have
+        // invited deleting it, which would not have helped.
+        string cwdDir = CreateDir("filter-beside-its-solution");
+        string solution = CreateSln(cwdDir, "Alpha.sln");
+        CreateSln(cwdDir, "BillingOnly.slnf");
+
+        SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir)
+            .ShouldBe(solution);
+    }
+
+    [Fact]
+    public void DiscoverSolution_SeveralSolutionsAndAFilter_RefusesNamingOnlyTheSurvivors()
+    {
+        // Demotion settles which candidates compete; it never turns two solutions into one answer. The
+        // filter is gone from the message because acting on it could not resolve anything.
+        string cwdDir = CreateDir("ambiguous-with-a-filter");
+        CreateSln(cwdDir, "Alpha.sln");
+        CreateSln(cwdDir, "Beta.slnf");
+        CreateSln(cwdDir, "Gamma.slnx");
+
+        var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir));
+
+        ex.Message.ShouldContain("Alpha.sln");
+        ex.Message.ShouldContain("Gamma.slnx");
+        ex.Message.ShouldNotContain("Beta.slnf");
+    }
+
+    [Fact]
     public void DiscoverSolution_NoSolutionAnywhere_ThrowsNamingBothFixes()
     {
         string cwdDir = CreateDir("empty", "deep", "nested");
@@ -230,6 +261,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
         SolutionDiscovery.DiscoverSolution(workingDirectory: slnxDir)
             .ShouldBe(slnxPath);
 
+        // Alone in its directory, so nothing demotes it: a filter is still a solution the walk-up can land on.
         string slnfDir = CreateDir("slnf-only");
         string slnfPath = CreateSln(slnfDir, "Filtered.slnf");
         SolutionDiscovery.DiscoverSolution(workingDirectory: slnfDir)

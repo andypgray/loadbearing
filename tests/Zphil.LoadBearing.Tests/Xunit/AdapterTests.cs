@@ -17,9 +17,12 @@ namespace Zphil.LoadBearing.Tests.Xunit;
 ///     inline specs replicate fixture rules verbatim because tests cannot reference the fixture spec
 ///     assemblies by design (<c>ReferenceOutputAssembly=false</c>); their driver classes are non-public, so
 ///     the test runner never discovers them — they are invoked directly.
-///     The last four facts cover the incomplete-model gate against the BrokenApp fixture: a partially-loaded
+///     Four facts cover the incomplete-model gate against the BrokenApp fixture: a partially-loaded
 ///     workspace fails <c>Workspace_LoadedCompletely</c> and skips the rule cases, and
-///     <c>AllowWorkspaceDiagnostics</c> flips that pair over.
+///     <c>AllowWorkspaceDiagnostics</c> flips that pair over. Three more cover the opposite case against a
+///     narrowing <c>.slnf</c> — a smaller model rather than a wrong one — where a rule whose subject the
+///     filter kept still reports its verdict, a rule whose subject it dropped skips carrying the filter's
+///     name, and <c>Workspace_LoadedCompletely</c> skips because it is the completeness claim itself.
 /// </summary>
 [Collection("Serial")]
 public sealed class AdapterTests
@@ -94,7 +97,7 @@ public sealed class AdapterTests
     [Fact]
     public async Task Tripwire_WithoutDiff_Skips()
     {
-        Exception? exception = await Record.ExceptionAsync(() => new InlineQuarantinedArchTests().Rule_Holds("legacy/billing/tripwire"));
+        Exception? exception = await CaughtAsync(() => new InlineQuarantinedArchTests().Rule_Holds("legacy/billing/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
@@ -120,7 +123,7 @@ public sealed class AdapterTests
         // The bug this exists to close: a rule whose subject lived in the unloaded project selects nothing, an
         // empty subject passes, and the run goes green into CI's most-trusted signal. The reason is constant and
         // points at the named test rather than repeating the diagnostics once per rule.
-        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppArchTests().Rule_Holds(BrokenAppRuleId));
+        Exception? exception = await CaughtAsync(() => new BrokenAppArchTests().Rule_Holds(BrokenAppRuleId));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldEndWith(IncompleteModelGate.AdapterSkipReason);
@@ -131,7 +134,7 @@ public sealed class AdapterTests
     {
         // Opting in restores the rule verdicts, but a test called Workspace_LoadedCompletely cannot pass while
         // the load failures it is named for are real — so it skips, carrying them.
-        Exception? exception = await Record.ExceptionAsync(() => new BrokenAppOptedInArchTests().Workspace_LoadedCompletely());
+        Exception? exception = await CaughtAsync(() => new BrokenAppOptedInArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldContain("BrokenApp.Contracts.csproj");
@@ -145,6 +148,47 @@ public sealed class AdapterTests
         Exception? exception = await Record.ExceptionAsync(() => new BrokenAppOptedInArchTests().Rule_Holds(BrokenAppRuleId));
 
         exception.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task NarrowingFilter_SkipsTheCompletenessClaimCarryingWhatWasNotChecked()
+    {
+        // A .slnf SolutionPath used to green every rule test over a subset: the adapter received the
+        // unchecked projects and surfaced them nowhere. Nothing fails here — a narrowed universe is a smaller
+        // true answer — but the one test whose name IS the completeness claim cannot pass while making it.
+        Exception? exception = await CaughtAsync(() => new BillingOnlyArchTests().Workspace_LoadedCompletely());
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.Replace("\r\n", "\n")
+            .ShouldContain(
+                "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked.\n"
+                + "  MyApp.Domain/MyApp.Domain.csproj\n"
+                + "  MyApp.Web/MyApp.Web.csproj\n"
+                + "Rule verdicts come from the projects that loaded, but a test by this name cannot pass "
+                + "while declared projects went unchecked; run the solution the filter references for the "
+                + "whole answer.");
+    }
+
+    [Fact]
+    public async Task NarrowingFilter_StillReportsEveryRuleCase()
+    {
+        // The line between a filter and a partial model, in one assertion: every verdict a filtered run
+        // reached is real, so the rule cases report rather than skip the way BrokenApp's do above.
+        Exception? exception = await Record.ExceptionAsync(() => new BillingOnlyArchTests().Rule_Holds(BillingOnlyRuleId));
+
+        exception.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task NarrowingFilter_RuleWhoseSubjectTheFilterDropped_SkipsRatherThanFailing()
+    {
+        // The other side of the row above: a verdict a filtered run could not reach is not a verdict, and
+        // the adapter is where that lands hardest — an empty-subject red arrives as a failing named test
+        // accusing the spec of naming a namespace the solution does have.
+        Exception? exception = await CaughtAsync(() => new BillingOnlyWebArchTests().Rule_Holds(BillingOnlyWebRuleId));
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.ShouldEndWith(NarrowedUniverseNotice.RuleSkipReason("BillingOnly.slnf", 2));
     }
 
     [Fact]
@@ -284,5 +328,68 @@ public sealed class AdapterTests
         protected override string SolutionPath => BrokenAppSolution;
         protected override string? ExcludeProjectName => null;
         protected override bool AllowWorkspaceDiagnostics => true;
+    }
+
+    // Record.ExceptionAsync rethrows a SkipException rather than returning it, which xunit then applies to
+    // the calling test — so a row that used it to assert on a skip reason was itself reported as skipped and
+    // never ran its assertions. Catching by hand is what keeps the assertion below real.
+    private static async Task<Exception?> CaughtAsync(Func<Task> act)
+    {
+        try
+        {
+            await act();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
+    private const string BillingOnlyRuleId = "layering/billing-independent";
+
+    // The narrowing fixture, read in place from the test output for FilteredSolutionE2ETests' reason: the
+    // filter reaches its solution by relative path, which a leased copy would strand. It selects the leaf of
+    // the reference chain, so two of MyApp's three declared projects go unchecked; that class's arrange-time
+    // guard is what keeps the two paths asserted above true.
+    private static string BillingOnlyFilter =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilteredSolutions", "BillingOnly.slnf");
+
+    // Scoped to the one project the filter does select, so the rule case reaches a verdict over a subject
+    // that really loaded rather than the empty-subject pass this whole arc exists to make visible.
+    private sealed class BillingOnlyInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule(BillingOnlyRuleId)
+                .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
+                .Because("Billing must not reach up into the web layer.");
+        }
+    }
+
+    private sealed class BillingOnlyArchTests : ArchRuleTests<BillingOnlyInlineSpec>
+    {
+        protected override string SolutionPath => BillingOnlyFilter;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    private const string BillingOnlyWebRuleId = "layering/web-independent";
+
+    // The mirror of BillingOnlyInlineSpec: scoped to a project the filter drops rather than one it selects,
+    // so the rule selects nothing and the run reaches no verdict for it — the case the skip exists for.
+    private sealed class BillingOnlyWebInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule(BillingOnlyWebRuleId)
+                .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
+                .Because("The web layer talks to billing through an abstraction.");
+        }
+    }
+
+    private sealed class BillingOnlyWebArchTests : ArchRuleTests<BillingOnlyWebInlineSpec>
+    {
+        protected override string SolutionPath => BillingOnlyFilter;
+        protected override string? ExcludeProjectName => null;
     }
 }

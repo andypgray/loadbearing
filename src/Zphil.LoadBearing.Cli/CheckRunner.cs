@@ -47,6 +47,7 @@ internal sealed class CheckRunner(
         // so. The stamp goes out just as early, because it says what the operator is about to wait for.
         var ruleGlobs = GlobList.Parse(request.Rules);
         var rules = CheckPipeline.SelectRules(source.Model, ruleGlobs);
+        WriteNarrowingStamp(request, source);
         WriteFilterStamp(request, ruleGlobs, rules.Count, source.Model.Rules.Count);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, request.DiffBase, rules, ct);
@@ -71,7 +72,7 @@ internal sealed class CheckRunner(
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
             Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete,
-            diagnostics.FailedProjects, ruleGlobs);
+            diagnostics.FailedProjects, diagnostics.UncheckedProjects, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
@@ -85,6 +86,22 @@ internal sealed class CheckRunner(
         }
 
         return report.HasViolations ? 1 : 0;
+    }
+
+    // The human narrowing stamp, sited beside the rules-filter stamp for the same reasons: a runner concern,
+    // suppressed under --json (where the document carries the same fact in uncheckedProjects), and
+    // byte-silent on every run that narrowed nothing — which is every unfiltered run, and a filtered one
+    // whose selection pulled the whole solution in transitively.
+    private void WriteNarrowingStamp(CheckRequest request, CodebaseSource source)
+    {
+        var uncheckedProjects = source.Diagnostics.UncheckedProjects;
+        if (uncheckedProjects.Count == 0 || request.Json) return;
+
+        NarrowedUniverseNotice.Write(
+            output,
+            NarrowedUniverseNotice.CheckStamp(
+                Path.GetFileName(source.SolutionPath),
+                NarrowedUniverseNotice.Relative(uncheckedProjects, source.SolutionDirectory)));
     }
 
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an
@@ -104,7 +121,8 @@ internal sealed class CheckRunner(
     private void Render(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
         IReadOnlyList<string> diagnostics, bool executionSuccessful, bool modelIncomplete,
-        IReadOnlyList<string> failedProjects, IReadOnlyList<string> ruleGlobs)
+        IReadOnlyList<string> failedProjects, IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> ruleGlobs)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
@@ -113,7 +131,7 @@ internal sealed class CheckRunner(
         if (request.Json)
             JsonReportRenderer.Render(
                 output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
-                modelIncomplete, failedProjects, ruleGlobs);
+                modelIncomplete, failedProjects, uncheckedProjects, ruleGlobs);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 
@@ -121,7 +139,8 @@ internal sealed class CheckRunner(
         // (it would break --json stdout purity); the SARIF itself carries the same result model either way.
         if (request.Sarif is { } sarifPath)
         {
-            SarifReportRenderer.Render(sarifPath, report, solutionDirectory, executionSuccessful, diagnostics);
+            SarifReportRenderer.Render(
+                sarifPath, report, solutionDirectory, executionSuccessful, diagnostics, uncheckedProjects);
             if (!request.Json) output.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
         }
     }

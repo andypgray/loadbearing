@@ -71,4 +71,15 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     the load, and an edit that a sweep folds in never adds or removes a project.
     /// </remarks>
     internal IReadOnlyList<string> FailedProjects { get; init; } = [];
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths the solution declares that the load did not check — non-empty
+    ///     only when the session is bound to a solution filter. It scopes the verdict rather than gating it.
+    /// </summary>
+    /// <remarks>
+    ///     Refreshed and stable on exactly the same terms as <see cref="FailedProjects" />: which projects a
+    ///     filter leaves out is a property of the load, and no content edit folded into a generation can
+    ///     change it.
+    /// </remarks>
+    internal IReadOnlyList<string> UncheckedProjects { get; init; } = [];
 }

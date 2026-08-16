@@ -92,6 +92,7 @@ public sealed class ExtractionCacheStoreTests
                 .ToList(),
             [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
             [],
+            [],
             []);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
@@ -345,7 +346,8 @@ public sealed class ExtractionCacheStoreTests
                 .ToList(),
             specs,
             ["load-diag-1", "load-diag-2"],
-            ["/repo/Broken/Broken.csproj"]);
+            ["/repo/Broken/Broken.csproj"],
+            []);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -391,6 +393,7 @@ public sealed class ExtractionCacheStoreTests
             ],
             [],
             [],
+            [],
             []);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
@@ -415,7 +418,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], ["diag"], []);
+        return new ExtractionResult(fragments, [], ["diag"], [], []);
     }
 
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
@@ -423,7 +426,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], [diagnostic], []);
+        return new ExtractionResult(fragments, [], [diagnostic], [], []);
     }
 
     /// <summary>

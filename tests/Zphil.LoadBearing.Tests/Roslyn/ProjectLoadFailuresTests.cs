@@ -7,9 +7,9 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
-///     <see cref="ProjectLoadFailures.Detect" />'s two arms over a pure <see cref="AdhocWorkspace" /> graph
-///     plus a real solution file on disk — the predicate the fail-closed gate now keys on, in place of
-///     matching MSBuild message text.
+///     <see cref="ProjectLoadFailures.Detect" />'s two arms — and, under a solution filter, its second
+///     answer — over a pure <see cref="AdhocWorkspace" /> graph plus a real solution file on disk. This is
+///     the predicate the fail-closed gate now keys on, in place of matching MSBuild message text.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -38,7 +38,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = WithProjects(workspace, Healthy("P", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldBeEmpty();
+            .ShouldHaveLoadedEverything();
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = WithProjects(workspace, Empty("P", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldBe([@"C:\repo\P\P.csproj"]);
+            .ShouldHaveFailed(@"C:\repo\P\P.csproj");
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class ProjectLoadFailuresTests
             Empty("HasOutput", @"C:\repo\A\A.csproj").WithOutputFilePath(@"C:\repo\A\bin\A.dll"));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldBeEmpty();
+            .ShouldHaveLoadedEverything();
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class ProjectLoadFailuresTests
             Empty("P(netstandard2.0)", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldBe([@"C:\repo\P\P.csproj"]);
+            .ShouldHaveFailed(@"C:\repo\P\P.csproj");
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = WithProjects(workspace, Healthy("Present", temp.PathOf("Present", "Present.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
-            .ShouldBe([temp.PathOf("Absent", "Absent.csproj")]);
+            .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
     }
 
     [Fact]
@@ -110,26 +110,76 @@ public sealed class ProjectLoadFailuresTests
             Healthy("Two", temp.PathOf("Two", "Two.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
-            .ShouldBeEmpty();
+            .ShouldHaveLoadedEverything();
     }
 
     [Fact]
-    public void Detect_SolutionFilter_SkipsTheDeclaredMembershipArmEntirely()
+    public void Detect_SolutionFilter_NamesTheUnselectedMemberAsUncheckedRatherThanFailed()
     {
-        // A .slnf legitimately loads a subset — measured: a filter naming one of two members loads exactly
-        // that one — so an arm that read the underlying solution's membership would refuse every filtered
-        // solution. SolutionProjectFileParser.OwnsFormat is the guard, and this is what it guards.
+        // A .slnf legitimately loads a subset, so a member it did not select is not a failure — but it is not
+        // nothing either. It lands in the second list, which narrows the verdict without gating it.
         using TempDirectory temp = TestTempRoot.Fresh("declared-filtered");
-        WriteSolution(temp, "Kept", "Dropped");
-        string filterPath = temp.PathOf("Filter.slnf");
-        File.WriteAllText(
-            filterPath,
-            "{\"solution\":{\"path\":\"Solution.sln\",\"projects\":[\"Kept\\\\Kept.csproj\"]}}");
+        string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
         Solution solution = WithProjects(workspace, Healthy("Kept", temp.PathOf("Kept", "Kept.csproj")));
 
         ProjectLoadFailures.Detect(solution, filterPath)
-            .ShouldBeEmpty();
+            .ShouldHaveLeftUnchecked(temp.PathOf("Dropped", "Dropped.csproj"));
+    }
+
+    [Fact]
+    public void Detect_SolutionFilterSelectsAProjectThatDidNotLoad_IsAFailure()
+    {
+        // The strengthening the filter-aware arm buys. This case was invisible while the arm was skipped
+        // wholesale for a filter: the run asked for Kept, did not get it, and exited green. It is sound to
+        // demand it because Roslyn refuses a filter naming a non-member outright, so everything a
+        // well-formed filter selects is something the load was obliged to produce.
+        using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
+        string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
+        using var workspace = new AdhocWorkspace();
+        Solution solution = WithProjects(workspace);
+
+        ProjectLoadReport report = ProjectLoadFailures.Detect(solution, filterPath);
+
+        report.Failed.ShouldBe([temp.PathOf("Kept", "Kept.csproj")]);
+        report.Unchecked.ShouldBe([temp.PathOf("Dropped", "Dropped.csproj")]);
+    }
+
+    [Fact]
+    public void Detect_SolutionFilterWithAnEmptyProjectsArray_ChecksTheWholeSolution()
+    {
+        // Roslyn's rule, which an intersection would invert: an empty projects array is not an empty
+        // selection, it is no filtering at all. Read the other way this would report every member unchecked
+        // and load none of them — the degraded answer arrived at from the opposite side.
+        using TempDirectory temp = TestTempRoot.Fresh("filtered-empty");
+        string filterPath = WriteFilter(temp, ["One", "Two"]);
+        using var workspace = new AdhocWorkspace();
+        Solution solution = WithProjects(
+            workspace,
+            Healthy("One", temp.PathOf("One", "One.csproj")),
+            Healthy("Two", temp.PathOf("Two", "Two.csproj")));
+
+        ProjectLoadFailures.Detect(solution, filterPath)
+            .ShouldHaveLoadedEverything();
+    }
+
+    [Fact]
+    public void Detect_SolutionFilterWhoseUnselectedMemberLoadedAnyway_ReportsNoNarrowing()
+    {
+        // The measurement that refuted the obvious arithmetic: Roslyn loads a filter's projects PLUS their
+        // transitive ProjectReference closure, so an unselected member routinely arrives anyway. Computing
+        // the narrowing from the filter text would name it as skipped — a false claim of a gap in a run that
+        // checked it. Subtracting what actually loaded is what makes that impossible.
+        using TempDirectory temp = TestTempRoot.Fresh("filtered-transitive");
+        string filterPath = WriteFilter(temp, ["Kept", "Pulled"], "Kept");
+        using var workspace = new AdhocWorkspace();
+        Solution solution = WithProjects(
+            workspace,
+            Healthy("Kept", temp.PathOf("Kept", "Kept.csproj")),
+            Healthy("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
+
+        ProjectLoadFailures.Detect(solution, filterPath)
+            .ShouldHaveLoadedEverything();
     }
 
     [Fact]
@@ -143,7 +193,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = WithProjects(workspace, Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
-            .ShouldBe([temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj")]);
+            .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
@@ -192,5 +242,20 @@ public sealed class ProjectLoadFailuresTests
         string solutionPath = temp.PathOf("Solution.sln");
         File.WriteAllLines(solutionPath, lines);
         return solutionPath;
+    }
+
+    // A .slnf beside the solution it filters. Passing no selection writes an empty projects array — the
+    // spelling Roslyn reads as "the whole solution", not as "nothing".
+    private static string WriteFilter(TempDirectory temp, string[] members, params string[] selected)
+    {
+        WriteSolution(temp, members);
+
+        var entries = selected.Select(name => $"\"{name}\\\\{name}.csproj\"");
+        string filterPath = temp.PathOf("Filter.slnf");
+        File.WriteAllText(
+            filterPath,
+            $"{{\"solution\":{{\"path\":\"Solution.sln\",\"projects\":[{string.Join(",", entries)}]}}}}");
+
+        return filterPath;
     }
 }

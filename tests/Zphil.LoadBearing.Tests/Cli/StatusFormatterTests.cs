@@ -10,8 +10,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     Pins every <c>status</c> line shape (<see cref="StatusFormatter" />) over synthetic
 ///     <see cref="RuleResult" />s — no workspace: Enforce pass/FAIL with counts, the four Migrate states
 ///     (captured-failing, promotable, interim-awaiting-acceptance, and uncaptured), the Quarantine
-///     containment ratchet lines (which never promote) and the tripwire's diff-aware skip, plus the
-///     burndown summary.
+///     containment ratchet lines (which never promote) and the tripwire's diff-aware skip, the
+///     narrowing skip that overrides posture dispatch entirely, plus the burndown summary.
 /// </summary>
 public sealed class StatusFormatterTests
 {
@@ -97,6 +97,29 @@ public sealed class StatusFormatterTests
     {
         Line(Result(Rule("legacy/billing/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
             .ShouldBe("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
+    }
+
+    [Fact]
+    public void Migrate_NarrowingSkipped_ReadsAsASkipRatherThanAPassWithABurndown()
+    {
+        // Posture dispatch is what makes this dangerous: without the skip branch a narrowing-skipped Migrate
+        // rule falls into the ratchet line and reads "pass … 0 new, 2 fixed awaiting acceptance" — a pass
+        // and a burndown for a rule the run never measured.
+        string line = Line(Result(
+            Rule("data-access/no-inline-sql"), RuleStatus.Skipped, stale: 2, captured: true,
+            skipReason: "'BillingOnly.slnf' narrowed this run."));
+
+        line.ShouldBe("skip data-access/no-inline-sql — 'BillingOnly.slnf' narrowed this run.");
+        line.ShouldNotContain("awaiting acceptance");
+    }
+
+    [Fact]
+    public void Enforce_NarrowingSkipped_ReadsAsASkipCarryingItsReason()
+    {
+        Line(Result(
+                Rule("layering/billing-independent"), RuleStatus.Skipped,
+                skipReason: "'BillingOnly.slnf' narrowed this run."))
+            .ShouldBe("skip layering/billing-independent — 'BillingOnly.slnf' narrowed this run.");
     }
 
     [Fact]

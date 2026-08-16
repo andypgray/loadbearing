@@ -12,6 +12,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     Quarantine containment) reads the ratchet state — grandfathered remaining, new (red), and
 ///     fixed-awaiting-acceptance; a Quarantine tripwire reads <c>skip</c> (diff-aware). Only Migrate surfaces
 ///     the promotion suggestion when the baseline has burned to zero — Quarantine→Migrate is a human decision.
+///     A rule a solution filter left no subject for reads <c>skip</c> with its reason, whatever its posture:
+///     the burndown its posture would otherwise print is a claim about a check this run never made.
 /// </remarks>
 internal static class StatusFormatter
 {
@@ -24,12 +26,24 @@ internal static class StatusFormatter
 
     private static string RuleLine(RuleResult result)
     {
+        // Ahead of the posture dispatch, because posture is what would mislead: a narrowing-skipped Migrate
+        // rule falls to RatchetLine and reads "pass … 0 new, 2 fixed awaiting acceptance" — a pass and a
+        // burndown for a rule the run never measured. The tripwire is Skipped for its own reason and keeps
+        // its own line, which says what a diff-aware skip is and what to run to get a verdict.
+        if (result.Status == RuleStatus.Skipped && !IsTripwire(result))
+            return $"skip {result.Rule.Id} — {result.SkipReason}";
+
         return result.Rule.Posture switch
         {
             Posture.Migrate => RatchetLine(result, "migrate"),
             Posture.Quarantine => QuarantineLine(result),
             _ => EnforceLine(result)
         };
+    }
+
+    private static bool IsTripwire(RuleResult result)
+    {
+        return result.Rule.Quarantine is { Role: QuarantineRole.Tripwire };
     }
 
     private static string QuarantineLine(RuleResult result)

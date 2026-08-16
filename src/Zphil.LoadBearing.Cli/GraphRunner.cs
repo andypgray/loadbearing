@@ -73,22 +73,37 @@ internal sealed class GraphRunner(
         // carries.
         var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
+        WriteNarrowingStamp(request, source, diagnostics);
 
         if (request.Json)
             WriteJson(
                 request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects, projectGlobs);
+                diagnostics.FailedProjects, diagnostics.UncheckedProjects, projectGlobs);
         else
             WriteHuman(request, summary, scoped, solutionName, projectGlobs);
 
         return 0;
     }
 
+    // The human narrowing stamp, byte-silent on every run that narrowed nothing and suppressed under --json,
+    // where the document carries the same fact in uncheckedProjects. Sited in the runner for the rules-filter
+    // stamp's reason: an unfiltered run's output stays byte-identical to what it always was.
+    private void WriteNarrowingStamp(GraphRequest request, CodebaseSource source, WorkspaceDiagnostics diagnostics)
+    {
+        if (diagnostics.UncheckedProjects.Count == 0 || request.Json) return;
+
+        NarrowedUniverseNotice.Write(
+            output,
+            NarrowedUniverseNotice.GraphStamp(
+                Path.GetFileName(source.SolutionPath),
+                NarrowedUniverseNotice.Relative(diagnostics.UncheckedProjects, source.SolutionDirectory)));
+    }
+
     // The JSON survey, degraded rather than cut. A caller whose transport has a response budget declares it,
     // and a document that overruns is re-composed one rung coarser from the summary already in hand — no
     // second extraction, and byte-identical to what that grain's own flag would have written, so the two
     // surfaces cannot drift. Degrading coarsens the grain and never touches the scope: the answer stays about
-    // the codebase the caller asked about.
+    // the codebase the caller asked about, and every rung carries the same narrowing.
     //
     // It walks the whole ladder rather than stepping once, because one step is not enough on a real solution:
     // on a 34-project codebase the full survey is ~147k characters and the overview it degrades to is still
@@ -98,7 +113,7 @@ internal sealed class GraphRunner(
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionDirectory, string solutionName,
         IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> projectGlobs)
+        IReadOnlyList<string> uncheckedProjects, IReadOnlyList<string> projectGlobs)
     {
         GraphGrain grain = request.Grain;
         string document = Compose(grain);
@@ -116,7 +131,7 @@ internal sealed class GraphRunner(
         {
             return GraphJsonRenderer.Document(
                 scoped, solutionDirectory, solutionName, renderedDiagnostics, modelIncomplete, failedProjects,
-                at, projectGlobs);
+                uncheckedProjects, at, projectGlobs);
         }
     }
 
