@@ -80,7 +80,7 @@ public sealed class Arch
     public Selection AnyOf(Selection first, params Selection[] more)
     {
         Guard.NotNull(more, nameof(more));
-        var parts = OperandList.OneOrMore(first, more, selection => selection);
+        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, selection => selection);
         return UnionSelection.Create(this, parts);
     }
 
@@ -93,7 +93,10 @@ public sealed class Arch
     public Selection AnyOf(Type first, params Type[] more)
     {
         Guard.NotNull(more, nameof(more));
-        var parts = OperandList.OneOrMore(first, more, type => Type(type));
+        // A method group here would read as the bare word Type, which at this call site is far more
+        // naturally the System.Type the operands already are. The lambda names the call.
+        // ReSharper disable once ConvertClosureToMethodGroup
+        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => Type(type));
         return UnionSelection.Create(this, parts);
     }
 

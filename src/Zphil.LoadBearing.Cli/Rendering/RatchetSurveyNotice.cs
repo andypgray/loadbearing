@@ -18,8 +18,8 @@ internal static class RatchetSurveyNotice
 {
     public static IReadOnlyList<string> Lines(CheckReport report, bool anyRatchetedRule)
     {
-        var unratcheted = report.Results
-            .Where(r => r.Status == RuleStatus.Failed && r.Rule.BaselinePath is null)
+        List<RuleResult> unratcheted = report.Results
+            .Where(r => r is { Status: RuleStatus.Failed, Rule.BaselinePath: null })
             .ToList();
 
         var lines = new List<string>();

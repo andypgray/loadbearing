@@ -50,16 +50,16 @@ public sealed class DependabotCoverageTests
     public void DependabotNuGetList_CoversEveryCommittedLockFile()
     {
         // Arrange
-        var listed = ReadNuGetDirectories()
+        HashSet<string> listed = ReadNuGetDirectories()
             .ToHashSet(StringComparer.Ordinal);
-        var committed = CommittedLockFileDirectories()
+        HashSet<string> committed = CommittedLockFileDirectories()
             .ToHashSet(StringComparer.Ordinal);
 
         // Act
-        var unlisted = committed.Except(listed)
+        List<string> unlisted = committed.Except(listed)
             .Order(StringComparer.Ordinal)
             .ToList();
-        var unlocked = listed.Except(committed)
+        List<string> unlocked = listed.Except(committed)
             .Order(StringComparer.Ordinal)
             .ToList();
 
@@ -74,7 +74,7 @@ public sealed class DependabotCoverageTests
     public void DependabotNuGetList_IsReadable()
     {
         // Act
-        var listed = ReadNuGetDirectories();
+        IReadOnlyList<string> listed = ReadNuGetDirectories();
 
         // Assert: the arm above compares two sets, and an empty parse would make it pass by reading
         // nothing rather than by finding agreement.
@@ -85,7 +85,7 @@ public sealed class DependabotCoverageTests
     public void CommittedLockFiles_StillNumberSix()
     {
         // Act
-        var committed = CommittedLockFileDirectories();
+        IReadOnlyList<string> committed = CommittedLockFileDirectories();
 
         // Assert: the count is written out in prose as well as enforced. It is stated in the comment
         // above the update list in .github/dependabot.yml and in the restore comment in

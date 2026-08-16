@@ -72,7 +72,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         ContextComposition composition = ContextFileComposer.Compose(
             source.Model, codebase, solutionDirectory, specName);
 
-        foreach (string warning in composition.Warnings) error.WriteLine($"warning: {warning}");
+        foreach (string warning in composition.Warnings) await error.WriteLineAsync($"warning: {warning}");
 
         WriteFiles(composition.Files, solutionDirectory);
 
@@ -108,7 +108,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
             summary, source.SolutionName, source.Model, specName, DiagramScopeFrom(request));
 
         WriteOutcome outcome = ManagedBlockFile.Splice(diagramPath, body);
-        output.WriteLine(WriteReport.Line(outcome, source.SolutionDirectory, diagramPath));
+        await output.WriteLineAsync(WriteReport.Line(outcome, source.SolutionDirectory, diagramPath));
     }
 
     private static DiagramScope DiagramScopeFrom(RenderRequest request)

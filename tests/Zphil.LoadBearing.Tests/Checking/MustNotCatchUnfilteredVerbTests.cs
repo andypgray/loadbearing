@@ -84,8 +84,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -110,8 +109,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("FilteredHandler")
+                    .Enforce(arch.Namespace("App.*").WithSuffix("FilteredHandler")
                         .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
@@ -132,8 +130,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
 
         RuleResult result = Checker.Run(MixedModel, arch =>
                 arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -173,8 +170,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // unfiltered but never matched by a DerivedFrom operand, so not flagged.
         RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
                 arch.Rule("ex/filter-derived-catches")
-                    .Enforce(arch.Namespace("N.*")
-                        .MustNotCatchUnfiltered(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*").MustNotCatchUnfiltered(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
@@ -191,8 +187,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // as its sibling does.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -207,8 +202,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // not a pattern — stays silent (the departure from the pattern-operand inert warning above).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/filter-format-catches")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -223,8 +217,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("App.*")))
+                    .Enforce(arch.Namespace("Nowhere.*").MustNotCatchUnfiltered(arch.Namespace("App.*")))
                     .Because("b"))
             .Single();
 
@@ -260,8 +253,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // hook would have to learn.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("ex/filter-domain-catches")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("catch", "App.DataHandler", "Errors.DbError");

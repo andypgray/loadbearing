@@ -58,21 +58,179 @@
 	     DotSettingsCleanupProfileTests pins the file well-formed. -->
 	<s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">LoadBearing: Full Cleanup (keep named arguments)</s:String>
 
+	<!-- 'var' only where the initializer makes the type evident; explicit type everywhere else.
+
+	     One policy, three category keys, all pinned to the same value. Until 2026-08-14 two of
+	     them (built-in and simple types) were supplied by this machine's personal global layer
+	     (GlobalSettingsStorage.DotSettings), which jb reads beneath this file: the prevailing
+	     style (explicit string/XDocument for method-call initializers, var for literals and new
+	     expressions) was held up by a file the repo does not carry. The third, ForOtherTypes,
+	     stood at its factory default of always-var, which is why generic-returning calls kept
+	     var even where nothing on the line names the type (var selected = SelectRules(...)).
+	     Pinning all three here makes the policy the repo's own on any machine and closes the
+	     ForOtherTypes gap. Cleanup enforces it through the profile's ArrangeVarStyle task, in
+	     both directions, on every file it touches.
+
+	     DotSettingsCleanupProfileTests pins the three entries present and UseVarWhenEvident. -->
+	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForBuiltInTypes/@EntryValue">UseVarWhenEvident</s:String>
+	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForSimpleTypes/@EntryValue">UseVarWhenEvident</s:String>
+	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForOtherTypes/@EntryValue">UseVarWhenEvident</s:String>
+
+	<!-- The severities that make the policy above enforceable rather than merely declared.
+
+	     The three style entries say what the style IS; on their own they only take effect when
+	     something runs cleanup. These four say a departure is visible without one — inspectcode
+	     reports it, so the zero-at-Warning baseline fails on the drift instead of absorbing it.
+	     Suggestion, ReSharper's default here, is not enough: the baseline is read at Warning, and
+	     a suggestion sits below it silently.
+
+	     Inspect-only, like the DO_NOT_SHOW entries at the top of this file and for the same
+	     reason: cleanup overrides the severity of every rule its enabled modules need, so nothing
+	     set here reaches ArrangeVarStyle in either direction.
+
+	     DeconstructionDeclarations is promoted alongside the other three even though no
+	     ForDeconstructionDeclarations style key sits above it — the declarations in the tree are
+	     already explicit and inspect reports none, so the promotion holds the line where it is.
+	     Should that ever red, pin the missing style key rather than demoting this one.
+
+	     DotSettingsCleanupProfileTests pins all four at WARNING. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_BuiltInTypes/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_SimpleTypes/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_Elsewhere/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_DeconstructionDeclarations/@EntryIndexedValue">WARNING</s:String>
+
+	<!-- A sync call that blocks an async pipeline, made visible.
+
+	     ReSharper reports this one only from inside an async method, so it never fires on
+	     deliberately synchronous code — the question it asks is always "you are already async
+	     here, why block?". In Core, Roslyn, Xunit and the CLI that question has one answer, and
+	     the tree gives it: those projects are clean, so the promotion holds a line already held.
+
+	     The test project is the exception and carries its own layer file turning this off, for the
+	     reason written there: its findings are all fixture file IO in arrange blocks. That is a
+	     scope, not a demotion — the guard stays live everywhere else, which is the whole point of
+	     putting it in the project layer rather than weakening this entry.
+
+	     Inspect-only, like every other severity in this file: cleanup overrides the severity of
+	     each rule its enabled modules need, so nothing set here reaches a cleanup task.
+
+	     DotSettingsCleanupProfileTests pins this at WARNING and the layer file at DO_NOT_SHOW. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MethodHasAsyncOverload/@EntryIndexedValue">WARNING</s:String>
+
+	<!-- Findings this solution can decide for itself, promoted so they stay decided.
+
+	     Each of these was carried at Suggestion until its sites were cleared, and each is decidable
+	     from evidence inside the tree rather than from consumers outside it: a redundant type
+	     argument inside nameof, a condition the nullable annotations already answer, a dictionary
+	     lookup with a shorter exact equivalent, a gate object that can name its own type now that
+	     System.Threading.Lock exists, a member or class whose entire scope is one file. None of them
+	     needs weighing per site, so a new one is drift rather than a judgement call, and Warning is
+	     the level the baseline actually reads.
+
+	     Where a site is deliberate anyway the house idiom still applies — a ReSharper disable
+	     carrying its reason — which is what the ones in FragmentExtractor, TypeNameSimpleTests and
+	     AdapterTests do.
+
+	     Two are deliberately NOT promoted beside them. RedundantVerbatimStringPrefix, because its
+	     four sites are all regex patterns, where the verbatim prefix is the convention that keeps the
+	     next added backslash from silently meaning something else. And FieldCanBeMadeReadOnly.Global,
+	     which would tax every deliberately mutable public field with a disable comment and buy little
+	     for it.
+
+	     DotSettingsCleanupProfileTests pins all seven at WARNING. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=RedundantTypeArgumentsInsideNameof/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=CanSimplifyDictionaryTryGetValueWithGetValueOrDefault/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=CanSimplifyDictionaryLookupWithTryAdd/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ChangeFieldTypeToSystemThreadingLock/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MemberCanBePrivate_002ELocal/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ClassNeverInstantiated_002ELocal/@EntryIndexedValue">WARNING</s:String>
+
+	<!-- The rules whose answer this solution does not contain, held at Suggestion on purpose.
+
+	     ReSharper encodes the distinction in the rule ID itself. A .Local finding is decided by
+	     the file it sits in: the scope is closed, the evidence complete. A .Global finding is
+	     decided by solution-wide search, and this solution ships four public packages, so the
+	     consumers that would answer it are outside the search. All seven report the same shape
+	     here: a public member nothing in the tree happens to call. Fifteen of those are ITypeInfo
+	     and IMemberInfo properties, which are the extension-point contracts the library exists to
+	     be implemented against, and which grow additively by design.
+
+	     Suggestion is already their inherited default, so these entries change no behaviour. That
+	     is the point. They turn "nobody promoted these" from an absence into a decision with a
+	     reason attached, and the pinning test makes a later drive-by promotion or DO_NOT_SHOW a
+	     visible edit rather than a silent one. The rule the next person needs: promote what is
+	     decidable from evidence this solution contains, declare what is not.
+
+	     Not DO_NOT_SHOW, because the same rules over the test project do find real dead code, and
+	     the IDE is where they earn their keep, one member at a time with the context to judge.
+	     Where a site is deliberate and worth saying so, the house idiom is a file-scoped ReSharper
+	     disable carrying a one-line reason.
+
+	     A dot inside a rule ID escapes as _002E, which is why these keys read oddly. A literal dot
+	     produces a key ReSharper never reads: no error, no effect, and a false conclusion that the
+	     entry did not work.
+
+	     DotSettingsCleanupProfileTests pins all seven present and at SUGGESTION. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MemberCanBePrivate_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedType_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedMember_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedMethodReturnValue_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedMemberInSuper_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedParameter_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ClassNeverInstantiated_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+
+	<!-- Suggestions weighed and declined, each for its own reason rather than by neglect.
+
+	     These are not noise and not defects: they are rewrites that would cost something real here.
+	     Recording them at their inherited Suggestion keeps them visible in the IDE, where a human has
+	     the context to judge one site, while saying the tree-wide answer has already been thought
+	     about.
+
+	     ForCanBeConvertedToForeach — the five sites are index walks in the evaluators, and
+	     SelectionEvaluator says why in prose above one of them: the scan runs once per type in the
+	     universe. Two more sit inside returned closures called per type and per member.
+	     ConvertToLocalFunction and ConvertToPrimaryConstructor — both move where a capture happens,
+	     and one of the two primary-constructor sites is the memoizing ExtractState whose hiding of an
+	     outer static is itself load-bearing.
+	     ReplaceWithFieldKeyword and the two IntroduceOptionalParameters — the first changes a readonly
+	     field into a property with a backing field, the others change the shape of an overload pair.
+	     Neither is a formatting choice.
+	     UseObjectOrCollectionInitializer — folding the first Add into an initializer while later ones
+	     stay behind reads worse than leaving all of them alone.
+	     RedundantVerbatimStringPrefix — all four are regex patterns, where the prefix is the
+	     convention that stops the next added backslash meaning something else.
+
+	     DotSettingsCleanupProfileTests pins all eight present and at SUGGESTION. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ForCanBeConvertedToForeach/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConvertToLocalFunction/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConvertToPrimaryConstructor/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ReplaceWithFieldKeyword/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=IntroduceOptionalParameters_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=IntroduceOptionalParameters_002ELocal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UseObjectOrCollectionInitializer/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=RedundantVerbatimStringPrefix/@EntryIndexedValue">SUGGESTION</s:String>
+
 	<!-- Line wrapping is deliberately OFF, and this key is what pins it.
 
-	     Fluent chains here follow the LINQ chain convention: one call per line, leading dot (see
-	     McpResultAssertions.cs). The test project got that shape in one machine pass, under a
-	     temporary WRAP_CHAINED_METHOD_CALLS=CHOP_ALWAYS key removed in the same commit that
-	     landed the reformat. The formatter's standing job is to PRESERVE the shape (keep existing
-	     line breaks), never to compute it, and the key above is what holds wrapping to that job.
+	     Chains here carry two registers. Pipeline chains (LINQ, Shouldly, any sequence of steps)
+	     chop one call per line, leading dot (see McpResultAssertions.cs); the test project got
+	     that shape in one machine pass, under a temporary WRAP_CHAINED_METHOD_CALLS=CHOP_ALWAYS
+	     key removed in the same commit that landed the reformat. Arch-spec chains read as English
+	     sentences and are NOT chopped: the statement head and each stage call (.Enforce, .Because,
+	     .Fix and the rest) sit one per line, and the subject/verb run inside a clause stays inline
+	     while the line fits 120 columns (see CanonicalSampleSpec.cs, GRAMMAR section 12). The
+	     formatter's standing job is to PRESERVE both shapes (keep existing line breaks), never to
+	     compute either, and the key above is what holds wrapping to that job.
 
-	     Two places were held out of the pass and are why no wrapping key may stand here:
+	     Two places were held out of the chop pass and are why no wrapping key may stand here:
 	     SpecValidationSpecs.cs, whose forty expected messages in SpecValidationTests.cs quote its
 	     anchors as literal "SpecValidationSpecs.cs:N" text, and the Fixtures and Stubs trees, whose
 	     goldens pin their line numbers. A chain-wrap key left in place chops them on the next
 	     cleanup of any file, silently. Margin wrapping is the same hazard from the other side: it
 	     fully chops any chain that already carries one break. Wrapping off is what keeps "any file
-	     can be passed to cleanup" true. Chop new chains by hand; cleanup will keep them.
+	     can be passed to cleanup" true. Shape new chains by hand in their register; cleanup will
+	     keep them.
 
 	     DotSettingsCleanupProfileTests pins both halves: this entry present and False, and no entry
 	     anywhere in the file whose key names chained method calls. -->

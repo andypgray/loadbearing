@@ -30,7 +30,7 @@ internal static class FragmentSiteSets
     internal static SortedSet<FragmentSite> For<TKey>(Dictionary<TKey, SortedSet<FragmentSite>> map, TKey key)
         where TKey : notnull
     {
-        ref var sites = ref CollectionsMarshal.GetValueRefOrAddDefault(map, key, out bool exists);
+        ref SortedSet<FragmentSite>? sites = ref CollectionsMarshal.GetValueRefOrAddDefault(map, key, out bool exists);
         if (!exists) sites = [];
         return sites!;
     }

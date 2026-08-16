@@ -118,8 +118,7 @@ public class ModelReificationTests
                 arch.Rule("data-access/no-inline-sql")
                     .Migrate(
                         "Controllers open SqlConnection directly.",
-                        web.WithSuffix("Controller")
-                            .MustNotReference(typeof(SqlConnection)))
+                        web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
                     .Because("Repository pattern for testability.");
             })
             .Rules.Single();
@@ -274,8 +273,7 @@ public class ModelReificationTests
             {
                 Selection web = arch.Namespace("MyApp.Web.*");
                 arch.Rule("naming/async-suffix")
-                    .Enforce(web.Methods.Returning(typeof(Task))
-                        .MustHaveSuffix("Async"))
+                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                     .Because("Async methods are discovered by suffix.");
             })
             .Rule("naming/async-suffix");
@@ -325,8 +323,7 @@ public class ModelReificationTests
     {
         // arch.Registered() reifies to a RegisteredNoun with a null lifetime (any lifetime).
         var constraint = Checker.Model(arch => arch.Rule("di/registered-inject")
-                .Enforce(arch.Registered()
-                    .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
                 .Because("Any registration must not inject a scoped service."))
             .Rules.Single()
             .Constraint
@@ -511,8 +508,7 @@ public class ModelReificationTests
         // An inner union with adjectives is a narrowed set of its own — flattening it would lose the
         // narrowing, so it survives as one operand.
         var arch = new Arch();
-        Selection inner = arch.AnyOf(arch.Project("A"), arch.Project("B"))
-            .Except(arch.Type(typeof(SqlConnection)));
+        Selection inner = arch.AnyOf(arch.Project("A"), arch.Project("B")).Except(arch.Type(typeof(SqlConnection)));
         var outer = arch.AnyOf(inner, arch.Project("C"))
             .ShouldBeOfType<UnionSelection>();
 
@@ -527,8 +523,7 @@ public class ModelReificationTests
     {
         // (a ∪ b) − c, not (a − c) ∪ (b − c): the union keeps its two operands and grows its own adjective.
         var arch = new Arch();
-        var union = arch.AnyOf(arch.Project("A"), arch.Project("B"))
-            .Except(arch.Type(typeof(SqlConnection)))
+        var union = arch.AnyOf(arch.Project("A"), arch.Project("B")).Except(arch.Type(typeof(SqlConnection)))
             .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(2);
@@ -543,8 +538,7 @@ public class ModelReificationTests
         // The adjective carries no payload — the whole statement is the placement and the fragment — so
         // the model pin is that one lands, on the union as well as on a plain selection.
         var arch = new Arch();
-        var union = arch.AnyOf(arch.Project("A"), arch.Project("B"))
-            .Authored()
+        var union = arch.AnyOf(arch.Project("A"), arch.Project("B")).Authored()
             .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(2);
@@ -582,7 +576,7 @@ public class ModelReificationTests
     {
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<TConstraint>();
-        var declared = targets(constraint);
+        IReadOnlyList<Selection> declared = targets(constraint);
 
         // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
         declared.Count.ShouldBe(1);
@@ -620,8 +614,8 @@ public class ModelReificationTests
             .Rules.Single()
             .Constraint
             .ShouldBeOfType<TConstraint>();
-        var sugaredTargets = targets(sugared);
-        var handWrittenTargets = targets(handWritten);
+        IReadOnlyList<Selection> sugaredTargets = targets(sugared);
+        IReadOnlyList<Selection> handWrittenTargets = targets(handWritten);
 
         sugaredTargets.Count.ShouldBe(1);
         Type sugarType = sugaredTargets[0]

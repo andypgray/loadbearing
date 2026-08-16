@@ -46,8 +46,8 @@ public sealed class AuthoredAdjectiveTests
         Selection everything = arch.Types;
 
         // Act
-        var unnarrowed = Names(everything);
-        var authored = Names(everything.Authored());
+        IReadOnlyList<string> unnarrowed = Names(everything);
+        IReadOnlyList<string> authored = Names(everything.Authored());
 
         // Assert — exactly the generated pair goes, and nothing an author wrote goes with it.
         unnarrowed.ShouldContain("Gen.Emitted");
@@ -65,8 +65,8 @@ public sealed class AuthoredAdjectiveTests
         Selection union = arch.AnyOf(arch.Namespace("App.*"), arch.Namespace("Gen.*"));
 
         // Act
-        var unnarrowed = Names(union);
-        var authored = Names(union.Authored());
+        IReadOnlyList<string> unnarrowed = Names(union);
+        IReadOnlyList<string> authored = Names(union.Authored());
 
         // Assert
         unnarrowed.ShouldBe(["App.Gizmo", "App.Widget", "Gen.Emitted", "Gen.Emitted.Inner"], ignoreOrder: true);
@@ -82,7 +82,7 @@ public sealed class AuthoredAdjectiveTests
         var arch = new Arch();
 
         // Act
-        var authored = Names(arch.Project("TestProject")
+        IReadOnlyList<string> authored = Names(arch.Project("TestProject")
             .Authored());
 
         // Assert

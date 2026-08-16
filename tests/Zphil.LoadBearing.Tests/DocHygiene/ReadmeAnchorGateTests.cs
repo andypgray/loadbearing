@@ -147,7 +147,7 @@ public sealed class ReadmeAnchorGateTests
     public void CommittedSourceAnchors_MatchTheirCommittedLine()
     {
         // Arrange
-        var reader = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> reader = SourceAnchors.DiskReader(RepoRoot.Directory);
         List<string> drift = new();
 
         // Act: every anchor that is not a documented demonstration must resolve against committed source.
@@ -169,7 +169,7 @@ public sealed class ReadmeAnchorGateTests
     public void DemonstrationAnchors_DoNotResolveAgainstCommittedSource()
     {
         // Arrange
-        var reader = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> reader = SourceAnchors.DiskReader(RepoRoot.Directory);
         List<string> promoted = new();
 
         // Act: a demonstration anchor quotes a hypothetical edit's output, so it must not match committed

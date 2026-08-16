@@ -45,7 +45,7 @@ public sealed class ManagedBlockFileTests
         WithTempDir(dir =>
         {
             string path = Path.Combine(dir, "AGENTS.md");
-            byte[] seeded = [.. Utf8Bom, .. Encoding.UTF8.GetBytes("# Title\n")];
+            byte[] seeded = [.. Utf8Bom, .. "# Title\n"u8];
             File.WriteAllBytes(path, seeded);
 
             ManagedBlockFile.Splice(path, Body);
@@ -65,7 +65,7 @@ public sealed class ManagedBlockFileTests
         WithTempDir(dir =>
         {
             string path = Path.Combine(dir, "AGENTS.md");
-            File.WriteAllBytes(path, Encoding.UTF8.GetBytes("# Title\n"));
+            File.WriteAllBytes(path, "# Title\n"u8);
 
             ManagedBlockFile.Splice(path, Body);
 

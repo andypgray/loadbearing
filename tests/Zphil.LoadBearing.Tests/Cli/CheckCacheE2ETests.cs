@@ -90,7 +90,7 @@ public sealed class CheckCacheE2ETests
 
         // Re-extraction covers exactly the content-dirty project and its Merkle dependents — nothing else.
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        partial.ReExtracted.ShouldBe(new[] { Web, Domain }, true);
+        partial.ReExtracted.ShouldBe([Web, Domain], true);
 
         // The partial model equals a full cold extraction on the edited tree, and the edit really was seen.
         partial.Out.ShouldBe(freshCold.Out);

@@ -104,8 +104,7 @@ public sealed class MustNotSwallowVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -130,8 +129,7 @@ public sealed class MustNotSwallowVerbTests
         // reds, and the filtered handler is green under both.
         RuleResult unfiltered = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/unfiltered")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -144,8 +142,7 @@ public sealed class MustNotSwallowVerbTests
 
         RuleResult swallow = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/swallow")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -162,9 +159,7 @@ public sealed class MustNotSwallowVerbTests
         // a real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("Rethrower")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").WithSuffix("Rethrower").MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -178,8 +173,7 @@ public sealed class MustNotSwallowVerbTests
         // form the sibling verb rewards keeps passing under the refinement.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("FilteredHandler")
+                    .Enforce(arch.Namespace("App.*").WithSuffix("FilteredHandler")
                         .MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
@@ -201,8 +195,7 @@ public sealed class MustNotSwallowVerbTests
 
         RuleResult result = Checker.Run(MixedModel, arch =>
                 arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -247,8 +240,7 @@ public sealed class MustNotSwallowVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -283,8 +275,7 @@ public sealed class MustNotSwallowVerbTests
         // matched by a DerivedFrom operand, so not flagged.
         RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
                 arch.Rule("ex/no-swallowed-derived-errors")
-                    .Enforce(arch.Namespace("N.*")
-                        .MustNotSwallow(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*").MustNotSwallow(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
@@ -301,8 +292,7 @@ public sealed class MustNotSwallowVerbTests
         // as its siblings do.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -317,8 +307,7 @@ public sealed class MustNotSwallowVerbTests
         // not a pattern — stays silent (the departure from the pattern-operand inert warning above).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-swallowed-format-errors")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotSwallow(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*").MustNotSwallow(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -333,8 +322,7 @@ public sealed class MustNotSwallowVerbTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustNotSwallow(arch.Namespace("App.*")))
+                    .Enforce(arch.Namespace("Nowhere.*").MustNotSwallow(arch.Namespace("App.*")))
                     .Because("b"))
             .Single();
 
@@ -370,8 +358,7 @@ public sealed class MustNotSwallowVerbTests
         // hook would have to learn.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("ex/no-swallowed-domain-errors")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotSwallow(arch.Namespace("Errors.*")))
+                .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("catch", "App.Swallower", "Errors.DbError");

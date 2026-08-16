@@ -63,7 +63,7 @@ public sealed class CoercerCoverageTests
         // The other half of the tie: which registrations are speculative is a recorded decision, not an
         // accident. The first array- or enum-shaped parameter to land moves a name out of the ledger, and
         // an accidental de-registration moves one in.
-        var liveTypes = LiveJsonBoundParameters()
+        Type[] liveTypes = LiveJsonBoundParameters()
             .Select(parameter => parameter.Type)
             .Distinct()
             .ToArray();
@@ -93,7 +93,7 @@ public sealed class CoercerCoverageTests
             if (method.GetCustomAttribute<McpServerToolAttribute>()
                     ?.Name is not { } toolName) continue;
 
-            var bound = method.GetParameters()
+            IEnumerable<ParameterInfo> bound = method.GetParameters()
                 .Where(ToolAttributeDiscovery.IsJsonBoundParameter);
 
             foreach (ParameterInfo parameter in bound)

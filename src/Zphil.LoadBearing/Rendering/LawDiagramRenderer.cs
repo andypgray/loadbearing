@@ -96,11 +96,11 @@ public static class LawDiagramRenderer
 
         places.ResolveNesting();
 
-        var ids = NodeIds(places);
-        var nodeLines = NodeLines(places, ids);
-        var edgeLines = EdgeLines(edges, ids);
-        var legendLines = LegendLines(places, edges);
-        var lines = MermaidText.Fence(
+        Dictionary<LawPlace, string> ids = NodeIds(places);
+        List<string> nodeLines = NodeLines(places, ids);
+        List<string> edgeLines = EdgeLines(edges, ids);
+        List<string> legendLines = LegendLines(places, edges);
+        IReadOnlyList<string> lines = MermaidText.Fence(
             $"Architecture law: {specName}",
             "The places this spec names, the references it forbids, and the debt it grandfathers.",
             nodeLines,
@@ -242,7 +242,7 @@ public static class LawDiagramRenderer
         LawPlaces places, LawPlace place, IReadOnlyDictionary<LawPlace, string> ids, int depth, List<string> lines)
     {
         string indent = new(' ', 4 * depth);
-        var children = places.Children(place);
+        IReadOnlyList<LawPlace> children = places.Children(place);
         if (children.Count == 0)
         {
             lines.Add(indent + ids[place] + Shape(place));
@@ -335,7 +335,7 @@ public static class LawDiagramRenderer
     {
         if (rules.Count == 0) return string.Empty;
 
-        var entries = rules.Select(rule => $"`{rule.Id}`" + (rule.Posture == Posture.Enforce ? string.Empty : $" ({rule.Posture})"));
+        IEnumerable<string> entries = rules.Select(rule => $"`{rule.Id}`" + (rule.Posture == Posture.Enforce ? string.Empty : $" ({rule.Posture})"));
 
         return "Not drawn in full: " + string.Join(", ", entries) +
                ". Expand any of them with `loadbearing explain <rule-id>`.";

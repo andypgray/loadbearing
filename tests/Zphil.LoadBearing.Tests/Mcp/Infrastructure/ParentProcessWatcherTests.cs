@@ -48,7 +48,7 @@ public sealed class ParentProcessWatcherTests
         // Act
         ParentProcessWatcher.Start(
             () => deadPid,
-            () => exited.Set(),
+            exited.Set,
             false);
 
         // Assert — synchronous: should already be set, but allow tiny slack.
@@ -69,7 +69,7 @@ public sealed class ParentProcessWatcherTests
         // Act
         ParentProcessWatcher.Start(
             () => helperPid,
-            () => exited.Set(),
+            exited.Set,
             false);
 
         // Assert — the helper exits quickly; allow generous slack for CI/scheduler.

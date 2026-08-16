@@ -102,8 +102,7 @@ public class ProseSentenceTests
             {
                 Selection web = arch.Namespace("MyApp.Web.*");
                 arch.Rule("naming/async-suffix")
-                    .Enforce(web.Methods.Returning(typeof(Task))
-                        .MustHaveSuffix("Async"))
+                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                     .Because("Async methods are discovered by suffix; agents grep by *Async.");
             })
             .Rule("naming/async-suffix")

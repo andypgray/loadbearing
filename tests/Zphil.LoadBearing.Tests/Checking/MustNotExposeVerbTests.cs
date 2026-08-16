@@ -53,8 +53,7 @@ public sealed class MustNotExposeVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotExpose(arch.Namespace("Secrets.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("b"))
             .Single();
 
@@ -73,8 +72,7 @@ public sealed class MustNotExposeVerbTests
         // The forbidden target resolves (Secrets.Secret exists), so this is a real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("CleanService")
+                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanService")
                         .MustNotExpose(arch.Namespace("Secrets.*")))
                     .Because("b"))
             .Single();
@@ -134,8 +132,7 @@ public sealed class MustNotExposeVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("api/no-expose-derived")
-                    .Enforce(arch.Namespace("N.*")
-                        .MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*").MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
@@ -151,8 +148,7 @@ public sealed class MustNotExposeVerbTests
         // pattern operand is the warning gate, exactly as MustNotCatch's inert-target semantics (§4.9).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/inert")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotExpose(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -167,8 +163,7 @@ public sealed class MustNotExposeVerbTests
         // pattern — stays silent (the departure from the pattern-operand inert warning above).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("api/no-expose-format")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotExpose(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*").MustNotExpose(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -183,8 +178,7 @@ public sealed class MustNotExposeVerbTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("api/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustNotExpose(arch.Namespace("App.*")))
+                    .Enforce(arch.Namespace("Nowhere.*").MustNotExpose(arch.Namespace("App.*")))
                     .Because("b"))
             .Single();
 
@@ -229,8 +223,7 @@ public sealed class MustNotExposeVerbTests
         // `target` field — no new slot, schemaVersion stays 3, so member/subject slots stay omitted as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("api/no-expose-secret")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotExpose(arch.Namespace("Secrets.*")))
+                .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("expose", "App.Facade", "Secrets.Secret");

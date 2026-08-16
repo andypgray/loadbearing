@@ -124,8 +124,8 @@ internal static class ProseFormat
     /// </remarks>
     internal static string AnchorList(IReadOnlyList<TypeAnchor> anchors)
     {
-        var paths = anchors.Select(anchor => anchor.PathSegments).ToList();
-        var displays = ResolvePathDisplays(paths);
+        List<IReadOnlyList<string>> paths = anchors.Select(anchor => anchor.PathSegments).ToList();
+        IReadOnlyList<string> displays = ResolvePathDisplays(paths);
         return JoinReferences(displays.Select(Backtick).ToList());
     }
 
@@ -155,8 +155,8 @@ internal static class ProseFormat
     {
         // Collision keys on the anchor's simple name; a Foo/FooAttribute pair that shares a bracket
         // display (distinct simple names) is not widened — an accepted v1 corner.
-        var paths = anchors.Select(anchor => anchor.PathSegments).ToList();
-        var displays = ResolvePathDisplays(paths);
+        List<IReadOnlyList<string>> paths = anchors.Select(anchor => anchor.PathSegments).ToList();
+        IReadOnlyList<string> displays = ResolvePathDisplays(paths);
         return JoinReferences(displays.Select(display => Backtick(BracketAttribute(display))).ToList());
     }
 
@@ -190,8 +190,8 @@ internal static class ProseFormat
     /// </remarks>
     internal static Dictionary<Type, string> ResolveTypeDisplays(IReadOnlyList<Type> types)
     {
-        var paths = types.Select(TypeName.PathSegments).ToList();
-        var displays = ResolvePathDisplays(paths);
+        List<IReadOnlyList<string>> paths = types.Select(TypeName.PathSegments).ToList();
+        IReadOnlyList<string> displays = ResolvePathDisplays(paths);
 
         // A type listed twice re-assigns the same display, so duplicate operands are harmless.
         var result = new Dictionary<Type, string>();
@@ -213,9 +213,9 @@ internal static class ProseFormat
     internal static IReadOnlyList<string> ResolvePathDisplays(IReadOnlyList<IReadOnlyList<string>> paths)
     {
         var displays = new string[paths.Count];
-        foreach (var group in Enumerable.Range(0, paths.Count).GroupBy(index => Leaf(paths[index])))
+        foreach (IGrouping<string, int>? group in Enumerable.Range(0, paths.Count).GroupBy(index => Leaf(paths[index])))
         {
-            var indices = group.ToList();
+            List<int> indices = group.ToList();
 
             // Dedupe by full path before judging the group: the SAME operand written twice is one
             // member, not a collision — and widening could never separate it, so a naive count would

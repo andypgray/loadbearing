@@ -422,8 +422,8 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
 
         CodebaseModel fast = CompilationFactory.Extract("MyApp.Legacy.Billing", files);
 
-        var fastEdges = RenderBillingEdges(fast.Edges, s => s.FilePath);
-        var workspaceEdges = RenderBillingEdges(fixture.Model.Edges, fixture.RelativePath);
+        List<string> fastEdges = RenderBillingEdges(fast.Edges, s => s.FilePath);
+        List<string> workspaceEdges = RenderBillingEdges(fixture.Model.Edges, fixture.RelativePath);
 
         workspaceEdges.ShouldBe(fastEdges);
         fastEdges.ShouldNotBeEmpty();

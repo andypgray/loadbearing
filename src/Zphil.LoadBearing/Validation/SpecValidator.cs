@@ -57,8 +57,8 @@ internal static class SpecValidator
 
     private static void ValidateIds(Arch arch, List<SpecValidationError> errors)
     {
-        var rules = arch.Registrations.OfType<RuleRegistration>().ToList();
-        var scopes = arch.Registrations.OfType<ScopeRegistration>().ToList();
+        List<RuleRegistration> rules = arch.Registrations.OfType<RuleRegistration>().ToList();
+        List<ScopeRegistration> scopes = arch.Registrations.OfType<ScopeRegistration>().ToList();
 
         // Malformed ID — walked per registration (not over the flattened ID list) so the offending anchor's
         // location rides along.
@@ -94,7 +94,7 @@ internal static class SpecValidator
             postDesugar.Add((scope.Id + "/tripwire", scope.Location));
         }
 
-        foreach (var group in postDesugar.GroupBy(entry => entry.Id, StringComparer.Ordinal))
+        foreach (IGrouping<string, (string Id, SpecSourceLocation? Location)>? group in postDesugar.GroupBy(entry => entry.Id, StringComparer.Ordinal))
             if (group.Count() > 1)
                 errors.Add(new SpecValidationError(Code.DuplicateId, group.Key,
                     $"Duplicate rule ID '{group.Key}'.", group.First().Location));
@@ -149,7 +149,7 @@ internal static class SpecValidator
 
         if (scope.BoundaryOnlyViaCount > 1)
             errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'.", scope.Location));
-        else if (scope.BoundaryOnlyViaCount == 1 && scope.Boundary.Count == 0)
+        else if (scope is { BoundaryOnlyViaCount: 1, Boundary.Count: 0 })
             errors.Add(new SpecValidationError(Code.EmptyBoundary, scope.Id,
                 $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic quarantine.", scope.Location));
 
@@ -232,7 +232,7 @@ internal static class SpecValidator
     // verb-minted member (which carries no location — GRAMMAR §8, items 11–13/18).
     private static void CheckMembers(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
-        var members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
+        IReadOnlyList<Member> members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
         if (members.Count == 0) return;
 
         foreach (Member member in members)
@@ -291,7 +291,7 @@ internal static class SpecValidator
         switch (rule.Constraint)
         {
             case MustImplementConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors([c.Anchor]), t => !t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is not an interface; MustImplement requires an interface anchor — use MustDeriveFrom for a base class");
                 break;
             case MustNotImplementConstraint c:
@@ -299,7 +299,7 @@ internal static class SpecValidator
                     t => $"'{SafeFullDisplay(t)}' is not an interface; MustNotImplement requires an interface anchor — use MustNotDeriveFrom for a base class");
                 break;
             case MustDeriveFromConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => t.IsInterface,
+                CheckAnchorCategory(rule, errors, TypedAnchors([c.Anchor]), t => t.IsInterface,
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustDeriveFrom requires a non-interface anchor — use MustImplement for an interface");
                 break;
             case MustNotDeriveFromConstraint c:
@@ -307,7 +307,7 @@ internal static class SpecValidator
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
                 break;
             case MustBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, new[] { c.Anchor }, "MustBeAttributedWith");
+                CheckAttributeAnchors(rule, errors, [c.Anchor], "MustBeAttributedWith");
                 break;
             case MustNotBeAttributedWithConstraint c:
                 CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
@@ -320,7 +320,7 @@ internal static class SpecValidator
             // type-side twin: it empties the subject, which the fail-on-empty gate reds loudly, whereas the
             // always-passing MustNot verb is the silent slip this item exists to catch.
             case MemberMustBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, new[] { c.Anchor }, "MustBeAttributedWith");
+                CheckAttributeAnchors(rule, errors, [c.Anchor], "MustBeAttributedWith");
                 break;
             case MemberMustNotBeAttributedWithConstraint c:
                 CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
@@ -593,7 +593,7 @@ internal static class SpecValidator
             // name is a slip that would otherwise mint an anchor matching nothing, silently. Only the string
             // arm has a name to check; a typeof anchor yields nothing here.
             case MustBeAttributedWithConstraint c:
-                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.AttributeName)) yield return pattern;
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns([c.Anchor], PatternKind.AttributeName)) yield return pattern;
                 break;
             case MustNotBeAttributedWithConstraint c:
                 foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.AttributeName)) yield return pattern;
@@ -602,13 +602,13 @@ internal static class SpecValidator
             // The hierarchy verbs' string anchors, on the same item-15 terms under their own labels, so the
             // error names which kind of anchor was left blank ("Blank interface name on 'rule/id'.").
             case MustImplementConstraint c:
-                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.InterfaceName)) yield return pattern;
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns([c.Anchor], PatternKind.InterfaceName)) yield return pattern;
                 break;
             case MustNotImplementConstraint c:
                 foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.InterfaceName)) yield return pattern;
                 break;
             case MustDeriveFromConstraint c:
-                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.BaseTypeName)) yield return pattern;
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns([c.Anchor], PatternKind.BaseTypeName)) yield return pattern;
                 break;
             case MustNotDeriveFromConstraint c:
                 foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.BaseTypeName)) yield return pattern;
@@ -617,7 +617,7 @@ internal static class SpecValidator
             // The member attribute verbs' string anchors, on the same terms and under the same label — blank
             // is the whole of a definition FQN's well-formedness on either side of the axis (item 15).
             case MemberMustBeAttributedWithConstraint c:
-                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.AttributeName)) yield return pattern;
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns([c.Anchor], PatternKind.AttributeName)) yield return pattern;
                 break;
             case MemberMustNotBeAttributedWithConstraint c:
                 foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.AttributeName)) yield return pattern;
@@ -677,18 +677,18 @@ internal static class SpecValidator
                 case WithPrefixAdjective a:
                     yield return (a.Prefix, PatternKind.Prefix);
                     break;
-                case AttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
+                case AttributedWithAdjective { Anchor.DefinitionFullName: { } attributeName }:
                     // The adjective's string anchor, on the same terms as the two verbs' (item 15).
                     yield return (attributeName, PatternKind.AttributeName);
                     break;
-                case ImplementingAdjective a when a.Anchor.DefinitionFullName is { } interfaceName:
+                case ImplementingAdjective { Anchor.DefinitionFullName: { } interfaceName }:
                     // The hierarchy adjectives' string anchors, likewise. Blankness is checked on an
                     // adjective even though item 21's category rule deliberately is not: a blank name is a
                     // spec-side slip either way, while a wrong CATEGORY on an adjective empties the subject
                     // and the fail-on-empty gate reds it loudly (see CheckHierarchyAnchors).
                     yield return (interfaceName, PatternKind.InterfaceName);
                     break;
-                case DerivedFromAdjective a when a.Anchor.DefinitionFullName is { } baseTypeName:
+                case DerivedFromAdjective { Anchor.DefinitionFullName: { } baseTypeName }:
                     yield return (baseTypeName, PatternKind.BaseTypeName);
                     break;
                 case ExceptAdjective a:
@@ -710,7 +710,7 @@ internal static class SpecValidator
             case MemberWithPrefixAdjective a:
                 yield return (a.Prefix, PatternKind.MemberPrefix);
                 break;
-            case MemberAttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
+            case MemberAttributedWithAdjective { Anchor.DefinitionFullName: { } attributeName }:
                 // The member attribute adjective's string anchor (item 15). The category check deliberately
                 // does not reach an adjective on either axis — see CheckHierarchyAnchors.
                 yield return (attributeName, PatternKind.AttributeName);

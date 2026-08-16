@@ -247,10 +247,10 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         await using var session = new WorkspaceSession();
 
         // Act
-        var calls = Enumerable.Range(0, 10)
+        Task<WorkspaceSnapshot>[] calls = Enumerable.Range(0, 10)
             .Select(_ => session.GetCurrentAsync(fixture.SolutionPath, ct))
             .ToArray();
-        var snapshots = await Task.WhenAll(calls);
+        WorkspaceSnapshot[] snapshots = await Task.WhenAll(calls);
 
         // Assert — all callers share one immutable snapshot, and the gate collapsed the burst to one load.
         snapshots.ShouldAllBe(s => ReferenceEquals(s, snapshots[0]));

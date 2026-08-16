@@ -1,3 +1,4 @@
+using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
@@ -31,7 +32,7 @@ public sealed class DeriveSpecPromptTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
 
         // Act
-        var prompts = await harness.Client.ListPromptsAsync(cancellationToken: Ct);
+        IList<McpClientPrompt> prompts = await harness.Client.ListPromptsAsync(cancellationToken: Ct);
 
         // Assert — registering the prompt advertises the capability and lists it by name.
         prompts.Select(prompt => prompt.Name)

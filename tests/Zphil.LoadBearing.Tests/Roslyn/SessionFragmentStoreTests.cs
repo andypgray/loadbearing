@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Tests.Extraction;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -125,7 +126,7 @@ public sealed class SessionFragmentStoreTests
 
         // Act — merge the store's fragments minus Billing (as CodebaseSource.Retain does) versus a cold
         // extraction that excludes Billing at the input stage.
-        var retained = all.Fragments.Where(fragment => fragment.ProjectName != Billing)
+        List<CodebaseFragment> retained = all.Fragments.Where(fragment => fragment.ProjectName != Billing)
             .ToList();
         CodebaseModel mergedExcluded = FragmentMerger.Merge(retained);
         CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(

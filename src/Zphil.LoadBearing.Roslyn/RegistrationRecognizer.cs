@@ -184,8 +184,8 @@ internal sealed class RegistrationRecognizer
     private IEnumerable<RecognizedRegistration> RecognizeTypeofAddFamily(
         Lifetime lifetime, IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
-        var parameters = method.Parameters;
-        var arguments = invocation.ArgumentList.Arguments;
+        ImmutableArray<IParameterSymbol> parameters = method.Parameters;
+        SeparatedSyntaxList<ArgumentSyntax> arguments = invocation.ArgumentList.Arguments;
         if (parameters.Length == 0 || !IsSystemType(parameters[0].Type) || arguments.Count == 0) return [];
 
         if (TypeFromTypeofArgument(arguments[0], model) is not { } service) return [];
@@ -243,7 +243,7 @@ internal sealed class RegistrationRecognizer
     {
         if (_serviceLifetime is null) return (false, false, default);
 
-        var parameters = method.Parameters;
+        ImmutableArray<IParameterSymbol> parameters = method.Parameters;
         int lifetimeParameter = -1;
         for (var i = 0; i < parameters.Length; i++)
             if (SymbolEqualityComparer.Default.Equals(parameters[i].Type.OriginalDefinition, _serviceLifetime))

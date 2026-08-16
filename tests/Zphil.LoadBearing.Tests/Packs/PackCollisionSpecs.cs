@@ -24,8 +24,7 @@ internal sealed class LocalCollidingSpec : IArchitectureSpec
     public void Define(Arch arch)
     {
         arch.Rule("di/no-buildserviceprovider")
-            .Enforce(arch.Types.InNamespace("Sample.*")
-                .MustHavePrefix("Sample"))
+            .Enforce(arch.Types.InNamespace("Sample.*").MustHavePrefix("Sample"))
             .Because("A locally authored rule that happens to claim an ID the pack also declares.");
     }
 }
@@ -36,8 +35,7 @@ internal sealed class LocalDistinctSpec : IArchitectureSpec
     public void Define(Arch arch)
     {
         arch.Rule("sample/local-only")
-            .Enforce(arch.Types.InNamespace("Sample.*")
-                .MustHavePrefix("Sample"))
+            .Enforce(arch.Types.InNamespace("Sample.*").MustHavePrefix("Sample"))
             .Because("A project-specific rule no shared pack could know about.");
     }
 }

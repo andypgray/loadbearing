@@ -40,8 +40,8 @@ internal static class CommandFactory
 
     private static Command BuildCheckCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
-        var solution = SolutionArgument();
-        var spec = SpecOption();
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
         Option<bool> json = new("--json")
         {
             Description = "Emit the machine-readable JSON document instead of human-readable output."
@@ -51,7 +51,7 @@ internal static class CommandFactory
             Description =
                 "A git ref; files changed since it are checked against quarantined scopes (Quarantine tripwire) — warnings only, never failures."
         };
-        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Check against the partial model even when some projects fail to load or to restore, instead of "
             + "failing the run with exit 2.");
         Option<string?> sarif = new("--sarif")
@@ -79,8 +79,8 @@ internal static class CommandFactory
                 + "prose, status, baseline and warnings, its violations replaced by their count. Coarser "
                 + "than --overview, and still not narrower."
         };
-        var noCache = NoCacheOption();
-        var binlog = BinlogOption();
+        Option<bool> noCache = NoCacheOption();
+        Option<string?> binlog = BinlogOption();
 
         Command check = new(
             "check",
@@ -126,8 +126,8 @@ internal static class CommandFactory
         {
             Description = "The rule ID to explain (a post-desugar ID, e.g. legacy/billing/containment)."
         };
-        var solution = SolutionArgument();
-        var spec = SpecOption();
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
 
         Command explain = new("explain", "Print a rule's because, fix, posture payload, and linked prose.")
         {
@@ -150,9 +150,9 @@ internal static class CommandFactory
 
     private static Command BuildRenderCommand(ISolutionSource? hostSource)
     {
-        var solution = SolutionArgument();
-        var spec = SpecOption();
-        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Render from the partial model even when some projects fail to load or to restore, instead of refusing "
             + "the command with exit 2.");
         Option<string?> diagram = new("--diagram")
@@ -210,8 +210,8 @@ internal static class CommandFactory
 
     private static Command BuildBaselineCommand(ISolutionSource? hostSource)
     {
-        var solution = SolutionArgument();
-        var spec = SpecOption();
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
         Option<bool> init = new("--init")
         {
             Description = "Grandfather each ratcheted rule's current violations into its baseline (uncaptured rules only)."
@@ -246,7 +246,7 @@ internal static class CommandFactory
         {
             Description = "The offending type of the shape violation to grandfather — a full type name or 'T:' symbol ID (with --add)."
         };
-        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Write baselines from the partial model even when some projects fail to load or to restore, instead of "
             + "refusing the command with exit 2.");
 
@@ -291,17 +291,17 @@ internal static class CommandFactory
 
     private static Command BuildStatusCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
-        var solution = SolutionArgument();
-        var spec = SpecOption();
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
         Option<bool> json = new("--json")
         {
             Description = "Emit the machine-readable JSON burndown document instead of human-readable output."
         };
-        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Report the burndown from the partial model even when some projects fail to load or to restore, "
             + "instead of exiting 2 after rendering it.");
-        var noCache = NoCacheOption();
-        var binlog = BinlogOption();
+        Option<bool> noCache = NoCacheOption();
+        Option<string?> binlog = BinlogOption();
 
         Command status = new(
             "status",
@@ -334,16 +334,16 @@ internal static class CommandFactory
 
     private static Command BuildGraphCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
-        var solution = SolutionArgument();
+        Argument<string?> solution = SolutionArgument();
         Option<bool> json = new("--json")
         {
             Description = "Emit the machine-readable JSON survey document instead of human-readable output."
         };
-        var allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Survey the partial model even when some projects fail to load or to restore, instead of refusing with "
             + "exit 2.");
-        var noCache = NoCacheOption();
-        var binlog = BinlogOption();
+        Option<bool> noCache = NoCacheOption();
+        Option<string?> binlog = BinlogOption();
         Option<bool> overview = new("--overview")
         {
             Description =
@@ -403,8 +403,8 @@ internal static class CommandFactory
 
     private static Command BuildMcpCommand()
     {
-        var solution = SolutionArgument();
-        var spec = SpecOption();
+        Argument<string?> solution = SolutionArgument();
+        Option<string?> spec = SpecOption();
 
         Command mcp = new("mcp", "Run the MCP stdio server bound to a solution and spec.")
         {

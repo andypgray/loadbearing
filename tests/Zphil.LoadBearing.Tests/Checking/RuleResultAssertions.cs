@@ -169,7 +169,7 @@ internal static class RuleResultAssertions
         violation.Kind.ShouldBe(kind, report);
         string detail = violation.Detail.ShouldNotBeNull(report);
 
-        var checks = fragments
+        Action[] checks = fragments
             .Select<string, Action>(fragment => () => detail.ShouldContain(fragment, customMessage: report))
             .ToArray();
         violation.ShouldSatisfyAllConditions(checks);

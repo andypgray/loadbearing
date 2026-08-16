@@ -143,7 +143,7 @@ internal static class LawPlaceClassifier
     // adjectives are an intersection of regions, and the honest node for that is none.
     private static LawPlace? FromTypes(Selection selection, IReadOnlyList<LayerDefinition> layers)
     {
-        var globs = selection.Adjectives.OfType<InNamespaceAdjective>().ToList();
+        List<InNamespaceAdjective> globs = selection.Adjectives.OfType<InNamespaceAdjective>().ToList();
         return globs.Count == 1 ? FromGlob(globs[0].Glob, layers) : null;
     }
 

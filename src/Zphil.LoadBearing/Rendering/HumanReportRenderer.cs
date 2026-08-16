@@ -75,7 +75,7 @@ public static class HumanReportRenderer
         if (result.Grandfathered.Count > 0)
             output.WriteLine($"  grandfathered: {result.Grandfathered.Count} (baselined; run 'loadbearing status' for burndown)");
 
-        if (result.Status == RuleStatus.Failed && !result.BaselineCaptured)
+        if (result is { Status: RuleStatus.Failed, BaselineCaptured: false })
             output.WriteLine(
                 "  hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
     }

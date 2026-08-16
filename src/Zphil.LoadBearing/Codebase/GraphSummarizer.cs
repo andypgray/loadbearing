@@ -19,17 +19,17 @@ public static class GraphSummarizer
         // One pass over the type universe rather than one per project: a per-project scan makes the survey
         // O(projects x types), and orienting on a large unfamiliar solution is the whole job. The lookup
         // preserves Types order within each group, and a project that declares nothing gets an empty group.
-        var declaredByProject = model.Types
+        ILookup<string, TypeNode> declaredByProject = model.Types
             .Where(type => !type.IsExternal)
             .ToLookup(type => type.ProjectName, StringComparer.Ordinal);
 
-        var projects = model.Projects
+        List<ProjectSummary> projects = model.Projects
             .Select(project => SummarizeProject(project, declaredByProject[project.Name]))
             .ToList();
 
         // Cross-project edges only: a same-project reference is never a cross-boundary rule candidate, so
         // it is excluded from the survey (the survey exists to seed layering/boundary rules).
-        var projectEdges = model.Edges
+        List<ProjectEdgeSummary> projectEdges = model.Edges
             .Where(edge => !edge.Target.IsExternal && edge.Source.ProjectName != edge.Target.ProjectName)
             .GroupBy(edge => (Source: edge.Source.ProjectName, Target: edge.Target.ProjectName))
             .Select(group => new ProjectEdgeSummary(group.Key.Source, group.Key.Target, group.Count()))
@@ -37,7 +37,7 @@ public static class GraphSummarizer
             .ThenBy(edge => edge.Target, StringComparer.Ordinal)
             .ToList();
 
-        var externalEdges = model.Edges
+        List<ExternalEdgeSummary> externalEdges = model.Edges
             .Where(edge => edge.Target.IsExternal)
             .GroupBy(edge => (Source: edge.Source.ProjectName, Root: NamespaceRoot(edge.Target.Namespace)))
             .Select(group => new ExternalEdgeSummary(group.Key.Source, group.Key.Root, group.Count()))
@@ -79,15 +79,15 @@ public static class GraphSummarizer
 
         if (projectGlobs.Count == 0) return summary;
 
-        var projects = summary.Projects
+        List<ProjectSummary> projects = summary.Projects
             .Where(project => Matches(projectGlobs, project.Name))
             .ToList();
 
-        var projectEdges = summary.ProjectEdges
+        List<ProjectEdgeSummary> projectEdges = summary.ProjectEdges
             .Where(edge => Matches(projectGlobs, edge.Source) || Matches(projectGlobs, edge.Target))
             .ToList();
 
-        var externalEdges = summary.ExternalEdges
+        List<ExternalEdgeSummary> externalEdges = summary.ExternalEdges
             .Where(edge => Matches(projectGlobs, edge.Source))
             .ToList();
 
@@ -101,9 +101,9 @@ public static class GraphSummarizer
 
     private static ProjectSummary SummarizeProject(ProjectNode project, IEnumerable<TypeNode> declared)
     {
-        var declaredTypes = declared.ToList();
+        List<TypeNode> declaredTypes = declared.ToList();
 
-        var namespaces = declaredTypes
+        List<NamespaceCount> namespaces = declaredTypes
             .GroupBy(type => type.Namespace)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
             .Select(group => new NamespaceCount(DisplayNamespace(group.Key), group.Count()))

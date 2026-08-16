@@ -73,7 +73,7 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
         {
             if (place.Parent is not null || place.Globs.Count == 0) continue;
 
-            var containers = _ordered
+            List<LawPlace> containers = _ordered
                 .Where(other => !ReferenceEquals(other, place) && other.Globs.Count > 0 && StrictlyContains(other, place))
                 .ToList();
 

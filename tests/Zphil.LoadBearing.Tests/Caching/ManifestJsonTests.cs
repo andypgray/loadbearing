@@ -29,8 +29,8 @@ public sealed class ManifestJsonTests
     [Fact]
     public void Options_CarryAConverterForExactlyTheEnumsTheManifestGraphContains()
     {
-        var inGraph = EnumFullNamesInManifestGraph();
-        var converted = EnumFullNamesTheOptionsConvert();
+        IReadOnlyList<string> inGraph = EnumFullNamesInManifestGraph();
+        IReadOnlyList<string> converted = EnumFullNamesTheOptionsConvert();
 
         converted.ShouldBe(
             inGraph,
@@ -139,7 +139,7 @@ public sealed class ManifestJsonTests
     /// </remarks>
     private static IReadOnlyList<string> EnumFullNamesTheOptionsConvert()
     {
-        var converted = ManifestJson.Options.Converters
+        IEnumerable<Type> converted = ManifestJson.Options.Converters
             .Select(converter => converter.GetType())
             .Where(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JsonStringEnumConverter<>))
             .Select(type => type.GetGenericArguments()
@@ -166,7 +166,7 @@ public sealed class ManifestJsonTests
         if (underlying is not null) return underlying;
         if (!slot.IsGenericType) return slot;
 
-        var arguments = slot.GetGenericArguments();
+        Type[] arguments = slot.GetGenericArguments();
         return arguments.Length == 1 ? arguments[0] : slot;
     }
 

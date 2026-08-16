@@ -106,7 +106,7 @@ public static class CodebaseExtractor
         IReadOnlySet<string>? declaredMembers,
         CancellationToken ct)
     {
-        var projects = solution.Projects
+        List<Project> projects = solution.Projects
             .Where(p => p.Language == LanguageNames.CSharp)
             .Where(include)
             .OrderBy(p => p.Name, StringComparer.Ordinal)
@@ -118,8 +118,8 @@ public static class CodebaseExtractor
         // Binding is the expensive half and the projects are independent, so they bind together rather than
         // one after another. The ordered list above still decides input order — the results are read back by
         // index, never in completion order — so the merge's first-declarer-wins rule sees what it always did.
-        var compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
-        var compilations = await Task.WhenAll(compilationTasks);
+        IEnumerable<Task<Compilation?>> compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
+        Compilation?[] compilations = await Task.WhenAll(compilationTasks);
 
         List<CompilationInput> inputs = [];
         for (var i = 0; i < projects.Count; i++)
@@ -127,7 +127,7 @@ public static class CodebaseExtractor
             if (compilations[i] is not { } compilation) continue;
 
             Project project = projects[i];
-            var projectReferences = project.ProjectReferences
+            List<string> projectReferences = project.ProjectReferences
                 .Select(r => solution.GetProject(r.ProjectId)?.Name)
                 .Where(n => n is not null)
                 .Select(n => n!)
@@ -146,6 +146,6 @@ public static class CodebaseExtractor
     {
         if (targetFrameworks is null) return null;
 
-        return targetFrameworks.TryGetValue(project.Id, out string? targetFramework) ? targetFramework : null;
+        return targetFrameworks.GetValueOrDefault(project.Id);
     }
 }

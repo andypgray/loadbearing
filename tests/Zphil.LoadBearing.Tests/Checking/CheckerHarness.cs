@@ -79,7 +79,7 @@ internal static class Checker
     /// </remarks>
     public static ArchRule Rule(this ArchitectureModel model, string id)
     {
-        var matching = model.Rules.Where(rule => rule.Id == id)
+        List<ArchRule> matching = model.Rules.Where(rule => rule.Id == id)
             .ToList();
         string declared = string.Join(", ", model.Rules.Select(rule => rule.Id));
 
@@ -112,8 +112,7 @@ internal static class Checker
     public static IReadOnlyList<string> Selects(CodebaseModel codebase, Func<Arch, Selection> select)
     {
         return Run(codebase, arch => arch.Rule("probe/selection")
-                .Enforce(select(arch)
-                    .MustHavePrefix("ZZZ"))
+                .Enforce(select(arch).MustHavePrefix("ZZZ"))
                 .Because("b"))
             .Single()
             .ShapeSubjects();

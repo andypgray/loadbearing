@@ -34,7 +34,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act
-        var selected = ArchChecker.SelectRules(model, ["layering/*"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["layering/*"]);
 
         // Assert
         selected.Select(rule => rule.Id)
@@ -48,7 +48,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act
-        var selected = ArchChecker.SelectRules(model, ["legacy/billing"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["legacy/billing"]);
 
         // Assert — no implicit subtree: an ID is a pattern over the whole ID, not a prefix.
         selected.Select(rule => rule.Id)
@@ -62,7 +62,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act
-        var selected = ArchChecker.SelectRules(model, ["legacy/*"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["legacy/*"]);
 
         // Assert — one '*' reaches across the slash, so an area glob takes a scope's children too.
         selected.Select(rule => rule.Id)
@@ -76,7 +76,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act — an exact ID beside a glob; the authoring order decides the result order, not the argument order.
-        var selected = ArchChecker.SelectRules(model, ["legacy/*", "layering/web-not-data"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["legacy/*", "layering/web-not-data"]);
 
         // Assert
         selected.Select(rule => rule.Id)
@@ -90,7 +90,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act
-        var selected = ArchChecker.SelectRules(model, []);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, []);
 
         // Assert
         selected.Select(rule => rule.Id)
@@ -104,7 +104,7 @@ public sealed class RuleSelectionTests
         ArchitectureModel model = Model();
 
         // Act
-        var selected = ArchChecker.SelectRules(model, ["naming/*"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["naming/*"]);
 
         // Assert — empty rather than everything, so a caller can refuse an unmatched filter rather than
         // silently running the whole model.
@@ -117,7 +117,7 @@ public sealed class RuleSelectionTests
         // Arrange — the model's red rule (layering/web-not-data) is deliberately not selected.
         ArchitectureModel model = Model();
         CodebaseModel codebase = CompilationFactory.Extract(ThreeNamespaces);
-        var selected = ArchChecker.SelectRules(model, ["layering/web-not-legacy"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["layering/web-not-legacy"]);
 
         // Act
         CheckReport report = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
@@ -140,7 +140,7 @@ public sealed class RuleSelectionTests
         // Arrange
         ArchitectureModel model = Model();
         CodebaseModel codebase = CompilationFactory.Extract(ThreeNamespaces);
-        var selected = ArchChecker.SelectRules(model, ["layering/web-not-data"]);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["layering/web-not-data"]);
 
         // Act
         CheckReport report = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
@@ -159,7 +159,7 @@ public sealed class RuleSelectionTests
         // Arrange
         ArchitectureModel model = Model();
         CodebaseModel codebase = CompilationFactory.Extract(ThreeNamespaces);
-        var selected = ArchChecker.SelectRules(model, []);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, []);
 
         // Act
         CheckReport subset = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
@@ -180,23 +180,19 @@ public sealed class RuleSelectionTests
         return Checker.Model(arch =>
         {
             arch.Rule("layering/web-not-data")
-                .Enforce(arch.Namespace("App.Web.*")
-                    .MustNotReference(arch.Namespace("App.Data.*")))
+                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("Controllers must reach data through a repository.");
 
             arch.Rule("layering/web-not-legacy")
-                .Enforce(arch.Namespace("App.Web.*")
-                    .MustNotReference(arch.Namespace("App.Legacy.*")))
+                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Legacy.*")))
                 .Because("The web layer must not grow new ties to the legacy ledger.");
 
             arch.Rule("legacy/billing")
-                .Enforce(arch.Namespace("App.Legacy.*")
-                    .MustNotReference(arch.Namespace("App.Web.*")))
+                .Enforce(arch.Namespace("App.Legacy.*").MustNotReference(arch.Namespace("App.Web.*")))
                 .Because("The ledger must not call back into the web layer.");
 
             arch.Rule("legacy/billing/containment")
-                .Enforce(arch.Namespace("App.Data.*")
-                    .MustNotReference(arch.Namespace("App.Legacy.*")))
+                .Enforce(arch.Namespace("App.Data.*").MustNotReference(arch.Namespace("App.Legacy.*")))
                 .Because("The data layer must not depend on the ledger it feeds.");
         });
     }

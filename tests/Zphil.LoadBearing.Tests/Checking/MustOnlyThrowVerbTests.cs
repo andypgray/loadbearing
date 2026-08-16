@@ -66,8 +66,7 @@ public sealed class MustOnlyThrowVerbTests
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/only-domain")
                     .Enforce(arch.Namespace("App.*")
-                        .MustOnlyThrow(arch.Namespace("Errors.*")
-                            .WithSuffix("DomainError")))
+                        .MustOnlyThrow(arch.Namespace("Errors.*").WithSuffix("DomainError")))
                     .Because("b"))
             .Single();
 
@@ -97,8 +96,7 @@ public sealed class MustOnlyThrowVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/only-domain")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("Service")
+                    .Enforce(arch.Namespace("App.*").WithSuffix("Service")
                         .MustOnlyThrow(arch.Types.WithSuffix("Error")))
                     .Because("b"))
             .Single();
@@ -126,8 +124,7 @@ public sealed class MustOnlyThrowVerbTests
 
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/only-timeout")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustOnlyThrow(typeof(TimeoutException)))
+                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(typeof(TimeoutException)))
                     .Because("b"))
             .Single();
 
@@ -141,8 +138,7 @@ public sealed class MustOnlyThrowVerbTests
         // harmlessly, with no crash — so it allows nothing: Service's Errors.MyError throw is red.
         RuleResult result = Checker.Run(OneThrowModel, arch =>
                 arch.Rule("ex/only-absent")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustOnlyThrow(typeof(DivideByZeroException)))
+                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(typeof(DivideByZeroException)))
                     .Because("b"))
             .Single();
 
@@ -159,8 +155,7 @@ public sealed class MustOnlyThrowVerbTests
         // allow-set is loud on its own (every throw is red), so the result carries violations and ZERO warnings.
         RuleResult result = Checker.Run(OneThrowModel, arch =>
                 arch.Rule("ex/only-nowhere")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustOnlyThrow(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -177,8 +172,7 @@ public sealed class MustOnlyThrowVerbTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustOnlyThrow(arch.Namespace("App.*")))
+                    .Enforce(arch.Namespace("Nowhere.*").MustOnlyThrow(arch.Namespace("App.*")))
                     .Because("b"))
             .Single();
 
@@ -210,8 +204,7 @@ public sealed class MustOnlyThrowVerbTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/only-throw")
-                    .Migrate("legacy throws", arch.Namespace("N.*")
-                        .MustOnlyThrow(arch.Namespace("Allowed.*")))
+                    .Migrate("legacy throws", arch.Namespace("N.*").MustOnlyThrow(arch.Namespace("Allowed.*")))
                     .Because("throw only the sanctioned exceptions"))
             .Single();
 
@@ -228,9 +221,7 @@ public sealed class MustOnlyThrowVerbTests
         // schemaVersion stays 3, so member/subject slots stay omitted (null) as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("ex/only-domain")
-                .Enforce(arch.Namespace("App.*")
-                    .MustOnlyThrow(arch.Namespace("Errors.*")
-                        .WithSuffix("DomainError")))
+                .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Errors.*").WithSuffix("DomainError")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("throw", "App.Service", "Errors.InfraError");

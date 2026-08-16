@@ -195,7 +195,7 @@ internal static class FragmentMerger
         {
             if (fragment.TargetFramework is not { } targetFramework) return;
 
-            if (!_frameworksByProject.TryGetValue(fragment.ProjectName, out var frameworks))
+            if (!_frameworksByProject.TryGetValue(fragment.ProjectName, out SortedSet<string>? frameworks))
                 _frameworksByProject[fragment.ProjectName] = frameworks = new SortedSet<string>(StringComparer.Ordinal);
 
             frameworks.Add(targetFramework);
@@ -216,7 +216,7 @@ internal static class FragmentMerger
                 NoteFrameworkCollapseIfSameProject(fqn, projectName, targetFramework);
             }
 
-            var sites = FragmentSiteSets.For(_declarationSites, fqn);
+            SortedSet<FragmentSite> sites = FragmentSiteSets.For(_declarationSites, fqn);
             foreach (FragmentSite site in declared.DeclarationSites) sites.Add(site);
         }
 
@@ -230,7 +230,7 @@ internal static class FragmentMerger
             string winner = _nodes[fqn].ProjectName;
             if (string.Equals(winner, laterProjectName, StringComparison.Ordinal)) return;
 
-            if (!_conflatedLosers.TryGetValue(fqn, out var losers))
+            if (!_conflatedLosers.TryGetValue(fqn, out SortedSet<string>? losers))
                 _conflatedLosers[fqn] = losers = new SortedSet<string>(StringComparer.Ordinal);
 
             losers.Add(laterProjectName);
@@ -264,7 +264,7 @@ internal static class FragmentMerger
         private string ConflationNote(string fqn)
         {
             string winner = _nodes[fqn].ProjectName;
-            var losers = _conflatedLosers[fqn];
+            SortedSet<string> losers = _conflatedLosers[fqn];
 
             string declarers = JoinWithAnd([$"'{winner}'", .. losers.Select(loser => $"'{loser}'")]);
             string selections = JoinWithAnd([.. losers.Select(loser => $"arch.Project('{loser}')")]);
@@ -280,7 +280,7 @@ internal static class FragmentMerger
         // drown the channel it is trying to be noticed in.
         private string FrameworkCollapseNote(string projectName)
         {
-            var frameworks = _frameworksByProject[projectName];
+            SortedSet<string> frameworks = _frameworksByProject[projectName];
             string winner = _multiFrameworkWinners[projectName];
             string targeted = JoinWithAnd([.. frameworks.Select(framework => $"'{framework}'")]);
 
@@ -300,7 +300,7 @@ internal static class FragmentMerger
         private void RecordExternal(FragmentExternal external)
         {
             string fqn = external.Facts.FullName;
-            if (!_nodes.ContainsKey(fqn) && !_externalFacts.ContainsKey(fqn)) _externalFacts[fqn] = external;
+            if (!_nodes.ContainsKey(fqn)) _externalFacts.TryAdd(fqn, external);
         }
 
         private void PopulateHierarchy(TypeNode node, FragmentType declared)
@@ -347,7 +347,7 @@ internal static class FragmentMerger
 
             ResolveNode(source);
             ResolveNode(target);
-            var merged = FragmentSiteSets.For(map, (source, target));
+            SortedSet<FragmentSite> merged = FragmentSiteSets.For(map, (source, target));
             foreach (FragmentSite site in sites) merged.Add(site);
             return true;
         }
@@ -363,7 +363,7 @@ internal static class FragmentMerger
             // Member facts are functions of the SymbolId, so the first mention wins and every later one agrees.
             _memberFacts.TryAdd(edge.MemberSymbolId, new MemberEdgeFacts(edge.TargetContainingTypeFullName, edge.MemberName, edge.MemberKind));
 
-            var sites = FragmentSiteSets.For(_memberEdgeSites, (edge.SourceFullName, edge.MemberSymbolId));
+            SortedSet<FragmentSite> sites = FragmentSiteSets.For(_memberEdgeSites, (edge.SourceFullName, edge.MemberSymbolId));
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
@@ -374,12 +374,12 @@ internal static class FragmentMerger
             // The unfiltered subset unions under the same key and the same guard. Unioning the UNFILTERED sites
             // is what keeps a `#if`-divergent filter honest: a (file, line) filtered in one fragment and
             // unfiltered in another reads unfiltered here, the truthful answer for a ban.
-            var unfilteredSites = FragmentSiteSets.For(_catchEdgeUnfilteredSites, (edge.SourceFullName, edge.CaughtFullName));
+            SortedSet<FragmentSite> unfilteredSites = FragmentSiteSets.For(_catchEdgeUnfilteredSites, (edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.UnfilteredSites) unfilteredSites.Add(site);
 
             // The swallowing subset unions the same way, and for the same reason: a (file, line) that rethrows
             // in one fragment and swallows in another reads swallowing here.
-            var swallowingSites = FragmentSiteSets.For(_catchEdgeSwallowingSites, (edge.SourceFullName, edge.CaughtFullName));
+            SortedSet<FragmentSite> swallowingSites = FragmentSiteSets.For(_catchEdgeSwallowingSites, (edge.SourceFullName, edge.CaughtFullName));
             foreach (FragmentSite site in edge.SwallowingSites) swallowingSites.Add(site);
         }
 
@@ -388,7 +388,7 @@ internal static class FragmentMerger
         // the identical registration collapse to one fact with unioned sites.
         private void MergeRegistration(FragmentServiceRegistration registration)
         {
-            var sites = FragmentSiteSets.For(
+            SortedSet<FragmentSite> sites = FragmentSiteSets.For(
                 _registrationSites, (registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
             foreach (FragmentSite site in registration.Sites) sites.Add(site);
         }
@@ -411,44 +411,44 @@ internal static class FragmentMerger
 
         private CodebaseModel Materialize(IReadOnlyList<CodebaseFragment> fragments)
         {
-            foreach ((string fqn, var sites) in _declarationSites)
+            foreach ((string fqn, SortedSet<FragmentSite> sites) in _declarationSites)
             {
                 TypeNode node = _nodes[fqn];
                 node.DeclarationSites = FragmentSiteSets.Locations(sites);
                 node.FilePaths = FragmentSiteSets.FilePaths(sites);
             }
 
-            var types = _nodes.Values
+            List<TypeNode> types = _nodes.Values
                 .OrderBy(n => n.FullName, StringComparer.Ordinal)
                 .ToList();
 
-            var edges = FragmentSiteSets.OrderedPairs(
+            List<ReferenceEdge> edges = FragmentSiteSets.OrderedPairs(
                 _edgeSites, (src, tgt, sites) => new ReferenceEdge(_nodes[src], _nodes[tgt], FragmentSiteSets.Locations(sites)));
 
-            var memberEdges = BuildMemberEdges();
+            List<MemberEdge> memberEdges = BuildMemberEdges();
 
-            var constructorEdges = FragmentSiteSets.OrderedPairs(
+            List<ConstructorEdge> constructorEdges = FragmentSiteSets.OrderedPairs(
                 _constructorEdgeSites, (src, ctor, sites) => new ConstructorEdge(_nodes[src], _nodes[ctor], FragmentSiteSets.Locations(sites)));
 
-            var injectionEdges = FragmentSiteSets.OrderedPairs(
+            List<InjectionEdge> injectionEdges = FragmentSiteSets.OrderedPairs(
                 _injectionEdgeSites, (src, injected, sites) => new InjectionEdge(_nodes[src], _nodes[injected], FragmentSiteSets.Locations(sites)));
 
             // All three site lists come out of SortedSets, so each is (file, line) ordered and each is a subset
             // of the one before it; an edge with no unfiltered (or no swallowing) site materializes the empty list.
-            var catchEdges = FragmentSiteSets.OrderedPairs(
+            List<CatchEdge> catchEdges = FragmentSiteSets.OrderedPairs(
                 _catchEdgeSites,
                 (src, caught, sites) => new CatchEdge(
                     _nodes[src], _nodes[caught], FragmentSiteSets.Locations(sites),
-                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? FragmentSiteSets.Locations(unfiltered) : [],
-                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? FragmentSiteSets.Locations(swallowing) : []));
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? unfiltered) ? FragmentSiteSets.Locations(unfiltered) : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? swallowing) ? FragmentSiteSets.Locations(swallowing) : []));
 
-            var throwEdges = FragmentSiteSets.OrderedPairs(
+            List<ThrowEdge> throwEdges = FragmentSiteSets.OrderedPairs(
                 _throwEdgeSites, (src, thrown, sites) => new ThrowEdge(_nodes[src], _nodes[thrown], FragmentSiteSets.Locations(sites)));
 
-            var exposureEdges = FragmentSiteSets.OrderedPairs(
+            List<ExposureEdge> exposureEdges = FragmentSiteSets.OrderedPairs(
                 _exposureEdgeSites, (src, exposed, sites) => new ExposureEdge(_nodes[src], _nodes[exposed], FragmentSiteSets.Locations(sites)));
 
-            var serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
+            List<ServiceRegistration> serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
                 _registrationSites,
                 (lifetime, service, impl, sites) => new ServiceRegistration(
                     lifetime, service, impl, FragmentSiteSets.Locations(sites)));
@@ -456,13 +456,13 @@ internal static class FragmentMerger
             // The advisory notes: project-level first (ordinal by project), then per-type (ordinal by FQN) —
             // coarse fact before fine, and each half sorted on the key it groups by, so the list is stable
             // across runs regardless of the order the distinct notes were first raised.
-            var frameworkCollapseNotes = _multiFrameworkWinners.Keys
+            IEnumerable<string> frameworkCollapseNotes = _multiFrameworkWinners.Keys
                 .OrderBy(projectName => projectName, StringComparer.Ordinal)
                 .Select(FrameworkCollapseNote);
-            var conflationNotes = _conflatedLosers.Keys
+            IEnumerable<string> conflationNotes = _conflatedLosers.Keys
                 .OrderBy(fqn => fqn, StringComparer.Ordinal)
                 .Select(ConflationNote);
-            var mergeNotes = frameworkCollapseNotes
+            List<string> mergeNotes = frameworkCollapseNotes
                 .Concat(conflationNotes)
                 .ToList();
 
@@ -499,7 +499,7 @@ internal static class FragmentMerger
             Dictionary<string, bool?> memberByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in fragments)
             {
-                if (!refsByProject.TryGetValue(fragment.ProjectName, out var refs))
+                if (!refsByProject.TryGetValue(fragment.ProjectName, out SortedSet<string>? refs))
                 {
                     refs = new SortedSet<string>(StringComparer.Ordinal);
                     refsByProject[fragment.ProjectName] = refs;

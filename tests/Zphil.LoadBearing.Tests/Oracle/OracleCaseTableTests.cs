@@ -53,10 +53,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row1_DomainMustNotReferenceWeb()
     {
-        var loadBearing = LoadBearingReferenceViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingReferenceViolators(arch =>
             arch.Rule("oracle/domain-not-web")
-                .Enforce(arch.Layer("Domain", "MyApp.Domain.*")
-                    .MustNotReference(arch.Layer("Web", "MyApp.Web.*")))
+                .Enforce(arch.Layer("Domain", "MyApp.Domain.*").MustNotReference(arch.Layer("Web", "MyApp.Web.*")))
                 .Because("Oracle row 1: Domain must not reference Web."));
 
         IArchRule rule = ArchRuleDefinition.Types()
@@ -65,7 +64,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .Should()
             .NotDependOnAnyTypesThat()
             .ResideInNamespace("MyApp.Web");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Domain.OrderService");
     }
@@ -74,10 +73,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row2_WebMustNotReferenceDomain()
     {
-        var loadBearing = LoadBearingReferenceViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingReferenceViolators(arch =>
             arch.Rule("oracle/web-not-domain")
-                .Enforce(arch.Layer("Web", "MyApp.Web.*")
-                    .MustNotReference(arch.Layer("Domain", "MyApp.Domain.*")))
+                .Enforce(arch.Layer("Web", "MyApp.Web.*").MustNotReference(arch.Layer("Domain", "MyApp.Domain.*")))
                 .Because("Oracle row 2: Web must not reference Domain."));
 
         IArchRule rule = ArchRuleDefinition.Types()
@@ -86,7 +84,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .Should()
             .NotDependOnAnyTypesThat()
             .ResideInNamespace("MyApp.Domain");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit);
     }
@@ -95,10 +93,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row3_BillingMustNotReferenceWeb()
     {
-        var loadBearing = LoadBearingReferenceViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingReferenceViolators(arch =>
             arch.Rule("oracle/billing-not-web")
-                .Enforce(arch.Namespace("MyApp.Legacy.Billing.*")
-                    .MustNotReference(arch.Namespace("MyApp.Web.*")))
+                .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
                 .Because("Oracle row 3: Billing must not reference Web."));
 
         IArchRule rule = ArchRuleDefinition.Types()
@@ -107,7 +104,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .Should()
             .NotDependOnAnyTypesThat()
             .ResideInNamespace("MyApp.Web");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit);
     }
@@ -117,10 +114,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row4_ControllersMustNotReferenceSystemData()
     {
-        var loadBearing = LoadBearingReferenceViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingReferenceViolators(arch =>
             arch.Rule("oracle/controllers-no-system-data")
-                .Enforce(arch.Namespace("MyApp.Web.*")
-                    .WithSuffix("Controller")
+                .Enforce(arch.Namespace("MyApp.Web.*").WithSuffix("Controller")
                     .MustNotReference(arch.Namespace("System.Data.*")))
                 .Because("Oracle row 4: controllers must not touch System.Data."));
 
@@ -132,7 +128,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .Should()
             .NotDependOnAnyTypesThat()
             .ResideInNamespace("System.Data");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController", "MyApp.Web.InvoiceController");
     }
@@ -141,11 +137,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row5_InterfacesMustHaveIPrefix()
     {
-        var loadBearing = LoadBearingShapeViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingShapeViolators(arch =>
             arch.Rule("oracle/interface-prefix")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface)
-                    .InNamespace("MyApp.*")
-                    .MustHavePrefix("I"))
+                .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*").MustHavePrefix("I"))
                 .Because("Oracle row 5: interfaces are I-prefixed."));
 
         IArchRule rule = ArchRuleDefinition.Interfaces()
@@ -153,7 +147,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .ResideInAssembly(oracle.Domain, oracle.Web, oracle.Billing)
             .Should()
             .HaveNameStartingWith("I");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit);
     }
@@ -169,10 +163,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row6_HandlerImplementorsMustHaveHandlerSuffix()
     {
-        var loadBearing = LoadBearingShapeViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingShapeViolators(arch =>
             arch.Rule("oracle/handler-suffix")
-                .Enforce(arch.Types.Implementing("MyApp.Web.IHandler<T>")
-                    .MustHaveSuffix("Handler"))
+                .Enforce(arch.Types.Implementing("MyApp.Web.IHandler<T>").MustHaveSuffix("Handler"))
                 .Because("Oracle row 6: handler implementors carry the Handler suffix."));
 
         IArchRule rule = ArchRuleDefinition.Types()
@@ -180,7 +173,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .ImplementInterface(oracle.HandlerInterface())
             .Should()
             .HaveNameEndingWith("Handler");
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.RefundProcessor");
     }
@@ -191,14 +184,13 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row7_QuarantinedInteriorContainment()
     {
-        var loadBearing = LoadBearingReferenceViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingReferenceViolators(arch =>
         {
             Selection quarantined = arch.Namespace("MyApp.Legacy.Billing.*");
             Selection facadeImpl = arch.Types.WithNameMatching("BillingFacade");
             Selection facadeIface = arch.Types.WithNameMatching("IBillingFacade");
             arch.Rule("oracle/quarantined-containment")
-                .Enforce(quarantined.Except(facadeImpl)
-                    .Except(facadeIface)
+                .Enforce(quarantined.Except(facadeImpl).Except(facadeIface)
                     .MustOnlyBeReferencedBy(quarantined, facadeImpl, facadeIface))
                 .Because("Oracle row 7: quarantined billing interior is facade-only.");
         });
@@ -216,7 +208,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
             .ResideInAssembly(oracle.Domain, oracle.Web)
             .Should()
             .NotDependOnAny(oracle.QuarantinedInterior());
-        var archUnit = oracle.FailingTypeNames(rule);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.InvoiceController");
     }
@@ -229,14 +221,14 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row8_AmbientClockReadsAtCallerTypeGranularity()
     {
-        var loadBearing = LoadBearingMemberUseViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingMemberUseViolators(arch =>
             arch.Rule("oracle/no-ambient-clock")
                 .Enforce(arch.Types.MustNotUse(
                     arch.Member(typeof(DateTime), nameof(DateTime.Now)),
                     arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Oracle row 8: no ambient-clock reads."));
 
-        var archUnit = oracle.TypesReadingAmbientClock();
+        IReadOnlySet<string> archUnit = oracle.TypesReadingAmbientClock();
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
     }
@@ -250,15 +242,13 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row9_TaskReturningMethodsMustHaveAsyncSuffixAtDeclaringTypeGranularity()
     {
-        var loadBearing = LoadBearingMemberShapeViolators(arch =>
+        IReadOnlySet<string> loadBearing = LoadBearingMemberShapeViolators(arch =>
             arch.Rule("oracle/async-suffix")
-                .Enforce(arch.Namespace("MyApp.Web.*")
-                    .Methods
-                    .Returning(typeof(Task), typeof(Task<>))
+                .Enforce(arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task), typeof(Task<>))
                     .MustHaveSuffix("Async"))
                 .Because("Oracle row 9: Task-returning methods carry the Async suffix."));
 
-        var archUnit = oracle.TypesDeclaringUnsuffixedTaskReturningMethods();
+        IReadOnlySet<string> archUnit = oracle.TypesDeclaringUnsuffixedTaskReturningMethods();
 
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
     }

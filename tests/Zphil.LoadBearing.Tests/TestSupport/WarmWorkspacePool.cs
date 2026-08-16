@@ -104,7 +104,7 @@ internal static class WarmWorkspacePool
         Gate.Wait();
         try
         {
-            var doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
+            List<Entry> doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
                 .ToList();
             foreach (Entry entry in doomed)
             {

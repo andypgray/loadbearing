@@ -62,7 +62,7 @@ internal static class QuarantineDesugarer
             // Hermetic quarantine: nothing outside the scope may reference it (GRAMMAR §7).
             return quarantined.MustOnlyBeReferencedBy(quarantined);
 
-        var facades = boundary
+        List<Selection> facades = boundary
             .Select(type => (Selection)new RefinedSelection(owner, new TypeNoun(type), Array.Empty<SelectionAdjective>()))
             .ToList();
 

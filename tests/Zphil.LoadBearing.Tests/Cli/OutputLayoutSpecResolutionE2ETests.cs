@@ -125,7 +125,7 @@ public sealed class OutputLayoutSpecResolutionE2ETests
         // solution, which is the field defect; the widening is what carries the answer up to `release`.
         Directory.Exists(evaluatedDirectory)
             .ShouldBeTrue($"the design-time build was expected to create '{evaluatedDirectory}'.");
-        var leftBehind = Directory.EnumerateFileSystemEntries(evaluatedDirectory)
+        List<string> leftBehind = Directory.EnumerateFileSystemEntries(evaluatedDirectory)
             .ToList();
         leftBehind.ShouldBeEmpty(
             "the evaluated directory the design-time build created should hold no build output — that "
@@ -162,7 +162,7 @@ public sealed class OutputLayoutSpecResolutionE2ETests
             "    <PropertyGroup>",
             $"        <LoadBearingContractPath>{ContractPath}</LoadBearingContractPath>"
         };
-        var indented = layoutProperties.Select(property => "        " + property);
+        IEnumerable<string> indented = layoutProperties.Select(property => "        " + property);
         lines.AddRange(indented);
         lines.Add("    </PropertyGroup>");
         lines.Add("</Project>");

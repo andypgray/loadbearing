@@ -32,7 +32,7 @@ public sealed class SourceAnchorTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var anchors = SourceAnchors.Extract("d.md", doc);
+        IReadOnlyList<SourceAnchor> anchors = SourceAnchors.Extract("d.md", doc);
 
         // Assert
         SourceAnchor anchor = anchors.ShouldHaveSingleItem();
@@ -60,7 +60,7 @@ public sealed class SourceAnchorTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var anchors = SourceAnchors.Extract("d.md", doc);
+        IReadOnlyList<SourceAnchor> anchors = SourceAnchors.Extract("d.md", doc);
 
         // Assert
         anchors.Count.ShouldBe(2);
@@ -94,7 +94,7 @@ public sealed class SourceAnchorTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var blocks = SourceAnchors.FencedBlocks(doc);
+        IReadOnlyList<IReadOnlyList<(string Text, int Number)>> blocks = SourceAnchors.FencedBlocks(doc);
 
         // Assert
         blocks.Count.ShouldBe(2);
@@ -116,7 +116,7 @@ public sealed class SourceAnchorTests
         string doc = string.Join("\n", "```text", "first", "second");
 
         // Act
-        var blocks = SourceAnchors.FencedBlocks(doc);
+        IReadOnlyList<IReadOnlyList<(string Text, int Number)>> blocks = SourceAnchors.FencedBlocks(doc);
 
         // Assert
         blocks.ShouldHaveSingleItem()
@@ -144,7 +144,7 @@ public sealed class SourceAnchorTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var blocks = SourceAnchors.FencedBlocks(doc);
+        IReadOnlyList<IReadOnlyList<(string Text, int Number)>> blocks = SourceAnchors.FencedBlocks(doc);
 
         // Assert
         SourceAnchors.FencedLines(doc)
@@ -184,7 +184,7 @@ public sealed class SourceAnchorTests
     {
         // Arrange
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 3, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "here is Foo on line three");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "here is Foo on line three");
 
         // Act
         SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, "ex", NoLandmarks, reader);
@@ -200,7 +200,7 @@ public sealed class SourceAnchorTests
         // anchor's path is already repository-relative. Prefixing a separator would make it rooted, and a
         // rooted path resolves outside the repository — every such anchor would silently miss the gate.
         SourceAnchor anchor = new("README.md", 5, "src/A.cs", 3, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("src/A.cs", "one", "two", "here is Foo on line three");
+        Func<string, IReadOnlyList<string>?> reader = Reader("src/A.cs", "one", "two", "here is Foo on line three");
 
         // Act
         SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, string.Empty, NoLandmarks, reader);
@@ -214,7 +214,7 @@ public sealed class SourceAnchorTests
     {
         // Arrange: the token sits on line 3, but the anchor claims line 4.
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 4, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four has no token");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four has no token");
 
         // Act
         SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, "ex", NoLandmarks, reader);
@@ -231,7 +231,7 @@ public sealed class SourceAnchorTests
         // Arrange: content already matches, so the anchor stays in the content bucket even though a
         // landmark exists — fewer pins carry the weight.
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 3, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "here is Foo");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "here is Foo");
         Dictionary<SourceAnchors.AnchorKey, SourceAnchors.Landmark> landmarks = new()
         {
             [new SourceAnchors.AnchorKey("ex", "src/A.cs", 3)] = new SourceAnchors.Landmark(1, "one")
@@ -249,7 +249,7 @@ public sealed class SourceAnchorTests
     {
         // Arrange: the reported line carries no token, but the landmark pins the committed line it lands on.
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 4, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four");
         Dictionary<SourceAnchors.AnchorKey, SourceAnchors.Landmark> landmarks = new()
         {
             [new SourceAnchors.AnchorKey("ex", "src/A.cs", 4)] = new SourceAnchors.Landmark(3, "here is Foo")
@@ -267,7 +267,7 @@ public sealed class SourceAnchorTests
     {
         // Arrange: the landmark points at a committed line that does not carry its snippet.
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 4, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "here is Foo", "four");
         Dictionary<SourceAnchors.AnchorKey, SourceAnchors.Landmark> landmarks = new()
         {
             [new SourceAnchors.AnchorKey("ex", "src/A.cs", 4)] = new SourceAnchors.Landmark(2, "here is Foo")
@@ -287,7 +287,7 @@ public sealed class SourceAnchorTests
         // Arrange: the documented edit adds a using that pushes the signature past the committed end of
         // file; the landmark pins the committed signature line the anchor is keyed to.
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 6, "Ns.I exposes Ns.Pkg.Entity");
-        var reader = Reader("ex/src/A.cs", "one", "two", "three", "four", "Task SendAsync here");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "three", "four", "Task SendAsync here");
         Dictionary<SourceAnchors.AnchorKey, SourceAnchors.Landmark> landmarks = new()
         {
             [new SourceAnchors.AnchorKey("ex", "src/A.cs", 6)] = new SourceAnchors.Landmark(5, "Task SendAsync")
@@ -320,7 +320,7 @@ public sealed class SourceAnchorTests
     {
         // Arrange
         SourceAnchor anchor = new("d.md", 5, "src/A.cs", 99, "Ns.T references Ns.Pkg.Foo");
-        var reader = Reader("ex/src/A.cs", "one", "two", "three");
+        Func<string, IReadOnlyList<string>?> reader = Reader("ex/src/A.cs", "one", "two", "three");
 
         // Act
         SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, "ex", NoLandmarks, reader);

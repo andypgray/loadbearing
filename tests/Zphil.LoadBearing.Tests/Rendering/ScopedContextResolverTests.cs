@@ -34,7 +34,7 @@ public class ScopedContextResolverTests
             ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"),
             ("MyApp.Legacy.Billing/RoundingMode.cs", "namespace MyApp.Legacy.Billing; public class RoundingMode {}"));
 
-        var placements = ScopedContextResolver.Resolve(Model(), codebase);
+        IReadOnlyList<ScopePlacement> placements = ScopedContextResolver.Resolve(Model(), codebase);
 
         placements.Count.ShouldBe(1);
         placements[0]

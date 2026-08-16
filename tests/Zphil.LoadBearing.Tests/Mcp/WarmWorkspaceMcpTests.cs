@@ -451,11 +451,11 @@ public sealed class WarmWorkspaceMcpTests
 
         // Act — fire two tool calls at once. The MCP SDK dispatches them in parallel; the session gate
         // serializes the concurrent first-load, and both callers share the one immutable snapshot.
-        var first = harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)
+        Task<CallToolResult> first = harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)
             .AsTask();
-        var second = harness.Client.CallToolAsync("arch_status", cancellationToken: Ct)
+        Task<CallToolResult> second = harness.Client.CallToolAsync("arch_status", cancellationToken: Ct)
             .AsTask();
-        var results = await Task.WhenAll(first, second);
+        CallToolResult[] results = await Task.WhenAll(first, second);
 
         // Assert — both succeeded with content.
         results.ShouldAllBe(result => result.IsError != true);

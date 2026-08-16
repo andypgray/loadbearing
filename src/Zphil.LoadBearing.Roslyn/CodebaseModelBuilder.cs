@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn;
 
@@ -15,7 +16,7 @@ internal static class CodebaseModelBuilder
 {
     public static CodebaseModel Build(IReadOnlyList<CompilationInput> inputs)
     {
-        var fragments = FragmentExtractor.ExtractAll(inputs);
+        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs);
 
         return FragmentMerger.Merge(fragments);
     }

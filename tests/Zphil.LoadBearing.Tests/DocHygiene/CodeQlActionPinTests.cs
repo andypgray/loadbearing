@@ -46,11 +46,11 @@ public sealed class CodeQlActionPinTests
     public void CodeQlActionPins_WithinAWorkflow_NameOneRevision()
     {
         // Arrange
-        var byWorkflow = ReadPins()
+        IEnumerable<IGrouping<string, Pin>> byWorkflow = ReadPins()
             .GroupBy(static pin => pin.Workflow);
 
         // Act
-        var split = byWorkflow
+        List<string> split = byWorkflow
             .Where(static workflow => workflow.Select(static pin => pin.Sha)
                 .Distinct(StringComparer.Ordinal)
                 .Count() > 1)
@@ -68,7 +68,7 @@ public sealed class CodeQlActionPinTests
     public void CodeQlActionPins_AreReadable()
     {
         // Act
-        var pins = ReadPins();
+        IReadOnlyList<Pin> pins = ReadPins();
 
         // Assert: the arm above passes over a workflow it cannot read, so the pins are held non-empty
         // rather than trusted. A rewrite into a form this scan cannot follow fails here.
@@ -77,7 +77,7 @@ public sealed class CodeQlActionPinTests
 
     private static string Describe(IGrouping<string, Pin> workflow)
     {
-        var steps = workflow
+        IOrderedEnumerable<string> steps = workflow
             .Select(static pin => $"    {pin.Path} -> {pin.Version}")
             .Order(StringComparer.Ordinal);
 

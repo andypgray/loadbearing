@@ -133,7 +133,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComputeDigest_KnownInput_MatchesIndependentSha256()
     {
-        var rules = Rules(
+        Dictionary<string, IReadOnlyCollection<BaselineEntry>> rules = Rules(
             ("b/two", [BaselineEntry.ForSubject("T:N.Two")]),
             ("a/one", [BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")]));
 

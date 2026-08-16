@@ -31,9 +31,7 @@ public sealed class MigrateRatchetTests
         arch.Rule("data/x")
             .Migrate(
                 "Controllers open the data layer directly (legacy Active Record style).",
-                arch.Namespace("App.Web.*")
-                    .WithSuffix("Controller")
-                    .MustNotReference(arch.Namespace("App.Data.*")))
+                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("Repository pattern for testability.");
     }
 
@@ -102,8 +100,7 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "Controllers `new` the data layer directly (legacy Active Record style).",
-                        arch.Namespace("App.Web.*")
-                            .WithSuffix("Controller")
+                        arch.Namespace("App.Web.*").WithSuffix("Controller")
                             .MustNotConstruct(arch.Namespace("App.Data.*")))
                     .Because("Resolve via DI for testability."))
             .Single();
@@ -122,8 +119,7 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("naming/x")
-                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*")
-                        .MustHaveSuffix("Handler"))
+                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
                     .Because("Handler discovery is convention-based."))
             .Single();
 
@@ -185,8 +181,7 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
-                        arch.Namespace("App.Nowhere.*")
-                            .WithSuffix("Controller")
+                        arch.Namespace("App.Nowhere.*").WithSuffix("Controller")
                             .MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
@@ -215,8 +210,7 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
-                        arch.Namespace("App.Nowhere.*")
-                            .WithSuffix("Controller")
+                        arch.Namespace("App.Nowhere.*").WithSuffix("Controller")
                             .MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
@@ -249,8 +243,7 @@ public sealed class MigrateRatchetTests
                 arch.Rule("data/x")
                     .Migrate(
                         "old",
-                        arch.Namespace("App.Web.*")
-                            .WithSuffix("Controller")
+                        arch.Namespace("App.Web.*").WithSuffix("Controller")
                             .MustNotReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
             .Single();
@@ -276,8 +269,7 @@ public sealed class MigrateRatchetTests
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("layer/x")
-                    .Enforce(arch.Namespace("App.Web.*")
-                        .MustNotReference(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 

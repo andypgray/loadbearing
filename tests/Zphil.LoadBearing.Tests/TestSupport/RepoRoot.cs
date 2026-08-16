@@ -36,6 +36,13 @@ internal static class RepoRoot
     /// </summary>
     public static string SolutionDotSettings => Solution + ".DotSettings";
 
+    /// <summary>
+    ///     The absolute path to the test project's ReSharper settings layer — a project layer's file is
+    ///     the csproj path plus the <c>.DotSettings</c> suffix, and jb mounts it above the solution layer.
+    /// </summary>
+    public static string TestProjectDotSettings =>
+        Absolute("tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj.DotSettings");
+
     /// <summary>The absolute native path for a forward-slash repo-relative one.</summary>
     public static string Absolute(string repoRelativePath)
     {

@@ -188,9 +188,9 @@ public sealed class QuoteSyncTests
         // Act: every excerpt's marker — including the demonstration-exempt one — must pick out exactly one
         // fence of its own doc; zero means the excerpt was dropped or reworded, more than one means it is
         // no longer distinctive.
-        foreach (var group in Excerpts.GroupBy(excerpt => excerpt.Doc))
+        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(excerpt => excerpt.Doc))
         {
-            var fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
+            IReadOnlyList<IReadOnlyList<string>> fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
             foreach (Excerpt excerpt in group)
             {
                 int matches = fences.Count(fence => ContainsMarker(fence, excerpt.Marker));
@@ -207,26 +207,26 @@ public sealed class QuoteSyncTests
     public void SyncedExcerpts_AppearVerbatimInTheirSource()
     {
         // Arrange
-        var readSource = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> readSource = SourceAnchors.DiskReader(RepoRoot.Directory);
         List<string> drift = new();
 
         // Act: every non-blank line of a synced excerpt's fence must appear, in order, as a verbatim
         // substring of its source's lines; a miss means the quote has drifted from the committed file.
-        foreach (var group in Excerpts.GroupBy(excerpt => excerpt.Doc))
+        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(excerpt => excerpt.Doc))
         {
-            var fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
+            IReadOnlyList<IReadOnlyList<string>> fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
             foreach (Excerpt excerpt in group)
             {
                 if (excerpt.Source is null) continue;
 
-                var source = readSource(excerpt.Source);
+                IReadOnlyList<string>? source = readSource(excerpt.Source);
                 if (source is null)
                 {
                     drift.Add($"{group.Key} {excerpt.Key}: source {excerpt.Source} does not exist.");
                     continue;
                 }
 
-                var fence = fences.Single(f => ContainsMarker(f, excerpt.Marker));
+                IReadOnlyList<string> fence = fences.Single(f => ContainsMarker(f, excerpt.Marker));
                 string? unmatched = FirstLineNotInSource(fence, source);
                 if (unmatched is not null)
                     drift.Add($"{group.Key} {excerpt.Key}: fence line '{unmatched}' is not a verbatim substring, in order, of {excerpt.Source}.");

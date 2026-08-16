@@ -38,8 +38,8 @@ internal static class McpServerCommand
         if (!Console.IsInputRedirected)
         {
             // A human ran the tool at a terminal: don't hang on a silent stdio server.
-            error.WriteLine("loadbearing mcp is an MCP stdio server; it is started by an MCP client, not interactively.");
-            error.WriteLine("Configure it in your MCP client (command \"loadbearing mcp <solution> --spec <spec>\").");
+            await error.WriteLineAsync("loadbearing mcp is an MCP stdio server; it is started by an MCP client, not interactively.");
+            await error.WriteLineAsync("Configure it in your MCP client (command \"loadbearing mcp <solution> --spec <spec>\").");
             return 2;
         }
 

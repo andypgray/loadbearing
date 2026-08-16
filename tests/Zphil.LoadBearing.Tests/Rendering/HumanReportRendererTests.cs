@@ -35,8 +35,7 @@ public sealed class HumanReportRendererTests
         // A hand-built model bypasses spec-build's closed-generic refusal (GRAMMAR §8 item 14) to reach the
         // checker's RuleError backstop; the renderer's RuleError arm prefixes the detail with "error: ".
         var arch = new Arch();
-        Constraint constraint = arch.Namespace("App.Async.*")
-            .Methods.Returning(typeof(Task<int>))
+        Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
             .MustHaveSuffix("Async");
         var model = new ArchitectureModel(
             [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
@@ -58,8 +57,7 @@ public sealed class HumanReportRendererTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("naming/x")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustHavePrefix("I"))
+                    .Enforce(arch.Namespace("Nowhere.*").MustHavePrefix("I"))
                     .Because("b"))
             .Single();
 
@@ -77,7 +75,7 @@ public sealed class HumanReportRendererTests
         // an unlocated line (HumanReportRenderer.cs:101-102) rather than a located `path:line — …` line.
         TypeNode subject = Node("App.Orphan");
         var result = new RuleResult(
-            EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, [], 0, false);
+            EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -93,7 +91,7 @@ public sealed class HumanReportRendererTests
         var construction = Violation.Construction(
             Node("App.Factory"), Node("Widgets.Widget"), [new SourceLocation("Factory.cs", 12)]);
         var result = new RuleResult(
-            EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, [], 0, false);
+            EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -111,7 +109,7 @@ public sealed class HumanReportRendererTests
         Violation catchViolation = Violation.Catch(
             Node("App.Handler"), Node("Errors.DbError"), [new SourceLocation("Handler.cs", 9)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, [], 0, false);
+            EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -129,7 +127,7 @@ public sealed class HumanReportRendererTests
         Violation exposeViolation = Violation.Expose(
             Node("App.Facade"), Node("Secrets.Secret"), [new SourceLocation("Facade.cs", 5)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, [], 0, false);
+            EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -147,7 +145,7 @@ public sealed class HumanReportRendererTests
         Violation throwViolation = Violation.Throw(
             Node("App.Service"), Node("Errors.InfraError"), [new SourceLocation("Service.cs", 14)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, [], 0, false);
+            EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -182,8 +180,7 @@ public sealed class HumanReportRendererTests
                               """;
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/filter-catches")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("A broad catch names what it expects."))
             .Single();
 
@@ -211,8 +208,7 @@ public sealed class HumanReportRendererTests
                               """;
         RuleResult result = Checker.Run(source, arch =>
                 arch.Rule("ex/no-bare-throws")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotThrow(typeof(Exception)))
+                    .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
                     .Because("Throw a type a caller can dispatch on."))
             .Single();
 
@@ -231,7 +227,7 @@ public sealed class HumanReportRendererTests
         TypeNode located = Node("App.Located", new SourceLocation("Located.cs", 7));
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed,
-            [Violation.Shape(located, []), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, [], 0, false);
+            [Violation.Shape(located, []), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, []);
 
         string block = result.HumanBlock();
 
@@ -261,9 +257,9 @@ public sealed class HumanReportRendererTests
     {
         var report = new CheckReport(
         [
-            new RuleResult(EnforceRule("r/pass"), RuleStatus.Passed, [], [], null, [], 0, false),
-            new RuleResult(EnforceRule("r/fail"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, [], 0, false),
-            new RuleResult(EnforceRule("r/skip"), RuleStatus.Skipped, [], [], "no --diff-base diff context", [], 0, false)
+            new RuleResult(EnforceRule("r/pass"), RuleStatus.Passed, [], [], null, []),
+            new RuleResult(EnforceRule("r/fail"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []),
+            new RuleResult(EnforceRule("r/skip"), RuleStatus.Skipped, [], [], "no --diff-base diff context", [])
         ]);
 
         var writer = new StringWriter { NewLine = "\n" };
@@ -284,8 +280,7 @@ public sealed class HumanReportRendererTests
     private static ArchRule MigrateRule(string id)
     {
         return Checker.Model(arch => arch.Rule(id)
-                .Migrate("old", arch.Namespace("App.*")
-                    .MustHaveSuffix("X"))
+                .Migrate("old", arch.Namespace("App.*").MustHaveSuffix("X"))
                 .Because("b"))
             .Rules.Single();
     }
@@ -294,10 +289,8 @@ public sealed class HumanReportRendererTests
     // DeclarationSites, so the remaining scalar facts are inert placeholders.
     private static TypeNode Node(string fullName, params SourceLocation[] sites)
     {
-        var node = new TypeNode(
+        return new TypeNode(
             fullName, "T:" + fullName, fullName, string.Empty, TypeKind.Class, Accessibility.Public,
-            false, false, false, false, false, "TestProject", false);
-        node.DeclarationSites = sites;
-        return node;
+            false, false, false, false, false, "TestProject", false) { DeclarationSites = sites };
     }
 }

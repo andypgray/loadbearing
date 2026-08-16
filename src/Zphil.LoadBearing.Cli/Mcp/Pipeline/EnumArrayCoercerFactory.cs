@@ -79,7 +79,7 @@ internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
 
                 case JsonTokenType.String:
                     string value = reader.GetString()!;
-                    if (CoercedJsonArray.TryParseJsonStringArray(value, ParseElement, out var unwrapped)) return unwrapped;
+                    if (CoercedJsonArray.TryParseJsonStringArray(value, ParseElement, out T[] unwrapped)) return unwrapped;
 
                     return [ParseElement(value)];
 

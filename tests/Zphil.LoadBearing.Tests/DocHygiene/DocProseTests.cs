@@ -213,7 +213,7 @@ public sealed class DocProseTests
         var text = $"first clean line\nprefix {token} suffix\nthird clean line";
 
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.InternalReferencePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.InternalReferencePatterns);
 
         // Assert
         hits.ShouldNotBeEmpty();
@@ -236,7 +236,7 @@ public sealed class DocProseTests
     public void FindForbidden_BenignLookalike_ReportsNoHit(string text)
     {
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.InternalReferencePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.InternalReferencePatterns);
 
         // Assert
         hits.ShouldBeEmpty();
@@ -255,7 +255,7 @@ public sealed class DocProseTests
         var text = $"first clean line\nprefix {token} suffix\nthird clean line";
 
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
 
         // Assert
         hits.ShouldNotBeEmpty();
@@ -273,7 +273,7 @@ public sealed class DocProseTests
     public void FindForbidden_PrivateEnvironmentLookalike_ReportsNoHit(string text)
     {
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.PrivateEnvironmentPatterns);
 
         // Assert
         hits.ShouldBeEmpty();
@@ -286,7 +286,7 @@ public sealed class DocProseTests
         var text = "The documentation reads clearly.\nThe codebase is messy today.";
 
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.HouseVoicePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.HouseVoicePatterns);
 
         // Assert
         hits.ShouldHaveSingleItem()
@@ -299,7 +299,7 @@ public sealed class DocProseTests
     public void FindForbidden_OffVoiceLookalike_ReportsNoHit(string text)
     {
         // Act
-        var hits = DocProse.FindForbidden(text, DocHygieneTests.HouseVoicePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.HouseVoicePatterns);
 
         // Assert
         hits.ShouldBeEmpty();

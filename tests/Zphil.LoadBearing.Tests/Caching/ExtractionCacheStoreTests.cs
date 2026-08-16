@@ -126,7 +126,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
             .ShouldBeTrue();
 
-        var stamps = solution.StructuralStampsByPath();
+        IReadOnlyDictionary<string, bool> stamps = solution.StructuralStampsByPath();
 
         stamps.ShouldContainKey(solution.ArtifactsAssetsPathOf("A"));
         stamps[solution.ArtifactsAssetsPathOf("A")]
@@ -441,7 +441,7 @@ public sealed class ExtractionCacheStoreTests
 
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
-        var fragments = solution.Projects
+        List<CodebaseFragment> fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], []));
@@ -449,7 +449,7 @@ public sealed class ExtractionCacheStoreTests
 
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
     {
-        var fragments = solution.Projects
+        List<CodebaseFragment> fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], new WorkspaceDiagnostics([diagnostic], [], [], [], []));
@@ -476,9 +476,9 @@ public sealed class ExtractionCacheStoreTests
 
         public string Root { get; }
 
-        public string CacheRoot { get; }
+        private string CacheRoot { get; }
 
-        public string SolutionPath { get; }
+        private string SolutionPath { get; }
 
         public string CacheFilePath => CacheLocations.CacheFilePath(SolutionPath, CacheRoot);
 

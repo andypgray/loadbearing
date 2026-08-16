@@ -58,7 +58,7 @@ internal static class CoercedJsonArray
     {
         result = [];
 
-        var trimmed = value.AsSpan().Trim();
+        ReadOnlySpan<char> trimmed = value.AsSpan().Trim();
         if (trimmed.Length == 0 || trimmed[0] != '[') return false;
 
         try

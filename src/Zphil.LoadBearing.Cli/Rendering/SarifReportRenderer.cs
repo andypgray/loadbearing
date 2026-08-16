@@ -87,9 +87,9 @@ internal static class SarifReportRenderer
         // untrustworthy, and how their paths are spelled, is shared plumbing all three documents already run
         // through. An empty list emits no notification here, which is the same omission the null encodes there.
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
-        var failedProjects = trust.FailedProjects ?? [];
-        var restoreFailedProjects = trust.RestoreFailedProjects ?? [];
-        var uncheckedProjects = trust.UncheckedProjects ?? [];
+        IReadOnlyList<string> failedProjects = trust.FailedProjects ?? [];
+        IReadOnlyList<string> restoreFailedProjects = trust.RestoreFailedProjects ?? [];
+        IReadOnlyList<string> uncheckedProjects = trust.UncheckedProjects ?? [];
 
         var run = new SarifRun(
             new SarifTool(driver),
@@ -98,7 +98,7 @@ internal static class SarifReportRenderer
                 uncheckedProjects),
             BuildOriginalUriBaseIds(),
             BuildResults(report, relativizer));
-        var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
+        var log = new SarifLog(SchemaUri, SarifVersion, [run]);
         return JsonSerializer.Serialize(log, LoadBearingJson.Context.SarifLog);
     }
 
@@ -131,7 +131,7 @@ internal static class SarifReportRenderer
         IReadOnlyList<string> restoreFailedProjects,
         IReadOnlyList<string> uncheckedProjects)
     {
-        var notifications = workspaceDiagnostics
+        List<SarifNotification> notifications = workspaceDiagnostics
             .Select(diagnostic => new SarifNotification(new SarifMessage(diagnostic), WarningLevel))
             .ToList();
 
@@ -139,7 +139,7 @@ internal static class SarifReportRenderer
         if (restoreFailedProjects.Count > 0) notifications.Add(RestoreFailureNotification(restoreFailedProjects));
         if (uncheckedProjects.Count > 0) notifications.Add(NarrowingNotification(uncheckedProjects));
 
-        return new[] { new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null) };
+        return [new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null)];
     }
 
     // An incomplete model reached SARIF only as MSBuild's replayed prose, in which a fatal evaluation failure
@@ -229,7 +229,7 @@ internal static class SarifReportRenderer
                 Violation violation = result.Grandfathered[i];
                 BaselineEntry entry = result.GrandfatheredEntries[i];
                 string justification = entry.Because ?? $"grandfathered in {result.Rule.BaselinePath}";
-                IReadOnlyList<SarifSuppression> suppressions = new[] { new SarifSuppression("external", justification) };
+                IReadOnlyList<SarifSuppression> suppressions = [new("external", justification)];
                 results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", suppressions, relativizer));
             }
         }
@@ -258,7 +258,7 @@ internal static class SarifReportRenderer
         foreach (SourceLocation site in violation.Sites)
         {
             string relativePath = relativizer.Relative(site.FilePath);
-            int ordinal = ordinals.TryGetValue(relativePath, out int seen) ? seen : 0;
+            int ordinal = ordinals.GetValueOrDefault(relativePath);
             ordinals[relativePath] = ordinal + 1;
 
             var fingerprints = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -271,7 +271,7 @@ internal static class SarifReportRenderer
                     new SarifRegion(site.Line)));
 
             yield return new SarifResult(
-                ruleId, level, message, new[] { location }, fingerprints, baselineState, suppressions);
+                ruleId, level, message, [location], fingerprints, baselineState, suppressions);
         }
     }
 

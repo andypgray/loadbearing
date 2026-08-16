@@ -120,7 +120,7 @@ public static class ArchChecker
         // second would repeat a full pass over the model; it holds no per-rule mutable state.
         var selections = new SelectionEvaluator(codebase);
         var evaluator = new ConstraintEvaluator(codebase, selections);
-        var results = rules
+        List<RuleResult> results = rules
             .Select(rule => CheckRule(rule, evaluator, selections, baselines, diff, narrowing))
             .ToList();
         return new CheckReport(results);
@@ -162,7 +162,7 @@ public static class ArchChecker
 
         try
         {
-            var (violations, warnings) = evaluator.Evaluate(rule.Constraint!);
+            (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = evaluator.Evaluate(rule.Constraint!);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
             // view at all — is asked of the raw violations and is the same one for both branches.
             if (narrowing is not null && SelectedNothing(violations))
@@ -192,7 +192,7 @@ public static class ArchChecker
 
     private static RuleResult Enforce(ArchRule rule, IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings)
     {
-        var ordered = Order(violations);
+        IReadOnlyList<Violation> ordered = Order(violations);
         RuleStatus status = ordered.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
         return new RuleResult(rule, status, ordered, warnings);
     }
@@ -226,8 +226,8 @@ public static class ArchChecker
             }
         }
 
-        var orderedRed = Order(red);
-        var orderedGrandfathered = OrderPairs(grandfatheredPairs);
+        IReadOnlyList<Violation> orderedRed = Order(red);
+        List<(Violation Violation, BaselineEntry Entry)> orderedGrandfathered = OrderPairs(grandfatheredPairs);
 
         // Split in one pass so the two lists are index-aligned by construction: Grandfathered[i] is the
         // violation the entry at GrandfatheredEntries[i] blessed.
@@ -254,9 +254,9 @@ public static class ArchChecker
         if (diff is null) return Skipped(rule, TripwireSkipReason);
 
         string scopeId = rule.Quarantine!.ScopeId;
-        var quarantined = selections.Evaluate(rule.Quarantine.Quarantined!, SelectionPosition.Subject);
+        HashSet<TypeNode> quarantined = selections.Evaluate(rule.Quarantine.Quarantined!, SelectionPosition.Subject);
 
-        var touched = quarantined
+        List<CheckWarning> touched = quarantined
             .Where(type => !type.IsExternal)
             .SelectMany(type => type.DeclarationSites)
             .Select(site => site.FilePath)
@@ -305,7 +305,7 @@ public static class ArchChecker
 
     private static RuleResult Errored(ArchRule rule, string detail)
     {
-        return new RuleResult(rule, RuleStatus.Failed, new[] { Violation.RuleError(detail) });
+        return new RuleResult(rule, RuleStatus.Failed, [Violation.RuleError(detail)]);
     }
 
     // Deterministic within-rule order: Violation.OrderKey, compared ordinal slot by slot (never as a

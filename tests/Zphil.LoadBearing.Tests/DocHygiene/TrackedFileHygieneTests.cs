@@ -58,7 +58,7 @@ public sealed class TrackedFileHygieneTests
     public void TrackedSource_CommentsNameNoInternalWorkingReferences()
     {
         // Act
-        var findings = ScanSources(DocHygieneTests.InternalReferencePatterns);
+        List<string> findings = ScanSources(DocHygieneTests.InternalReferencePatterns);
 
         // Assert
         findings.ShouldBeEmpty(
@@ -69,7 +69,7 @@ public sealed class TrackedFileHygieneTests
     public void TrackedSource_CommentsNameNoPrivateEnvironment()
     {
         // Act
-        var findings = ScanSources(EnvironmentPatterns);
+        List<string> findings = ScanSources(EnvironmentPatterns);
 
         // Assert
         findings.ShouldBeEmpty(
@@ -80,7 +80,7 @@ public sealed class TrackedFileHygieneTests
     public void TrackedText_NamesNoInternalWorkingReferences()
     {
         // Act
-        var findings = ScanNonSource(DocHygieneTests.InternalReferencePatterns);
+        List<string> findings = ScanNonSource(DocHygieneTests.InternalReferencePatterns);
 
         // Assert
         findings.ShouldBeEmpty(
@@ -91,7 +91,7 @@ public sealed class TrackedFileHygieneTests
     public void TrackedText_NamesNoPrivateEnvironment()
     {
         // Act
-        var findings = ScanNonSource(EnvironmentPatterns);
+        List<string> findings = ScanNonSource(EnvironmentPatterns);
 
         // Assert
         findings.ShouldBeEmpty(
@@ -119,7 +119,7 @@ public sealed class TrackedFileHygieneTests
     public void TrackedPaths_NeedNoQuoting()
     {
         // Act
-        var quoted = TrackedFiles.All.Where(static path => !PlainPath.IsMatch(path))
+        List<string> quoted = TrackedFiles.All.Where(static path => !PlainPath.IsMatch(path))
             .ToList();
 
         // Assert: the inventory is read from line-oriented output, so a path git would quote or one
@@ -146,7 +146,7 @@ public sealed class TrackedFileHygieneTests
                 continue;
             }
 
-            var hits = DocProse.FindForbidden(File.ReadAllText(absolute), everyPattern);
+            IReadOnlyList<string> hits = DocProse.FindForbidden(File.ReadAllText(absolute), everyPattern);
             if (!hits.Any(hit => IsToken(hit, token))) dead.Add($"{path} no longer carries '{token}'.");
         }
 

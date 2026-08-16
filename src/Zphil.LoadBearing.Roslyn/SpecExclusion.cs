@@ -65,7 +65,7 @@ internal static class SpecExclusion
     internal static IReadOnlyCollection<string> Compute(
         Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName)
     {
-        var projects = solution.Projects
+        List<SpecExclusionProject> projects = solution.Projects
             .Select(project => new SpecExclusionProject(
                 project.Name,
                 project.FilePath,
@@ -96,7 +96,7 @@ internal static class SpecExclusion
         var declaredByName = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (SpecExclusionProject project in projects)
         {
-            if (!referencesByName.TryGetValue(project.Name, out var references))
+            if (!referencesByName.TryGetValue(project.Name, out List<string>? references))
                 referencesByName[project.Name] = references = [];
             references.AddRange(project.ProjectReferenceNames);
 
@@ -114,7 +114,7 @@ internal static class SpecExclusion
         while (pending.Count > 0)
         {
             string name = pending.Dequeue();
-            if (!referencesByName.TryGetValue(name, out var references)) continue;
+            if (!referencesByName.TryGetValue(name, out List<string>? references)) continue;
 
             foreach (string reference in references)
             {

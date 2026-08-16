@@ -1,0 +1,34 @@
+<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<!-- The repo's first per-project settings layer, and the reason it exists is scope.
+
+	     MethodHasAsyncOverload sits at WARNING in the solution file, where it guards the async
+	     pipelines in Core, Roslyn, Xunit and the CLI: a sync call that blocks one of those is a
+	     real defect. It cannot mean that here. Every finding it raises in this project is
+	     File.ReadAllText or File.WriteAllText in a test's arrange or assert block — fixture setup
+	     on tiny files, strictly sequential, inside an async Task test method whose async exists to
+	     await the runner under test rather than to overlap anything. Awaiting them yields no
+	     thread, saves no blocking, and puts await noise through arrange blocks that read as data.
+
+	     Off here rather than demoted in the solution file, because demoting it there would give up
+	     the guard everywhere. jb mounts project layers by default — the switch that suppresses
+	     them names ProjectShared among the layers it turns off, and is not spelled literally in
+	     this comment for the reason below — so the explicit WARNING beside them still reaches
+	     every other project.
+
+	     Three traps, each of which cost a probe here before this file worked:
+
+	     1. XML forbids adjacent hyphens inside a comment. Spelling a jb switch literally makes
+	        this file unparseable, and jb then ignores the whole layer SILENTLY: no error, no
+	        warning, findings simply keep their solution-level severity. It reads exactly like the
+	        mechanism not working.
+	     2. A dot inside a rule ID escapes as _002E in these keys. This rule has none; one that
+	        does needs the escape, and a literal dot produces a key ReSharper never reads.
+	     3. Naming the solution settings file explicitly on the command line DEFEATS this layer.
+	        jb mounts an explicitly-named settings file as a custom layer that sits above the
+	        project layers, so the scope below is ignored and the solution-level WARNING applies
+	        here after all. jb finds this file on its own; the run that proves the baseline is the
+	        one that passes no settings path at all. Measured: 0 findings without, 83 with.
+
+	     DotSettingsCleanupProfileTests pins this file present, well-formed, and DO_NOT_SHOW. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MethodHasAsyncOverload/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+</wpf:ResourceDictionary>

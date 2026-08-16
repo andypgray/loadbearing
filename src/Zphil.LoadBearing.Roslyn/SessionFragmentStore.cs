@@ -98,7 +98,7 @@ internal sealed class SessionFragmentStore
     // business holding up the compare-and-extract.
     private readonly Dictionary<string, CodebaseModel> merged = new(StringComparer.Ordinal);
 
-    private readonly object mergedGate = new();
+    private readonly Lock mergedGate = new();
 
     // The generation the stored fragments were extracted at. -1 means nothing extracted yet; a loaded
     // snapshot's generation is always >= 1, so the first call always mismatches and full-extracts.
@@ -222,7 +222,7 @@ internal sealed class SessionFragmentStore
     private async Task<SessionFragmentSet> FullWalkAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
-        var fragments = await CodebaseExtractor
+        IReadOnlyList<CodebaseFragment> fragments = await CodebaseExtractor
             .ExtractFragmentsAsync(snapshot.Solution, null, snapshot.TargetFrameworks, declaredMembers, ct)
             .ConfigureAwait(false);
 
@@ -239,10 +239,10 @@ internal sealed class SessionFragmentStore
     private async Task<SessionFragmentSet> IncrementalWalkAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
-        var dirty = ExpandToDependents(ContentDirtyProjects(snapshot), snapshot.Solution);
+        HashSet<string> dirty = ExpandToDependents(ContentDirtyProjects(snapshot), snapshot.Solution);
         if (dirty.Count > 0)
         {
-            var reExtracted = await CodebaseExtractor
+            IReadOnlyList<CodebaseFragment> reExtracted = await CodebaseExtractor
                 .ExtractFragmentsAsync(snapshot.Solution, dirty, snapshot.TargetFrameworks, declaredMembers, ct)
                 .ConfigureAwait(false);
 
@@ -276,13 +276,13 @@ internal sealed class SessionFragmentStore
     {
         if (seed.Count == 0) return seed;
 
-        var dependentsByName = BuildReverseReferenceGraph(solution);
+        Dictionary<string, HashSet<string>> dependentsByName = BuildReverseReferenceGraph(solution);
         var result = new HashSet<string>(seed, StringComparer.Ordinal);
         var queue = new Queue<string>(seed);
         while (queue.Count > 0)
         {
             string current = queue.Dequeue();
-            if (!dependentsByName.TryGetValue(current, out var dependents)) continue;
+            if (!dependentsByName.TryGetValue(current, out HashSet<string>? dependents)) continue;
 
             foreach (string dependent in dependents)
                 if (result.Add(dependent))
@@ -303,7 +303,7 @@ internal sealed class SessionFragmentStore
             {
                 if (solution.GetProject(reference.ProjectId)?.Name is not { } referenced) continue;
 
-                if (!dependentsByName.TryGetValue(referenced, out var dependents))
+                if (!dependentsByName.TryGetValue(referenced, out HashSet<string>? dependents))
                 {
                     dependents = new HashSet<string>(StringComparer.Ordinal);
                     dependentsByName[referenced] = dependents;
@@ -320,7 +320,7 @@ internal sealed class SessionFragmentStore
     {
         foreach (CodebaseFragment fragment in fragments)
         {
-            if (!fragmentsByProject.TryGetValue(fragment.ProjectName, out var list))
+            if (!fragmentsByProject.TryGetValue(fragment.ProjectName, out List<CodebaseFragment>? list))
             {
                 list = [];
                 fragmentsByProject[fragment.ProjectName] = list;
@@ -340,7 +340,7 @@ internal sealed class SessionFragmentStore
     {
         if (orderedVersion == fragmentSetVersion && orderedFragments is { } cached) return cached;
 
-        var ordered = fragmentsByProject.Values
+        List<CodebaseFragment> ordered = fragmentsByProject.Values
             .SelectMany(list => list)
             .OrderBy(f => f.ProjectName, StringComparer.Ordinal)
             .ToList();

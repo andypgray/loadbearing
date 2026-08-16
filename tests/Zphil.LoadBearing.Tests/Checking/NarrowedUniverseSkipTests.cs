@@ -42,8 +42,7 @@ public sealed class NarrowedUniverseSkipTests
         // solution does have.
         RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Narrowed(), arch =>
                 arch.Rule("layering/x")
-                    .Enforce(arch.Namespace("App.Nowhere.*")
-                        .MustNotReference(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 
@@ -57,8 +56,7 @@ public sealed class NarrowedUniverseSkipTests
         // so it is its own empty-selection site and would otherwise red on its own message.
         RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Narrowed(), arch =>
                 arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.Nowhere.*")
-                        .Methods.MustBePublic())
+                    .Enforce(arch.Namespace("App.Nowhere.*").Methods.MustBePublic())
                     .Because("b"))
             .Single();
 
@@ -88,8 +86,7 @@ public sealed class NarrowedUniverseSkipTests
         // verdicts. Over the whole solution an empty subject is a spec defect and stays loud.
         RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, null, arch =>
                 arch.Rule("layering/x")
-                    .Enforce(arch.Namespace("App.Nowhere.*")
-                        .MustNotReference(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 
@@ -103,8 +100,7 @@ public sealed class NarrowedUniverseSkipTests
         // types that did load is a finding, and a filter is no reason to hold it back.
         RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Narrowed(), arch =>
                 arch.Rule("layering/x")
-                    .Enforce(arch.Namespace("App.Web.*")
-                        .MustNotReference(arch.Namespace("App.Data.*")))
+                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
 

@@ -70,7 +70,7 @@ internal sealed class ConstraintEvaluator
         // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
         // member-subject paths alike. The gate hands back the operand sets it evaluated, so the union
         // subject is folded from them rather than evaluated a second time.
-        var (emptyOperands, unionOperands) = EmptySubjectOperands(constraint.Subject);
+        (IReadOnlyList<Violation> emptyOperands, IReadOnlyList<HashSet<TypeNode>>? unionOperands) = EmptySubjectOperands(constraint.Subject);
         if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
@@ -78,8 +78,8 @@ internal sealed class ConstraintEvaluator
         // types none of whose members survive the kind filter is the ordinary way to fail empty).
         if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, unionOperands);
 
-        var subjects = Subjects(constraint.Subject, unionOperands);
-        if (subjects.Count == 0) return (new[] { Violation.EmptySubject(EmptySubjectMessage) }, NoWarnings);
+        HashSet<TypeNode> subjects = Subjects(constraint.Subject, unionOperands);
+        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings);
 
         switch (constraint)
         {
@@ -171,24 +171,24 @@ internal sealed class ConstraintEvaluator
         bool requireSites,
         bool warnInert)
     {
-        var operandSet = ResolveOperands(operands);
+        HashSet<TypeNode> operandSet = ResolveOperands(operands);
         var violations = new List<Violation>();
 
         foreach (TEdge edge in candidates)
         {
             if (!operandSet.Contains(operandOf(edge))) continue;
 
-            var sites = sitesOf(edge);
+            IReadOnlyList<SourceLocation>? sites = sitesOf(edge);
             if (requireSites && sites.Count == 0) continue;
 
             violations.Add(toViolation(edge, sites));
         }
 
-        var warnings = warnInert
-                       && violations.Count == 0
-                       && operandSet.Count == 0
-                       && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? new[] { new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage) }
+        IReadOnlyList<CheckWarning> warnings = warnInert
+                                               && violations.Count == 0
+                                               && operandSet.Count == 0
+                                               && operands.Any(SelectionEvaluator.IsPatternSelection)
+            ? [new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage)]
             : NoWarnings;
 
         return (violations, warnings);
@@ -214,7 +214,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
     {
-        var index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
+        ILookup<TypeNode, ReferenceEdge> index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
         Func<ReferenceEdge, TypeNode> operandOf = inbound ? e => e.Source : e => e.Target;
         return ForbiddenEdge(
             Keyed(subjects, index), operands, operandOf, e => e.Sites,
@@ -376,7 +376,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedTargets)
     {
-        var allowed = ResolveOperands(allowedTargets);
+        HashSet<TypeNode> allowed = ResolveOperands(allowedTargets);
         var violations = new List<Violation>();
 
         // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
@@ -391,7 +391,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedSources)
     {
-        var allowed = ResolveOperands(allowedSources);
+        HashSet<TypeNode> allowed = ResolveOperands(allowedSources);
         var violations = new List<Violation>();
 
         // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
@@ -413,7 +413,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyThrow(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedThrows)
     {
-        var allowed = ResolveOperands(allowedThrows);
+        HashSet<TypeNode> allowed = ResolveOperands(allowedThrows);
         var violations = new List<Violation>();
 
         foreach (ThrowEdge edge in Keyed(subjects, _throwEdgesBySource.Lookup))
@@ -439,7 +439,7 @@ internal sealed class ConstraintEvaluator
         var violations = new List<Violation>();
         foreach (Selection operand in union.Parts)
         {
-            var matched = _selections.Evaluate(operand, SelectionPosition.Subject);
+            HashSet<TypeNode> matched = _selections.Evaluate(operand, SelectionPosition.Subject);
             operands.Add(matched);
             if (matched.Count == 0)
                 violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
@@ -478,7 +478,7 @@ internal sealed class ConstraintEvaluator
     private static Func<TSubject, bool> NoneOf<TSubject>(
         IReadOnlyList<TypeAnchor> anchors, Func<TypeAnchor, Func<TSubject, bool>> matcher)
     {
-        var matchers = anchors.Select(matcher).ToList();
+        List<Func<TSubject, bool>> matchers = anchors.Select(matcher).ToList();
         return subject =>
         {
             for (var i = 0; i < matchers.Count; i++)
@@ -499,9 +499,9 @@ internal sealed class ConstraintEvaluator
     {
         // MemberConstraint.Subject IS MemberSubject.Source, so the union gate's operand sets are this
         // member selection's source types — resolved from them rather than evaluated a second time.
-        var sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
-        var members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
-        if (members.Count == 0) return (new[] { Violation.EmptySubject(EmptyMemberSubjectMessage) }, NoWarnings);
+        HashSet<TypeNode> sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
+        IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
+        if (members.Count == 0) return ([Violation.EmptySubject(EmptyMemberSubjectMessage)], NoWarnings);
 
         switch (constraint)
         {
@@ -555,7 +555,7 @@ internal sealed class ConstraintEvaluator
     // once per member of the subject.
     private static bool AcceptsParameter(IMemberInfo member, string parameterAnchor)
     {
-        var parameters = member.Parameters;
+        IReadOnlyList<IParameterInfo> parameters = member.Parameters;
         for (var i = 0; i < parameters.Count; i++)
             if (parameters[i].TypeFullName == parameterAnchor)
                 return true;

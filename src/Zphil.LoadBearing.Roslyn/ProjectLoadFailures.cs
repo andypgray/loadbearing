@@ -152,7 +152,7 @@ internal static class ProjectLoadFailures
 
         if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
         {
-            var loadedFiles = solution.Projects
+            HashSet<string> loadedFiles = solution.Projects
                 .Select(project => project.FilePath)
                 .Where(filePath => !string.IsNullOrEmpty(filePath))
                 .Select(filePath => Path.GetFullPath(filePath!))

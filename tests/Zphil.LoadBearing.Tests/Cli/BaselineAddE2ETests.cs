@@ -117,10 +117,10 @@ public sealed class BaselineAddE2ETests
 
         // A one-line burndown-shaped diff: exactly one new entry line + one bumped digest line added,
         // exactly one old digest line removed (the InvoiceController neighbour stays last, so no comma flip).
-        var added = LineSet(afterText)
+        List<string> added = LineSet(afterText)
             .Except(LineSet(beforeText))
             .ToList();
-        var removed = LineSet(beforeText)
+        List<string> removed = LineSet(beforeText)
             .Except(LineSet(afterText))
             .ToList();
         added.Count.ShouldBe(2);
@@ -242,7 +242,7 @@ public sealed class BaselineAddE2ETests
             .GetProperty("grandfathered")
             .GetInt32()
             .ShouldBe(1);
-        var bystanders = clockRule.GetProperty("violations")
+        List<JsonElement> bystanders = clockRule.GetProperty("violations")
             .EnumerateArray()
             .ToList();
         JsonElement bystander = bystanders.ShouldHaveSingleItem();

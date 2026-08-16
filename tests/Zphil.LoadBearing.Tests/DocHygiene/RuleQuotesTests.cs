@@ -29,7 +29,7 @@ public sealed class RuleQuotesTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var quotes = RuleQuotes.Extract("d.md", doc);
+        IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert: the line outside the fence is prose restating the quote, not the quote itself.
         RuleQuote quote = quotes.ShouldHaveSingleItem();
@@ -52,7 +52,7 @@ public sealed class RuleQuotesTests
             "```");
 
         // Act
-        var quotes = RuleQuotes.Extract("d.md", doc);
+        IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert
         quotes.ShouldHaveSingleItem()
@@ -74,7 +74,7 @@ public sealed class RuleQuotesTests
             "```");
 
         // Act
-        var quotes = RuleQuotes.Extract("d.md", doc);
+        IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert
         quotes.ShouldHaveSingleItem()
@@ -94,7 +94,7 @@ public sealed class RuleQuotesTests
             "```");
 
         // Act
-        var quotes = RuleQuotes.Extract("d.md", doc);
+        IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert
         quotes.ShouldBeEmpty();
@@ -117,7 +117,7 @@ public sealed class RuleQuotesTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var quotes = RuleQuotes.Extract("d.md", doc);
+        IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert
         quotes.Count.ShouldBe(2);
@@ -140,7 +140,7 @@ public sealed class RuleQuotesTests
             "- Expand any rule above with `loadbearing explain <rule-id>`.");
 
         // Act
-        var bullets = RuleQuotes.IndexBullets([card]);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.IndexBullets([card]);
 
         // Assert: the trailing help bullet carries no id and contributes nothing.
         bullets.Count.ShouldBe(1);
@@ -158,7 +158,7 @@ public sealed class RuleQuotesTests
         string scoped = Card($"- `time/inject-clock` {EmDash} scoped wording of the clock rule.");
 
         // Act
-        var bullets = RuleQuotes.IndexBullets([root, scoped]);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.IndexBullets([root, scoped]);
 
         // Assert
         bullets["time/inject-clock"]
@@ -172,7 +172,7 @@ public sealed class RuleQuotesTests
         var plain = $"# A hand-written page\n\n- `some/rule` {EmDash} not inside a managed block.";
 
         // Act
-        var bullets = RuleQuotes.IndexBullets([plain]);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.IndexBullets([plain]);
 
         // Assert
         bullets.ShouldBeEmpty();
@@ -184,7 +184,7 @@ public sealed class RuleQuotesTests
         // Arrange: a Migrate rule wraps the sentence in its old-pattern narration, so the quoted sentence
         // sits mid-bullet and the comparison must be containment rather than a prefix.
         RuleQuote quote = new("d.md", 5, "pass", "data-access/no-inline-sql", "Types in `Web.*` must not reference `SqlConnection`.");
-        var bullets = Bullets(
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = Bullets(
             "data-access/no-inline-sql",
             "Most existing code here follows the OLD pattern: inline SQL. New code must follow: Types in `Web.*` must not reference `SqlConnection`. Data access behind a repository can be swapped.");
 
@@ -201,7 +201,7 @@ public sealed class RuleQuotesTests
     {
         // Arrange
         RuleQuote quote = new("d.md", 5, "FAIL", "time/inject-clock", "The Web layer must not use `DateTime.Now`.");
-        var bullets = Bullets(
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = Bullets(
             "time/inject-clock",
             "Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now`.");
 
@@ -221,7 +221,7 @@ public sealed class RuleQuotesTests
     {
         // Arrange
         RuleQuote quote = new("d.md", 5, "FAIL", "data-access/no-inline-sql", "Types in `Classic.*` must not reference types in `System.Data.*`.");
-        var bullets = Bullets("layering/domain-independent", "The Domain layer must not reference the Web layer.");
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = Bullets("layering/domain-independent", "The Domain layer must not reference the Web layer.");
 
         // Act
         RuleQuotes.QuoteResult result = RuleQuotes.Classify(quote, bullets);
@@ -246,7 +246,7 @@ public sealed class RuleQuotesTests
         ];
 
         // Act
-        var cards = RuleQuotes.RenderedCards("examples/Meridian", tracked);
+        IReadOnlyList<string> cards = RuleQuotes.RenderedCards("examples/Meridian", tracked);
 
         // Assert: the root block and the scoped card beneath it, and nothing from a sibling example whose
         // path shares the prefix as a string but not as a directory.
@@ -268,7 +268,7 @@ public sealed class RuleQuotesTests
         ];
 
         // Act
-        var cards = RuleQuotes.RenderedCards(string.Empty, tracked);
+        IReadOnlyList<string> cards = RuleQuotes.RenderedCards(string.Empty, tracked);
 
         // Assert
         cards.ShouldBe(["AGENTS.md", "src/Zphil.LoadBearing/AGENTS.md"]);
@@ -284,7 +284,7 @@ public sealed class RuleQuotesTests
         Func<string, string?> reader = path => path == "examples/Ex/AGENTS.md" ? card : null;
 
         // Act
-        var bullets = RuleQuotes.RenderedBullets("examples/Ex", tracked, reader);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.RenderedBullets("examples/Ex", tracked, reader);
 
         // Assert
         bullets.ShouldHaveSingleItem()

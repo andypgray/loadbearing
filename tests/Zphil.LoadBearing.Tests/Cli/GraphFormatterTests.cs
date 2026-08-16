@@ -19,7 +19,7 @@ public sealed class GraphFormatterTests
     public void Lines_MixedSolutionMembership_AnnotatesOnlyThePassenger()
     {
         // Act
-        var lines = GraphFormatter.Lines(MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full);
+        IReadOnlyList<string> lines = GraphFormatter.Lines(MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full);
 
         // Assert — the annotation sits between the name and the em-dash, so the rest of the line reads
         // exactly as every other project's does and the roster still scans as one column of names. The

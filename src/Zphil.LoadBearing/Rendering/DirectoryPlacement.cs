@@ -23,7 +23,7 @@ internal static class DirectoryPlacement
     /// </summary>
     internal static string? ResolveDirectory(SelectionEvaluator evaluator, Selection selection)
     {
-        var sites = evaluator.Evaluate(selection, SelectionPosition.Subject)
+        List<string> sites = evaluator.Evaluate(selection, SelectionPosition.Subject)
             .Where(type => !type.IsExternal)
             .SelectMany(type => type.DeclarationSites)
             .Select(site => site.FilePath)

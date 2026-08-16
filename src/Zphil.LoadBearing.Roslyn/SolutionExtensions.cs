@@ -34,7 +34,7 @@ internal static class SolutionExtensions
 
         foreach (Project project in solution.Projects.ToList())
         {
-            var resolvedAnalyzers = project.AnalyzerReferences
+            List<AnalyzerReference> resolvedAnalyzers = project.AnalyzerReferences
                 .Where(analyzerRef => analyzerRef is not UnresolvedAnalyzerReference)
                 .ToList();
             int unresolvedAnalyzers = project.AnalyzerReferences.Count - resolvedAnalyzers.Count;
@@ -44,7 +44,7 @@ internal static class SolutionExtensions
                 analyzerCount += unresolvedAnalyzers;
             }
 
-            var resolvedMetadata = project.MetadataReferences
+            List<MetadataReference> resolvedMetadata = project.MetadataReferences
                 .Where(metadataRef => metadataRef is not UnresolvedMetadataReference)
                 .ToList();
             int unresolvedMetadata = project.MetadataReferences.Count - resolvedMetadata.Count;
@@ -108,12 +108,12 @@ internal static class SolutionExtensions
                 ? $"\0{project.Id.Id}"
                 : PathComparison.Fold(CanonicalProjectFile(project.FilePath, resolvedDirectories));
 
-            if (!byProjectFile.TryGetValue(key, out var group)) byProjectFile[key] = group = [];
+            if (!byProjectFile.TryGetValue(key, out List<Project>? group)) byProjectFile[key] = group = [];
             group.Add(project);
         }
 
         var targetFrameworks = new Dictionary<ProjectId, string>();
-        foreach (var group in byProjectFile.Values)
+        foreach (List<Project> group in byProjectFile.Values)
         {
             // The exact inverse of Roslyn's addDiscriminator guard: one Project per project file means the
             // name was never decorated, so there is nothing to undo and no framework to report.

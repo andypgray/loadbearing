@@ -30,7 +30,7 @@ public static class BaselineFormat
     /// </summary>
     public static string ComposeFile(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
-        var sorted = SortRules(rules);
+        IReadOnlyList<SortedRule> sorted = SortRules(rules);
         string digest = ComputeDigest(sorted);
 
         var builder = new StringBuilder();

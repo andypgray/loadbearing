@@ -20,9 +20,7 @@ internal static class MermaidText
         var builder = new StringBuilder(name.Length);
         foreach (char character in name)
         {
-            bool ascii = (character >= 'a' && character <= 'z')
-                         || (character >= 'A' && character <= 'Z')
-                         || (character >= '0' && character <= '9');
+            bool ascii = character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9';
             builder.Append(ascii ? character : '_');
         }
 
@@ -88,8 +86,8 @@ internal static class MermaidText
         string prefix, IReadOnlyList<TKey> keys, Func<TKey, string> nameOf, IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
-        var names = keys.Select(nameOf).ToList();
-        var ids = UniqueIds(prefix, names);
+        List<string> names = keys.Select(nameOf).ToList();
+        IReadOnlyList<string> ids = UniqueIds(prefix, names);
 
         var map = new Dictionary<TKey, string>(comparer);
         for (var i = 0; i < keys.Count; i++) map[keys[i]] = ids[i];
@@ -116,7 +114,7 @@ internal static class MermaidText
             $"    accDescr: {accDescr}"
         };
 
-        foreach (var section in sections)
+        foreach (IReadOnlyList<string> section in sections)
         {
             if (section.Count == 0) continue;
 

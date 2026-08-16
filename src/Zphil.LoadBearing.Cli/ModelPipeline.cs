@@ -111,7 +111,7 @@ internal static class ModelPipeline
     /// </remarks>
     internal static string LoaderFailureMessage(ReflectionTypeLoadException ex, string specDllPath)
     {
-        var messages = ex.LoaderExceptions
+        List<string> messages = ex.LoaderExceptions
             .Select(inner => inner?.Message)
             .Where(message => !string.IsNullOrWhiteSpace(message))
             .Select(message => message!)

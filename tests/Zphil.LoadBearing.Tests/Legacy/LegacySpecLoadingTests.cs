@@ -32,7 +32,7 @@ public sealed class LegacySpecLoadingTests
         {
             // Act
             Assembly spec = context.LoadFromAssemblyPath(specPath);
-            var specs = SpecDiscovery.FindSpecs(spec);
+            IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(spec);
             ArchitectureModel model = ArchModelBuilder.Build(specs);
 
             // Assert: the fixture really is .NET Framework, not silently retargeted by the build.

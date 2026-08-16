@@ -160,7 +160,7 @@ internal static class ProcessFileFootprint
                 + "an empty footprint for the wrong reason. Assert the process is alive first.");
 
         string canonicalRoot = Canonicalize(root);
-        var deviceMap = BuildDeviceMap();
+        Dictionary<string, string> deviceMap = BuildDeviceMap();
 
         IntPtr handle = OpenProcess(ProcessQueryInformation | ProcessDupHandle, false, process.Id);
         if (handle == IntPtr.Zero)

@@ -185,7 +185,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         // Only ever a clean load by here: a broken model outranks a small one, and it has already answered.
         if (run.Diagnostics.UncheckedProjects.Count == 0) return;
 
-        var uncheckedProjects = NarrowedUniverseNotice.Relative(
+        IReadOnlyList<string> uncheckedProjects = NarrowedUniverseNotice.Relative(
             run.Diagnostics.UncheckedProjects, run.SolutionDirectory);
         Assert.Skip(NarrowedUniverseNotice.AdapterSkip(Path.GetFileName(run.SolutionPath), uncheckedProjects));
     }
@@ -231,8 +231,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                     // with the solution's declared members subtracted so a spec that references the code it
                     // governs never excludes it. One read of that membership serves both consumers — the
                     // subtraction here, and the per-project label the extraction stamps on the model.
-                    var declaredMembers = SpecExclusion.TryReadDeclaredMembers(fullSolutionPath);
-                    var exclude = excludeProjectName is null
+                    IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(fullSolutionPath);
+                    IReadOnlyCollection<string>? exclude = excludeProjectName is null
                         ? null
                         : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
@@ -243,7 +243,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                 },
                 null, CancellationToken.None);
 
-            var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
+            Dictionary<string, RuleResult> byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
             // No merge notes: the adapter has no channel that renders them, so its diagnostics are the load
             // failures alone. The failed and unchecked projects come off the load itself — null only where no
             // load happened, which is also the case where there is nothing to have failed or skipped.
@@ -274,7 +274,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     // Per-closed-generic statics are load-bearing: each ArchRuleTests<TSpec> caches ITS spec's single check
     // run (per-TSpec caching is the whole point of the design), so these must NOT be shared across TSpec.
     // ReSharper disable StaticMemberInGenericType
-    private static readonly object Gate = new();
+    private static readonly Lock Gate = new();
 
     private static Task<ArchCheckRun>? s_run;
     // ReSharper restore StaticMemberInGenericType

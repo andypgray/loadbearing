@@ -38,9 +38,9 @@ internal static class GitChangedFiles
         // The three commands share nothing and process spawn dominates, so they run together. They are
         // awaited in launch order because that order is the refusal precedence: a directory that is not a
         // repository still surfaces rev-parse's message, not whichever child failed first.
-        var toplevelRun = RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
-        var trackedRun = RunGitAsync(solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "--");
-        var untrackedRun = RunGitAsync(
+        Task<string> toplevelRun = RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
+        Task<string> trackedRun = RunGitAsync(solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "--");
+        Task<string> untrackedRun = RunGitAsync(
             solutionDirectory, ct, "ls-files", "--others", "--exclude-standard", "--full-name", "-z");
 
         string toplevelOutput = await toplevelRun;
@@ -49,10 +49,10 @@ internal static class GitChangedFiles
         string trackedOutput = await trackedRun;
         string untrackedOutput = await untrackedRun;
 
-        var tracked = ParseZTerminated(trackedOutput);
-        var untracked = ParseZTerminated(untrackedOutput);
+        IReadOnlyList<string> tracked = ParseZTerminated(trackedOutput);
+        IReadOnlyList<string> untracked = ParseZTerminated(untrackedOutput);
 
-        var files = ComposeAbsolute(toplevel, tracked.Concat(untracked));
+        IReadOnlyList<string> files = ComposeAbsolute(toplevel, tracked.Concat(untracked));
         return new DiffContext(baseRef, solutionDirectory, files);
     }
 

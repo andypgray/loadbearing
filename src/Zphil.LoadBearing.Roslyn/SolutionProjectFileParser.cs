@@ -100,14 +100,14 @@ internal static class SolutionProjectFileParser
         string fullPath = Path.GetFullPath(solutionPath);
         if (!IsFilterFormat(fullPath))
         {
-            var members = ReadCsprojMembers(fullPath);
+            IReadOnlyList<string> members = ReadCsprojMembers(fullPath);
             return new SolutionMembership(members, members);
         }
 
-        (string referencedSolution, var requested) =
+        (string referencedSolution, IReadOnlyList<string> requested) =
             ParseFilter(File.ReadAllText(fullPath), Path.GetDirectoryName(fullPath)!);
 
-        var declared = ReadCsprojMembers(referencedSolution);
+        IReadOnlyList<string> declared = ReadCsprojMembers(referencedSolution);
 
         // Roslyn's own rule, reproduced exactly: an empty projects array is not an empty selection, it is
         // "no filtering at all". Intersecting instead would load nothing and report the whole solution
@@ -115,7 +115,7 @@ internal static class SolutionProjectFileParser
         if (requested.Count == 0) return new SolutionMembership(declared, declared);
 
         var selected = new HashSet<string>(requested, PathComparison.Comparer);
-        var required = declared
+        List<string> required = declared
             .Where(selected.Contains)
             .ToList();
 
@@ -239,7 +239,7 @@ internal static class SolutionProjectFileParser
     internal static IReadOnlyList<string> ParseCsprojMembers(
         string solutionText, string extension, string solutionDirectory)
     {
-        var relativePaths = extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase)
+        IEnumerable<string> relativePaths = extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase)
             ? ParseSlnx(solutionText)
             : ParseSln(solutionText);
 

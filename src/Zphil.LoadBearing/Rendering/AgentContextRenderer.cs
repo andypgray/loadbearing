@@ -116,13 +116,13 @@ public static class AgentContextRenderer
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));
 
-        var enforceRules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
+        List<ArchRule> enforceRules = model.Rules.Where(rule => rule.Posture == Posture.Enforce).ToList();
         if (enforceRules.Count > 0) sections.Add(RulesSection(enforceRules));
 
-        var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
+        List<ArchRule> migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
         if (migrateRules.Count > 0) sections.Add(MigrationsSection(migrateRules, grandfatheredCounts));
 
-        var containmentRules = model.Rules.Where(rule => rule.Quarantine is { Role: QuarantineRole.Containment }).ToList();
+        List<ArchRule> containmentRules = model.Rules.Where(rule => rule.Quarantine is { Role: QuarantineRole.Containment }).ToList();
         if (containmentRules.Count > 0) sections.Add(QuarantinedScopesSection(containmentRules));
 
         return string.Join("\n\n", sections);
@@ -133,7 +133,7 @@ public static class AgentContextRenderer
     // renders the bare "reference." line and nothing more (GRAMMAR §4.1/§4.5/§10).
     private static string GlossaryLine(IReadOnlyList<ArchRule> rules)
     {
-        var exercised = GlossaryAxes
+        IEnumerable<string> exercised = GlossaryAxes
             .Where(axis => rules.Any(axis.Applies))
             .Select(axis => axis.Clause);
 
@@ -150,7 +150,7 @@ public static class AgentContextRenderer
     // SpecValidator.CheckLifetimes's, and it is load-bearing because a UnionSelection has no noun to read.
     private static bool CarriesRegisteredNoun(Constraint constraint)
     {
-        var selections = SelectionWalk.ConstraintSelections(constraint);
+        IEnumerable<Selection> selections = SelectionWalk.ConstraintSelections(constraint);
         return selections.Any(selection => selection is not UnionSelection && selection.Noun is RegisteredNoun);
     }
 
@@ -209,7 +209,7 @@ public static class AgentContextRenderer
         Guard.NotNullOrWhiteSpace(layerName, nameof(layerName));
         Guard.NotNull(rules, nameof(rules));
 
-        var bullets = rules.Select(rule => RuleBullet(rule)).ToList();
+        List<string> bullets = rules.Select(rule => RuleBullet(rule)).ToList();
         bullets.Add($"- Expand any rule above with {ProseFormat.Backtick("loadbearing explain <rule-id>")}.");
 
         var sections = new List<string>
@@ -231,13 +231,13 @@ public static class AgentContextRenderer
 
     private static string LayersSection(IReadOnlyList<LayerDefinition> layers)
     {
-        var bullets = layers.Select(layer => "- " + layer.DefinitionFragment);
+        IEnumerable<string> bullets = layers.Select(layer => "- " + layer.DefinitionFragment);
         return Section("Layers", bullets);
     }
 
     private static string RulesSection(IReadOnlyList<ArchRule> rules)
     {
-        var bullets = rules.Select(rule => RuleBullet(rule));
+        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule));
         return Section("Rules", bullets);
     }
 
@@ -246,7 +246,7 @@ public static class AgentContextRenderer
     // so an agent reading the majority (old) pattern does not infer it is house style.
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
     {
-        var bullets = rules.Select(rule => RuleBullet(rule, counts));
+        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule, counts));
         return Section("Migrations", bullets);
     }
 
@@ -280,7 +280,7 @@ public static class AgentContextRenderer
     // Dragons prose stays scoped-only (progressive disclosure) and prints in the scope card + explain.
     private static string QuarantinedScopesSection(IReadOnlyList<ArchRule> containmentRules)
     {
-        var bullets = containmentRules.Select(QuarantinedScopeBullet);
+        IEnumerable<string> bullets = containmentRules.Select(QuarantinedScopeBullet);
         return Section("Quarantined scopes", bullets);
     }
 

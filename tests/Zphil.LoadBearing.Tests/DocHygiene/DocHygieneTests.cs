@@ -140,7 +140,7 @@ public sealed class DocHygieneTests
         string content = RepoRoot.ReadText(relativePath);
 
         // Act
-        var hits = DocProse.FindForbidden(content, InternalReferencePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(content, InternalReferencePatterns);
 
         // Assert
         hits.ShouldBeEmpty($"{relativePath} names internal working references:\n{string.Join("\n", hits)}");
@@ -154,7 +154,7 @@ public sealed class DocHygieneTests
         string content = RepoRoot.ReadText(relativePath);
 
         // Act
-        var hits = DocProse.FindForbidden(content, HouseVoicePatterns);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(content, HouseVoicePatterns);
 
         // Assert
         hits.ShouldBeEmpty($"{relativePath} uses off-voice wording:\n{string.Join("\n", hits)}");
@@ -217,7 +217,7 @@ public sealed class DocHygieneTests
         // Act: the walk above descends one level under examples/ and src/, which is how a reader doc at
         // a new top-level directory stayed invisible to it. Asking git for the set closes that blind
         // spot without another directory name to keep up to date.
-        var uncovered = TrackedFiles.All
+        List<string> uncovered = TrackedFiles.All
             .Where(static path => BudgetedFileNames.Contains(Path.GetFileName(path)))
             .Where(static path => !BudgetDocs.Contains(path))
             .ToList();

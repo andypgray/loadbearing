@@ -177,7 +177,7 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
             TimeSpan.FromMilliseconds(50),
             TimeSpan.FromMilliseconds(10),
             Stopwatch.GetTimestamp,
-            () => exited.Set());
+            exited.Set);
 
         // Assert — 10 s slack matches ParentProcessWatcherTests' analogous background
         // poll-loop test. A tighter budget flakes under coverage instrumentation / a

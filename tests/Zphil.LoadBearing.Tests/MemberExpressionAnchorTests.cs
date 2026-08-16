@@ -278,6 +278,9 @@ internal sealed class AnchorReadable : IAnchorReadable
 
 internal sealed class AnchorWidget
 {
+    // An ordinary read-write field is one of the shapes the menagerie below exists to offer; readonly
+    // would make it a different shape and leave that one unnamed.
+    // ReSharper disable once FieldCanBeMadeReadOnly.Global
     public int Size = 1;
 
     // A menagerie of member shapes for anchor expressions to name; the setters exist to make these

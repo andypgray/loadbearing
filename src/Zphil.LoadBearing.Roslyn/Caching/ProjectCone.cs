@@ -78,7 +78,7 @@ internal static class ProjectCone
     /// </summary>
     public static IReadOnlyList<string> Adds(string projectDirectory, ICollection<string> known)
     {
-        var adds = Enumerate(projectDirectory)
+        List<string> adds = Enumerate(projectDirectory)
             .Where(full => !known.Contains(full))
             .ToList();
         adds.Sort(StringComparer.Ordinal);

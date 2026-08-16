@@ -27,7 +27,7 @@ public sealed class WrittenPathsTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var written = WrittenPaths.Extract("d.md", doc);
+        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert: the line outside the fence is prose restating the capture, not the capture itself.
         WrittenPath path = written.ShouldHaveSingleItem();
@@ -50,7 +50,7 @@ public sealed class WrittenPathsTests
             "```");
 
         // Act
-        var written = WrittenPaths.Extract("d.md", doc);
+        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert
         written.ShouldHaveSingleItem()
@@ -70,7 +70,7 @@ public sealed class WrittenPathsTests
             "```");
 
         // Act
-        var written = WrittenPaths.Extract("d.md", doc);
+        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert
         written.ShouldBeEmpty();
@@ -84,7 +84,7 @@ public sealed class WrittenPathsTests
         string doc = string.Join("\n", "```text", "unchanged AGENTS.md", "```");
 
         // Act
-        var written = WrittenPaths.Extract("d.md", doc);
+        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert
         written.ShouldHaveSingleItem()
@@ -108,7 +108,7 @@ public sealed class WrittenPathsTests
         string doc = string.Join("\n", lines);
 
         // Act
-        var written = WrittenPaths.Extract("d.md", doc);
+        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert
         written.Count.ShouldBe(2);
@@ -127,7 +127,7 @@ public sealed class WrittenPathsTests
     {
         // Arrange
         WrittenPath written = new("d.md", 12, "unchanged", "src/Meridian.Web/AGENTS.md");
-        var tracked = WrittenPaths.TrackedSet(["examples/Meridian/src/Meridian.Web/AGENTS.md"]);
+        IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian/src/Meridian.Web/AGENTS.md"]);
 
         // Act
         WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);
@@ -143,7 +143,7 @@ public sealed class WrittenPathsTests
         // Arrange: a doc quoting a run over this repository's own solution reports paths that are already
         // repository-relative.
         WrittenPath written = new("README.md", 12, "wrote", "arch/baselines/mcp/env-through-seam.json");
-        var tracked = WrittenPaths.TrackedSet(["arch/baselines/mcp/env-through-seam.json"]);
+        IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["arch/baselines/mcp/env-through-seam.json"]);
 
         // Act
         WrittenPaths.PathResult result = WrittenPaths.Classify(written, string.Empty, tracked);
@@ -157,7 +157,7 @@ public sealed class WrittenPathsTests
     {
         // Arrange: the rename this gate exists to catch — the walkthrough still quotes the old name.
         WrittenPath written = new("d.md", 12, "wrote", "arch/baselines/time/inject-clock.json");
-        var tracked = WrittenPaths.TrackedSet(["examples/Meridian/arch/baselines/time/injected-clock.json"]);
+        IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian/arch/baselines/time/injected-clock.json"]);
 
         // Act
         WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);
@@ -175,7 +175,7 @@ public sealed class WrittenPathsTests
         // Arrange: the root is part of the identity, so a sibling example's file cannot answer for this
         // walkthrough's quoted path.
         WrittenPath written = new("d.md", 12, "unchanged", "AGENTS.md");
-        var tracked = WrittenPaths.TrackedSet(["examples/Meridian.Quoting/AGENTS.md"]);
+        IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian.Quoting/AGENTS.md"]);
 
         // Act
         WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);

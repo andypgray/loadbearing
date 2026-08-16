@@ -164,7 +164,7 @@ public sealed class SdkStyleProjectTests
         // The measurement AC #1 asks for. Both columns in one table, because the classification alone would
         // only describe the XML: what licenses the gate is that "SDK-style" and "has an assets file" agree
         // everywhere except where a bed was deliberately left unrestored.
-        var measured = RealProjectFiles()
+        List<string> measured = RealProjectFiles()
             .Select(Describe)
             .Order(StringComparer.Ordinal)
             .ToList();

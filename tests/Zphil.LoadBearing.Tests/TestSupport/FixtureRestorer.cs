@@ -35,7 +35,7 @@ internal static class FixtureRestorer
                 Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json")));
         if (!anyUnrestored) return true;
 
-        var solutions = Directory
+        IEnumerable<string> solutions = Directory
             .EnumerateFiles(testSolutionsDir, "*", SearchOption.AllDirectories)
             .Where(IsSolutionFile);
         foreach (string solutionPath in solutions) Restore(solutionPath);

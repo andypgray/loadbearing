@@ -58,9 +58,12 @@ internal sealed class SelectionEvaluator
             return Unite(union, parts);
         }
 
-        var current = ByNoun(selection.Noun, position);
+        IEnumerable<TypeNode> current = ByNoun(selection.Noun, position);
         foreach (SelectionAdjective adjective in selection.Adjectives) current = ApplyAdjective(current, adjective);
 
+        // The constructor is the point: adjectives can yield the same node twice, and naming HashSet here
+        // says the deduplication is deliberate where a spread would leave it to the return type.
+        // ReSharper disable once UseCollectionExpression
         return new HashSet<TypeNode>(current);
     }
 
@@ -76,13 +79,15 @@ internal sealed class SelectionEvaluator
     internal HashSet<TypeNode> Unite(UnionSelection union, IReadOnlyList<HashSet<TypeNode>> parts)
     {
         var members = new HashSet<TypeNode>();
-        foreach (var part in parts) members.UnionWith(part);
+        foreach (HashSet<TypeNode>? part in parts) members.UnionWith(part);
 
         if (union.Adjectives.Count == 0) return members;
 
         IEnumerable<TypeNode> unioned = members;
         foreach (SelectionAdjective adjective in union.Adjectives) unioned = ApplyAdjective(unioned, adjective);
 
+        // Same as Evaluate's tail: the constructor names the deduplication rather than implying it.
+        // ReSharper disable once UseCollectionExpression
         return new HashSet<TypeNode>(unioned);
     }
 
@@ -103,7 +108,7 @@ internal sealed class SelectionEvaluator
             case LayerNoun layer:
                 return Scanned(noun, position, () =>
                 {
-                    var globs = layer.Globs.Select(g => new NamespacePattern(g)).ToList();
+                    List<NamespacePattern> globs = layer.Globs.Select(g => new NamespacePattern(g)).ToList();
                     return universe.Where(t => MatchesAnyGlob(globs, t.Namespace));
                 });
             case NamespaceNoun ns:
@@ -115,7 +120,7 @@ internal sealed class SelectionEvaluator
             case ProjectNoun project:
                 // The ordinal ProjectName index, then the position filter — the same nodes in the same
                 // order the universe scan yielded, because a lookup grouping keeps Types order.
-                var declaring = ByProjectName[project.Name];
+                IEnumerable<TypeNode> declaring = ByProjectName[project.Name];
                 return subject ? declaring.Where(t => !t.IsExternal) : declaring;
             case TypeNoun typeNoun:
                 // Types is unique by FullName (same-FQN declarers are conflated at merge), so the scan
@@ -131,7 +136,7 @@ internal sealed class SelectionEvaluator
                 // target position but never enters a subject — exactly the §4.1 universe discipline.
                 return Scanned(noun, position, () =>
                 {
-                    var registeredNames = RegisteredFullNames(registered.Lifetime);
+                    HashSet<string> registeredNames = RegisteredFullNames(registered.Lifetime);
                     return universe.Where(t => registeredNames.Contains(t.FullName));
                 });
             default:
@@ -151,9 +156,9 @@ internal sealed class SelectionEvaluator
         SelectionNoun noun, SelectionPosition position, Func<IEnumerable<TypeNode>> scan)
     {
         (SelectionNoun noun, SelectionPosition position) key = (noun, position);
-        if (_byNoun.TryGetValue(key, out var cached)) return cached;
+        if (_byNoun.TryGetValue(key, out IReadOnlyList<TypeNode>? cached)) return cached;
 
-        var scanned = scan().ToList();
+        List<TypeNode> scanned = scan().ToList();
         _byNoun[key] = scanned;
         return scanned;
     }
@@ -227,16 +232,16 @@ internal sealed class SelectionEvaluator
                 var namePattern = new TypeNamePattern(matching.Glob);
                 return current.Where(t => namePattern.Matches(t.Name));
             case ImplementingAdjective implementing:
-                var interfaceMatch = InterfaceMatcher(implementing.Anchor);
+                Func<TypeNode, bool> interfaceMatch = InterfaceMatcher(implementing.Anchor);
                 return current.Where(interfaceMatch);
             case DerivedFromAdjective derivedFrom:
-                var baseMatch = BaseTypeMatcher(derivedFrom.Anchor);
+                Func<TypeNode, bool> baseMatch = BaseTypeMatcher(derivedFrom.Anchor);
                 return current.Where(baseMatch);
             case AttributedWithAdjective attributedWith:
-                var attributeMatch = AttributeMatcher(attributedWith.Anchor);
+                Func<TypeNode, bool> attributeMatch = AttributeMatcher(attributedWith.Anchor);
                 return current.Where(attributeMatch);
             case ExceptAdjective except:
-                var excluded = Evaluate(except.Payload, SelectionPosition.Target);
+                HashSet<TypeNode> excluded = Evaluate(except.Payload, SelectionPosition.Target);
                 return current.Where(t => !excluded.Contains(t));
             case WhereAdjective where:
                 return current.Where(t => InvokePredicate(where.Predicate, t, "Where"));
@@ -297,7 +302,7 @@ internal sealed class SelectionEvaluator
         Func<TypeConstruction, string> nameOf = onDefinition ? c => c.Definition.FullName : c => c.FullName;
         return t =>
         {
-            var candidates = constructions(t);
+            IReadOnlyList<TypeConstruction>? candidates = constructions(t);
             for (var i = 0; i < candidates.Count; i++)
                 if (nameOf(candidates[i]) == key)
                     return true;

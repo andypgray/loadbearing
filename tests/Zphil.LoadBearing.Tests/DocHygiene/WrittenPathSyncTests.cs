@@ -37,7 +37,7 @@ public sealed class WrittenPathSyncTests
     public void QuotedWritePaths_NameTrackedFiles()
     {
         // Arrange
-        var tracked = WrittenPaths.TrackedSet(TrackedFiles.All);
+        IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(TrackedFiles.All);
         List<string> stranded = new();
 
         // Act: every quoted path, resolved against its own example root, must be a file git tracks.
@@ -75,7 +75,7 @@ public sealed class WrittenPathSyncTests
     {
         // Arrange & Act: the corpus must keep exercising both alternatives, or half the pattern is dead
         // and nobody finds out until the day a doc quotes the other one.
-        var labels = WriteDocs
+        HashSet<string> labels = WriteDocs
             .SelectMany(entry => ExtractDoc(entry.Doc))
             .Select(written => written.Label)
             .ToHashSet(StringComparer.Ordinal);
@@ -90,7 +90,7 @@ public sealed class WrittenPathSyncTests
         // Arrange: the registry above is hand-written, so the failure it cannot see is a doc that quotes
         // a write report and was never added to it — a whole walkthrough silently outside the gate. Git
         // decides the scope, as it does for every hygiene gate here.
-        var registered = WriteDocs
+        HashSet<string> registered = WriteDocs
             .Select(entry => entry.Doc)
             .ToHashSet(StringComparer.Ordinal);
         List<string> unregistered = new();

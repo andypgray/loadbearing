@@ -15,7 +15,7 @@ public class SpecDiscoveryTests
     [Fact]
     public void FindSpecs_OrdersByFullNameOrdinal()
     {
-        var names = SpecDiscovery.FindSpecs(typeof(ArchSpec).Assembly)
+        List<string?> names = SpecDiscovery.FindSpecs(typeof(ArchSpec).Assembly)
             .Select(spec => spec.GetType()
                 .FullName)
             .ToList();

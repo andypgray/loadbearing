@@ -134,8 +134,8 @@ internal static class SpecResolver
         if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
             string canonicalPath = PathCanonicalizer.Resolve(Path.GetFullPath(specArgument));
-            var projects = CanonicalProjectsOf(solution);
-            var sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+            List<CanonicalProject> projects = CanonicalProjectsOf(solution);
+            List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalPath);
             if (sharingProjects.Count == 0)
                 throw new UserErrorException(
                     $"--spec '{specArgument}' is not a project in the solution. " +
@@ -152,9 +152,9 @@ internal static class SpecResolver
     private static SpecResolution ResolveByConvention(
         Solution solution, IReadOnlySet<string>? declaredMembers, WorkspaceDiagnostics diagnostics)
     {
-        var projects = CanonicalProjectsOf(solution);
+        List<CanonicalProject> projects = CanonicalProjectsOf(solution);
 
-        var candidates = projects
+        List<SpecProjectCandidate> candidates = projects
             .Where(entry => entry.Project.Language == LanguageNames.CSharp)
             .Select(entry => new SpecProjectCandidate(
                 entry.Project.Name,
@@ -182,7 +182,7 @@ internal static class SpecResolver
         string specProjectName,
         BuiltOutputInputs built)
     {
-        var evaluatedPaths = NormalizeEvaluatedPaths(built.OutputFilePaths);
+        List<string> evaluatedPaths = NormalizeEvaluatedPaths(built.OutputFilePaths);
 
         return new SpecResolution(
             RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
@@ -215,14 +215,14 @@ internal static class SpecResolver
             return new BuiltOutputInputs([evaluatedOutputFilePath], evaluatedIntermediatePath);
 
         string canonicalPath = PathCanonicalizer.Resolve(projectFilePath);
-        var sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+        List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalPath);
         return BuiltOutputsOf(sharingProjects);
     }
 
     // The two built-output facts, read off the projects one .csproj was built into.
     private static BuiltOutputInputs BuiltOutputsOf(IReadOnlyList<CanonicalProject> sharingProjects)
     {
-        var outputFilePaths = sharingProjects
+        List<string?> outputFilePaths = sharingProjects
             .Select(entry => entry.Project.OutputFilePath)
             .ToList();
         string? intermediateAssemblyPath = sharingProjects
@@ -271,11 +271,11 @@ internal static class SpecResolver
     /// </summary>
     private static IReadOnlyList<string> ReferencePathsOf(Project project, Solution solution)
     {
-        var metadataPaths = project.MetadataReferences
+        IEnumerable<string> metadataPaths = project.MetadataReferences
             .OfType<PortableExecutableReference>()
             .Select(r => r.FilePath ?? string.Empty);
 
-        var projectReferenceOutputs = project.ProjectReferences
+        IEnumerable<string> projectReferenceOutputs = project.ProjectReferences
             .Select(r => solution.GetProject(r.ProjectId)?.OutputFilePath ?? string.Empty);
 
         return metadataPaths.Concat(projectReferenceOutputs).ToList();
@@ -298,18 +298,18 @@ internal static class SpecResolver
     internal static SpecProjectCandidate ResolveConventionProject(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
-        var matches = candidates.Where(c => c.IsDeclaredMember && ReferencesCore(c)).ToList();
+        List<SpecProjectCandidate> matches = candidates.Where(c => c.IsDeclaredMember && ReferencesCore(c)).ToList();
 
         if (matches.Count == 0) throw NoSpecProjectFound(candidates, diagnostics);
 
-        var groups = matches
+        List<IGrouping<string, SpecProjectCandidate>> groups = matches
             .Select((candidate, index) => (Candidate: candidate, Key: GroupKey(candidate, index)))
             .GroupBy(match => match.Key, match => match.Candidate, StringComparer.Ordinal)
             .ToList();
 
         if (groups.Count > 1)
         {
-            var lines = groups
+            IOrderedEnumerable<string> lines = groups
                 .Select(group => DisambiguationLine(group.First()))
                 .OrderBy(line => line, StringComparer.Ordinal);
 
@@ -411,7 +411,7 @@ internal static class SpecResolver
     internal static string RequireBuiltOutput(
         string projectName, IReadOnlyList<string?> outputFilePaths, string? intermediateAssemblyPath = null)
     {
-        var evaluatedPaths = NormalizeEvaluatedPaths(outputFilePaths);
+        List<string> evaluatedPaths = NormalizeEvaluatedPaths(outputFilePaths);
 
         foreach (string outputFilePath in evaluatedPaths)
         {

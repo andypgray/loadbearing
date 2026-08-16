@@ -78,12 +78,10 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
-                .Enforce(arch.Namespace("A.*")
-                    .MustNotReference(arch.Namespace("B.*")))
+                .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*")))
                 .Because("x");
             arch.Rule("r/in")
-                .Enforce(arch.Namespace("C.*")
-                    .MustNotBeReferencedBy(arch.Namespace("D.*")))
+                .Enforce(arch.Namespace("C.*").MustNotBeReferencedBy(arch.Namespace("D.*")))
                 .Because("x");
         });
 
@@ -103,12 +101,10 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/out")
-                .Enforce(arch.Namespace("A.*")
-                    .MustOnlyReference(arch.Namespace("A.*"), arch.Namespace("B.*")))
+                .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("A.*"), arch.Namespace("B.*")))
                 .Because("x");
             arch.Rule("r/in")
-                .Enforce(arch.Namespace("C.*")
-                    .MustOnlyBeReferencedBy(arch.Namespace("C.*"), arch.Namespace("D.*")))
+                .Enforce(arch.Namespace("C.*").MustOnlyBeReferencedBy(arch.Namespace("C.*"), arch.Namespace("D.*")))
                 .Because("x");
         });
 
@@ -127,8 +123,7 @@ public sealed class LawDiagramRendererTests
         // permitted target is the subject.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/leaf")
-                .Enforce(arch.Namespace("A.*")
-                    .MustOnlyReference(arch.Namespace("A.*")))
+                .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("A.*")))
                 .Because("x"));
 
         // Act
@@ -147,12 +142,10 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/ban")
-                .Migrate("Callers reach across.", arch.Namespace("A.*")
-                    .MustNotReference(arch.Namespace("B.*")))
+                .Migrate("Callers reach across.", arch.Namespace("A.*").MustNotReference(arch.Namespace("B.*")))
                 .Because("x");
             arch.Rule("r/expose")
-                .Migrate("Engine types leak.", arch.Namespace("C.*")
-                    .MustNotExpose(arch.Namespace("D.*")))
+                .Migrate("Engine types leak.", arch.Namespace("C.*").MustNotExpose(arch.Namespace("D.*")))
                 .Because("x");
         });
 
@@ -275,12 +268,10 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.*")
-                    .MustNotReference(arch.Namespace("Z.*")))
+                .Enforce(arch.Namespace("A.*").MustNotReference(arch.Namespace("Z.*")))
                 .Because("x");
             arch.Rule("r/two")
-                .Enforce(arch.Namespace("A.B.*")
-                    .MustNotReference(arch.Namespace("Z.*")))
+                .Enforce(arch.Namespace("A.B.*").MustNotReference(arch.Namespace("Z.*")))
                 .Because("x");
         });
 
@@ -316,8 +307,7 @@ public sealed class LawDiagramRendererTests
             Layer wide = arch.Layer("Wide", "A.*");
             Layer split = arch.Layer("Split", "A.B.*", "Q.*");
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.B.C.*")
-                    .MustNotReference(arch.Namespace("Z.*")))
+                .Enforce(arch.Namespace("A.B.C.*").MustNotReference(arch.Namespace("Z.*")))
                 .Because("x");
             arch.Rule("r/two")
                 .Enforce(wide.MustNotReference(arch.Namespace("Z.*")))
@@ -360,8 +350,7 @@ public sealed class LawDiagramRendererTests
                 .Enforce(web.MustNotReference(arch.Namespace("Z.*")))
                 .Because("x");
             arch.Rule("r/two")
-                .Enforce(arch.Namespace("MyApp.Web.*")
-                    .MustNotReference(arch.Namespace("Y.*")))
+                .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("Y.*")))
                 .Because("x");
         });
 
@@ -415,8 +404,7 @@ public sealed class LawDiagramRendererTests
         // Arrange
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Project(reserved)
-                    .MustNotReference(arch.Namespace("Z.*")))
+                .Enforce(arch.Project(reserved).MustNotReference(arch.Namespace("Z.*")))
                 .Because("x"));
 
         // Act
@@ -437,8 +425,7 @@ public sealed class LawDiagramRendererTests
         // an entity reference. All go out as the entity Mermaid reads back as the character itself.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
-                .Enforce(arch.Namespace("A.*")
-                    .MustNotReference(typeof(List<string>)))
+                .Enforce(arch.Namespace("A.*").MustNotReference(typeof(List<string>)))
                 .Because("x"));
 
         // Act
@@ -456,8 +443,7 @@ public sealed class LawDiagramRendererTests
         // Arrange — a naming rule has no direction to draw.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface)
-                    .MustHavePrefix("I"))
+                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I"))
                 .Because("x"));
 
         // Act
@@ -477,8 +463,7 @@ public sealed class LawDiagramRendererTests
         ArchitectureModel model = Checker.Model(arch =>
         {
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface)
-                    .MustHavePrefix("I"))
+                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I"))
                 .Because("x");
             arch.Rule("naming/suffix")
                 .Migrate("Handlers are named freely.", arch.Types.MustHaveSuffix("Handler"))
@@ -540,20 +525,17 @@ public sealed class LawDiagramRendererTests
                 .Because("An engine type on a public signature forces every consumer to compile against it.");
 
             arch.Rule("packs/leaf")
-                .Enforce(arch.Namespace("Shop.Pack.*")
-                    .MustOnlyReference(arch.Namespace("Shop.Pack.*"), domain))
+                .Enforce(arch.Namespace("Shop.Pack.*").MustOnlyReference(arch.Namespace("Shop.Pack.*"), domain))
                 .Because("A pack that reaches past the domain drags the tool into its consumers.");
 
             arch.Rule("data/no-inline-sql")
                 .Migrate(
                     "Controllers build DataTables inline.",
-                    arch.Namespace("Shop.Web.Controllers.*")
-                        .MustNotReference(typeof(DataTable)))
+                    arch.Namespace("Shop.Web.Controllers.*").MustNotReference(typeof(DataTable)))
                 .Because("Repository pattern for testability.");
 
             arch.Rule("naming/interfaces")
-                .Enforce(arch.Types.OfKind(TypeKind.Interface)
-                    .MustHavePrefix("I"))
+                .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I"))
                 .Because("`I*` stays a reliable grep for the seams.");
 
             arch.Scope("legacy/pricing")

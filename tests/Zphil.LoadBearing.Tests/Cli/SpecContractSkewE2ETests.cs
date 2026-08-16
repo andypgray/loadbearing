@@ -128,7 +128,7 @@ public sealed class SpecContractSkewE2ETests
         using var peReader = new PEReader(stream);
         MetadataReader metadata = peReader.GetMetadataReader();
 
-        var referenced = metadata.AssemblyReferences
+        List<Version> referenced = metadata.AssemblyReferences
             .Select(metadata.GetAssemblyReference)
             .Where(reference => metadata.GetString(reference.Name) == SpecLoadContext.ContractAssemblyName)
             .Select(reference => reference.Version)

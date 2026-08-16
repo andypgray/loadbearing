@@ -55,7 +55,7 @@ internal static class SentenceRenderer
             if (TryBareType(target, out Type type))
                 types.Add(type);
 
-        var display = ProseFormat.ResolveTypeDisplays(types);
+        Dictionary<Type, string> display = ProseFormat.ResolveTypeDisplays(types);
         var parts = new List<string>(targets.Count);
         foreach (Selection target in targets)
             parts.Add(TryBareType(target, out Type type)
@@ -74,8 +74,8 @@ internal static class SentenceRenderer
     /// </summary>
     internal static string MemberList(IReadOnlyList<Member> members)
     {
-        var declaringTypes = members.Select(member => member.DeclaringType).ToList();
-        var display = ProseFormat.ResolveTypeDisplays(declaringTypes);
+        List<Type> declaringTypes = members.Select(member => member.DeclaringType).ToList();
+        Dictionary<Type, string> display = ProseFormat.ResolveTypeDisplays(declaringTypes);
 
         var parts = new List<string>(members.Count);
         foreach (Member member in members)
@@ -108,7 +108,7 @@ internal static class SentenceRenderer
         if (selection is UnionSelection union) return UnionPhrase(union, headOverride, headPrefixOverride);
 
         SelectionNoun noun = selection.Noun;
-        var adjectives = selection.Adjectives;
+        IReadOnlyList<SelectionAdjective> adjectives = selection.Adjectives;
 
         // Collective voice: a bare layer with no adjectives ("the Domain layer"). Any adjective
         // switches to types voice — the switch is structural, hence deterministic (GRAMMAR §6).
@@ -132,7 +132,7 @@ internal static class SentenceRenderer
     {
         if (union.Adjectives.Count > 0) return UnionPhrase(union, null, null);
 
-        var nouns = CollapsibleNouns(union);
+        IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
         return nouns is null
             ? ProseFormat.JoinReferences(union.Parts.Select(Reference).ToList())
             : nouns[0].CollapsedReference(nouns);
@@ -145,18 +145,18 @@ internal static class SentenceRenderer
     // against the or-joined operand phrases with the head and its prefix distributed into each.
     private static string UnionPhrase(UnionSelection union, string? headOverride, string? headPrefixOverride)
     {
-        var adjectives = union.Adjectives;
+        IReadOnlyList<SelectionAdjective> adjectives = union.Adjectives;
         if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
         (string? head, string? headPrefix, string inline, string subjectFinal) =
             Placements(adjectives, headOverride, headPrefixOverride);
 
-        var nouns = CollapsibleNouns(union);
+        IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
         if (nouns is not null)
             return (headPrefix ?? string.Empty) + (head ?? nouns[0].SubjectHead)
                                                 + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
 
-        var parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
+        List<string> parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
         return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
     }
 

@@ -38,8 +38,10 @@ public sealed class TypeNameSimpleTests
             .ShouldBe("PlainInner");
     }
 
-    // Arity is the shape under test — neither parameter is meant to be used.
+    // Arity is the shape under test — neither parameter is meant to be used, and the types are named by
+    // typeof rather than constructed, so nothing here is ever instantiated.
     // ReSharper disable once UnusedTypeParameter
+    // ReSharper disable once ClassNeverInstantiated.Local
     private sealed class GenericOuter<TOuter>
     {
         // ReSharper disable once UnusedTypeParameter

@@ -91,7 +91,7 @@ public sealed class McpChildServerRepoHandleTests
             CliRunner.QuarantinedSpecDll,
             repo.Root);
 
-        var inherited = LauncherHandlesUnderRepo();
+        IReadOnlyList<RetainedPath> inherited = LauncherHandlesUnderRepo();
 
         // The footprint assertion is the only one that has to run against a live process, so it rides the
         // harness's whileComplete hook — which fires only on a conversation that actually completed, so a
@@ -136,7 +136,7 @@ public sealed class McpChildServerRepoHandleTests
             CliRunner.QuarantinedSpecDll,
             AppContext.BaseDirectory);
 
-        var inherited = LauncherHandlesUnderRepo();
+        IReadOnlyList<RetainedPath> inherited = LauncherHandlesUnderRepo();
 
         IReadOnlyList<RetainedPath> retained = [];
 

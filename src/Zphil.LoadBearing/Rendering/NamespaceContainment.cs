@@ -23,8 +23,6 @@ internal static class NamespaceContainment
     /// </summary>
     internal static bool Implies(string inner, string outer)
     {
-        if (inner is null || outer is null) return false;
-
         if (!TryParse(inner, out string innerPrefix, out bool innerSubtree)) return false;
 
         if (!TryParse(outer, out string outerPrefix, out bool outerSubtree)) return false;

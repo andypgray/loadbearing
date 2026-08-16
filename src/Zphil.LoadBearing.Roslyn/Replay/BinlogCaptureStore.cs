@@ -135,7 +135,7 @@ internal sealed class BinlogCaptureStore
     /// <summary>The refusal text when the binlog is missing one or more of the solution's csproj members.</summary>
     internal static string MissingCoverageMessage(string binlogArgument, IEnumerable<string> missingCsprojs)
     {
-        var ordered = missingCsprojs
+        List<string> ordered = missingCsprojs
             .OrderBy(csproj => csproj, StringComparer.Ordinal)
             .ToList();
         return EvidenceBlock.Compose(
@@ -155,7 +155,7 @@ internal sealed class BinlogCaptureStore
     internal static string ExtraCoverageMessage(
         string binlogArgument, string solutionFileName, IEnumerable<string> extraCsprojs)
     {
-        var ordered = extraCsprojs
+        List<string> ordered = extraCsprojs
             .OrderBy(csproj => csproj, StringComparer.Ordinal)
             .ToList();
         return EvidenceBlock.Compose(
@@ -202,8 +202,8 @@ internal sealed class BinlogCaptureStore
         if (SolutionProjectFileParser.IsFilterFormat(solutionPath))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
-        var projects = CollectProjects(replayedSolution);
-        var structuralPaths = ProjectCone.SolutionStructuralPaths(
+        IReadOnlyList<CaptureProjectEntry> projects = CollectProjects(replayedSolution);
+        IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(
             solutionPath,
             projects.Select(project => (
                 project.CsprojPath,
@@ -251,12 +251,12 @@ internal sealed class BinlogCaptureStore
         // Canonicalized once per side, not once per comparison: resolving a path walks its ancestors probing
         // for reparse points, and the two-way subtraction below asks about every member twice. The refusals
         // quote the original spellings, which is what the pairing keeps hold of.
-        var solutionCsprojs = CanonicalPairs(SolutionProjectFileParser.ReadCsprojMembers(solutionPath));
-        var replayCsprojs = CanonicalPairs(projects.Select(project => project.CsprojPath));
+        IReadOnlyList<(string Original, string Canonical)> solutionCsprojs = CanonicalPairs(SolutionProjectFileParser.ReadCsprojMembers(solutionPath));
+        IReadOnlyList<(string Original, string Canonical)> replayCsprojs = CanonicalPairs(projects.Select(project => project.CsprojPath));
 
         var replayCanonical = new HashSet<string>(
             replayCsprojs.Select(csproj => csproj.Canonical), PathComparison.Comparer);
-        var missing = solutionCsprojs
+        List<string> missing = solutionCsprojs
             .Where(csproj => !replayCanonical.Contains(csproj.Canonical))
             .Select(csproj => csproj.Original)
             .ToList();
@@ -265,7 +265,7 @@ internal sealed class BinlogCaptureStore
 
         var solutionCanonical = new HashSet<string>(
             solutionCsprojs.Select(csproj => csproj.Canonical), PathComparison.Comparer);
-        var extra = replayCsprojs
+        List<string> extra = replayCsprojs
             .Where(csproj => !solutionCanonical.Contains(csproj.Canonical))
             .Select(csproj => csproj.Original)
             .ToList();
@@ -406,7 +406,7 @@ internal sealed class BinlogCaptureStore
     private static CaptureProjectEntry ToEntry(ProjectInputs project)
     {
         // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
-        var coneFiles = ProjectCone.Enumerate(project.ProjectDirectory)
+        List<string> coneFiles = ProjectCone.Enumerate(project.ProjectDirectory)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
 

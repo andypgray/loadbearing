@@ -193,11 +193,11 @@ internal sealed class ExtractionCacheStore
     /// </summary>
     public CacheFingerprint CaptureFingerprint(IReadOnlyList<ProjectInputs> projects, CancellationToken ct = default)
     {
-        var structuralStamps = StructuralPathsOf(projects)
+        List<FileStamp> structuralStamps = StructuralPathsOf(projects)
             .Select(FileStamping.StampOf)
             .ToList();
 
-        var structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
+        Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
 
         // Each project's fingerprint reads only its own files, so the whole SHA-256 pass over the solution's
         // sources runs in parallel — the one place a cold run spends real wall-clock — and lands in
@@ -210,8 +210,8 @@ internal sealed class ExtractionCacheStore
         {
             ProjectInputs project = projects[index];
 
-            var documents = project.DocumentPaths.Select(FileStamping.StampOf).ToList();
-            var documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
+            List<FileStamp> documents = project.DocumentPaths.Select(FileStamping.StampOf).ToList();
+            List<(string Path, string? Sha256)> documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
             string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
             string? assetsSha = structuralShaByPath.GetValueOrDefault(
                 IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
@@ -222,7 +222,7 @@ internal sealed class ExtractionCacheStore
             // validate and the project would stay dirty forever. With capture and validation running the one
             // routine, they agree.
             var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
-            var adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
+            IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
             contentKeyByIndex[index] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
             documentsByIndex[index] = documents;
         });
@@ -334,7 +334,7 @@ internal sealed class ExtractionCacheStore
             refreshedStructural.Add(refreshed);
         }
 
-        var structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
+        Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
         // Per-document sweep + cone scan ⇒ each project's recomputed content key. Independent per project —
         // each reads only its own documents and its own cone — so it runs in parallel into position-indexed
@@ -352,7 +352,7 @@ internal sealed class ExtractionCacheStore
         for (var index = 0; index < manifest.Projects.Count; index++)
         {
             ProjectCacheEntry project = manifest.Projects[index];
-            (string contentKey, var refreshedDocuments) = checkedByIndex[index];
+            (string contentKey, IReadOnlyList<FileStamp> refreshedDocuments) = checkedByIndex[index];
             recomputedContentKeys[project.ProjectName] = contentKey;
             referencesByName[project.ProjectName] = project.ProjectReferences;
             refreshedProjects.Add(project with { Documents = refreshedDocuments });
@@ -382,7 +382,7 @@ internal sealed class ExtractionCacheStore
             return CacheReadResult.Hit(manifest.Fragments, manifest.SpecResolutions, loadDiagnostics);
         }
 
-        var reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
+        List<CodebaseFragment> reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
         return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics);
     }
 
@@ -423,7 +423,7 @@ internal sealed class ExtractionCacheStore
 
         // Capture and validation compute cone-adds through the one routine over the same known-document set,
         // so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
-        var adds = ProjectCone.Adds(project.ProjectDirectory, knownDocuments);
+        IReadOnlyList<string> adds = ProjectCone.Adds(project.ProjectDirectory, knownDocuments);
         string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
         string? assetsSha = structuralShaByPath.GetValueOrDefault(
             IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
@@ -451,8 +451,8 @@ internal sealed class ExtractionCacheStore
 
         // Folded once per document, then sorted on the folded form — one fold per document rather than one
         // per comparison.
-        var keyed = documents
-            .Select(d => (Path: PathComparison.Fold(d.Path), d.Sha))
+        IOrderedEnumerable<(string Path, string? Sha)> keyed = documents
+            .Select(d => d with { Path = PathComparison.Fold(d.Path) })
             .OrderBy(d => d.Path, StringComparer.Ordinal);
         foreach ((string path, string? sha) in keyed)
             Append(hash, $"doc\0{path}\0{sha ?? "MISSING"}\n");
@@ -487,7 +487,7 @@ internal sealed class ExtractionCacheStore
 
         var builder = new StringBuilder();
         builder.Append(self);
-        if (referencesByName.TryGetValue(name, out var dependencies))
+        if (referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies))
             foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
                 if (contentKeys.ContainsKey(dependency))
                     builder.Append('\0').Append(ComputeMerkleKey(dependency, contentKeys, referencesByName, memo, visiting));

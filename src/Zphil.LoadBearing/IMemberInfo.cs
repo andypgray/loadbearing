@@ -9,6 +9,9 @@ namespace Zphil.LoadBearing;
 ///     grown additively as extraction learns new facts. Predicates are stored on the model but never
 ///     evaluated at spec build — the mandatory description is what renders, not the lambda.
 /// </summary>
+// Same as ITypeInfo: read by predicate authors, not through the interface in-solution, so
+// solution-wide search sees only the implementations and calls the members unused.
+// ReSharper disable UnusedMemberInSuper.Global
 public interface IMemberInfo
 {
     /// <summary>The member's simple name (no declaring-type qualifier, no signature).</summary>

@@ -55,8 +55,7 @@ public sealed class MustNotCatchVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-catch-domain")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatch(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 
@@ -75,8 +74,7 @@ public sealed class MustNotCatchVerbTests
         // this is a real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-catch-domain")
-                    .Enforce(arch.Namespace("App.*")
-                        .WithSuffix("CleanHandler")
+                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanHandler")
                         .MustNotCatch(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
@@ -110,8 +108,7 @@ public sealed class MustNotCatchVerbTests
         // DerivedFrom operand, so not flagged), pinning that the adjective matches solution types but not externals.
         RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
                 arch.Rule("ex/no-catch-derived")
-                    .Enforce(arch.Namespace("N.*")
-                        .MustNotCatch(arch.Types.DerivedFrom(typeof(Exception))))
+                    .Enforce(arch.Namespace("N.*").MustNotCatch(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
@@ -127,8 +124,7 @@ public sealed class MustNotCatchVerbTests
         // pattern operand is the warning gate, exactly as MustNotConstruct's inert-target semantics (§4.8).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatch(arch.Namespace("Nonexistent.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Nonexistent.*")))
                     .Because("b"))
             .Single();
 
@@ -143,8 +139,7 @@ public sealed class MustNotCatchVerbTests
         // pattern — stays silent (the departure from the pattern-operand inert warning above).
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("ex/no-catch-format")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatch(typeof(FormatException)))
+                    .Enforce(arch.Namespace("App.*").MustNotCatch(typeof(FormatException)))
                     .Because("b"))
             .Single();
 
@@ -159,8 +154,7 @@ public sealed class MustNotCatchVerbTests
         RuleResult result = Checker.Run(
                 "namespace App { public class Foo {} }",
                 arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustNotCatch(arch.Namespace("App.*")))
+                    .Enforce(arch.Namespace("Nowhere.*").MustNotCatch(arch.Namespace("App.*")))
                     .Because("b"))
             .Single();
 
@@ -176,8 +170,7 @@ public sealed class MustNotCatchVerbTests
 
         RuleResult result = Checker.Run(Sources.CatchRatchetModel, index, arch =>
                 arch.Rule("ex/no-catch")
-                    .Migrate("legacy broad catches", arch.Namespace("App.*")
-                        .MustNotCatch(arch.Namespace("Errors.*")))
+                    .Migrate("legacy broad catches", arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                     .Because("catch specific exceptions"))
             .Single();
 
@@ -194,8 +187,7 @@ public sealed class MustNotCatchVerbTests
         // schemaVersion stays 3, so member/subject slots stay omitted (null) as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("ex/no-catch-domain")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotCatch(arch.Namespace("Errors.*")))
+                .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("catch", "App.DataHandler", "Errors.DbError");

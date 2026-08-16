@@ -79,7 +79,9 @@ internal sealed class CodebaseSource : IDisposable
     private readonly CacheReadResult cacheRead;
 
     // The solution's declared membership, read at most once per source and handed to every extraction path so
-    // each project it collects carries ProjectNode.SolutionMember. Lazy because a cache hit merges stored
+    // each project it collects carries ProjectNode.SolutionMember. Resolution needs the same set (see
+    // SpecResolver.Resolve), so the cold spec path forces its own reader and hands it in rather than reading
+    // twice; every other path mints one here and leaves it unforced. Lazy because a cache hit merges stored
     // fragments and never extracts, and the point of a hit is that it touches nothing it does not have to.
     private readonly Lazy<IReadOnlySet<string>?> declaredMembers;
 
@@ -97,12 +99,7 @@ internal sealed class CodebaseSource : IDisposable
 
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
-    /// <param name="declaredMembers">
-    ///     The membership reader to adopt, or null to mint an unforced one. The cold spec path passes its own,
-    ///     already forced: resolution had to read the membership to pick the spec project, and extraction
-    ///     needs the same set to label every project it collects, so sharing the one Lazy is what makes that
-    ///     a single read. Every other path leaves it null and keeps the lazy behaviour a hit depends on.
-    /// </param>
+    // A null declaredMembers mints the unforced reader; the cold spec path passes the one it already forced.
     private CodebaseSource(
         CodebaseSourceOutcome outcome,
         string solutionPath,
@@ -332,7 +329,7 @@ internal sealed class CodebaseSource : IDisposable
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
-        var allFragments = await ExtractAllFragmentsAsync(solution, ct);
+        List<CodebaseFragment> allFragments = await ExtractAllFragmentsAsync(solution, ct);
         CodebaseModel merged = FragmentMerger.Merge(FragmentMerger.Retain(allFragments, excludeProjectNames));
 
         if (fingerprint is not null)
@@ -348,7 +345,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         if (Outcome == CodebaseSourceOutcome.Partial)
         {
-            var reExtracted = await CodebaseExtractor.ExtractFragmentsAsync(
+            IReadOnlyList<CodebaseFragment> reExtracted = await CodebaseExtractor.ExtractFragmentsAsync(
                 solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, declaredMembers.Value, ct);
             reExtractedProjects = new HashSet<string>(cacheRead.DirtyProjects, StringComparer.Ordinal);
             return cacheRead.ReusableFragments
@@ -375,10 +372,7 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
         try
         {
-            // One read of the declared membership for the whole source: resolution filters its candidates by
-            // it and subtracts the same set for the exclusion, and the extraction that follows labels every
-            // project it collects with it. The Lazy itself travels into the source — already forced — so what
-            // resolution read here is what extraction gets.
+            // Forced here and travelling on as the same Lazy, so what resolution read is what extraction gets.
             var declaredMembers = new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
             SpecResolution resolution = SpecResolver.Resolve(
                 handle.Solution, declaredMembers.Value, spec, handle.LoadDiagnostics);
@@ -438,7 +432,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         try
         {
-            var inputs = SolutionCacheInputs.Collect(solution);
+            IReadOnlyList<ProjectInputs> inputs = SolutionCacheInputs.Collect(solution);
             return store!.CaptureFingerprint(inputs, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -451,7 +445,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         try
         {
-            var records = BuildWriteSpecRecords();
+            IReadOnlyList<SpecResolutionRecord> records = BuildWriteSpecRecords();
             store!.Write(fingerprint, new ExtractionResult(allFragments, records, loadDiagnostics), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -467,7 +461,7 @@ internal sealed class CodebaseSource : IDisposable
     // the hit path has no workspace to re-walk the spec project's ProjectReference closure with.
     private IReadOnlyList<SpecResolutionRecord> BuildWriteSpecRecords()
     {
-        var existing = cacheRead.SpecResolutions;
+        IReadOnlyList<SpecResolutionRecord> existing = cacheRead.SpecResolutions;
         if (resolution?.SpecProjectName is not { } specProjectName) return existing;
 
         // The built-output inputs come off the resolution that consumed them rather than being re-derived
@@ -475,7 +469,7 @@ internal sealed class CodebaseSource : IDisposable
         // groups them by canonicalized project file — the distinction that keeps two same-named csprojs from
         // recording each other's outputs. Both slots are non-null on this branch: naming a spec project is
         // exactly what the solution-member resolution does, and that is the branch that fills them.
-        var outputFilePaths = resolution.OutputFilePaths ?? [];
+        IReadOnlyList<string> outputFilePaths = resolution.OutputFilePaths ?? [];
 
         var record = new SpecResolutionRecord(
             normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,

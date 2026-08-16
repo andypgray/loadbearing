@@ -109,7 +109,7 @@ public sealed class BinlogCliE2ETests : IDisposable
         await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed the capture (replay)
 
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        var original = FileSnapshot.Capture(csproj);
+        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
         try
         {
             // A harmless XML comment: a structural content change that invalidates the capture (stale) and the

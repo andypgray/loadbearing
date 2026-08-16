@@ -48,7 +48,7 @@ internal static class SpecValidationAssertions
     /// <summary>Every reported error as <c>Code on 'ruleId'</c>, in validator order.</summary>
     private static string Describe(SpecValidationException exception)
     {
-        var lines = exception.Errors
+        IEnumerable<string> lines = exception.Errors
             .Select(error => $"    {error.Code} on '{error.RuleId ?? "(no rule)"}'");
 
         return $"  reported {exception.Errors.Count} error(s):{Environment.NewLine}"

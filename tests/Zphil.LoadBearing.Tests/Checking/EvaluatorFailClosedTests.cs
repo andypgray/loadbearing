@@ -34,7 +34,7 @@ public sealed class EvaluatorFailClosedTests
     public void ApplyAdjective_UnknownAdjective_ThrowsNamingTheType()
     {
         var selection = new RefinedSelection(
-            new Arch(), TypesNoun.Instance, new SelectionAdjective[] { new UnknownAdjective() });
+            new Arch(), TypesNoun.Instance, [new UnknownAdjective()]);
         var evaluator = new SelectionEvaluator(EmptyCodebase);
 
         var ex = Should.Throw<InvalidOperationException>(() => evaluator.Evaluate(selection, SelectionPosition.Subject));
@@ -46,9 +46,9 @@ public sealed class EvaluatorFailClosedTests
     {
         var arch = new Arch();
         var memberSelection = new KindMemberSelection(
-            arch.Types, MemberKindFilter.Any, new MemberAdjective[] { new UnknownMemberAdjective() });
+            arch.Types, MemberKindFilter.Any, [new UnknownMemberAdjective()]);
         var selections = new SelectionEvaluator(EmptyCodebase);
-        var sourceTypes = selections.Evaluate(memberSelection.Source, SelectionPosition.Subject);
+        HashSet<TypeNode> sourceTypes = selections.Evaluate(memberSelection.Source, SelectionPosition.Subject);
 
         var ex = Should.Throw<InvalidOperationException>(() => MemberSelectionEvaluator.Resolve(memberSelection, sourceTypes));
         ex.Message.ShouldBe("Unhandled member adjective 'UnknownMemberAdjective'.");
@@ -60,7 +60,7 @@ public sealed class EvaluatorFailClosedTests
         // A real verb over a fake-adjective subject: the throw propagates out of ConstraintEvaluator and is
         // contained by ArchChecker.CheckRule as a per-rule RuleError (the run continues; the rule is Failed).
         var arch = new Arch();
-        var selection = new RefinedSelection(arch, TypesNoun.Instance, new SelectionAdjective[] { new UnknownAdjective() });
+        var selection = new RefinedSelection(arch, TypesNoun.Instance, [new UnknownAdjective()]);
         Constraint constraint = selection.MustHavePrefix("I");
         var model = new ArchitectureModel(
             [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
@@ -83,7 +83,7 @@ public sealed class EvaluatorFailClosedTests
         // fail-closed containment guarantee is exercised through the selection the member verb evaluates.
         var arch = new Arch();
         var memberSelection = new KindMemberSelection(
-            arch.Types, MemberKindFilter.Any, new MemberAdjective[] { new UnknownMemberAdjective() });
+            arch.Types, MemberKindFilter.Any, [new UnknownMemberAdjective()]);
         Constraint constraint = memberSelection.MustHaveSuffix("Async");
         var model = new ArchitectureModel(
             [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
@@ -101,7 +101,7 @@ public sealed class EvaluatorFailClosedTests
         // through its own §6 arm, collapsed or or-joined. Reading .Noun still throws rather than inventing
         // one — a subject union is admitted by the renderer's union arm, not by minting a fake head.
         var arch = new Arch();
-        var union = new UnionSelection(arch, new[] { arch.Types });
+        var union = new UnionSelection(arch, [arch.Types]);
 
         var ex = Should.Throw<InvalidOperationException>(() => _ = union.Noun);
         ex.Message.ShouldBe("A union selection has no single noun; render it in reference position.");

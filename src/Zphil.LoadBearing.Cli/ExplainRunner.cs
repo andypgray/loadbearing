@@ -26,7 +26,7 @@ internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISoluti
         ArchRule? rule = model.Rules.FirstOrDefault(candidate => candidate.Id == request.RuleId);
         if (rule is null) throw new UserErrorException(UnknownRuleMessage(request.RuleId, model));
 
-        foreach (string line in ExplainFormatter.Lines(rule)) output.WriteLine(line);
+        foreach (string line in ExplainFormatter.Lines(rule)) await output.WriteLineAsync(line);
         return 0;
     }
 

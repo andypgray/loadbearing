@@ -26,7 +26,7 @@ internal static class DocProse
     /// </remarks>
     public static string StripFences(string text)
     {
-        var kept = SourceAnchors.ProseLines(text)
+        IEnumerable<string> kept = SourceAnchors.ProseLines(text)
             .Select(static line => line.Text);
 
         return string.Join("\n", kept);
@@ -59,10 +59,10 @@ internal static class DocProse
     /// </summary>
     public static IReadOnlyList<string> FindForbidden(string text, IEnumerable<Regex> patterns)
     {
-        var patternList = patterns as Regex[] ?? patterns.ToArray();
+        Regex[] patternList = patterns as Regex[] ?? patterns.ToArray();
         string normalized = text.NormalizedLines();
 
-        var present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
+        Regex[] present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
             .ToArray();
         if (present.Length == 0) return [];
 

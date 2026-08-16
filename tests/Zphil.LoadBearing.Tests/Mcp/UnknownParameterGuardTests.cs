@@ -47,7 +47,7 @@ public sealed class UnknownParameterGuardTests
             if (method.GetCustomAttribute<McpServerToolAttribute>()
                     ?.Name is not { } toolName) continue;
 
-            var arguments = method.GetParameters()
+            Dictionary<string, JsonElement> arguments = method.GetParameters()
                 .Where(IsJsonBound)
                 .ToDictionary(p => p.Name!, _ => DummyValue);
 

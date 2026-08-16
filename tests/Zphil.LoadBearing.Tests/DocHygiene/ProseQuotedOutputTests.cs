@@ -160,7 +160,7 @@ public sealed class ProseQuotedOutputTests
         // and should be held like every other capture.
         foreach ((string doc, string marker, string _) in TimedCaptures)
         {
-            var fences = SourceAnchors.Fences(RepoRoot.ReadText(doc))
+            IReadOnlyList<string>[] fences = SourceAnchors.Fences(RepoRoot.ReadText(doc))
                 .Where(fence => fence.Any(line => line.Contains(marker, StringComparison.Ordinal)))
                 .ToArray();
             if (fences.Length != 1)

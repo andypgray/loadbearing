@@ -58,7 +58,7 @@ public class DotNetGuidanceTests
     {
         // The ratchet: add a tenth rule method and forget to wire it into ApplyAll, and this counts 9
         // rules against 10 methods. Nothing else in the suite would notice.
-        var ruleMethods = typeof(DotNetGuidance)
+        List<string> ruleMethods = typeof(DotNetGuidance)
             .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(method => method.Name != nameof(DotNetGuidance.ApplyAll))
             .Select(method => method.Name)

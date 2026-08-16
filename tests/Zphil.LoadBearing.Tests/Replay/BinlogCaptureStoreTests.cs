@@ -88,7 +88,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        var original = FileSnapshot.Capture(csproj);
+        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
         try
         {
             // A warm-up validation promotes any structural stamp that was still racy at ingest, so the only
@@ -132,7 +132,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
             .ShouldBeTrue();
 
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        var original = FileSnapshot.Capture(csproj);
+        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
         try
         {
             string edited = File.ReadAllText(csproj)
@@ -325,7 +325,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         // Arrange — make one csproj newer than the binlog (a rebuild the binlog no longer reflects).
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        var original = FileSnapshot.Capture(csproj);
+        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
         try
         {
             DateTime newer = File.GetLastWriteTimeUtc(Fixture.BinlogPath)
@@ -360,7 +360,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // The two solution members the leaf binlog does not build.
-        var missing = SolutionProjectFileParser.ReadCsprojMembers(Fixture.SolutionPath)
+        List<string> missing = SolutionProjectFileParser.ReadCsprojMembers(Fixture.SolutionPath)
             .Where(p => !p.EndsWith("MyApp.Legacy.Billing.csproj", StringComparison.OrdinalIgnoreCase))
             .ToList();
         missing.Count.ShouldBe(2);
@@ -490,7 +490,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
     // the ingest staleness check passes and the coverage check is what fires. Returns the reduced-sln path.
     private string WriteReducedSolutionWithoutWeb()
     {
-        var lines = File.ReadAllLines(Fixture.SolutionPath)
+        List<string> lines = File.ReadAllLines(Fixture.SolutionPath)
             .ToList();
         int webLine = lines.FindIndex(l => l.TrimStart()
             .StartsWith("Project(") && l.Contains("\"MyApp.Web\""));

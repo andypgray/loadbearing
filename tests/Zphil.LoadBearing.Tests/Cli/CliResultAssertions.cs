@@ -72,7 +72,7 @@ internal static class CliResultAssertions
         string report = Describe(result);
         result.Exit.ShouldBe(exit, report);
 
-        var checks = fragments
+        Action[] checks = fragments
             .Select<string, Action>(fragment => () => channel.ShouldContain(fragment, customMessage: report))
             .ToArray();
         result.ShouldSatisfyAllConditions(checks);

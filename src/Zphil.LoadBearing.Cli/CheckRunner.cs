@@ -52,8 +52,8 @@ internal sealed class CheckRunner(
         // Select — and refuse an unmatched filter — before extraction: rule IDs come from the spec model,
         // which is already resolved here, so nothing about a bad --rules value needs a codebase walk to say
         // so. The stamp goes out just as early, because it says what the operator is about to wait for.
-        var ruleGlobs = GlobList.Parse(request.Rules);
-        var rules = CheckPipeline.SelectRules(source.Model, ruleGlobs);
+        IReadOnlyList<string> ruleGlobs = GlobList.Parse(request.Rules);
+        IReadOnlyList<ArchRule> rules = CheckPipeline.SelectRules(source.Model, ruleGlobs);
 
         // Both stamps are human-channel only: under --json the document carries the same two facts in
         // uncheckedProjects and rulesFilter.
@@ -70,7 +70,7 @@ internal sealed class CheckRunner(
         // explain. They never reach the gate: that decision is WorkspaceDiagnostics' and keys on the load
         // failures alone.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        var renderedDiagnostics = diagnostics.RenderedWithMergeNotes;
+        IReadOnlyList<string> renderedDiagnostics = diagnostics.RenderedWithMergeNotes;
 
         // Fail closed on an incomplete model (a project failed to load, or to restore): a workspace-load diagnostic makes
         // exit 2 take precedence over 0/1, unless the operator opted into the partial model. The NuGetAudit
@@ -143,7 +143,7 @@ internal sealed class CheckRunner(
         string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         IReadOnlyList<string> ruleGlobs)
     {
-        var ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        IEnumerable<string> ladder = DocumentGrains.Ladder(request.Grain, Compose);
         string document = Fitter.Fit(ladder);
         output.WriteLine(document);
         return;

@@ -351,7 +351,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
             SweepContentReads++;
 
-            if (!documentIds.TryGetValue(path, out var ids) || ids.Count == 0)
+            if (!documentIds.TryGetValue(path, out List<DocumentId>? ids) || ids.Count == 0)
             {
                 // Path recorded but no document maps to it (defensive): re-fingerprint and move on.
                 documentFingerprints[path] = beforeRead;
@@ -446,7 +446,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
             string full = Path.GetFullPath(document.FilePath);
             documentFingerprints[full] = FileFreshness.CaptureUnverified(full);
-            if (!documentIds.TryGetValue(full, out var ids))
+            if (!documentIds.TryGetValue(full, out List<DocumentId>? ids))
             {
                 ids = [];
                 documentIds[full] = ids;
@@ -499,15 +499,15 @@ public sealed class WorkspaceSession : IAsyncDisposable
     /// </remarks>
     private static async Task<Solution> MaterializeDocumentTextsAsync(Solution solution, CancellationToken ct)
     {
-        var ids = solution.Projects
+        List<DocumentId> ids = solution.Projects
             .SelectMany(project => project.DocumentIds)
             .ToList();
 
-        var reads = ids
+        List<Task<SourceText?>> reads = ids
             .Select(id => ReadLoadedTextAsync(solution, id, ct))
             .ToList();
 
-        var texts = await Task.WhenAll(reads).ConfigureAwait(false);
+        SourceText?[] texts = await Task.WhenAll(reads).ConfigureAwait(false);
 
         Solution result = solution;
         for (var index = 0; index < ids.Count; index++)

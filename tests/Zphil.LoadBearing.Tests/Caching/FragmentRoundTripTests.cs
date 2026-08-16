@@ -26,7 +26,7 @@ public sealed class FragmentRoundTripTests
         // [GeneratedCode] type and the nested type that inherits the flag through the containing-type walk,
         // cross-project references, partials across files (declaration-site union), a multi-site edge,
         // externals, and a multi-TFM project.
-        var fragments = ExtractRichSolution();
+        IReadOnlyList<CodebaseFragment> fragments = ExtractRichSolution();
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -55,7 +55,7 @@ public sealed class FragmentRoundTripTests
     {
         // Pins the enum-serialization choice: names, not integers, so a reorder cannot silently remap and a
         // rename degrades to a parse-error miss rather than a wrong value.
-        var fragments = ExtractRichSolution();
+        IReadOnlyList<CodebaseFragment> fragments = ExtractRichSolution();
 
         string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
 
@@ -189,7 +189,7 @@ public sealed class FragmentRoundTripTests
         direct.InjectionEdges.Select(e => (e.Source.FullName, e.Injected.FullName))
             .ShouldContain(("N.Svc", "N.IFoo"));
         direct.ServiceRegistrations
-            .Any(r => r.Lifetime == Lifetime.Singleton && r.ServiceFullName == "N.IFoo" && r.ImplementationFullName == "N.Foo")
+            .Any(r => r is { Lifetime: Lifetime.Singleton, ServiceFullName: "N.IFoo", ImplementationFullName: "N.Foo" })
             .ShouldBeTrue();
         fromCache.ShouldModelTheSameAs(direct);
     }

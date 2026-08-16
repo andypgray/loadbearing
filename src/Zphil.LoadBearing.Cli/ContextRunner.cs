@@ -38,7 +38,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         {
             string caveat = IncompleteModelGate.ContextCaveat(diagnostics);
             LineBlocks.Write(output, caveat);
-            output.WriteLine();
+            await output.WriteLineAsync();
         }
 
         // Beside that caveat rather than instead of it — both can be true of one run, and a broken model
@@ -51,7 +51,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         // and point at the root block.
         if (!ContextFileComposer.HasAnythingToPlace(source.Model))
         {
-            output.WriteLine(PointerLine(request.Path));
+            await output.WriteLineAsync(PointerLine(request.Path));
             return 0;
         }
 
@@ -62,14 +62,14 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         // The composer's own placements, filtered to the ones covering the query path: layer local-rules
         // card(s) ahead of quarantined-scope card(s), the same cards in the same order render splices. An
         // unplaceable card carries a null directory and so covers nothing, which is the drop it always was.
-        var cards = ContextFileComposer.Placements(source.Model, codebase)
+        List<string> cards = ContextFileComposer.Placements(source.Model, codebase)
             .Where(card => card.DirectoryPath is not null && PathFormat.Contains(card.DirectoryPath, queryFullPath))
             .Select(card => card.Body)
             .ToList();
 
         if (cards.Count == 0)
         {
-            output.WriteLine(PointerLine(request.Path));
+            await output.WriteLineAsync(PointerLine(request.Path));
             return 0;
         }
 

@@ -227,7 +227,7 @@ public sealed class ProjectLoadFailuresTests
     {
         WriteSolution(temp, members);
 
-        var entries = selected.Select(name => $"\"{name}\\\\{name}.csproj\"");
+        IEnumerable<string> entries = selected.Select(name => $"\"{name}\\\\{name}.csproj\"");
         string filterPath = temp.PathOf("Filter.slnf");
         File.WriteAllText(
             filterPath,

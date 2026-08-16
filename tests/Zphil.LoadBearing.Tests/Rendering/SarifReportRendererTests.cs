@@ -39,13 +39,12 @@ public sealed class SarifReportRendererTests
         // nothing grandfathers it — carries no suppressions property at all (null-omitted, not an empty array).
         CheckReport report = Checker.Run(OneController, arch =>
             arch.Rule("layer/no-data")
-                .Enforce(arch.Namespace("App.Web.*")
-                    .MustNotReference(arch.Namespace("App.Data.*")))
+                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
 
         string json = Serialize(report);
 
-        var results = Results(json);
+        IReadOnlyList<JsonElement> results = Results(json);
         results.ShouldNotBeEmpty();
         foreach (JsonElement result in results)
         {
@@ -79,19 +78,18 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("layer/no-data")
-                .Enforce(arch.Namespace("App.Web.*")
-                    .MustNotReference(arch.Namespace("App.Data.*")))
+                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
 
         string json = Serialize(report);
 
-        var results = Results(json);
+        IReadOnlyList<JsonElement> results = Results(json);
         results.Count.ShouldBeGreaterThan(1); // genuinely multi-site
         // All sites belong to the one Page -> Db violation, so the fingerprints share every slot but the ordinal.
         IReadOnlyList<string> fingerprints = results.Select(Fingerprint)
             .ToList();
         fingerprints.ShouldAllBe(f => f.StartsWith("v1|T:App.Web.Page|T:App.Data.Db|", StringComparison.Ordinal));
-        var ordinals = fingerprints.Select(f => int.Parse(f.Split('|')[^1]))
+        List<int> ordinals = fingerprints.Select(f => int.Parse(f.Split('|')[^1]))
             .ToList();
         ordinals.ShouldBe(Enumerable.Range(0, ordinals.Count)); // consecutive, 0-based, distinct
     }
@@ -107,8 +105,7 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("ex/no-catch")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotCatch(arch.Namespace("Errors.*")))
+                .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                 .Because("Catch specific exceptions, not the domain base."));
 
         string json = Serialize(report);
@@ -127,8 +124,7 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("api/no-expose")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotExpose(arch.Namespace("Secrets.*")))
+                .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
                 .Because("Keep internal types off the public API."));
 
         string json = Serialize(report);
@@ -146,8 +142,7 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("ex/only-throw")
-                .Enforce(arch.Namespace("App.*")
-                    .MustOnlyThrow(arch.Namespace("Sanctioned.*")))
+                .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Sanctioned.*")))
                 .Because("Throw only the sanctioned exception types."));
 
         string json = Serialize(report);
@@ -181,8 +176,7 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("ex/filter-catches")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                 .Because("A broad catch names what it expects."));
 
         string json = Serialize(report);
@@ -214,8 +208,7 @@ public sealed class SarifReportRendererTests
                               """;
         CheckReport report = Checker.Run(source, arch =>
             arch.Rule("ex/no-bare-throws")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotThrow(typeof(Exception)))
+                .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
                 .Because("Throw a type a caller can dispatch on."));
 
         string json = Serialize(report);
@@ -314,9 +307,7 @@ public sealed class SarifReportRendererTests
         arch.Rule("data/x")
             .Migrate(
                 "Controllers open the data layer directly (legacy Active Record style).",
-                arch.Namespace("App.Web.*")
-                    .WithSuffix("Controller")
-                    .MustNotReference(arch.Namespace("App.Data.*")))
+                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("Repository pattern for testability.");
     }
 
@@ -360,7 +351,7 @@ public sealed class SarifReportRendererTests
     /// </summary>
     private static void ShouldSuppressEveryNoteWith(string json, string justification)
     {
-        var notes = Notes(json);
+        IReadOnlyList<JsonElement> notes = Notes(json);
         notes.ShouldNotBeEmpty();
         foreach (JsonElement note in notes)
         {

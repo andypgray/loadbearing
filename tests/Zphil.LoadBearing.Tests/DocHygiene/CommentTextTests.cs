@@ -92,7 +92,7 @@ public sealed class CommentTextTests
         string source = string.Join("\n", lines);
 
         // Act
-        var hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
 
         // Assert
         hits.ShouldHaveSingleItem()
@@ -106,7 +106,7 @@ public sealed class CommentTextTests
         var source = "var a = 1;\r\n// Phase 9\r\nvar b = 2;";
 
         // Act
-        var hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
+        IReadOnlyList<string> hits = DocProse.FindForbidden(CommentText.Mask(source), [PhaseLabel]);
 
         // Assert
         hits.ShouldHaveSingleItem()

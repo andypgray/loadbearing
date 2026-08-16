@@ -45,7 +45,7 @@ public sealed class ManifestVersionTests
     public void EveryVersionSite_NamesTheSameVersion()
     {
         // Arrange
-        var sites = ReadSites();
+        IReadOnlyList<VersionSite> sites = ReadSites();
 
         // Act
         string[] distinct = sites
@@ -78,7 +78,7 @@ public sealed class ManifestVersionTests
     {
         XDocument props = XDocument.Load(RepoRoot.Absolute(PropsPath));
 
-        var declared = props.Descendants("Version")
+        XElement[] declared = props.Descendants("Version")
             .ToArray();
         XElement version = declared.ShouldHaveSingleItem(
             $"{PropsPath} declares the lockstep <Version> exactly once, for all four packages at "
@@ -126,7 +126,7 @@ public sealed class ManifestVersionTests
 
     private static string Describe(IEnumerable<VersionSite> sites)
     {
-        var lines = sites.Select(static site => $"  {site.Site} -> {site.Version}");
+        IEnumerable<string> lines = sites.Select(static site => $"  {site.Site} -> {site.Version}");
 
         return string.Join("\n", lines);
     }

@@ -67,7 +67,7 @@ internal static class CompilationFactory
     public static CSharpCompilation CreateCompilation(
         string name, IReadOnlyList<MetadataReference> references, OutputKind kind, params (string Path, string Source)[] files)
     {
-        var trees = files
+        SyntaxTree[] trees = files
             .Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
             .ToArray();
         return CSharpCompilation.Create(name, trees, references, new CSharpCompilationOptions(kind));

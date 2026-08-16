@@ -130,12 +130,9 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustHaveSuffix_HoldsAndFlagsMismatch()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithSuffix("Async")
-            .MustHaveSuffix("Async"));
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithSuffix("Async").MustHaveSuffix("Async"));
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Walk")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Walk")
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
@@ -143,12 +140,9 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustHavePrefix_HoldsAndFlagsMismatch()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Run")
-            .MustHavePrefix("Run"));
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Run").MustHavePrefix("Run"));
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Walk")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Walk")
                 .MustHavePrefix("Run"))
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
@@ -156,12 +150,10 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustHaveNameMatching_HoldsAndFlagsMismatch()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithSuffix("Async")
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithSuffix("Async")
             .MustHaveNameMatching("*Async"));
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Walk")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Walk")
                 .MustHaveNameMatching("*Async"))
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
@@ -173,13 +165,11 @@ public sealed class MemberSubjectVerbTests
         // methods by an ordinal *-glob before the verb runs — MemberSelectionEvaluator.ApplyAdjective's
         // name-matching arm. "*Async" keeps only RunAsync, so MustHaveSuffix("Async") holds; without the
         // narrowing the other seven methods would fail, so the pass proves the glob actually filtered.
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithNameMatching("*Async")
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async")
             .MustHaveSuffix("Async"));
 
         // "*Walk*" selects only Walk, which fails the suffix — the glob arm flags exactly that member.
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithNameMatching("*Walk*")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Walk*")
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
@@ -189,12 +179,9 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustBePublic_HoldsAndFlagsInternal()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Run")
-            .MustBePublic());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Run").MustBePublic());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Hidden")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Hidden")
                 .MustBePublic())
             .ShouldBe(["M:App.Members.Widget.Hidden"]);
     }
@@ -202,12 +189,9 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustBeInternal_HoldsAndFlagsPublic()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Hidden")
-            .MustBeInternal());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Hidden").MustBeInternal());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Run")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Run")
                 .MustBeInternal())
             .ShouldBe(["M:App.Members.Widget.RunAsync"]);
     }
@@ -216,13 +200,9 @@ public sealed class MemberSubjectVerbTests
     public void MustBePrivate_HoldsAndFlagsPublic()
     {
         // MustBePrivate is member-only vocabulary (no type-side twin) — a private member is inventoried.
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Secret")
-            .MustBePrivate());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Secret").MustBePrivate());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Run")
-                .MustBePrivate())
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Run").MustBePrivate())
             .ShouldBe(["M:App.Members.Widget.RunAsync"]);
     }
 
@@ -231,25 +211,18 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustBeStatic_HoldsAndFlagsInstance()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Boot")
-            .MustBeStatic());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Boot").MustBeStatic());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Walk")
-                .MustBeStatic())
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Walk").MustBeStatic())
             .ShouldBe(["M:App.Members.Widget.Walk"]);
     }
 
     [Fact]
     public void MustBeAbstract_HoldsAndFlagsConcrete()
     {
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Cycle")
-            .MustBeAbstract());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Cycle").MustBeAbstract());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Idle")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Idle")
                 .MustBeAbstract())
             .ShouldBe(["M:App.Members.Machine.Idle"]);
     }
@@ -259,17 +232,13 @@ public sealed class MemberSubjectVerbTests
     {
         // C# declaration semantics: only a `virtual` member is virtual — an abstract or concrete one is not
         // (member-only vocabulary, no type-side twin).
-        Pass(MembersModel, arch => arch.Namespace("App.Members.*")
-            .Methods.WithPrefix("Spin")
-            .MustBeVirtual());
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Spin").MustBeVirtual());
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Idle")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Idle")
                 .MustBeVirtual())
             .ShouldBe(["M:App.Members.Machine.Idle"]);
 
-        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*")
-                .Methods.WithPrefix("Cycle")
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Cycle")
                 .MustBeVirtual())
             .ShouldBe(["M:App.Members.Machine.Cycle"]);
     }
@@ -281,14 +250,11 @@ public sealed class MemberSubjectVerbTests
     {
         // Each kind sugar narrows the member set to exactly its kind — a MustBeStatic over an instance
         // member of that kind flags only it, proving the other kinds were filtered out.
-        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*")
-                .Properties.MustBeStatic())
+        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*").Properties.MustBeStatic())
             .ShouldBe(["P:App.Kinds.Box.Prop"]);
-        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*")
-                .Fields.MustBeStatic())
+        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*").Fields.MustBeStatic())
             .ShouldBe(["F:App.Kinds.Box.Field"]);
-        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*")
-                .Events.MustBeStatic())
+        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*").Events.MustBeStatic())
             .ShouldBe(["E:App.Kinds.Box.Evt"]);
     }
 
@@ -296,8 +262,7 @@ public sealed class MemberSubjectVerbTests
     public void Members_ProjectionIsAllKinds()
     {
         // .Members is the unrestricted projection — every kind is in the subject set.
-        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*")
-                .Members.MustBeStatic())
+        FailedMemberIds(KindsModel, arch => arch.Namespace("App.Kinds.*").Members.MustBeStatic())
             .ShouldBe(["E:App.Kinds.Box.Evt", "F:App.Kinds.Box.Field", "M:App.Kinds.Box.Do", "P:App.Kinds.Box.Prop"]);
     }
 
@@ -307,8 +272,7 @@ public sealed class MemberSubjectVerbTests
     public void Returning_NonGenericAnchor_MatchesThatReturnTypeExactly()
     {
         // typeof(Task) matches the two Task-returning methods (not Task<int>, not void); Save fails the suffix.
-        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
-                .Methods.Returning(typeof(Task))
+        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*").Methods.Returning(typeof(Task))
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Async.HomeController.Save"]);
     }
@@ -318,8 +282,7 @@ public sealed class MemberSubjectVerbTests
     {
         // typeof(Task<>) matches Task<int> at the definition level (GRAMMAR §4.6) — the open-generic
         // construction match, mirroring Implementing's auto-detect.
-        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
-                .Methods.Returning(typeof(Task<>))
+        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<>))
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Async.HomeController.Load"]);
     }
@@ -328,8 +291,7 @@ public sealed class MemberSubjectVerbTests
     public void Returning_VoidAnchor_MatchesVoidReturn()
     {
         // typeof(void) → the System.Void return normalization the extractor records.
-        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
-                .Methods.Returning(typeof(void))
+        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*").Methods.Returning(typeof(void))
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Async.HomeController.Sync"]);
     }
@@ -339,8 +301,7 @@ public sealed class MemberSubjectVerbTests
     {
         // typeof(Task) or typeof(Task<>) selects Save, SaveAsync, and Load; SaveAsync passes, the other two fail.
         FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
-                .Methods
-                .Returning(typeof(Task), typeof(Task<>))
+                .Methods.Returning(typeof(Task), typeof(Task<>))
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
     }
@@ -352,17 +313,14 @@ public sealed class MemberSubjectVerbTests
     {
         // Under .Returning(Task, Task<>).MustAcceptParameter(CancellationToken): a method that declares a
         // CancellationToken parameter passes.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-            .Methods
-            .WithPrefix("HandleWithToken")
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("HandleWithToken")
             .Returning(typeof(Task), typeof(Task<>))
             .MustAcceptParameter(typeof(CancellationToken)));
 
         // …a tokenless one reds, keyed on its own M: DocId and located at its declaration site (Test.cs).
         RuleResult result = Checker.Run(ParametersModel, arch => arch.Rule("member/x")
                 .Enforce(
-                    arch.Namespace("App.Parameters.*")
-                        .Methods.WithPrefix("PollWithoutToken")
+                    arch.Namespace("App.Parameters.*").Methods.WithPrefix("PollWithoutToken")
                         .Returning(typeof(Task), typeof(Task<>))
                         .MustAcceptParameter(typeof(CancellationToken)))
                 .Because("b"))
@@ -377,13 +335,10 @@ public sealed class MemberSubjectVerbTests
     {
         // The bare .Methods.MustAcceptParameter form (no .Returning narrowing): a method that accepts a token
         // behind another parameter passes (any position counts), a tokenless one reds.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-            .Methods
-            .WithPrefix("FetchWithToken")
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("FetchWithToken")
             .MustAcceptParameter(typeof(CancellationToken)));
 
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-                .Methods
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .WithPrefix("PollWithoutToken")
                 .MustAcceptParameter(typeof(CancellationToken)))
             .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
@@ -394,14 +349,11 @@ public sealed class MemberSubjectVerbTests
     {
         // typeof(IProgress<>) matches a method accepting IProgress<int> at the definition level (any
         // construction on the definition name, GRAMMAR §4.6) — the parameter analog of .Returning(typeof(Task<>)).
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-            .Methods
-            .WithPrefix("ReportProgress")
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("ReportProgress")
             .MustAcceptParameter(typeof(IProgress<>)));
 
         // …and reds a method accepting no IProgress construction.
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-                .Methods
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .WithPrefix("PollWithoutToken")
                 .MustAcceptParameter(typeof(IProgress<>)))
             .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
@@ -412,9 +364,7 @@ public sealed class MemberSubjectVerbTests
     {
         // A `CancellationToken cancellationToken = default` parameter counts — the most common compliant
         // signature. Extraction reads the declared symbol, so a default value never drops the parameter.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-            .Methods
-            .WithPrefix("DefaultedToken")
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("DefaultedToken")
             .MustAcceptParameter(typeof(CancellationToken)));
     }
 
@@ -425,14 +375,12 @@ public sealed class MemberSubjectVerbTests
         // definition, and a params CancellationToken[] records the array type — NEITHER equals the
         // System.Threading.CancellationToken anchor, so both red. Asserted through the real evaluator over
         // real extracted facts, not by faking a parameter list.
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-                .Methods
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .WithPrefix("NullableTokenOnly")
                 .MustAcceptParameter(typeof(CancellationToken)))
             .ShouldBe(["M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})"]);
 
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-                .Methods
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .WithPrefix("ParamsTokensOnly")
                 .MustAcceptParameter(typeof(CancellationToken)))
             .ShouldBe(["M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])"]);
@@ -445,15 +393,12 @@ public sealed class MemberSubjectVerbTests
     {
         // MustBePublic over the [Mark]-attributed methods reds exactly one — the internal Hidden. Ignored is
         // internal too and would red alongside it had the adjective not narrowed, so the pin is self-guarding.
-        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
-                .AttributedWith(typeof(MarkAttribute))
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.AttributedWith(typeof(MarkAttribute))
                 .MustBePublic())
             .ShouldBe([$"M:{T}Tools.Hidden"]);
 
         // The string arm names the DEFINITION and selects identically — the type side's semantics, member side.
-        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
-                .AttributedWith($"{T}MarkAttribute")
-                .MustBePublic())
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.AttributedWith($"{T}MarkAttribute").MustBePublic())
             .ShouldBe([$"M:{T}Tools.Hidden"]);
     }
 
@@ -462,8 +407,7 @@ public sealed class MemberSubjectVerbTests
     {
         // The adjective is kind-agnostic: on .Properties it keeps the attributed Tally and drops the bare
         // Ledger, which is equally non-static and would red too if the narrowing had not happened.
-        FailedMemberIds(AttributedModel, arch => arch.Types.Properties
-                .AttributedWith(typeof(MarkAttribute))
+        FailedMemberIds(AttributedModel, arch => arch.Types.Properties.AttributedWith(typeof(MarkAttribute))
                 .MustBeStatic())
             .ShouldBe([$"P:{T}Tools.Tally"]);
     }
@@ -475,8 +419,7 @@ public sealed class MemberSubjectVerbTests
         // wrong-category anchor as the sole adjective matches nothing, and the fail-on-empty gate reds the
         // rule in member terms rather than letting it pass vacuously. Pinned, because it is the argument.
         RuleResult result = Checker.Run(AttributedModel, arch => arch.Rule("member/x")
-                .Enforce(arch.Types.Methods.AttributedWith($"{T}MrakAttribute")
-                    .MustBePublic())
+                .Enforce(arch.Types.Methods.AttributedWith($"{T}MrakAttribute").MustBePublic())
                 .Because("b"))
             .Single();
 
@@ -486,12 +429,10 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustBeAttributedWith_HoldsForAttributedMember_RedsBareMemberAtItsDocId()
     {
-        Pass(AttributedModel, arch => arch.Types.Methods
-            .WithPrefix("RunAsync")
+        Pass(AttributedModel, arch => arch.Types.Methods.WithPrefix("RunAsync")
             .MustBeAttributedWith(typeof(MarkAttribute)));
 
-        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
-                .WithPrefix("Ignored")
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.WithPrefix("Ignored")
                 .MustBeAttributedWith(typeof(MarkAttribute)))
             .ShouldBe([$"M:{T}Tools.Ignored"]);
 
@@ -499,8 +440,7 @@ public sealed class MemberSubjectVerbTests
         Pass(AttributedModel, arch => arch.Types.Methods.WithPrefix("RunAsync")
             .MustBeAttributedWith($"{T}MarkAttribute"));
 
-        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
-                .WithPrefix("Ignored")
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.WithPrefix("Ignored")
                 .MustBeAttributedWith($"{T}MarkAttribute"))
             .ShouldBe([$"M:{T}Tools.Ignored"]);
     }
@@ -508,13 +448,11 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MustNotBeAttributedWith_RedsAttributedMember_PassesForBare()
     {
-        FailedMemberIds(AttributedModel, arch => arch.Types.Methods
-                .WithPrefix("RunAsync")
+        FailedMemberIds(AttributedModel, arch => arch.Types.Methods.WithPrefix("RunAsync")
                 .MustNotBeAttributedWith(typeof(MarkAttribute)))
             .ShouldBe([$"M:{T}Tools.RunAsync"]);
 
-        Pass(AttributedModel, arch => arch.Types.Methods
-            .WithPrefix("Ignored")
+        Pass(AttributedModel, arch => arch.Types.Methods.WithPrefix("Ignored")
             .MustNotBeAttributedWith(typeof(MarkAttribute)));
     }
 
@@ -537,8 +475,7 @@ public sealed class MemberSubjectVerbTests
         // Every [Mark]-attributed member across both declaring types, all instance, so all red. Ordering is
         // (DeclaringType.FullName, SymbolId): Tools.Tally (a P: id) sorts before Widgets.Assemble (an M: id)
         // because its declaring type sorts first — a global SymbolId sort would invert the pair.
-        FailedMemberIds(AttributedModel, arch => arch.Types.Members
-                .AttributedWith(typeof(MarkAttribute))
+        FailedMemberIds(AttributedModel, arch => arch.Types.Members.AttributedWith(typeof(MarkAttribute))
                 .MustBeStatic())
             .ShouldBe([$"M:{T}Tools.Hidden", $"M:{T}Tools.RunAsync", $"P:{T}Tools.Tally", $"M:{T}Widgets.Assemble"]);
     }
@@ -583,8 +520,7 @@ public sealed class MemberSubjectVerbTests
                               }
                               """;
 
-        Pass(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*")
-            .Methods
+        Pass(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*").Methods
             .Where(m => m.IsAsync, "that are async")
             .MustHaveSuffix("Async"));
     }
@@ -602,8 +538,7 @@ public sealed class MemberSubjectVerbTests
                               }
                               """;
 
-        FailedMemberIds(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*")
-                .Methods
+        FailedMemberIds(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*").Methods
                 .Must(m => m.DeclaringType.Name == "KeepThis", "be declared on KeepThis"))
             .ShouldBe(["M:App.Hatch.DropThis.B"]);
     }
@@ -614,8 +549,7 @@ public sealed class MemberSubjectVerbTests
         // Self-guarding: the Where narrows to methods declaring a System.Threading.CancellationToken
         // parameter — if Parameters/TypeFullName were unpopulated the subject would be empty and the rule
         // would FAIL. Passed proves the real extracted parameter facts reach the checker end-to-end.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-            .Methods
+        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
             .Where(m => m.Parameters.Any(p => p.TypeFullName == "System.Threading.CancellationToken"), "that accept a token")
             .MustBePublic());
     }
@@ -625,8 +559,7 @@ public sealed class MemberSubjectVerbTests
     {
         // The Must predicate reads m.Parameters.Count: the one parameterless method reds, proving the
         // parameter list reaches the member predicate end-to-end (the other six declare a parameter and pass).
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
-                .Methods
+        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
                 .Must(m => m.Parameters.Count > 0, "declare at least one parameter"))
             .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
     }
@@ -642,8 +575,7 @@ public sealed class MemberSubjectVerbTests
 
         RuleResult result = Checker.Run(CompilationFactory.Extract(source), arch =>
                 arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.NoFields.*")
-                        .Fields.MustBePublic())
+                    .Enforce(arch.Namespace("App.NoFields.*").Fields.MustBePublic())
                     .Because("b"))
             .Single();
 
@@ -659,8 +591,7 @@ public sealed class MemberSubjectVerbTests
         // member dispatch runs before the type-subject empty gate.
         RuleResult result = Checker.Run(AsyncModel, arch =>
                 arch.Rule("member/x")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .Methods.MustBePublic())
+                    .Enforce(arch.Namespace("Nowhere.*").Methods.MustBePublic())
                     .Because("b"))
             .Single();
 
@@ -674,9 +605,7 @@ public sealed class MemberSubjectVerbTests
     {
         ArchitectureModel model = Checker.Model(arch => arch.Rule("naming/async-suffix")
             .Migrate("legacy Task-returning methods lack the Async suffix",
-                arch.Namespace("App.Async.*")
-                    .Methods.Returning(typeof(Task))
-                    .MustHaveSuffix("Async"))
+                arch.Namespace("App.Async.*").Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
             .Because("Async discovery is suffix-based."));
 
         // Empty baseline → Save() is red (SaveAsync passes); capture its member-subject identity (a M: DocId).
@@ -727,9 +656,7 @@ public sealed class MemberSubjectVerbTests
     {
         ArchitectureModel model = Checker.Model(arch => arch.Rule("async/accept-cancellation")
             .Migrate("legacy Task-returning methods do not accept a CancellationToken",
-                arch.Namespace("App.Cancel.*")
-                    .Methods
-                    .Returning(typeof(Task), typeof(Task<>))
+                arch.Namespace("App.Cancel.*").Methods.Returning(typeof(Task), typeof(Task<>))
                     .MustAcceptParameter(typeof(CancellationToken)))
             .Because("Async methods must honor cancellation."));
 
@@ -800,8 +727,7 @@ public sealed class MemberSubjectVerbTests
         // refusal as a backstop. A hand-built model bypasses spec-build validation to reach it: the closed
         // construction surfaces as a RuleError, not a crash.
         var arch = new Arch();
-        Constraint constraint = arch.Namespace("App.Async.*")
-            .Methods.Returning(typeof(Task<int>))
+        Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
             .MustHaveSuffix("Async");
         var model = new ArchitectureModel(
             [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
@@ -823,8 +749,7 @@ public sealed class MemberSubjectVerbTests
         // through the SAME definition-FQN path. A hand-built model bypasses spec-build validation to reach it:
         // the closed construction surfaces as a RuleError, not a crash.
         var arch = new Arch();
-        Constraint constraint = arch.Namespace("App.Parameters.*")
-            .Methods.MustAcceptParameter(typeof(IProgress<int>));
+        Constraint constraint = arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(IProgress<int>));
         var model = new ArchitectureModel(
             [new ArchRule("async/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
 
@@ -844,9 +769,7 @@ public sealed class MemberSubjectVerbTests
     {
         RuleResult result = Checker.Run(AsyncModel, arch =>
                 arch.Rule("naming/async-suffix")
-                    .Enforce(arch.Namespace("App.Async.*")
-                        .Methods.Returning(typeof(Task))
-                        .MustHaveSuffix("Async"))
+                    .Enforce(arch.Namespace("App.Async.*").Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                     .Because("Async discovery is suffix-based."))
             .Single();
 
@@ -860,9 +783,7 @@ public sealed class MemberSubjectVerbTests
     {
         CheckReport report = Checker.Run(AsyncModel, arch =>
             arch.Rule("naming/async-suffix")
-                .Enforce(arch.Namespace("App.Async.*")
-                    .Methods.Returning(typeof(Task))
-                    .MustHaveSuffix("Async"))
+                .Enforce(arch.Namespace("App.Async.*").Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
                 .Because("b"));
 
         report.ShouldRenderMemberShapeViolation("memberShape", "M:App.Async.HomeController.Save");

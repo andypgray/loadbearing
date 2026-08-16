@@ -144,7 +144,7 @@ internal static class McpChildHarness
                                 ?? throw new InvalidOperationException("Failed to start the MCP server child."))
         {
             // Drained from the start so a chatty child cannot fill its stderr pipe and stall.
-            var errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+            Task<string> errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
             try
             {
                 await SendAsync(server, InitializeRequest);
@@ -294,7 +294,7 @@ internal static class McpChildHarness
     /// </summary>
     internal static async Task<string?> ReadLineWithinAsync(StreamReader stdout, TimeSpan budget)
     {
-        var pending = stdout.ReadLineAsync();
+        Task<string?> pending = stdout.ReadLineAsync();
         Task first = await Task.WhenAny(pending, Task.Delay(budget, TestContext.Current.CancellationToken));
         return first == pending ? await pending : null;
     }

@@ -34,7 +34,7 @@ internal static class CliEntry
         // Remap System.CommandLine's default parse-error exit code (1) to 2; 1 means "violations found".
         if (parseResult.Errors.Count > 0)
         {
-            foreach (ParseError error in parseResult.Errors) configuration.Error.WriteLine(error.Message);
+            foreach (ParseError error in parseResult.Errors) await configuration.Error.WriteLineAsync(error.Message);
             return 2;
         }
 

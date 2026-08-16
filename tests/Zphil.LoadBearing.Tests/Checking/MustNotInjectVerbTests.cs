@@ -58,8 +58,7 @@ public sealed class MustNotInjectVerbTests
     {
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
@@ -78,8 +77,7 @@ public sealed class MustNotInjectVerbTests
         // The scoped operand resolves (IScopedDep/ScopedDep exist), so this is a real pass, not an inert one.
         RuleResult result = Checker.Run(SceneModel, arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .WithPrefix("Referencing")
+                    .Enforce(arch.Registered(Lifetime.Singleton).WithPrefix("Referencing")
                         .MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
@@ -116,8 +114,7 @@ public sealed class MustNotInjectVerbTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
@@ -158,8 +155,7 @@ public sealed class MustNotInjectVerbTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .Except(arch.Namespace("App.Composition.*"))
+                    .Enforce(arch.Registered(Lifetime.Singleton).Except(arch.Namespace("App.Composition.*"))
                         .MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
@@ -231,8 +227,7 @@ public sealed class MustNotInjectVerbTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
@@ -246,8 +241,7 @@ public sealed class MustNotInjectVerbTests
         // slot, schemaVersion stays 3, so member/subject slots stay omitted (null) exactly as before.
         CheckReport report = Checker.Run(SceneModel, arch =>
             arch.Rule("di/no-captive")
-                .Enforce(arch.Registered(Lifetime.Singleton)
-                    .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                 .Because("b"));
 
         report.ShouldRenderEdgeViolation("injection", "App.CaptiveSingleton", "App.IScopedDep");

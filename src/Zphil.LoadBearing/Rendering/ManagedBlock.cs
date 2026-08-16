@@ -123,7 +123,7 @@ public static class ManagedBlock
     // Returns null when the file carries no markers at all (the append case).
     private static MarkerLocation? LocateMarkers(string text)
     {
-        var lines = SplitLines(text);
+        List<PhysicalLine> lines = SplitLines(text);
 
         var beginIndices = new List<int>();
         var endIndices = new List<int>();

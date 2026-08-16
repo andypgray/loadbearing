@@ -73,11 +73,11 @@ public sealed class MultiTargetFrameworkTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ShouldBe([Core, Core, Web]);
 
-        var coreProjectIds = loaded.Solution.Projects
+        List<ProjectId> coreProjectIds = loaded.Solution.Projects
             .Where(project => project.Name == Core)
             .Select(project => project.Id)
             .ToList();
-        var frameworks = loaded.TargetFrameworks;
+        IReadOnlyDictionary<ProjectId, string> frameworks = loaded.TargetFrameworks;
         coreProjectIds
             .Select(id => frameworks[id])
             .OrderBy(framework => framework, StringComparer.Ordinal)
@@ -119,8 +119,7 @@ public sealed class MultiTargetFrameworkTests
         // empty-subject false negative rather than a selection that worked.
         RuleResult failing = Checker.Run(model, arch =>
                 arch.Rule("naming/multi-tfm")
-                    .Enforce(arch.Project(Core)
-                        .MustHavePrefix("Zzz"))
+                    .Enforce(arch.Project(Core).MustHavePrefix("Zzz"))
                     .Because("b"))
             .Single();
         failing.ShapeSubjects()
@@ -129,8 +128,7 @@ public sealed class MultiTargetFrameworkTests
         // And a rule that must hold, over the same subject: the selection is non-empty and behaves.
         Checker.Run(model, arch =>
                 arch.Rule("layering/multi-tfm")
-                    .Enforce(arch.Project(Core)
-                        .MustNotReference(arch.Namespace("MultiTfm.Web.*")))
+                    .Enforce(arch.Project(Core).MustNotReference(arch.Namespace("MultiTfm.Web.*")))
                     .Because("b"))
             .Single()
             .ShouldHavePassedClean();

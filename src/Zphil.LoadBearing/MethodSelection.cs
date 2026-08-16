@@ -30,7 +30,7 @@ public sealed class MethodSelection : MemberSelection
     /// </summary>
     public MethodSelection Returning(Type first, params Type[] more)
     {
-        var types = OperandList.OneOrMore(first, more, type => type);
+        IReadOnlyList<Type> types = OperandList.OneOrMore(first, more, type => type);
         return (MethodSelection)Refined(new ReturningAdjective(types));
     }
 

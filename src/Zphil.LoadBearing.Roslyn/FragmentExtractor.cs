@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -185,7 +186,7 @@ internal static class FragmentExtractor
     // needs neither the ordering set nor the list it would be copied into.
     private static IReadOnlyList<FragmentSite> MemberDeclarationSites(ISymbol member)
     {
-        var references = member.DeclaringSyntaxReferences;
+        ImmutableArray<SyntaxReference> references = member.DeclaringSyntaxReferences;
         if (references.Length == 1) return [DeclarationSiteOf(references[0])];
 
         var sites = new SortedSet<FragmentSite>();
@@ -441,7 +442,7 @@ internal static class FragmentExtractor
             // The two attribute facts read one walk of the attribute list, not one each — they differ in what
             // they record (a resolved FQN vs a definition/construction pair) and in their order, never in what
             // they range over.
-            var attributeClasses = AttributeClassesOf(symbol).ToList();
+            List<INamedTypeSymbol> attributeClasses = AttributeClassesOf(symbol).ToList();
 
             builder.Attributes = attributeClasses
                 .Select(ResolveName)
@@ -520,7 +521,7 @@ internal static class FragmentExtractor
                     if (Record(channels.Caught, _catchEdgeSites, site) is { } caughtFqn)
                     {
                         if (!channels.CaughtHasFilter) FragmentSiteSets.For(_catchEdgeUnfilteredSites, (srcFqn, caughtFqn)).Add(site);
-                        if (!channels.CaughtHasFilter && !channels.CaughtEndsInThrow)
+                        if (channels is { CaughtHasFilter: false, CaughtEndsInThrow: false })
                             FragmentSiteSets.For(_catchEdgeSwallowingSites, (srcFqn, caughtFqn)).Add(site);
                     }
 
@@ -596,7 +597,7 @@ internal static class FragmentExtractor
                 {
                     string exposedFqn = ResolveName(endpoint);
                     if (exposedFqn == srcFqn) continue; // self-exposure dropped (enum value self-typing self-drops here)
-                    var sites = FragmentSiteSets.For(_exposureEdgeSites, (srcFqn, exposedFqn));
+                    SortedSet<FragmentSite> sites = FragmentSiteSets.For(_exposureEdgeSites, (srcFqn, exposedFqn));
                     foreach (FragmentSite site in member.DeclarationSites) sites.Add(site);
                 }
             }
@@ -871,46 +872,46 @@ internal static class FragmentExtractor
         {
             // Canonical ordering makes the serialized fragment stable; the merge re-derives global order,
             // so a fragment's internal order never affects the model.
-            var declaredTypes = _declared.Values
+            List<FragmentType> declaredTypes = _declared.Values
                 .Select(b => b.ToFragmentType())
                 .OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
                 .ToList();
 
-            var externals = _externals.Values
+            List<FragmentExternal> externals = _externals.Values
                 .OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
                 .ToList();
 
-            var edges = FragmentSiteSets.OrderedPairs(
+            List<FragmentEdge> edges = FragmentSiteSets.OrderedPairs(
                 _edgeSites, (src, tgt, sites) => new FragmentEdge(src, tgt, sites.ToList()));
 
-            var memberEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentMemberEdge> memberEdges = FragmentSiteSets.OrderedPairs(
                 _memberEdges,
                 (src, symbolId, builder) => new FragmentMemberEdge(
                     src, builder.ContainingFullName, builder.MemberName, symbolId, builder.Kind, builder.Sites.ToList()));
 
-            var constructorEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentConstructorEdge> constructorEdges = FragmentSiteSets.OrderedPairs(
                 _constructorEdgeSites, (src, ctor, sites) => new FragmentConstructorEdge(src, ctor, sites.ToList()));
 
-            var injectionEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentInjectionEdge> injectionEdges = FragmentSiteSets.OrderedPairs(
                 _injectionEdgeSites, (src, injected, sites) => new FragmentInjectionEdge(src, injected, sites.ToList()));
 
             // An edge whose every site is filtered has no entry in either parallel table, which materializes as
             // the empty list — the honest reading, since nothing about that edge is unfiltered. An edge whose
             // every unfiltered site ends in a throw materializes the third list empty for the same reason.
-            var catchEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentCatchEdge> catchEdges = FragmentSiteSets.OrderedPairs(
                 _catchEdgeSites,
                 (src, caught, sites) => new FragmentCatchEdge(
                     src, caught, sites.ToList(),
-                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? unfiltered.ToList() : [],
-                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? swallowing.ToList() : []));
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? unfiltered) ? unfiltered.ToList() : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? swallowing) ? swallowing.ToList() : []));
 
-            var throwEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentThrowEdge> throwEdges = FragmentSiteSets.OrderedPairs(
                 _throwEdgeSites, (src, thrown, sites) => new FragmentThrowEdge(src, thrown, sites.ToList()));
 
-            var exposureEdges = FragmentSiteSets.OrderedPairs(
+            List<FragmentExposureEdge> exposureEdges = FragmentSiteSets.OrderedPairs(
                 _exposureEdgeSites, (src, exposed, sites) => new FragmentExposureEdge(src, exposed, sites.ToList()));
 
-            var serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
+            List<FragmentServiceRegistration> serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
                 _registrationSites,
                 (lifetime, service, impl, sites) => new FragmentServiceRegistration(lifetime, service, impl, sites.ToList()));
 
@@ -930,7 +931,10 @@ internal static class FragmentExtractor
         INamedTypeSymbol symbol,
         IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> members)
     {
-        public TypeFacts Facts { get; } = facts;
+        // Private where its siblings are not, because the distinction is real: the owner reads Symbol and
+        // Members as it walks, while Facts is only ever handed straight back out by ToFragmentType below.
+        private TypeFacts Facts { get; } = facts;
+
         public INamedTypeSymbol Symbol { get; } = symbol;
 
         /// <summary>

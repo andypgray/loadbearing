@@ -40,7 +40,7 @@ public static class LayerContextResolver
 
         foreach (LayerDefinition layer in model.Layers)
         {
-            var anchored = AnchoredRules(model, layer).ToList();
+            List<ArchRule> anchored = AnchoredRules(model, layer).ToList();
             if (anchored.Count == 0) continue; // A layer no rule anchors on gets no placement at all.
 
             string? directory = DirectoryPlacement.ResolveDirectory(evaluator, BareLayer(anchored[0]));
@@ -80,6 +80,9 @@ public static class LayerContextResolver
     // guard also keeps this off UnionSelection.Noun, which throws.
     private static bool IsAnchoredOn(ArchRule rule, LayerDefinition layer)
     {
+        // Kept as separate conjuncts because the order is the guard: the UnionSelection test has to be
+        // read before .Noun, which throws on a union. A merged pattern preserves that order but buries it.
+        // ReSharper disable once MergeIntoPattern
         return rule.Constraint?.Subject is { } subject
                && subject is not UnionSelection
                && subject.Noun is LayerNoun noun

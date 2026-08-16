@@ -219,7 +219,7 @@ internal static class MsBuildGate
         }
         catch (CaptureReplayFailedException ex)
         {
-            error.WriteLine($"warning: {ex.Message}");
+            await error.WriteLineAsync($"warning: {ex.Message}");
             LastAcquisition = GateAcquisition.CaptureReplayFellBackToCold;
             return await invokeRunner(solutionPath, SourceOrCold(hostSource));
         }

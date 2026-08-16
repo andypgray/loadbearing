@@ -78,7 +78,7 @@ internal static class FixtureEdits
     internal static void BackdateAllDocuments(WorkspaceSnapshot snapshot)
     {
         DateTime wellPast = DateTime.UtcNow.AddDays(-1);
-        var paths = snapshot.Solution.Projects
+        IEnumerable<string> paths = snapshot.Solution.Projects
             .SelectMany(p => p.Documents)
             .Select(d => d.FilePath)
             .OfType<string>()

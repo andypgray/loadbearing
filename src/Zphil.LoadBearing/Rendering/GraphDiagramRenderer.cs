@@ -73,13 +73,13 @@ public static class GraphDiagramRenderer
         Guard.NotNullOrWhiteSpace(solutionName, nameof(solutionName));
 
         DiagramScope filter = scope ?? DiagramScope.Everything;
-        var projects = summary.Projects
+        List<ProjectSummary> projects = summary.Projects
             .Where(project => project.SolutionMember != false && filter.Includes(project.Name))
             .ToList();
-        var ids = NodeIds(projects);
-        var nodeLines = NodeLines(projects, ids);
-        var edgeLines = EdgeLines(summary, projects, ids);
-        var lines = MermaidText.Fence(
+        Dictionary<string, string> ids = NodeIds(projects);
+        IReadOnlyList<string> nodeLines = NodeLines(projects, ids);
+        List<string> edgeLines = EdgeLines(summary, projects, ids);
+        IReadOnlyList<string> lines = MermaidText.Fence(
             $"Codebase survey: {solutionName}",
             "Projects in this solution and their cross-project references.",
             nodeLines,
@@ -118,7 +118,7 @@ public static class GraphDiagramRenderer
         var observed = new HashSet<(string Source, string Target)>(
             summary.ProjectEdges.Select(edge => (edge.Source, edge.Target)));
 
-        var lines = summary.ProjectEdges
+        List<string> lines = summary.ProjectEdges
             .Where(edge => ids.ContainsKey(edge.Source) && ids.ContainsKey(edge.Target))
             .Select(edge => $"    {ids[edge.Source]} --> {ids[edge.Target]}")
             .ToList();
@@ -137,7 +137,7 @@ public static class GraphDiagramRenderer
     // keyed by the name, because that is what an edge names at both ends.
     private static Dictionary<string, string> NodeIds(IReadOnlyList<ProjectSummary> projects)
     {
-        var names = projects.Select(project => project.Name).ToList();
+        List<string> names = projects.Select(project => project.Name).ToList();
         return MermaidText.IdMap(NodeIdPrefix, names, name => name, StringComparer.Ordinal);
     }
 }

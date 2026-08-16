@@ -12,7 +12,7 @@ internal static class Generics
 {
     internal static bool IsConstructed(Type type)
     {
-        return type.IsGenericType && !type.IsGenericTypeDefinition;
+        return type is { IsGenericType: true, IsGenericTypeDefinition: false };
     }
 
     internal static Type Definition(Type type)

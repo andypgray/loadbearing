@@ -35,7 +35,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Zphil.LoadBearing", "/elsewhere/Core.csproj", [])
         };
 
-        var excluded = SpecExclusion.Compute(
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(
             projects,
             Declared("/repo/arch/ArchSpec.csproj", "/repo/src/App.csproj"),
             "Meridian.Interchange.ArchSpec");
@@ -55,7 +55,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Zphil.LoadBearing.Roslyn", "/repo/src/Roslyn.csproj", ["Zphil.LoadBearing"])
         };
 
-        var excluded = SpecExclusion.Compute(
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(
             projects,
             Declared("/repo/arch/ArchSpec.csproj", "/repo/src/Core.csproj", "/repo/src/Roslyn.csproj"),
             "Zphil.LoadBearing.ArchSpec");
@@ -76,7 +76,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("App", "/repo/src/App.csproj", [])
         };
 
-        var excluded = SpecExclusion.Compute(
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(
             projects, Declared("/repo/arch/ArchSpec.csproj", "/repo/src/App.csproj"), "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec", "Guidance.Pack", "Zphil.LoadBearing"]);
@@ -94,7 +94,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Somebody.Elses.Passenger", "/elsewhere/Other.csproj", [])
         };
 
-        var excluded = SpecExclusion.Compute(
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(
             projects, Declared("/repo/arch/ArchSpec.csproj", "/repo/src/App.csproj"), "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec"]);
@@ -111,7 +111,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Mystery", null, [])
         };
 
-        var excluded = SpecExclusion.Compute(projects, Declared("/repo/arch/ArchSpec.csproj"), "App.ArchSpec");
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(projects, Declared("/repo/arch/ArchSpec.csproj"), "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec"]);
     }
@@ -129,7 +129,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Zphil.LoadBearing", "/elsewhere/Core.csproj", [])
         };
 
-        var excluded = SpecExclusion.Compute(projects, null, "App.ArchSpec");
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(projects, null, "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec"]);
     }
@@ -145,7 +145,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Right", "/elsewhere/Right.csproj", ["Left", "App.ArchSpec"])
         };
 
-        var excluded = SpecExclusion.Compute(projects, Declared("/repo/arch/ArchSpec.csproj"), "App.ArchSpec");
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(projects, Declared("/repo/arch/ArchSpec.csproj"), "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec", "Left", "Right"]);
     }
@@ -163,7 +163,7 @@ public sealed class SpecExclusionTests : IDisposable
             new("Zphil.LoadBearing", "/elsewhere/Core.csproj", [])
         };
 
-        var excluded = SpecExclusion.Compute(
+        IReadOnlyCollection<string> excluded = SpecExclusion.Compute(
             projects, Declared("/repo/arch/ArchSpec.csproj", "/repo/src/App.csproj"), "App.ArchSpec");
 
         excluded.ShouldBe(["App.ArchSpec", "Zphil.LoadBearing"]);
@@ -181,7 +181,7 @@ public sealed class SpecExclusionTests : IDisposable
                                         </Solution>
                                         """);
 
-        var members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+        IReadOnlySet<string>? members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
 
         members.ShouldNotBeNull();
         members.ShouldContain(_temp.PathOf("src", "App", "App.csproj"));
@@ -205,7 +205,7 @@ public sealed class SpecExclusionTests : IDisposable
             solutionPath,
             """{ "solution": { "path": "App.slnx", "projects": [ "src/App/App.csproj" ] } }""");
 
-        var members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+        IReadOnlySet<string>? members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
 
         members.ShouldNotBeNull();
         members.ShouldContain(_temp.PathOf("src", "App", "App.csproj"));
@@ -256,7 +256,7 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void SolutionMembershipOf_ReadMembership_SeparatesDeclaredMembersFromPassengers()
     {
-        var declared = Declared("/repo/src/App.csproj");
+        IReadOnlySet<string> declared = Declared("/repo/src/App.csproj");
 
         SpecExclusion.SolutionMembershipOf(declared, "/repo/src/App.csproj")
             .ShouldBe(true);

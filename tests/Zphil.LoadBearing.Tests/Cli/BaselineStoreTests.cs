@@ -66,11 +66,11 @@ public sealed class BaselineStoreTests : IDisposable
 
         document.ShouldNotBeNull();
         // Equality ignores attribution, so pin identity and .Because separately.
-        var edges = document.Sections["data/x"];
+        IReadOnlyList<BaselineEntry> edges = document.Sections["data/x"];
         edges.ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
         edges[0]
             .Because.ShouldBe("INC-1234");
-        var subjects = document.Sections["legacy/billing/containment"];
+        IReadOnlyList<BaselineEntry> subjects = document.Sections["legacy/billing/containment"];
         subjects.ShouldBe([BaselineEntry.ForSubject("T:App.Legacy.Thing")]);
         subjects[0]
             .Because.ShouldBe("grandfathered pending rewrite");
@@ -302,16 +302,14 @@ public sealed class BaselineStoreTests : IDisposable
             arch.Rule(ruleId)
                 .Migrate(
                     "old",
-                    arch.Namespace("App.Web.*")
-                        .WithSuffix("Controller")
-                        .MustNotReference(arch.Namespace("App.Data.*")))
+                    arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
                 .Baseline(baselinePath)
                 .Because("b"));
     }
 
     private string WriteComposed(string relativePath, params (string RuleId, BaselineEntry[] Entries)[] rules)
     {
-        var input = rules.ToDictionary(
+        Dictionary<string, IReadOnlyCollection<BaselineEntry>> input = rules.ToDictionary(
             r => r.RuleId, r => (IReadOnlyCollection<BaselineEntry>)r.Entries, StringComparer.Ordinal);
         return Write(relativePath, BaselineFormat.ComposeFile(input));
     }

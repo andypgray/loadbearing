@@ -18,8 +18,7 @@ public class AgentContextRendererTests
     // into the always-on block (progressive disclosure).
     private static readonly IArchitectureSpec DogfoodShapeSpec = new InlineSpec(arch =>
         arch.Rule("layering/core-no-roslyn")
-            .Enforce(arch.Project("Zphil.LoadBearing")
-                .MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn")))
+            .Enforce(arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn")))
             .Because("Core is the netstandard2.0 reified model both render targets consume; " +
                      "Roslyn extraction is host machinery.")
             .Fix("Depend on the Codebase model types in Core; keep Microsoft.CodeAnalysis behind " +
@@ -172,7 +171,7 @@ public class AgentContextRendererTests
                 .Enforce(dispatch.MustNotBeReferencedBy(arch.Namespace("Acme.Legacy.*")))
                 .Because("Nothing legacy may depend on dispatch.");
         });
-        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
+        List<ArchRule> rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
             .ToList();
 
         const string expected =
@@ -198,11 +197,10 @@ public class AgentContextRendererTests
             arch.Rule("data-access/no-inline-sql")
                 .Migrate(
                     "Controllers build DataTables inline (legacy Active Record style).",
-                    web.WithSuffix("Controller")
-                        .MustNotReference(arch.Namespace("System.Data.*")))
+                    web.WithSuffix("Controller").MustNotReference(arch.Namespace("System.Data.*")))
                 .Because("Repository pattern for testability.");
         });
-        var migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate)
+        List<ArchRule> migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate)
             .ToList();
 
         // The exact counter-prior bullet the root ### Migrations section renders for this rule.
@@ -234,7 +232,7 @@ public class AgentContextRendererTests
                 .Because("Web reaches billing only through the facade.")
                 .Fix("Inject IBillingFacade instead of newing up billing types.");
         });
-        var rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
+        List<ArchRule> rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
             .ToList();
 
         string card = AgentContextRenderer.LayerCard("Web", rules);
@@ -381,8 +379,7 @@ public class AgentContextRendererTests
     {
         // A Registered noun on a non-inject verb — triggers the registered line but no inject clause.
         ArchitectureModel model = Checker.Model(arch => arch.Rule("di/registered-no-clock")
-            .Enforce(arch.Registered(Lifetime.Singleton)
-                .MustNotReference(typeof(DateTime)))
+            .Enforce(arch.Registered(Lifetime.Singleton).MustNotReference(typeof(DateTime)))
             .Because("Singletons must not read the wall clock."));
 
         string block = AgentContextRenderer.RootBlock(model, "Spec");

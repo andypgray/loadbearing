@@ -190,7 +190,7 @@ internal static class SourceAnchors
         Func<string, IReadOnlyList<string>?> readLines)
     {
         string repoRelativeFile = RepoRelative(exampleRoot, anchor.File);
-        var lines = readLines(repoRelativeFile);
+        IReadOnlyList<string>? lines = readLines(repoRelativeFile);
         if (lines is null) return Unresolved(anchor, $"source file not found at {repoRelativeFile}");
 
         string token = DeriveToken(anchor.Message);
@@ -236,7 +236,7 @@ internal static class SourceAnchors
 
         return repoRelative =>
         {
-            if (read.TryGetValue(repoRelative, out var cached)) return cached;
+            if (read.TryGetValue(repoRelative, out IReadOnlyList<string>? cached)) return cached;
 
             string full = Path.Combine(repoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar));
             IReadOnlyList<string>? lines = File.Exists(full) ? File.ReadAllLines(full) : null;

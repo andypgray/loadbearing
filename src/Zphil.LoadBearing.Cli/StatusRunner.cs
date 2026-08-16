@@ -42,7 +42,7 @@ internal sealed class StatusRunner(
         // status carries no --rules flag: a burndown of part of the spec would read as progress on all of
         // it. The empty selection — every rule — is spelled out so both callers of the shared pipeline
         // choose their rules the same way.
-        var rules = CheckPipeline.SelectRules(source.Model, []);
+        IReadOnlyList<ArchRule> rules = CheckPipeline.SelectRules(source.Model, []);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, null, rules, ct);
         RecordCacheOutcome(source);
@@ -50,7 +50,7 @@ internal sealed class StatusRunner(
         // Composed once and handed to both surfaces, so the MSBuild-selection note rides the burndown
         // document as well as stderr.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        var renderedDiagnostics = diagnostics.Rendered;
+        IReadOnlyList<string> renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         // The narrowing stamp is human-channel only, where the document carries the same fact in
@@ -64,7 +64,7 @@ internal sealed class StatusRunner(
                 Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, diagnostics);
         else
             foreach (string line in StatusFormatter.Lines(report))
-                output.WriteLine(line);
+                await output.WriteLineAsync(line);
 
         if (IncompleteModelNotices.Refused(
                 error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.StatusMessage))

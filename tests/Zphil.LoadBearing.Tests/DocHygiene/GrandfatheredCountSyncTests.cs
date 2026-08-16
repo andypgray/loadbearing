@@ -198,7 +198,7 @@ public sealed class GrandfatheredCountSyncTests
     public void QuotedGrandfatheredCounts_MatchTheirBaseline()
     {
         // Arrange
-        var read = RuleQuotes.DiskTextReader(RepoRoot.Directory);
+        Func<string, string?> read = RuleQuotes.DiskTextReader(RepoRoot.Directory);
         List<string> drift = new();
 
         // Act: every fenced count, resolved against its own root's baselines, must equal the entries the
@@ -239,7 +239,7 @@ public sealed class GrandfatheredCountSyncTests
         // Arrange: the registry above is hand-written, so the failure it cannot see is a doc that quotes
         // a count and was never added to it — a whole walkthrough silently outside the gate. Git decides
         // the scope, as it does for every hygiene gate here.
-        var registered = CountDocs
+        HashSet<string> registered = CountDocs
             .Select(entry => entry.Doc)
             .ToHashSet(StringComparer.Ordinal);
         List<string> unregistered = new();
@@ -297,7 +297,7 @@ public sealed class GrandfatheredCountSyncTests
         // Act
         foreach (string path in TrackedFiles.Markdown)
         {
-            var claimed = ClaimedLines(path);
+            IReadOnlySet<int> claimed = ClaimedLines(path);
             foreach (GrandfatheredCounts.ProseMention mention in SweepDoc(path))
             {
                 if (claimed.Contains(mention.DocLine) || IsExempt(mention)) continue;
@@ -315,7 +315,7 @@ public sealed class GrandfatheredCountSyncTests
     public void SweepExemptions_StillMatchASweptMention()
     {
         // Arrange
-        var swept = TrackedFiles.Markdown
+        GrandfatheredCounts.ProseMention[] swept = TrackedFiles.Markdown
             .SelectMany(SweepDoc)
             .ToArray();
         List<string> dead = new();
@@ -411,7 +411,7 @@ public sealed class GrandfatheredCountSyncTests
             string? fragment = Compose(prose);
             if (fragment is null) continue;
 
-            var span = collapsed.Span(fragment);
+            (int First, int Last)? span = collapsed.Span(fragment);
             if (span is null) continue;
 
             for (int line = span.Value.First; line <= span.Value.Last; line++) claimed.Add(line);

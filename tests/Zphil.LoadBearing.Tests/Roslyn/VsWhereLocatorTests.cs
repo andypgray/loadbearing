@@ -33,7 +33,7 @@ public sealed class VsWhereLocatorTests
                             ]
                             """;
 
-        var instances = VsWhereLocator.ParseInstances(json);
+        IReadOnlyList<VsInstance> instances = VsWhereLocator.ParseInstances(json);
 
         instances.Count.ShouldBe(2);
         instances[0]
@@ -69,7 +69,7 @@ public sealed class VsWhereLocatorTests
                             ]
                             """;
 
-        var instances = VsWhereLocator.ParseInstances(json);
+        IReadOnlyList<VsInstance> instances = VsWhereLocator.ParseInstances(json);
 
         instances.Count.ShouldBe(1);
         instances[0]
@@ -104,7 +104,7 @@ public sealed class VsWhereLocatorTests
                             ]
                             """;
 
-        var instances = VsWhereLocator.ParseInstances(json);
+        IReadOnlyList<VsInstance> instances = VsWhereLocator.ParseInstances(json);
 
         instances[0]
             .Name.ShouldBe("Visual Studio");

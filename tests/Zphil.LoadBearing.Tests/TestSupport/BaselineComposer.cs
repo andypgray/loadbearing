@@ -18,7 +18,7 @@ internal static class BaselineComposer
     internal static string Compose(params (string RuleId, BaselineEntry[] Entries)[] sections)
     {
         var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal);
-        foreach ((string ruleId, var entries) in sections) rules[ruleId] = entries;
+        foreach ((string ruleId, BaselineEntry[] entries) in sections) rules[ruleId] = entries;
         return BaselineFormat.ComposeFile(rules);
     }
 

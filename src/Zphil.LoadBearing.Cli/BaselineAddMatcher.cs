@@ -36,7 +36,7 @@ internal static class BaselineAddMatcher
     public static Violation ResolveEdge(string ruleId, IReadOnlyList<Violation> violations, string source, string target)
     {
         var echo = $"--source '{source}' --target '{target}'";
-        var candidates = violations
+        List<Violation> candidates = violations
             .Where(v => MatchesEdge(v, source, target))
             .ToList();
 
@@ -46,7 +46,7 @@ internal static class BaselineAddMatcher
     public static Violation ResolveSubject(string ruleId, IReadOnlyList<Violation> violations, string subject)
     {
         var echo = $"--subject '{subject}'";
-        var candidates = violations
+        List<Violation> candidates = violations
             .Where(v => MatchesSubject(v, subject))
             .ToList();
 
@@ -74,7 +74,7 @@ internal static class BaselineAddMatcher
 
     private static Violation Resolve(string ruleId, IReadOnlyList<Violation> violations, IReadOnlyList<Violation> candidates, string echo)
     {
-        var identities = candidates.Select(c => c.BaselineIdentity()!).Distinct().ToList();
+        List<BaselineEntry> identities = candidates.Select(c => c.BaselineIdentity()!).Distinct().ToList();
         if (identities.Count == 0) throw new UserErrorException(NoMatch(ruleId, violations, echo));
         if (identities.Count > 1)
             throw new UserErrorException(
@@ -111,7 +111,7 @@ internal static class BaselineAddMatcher
 
     private static string NoMatch(string ruleId, IReadOnlyList<Violation> violations, string echo)
     {
-        var current = violations
+        List<string> current = violations
             .Where(v => v.BaselineIdentity() is not null)
             .Select(FullNameForm)
             .Distinct(StringComparer.Ordinal)
@@ -148,7 +148,7 @@ internal static class BaselineAddMatcher
 
     private static string SymbolForm(BaselineEntry identity)
     {
-        return identity.Subject is not null ? identity.Subject : $"{identity.Source} -> {identity.Target}";
+        return identity.Subject ?? $"{identity.Source} -> {identity.Target}";
     }
 
     private static bool Matches(TypeNode node, string name)

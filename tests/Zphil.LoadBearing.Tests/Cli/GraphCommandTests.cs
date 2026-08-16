@@ -175,7 +175,7 @@ public sealed class GraphCommandTests
                 .GetString())
             .ShouldBe(["MyApp.Web"]);
 
-        var projectFields = root.GetProperty("projects")
+        List<string> projectFields = root.GetProperty("projects")
             .EnumerateArray()
             .SelectMany(project => project.EnumerateObject()
                 .Select(field => field.Name))

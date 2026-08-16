@@ -91,7 +91,7 @@ public static class SolutionDiscovery
     /// <param name="candidates">The solution files found there; rendered by file name.</param>
     internal static string AmbiguousMessage(string directory, IReadOnlyList<string> candidates)
     {
-        var names = candidates
+        List<string> names = candidates
             .Select(candidate => Path.GetFileName(candidate))
             .ToList();
 
@@ -118,7 +118,7 @@ public static class SolutionDiscovery
             ? header + "\nSolution files one level down:"
             : header;
 
-        var relative = nearMisses
+        List<string> relative = nearMisses
             .Select(nearMiss => Path.GetRelativePath(directory, nearMiss))
             .ToList();
 

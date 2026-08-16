@@ -29,7 +29,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         fingerprint that must not move when the workspace enumerates differently.
 ///     </para>
 ///     <para>
-///         <b>The one deliberate difference is <paramref name="includeDocument" />.</b> The two stores
+///         <b>The one deliberate difference is <c>includeDocument</c>.</b> The two stores
 ///         disagree about build-output-generated sources — the fragment cache excludes them because their
 ///         mtimes churn on every build, the capture records them because they are csc inputs replay cannot
 ///         regenerate — and that disagreement is the whole of it. Passing it in keeps the difference

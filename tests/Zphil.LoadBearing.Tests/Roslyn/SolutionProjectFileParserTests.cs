@@ -53,7 +53,7 @@ public sealed class SolutionProjectFileParserTests
                             """;
 
         // Act
-        var members = SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory);
+        IReadOnlyList<string> members = SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory);
 
         // Assert — both csprojs (either slash spelling resolves), the folder dropped.
         members.ShouldBe([
@@ -77,7 +77,7 @@ public sealed class SolutionProjectFileParserTests
                             """;
 
         // Act
-        var members = SolutionProjectFileParser.ParseCsprojMembers(text, ".slnx", SolutionDirectory);
+        IReadOnlyList<string> members = SolutionProjectFileParser.ParseCsprojMembers(text, ".slnx", SolutionDirectory);
 
         // Assert — both csprojs (nesting flattened, both slash spellings), the markdown dropped.
         members.ShouldBe([
@@ -132,7 +132,7 @@ public sealed class SolutionProjectFileParserTests
                                   }
                                   """;
 
-        (string referencedSolution, var requested) = SolutionProjectFileParser.ParseFilter(filterText, FilterDirectory);
+        (string referencedSolution, IReadOnlyList<string> requested) = SolutionProjectFileParser.ParseFilter(filterText, FilterDirectory);
 
         referencedSolution.ShouldBe(ReferencedSolution);
         requested.ShouldBe([
@@ -148,7 +148,7 @@ public sealed class SolutionProjectFileParserTests
         // all", which is Roslyn's own rule. The parser's job is only to report that nothing was requested.
         const string filterText = """{ "solution": { "path": "../solutions/App.sln", "projects": [] } }""";
 
-        (string referencedSolution, var requested) = SolutionProjectFileParser.ParseFilter(filterText, FilterDirectory);
+        (string referencedSolution, IReadOnlyList<string> requested) = SolutionProjectFileParser.ParseFilter(filterText, FilterDirectory);
 
         referencedSolution.ShouldBe(ReferencedSolution);
         requested.ShouldBeEmpty();

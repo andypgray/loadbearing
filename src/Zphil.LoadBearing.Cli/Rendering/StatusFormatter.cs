@@ -20,7 +20,7 @@ internal static class StatusFormatter
 {
     public static IReadOnlyList<string> Lines(CheckReport report)
     {
-        var lines = report.Results.Select(RuleLine).ToList();
+        List<string> lines = report.Results.Select(RuleLine).ToList();
         lines.Add(Summary(report));
         return lines;
     }

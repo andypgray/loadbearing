@@ -41,7 +41,7 @@ internal static class BaselineStore
                 cache[absolutePath] = document;
             }
 
-            if (document is not null && document.Sections.TryGetValue(rule.Id, out var entries))
+            if (document is not null && document.Sections.TryGetValue(rule.Id, out IReadOnlyList<BaselineEntry>? entries))
                 sections[rule.Id] = new RuleBaseline(entries);
         }
 
@@ -81,7 +81,7 @@ internal static class BaselineStore
                 throw Malformed(absolutePath, $"unsupported schemaVersion {schemaVersion} (expected {BaselineFormat.SchemaVersion}).");
 
             string digest = ReadDigest(absolutePath, root);
-            var sections = ReadSections(absolutePath, root);
+            Dictionary<string, IReadOnlyList<BaselineEntry>> sections = ReadSections(absolutePath, root);
 
             // Recanonicalize + verify: rebuild the digest from the parsed entries. Formatting/order/CRLF
             // changes are invisible; any entry change is not — so a mismatch is a hand edit (tamper).

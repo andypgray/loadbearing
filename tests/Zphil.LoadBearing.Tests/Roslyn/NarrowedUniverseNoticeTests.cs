@@ -192,7 +192,7 @@ public sealed class NarrowedUniverseNoticeTests
             Path.Combine(solutionDirectory, "..", "Shared", "Shared.csproj")
         ];
 
-        var shown = NarrowedUniverseNotice.Relative(projects, solutionDirectory);
+        IReadOnlyList<string> shown = NarrowedUniverseNotice.Relative(projects, solutionDirectory);
 
         shown.ShouldBe(["MyApp.Web/MyApp.Web.csproj", "../Shared/Shared.csproj"]);
     }

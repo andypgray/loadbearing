@@ -66,7 +66,7 @@ public static class WorkspaceLoader
 
         Solution solution = await OpenAsync(workspace, solutionPath, ct);
         (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
-        (Solution normalized, var targetFrameworks) =
+        (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
             stripped.NormalizeProjectNames();
 
         // What the load did and did not produce is read off the loaded structure here, at the boundary, so
@@ -74,7 +74,7 @@ public static class WorkspaceLoader
         // diagnostic text. The restore verdict is the same idea one file further out: a project whose restore
         // failed loads completely, so nothing in the loaded structure says so and only its assets file can.
         ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
-        var restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
+        IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
 
         return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
     }

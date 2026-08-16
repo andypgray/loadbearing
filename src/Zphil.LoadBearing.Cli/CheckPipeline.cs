@@ -31,7 +31,7 @@ internal static class CheckPipeline
     /// </summary>
     public static IReadOnlyList<ArchRule> SelectRules(ArchitectureModel model, IReadOnlyList<string> ruleIdGlobs)
     {
-        var selected = ArchChecker.SelectRules(model, ruleIdGlobs);
+        IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ruleIdGlobs);
         if (ruleIdGlobs.Count > 0 && selected.Count == 0)
             throw new UserErrorException(UnmatchedRulesMessage(ruleIdGlobs, model));
 

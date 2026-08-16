@@ -75,8 +75,8 @@ public sealed class GeneratedTypeExtractionTests
         var evaluator = new SelectionEvaluator(Model);
 
         // Act
-        var inAuthoredNamespace = Names(evaluator.Evaluate(arch.Namespace("App.*"), SelectionPosition.Subject));
-        var inProject = Names(evaluator.Evaluate(arch.Project("TestProject"), SelectionPosition.Subject));
+        IReadOnlyList<string> inAuthoredNamespace = Names(evaluator.Evaluate(arch.Namespace("App.*"), SelectionPosition.Subject));
+        IReadOnlyList<string> inProject = Names(evaluator.Evaluate(arch.Project("TestProject"), SelectionPosition.Subject));
 
         // Assert
         inAuthoredNamespace.ShouldNotContain("Gen.Emitted");

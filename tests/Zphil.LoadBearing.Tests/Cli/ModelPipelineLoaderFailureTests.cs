@@ -18,13 +18,12 @@ public sealed class ModelPipelineLoaderFailureTests
     public void LoaderFailureMessage_DistinctLoaderMessages_AreDedupedAndOrdinalSorted()
     {
         var exception = new ReflectionTypeLoadException(
-            new Type?[] { null, null, null },
-            new Exception?[]
-            {
+            [null, null, null],
+            [
                 new TypeLoadException("Could not load type 'Zebra'."),
                 new FileNotFoundException("Could not load file or assembly 'Acme'."),
                 new FileNotFoundException("Could not load file or assembly 'Acme'.") // duplicate — deduped
-            });
+            ]);
 
         // Build the spec path with the native separator so Path.GetFileName strips the directory on
         // every OS. A literal "C:\out\..." only strips on Windows — on Linux/macOS '\' is not a
@@ -48,7 +47,7 @@ public sealed class ModelPipelineLoaderFailureTests
     [Fact]
     public void LoaderFailureMessage_NoLoaderDetail_StillNamesTheAssemblyAndFix()
     {
-        var exception = new ReflectionTypeLoadException(new Type?[] { null }, new Exception?[] { null });
+        var exception = new ReflectionTypeLoadException([null], [null]);
 
         string message = ModelPipeline.LoaderFailureMessage(exception, "Spec.dll");
 

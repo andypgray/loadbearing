@@ -37,6 +37,9 @@ public sealed class AtomicFileTests
         WithTempDir(dir =>
         {
             string path = Path.Combine(dir, "target.bin");
+            // Arbitrary filler to be overwritten, not text — a UTF-8 literal of tabs would say the
+            // opposite of what these bytes are for.
+            // ReSharper disable once UseUtf8StringLiteral
             File.WriteAllBytes(path, [9, 9, 9, 9]);
 
             AtomicFile.WriteAllBytes(path, [1, 2, 3]);
@@ -114,6 +117,9 @@ public sealed class AtomicFileTests
             string source = Path.Combine(dir, "source.bin");
             File.WriteAllBytes(source, [1, 2, 3]);
             string path = Path.Combine(dir, "target.bin");
+            // Arbitrary filler to be overwritten, not text — a UTF-8 literal of tabs would say the
+            // opposite of what these bytes are for.
+            // ReSharper disable once UseUtf8StringLiteral
             File.WriteAllBytes(path, [9, 9, 9, 9]);
 
             AtomicFile.Copy(source, path);

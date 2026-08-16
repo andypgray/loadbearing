@@ -248,6 +248,8 @@ public sealed class AdapterTests
 
     // Reaches the protected FindSolutionUp helper without discovering a real test case: SolutionPath is
     // never read (the runner never sees this private class), so it throws if the pipeline ever touched it.
+    // Reached through its static Call below, which is why it is never instantiated.
+    // ReSharper disable once ClassNeverInstantiated.Local
     private sealed class HelperAccessor : ArchRuleTests<MyAppViolatedInlineSpec>
     {
         protected override string SolutionPath => throw new NotSupportedException();

@@ -795,7 +795,7 @@ public class SpecValidationTests
         // SECOND anchor of a negative's list — under two labels that name which kind of anchor was left empty.
         SpecValidationException ex = BuildExpectingFailure(new BlankHierarchyNameSpec());
 
-        var blanks = ex.Errors.Where(e => e.Code == Code.BlankPattern)
+        List<SpecValidationError> blanks = ex.Errors.Where(e => e.Code == Code.BlankPattern)
             .ToList();
         blanks.Count.ShouldBe(6);
         blanks.Count(e => e.Message.Contains("Blank interface name"))

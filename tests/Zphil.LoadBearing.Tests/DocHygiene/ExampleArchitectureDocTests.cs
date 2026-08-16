@@ -99,7 +99,7 @@ public sealed class ExampleArchitectureDocTests
         string solutionPath = Path.Combine(Path.GetDirectoryName(absolutePath)!, solutionFileName);
 
         // Act
-        var missing = DeclaredProjectNames(solutionPath)
+        List<string> missing = DeclaredProjectNames(solutionPath)
             .Where(name => !body.Contains($"[\"{name}\"]", StringComparison.Ordinal))
             .ToList();
 
@@ -122,11 +122,11 @@ public sealed class ExampleArchitectureDocTests
     public void EveryTrackedExampleArchitectureDoc_IsOneOfTheFourPinned()
     {
         // Arrange
-        var pinned = Pinned.Select(static entry => entry.Path)
+        List<string> pinned = Pinned.Select(static entry => entry.Path)
             .ToList();
 
         // Act
-        var uncovered = TrackedFiles.All
+        List<string> uncovered = TrackedFiles.All
             .Where(static path => path.StartsWith("examples/", StringComparison.Ordinal))
             .Where(static path => Path.GetFileName(path) == "ARCHITECTURE.md")
             .Where(path => !pinned.Contains(path))

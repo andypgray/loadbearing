@@ -127,7 +127,7 @@ internal static class RuleQuotes
 
                 string id = match.Groups["id"]
                     .Value;
-                if (!index.TryGetValue(id, out var texts))
+                if (!index.TryGetValue(id, out List<string>? texts))
                 {
                     texts = new List<string>();
                     index[id] = texts;
@@ -172,7 +172,7 @@ internal static class RuleQuotes
         IEnumerable<string> trackedPaths,
         Func<string, string?> readText)
     {
-        var texts = RenderedCards(exampleRoot, trackedPaths)
+        IEnumerable<string> texts = RenderedCards(exampleRoot, trackedPaths)
             .Select(readText)
             .OfType<string>();
 
@@ -188,7 +188,7 @@ internal static class RuleQuotes
     /// </summary>
     public static QuoteResult Classify(RuleQuote quote, IReadOnlyDictionary<string, IReadOnlyList<string>> bullets)
     {
-        if (!bullets.TryGetValue(quote.RuleId, out var texts))
+        if (!bullets.TryGetValue(quote.RuleId, out IReadOnlyList<string>? texts))
             return new QuoteResult(
                 QuoteBucket.Unrendered,
                 $"{quote.Doc}:{quote.DocLine} quotes rule '{quote.RuleId}', which no committed AGENTS.md renders.");

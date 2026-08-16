@@ -93,7 +93,7 @@ internal static class ServerShutdown
             snapshot = [.. Disposers];
         }
 
-        foreach (var disposer in snapshot) RunDisposerBounded(disposer, disposalTimeout);
+        foreach (Func<ValueTask> disposer in snapshot) RunDisposerBounded(disposer, disposalTimeout);
 
         Log.CloseAndFlush();
         exit();

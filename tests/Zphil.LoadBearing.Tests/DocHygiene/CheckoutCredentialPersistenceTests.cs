@@ -38,10 +38,10 @@ public sealed class CheckoutCredentialPersistenceTests
     public void CheckoutSteps_AcrossTheWorkflows_DoNotPersistCredentials()
     {
         // Arrange
-        var steps = ReadCheckoutSteps();
+        IReadOnlyList<CheckoutStep> steps = ReadCheckoutSteps();
 
         // Act
-        var persisting = steps
+        List<string> persisting = steps
             .Where(static step => !step.OptsOut)
             .Select(static step => $"  {step.Workflow}:{step.Line}")
             .Order(StringComparer.Ordinal)
@@ -57,7 +57,7 @@ public sealed class CheckoutCredentialPersistenceTests
     public void CheckoutSteps_AreReadable()
     {
         // Act
-        var steps = ReadCheckoutSteps();
+        IReadOnlyList<CheckoutStep> steps = ReadCheckoutSteps();
 
         // Assert: the arm above passes over a workflow it cannot read, so the steps are held non-empty
         // rather than trusted. A rewrite into a form this scan cannot follow fails here.
@@ -92,7 +92,7 @@ public sealed class CheckoutCredentialPersistenceTests
     private static CheckoutStep ToStep(string workflow, string[] lines, int index)
     {
         int indent = IndentOf(lines[index]);
-        var inputs = lines
+        IEnumerable<string> inputs = lines
             .Skip(index + 1)
             .TakeWhile(line => ContinuesStep(line, indent));
         bool optsOut = inputs.Any(static line =>

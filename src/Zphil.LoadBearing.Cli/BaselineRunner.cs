@@ -84,25 +84,27 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         if (request.Add)
             return AddEntry(request, report, source.SolutionDirectory);
 
-        var ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
+        List<RuleResult> ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
         if (ratchetResults.Count == 0)
         {
             foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: false))
-                output.WriteLine(line);
+                await output.WriteLineAsync(line);
             return 0;
         }
 
         // Ordinal grouping in first-appearance order, so two rules sharing a baseline file are read, spliced
-        // and written once between them.
-        var fileGroups = ratchetResults
-            .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, source.SolutionDirectory), StringComparer.Ordinal);
+        // and written once between them. The directory is read out first because GroupBy is lazy: a lambda
+        // closing over `source` would outlive the using block if the sequence were ever enumerated later.
+        string solutionDirectory = source.SolutionDirectory;
+        IEnumerable<IGrouping<string, RuleResult>> fileGroups = ratchetResults
+            .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, solutionDirectory), StringComparer.Ordinal);
 
-        foreach (var group in fileGroups)
-            ApplyFile(request, group, source.SolutionDirectory);
+        foreach (IGrouping<string, RuleResult> group in fileGroups)
+            ApplyFile(request, group, solutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
         foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
-            output.WriteLine(line);
+            await output.WriteLineAsync(line);
 
         return 0;
     }
@@ -154,7 +156,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
 
         string path = BaselineStore.ResolvePath(result.Rule.BaselinePath, solutionDirectory);
         BaselineDocument? existing = BaselineStore.TryReadDocument(path);
-        if (existing is null || !existing.Sections.TryGetValue(ruleId, out var existingEntries))
+        if (existing is null || !existing.Sections.TryGetValue(ruleId, out IReadOnlyList<BaselineEntry>? existingEntries))
             throw new UserErrorException($"no baseline section for '{ruleId}' — run 'loadbearing baseline --init' first.");
 
         Violation violation = request.Subject is not null
@@ -165,7 +167,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         BaselineEntry attributed = identity.WithBecause(request.Because!);
 
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
-        foreach (var section in existing.Sections)
+        foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
             sections[section.Key] = section.Value; // co-resident foreign sections ride through untouched
 
         if (existingEntries.Contains(identity))
@@ -193,7 +195,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         BaselineDocument? existing = BaselineStore.TryReadDocument(group.Key);
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
         if (existing is not null)
-            foreach (var section in existing.Sections)
+            foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
                 sections[section.Key] = section.Value; // sections for rules not in this run (e.g. a removed rule) ride through untouched
 
         foreach (RuleResult result in group) ApplyRule(request, result, sections);
@@ -211,7 +213,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
             return;
         }
 
-        sections.TryGetValue(ruleId, out var existingEntries);
+        sections.TryGetValue(ruleId, out IReadOnlyList<BaselineEntry>? existingEntries);
         if (request.Init)
             InitRule(ruleId, current, existingEntries, sections);
         else
@@ -248,7 +250,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
 
         var currentSet = new HashSet<BaselineEntry>(current);
         var existingSet = new HashSet<BaselineEntry>(captured);
-        var kept = captured.Where(currentSet.Contains).ToList();
+        List<BaselineEntry> kept = captured.Where(currentSet.Contains).ToList();
         int removed = captured.Count - kept.Count;
         int additions = current.Count(entry => !existingSet.Contains(entry));
 

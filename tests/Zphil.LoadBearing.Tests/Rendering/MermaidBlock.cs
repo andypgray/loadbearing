@@ -13,7 +13,7 @@ internal static class MermaidBlock
     /// </summary>
     public static IReadOnlyList<string> Diagram(string block)
     {
-        var lines = block.Split('\n')
+        List<string> lines = block.Split('\n')
             .ToList();
         int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
         int end = lines.FindLastIndex(line => line == "```");

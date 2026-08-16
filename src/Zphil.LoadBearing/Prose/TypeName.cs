@@ -22,7 +22,7 @@ internal static class TypeName
         int arity = IntroducedArity(type);
         if (arity == 0) return baseName;
 
-        var all = type.GetGenericArguments();
+        Type[] all = type.GetGenericArguments();
         string arguments = string.Join(", ", all.Skip(all.Length - arity).Select(Simple));
         return baseName + "<" + arguments + ">";
     }
@@ -62,14 +62,14 @@ internal static class TypeName
 
         // A partially-open construction (some arguments bound, some free) is not source-writable and
         // has no extraction analog — the definition or a fully-closed construction do.
-        if (type.ContainsGenericParameters && !type.IsGenericTypeDefinition) throw new UnrepresentableTypeException(type);
+        if (type is { ContainsGenericParameters: true, IsGenericTypeDefinition: false }) throw new UnrepresentableTypeException(type);
 
         // The containing-type chain, outermost-first (includes the type itself). Namespace is taken
         // once from the outermost link; nested types inherit it.
         var chain = new List<Type>();
         for (Type? link = type; link is not null; link = link.DeclaringType) chain.Insert(0, link);
 
-        var arguments = type.IsGenericType ? type.GetGenericArguments() : Array.Empty<Type>();
+        Type[] arguments = type.IsGenericType ? type.GetGenericArguments() : Array.Empty<Type>();
 
         var builder = new StringBuilder();
         string? @namespace = chain[0].Namespace;

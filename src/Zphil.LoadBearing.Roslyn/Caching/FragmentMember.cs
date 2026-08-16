@@ -31,10 +31,10 @@ internal sealed record FragmentMember(
     /// </remarks>
     public MemberNode ToMemberNode(TypeNode declaringType)
     {
-        var declarationSites = FragmentSiteSets.Locations(DeclarationSites);
-        var filePaths = FragmentSiteSets.FilePaths(DeclarationSites);
-        var parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
-        var attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
+        IReadOnlyList<SourceLocation> declarationSites = FragmentSiteSets.Locations(DeclarationSites);
+        IReadOnlyList<string> filePaths = FragmentSiteSets.FilePaths(DeclarationSites);
+        List<ParameterNode> parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
+        List<AttributeNode> attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
 
         return new MemberNode(
             declaringType,

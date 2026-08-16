@@ -302,7 +302,7 @@ internal static class ReferenceWalker
 
         switch (symbol)
         {
-            case IMethodSymbol method when method.MethodKind is MethodKind.Ordinary or MethodKind.ReducedExtension:
+            case IMethodSymbol { MethodKind: MethodKind.Ordinary or MethodKind.ReducedExtension } method:
                 IMethodSymbol normalized = method.ReducedFrom ?? method;
                 return normalized.OriginalDefinition;
 

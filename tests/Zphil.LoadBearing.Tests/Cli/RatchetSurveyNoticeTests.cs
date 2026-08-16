@@ -75,7 +75,7 @@ public sealed class RatchetSurveyNoticeTests
             Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 2)
         ]);
 
-        var lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: true);
+        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: true);
 
         lines.ShouldBe(
         [
@@ -101,7 +101,7 @@ public sealed class RatchetSurveyNoticeTests
     {
         var report = new CheckReport([Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1)]);
 
-        var lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: false);
+        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: false);
 
         lines[1]
             .ShouldBe("1 rule is failing with no baseline to capture (1 violation):");

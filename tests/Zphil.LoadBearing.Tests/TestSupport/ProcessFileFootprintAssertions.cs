@@ -36,7 +36,7 @@ internal static class ProcessFileFootprintAssertions
 
         while (true)
         {
-            var retained = ProcessFileFootprint.PathsUnder(process, root);
+            IReadOnlyList<RetainedPath> retained = ProcessFileFootprint.PathsUnder(process, root);
             if (inheritedHandles is not null)
                 retained = ProcessFileFootprint.ExceptInherited(retained, inheritedHandles);
 
@@ -52,7 +52,7 @@ internal static class ProcessFileFootprintAssertions
     private static string Describe(
         Process process, string root, IReadOnlyList<RetainedPath> retained, TimeSpan ceiling)
     {
-        var lines = retained
+        IEnumerable<string> lines = retained
             .OrderBy(path => path.Scan)
             .ThenBy(path => path.ResolvedPath, StringComparer.OrdinalIgnoreCase)
             .Select(path => $"    [{path.Scan}] {path.ResolvedPath}{Environment.NewLine}        raw: {path.RawPath}");

@@ -24,7 +24,7 @@ public class SpecLoadingTests
         try
         {
             Assembly fixture = context.LoadFromAssemblyPath(fixturePath);
-            var specs = SpecDiscovery.FindSpecs(fixture);
+            IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(fixture);
 
             specs.ShouldNotBeEmpty();
             // Type identity across the ALC boundary — the shared-contract-to-Default delegation.

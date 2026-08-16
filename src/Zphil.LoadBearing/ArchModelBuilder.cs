@@ -29,7 +29,7 @@ public static class ArchModelBuilder
         var arch = new Arch();
         foreach (IArchitectureSpec spec in Guard.NotNull(specs, nameof(specs))) Guard.NotNull(spec, nameof(spec)).Define(arch);
 
-        var errors = SpecValidator.Validate(arch);
+        IReadOnlyList<SpecValidationError> errors = SpecValidator.Validate(arch);
         if (errors.Count > 0) throw new SpecValidationException(errors);
 
         return ProjectModel(arch);
@@ -49,7 +49,7 @@ public static class ArchModelBuilder
                     break;
             }
 
-        var layers = arch.Layers.Select(ProjectLayer).ToList();
+        List<LayerDefinition> layers = arch.Layers.Select(ProjectLayer).ToList();
         return new ArchitectureModel(rules, layers);
     }
 

@@ -42,8 +42,7 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
@@ -84,8 +83,7 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered()))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered()))
                     .Because("b"))
             .Single();
 
@@ -121,8 +119,7 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton)
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
                     .Because("b"))
             .Single();
 
@@ -151,8 +148,7 @@ public sealed class RegisteredNounMembershipTests
 
         RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
                 arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Scoped)
-                        .MustNotInject(arch.Types))
+                    .Enforce(arch.Registered(Lifetime.Scoped).MustNotInject(arch.Types))
                     .Because("b"))
             .Single();
 

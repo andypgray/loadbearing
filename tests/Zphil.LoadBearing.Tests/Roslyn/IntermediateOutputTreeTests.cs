@@ -66,7 +66,7 @@ public sealed class IntermediateOutputTreeTests
     public void AssetsPathsOf_StampsEveryPlaceTheLayoutInForceCouldPutTheAssetsFile(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath, string expected)
     {
-        var paths = IntermediateOutputTree.AssetsPathsOf(
+        IReadOnlyList<string> paths = IntermediateOutputTree.AssetsPathsOf(
             projectDirectory, evaluatedOutputPath, intermediateAssemblyPath);
 
         paths.ShouldBe(expected.Split(';')
@@ -78,7 +78,7 @@ public sealed class IntermediateOutputTreeTests
     {
         // The default location and the intermediate root are the same directory in the default layout, and a
         // duplicated stamp would be a second stat and a second entry in every persisted manifest.
-        var paths = IntermediateOutputTree.AssetsPathsOf(
+        IReadOnlyList<string> paths = IntermediateOutputTree.AssetsPathsOf(
             "/r/P", "/r/P/bin/Debug/net10.0/A.dll", "/r/P/obj/Debug/net10.0/A.dll");
 
         paths.Distinct()

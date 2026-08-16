@@ -83,7 +83,7 @@ public sealed class RuleQuoteSyncTests
         // bullet its own example root renders for that rule id.
         foreach ((string doc, string exampleRoot) in QuoteDocs)
         {
-            var bullets = BulletsFor(exampleRoot);
+            IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = BulletsFor(exampleRoot);
             foreach (RuleQuote quote in ExtractDoc(doc))
             {
                 if (IsNarrative(quote)) continue;
@@ -108,7 +108,7 @@ public sealed class RuleQuoteSyncTests
         // matching, the exemption is dead and the quote should be held by the gate above.
         foreach ((string doc, string exampleRoot) in QuoteDocs)
         {
-            var bullets = BulletsFor(exampleRoot);
+            IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = BulletsFor(exampleRoot);
             foreach (RuleQuote quote in ExtractDoc(doc))
             {
                 if (!IsNarrative(quote)) continue;
@@ -167,7 +167,7 @@ public sealed class RuleQuoteSyncTests
         // scope, as it does for every hygiene gate here, and the sweep runs over every tracked markdown
         // file rather than only the ones under examples/: the root README is already registered, so
         // restricting it to examples/ would leave that doc's siblings unguarded for no reason.
-        var registered = QuoteDocs
+        HashSet<string> registered = QuoteDocs
             .Select(entry => entry.Doc)
             .ToHashSet(StringComparer.Ordinal);
         List<string> unregistered = new();

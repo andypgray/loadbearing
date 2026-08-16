@@ -22,10 +22,8 @@ public static class SpecDiscovery
     {
         Guard.NotNull(assembly, nameof(assembly));
 
-        var specTypes = assembly.GetTypes()
-            .Where(type => type.IsClass
-                           && !type.IsAbstract
-                           && type.IsVisible
+        List<Type> specTypes = assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false, IsVisible: true }
                            && typeof(IArchitectureSpec).IsAssignableFrom(type))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToList();

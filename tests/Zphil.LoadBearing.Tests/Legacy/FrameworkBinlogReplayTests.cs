@@ -59,7 +59,7 @@ public sealed class FrameworkBinlogReplayTests
         CliResult replay = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--binlog", binlog, "--no-cache");
         long replayLoads = WorkspaceLoader.LoadCount - loaderBeforeReplay;
-        var replayGate = MsBuildGate.LastAcquisition;
+        GateAcquisition? replayGate = MsBuildGate.LastAcquisition;
 
         long loaderBeforeCold = WorkspaceLoader.LoadCount;
         CliResult cold = await CliRunner.InvokeColdAsync(

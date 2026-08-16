@@ -101,7 +101,7 @@ internal static class BinlogReplayer
             });
 
             Solution solution = workspace.AddSolution(solutionInfo);
-            (Solution normalized, var targetFrameworks) =
+            (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
                 NormalizeProjects(solution);
             (Solution stripped, int analyzerCount, int metadataCount) = normalized.StripUnresolvedReferences();
             if (analyzerCount > 0 || metadataCount > 0)
@@ -112,7 +112,7 @@ internal static class BinlogReplayer
             // No solution file to read declared membership from, so only the loaded-but-empty arm can fire —
             // and it cannot, because every replayed project came from a compiler invocation that ran. Asked
             // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
-            var failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
+            IReadOnlyList<string> failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
 
             return new ReplayedSolution(workspace, reader, stripped, targetFrameworks, failedProjects);
         }
@@ -193,6 +193,6 @@ internal static class BinlogReplayer
     // enforced, so a mixed-language solution replays its C# projects and silently ignores the rest.
     private static bool IsReplayableCSharpCall(CompilerCall call)
     {
-        return call.Kind == CompilerCallKind.Regular && call.IsCSharp;
+        return call is { Kind: CompilerCallKind.Regular, IsCSharp: true };
     }
 }

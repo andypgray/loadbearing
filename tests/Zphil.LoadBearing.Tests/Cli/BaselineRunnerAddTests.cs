@@ -113,8 +113,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         ArchitectureModel model = Checker.Model(arch => arch.Rule(CtorRuleId)
             .Migrate(
                 "controllers `new` the data layer directly",
-                arch.Namespace("MyApp.Web.*")
-                    .MustNotConstruct(arch.Namespace("MyApp.Data.*")))
+                arch.Namespace("MyApp.Web.*").MustNotConstruct(arch.Namespace("MyApp.Data.*")))
             .Baseline("ctor.json")
             .Because("b"));
         CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
@@ -157,8 +156,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         ArchitectureModel model = Checker.Model(arch => arch.Rule(UnfilteredCatchRuleId)
             .Migrate(
                 "legacy handlers wrap their work in an unfiltered broad catch",
-                arch.Namespace("App.*")
-                    .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
             .Baseline("catch.json")
             .Because("b"));
         CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);

@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Model;
 ///     block does not end in a <c>throw</c> — the composite of three facts a handler needs to hold a failure
 ///     and continue. A bare <c>catch</c> counts as <c>System.Exception</c> and counts as unfiltered; a
 ///     filtered catch and a rethrowing catch are both lawful. Structurally a dependency-shape verb — it
-///     carries selection targets on <see cref="Operands" />, exactly like <see cref="MustNotCatchConstraint" />
+///     carries selection targets on <see cref="Constraint.Operands" />, exactly like <see cref="MustNotCatchConstraint" />
 ///     and <see cref="MustNotCatchUnfilteredConstraint" /> — so the generic operand/prose/foreign-Arch walks
 ///     reach it with no special-casing.
 /// </summary>

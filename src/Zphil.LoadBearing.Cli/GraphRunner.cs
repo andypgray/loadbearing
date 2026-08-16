@@ -69,7 +69,7 @@ internal sealed class GraphRunner(
         // Scope, then refuse, then render. The refusal fires here rather than at parse time because the
         // inventory it lists IS the extraction's output: nothing before this point knows the solution's
         // project names, so a filter that matches nothing cannot be caught any earlier.
-        var projectGlobs = GlobList.Parse(request.Projects);
+        IReadOnlyList<string> projectGlobs = GlobList.Parse(request.Projects);
         GraphSummary scoped = GraphSummarizer.Scope(summary, projectGlobs);
         if (projectGlobs.Count > 0 && scoped.Projects.Count == 0)
             throw new UserErrorException(UnmatchedProjectsMessage(projectGlobs, summary));
@@ -77,7 +77,7 @@ internal sealed class GraphRunner(
         // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr. Composed
         // once for both, so the survey document carries the MSBuild-selection note the refusal above already
         // carries.
-        var renderedDiagnostics = diagnostics.Rendered;
+        IReadOnlyList<string> renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         // The narrowing stamp is human-channel only, where the document carries the same fact in
@@ -105,7 +105,7 @@ internal sealed class GraphRunner(
         IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         IReadOnlyList<string> projectGlobs)
     {
-        var ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        IEnumerable<string> ladder = DocumentGrains.Ladder(request.Grain, Compose);
         string document = Fitter.Fit(ladder);
         output.WriteLine(document);
         return;

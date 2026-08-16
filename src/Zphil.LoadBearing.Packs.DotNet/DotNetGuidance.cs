@@ -112,11 +112,11 @@ public static class DotNetGuidance
         IRuleBuilder rule = arch.Rule("async/no-sync-over-async");
         Constraint constraint = subject.MustNotUse(
             arch.Member(typeof(Task), nameof(Task.Wait)),
-            arch.Member(typeof(Task<>), nameof(Task<object>.Result)),
+            arch.Member(typeof(Task<>), nameof(Task<>.Result)),
             arch.Member(typeof(Task), nameof(Task.GetAwaiter)),
-            arch.Member(typeof(Task<>), nameof(Task<object>.GetAwaiter)),
+            arch.Member(typeof(Task<>), nameof(Task<>.GetAwaiter)),
             arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
-            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<object>.GetResult)));
+            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)));
 
         Declare(rule, constraint, posture,
             "Blocking on a Task (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead — https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios",

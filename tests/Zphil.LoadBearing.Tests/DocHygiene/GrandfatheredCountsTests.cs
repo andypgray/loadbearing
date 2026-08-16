@@ -25,7 +25,7 @@ public sealed class GrandfatheredCountsTests
             "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         GrandfatheredCount count = counts.ShouldHaveSingleItem();
@@ -45,7 +45,7 @@ public sealed class GrandfatheredCountsTests
         string doc = string.Join("\n", "```text", line, "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert: `baseline --init` writes exactly what it captured, so the line carries no stale count.
         GrandfatheredCount count = counts.ShouldHaveSingleItem();
@@ -65,7 +65,7 @@ public sealed class GrandfatheredCountsTests
             "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         GrandfatheredCount count = counts.ShouldHaveSingleItem();
@@ -87,7 +87,7 @@ public sealed class GrandfatheredCountsTests
             "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         GrandfatheredCount count = counts.ShouldHaveSingleItem();
@@ -113,7 +113,7 @@ public sealed class GrandfatheredCountsTests
             "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         GrandfatheredCount count = counts.ShouldHaveSingleItem();
@@ -138,7 +138,7 @@ public sealed class GrandfatheredCountsTests
             "```");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         counts.ShouldHaveSingleItem()
@@ -155,7 +155,7 @@ public sealed class GrandfatheredCountsTests
             "data-access/no-inline-sql: captured 12 grandfathered violations.");
 
         // Act
-        var counts = GrandfatheredCounts.Extract("d.md", doc);
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
         counts.ShouldBeEmpty();
@@ -190,7 +190,7 @@ public sealed class GrandfatheredCountsTests
     {
         // Arrange
         GrandfatheredCount count = new("d.md", 12, "time/inject-clock", 7, null);
-        var read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
+        Func<string, string?> read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
 
         // Act
         GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], read);
@@ -206,7 +206,7 @@ public sealed class GrandfatheredCountsTests
         // Arrange: entries = grandfathered + stale, exactly as the checker computes them, so a line that
         // carries the stale count is checked whole rather than only where the baseline is fully matched.
         GrandfatheredCount count = new("d.md", 12, "time/inject-clock", 5, 2);
-        var read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
+        Func<string, string?> read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
 
         // Act
         GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], read);
@@ -220,7 +220,7 @@ public sealed class GrandfatheredCountsTests
     {
         // Arrange: the re-baseline this gate exists to catch — the walkthrough still quotes the old count.
         GrandfatheredCount count = new("d.md", 12, "time/inject-clock", 8, null);
-        var read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
+        Func<string, string?> read = Reader(("examples/Meridian/arch/baselines/time/inject-clock.json", Baseline(("time/inject-clock", 7))));
 
         // Act
         GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], read);
@@ -274,7 +274,7 @@ public sealed class GrandfatheredCountsTests
             "examples/Meridian/arch/baselines/scoped/b/rule.json",
             "examples/Meridian.Quoting/arch/baselines/c/rule.json"
         ];
-        var read = Reader(
+        Func<string, string?> read = Reader(
             ("examples/Meridian/arch/baselines/a/rule.json", Baseline(("a/rule", 4))),
             ("examples/Meridian/arch/baselines/scoped/b/rule.json", Baseline(("scoped/b/rule", 6))),
             ("examples/Meridian.Quoting/arch/baselines/c/rule.json", Baseline(("c/rule", 99))));
@@ -311,7 +311,7 @@ public sealed class GrandfatheredCountsTests
         ];
 
         // Act
-        var files = GrandfatheredCounts.BaselineFiles(string.Empty, tracked);
+        IReadOnlyList<string> files = GrandfatheredCounts.BaselineFiles(string.Empty, tracked);
 
         // Assert
         files.ShouldBe(["arch/baselines/mcp/env-through-seam.json", "arch/baselines/roslyn/msbuild-bootstrap/containment.json"]);
@@ -392,7 +392,7 @@ public sealed class GrandfatheredCountsTests
         var doc = "the generated baseline carries four entries. Because they are grandfathered, check exits 0";
 
         // Act
-        var mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
+        IReadOnlyList<GrandfatheredCounts.ProseMention> mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
 
         // Assert
         mentions.ShouldHaveSingleItem()
@@ -407,7 +407,7 @@ public sealed class GrandfatheredCountsTests
         var doc = "a Migrate rule's grandfathered sites keep their test green while the ratchet holds, and CI runs it as a step of its own, one line per rule ID.";
 
         // Act
-        var mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
+        IReadOnlyList<GrandfatheredCounts.ProseMention> mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
 
         // Assert
         mentions.ShouldBeEmpty();
@@ -425,7 +425,7 @@ public sealed class GrandfatheredCountsTests
             "and its twelve grandfathered sites stay quiet");
 
         // Act
-        var mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
+        IReadOnlyList<GrandfatheredCounts.ProseMention> mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
 
         // Assert
         mentions.ShouldHaveSingleItem()
@@ -439,7 +439,7 @@ public sealed class GrandfatheredCountsTests
         var doc = "That is grandfathered debt, not house style.";
 
         // Act
-        var mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
+        IReadOnlyList<GrandfatheredCounts.ProseMention> mentions = GrandfatheredCounts.ProseMentions("d.md", doc);
 
         // Assert
         mentions.ShouldBeEmpty();
@@ -447,7 +447,7 @@ public sealed class GrandfatheredCountsTests
 
     private static string Baseline(params (string RuleId, int Entries)[] sections)
     {
-        var rules = sections
+        IEnumerable<string> rules = sections
             .Select(section =>
             {
                 string entries = string.Join(", ", Enumerable.Repeat("{ \"subject\": \"M:X.Y\" }", section.Entries));

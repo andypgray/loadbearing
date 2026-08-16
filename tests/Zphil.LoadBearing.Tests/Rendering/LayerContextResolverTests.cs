@@ -42,8 +42,7 @@ public class LayerContextResolverTests
     {
         arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-namespace")
-            .Enforce(arch.Namespace("MyApp.Web.*")
-                .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("A namespace-subject rule, deliberately not layer-anchored.");
     });
 
@@ -85,7 +84,7 @@ public class LayerContextResolverTests
             ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
             ("src/MyApp.Web/InvoiceController.cs", "namespace MyApp.Web; public class InvoiceController {}"));
 
-        var placements = LayerContextResolver.Resolve(ArchModelBuilder.Build(WebLayerSpec), codebase);
+        IReadOnlyList<LayerPlacement> placements = LayerContextResolver.Resolve(ArchModelBuilder.Build(WebLayerSpec), codebase);
 
         placements.Count.ShouldBe(1);
         placements[0]

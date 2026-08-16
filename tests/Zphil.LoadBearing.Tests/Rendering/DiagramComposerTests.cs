@@ -121,8 +121,7 @@ public sealed class DiagramComposerTests
     {
         return Checker.Model(arch =>
             arch.Rule("layering/lib-is-a-leaf")
-                .Enforce(arch.Namespace("Lib.*")
-                    .MustNotReference(arch.Namespace("App.*")))
+                .Enforce(arch.Namespace("Lib.*").MustNotReference(arch.Namespace("App.*")))
                 .Because("A library that reaches back into its caller is not a library."));
     }
 

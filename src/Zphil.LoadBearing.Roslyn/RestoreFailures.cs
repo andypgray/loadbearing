@@ -181,7 +181,7 @@ internal static class RestoreFailures
     {
         try
         {
-            var preamble = Encoding.UTF8.Preamble;
+            ReadOnlySpan<byte> preamble = Encoding.UTF8.Preamble;
             ReadOnlySpan<byte> json = File.ReadAllBytes(assetsPath);
 
             // Every assets file a real restore writes carries a UTF-8 BOM. The stream parse this replaces

@@ -75,7 +75,7 @@ internal sealed class TypeAnchor
     /// </summary>
     internal static IReadOnlyList<TypeAnchor> FromTypes(Type first, Type[] more)
     {
-        return OperandList.OneOrMore(first, more, type => FromType(type));
+        return OperandList.OneOrMore(first, more, FromType);
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ internal sealed class TypeAnchor
     /// </summary>
     internal static IReadOnlyList<TypeAnchor> FromNames(string first, string[] more)
     {
-        return OperandList.OneOrMore(first, more, name => FromName(name));
+        return OperandList.OneOrMore(first, more, FromName);
     }
 
     // Splits a fully-qualified name on the dots OUTSIDE any <...>: "N.Sub.MarkAttribute<T>" is

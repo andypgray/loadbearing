@@ -57,7 +57,7 @@ internal static class NarrowingNotices
 
     private static string Compose(CodebaseSource source, Func<string, IReadOnlyList<string>, string> factory)
     {
-        var uncheckedProjects = NarrowedUniverseNotice.Relative(
+        IReadOnlyList<string> uncheckedProjects = NarrowedUniverseNotice.Relative(
             source.Diagnostics.UncheckedProjects, source.SolutionDirectory);
 
         return factory(source.SolutionName, uncheckedProjects);

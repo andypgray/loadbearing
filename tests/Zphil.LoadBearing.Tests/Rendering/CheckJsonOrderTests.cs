@@ -24,8 +24,7 @@ public sealed class CheckJsonOrderTests
 
     private static readonly CheckReport WebOpensData = Checker.Run(OneController, arch =>
         arch.Rule("layer/no-data")
-            .Enforce(arch.Namespace("App.Web.*")
-                .MustNotReference(arch.Namespace("App.Data.*")))
+            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("The web layer must not open the data layer directly."));
 
     // A run whose workspace loaded incompletely, whose packages did not restore, that a solution filter

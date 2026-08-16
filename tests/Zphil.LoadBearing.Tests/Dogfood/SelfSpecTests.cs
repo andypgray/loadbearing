@@ -213,7 +213,7 @@ public sealed class SelfSpecTests
         // here the extraction decides card placement, and a card must land where the command puts it.
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, TestContext.Current.CancellationToken);
-        var declaredMembers = SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution);
+        IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution);
         SpecResolution resolution = SpecResolver.Resolve(
             snapshot.Solution, declaredMembers, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
@@ -260,14 +260,14 @@ public sealed class SelfSpecTests
     {
         string ledger = File.ReadAllText(RepoRoot.ArchSpecSource);
 
-        var used = SelfModel.Rules
+        HashSet<string> used = SelfModel.Rules
             .Where(rule => rule.Constraint is not null)
             .Select(rule => VerbName(rule.Constraint!.GetType()))
             .ToHashSet(StringComparer.Ordinal);
 
         // The `<c>Verb</c>` needle rather than a bare substring: `Must` is a prefix of every other verb,
         // so an unbounded search would let one mention account for all of them.
-        var unaccounted = PublicVerbs()
+        List<string> unaccounted = PublicVerbs()
             .Where(verb => !used.Contains(verb))
             .Where(verb => !ledger.Contains($"<c>{verb}</c>", StringComparison.Ordinal))
             .ToList();
@@ -293,7 +293,7 @@ public sealed class SelfSpecTests
         field.ShouldNotBeNull("the self-spec no longer carries a SanctionedBroadCatchers set; move this pin with it.");
 
         var sanctioned = (HashSet<string>)field.GetValue(null)!;
-        var ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal)
+        List<string> ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         ordered.ShouldBe(
@@ -356,8 +356,8 @@ public sealed class SelfSpecTests
         Selection coreProject = coreLayer.Owner.Project("Zphil.LoadBearing");
 
         var evaluator = new SelectionEvaluator(codebase);
-        var inLayer = Names(evaluator.Evaluate(coreLayer, SelectionPosition.Subject));
-        var inProject = Names(evaluator.Evaluate(coreProject, SelectionPosition.Subject));
+        IReadOnlyList<string> inLayer = Names(evaluator.Evaluate(coreLayer, SelectionPosition.Subject));
+        IReadOnlyList<string> inProject = Names(evaluator.Evaluate(coreProject, SelectionPosition.Subject));
 
         // Asserted as two set differences rather than one list equality, because the whole Core type list
         // is ~190 names and a positional diff of it says nothing. Each direction names only the strays.
@@ -394,8 +394,8 @@ public sealed class SelfSpecTests
         Selection cliProject = arch.Project("Zphil.LoadBearing.Cli");
 
         var evaluator = new SelectionEvaluator(codebase);
-        var declared = Names(evaluator.Evaluate(cliProject, SelectionPosition.Subject));
-        var authored = Names(evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject));
+        IReadOnlyList<string> declared = Names(evaluator.Evaluate(cliProject, SelectionPosition.Subject));
+        IReadOnlyList<string> authored = Names(evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject));
 
         declared.Except(authored)
             .ShouldBe(["Zphil.LoadBearing.Cli.Rendering.LoadBearingJsonContext"]);
@@ -430,8 +430,8 @@ public sealed class SelfSpecTests
         Selection roslynProject = arch.Project("Zphil.LoadBearing.Roslyn");
 
         var evaluator = new SelectionEvaluator(codebase);
-        var declared = Names(evaluator.Evaluate(roslynProject, SelectionPosition.Subject));
-        var authored = Names(evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject));
+        IReadOnlyList<string> declared = Names(evaluator.Evaluate(roslynProject, SelectionPosition.Subject));
+        IReadOnlyList<string> authored = Names(evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject));
 
         declared.Except(authored)
             .ShouldBe(
@@ -467,14 +467,14 @@ public sealed class SelfSpecTests
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, TestContext.Current.CancellationToken);
 
-        var cSharpProjects = snapshot.Solution.Projects
+        List<Project> cSharpProjects = snapshot.Solution.Projects
             .Where(project => project.Language == LanguageNames.CSharp)
             .ToList();
 
         // The guard against a vacuous pass: an empty project set satisfies every claim below.
         cSharpProjects.ShouldNotBeEmpty();
 
-        var unusable = cSharpProjects
+        List<string> unusable = cSharpProjects
             .Where(project => !IsUsableIntermediateAssemblyPath(project))
             .Select(project => $"{project.Name}: '{project.CompilationOutputInfo.AssemblyPath}'")
             .OrderBy(line => line, StringComparer.Ordinal)

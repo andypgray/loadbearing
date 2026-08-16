@@ -27,8 +27,7 @@ public sealed class RuleResultAssertionsTests
                 }
                 """,
                 arch => arch.Rule("ex/no-catch")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotCatch(arch.Namespace("Errors.*")))
+                    .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                     .Because("b"))
             .Single();
 

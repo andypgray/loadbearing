@@ -21,8 +21,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     {
         // InvoiceCreatedHandler : IHandler<InvoiceCreated> — the open-generic construction match reds it.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler")
-                    .MustNotImplement("MyApp.Web.IHandler<T>"))
+                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
             .Single()
             .ShapeSubjects()
@@ -30,8 +29,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
 
         // HomeController does not implement IHandler — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("HomeController")
-                    .MustNotImplement("MyApp.Web.IHandler<T>"))
+                .Enforce(arch.Types.WithPrefix("HomeController").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
             .Single()
             .ShouldHavePassed();
@@ -42,8 +40,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     {
         // OrderRuleViolation : System.Exception — the direct external base is recorded, so the ban reds it.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
-                .Enforce(arch.Types.WithPrefix("OrderRuleViolation")
-                    .MustNotDeriveFrom(typeof(Exception)))
+                .Enforce(arch.Types.WithPrefix("OrderRuleViolation").MustNotDeriveFrom(typeof(Exception)))
                 .Because("b"))
             .Single()
             .ShapeSubjects()
@@ -51,8 +48,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
 
         // OrderApproval derives from no BCL exception — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
-                .Enforce(arch.Types.WithPrefix("OrderApproval")
-                    .MustNotDeriveFrom(typeof(Exception)))
+                .Enforce(arch.Types.WithPrefix("OrderApproval").MustNotDeriveFrom(typeof(Exception)))
                 .Because("b"))
             .Single()
             .ShouldHavePassed();
@@ -63,8 +59,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     {
         // HomeController carries [WebRoute("/home")] — the declared attribute reds it.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
-                .Enforce(arch.Types.WithPrefix("HomeController")
-                    .MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
+                .Enforce(arch.Types.WithPrefix("HomeController").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
                 .Because("b"))
             .Single()
             .ShapeSubjects()

@@ -133,7 +133,7 @@ internal static class GrandfatheredCounts
     {
         List<GrandfatheredCount> counts = new();
 
-        foreach (var block in SourceAnchors.FencedBlocks(docText))
+        foreach (IReadOnlyList<(string Text, int Number)> block in SourceAnchors.FencedBlocks(docText))
         {
             var currentRuleId = string.Empty;
             foreach ((string line, int number) in block)
@@ -292,7 +292,7 @@ internal static class GrandfatheredCounts
         Func<string, string?> readText)
     {
         string directory = BaselineDirectoryOf(exampleRoot);
-        var paths = ruleId == RootTotal
+        IReadOnlyList<string> paths = ruleId == RootTotal
             ? BaselineFiles(exampleRoot, trackedPaths)
             : [BaselinePath(exampleRoot, ruleId)];
         if (paths.Count == 0) return new Lookup(null, $"no baseline is committed under {directory}");

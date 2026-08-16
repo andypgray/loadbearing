@@ -76,8 +76,8 @@ internal static class ChildProcess
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(bound);
 
-        var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
-        var error = process.StandardError.ReadToEndAsync(deadline.Token);
+        Task<string> output = process.StandardOutput.ReadToEndAsync(deadline.Token);
+        Task<string> error = process.StandardError.ReadToEndAsync(deadline.Token);
         try
         {
             await process.WaitForExitAsync(deadline.Token);

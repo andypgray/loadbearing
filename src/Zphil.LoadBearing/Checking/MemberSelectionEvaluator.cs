@@ -31,7 +31,7 @@ internal static class MemberSelectionEvaluator
     /// </summary>
     internal static IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
     {
-        var members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
+        IEnumerable<MemberNode> members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
         foreach (MemberAdjective adjective in selection.Adjectives) members = ApplyAdjective(members, adjective);
 
         return members
@@ -66,7 +66,7 @@ internal static class MemberSelectionEvaluator
             case ReturningAdjective returning:
                 // Anchor keys resolve eagerly (before the lazy Where), so a closed-generic anchor throws the
                 // backstop here — during resolution — exactly like a closed-generic type noun (§4.1).
-                var anchors = ReturningAnchors(returning.Types);
+                HashSet<string> anchors = ReturningAnchors(returning.Types);
                 return current.Where(member => member.ReturnTypeFullName is { } returnType && anchors.Contains(returnType));
             case MemberAttributedWithAdjective attributed:
                 // The matcher is built once, eagerly (before the lazy Where), so an unrepresentable typeof
@@ -106,7 +106,7 @@ internal static class MemberSelectionEvaluator
         Func<IAttributeInfo, string> nameOf = onDefinition ? a => a.DefinitionFullName : a => a.FullName;
         return member =>
         {
-            var attributes = member.Attributes;
+            IReadOnlyList<IAttributeInfo> attributes = member.Attributes;
             for (var i = 0; i < attributes.Count; i++)
                 if (nameOf(attributes[i]) == key)
                     return true;

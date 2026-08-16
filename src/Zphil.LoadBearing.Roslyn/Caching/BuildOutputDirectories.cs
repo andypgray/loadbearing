@@ -50,7 +50,7 @@ internal static class BuildOutputDirectories
         while (!remaining.IsEmpty)
         {
             int separator = remaining.IndexOfAny('\\', '/');
-            var segment = separator < 0 ? remaining : remaining[..separator];
+            ReadOnlySpan<char> segment = separator < 0 ? remaining : remaining[..separator];
             if (IsBuildOutputName(segment)) return true;
             if (separator < 0) break;
 
