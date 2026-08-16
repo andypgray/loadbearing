@@ -21,6 +21,9 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     private static readonly IReadOnlyDictionary<string, int> NoEditVersions =
         new Dictionary<string, int>(StringComparer.Ordinal);
 
+    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
+        new Dictionary<ProjectId, string>();
+
     /// <summary>
     ///     The session load generation that produced this snapshot — bumped on every full (re)load, stable
     ///     across the in-place content edits folded into the same load. A session-scoped consumer (the
@@ -43,4 +46,18 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     zero extra I/O. A semantic-version identity would miss the line shift and strand stale sites.
     /// </remarks>
     internal IReadOnlyDictionary<string, int> ProjectEditVersions { get; init; } = NoEditVersions;
+
+    /// <summary>
+    ///     The target framework each multi-target-framework project was loaded for, keyed by
+    ///     <see cref="ProjectId" /> — the discriminator
+    ///     <see cref="SolutionExtensions.NormalizeProjectNames" /> took out of the project names, carried
+    ///     from the load that produced this snapshot. Empty for a solution whose projects each target one
+    ///     framework.
+    /// </summary>
+    /// <remarks>
+    ///     Stable for the whole <see cref="Generation" />: a <see cref="ProjectId" /> survives
+    ///     <see cref="Solution.WithDocumentText(DocumentId,Microsoft.CodeAnalysis.Text.SourceText,PreservationMode)" />,
+    ///     so the map a load produced stays valid across every in-place content edit folded into it.
+    /// </remarks>
+    internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = NoTargetFrameworks;
 }

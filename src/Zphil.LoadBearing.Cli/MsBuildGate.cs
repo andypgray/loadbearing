@@ -180,7 +180,8 @@ internal static class MsBuildGate
             if (!noCache)
                 new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
 
-            return await invokeRunner(new ReplayedSolutionSource(replayed.Solution, solutionPath, diagnostics));
+            return await invokeRunner(new ReplayedSolutionSource(
+                replayed.Solution, solutionPath, diagnostics, replayed.TargetFrameworks));
         }
         finally
         {

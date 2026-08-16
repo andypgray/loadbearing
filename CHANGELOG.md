@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A workspace that failed to load no longer reports itself as a missing spec project.** A broken
+  `--locked-mode` restore leaves the spec project's reference to the contract library unresolved, so
+  convention discovery matched nothing and reported that in its own terms — "no solution project references
+  Zphil.LoadBearing.dll. Pass `--spec` to name one" — sending the reader off to write an argument that cannot
+  help, because an unresolved reference stays unresolved whichever project you name. Zero candidates now
+  splits on how the workspace loaded. A clean load keeps that sentence byte for byte and adds how many C#
+  projects were considered, since a count far short of the solution's is the real finding. A load that failed
+  says so instead, quotes up to three of the failures that made the model incomplete, and points at repairing
+  the restore and the build. The quote deliberately reads those failures rather than the raw diagnostic
+  stream: three freshly published NuGet advisories would otherwise fill it and push the one actionable
+  failure past its end.
+- **`check` finds the spec assembly under any output layout the SDK produces, including two that refused a
+  fully built solution.** A parent `Directory.Build.props` carrying
+  `<OutputPath>bin\$(Configuration)\</OutputPath>` is imported before the SDK defaults `Configuration`, so the
+  path MSBuild evaluates is a flat `bin\` that no build ever writes to — and the fallback meant to cover a
+  missing output counted a fixed number of directories up from that path, climbed past the project entirely,
+  and reported "no built output" in every configuration. `<UseArtifactsOutput>true</UseArtifactsOutput>` built
+  `-c Release` only failed the same arithmetic from the other side, re-appending the literal `debug` segment
+  as though it were a target framework. The fallback is now a bounded search: it anchors inside the output
+  root the evaluated path already sits in — `bin` or `artifacts`, starting at the deepest directory of that
+  chain that exists and widening toward the root only while it finds nothing, because the workspace load's own
+  design-time build creates the evaluated directory, empty, before resolution ever looks — looks for the
+  assembly by name below it, and prefers the shallowest match, then the most recently written. It also cannot answer with an intermediate (`obj`-side) assembly, whose metadata-only reference
+  twins fail deep inside `Define()` rather than at load: the project's own intermediate path is read from the
+  workspace and recorded in the cache, so the refusal holds identically on a cold run and a cache hit, and
+  holds without the rule ever naming `obj`. What it deliberately costs: a repository that renames its output
+  root keeps the primary resolution and loses the cross-configuration fallback it incidentally had, which is
+  the price of a search that can never climb to a repository or a drive root.
+- **A project that multi-targets is one project again, everywhere.** Roslyn appends a `(tfm)`
+  discriminator when one csproj yields several projects, and that name leaked into everything
+  downstream: convention discovery refused a multi-target spec project as "Multiple spec projects
+  found" while listing two names that are one csproj — neither typeable as `--spec` — and
+  `arch.Project("Foo")` selected the empty set because every node carried `Foo(net10.0)`, turning
+  a correct spec into a false red. The name is now normalized where the solution is produced,
+  exactly when several projects share one project file, so discovery counts one candidate per
+  csproj, selections mean what they say, and a cache hit replays the same built output a cold run
+  chose from every framework's evaluated path. What deliberately remains: types declared by
+  several frameworks take their facts from one framework, and the model note naming the winning
+  framework stays, so a rule that passes because of the other framework's shape is never silent.
 - **A flag spelled as a string is now coerced, instead of coming back as a server bug.**
   `{"overview": "true"}` is the likeliest mis-spelling of an MCP flag and was the one shape the
   forgiving-input layer did not cover: Web JSON defaults read numbers from strings but never

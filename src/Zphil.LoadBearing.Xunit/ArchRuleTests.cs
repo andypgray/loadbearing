@@ -210,7 +210,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                     var exclude = excludeProjectName is null
                         ? null
                         : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
-                    return await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution, exclude, ct);
+                    return await CodebaseExtractor.ExtractFromSolutionAsync(
+                        loaded.Solution, exclude, loaded.TargetFrameworks, ct);
                 },
                 null, CancellationToken.None);
 

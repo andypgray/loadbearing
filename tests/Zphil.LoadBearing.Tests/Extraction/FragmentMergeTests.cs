@@ -11,8 +11,9 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     per-input-fragment refactor must reproduce byte-for-byte: first-declarer-wins node facts and
 ///     ProjectName, declaration-site union across declarers, declare-all-before-reference
 ///     (declared-beats-external globally), the reference-equality contract on constructions and edges,
-///     external-node sharing, and the same-project-name (multi-TFM) project union. The final block pins the
-///     same-FQN cross-project conflation notes that ride on top of first-declarer-wins.
+///     external-node sharing, and the same-project-name (multi-TFM) project union. The last two blocks pin
+///     the two advisory note kinds that ride on top of first-declarer-wins: same-FQN cross-project
+///     conflation, and one project's several target frameworks collapsing onto a shared type.
 /// </summary>
 public sealed class FragmentMergeTests
 {
@@ -421,5 +422,79 @@ public sealed class FragmentMergeTests
             + "attribution follow 'App.Web' (the first declarer), so arch.Project('Spec.A') and "
             + "arch.Project('Spec.B') selections will not include it."
         ]);
+    }
+
+    // ── Multi-target-framework collapse notes ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ExtractFromCompilations_SameProjectTwoFrameworksSharingAType_RecordsOneMultiFrameworkNote()
+    {
+        // One project file's two frameworks both declare P.A, so the type carries the first-extracted
+        // framework's facts and only its facts. That is not a conflation — the project is one project — but
+        // it is not free either, so it gets a note of its own naming both frameworks and the winner.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            """);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "net10.0");
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "netstandard2.0");
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+
+        model.MergeNotes.ShouldBe([
+            "Project 'P' targets 'net10.0' and 'netstandard2.0'; the types they share take their facts "
+            + "from 'net10.0' (the first extracted), so a rule about them is checked against that "
+            + "framework alone."
+        ]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_SameProjectTwoFrameworksDeclaringDisjointTypes_RecordsNoNote()
+    {
+        // The gate, and it is a correctness matter rather than an economy: a type only ONE framework
+        // declares (a #if-guarded class, a framework-conditional <Compile>) keeps its own framework's facts.
+        // Nothing collapsed, so a note saying the facts came from the other framework would be false.
+        var modern = new CompilationInput(
+            CompilationFactory.Compile("P", ("Modern.cs", """
+                                                          namespace P;
+                                                          public class Modern {}
+                                                          """))
+                .Compilation, "P", [], "net10.0");
+        var legacy = new CompilationInput(
+            CompilationFactory.Compile("P", ("Legacy.cs", """
+                                                          namespace P;
+                                                          public class Legacy {}
+                                                          """))
+                .Compilation, "P", [], "netstandard2.0");
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+
+        model.MergeNotes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_MultiFrameworkProjectSharingManyTypes_RecordsExactlyOneNote()
+    {
+        // Per project, not per type: the answer is identical for every shared type, so a project sharing
+        // three types costs one line and a project sharing two hundred still costs one — which is what keeps
+        // the channel legible enough that a reader notices a line arriving at all.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            public class B {}
+                            public class C {}
+                            """);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "net10.0");
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "netstandard2.0");
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+
+        model.MergeNotes.Count.ShouldBe(1);
+        model.MergeNotes[0]
+            .ShouldContain("Project 'P' targets 'net10.0' and 'netstandard2.0'");
     }
 }

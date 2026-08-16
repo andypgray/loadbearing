@@ -58,9 +58,10 @@ internal sealed record FileStamp(
     bool Promoted);
 
 /// <summary>
-///     One cached project (keyed by name; a multi-target-framework project has one entry but several
-///     <see cref="CodebaseFragment" />s): its structural inputs, its source-document stamps, and the two
-///     invalidation keys.
+///     One cached project (keyed by name; a multi-target-framework project has one entry — its several
+///     <see cref="Microsoft.CodeAnalysis.Project" />s share the name the load boundary normalized them to —
+///     but one <see cref="CodebaseFragment" /> per framework): its structural inputs, its source-document
+///     stamps, and the two invalidation keys.
 /// </summary>
 /// <param name="ProjectName">The project (assembly) name — the key that ties this entry to its fragments.</param>
 /// <param name="CsprojPath">The absolute path to the project file (also present in the structural set).</param>
@@ -93,9 +94,10 @@ internal sealed record ProjectCacheEntry(
 
 /// <summary>
 ///     A recorded spec resolution: the normalized <c>--spec</c> argument that produced it mapped to the spec
-///     project, the projects to drop from the checked universe, and the Debug-evaluated output path. Stored
-///     faithfully so a cache hit can replay spec resolution without a workspace, resolving identically to a
-///     cold run — including the sibling-configuration fallback and its error text.
+///     project, the projects to drop from the checked universe, the Debug-evaluated output paths, and the
+///     project's intermediate assembly path. Stored faithfully so a cache hit can replay spec resolution
+///     without a workspace, resolving identically to a cold run — including the built-output search, what
+///     that search refuses, and its error text.
 /// </summary>
 /// <param name="NormalizedSpecArgument">
 ///     The normalized <c>--spec</c> value this record resolves (an absolute csproj/dll path, or the empty
@@ -107,9 +109,22 @@ internal sealed record ProjectCacheEntry(
 ///     references (<c>SpecExclusion</c>). Recorded whole rather than recomputed, because deriving it needs
 ///     the workspace a hit deliberately never opens.
 /// </param>
-/// <param name="OutputFilePath">The Debug-evaluated output path of the spec project, or null for an explicit DLL.</param>
+/// <param name="OutputFilePaths">
+///     Every Debug-evaluated output path of the spec project, ordinal-sorted, or empty for an explicit DLL. A
+///     multi-target-framework spec project evaluates one per framework, and recording only one would let a hit
+///     load a different framework's DLL than the cold run chose — the one thing this record promises it cannot
+///     do.
+/// </param>
+/// <param name="IntermediateAssemblyPath">
+///     The spec project's intermediate (<c>obj</c>-side) assembly path, or null when the workspace did not
+///     carry one. Recorded because the built-output search reads it to refuse an intermediate result: without
+///     it a hit would answer where a cold run refuses. One path is enough for a multi-target-framework
+///     project — the search derives the intermediate root from the prefix it shares with the evaluated path,
+///     and that root is the same whichever framework's pair it starts from.
+/// </param>
 internal sealed record SpecResolutionRecord(
     string NormalizedSpecArgument,
     string? SpecProjectName,
     IReadOnlyList<string> ExcludeProjectNames,
-    string? OutputFilePath);
+    IReadOnlyList<string> OutputFilePaths,
+    string? IntermediateAssemblyPath);

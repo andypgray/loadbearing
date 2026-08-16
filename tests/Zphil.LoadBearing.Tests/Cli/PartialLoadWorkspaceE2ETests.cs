@@ -149,6 +149,24 @@ public sealed class PartialLoadWorkspaceE2ETests
     }
 
     [Fact]
+    public async Task Check_PartiallyLoadedWorkspaceWithNoSpec_BlamesTheLoadRatherThanTheMissingSpec()
+    {
+        // Spec resolution runs before the incomplete-model gate can fire, so on a tree like this the reader
+        // met the convention's own failure first: "no solution project references Zphil.LoadBearing.dll —
+        // pass --spec to name one". Both halves of that were misdirection. The reference may well exist and
+        // simply not have resolved, and no --spec argument repairs a load. So the refusal names the load.
+        using TempFixtureWorkspace workspace = BrokenApp();
+
+        CliResult check = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");
+
+        check.ShouldRefuseWith("did not load cleanly");
+        check.Err.ShouldContain("BrokenApp.Contracts.csproj"); // the evidence, inline
+        check.Err.ShouldContain("Restore and build the solution first");
+        check.Err.ShouldNotContain("Pass --spec to name one");
+        check.Err.ShouldNotContain(InvariantViolationFragment);
+    }
+
+    [Fact]
     public async Task Baseline_PartiallyLoadedWorkspace_RefusesWithoutWritingAnything()
     {
         // The stakes command. Nothing under the solution root may appear as a result of this run.

@@ -46,9 +46,10 @@ internal enum CodebaseSourceOutcome
 ///         write is best-effort — any doubt or failure degrades to a plain cold extraction, never a wrong
 ///         answer. On a hit the spec is replayed without a workspace: an explicit DLL through
 ///         <see cref="SpecResolver.TryResolveWithoutSolution" />, a convention/csproj spec through the
-///         recorded resolution re-run over <see cref="SpecResolver.RequireBuiltOutput" /> (so the
-///         sibling-configuration fallback and its error text match a cold run); a spec with no matching
-///         record falls back to the cold path.
+///         recorded resolution re-run over
+///         <see cref="SpecResolver.RequireBuiltOutput(string,IReadOnlyList{string},string)" /> (so the bounded
+///         search from the output root, what that search refuses, and its error text all match a cold run); a
+///         spec with no matching record falls back to the cold path.
 ///     </para>
 ///     <para>
 ///         <b>The warm MCP path leaves the persisted cache untouched.</b> Tool calls pass <c>--no-cache</c>
@@ -281,7 +282,8 @@ internal sealed class CodebaseSource : IDisposable
                 return warm.Model;
             }
 
-            return await CodebaseExtractor.ExtractFromSolutionAsync(solution, excludeProjectNames, ct);
+            return await CodebaseExtractor.ExtractFromSolutionAsync(
+                solution, excludeProjectNames, handle.TargetFrameworks, ct);
         }
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
@@ -303,8 +305,8 @@ internal sealed class CodebaseSource : IDisposable
     {
         if (Outcome == CodebaseSourceOutcome.Partial)
         {
-            var reExtracted =
-                await CodebaseExtractor.ExtractFragmentsAsync(solution, cacheRead.DirtyProjects, ct);
+            var reExtracted = await CodebaseExtractor.ExtractFragmentsAsync(
+                solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, ct);
             reExtractedProjects = new HashSet<string>(cacheRead.DirtyProjects, StringComparer.Ordinal);
             return cacheRead.ReusableFragments
                 .Concat(reExtracted)
@@ -312,7 +314,8 @@ internal sealed class CodebaseSource : IDisposable
                 .ToList();
         }
 
-        List<CodebaseFragment> all = [.. await CodebaseExtractor.ExtractFragmentsAsync(solution, null, ct)];
+        List<CodebaseFragment> all =
+            [.. await CodebaseExtractor.ExtractFragmentsAsync(solution, null, handle!.TargetFrameworks, ct)];
         reExtractedProjects = all.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
         return all;
     }
@@ -326,7 +329,10 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
         try
         {
-            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec);
+            // Merge notes are empty by construction here: extraction has not run, and only extraction
+            // produces them. What spec resolution needs from this value is the load failures.
+            var diagnostics = new WorkspaceDiagnostics(handle.Diagnostics, []);
+            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec, diagnostics);
             ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
                 outcome, solutionPath, handle.Diagnostics, model, resolution, handle, store, cacheRead, normalizedSpec);
@@ -361,9 +367,14 @@ internal sealed class CodebaseSource : IDisposable
     ///     Resolves the spec on a cache hit without a workspace, or returns null when the cold path is needed.
     ///     An explicit DLL resolves directly (a missing one throws the same loud error a cold run would); a
     ///     convention or csproj spec replays its recorded resolution, re-running the built-output check so the
-    ///     sibling-configuration fallback and its error text match cold; a spec with no matching record returns
-    ///     null so the caller reloads the workspace.
+    ///     bounded search from the output root and its error text match cold; a spec with no matching record
+    ///     returns null so the caller reloads the workspace.
     /// </summary>
+    /// <remarks>
+    ///     The recorded intermediate assembly path is replayed rather than left null, because that is what
+    ///     makes the search's refusal of an intermediate result identical on both paths: without it a hit
+    ///     would answer with the <c>obj</c>-side assembly a cold run refuses.
+    /// </remarks>
     internal static SpecResolution? ResolveSpecOnHit(string? spec, IReadOnlyList<SpecResolutionRecord> records)
     {
         if (SpecResolver.TryResolveWithoutSolution(spec) is { } dllResolution) return dllResolution;
@@ -372,7 +383,8 @@ internal sealed class CodebaseSource : IDisposable
         SpecResolutionRecord? record = records.FirstOrDefault(r => string.Equals(r.NormalizedSpecArgument, normalized, StringComparison.Ordinal));
         if (record is null) return null;
 
-        string dll = SpecResolver.RequireBuiltOutput(record.SpecProjectName ?? normalized, record.OutputFilePath);
+        string dll = SpecResolver.RequireBuiltOutput(
+            record.SpecProjectName ?? normalized, record.OutputFilePaths, record.IntermediateAssemblyPath);
         return new SpecResolution(dll, record.SpecProjectName, record.ExcludeProjectNames);
     }
 
@@ -414,11 +426,33 @@ internal sealed class CodebaseSource : IDisposable
         var existing = cacheRead.SpecResolutions;
         if (resolution?.SpecProjectName is not { } specProjectName) return existing;
 
-        string? outputFilePath = solution.Projects
-            .FirstOrDefault(p => string.Equals(p.Name, specProjectName, StringComparison.Ordinal))?.OutputFilePath;
+        // One lookup, both facts: a multi-target-framework spec project is several Roslyn projects under one
+        // name, and each carries its own evaluated output and its own intermediate assembly.
+        var specProjects = solution.Projects
+            .Where(p => string.Equals(p.Name, specProjectName, StringComparison.Ordinal))
+            .ToList();
+
+        // Every framework's output, not the first: recording one of them would let a hit resolve a different
+        // DLL than the cold run chose. The same ordinal order the built-output check consumes.
+        var outputFilePaths = specProjects
+            .Select(p => p.OutputFilePath)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => path!)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        // One intermediate path, deterministically the ordinal-first: the search derives the intermediate
+        // root from the prefix it shares with the evaluated path, and obj and bin diverge at the same segment
+        // level whichever framework's pair it starts from, so the root is framework-invariant.
+        string? intermediateAssemblyPath = specProjects
+            .Select(p => p.CompilationOutputInfo.AssemblyPath)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
 
         var record = new SpecResolutionRecord(
-            normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePath);
+            normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,
+            intermediateAssemblyPath);
         return existing
             .Where(r => !string.Equals(r.NormalizedSpecArgument, normalizedSpecArgument, StringComparison.Ordinal))
             .Append(record)

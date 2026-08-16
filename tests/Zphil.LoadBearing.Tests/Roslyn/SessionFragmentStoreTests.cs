@@ -22,6 +22,8 @@ public sealed class SessionFragmentStoreTests
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
     private const string Billing = "MyApp.Legacy.Billing";
+    private const string MultiTfmCore = "MultiTfm.Core";
+    private const string MultiTfmWeb = "MultiTfm.Web";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -127,11 +129,49 @@ public sealed class SessionFragmentStoreTests
         var retained = all.Fragments.Where(fragment => fragment.ProjectName != Billing)
             .ToList();
         CodebaseModel mergedExcluded = FragmentMerger.Merge(retained);
-        CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution, [Billing], Ct);
+        CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(
+            snapshot.Solution, [Billing], snapshot.TargetFrameworks, Ct);
 
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
         ModelDump.Render(mergedExcluded)
             .ShouldBe(ModelDump.Render(coldExcluded));
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_MultiTargetedProjectEdited_ReExtractsBothFrameworksUnderOneName()
+    {
+        // Arrange — the MultiTfm fixture, whose Core csproj yields two Projects under one name and whose Web
+        // project is its single reverse-dependent. Three separately-keyed pieces of the store meet on that
+        // one name — the edit-version dirty set, the per-name fragment eviction, and the includeProjects
+        // filter re-extraction passes — so a project spelled two ways anywhere would strand a stale fragment.
+        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        await using var session = new WorkspaceSession();
+        var store = new SessionFragmentStore();
+        WorkspaceSnapshot clean = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet first = await store.GetFragmentsAsync(clean, Ct);
+
+        // Both frameworks' fragments are held under the one project name from the start.
+        first.Fragments.Where(fragment => fragment.ProjectName == MultiTfmCore)
+            .Select(fragment => fragment.TargetFramework)
+            .ShouldBe(["net10.0", "netstandard2.0"]);
+
+        // Act — an edit to a file both frameworks compile.
+        string widget = fixture.PathOf(MultiTfmCore, "Widget.cs");
+        FixtureEdits.EditOnDisk(
+            widget,
+            content => content + "\nnamespace MultiTfm.Core\n{\n    public class WidgetProbe\n    {\n    }\n}\n");
+        WorkspaceSnapshot edited = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet reExtracted = await store.GetFragmentsAsync(edited, Ct);
+
+        // Assert — one name went dirty (plus its reverse-dependent), and BOTH of its fragments came back,
+        // each still carrying its own framework, with the new type in the merged model.
+        reExtracted.ReExtractedProjects.ShouldBe([MultiTfmCore, MultiTfmWeb], true);
+        store.FullWalkCount.ShouldBe(1);
+        reExtracted.Fragments.Where(fragment => fragment.ProjectName == MultiTfmCore)
+            .Select(fragment => fragment.TargetFramework)
+            .ShouldBe(["net10.0", "netstandard2.0"]);
+        ModelDump.Render(FragmentMerger.Merge(reExtracted.Fragments))
+            .ShouldContain("MultiTfm.Core.WidgetProbe");
     }
 }

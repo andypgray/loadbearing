@@ -101,14 +101,15 @@ internal static class BinlogReplayer
             });
 
             Solution solution = workspace.AddSolution(solutionInfo);
-            solution = NormalizeProjects(solution);
-            (Solution stripped, int analyzerCount, int metadataCount) = solution.StripUnresolvedReferences();
+            (Solution normalized, var targetFrameworks) =
+                NormalizeProjects(solution);
+            (Solution stripped, int analyzerCount, int metadataCount) = normalized.StripUnresolvedReferences();
             if (analyzerCount > 0 || metadataCount > 0)
                 diagnosticSink?.Invoke(
                     $"Replay stripped {analyzerCount} unresolved analyzer and {metadataCount} unresolved "
                     + "metadata reference(s); a build artifact recorded in the binlog was missing from disk.");
 
-            return new ReplayedSolution(workspace, reader, stripped);
+            return new ReplayedSolution(workspace, reader, stripped, targetFrameworks);
         }
         catch
         {
@@ -120,7 +121,11 @@ internal static class BinlogReplayer
 
     // Two SolutionReader project-metadata spellings need aligning with what MSBuildWorkspace produces, so
     // the extractor, the persisted cache, SpecResolver, and the goldens all see identical data on either path.
-    private static Solution NormalizeProjects(Solution solution)
+    // The shared project-name normalization then runs over the result, exactly as the MSBuild path runs it:
+    // SolutionReader never discriminates a multi-target-framework project's name, so that pass renames
+    // nothing here and only reports each project's framework (read from its output path) for the merge.
+    private static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks) NormalizeProjects(
+        Solution solution)
     {
         foreach (ProjectId projectId in solution.ProjectIds.ToList())
         {
@@ -140,6 +145,12 @@ internal static class BinlogReplayer
             //     the OutputKind implies to point at the real obj-intermediate assembly — the form
             //     SpecResolver.RequireBuiltOutput and the cache's SpecResolutionRecord consume. The obj path
             //     (vs MSBuild's bin path) is deliberately kept: nothing compares its bytes, only resolves it.
+            //     What that costs is pinned, not assumed: SpecResolverTests'
+            //     RequireBuiltOutput_EvaluatedPathPresent_ReturnsItEvenWhenItIsTheIntermediateAssembly and
+            //     RequireBuiltOutput_ReplayShapedIntermediatePathAbsent_RefusesRatherThanFindingASiblingIntermediate
+            //     hold the two halves — the built-output check returns an obj path handed to it directly, and
+            //     refuses to go looking for one. CompilationOutputInfo is deliberately left unset here: the
+            //     only honest value is this same path, and setting it would change nothing.
             if (project.OutputFilePath is { } outputFilePath)
             {
                 string withExtension = EnsureAssemblyExtension(outputFilePath, project.CompilationOptions?.OutputKind);
@@ -148,7 +159,7 @@ internal static class BinlogReplayer
             }
         }
 
-        return solution;
+        return solution.NormalizeProjectNames();
     }
 
     // Appends the assembly file extension the OutputKind implies when the path carries none. Path.GetExtension

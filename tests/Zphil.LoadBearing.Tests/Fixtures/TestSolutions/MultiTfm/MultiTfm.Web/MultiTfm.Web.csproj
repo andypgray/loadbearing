@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!-- Single-framework on purpose: it pins that the inverse guard leaves an undiscriminated name
+             alone, and its ProjectReference pins that a reference to a multi-framework project resolves to
+             the undiscriminated name too. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\MultiTfm.Core\MultiTfm.Core.csproj" />
+    </ItemGroup>
+</Project>

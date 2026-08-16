@@ -46,6 +46,9 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 public sealed class WorkspaceSession : IAsyncDisposable
 {
+    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
+        new Dictionary<ProjectId, string>();
+
     private readonly Action<string>? diagnosticSink;
 
     // Known-document fingerprints, keyed by canonical full path. Covers only the project's COMPILED documents,
@@ -103,6 +106,10 @@ public sealed class WorkspaceSession : IAsyncDisposable
     // The cached immutable snapshot returned to callers. Reference-stable while nothing changes, so a
     // no-op reconcile hands back the very same instance.
     private WorkspaceSnapshot? snapshot;
+
+    // Per-project target frameworks of the current load generation, carried onto every snapshot it produces.
+    // ProjectIds survive WithDocumentText, so one load's map stays valid for every edit folded into it.
+    private IReadOnlyDictionary<ProjectId, string> targetFrameworks = NoTargetFrameworks;
 
     /// <summary>
     ///     Creates an unloaded session. The workspace is opened lazily on the first
@@ -210,6 +217,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loadedSolutionPath = null;
         snapshot = null;
         loadDiagnostics = [];
+        targetFrameworks = NoTargetFrameworks;
         documentFingerprints.Clear();
         documentIds.Clear();
         structuralFingerprints.Clear();
@@ -229,6 +237,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         current = materialized;
         loadedSolutionPath = solutionPath;
         loadDiagnostics = collected;
+        targetFrameworks = freshlyLoaded.TargetFrameworks;
         generation++;
         SeedEditVersions(materialized);
         RecordAllFingerprints(solutionPath, materialized);
@@ -372,16 +381,17 @@ public sealed class WorkspaceSession : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Mints a snapshot of the current solution stamped with this generation and an immutable copy of the
-    ///     per-project edit-version map, so a consumer holding the snapshot keeps a frozen view even as later
-    ///     sweeps keep bumping the live map.
+    ///     Mints a snapshot of the current solution stamped with this generation, the load's per-project
+    ///     target frameworks, and an immutable copy of the per-project edit-version map, so a consumer
+    ///     holding the snapshot keeps a frozen view even as later sweeps keep bumping the live map.
     /// </summary>
     private WorkspaceSnapshot MintSnapshot()
     {
         return new WorkspaceSnapshot(current!, loadDiagnostics)
         {
             Generation = generation,
-            ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal)
+            ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
+            TargetFrameworks = targetFrameworks
         };
     }
 
@@ -400,8 +410,10 @@ public sealed class WorkspaceSession : IAsyncDisposable
     /// <summary>
     ///     Bumps the edit counter of every project owning one of the just-rewritten documents, resolving each
     ///     <see cref="DocumentId" /> to its project by name. A multi-target-framework project's several
-    ///     same-name <see cref="Project" />s collapse onto one counter, so the version keys align with the
-    ///     name-keyed fragment store; the absolute count is irrelevant — only that it changes when bytes did.
+    ///     <see cref="Project" />s do share one name — <see cref="SolutionExtensions.NormalizeProjectNames" />
+    ///     saw to that at the load boundary — so they collapse onto one counter and the version keys align
+    ///     with the name-keyed fragment store; the absolute count is irrelevant, only that it changes when
+    ///     bytes did.
     /// </summary>
     private void BumpEditVersions(IReadOnlyList<DocumentId> ids)
     {

@@ -182,7 +182,9 @@ internal static class WarmWorkspacePool
         {
             string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
             WorkspaceSnapshot snapshot = await GetCurrentAsync(solutionPath, ct);
-            return new SolutionHandle(snapshot.Solution, solutionPath, snapshot.Diagnostics, null);
+            return new SolutionHandle(
+                snapshot.Solution, solutionPath, snapshot.Diagnostics, null,
+                targetFrameworks: snapshot.TargetFrameworks);
         }
     }
 }

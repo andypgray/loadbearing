@@ -47,7 +47,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
             .ShouldBeTrue();
 
-        // Act — downgrade the recorded schema to the immediately-prior version.
+        // Act — downgrade the recorded schema to that superseded version.
         solution.MutateCacheJson(root => root["SchemaVersion"] = 13);
 
         // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
@@ -66,9 +66,9 @@ public sealed class ExtractionCacheStoreTests
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
                 .ToList(),
-            [new SpecResolutionRecord("", "A", ["A"], "/out/A.dll")],
+            [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
             []);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
@@ -316,9 +316,9 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("B", ["A"], ("B.cs", "class B {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], "/out/A.dll")];
+        SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], ["/out/A.dll"], "/obj/A.dll")];
         var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
                 .ToList(),
             specs,
             ["load-diag-1", "load-diag-2"]);
@@ -339,8 +339,45 @@ public sealed class ExtractionCacheStoreTests
         replayed.NormalizedSpecArgument.ShouldBe("");
         replayed.SpecProjectName.ShouldBe("A");
         replayed.ExcludeProjectNames.ShouldBe(["A", "PrivatePack"]);
-        replayed.OutputFilePath.ShouldBe("/out/A.dll");
+        replayed.OutputFilePaths.ShouldBe(["/out/A.dll"]);
+        // The intermediate assembly path round-trips too: a hit that lost it would resolve a built output the
+        // cold run refused, which is the whole reason it is persisted rather than recomputed.
+        replayed.IntermediateAssemblyPath.ShouldBe("/obj/A.dll");
         result.Diagnostics.ShouldBe(["load-diag-1", "load-diag-2"]);
+    }
+
+    [Fact]
+    public void ReadAndValidate_MultiTargetedProject_HasOneProjectEntryAndTwoFragments()
+    {
+        // Arrange — the shape a multi-target-framework csproj produces: its several Projects collapse to ONE
+        // fingerprinted project entry (one csproj, one document set, one pair of invalidation keys) while
+        // extraction yields one fragment per framework. The two sides key on the same project name, which is
+        // the whole reason they can meet.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        var extraction = new ExtractionResult(
+            [
+                new CodebaseFragment("A", "net10.0", [], [], [], [], [], [], [], [], [], [], []),
+                new CodebaseFragment("A", "netstandard2.0", [], [], [], [], [], [], [], [], [], [], [])
+            ],
+            [],
+            []);
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction)
+            .ShouldBeTrue();
+
+        // Act
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — a clean hit replays both fragments under the one name, each still carrying its framework.
+        result.Outcome.ShouldBe(CacheOutcome.Hit);
+        result.ReusableFragments.Select(fragment => fragment.ProjectName)
+            .ShouldBe(["A", "A"]);
+        result.ReusableFragments.Select(fragment => fragment.TargetFramework)
+            .ShouldBe(["net10.0", "netstandard2.0"]);
+        solution.CacheProjectEntryCount()
+            .ShouldBe(1);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
@@ -348,7 +385,7 @@ public sealed class ExtractionCacheStoreTests
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
         var fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+            .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], ["diag"]);
     }
@@ -356,7 +393,7 @@ public sealed class ExtractionCacheStoreTests
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
     {
         var fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
+            .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
         return new ExtractionResult(fragments, [], [diagnostic]);
     }
@@ -440,6 +477,15 @@ public sealed class ExtractionCacheStoreTests
         public void BackdateAll()
         {
             FixtureEdits.BackdateTree(Root, CacheRoot);
+        }
+
+        // The number of project entries the written manifest carries — the fingerprint's own grain, which a
+        // multi-framework project must not multiply however many fragments it extracted to.
+        public int CacheProjectEntryCount()
+        {
+            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            return root["Projects"]!.AsArray()
+                .Count;
         }
 
         public void MutateCacheJson(Action<JsonObject> mutate)

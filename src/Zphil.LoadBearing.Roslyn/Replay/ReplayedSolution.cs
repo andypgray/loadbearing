@@ -21,13 +21,19 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 /// </remarks>
 internal sealed class ReplayedSolution : IDisposable
 {
+    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
+        new Dictionary<ProjectId, string>();
+
     private readonly SolutionReader _reader;
 
-    internal ReplayedSolution(AdhocWorkspace workspace, SolutionReader reader, Solution solution)
+    internal ReplayedSolution(
+        AdhocWorkspace workspace, SolutionReader reader, Solution solution,
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null)
     {
         Workspace = workspace;
         _reader = reader;
         Solution = solution;
+        TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
     }
 
     /// <summary>The in-memory workspace the replayed solution was added to.</summary>
@@ -35,6 +41,14 @@ internal sealed class ReplayedSolution : IDisposable
 
     /// <summary>The replayed, unresolved-reference-stripped solution.</summary>
     public Solution Solution { get; }
+
+    /// <summary>
+    ///     The target framework each multi-target-framework project was built for, keyed by
+    ///     <see cref="ProjectId" />, read from the recorded output paths (the replay reader applies no name
+    ///     discriminator of its own). Empty for a solution whose projects each target one framework, and for
+    ///     any project that suppresses the framework segment of its output path.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
     public void Dispose()

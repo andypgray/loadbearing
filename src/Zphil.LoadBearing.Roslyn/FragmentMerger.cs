@@ -30,7 +30,15 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         Facts still follow the first declarer, and an advisory
 ///         <see cref="CodebaseModel.MergeNotes">merge note</see> records it — one note per conflated FQN
 ///         naming every losing project, so a type several projects shadow costs one line rather than one
-///         per shadow. A project's own several target frameworks share its name, so they union silently.
+///         per shadow.
+///     </para>
+///     <para>
+///         A later declarer under the <em>same</em> project name is one project file's several target
+///         frameworks, which union into one project. Their types union too, but a type two frameworks both
+///         declare can only carry one framework's facts — the first extracted — so where that actually
+///         happens a second kind of merge note records it, one line per project rather than per type. A
+///         framework-exclusive type (a <c>#if</c>-guarded class) keeps its own framework's facts and is not
+///         what the note is about, so a project whose frameworks share no type stays silent.
 ///     </para>
 ///     <para>
 ///         Where one external FQN carries genuinely different facts across compilations (mixed assembly
@@ -78,23 +86,41 @@ internal static class FragmentMerger
         private readonly Dictionary<(string Src, string Ctor), SortedSet<FragmentSite>> _constructorEdgeSites = new();
 
         private readonly Dictionary<string, SortedSet<FragmentSite>> _declarationSites = new(StringComparer.Ordinal);
+
+        // FQN → the target framework of the fragment that won its facts (null where the framework is unknown,
+        // which is every single-framework project and every hand-built fast-path input).
+        private readonly Dictionary<string, string?> _declaringFrameworks = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Tgt), SortedSet<FragmentSite>> _edgeSites = new();
         private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externalFacts = new(StringComparer.Ordinal);
+
+        // Project name → every target framework its fragments carried, ordinal-sorted. Built over all
+        // fragments, not just the declaring ones, so a note can name the project's whole framework set.
+        private readonly Dictionary<string, SortedSet<string>> _frameworksByProject = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
+
+        // Project name → the framework that won the facts of the first type two of the project's frameworks
+        // both declared. An entry exists only where such a collapse actually happened, which is the note's
+        // gate: without it a note would claim a shared winner for a project whose frameworks share nothing.
+        private readonly Dictionary<string, string> _multiFrameworkWinners = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
         {
+            // The project → target-framework index the multi-framework note reads, indexed before any
+            // declaration so a note can name every framework of a project, not only the ones that collapsed.
+            foreach (CodebaseFragment fragment in fragments)
+                RecordTargetFramework(fragment);
+
             // Declared nodes: first declarer (input order) wins facts/ProjectName; sites union.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentType declared in fragment.DeclaredTypes)
-                DeclareMerged(declared, fragment.ProjectName);
+                DeclareMerged(declared, fragment.ProjectName, fragment.TargetFramework);
 
             // External facts table: the first fragment (input order) referencing a not-declared-anywhere
             // FQN wins its facts. Built after declaration so an FQN some fragment declares never goes external.
@@ -163,17 +189,29 @@ internal static class FragmentMerger
             return Materialize(fragments);
         }
 
-        private void DeclareMerged(FragmentType declared, string projectName)
+        private void RecordTargetFramework(CodebaseFragment fragment)
+        {
+            if (fragment.TargetFramework is not { } targetFramework) return;
+
+            if (!_frameworksByProject.TryGetValue(fragment.ProjectName, out var frameworks))
+                _frameworksByProject[fragment.ProjectName] = frameworks = new SortedSet<string>(StringComparer.Ordinal);
+
+            frameworks.Add(targetFramework);
+        }
+
+        private void DeclareMerged(FragmentType declared, string projectName, string? targetFramework)
         {
             string fqn = declared.Facts.FullName;
             if (!_nodes.ContainsKey(fqn))
             {
                 _nodes[fqn] = declared.Facts.ToTypeNode(projectName, isExternal: false);
                 _hierarchy[fqn] = declared; // the winning (first) declarer supplies the hierarchy
+                _declaringFrameworks[fqn] = targetFramework;
             }
             else
             {
                 NoteConflationIfCrossProject(fqn, projectName);
+                NoteFrameworkCollapseIfSameProject(fqn, projectName, targetFramework);
             }
 
             var sites = FragmentSiteSets.For(_declarationSites, fqn);
@@ -183,8 +221,8 @@ internal static class FragmentMerger
         // A second (or later) declarer of an already-declared FQN. When its project name differs from the
         // winner's, this is same-FQN cross-project conflation: the facts and ProjectName keep following the
         // first declarer, so the loser's copy is invisible to arch.Project selections — record the loser
-        // against the type. A matching project name is a project's own several target frameworks — a
-        // legitimate union, which stays silent; the loser set collapses a multi-TFM loser to one entry.
+        // against the type. A matching project name is a project's own several target frameworks, which the
+        // sibling below answers for; the loser set collapses a multi-framework loser to one entry.
         private void NoteConflationIfCrossProject(string fqn, string laterProjectName)
         {
             string winner = _nodes[fqn].ProjectName;
@@ -194,6 +232,27 @@ internal static class FragmentMerger
                 _conflatedLosers[fqn] = losers = new SortedSet<string>(StringComparer.Ordinal);
 
             losers.Add(laterProjectName);
+        }
+
+        // The same-project half: one project file's several target frameworks both declaring this FQN, so the
+        // type collapses onto whichever framework was extracted first. The three guards are the note's gate,
+        // and each is a correctness matter rather than an optimisation:
+        //   • a differing project name is cross-project conflation, already recorded above;
+        //   • an unknown framework on either side (a single-framework project, a hand-built input) leaves
+        //     nothing truthful to say about which framework won;
+        //   • a type only ONE framework declares — a #if-guarded class, a framework-conditional <Compile> —
+        //     never collapsed at all: its facts follow its own framework, and a note would be false about it.
+        private void NoteFrameworkCollapseIfSameProject(string fqn, string laterProjectName, string? laterFramework)
+        {
+            if (!string.Equals(_nodes[fqn].ProjectName, laterProjectName, StringComparison.Ordinal)) return;
+            if (laterFramework is null) return;
+            if (!_declaringFrameworks.TryGetValue(fqn, out string? winningFramework) || winningFramework is null) return;
+            if (string.Equals(winningFramework, laterFramework, StringComparison.Ordinal)) return;
+
+            // One note per project, so only the first collapse's winner is kept: fragments arrive in
+            // (name, framework) order, making it the earliest-extracted framework that actually won a
+            // shared type.
+            _multiFrameworkWinners.TryAdd(laterProjectName, winningFramework);
         }
 
         // One note per conflated type, naming every project that loses it. Grouping is what keeps a type
@@ -211,6 +270,21 @@ internal static class FragmentMerger
             return $"Type '{fqn}' is declared by projects {declarers}; its facts and "
                    + $"project attribution follow '{winner}' (the first declarer), so {selections} "
                    + "selections will not include it.";
+        }
+
+        // One note per multi-framework project whose frameworks share a type, naming every framework it
+        // targets and the one whose facts the shared types carry. Per project rather than per type because
+        // the answer is the same for all of them, and a project sharing two hundred types would otherwise
+        // drown the channel it is trying to be noticed in.
+        private string FrameworkCollapseNote(string projectName)
+        {
+            var frameworks = _frameworksByProject[projectName];
+            string winner = _multiFrameworkWinners[projectName];
+            string targeted = JoinWithAnd([.. frameworks.Select(framework => $"'{framework}'")]);
+
+            return $"Project '{projectName}' targets {targeted}; the types they share take their facts from "
+                   + $"'{winner}' (the first extracted), so a rule about them is checked against that "
+                   + "framework alone.";
         }
 
         // "A", "A and B", "A, B and C" — each caller formats its own items, so this only joins.
@@ -381,11 +455,17 @@ internal static class FragmentMerger
                 .Select(kv => new ServiceRegistration(kv.Key.Lifetime, kv.Key.Service, kv.Key.Impl, ToLocations(kv.Value)))
                 .ToList();
 
-            // Sort the advisory notes by the FQN they key on, so the list is stable across runs regardless
-            // of the order distinct conflations were first seen.
-            var mergeNotes = _conflatedLosers.Keys
+            // The advisory notes: project-level first (ordinal by project), then per-type (ordinal by FQN) —
+            // coarse fact before fine, and each half sorted on the key it groups by, so the list is stable
+            // across runs regardless of the order the distinct notes were first raised.
+            var frameworkCollapseNotes = _multiFrameworkWinners.Keys
+                .OrderBy(projectName => projectName, StringComparer.Ordinal)
+                .Select(FrameworkCollapseNote);
+            var conflationNotes = _conflatedLosers.Keys
                 .OrderBy(fqn => fqn, StringComparer.Ordinal)
-                .Select(ConflationNote)
+                .Select(ConflationNote);
+            var mergeNotes = frameworkCollapseNotes
+                .Concat(conflationNotes)
                 .ToList();
 
             return new CodebaseModel(

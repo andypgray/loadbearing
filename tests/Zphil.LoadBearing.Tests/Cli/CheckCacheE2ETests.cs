@@ -159,7 +159,8 @@ public sealed class CheckCacheE2ETests
         // recorded exclusion set replays: a hit has no workspace to re-walk the spec's reference closure with.
         var records = new[]
         {
-            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch", "MyApp.Arch.Pack"], CliRunner.CleanSpecDll)
+            new SpecResolutionRecord(
+                "", "MyApp.Arch", ["MyApp.Arch", "MyApp.Arch.Pack"], [CliRunner.CleanSpecDll], null)
         };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
@@ -173,21 +174,57 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public void ResolveSpecOnHit_ConventionRecordEvaluatedConfigMissingButSiblingBuilt_ResolvesSiblingConfiguration()
     {
-        // Mirrors the SpecResolver sibling-configuration test (commit ce899f2): a hit re-runs the built-output
-        // check over the recorded Debug path, and when only Release was built it must resolve the Release DLL —
-        // identical fallback and identical error text to a cold run.
+        // An exact mirror of the cold case in SpecResolverTests, down to the intermediate assembly in the tree
+        // and in the record: a hit re-runs the built-output check over the same two inputs the cold path had —
+        // the recorded Debug path and the recorded obj-side assembly — so the search cannot diverge between
+        // them. Only Release was built, so the Release DLL is the answer on both paths.
         using TempDirectory temp = TestTempRoot.Fresh("cache-spec-replay");
         string evaluatedDebug = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
-        string builtRelease = temp.PathOf("bin", "Release", "net10.0", "MyApp.Arch.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(builtRelease)!);
-        File.WriteAllText(builtRelease, "");
-        var records = new[] { new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], evaluatedDebug) };
+        string builtRelease = WriteAssembly(temp, "bin", "Release", "net10.0", "MyApp.Arch.dll");
+        string intermediate = WriteAssembly(temp, "obj", "Release", "net10.0", "MyApp.Arch.dll");
+        var records = new[]
+        {
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate)
+        };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
 
         resolution.ShouldNotBeNull();
         resolution.DllPath.ShouldBe(builtRelease);
         resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
+    }
+
+    [Fact]
+    public void ResolveSpecOnHit_RecordCarriesTheIntermediatePath_RefusesAnIntermediateResultExactlyAsColdDoes()
+    {
+        // Why the recorded intermediate path is worth a cache schema version. The tree is the one where the
+        // anchor walk alone cannot keep the obj-side assembly out of scope — BaseIntermediateOutputPath
+        // redirected under the output root — so the only thing that refuses it is the recorded path. Without
+        // that field a hit would load an intermediate assembly where a cold run refuses, which is a hit
+        // answering differently from the cold run it replays.
+        using TempDirectory temp = TestTempRoot.Fresh("cache-spec-replay");
+        string evaluatedDebug = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
+        string intermediate = WriteAssembly(temp, "bin", "obj", "Debug", "net10.0", "MyApp.Arch.dll");
+        var recorded = new[]
+        {
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate)
+        };
+
+        var error = Should.Throw<UserErrorException>(() => CodebaseSource.ResolveSpecOnHit(null, recorded));
+        error.Message.ShouldContain("Build the solution first (dotnet build).");
+
+        // The negative control, on the same tree: a record from before the field existed deserializes with a
+        // null intermediate path and resolves the obj-side assembly — the behaviour the schema bump exists to
+        // keep out of a hit.
+        var unrecorded = new[]
+        {
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], null)
+        };
+
+        SpecResolution? unrefused = CodebaseSource.ResolveSpecOnHit(null, unrecorded);
+
+        unrefused.ShouldNotBeNull();
+        unrefused.DllPath.ShouldBe(intermediate);
     }
 
     [Fact]
@@ -198,7 +235,7 @@ public sealed class CheckCacheE2ETests
         string normalized = Path.GetFullPath(csprojArgument);
         var records = new[]
         {
-            new SpecResolutionRecord(normalized, "MyApp.Arch", ["MyApp.Arch"], CliRunner.CleanSpecDll)
+            new SpecResolutionRecord(normalized, "MyApp.Arch", ["MyApp.Arch"], [CliRunner.CleanSpecDll], null)
         };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(csprojArgument, records);
@@ -253,6 +290,16 @@ public sealed class CheckCacheE2ETests
     private static async Task AddSourceFileAsync(string filePath, string content)
     {
         await File.WriteAllTextAsync(filePath, content, Ct);
+    }
+
+    // A zero-byte assembly for the spec-replay trees: the built-output check resolves a path, it never reads
+    // the bytes behind it.
+    private static string WriteAssembly(TempDirectory temp, params string[] segments)
+    {
+        string path = temp.PathOf(segments);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "");
+        return path;
     }
 
     private sealed record CacheRun(

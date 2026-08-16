@@ -45,6 +45,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         }
 
         Replayed = replayed;
-        return Task.FromResult(new SolutionHandle(replayed.Solution, solutionPath, diagnostics, null));
+        return Task.FromResult(new SolutionHandle(
+            replayed.Solution, solutionPath, diagnostics, null, targetFrameworks: replayed.TargetFrameworks));
     }
 }

@@ -327,6 +327,41 @@ public sealed class FragmentRoundTripTests
             .ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void RoundTrip_MultiFrameworkFragments_PreserveTheirTargetFramework()
+    {
+        // Arrange — one project's two frameworks, both declaring P.Widget. The framework is the half of a
+        // fragment's identity the project name no longer supplies, so it has to survive the cache.
+        (string Path, string Source) shared = ("Widget.cs", """
+                                                            namespace P;
+                                                            public class Widget {}
+                                                            """);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", shared)
+            .Compilation, "P", [], "net10.0");
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
+            .Compilation, "P", [], "netstandard2.0");
+        var fragments = new[] { modern, legacy }
+            .Select(FragmentExtractor.Extract)
+            .ToList();
+
+        // Act
+        string json = JsonSerializer.Serialize(fragments, ExtractionCacheStore.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<List<CodebaseFragment>>(json, ExtractionCacheStore.JsonOptions)!;
+
+        // Assert — the field itself, and then the observable that depends on it. The merge's
+        // multi-framework note is a pure function of the fragments' frameworks, so a dropped field would
+        // replay as silence on a cache hit while the cold run spoke — which no dump comparison would catch,
+        // since ModelDump does not render the notes.
+        roundTripped.Select(fragment => fragment.TargetFramework)
+            .ShouldBe(["net10.0", "netstandard2.0"]);
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+        direct.MergeNotes.ShouldNotBeEmpty();
+        fromCache.MergeNotes.ShouldBe(direct.MergeNotes);
+        ModelDump.Render(fromCache)
+            .ShouldBe(ModelDump.Render(direct));
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

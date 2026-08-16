@@ -94,8 +94,8 @@ internal static class SpecExclusion
                 referencesByName[project.Name] = references = [];
             references.AddRange(project.ProjectReferenceNames);
 
-            // A multi-targeted project arrives once per framework under one name; declared by any entry is
-            // declared, and its reference edges union.
+            // A multi-targeted project arrives once per framework, under the one name the load boundary
+            // normalized its Projects to; declared by any entry is declared, and its reference edges union.
             declaredByName[project.Name] = declaredByName.GetValueOrDefault(project.Name)
                                            || IsDeclaredMember(declaredMembers, project.FilePath);
         }

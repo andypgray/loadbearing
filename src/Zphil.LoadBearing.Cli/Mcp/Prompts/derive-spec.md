@@ -208,9 +208,17 @@ Errors you may see, verbatim, and what they mean:
   for every file the spec grows.
 - `No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec
   to name one.` — the spec project is not in the solution yet (`dotnet sln add`), or you need
-  an explicit `--spec`.
+  an explicit `--spec`. The line below it says how many C# projects the workspace held: a count
+  far short of the solution's is the real finding, not the missing spec project.
+- `No spec project found: the workspace did not load cleanly, so a project that references
+  Zphil.LoadBearing.dll may have failed to resolve it:` — followed by the load failures, up to
+  three of them. The spec project may well be there; its reference to the contract library did
+  not resolve, which a broken restore is the usual cause of (`NU1004`, a lock file inconsistent
+  with the project). Repair the restore and build, then retry. `--spec` cannot help here — an
+  unresolved reference is unresolved whichever project you name.
 - `Multiple spec projects found; pass --spec to disambiguate:` — more than one project
-  references the contract library; name yours.
+  references the contract library; the listed lines name each one's `.csproj`, so pass yours.
+  A project that multi-targets is listed once: its frameworks are one spec project.
 - `The spec project '…' has no built output … Build the solution first (dotnet build).` —
   the CLI and this server **never build**; build before every check, or the results are stale.
 - `The spec assembly '…' failed to load its dependency '…' while running Define().` — the spec

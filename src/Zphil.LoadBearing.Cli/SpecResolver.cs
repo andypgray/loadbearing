@@ -13,16 +13,27 @@ namespace Zphil.LoadBearing.Cli;
 ///     the output paths of its direct project references: a spec project references the contract library as a
 ///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
 ///     convention must see both (the derive walk caught the P2P blind spot).
+///     <see cref="FilePath" /> is the candidate's own <c>.csproj</c>, and it is what the convention counts by:
+///     a multi-target-framework project file yields one Roslyn project per framework, and those are one
+///     candidate rather than an ambiguity. It carries no default on purpose — a caller with no project file in
+///     hand has to say so out loud, because a silent default would fold every unknown-path candidate together
+///     and turn genuine ambiguity green.
 ///     <see cref="IsDeclaredMember" /> says whether the solution file declares this project, so the convention
 ///     considers only solution material: a rule-pack library that a spec project drags into the workspace also
 ///     references the contract library, and would otherwise turn every composing solution into "Multiple spec
 ///     projects found".
+///     <see cref="IntermediateAssemblyPath" /> is the project's <c>obj</c>-side assembly, which the
+///     built-output search uses to refuse an intermediate result. It reads better beside
+///     <see cref="OutputFilePath" />, and is last anyway: inserting it there would rebind the positional
+///     <see cref="IsDeclaredMember" /> argument every construction already passes to a <c>string?</c>.
 /// </remarks>
 internal sealed record SpecProjectCandidate(
     string Name,
     IReadOnlyList<string> ReferencePaths,
     string? OutputFilePath,
-    bool IsDeclaredMember = true);
+    string? FilePath,
+    bool IsDeclaredMember = true,
+    string? IntermediateAssemblyPath = null);
 
 /// <summary>
 ///     The resolved spec: the DLL to load and, when the spec is a solution member, its project name plus the
@@ -46,10 +57,29 @@ internal static class SpecResolver
 {
     private const string CoreAssemblyFile = "Zphil.LoadBearing.dll";
 
-    internal static SpecResolution Resolve(Solution solution, string solutionPath, string? specArgument)
+    // How many load failures a refusal quotes before it counts the rest. A refusal nobody reads to the end
+    // names nothing; three is enough to see whether the failures share a cause.
+    private const int MaxQuotedDiagnostics = 3;
+
+    /// <summary>
+    ///     Resolves the spec against a loaded solution.
+    /// </summary>
+    /// <param name="solution">The loaded solution.</param>
+    /// <param name="solutionPath">The solution file, read for its declared membership.</param>
+    /// <param name="specArgument">The <c>--spec</c> value, or null/blank for the convention default.</param>
+    /// <param name="diagnostics">
+    ///     How well the workspace loaded. Not defaulted, and deliberately: an unresolved package reference
+    ///     makes the convention find nothing, so "the workspace loaded cleanly" is what decides whether zero
+    ///     candidates means "there is no spec project" or "the evidence for one did not resolve" — and unlike
+    ///     an intermediate assembly path, that is never genuinely unknown to a caller. A default is also
+    ///     untypeable: <see cref="WorkspaceDiagnostics.None" /> is a property, and
+    ///     <c>default(WorkspaceDiagnostics)</c> carries null lists.
+    /// </param>
+    internal static SpecResolution Resolve(
+        Solution solution, string solutionPath, string? specArgument, WorkspaceDiagnostics diagnostics)
     {
         return string.IsNullOrWhiteSpace(specArgument)
-            ? ResolveByConvention(solution, solutionPath)
+            ? ResolveByConvention(solution, solutionPath, diagnostics)
             : ResolveExplicit(solution, solutionPath, specArgument);
     }
 
@@ -86,15 +116,20 @@ internal static class SpecResolver
                               ?? throw new UserErrorException(
                                   $"--spec '{specArgument}' is not a project in the solution. " +
                                   "Pass a built spec DLL or a csproj that is a member of the target solution.");
+            var declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+            var outputFilePaths = OutputsOfProjectFile(solution, project.FilePath, project.OutputFilePath);
+            string? intermediateAssemblyPath =
+                IntermediateOfProjectFile(solution, project.FilePath, project.CompilationOutputInfo.AssemblyPath);
             return MemberResolution(
-                solution, SpecExclusion.TryReadDeclaredMembers(solutionPath), project.Name, project.OutputFilePath);
+                solution, declaredMembers, project.Name, outputFilePaths, intermediateAssemblyPath);
         }
 
         // A DLL path — the branch that needs no solution.
         return TryResolveWithoutSolution(specArgument)!;
     }
 
-    private static SpecResolution ResolveByConvention(Solution solution, string solutionPath)
+    private static SpecResolution ResolveByConvention(
+        Solution solution, string solutionPath, WorkspaceDiagnostics diagnostics)
     {
         // Read declared membership once: the convention filters candidates by it, and the exclusion walk
         // subtracts the same set.
@@ -106,23 +141,66 @@ internal static class SpecResolver
                 p.Name,
                 ReferencePathsOf(p, solution),
                 p.OutputFilePath,
-                SpecExclusion.IsDeclaredMember(declaredMembers, p.FilePath)))
+                p.FilePath,
+                SpecExclusion.IsDeclaredMember(declaredMembers, p.FilePath),
+                p.CompilationOutputInfo.AssemblyPath))
             .ToList();
 
-        SpecProjectCandidate chosen = ResolveConventionProject(candidates);
-        return MemberResolution(solution, declaredMembers, chosen.Name, chosen.OutputFilePath);
+        SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
+        var outputFilePaths = OutputsOfProjectFile(solution, chosen.FilePath, chosen.OutputFilePath);
+        string? intermediateAssemblyPath =
+            IntermediateOfProjectFile(solution, chosen.FilePath, chosen.IntermediateAssemblyPath);
+        return MemberResolution(
+            solution, declaredMembers, chosen.Name, outputFilePaths, intermediateAssemblyPath);
     }
 
     // The shared tail of both solution-member branches: the built DLL plus the projects the checked universe
     // drops — the spec project and the plumbing only it references. A null declaredMembers is the unreadable
     // case, which SpecExclusion degrades to just the spec project.
     private static SpecResolution MemberResolution(
-        Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName, string? outputFilePath)
+        Solution solution,
+        IReadOnlySet<string>? declaredMembers,
+        string specProjectName,
+        IReadOnlyList<string?> outputFilePaths,
+        string? intermediateAssemblyPath)
     {
         return new SpecResolution(
-            RequireBuiltOutput(specProjectName, outputFilePath),
+            RequireBuiltOutput(specProjectName, outputFilePaths, intermediateAssemblyPath),
             specProjectName,
             SpecExclusion.Compute(solution, declaredMembers, specProjectName));
+    }
+
+    // Every output path the projects sharing one project file evaluate to. A multi-target-framework csproj
+    // yields one Roslyn project per framework, so any single project's OutputFilePath names an arbitrary
+    // framework's DLL; the built-output check needs them all so it can pick one that is actually on disk —
+    // and so a cache hit, which records the same set, replays the identical choice.
+    private static IReadOnlyList<string?> OutputsOfProjectFile(
+        Solution solution, string? projectFilePath, string? evaluatedOutputFilePath)
+    {
+        if (string.IsNullOrEmpty(projectFilePath)) return [evaluatedOutputFilePath];
+
+        return solution.Projects
+            .Where(p => PathsEqual(p.FilePath, projectFilePath))
+            .Select(p => p.OutputFilePath)
+            .ToList();
+    }
+
+    // The one intermediate assembly path to hand the built-output search, out of however many the projects
+    // sharing a project file carry. One suffices even for a multi-target-framework spec project: the search
+    // derives the intermediate ROOT by peeling the prefix the evaluated and intermediate paths share, and the
+    // two diverge at the same segment level whichever framework's pair it starts from — so the derived root
+    // is framework-invariant. Ordinal-first keeps the choice deterministic rather than load-order dependent.
+    private static string? IntermediateOfProjectFile(
+        Solution solution, string? projectFilePath, string? evaluatedIntermediatePath)
+    {
+        if (string.IsNullOrEmpty(projectFilePath)) return evaluatedIntermediatePath;
+
+        return solution.Projects
+            .Where(p => PathsEqual(p.FilePath, projectFilePath))
+            .Select(p => p.CompilationOutputInfo.AssemblyPath)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
     }
 
     /// <summary>
@@ -148,22 +226,96 @@ internal static class SpecResolver
     ///     <c>Zphil.LoadBearing.dll</c>. Zero candidates and multiple candidates are both loud errors
     ///     (unit-tested over tuples). Undeclared projects are workspace passengers — a spec project's own
     ///     <c>ProjectReference</c>s pull the contract library and any rule-pack library in — and a passenger
-    ///     that references the contract is not a spec project the user chose to have.
+    ///     that references the contract is not a spec project the user chose to have. Several Roslyn projects
+    ///     sharing one <c>.csproj</c> (a multi-target-framework spec project) count once.
     /// </summary>
-    internal static SpecProjectCandidate ResolveConventionProject(IReadOnlyList<SpecProjectCandidate> candidates)
+    /// <remarks>
+    ///     Zero candidates is reported against <paramref name="diagnostics" />, because a workspace that did
+    ///     not load cleanly produces exactly the same zero: an unresolved package reference means the spec
+    ///     project's reference to the contract library is simply not there to match.
+    /// </remarks>
+    internal static SpecProjectCandidate ResolveConventionProject(
+        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
         var matches = candidates.Where(c => c.IsDeclaredMember && ReferencesCore(c)).ToList();
 
-        if (matches.Count == 0)
-            throw new UserErrorException(
-                "No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec to name one.");
+        if (matches.Count == 0) throw NoSpecProjectFound(candidates, diagnostics);
 
-        if (matches.Count > 1)
+        var groups = matches
+            .Select((candidate, index) => (Candidate: candidate, Key: GroupKey(candidate, index)))
+            .GroupBy(match => match.Key, match => match.Candidate, StringComparer.Ordinal)
+            .ToList();
+
+        if (groups.Count > 1)
+        {
+            var lines = groups
+                .Select(group => DisambiguationLine(group.First()))
+                .OrderBy(line => line, StringComparer.Ordinal);
+
             throw new UserErrorException(
-                "Multiple spec projects found; pass --spec to disambiguate:\n  " +
-                string.Join("\n  ", matches.Select(m => m.Name).OrderBy(n => n, StringComparer.Ordinal)));
+                "Multiple spec projects found; pass --spec to disambiguate:\n  " + string.Join("\n  ", lines));
+        }
 
         return matches[0];
+    }
+
+    // Zero candidates has two causes whose remedies do not overlap, and reporting only the first sent readers
+    // to write an argument that could not help them. A clean load means the solution really has no spec
+    // project: the sentence stays byte-identical (the derive_spec prompt quotes it), plus how many projects
+    // were considered, which is what tells a reader whether the workspace held what they expected. A load
+    // that failed means the reference that would have matched may simply not have resolved — so that arm
+    // names the failures and points at the restore, and deliberately does not mention --spec.
+    private static UserErrorException NoSpecProjectFound(
+        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
+    {
+        if (!diagnostics.IsIncomplete)
+            return new UserErrorException(
+                "No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec to name one.\n"
+                + $"Considered {candidates.Count} C# project(s) in the workspace.");
+
+        var lines = new List<string>
+        {
+            "No spec project found: the workspace did not load cleanly, so a project that references "
+            + "Zphil.LoadBearing.dll may have failed to resolve it:"
+        };
+        lines.AddRange(QuotedReasons(diagnostics.IncompleteReasons));
+        lines.Add("Restore and build the solution first (dotnet restore, dotnet build), then retry.");
+
+        // The refusal is thrown before a CodebaseSource exists, so no runner renders the diagnostics beside
+        // it — the message has to carry them itself. CliErrorMapper.Write splits on \n and writes a line
+        // apiece, so this reads the same on stderr and in an MCP error result.
+        return new UserErrorException(string.Join("\n", lines));
+    }
+
+    // Up to MaxQuotedDiagnostics reasons, two-space indented as every other diagnostics block renders them,
+    // then a count of the rest. Reading IncompleteReasons rather than LoadFailures is load-bearing: three
+    // freshly published advisories would otherwise fill the quote and hide the one failure worth acting on.
+    private static IEnumerable<string> QuotedReasons(IReadOnlyList<string> reasons)
+    {
+        foreach (string reason in reasons.Take(MaxQuotedDiagnostics)) yield return "  " + reason;
+
+        if (reasons.Count > MaxQuotedDiagnostics)
+            yield return $"  ... and {reasons.Count - MaxQuotedDiagnostics} more.";
+    }
+
+    // One csproj that yields several Roslyn Projects (multi-TFM) is ONE candidate, not many. Group on
+    // the canonicalized project file, folded so a plain ordinal comparer carries the per-OS case rule.
+    // A candidate with no project file is its own group: folding the unknown-path candidates together
+    // would turn genuine ambiguity green, and '\0' cannot occur in a path so the sentinel cannot collide.
+    private static string GroupKey(SpecProjectCandidate candidate, int index)
+    {
+        return string.IsNullOrEmpty(candidate.FilePath)
+            ? $"\0{index}"
+            : PathComparison.Fold(PathCanonicalizer.Resolve(candidate.FilePath));
+    }
+
+    // One line of the ambiguity error. The project file is what the reader has to pass to --spec, so it is
+    // named whenever it is known; a candidate with no project file renders as the bare name it always did.
+    private static string DisambiguationLine(SpecProjectCandidate candidate)
+    {
+        return string.IsNullOrEmpty(candidate.FilePath)
+            ? candidate.Name
+            : $"{candidate.Name}  ({candidate.FilePath})";
     }
 
     private static bool ReferencesCore(SpecProjectCandidate candidate)
@@ -172,52 +324,57 @@ internal static class SpecResolver
             Path.GetFileName(path).Equals(CoreAssemblyFile, StringComparison.OrdinalIgnoreCase));
     }
 
-    internal static string RequireBuiltOutput(string projectName, string? outputFilePath)
+    /// <summary>
+    ///     The one built output the spec loads from, given the single path a project evaluated to. Delegates
+    ///     to the list overload, which is where the resolution and the error text live.
+    /// </summary>
+    internal static string RequireBuiltOutput(
+        string projectName, string? outputFilePath, string? intermediateAssemblyPath = null)
     {
-        if (!string.IsNullOrEmpty(outputFilePath))
+        return RequireBuiltOutput(projectName, [outputFilePath], intermediateAssemblyPath);
+    }
+
+    /// <summary>
+    ///     The one built output the spec loads from, given every path the projects behind one <c>.csproj</c>
+    ///     evaluated to — one per target framework for a multi-target-framework spec project. The first in
+    ///     ordinal path order that is actually on disk wins, each path getting the
+    ///     <see cref="BuiltOutputProbe">built-output search</see> before the next is tried; none built is a
+    ///     loud error naming every path tried.
+    /// </summary>
+    /// <remarks>
+    ///     Which framework's DLL wins is deliberately "whichever is built", not "whichever matches the host":
+    ///     the CLI never builds, so existence is the question that matters, and a spec DLL is loaded across
+    ///     frameworks routinely (this repo loads a <c>net48</c> spec from a <c>net10.0</c> host).
+    /// </remarks>
+    internal static string RequireBuiltOutput(
+        string projectName, IReadOnlyList<string?> outputFilePaths, string? intermediateAssemblyPath = null)
+    {
+        var evaluatedPaths = outputFilePaths
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => path!)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        foreach (string outputFilePath in evaluatedPaths)
         {
+            // The evaluated path exists: it is the answer, with no search and — deliberately — no
+            // intermediate refusal. Binlog replay hands an obj-side assembly as this primary argument
+            // (BinlogReplayer.NormalizeProjects), because a capture records no other path, so refusing an
+            // intermediate here would refuse every replayed run.
             if (File.Exists(outputFilePath)) return outputFilePath;
 
-            // MSBuildWorkspace evaluates every project in its default configuration (Debug) whatever the
-            // caller actually built, so OutputFilePath can name a Debug DLL a Release-only build never
-            // produced — the release-CI regression: `dotnet build -c Release` then `check` looked for the
-            // never-built Debug output and failed "no built output". Fall back to the same assembly under a
-            // sibling configuration before giving up, so `check` works whatever configuration was built.
-            if (FindBuiltOutputInSiblingConfiguration(outputFilePath) is { } built) return built;
+            // The evaluated path can name a directory no build ever writes, in any configuration:
+            // MSBuildWorkspace evaluates in its default configuration whatever the caller built, and a
+            // props file spelling `bin\$(Configuration)\` is imported before the SDK defaults Configuration
+            // at all, evaluating to a flat `bin\`. So search the tree the build actually wrote, from the
+            // SDK's own output root down, rather than doing arithmetic over a path shape we did not build.
+            if (BuiltOutputProbe.Find(outputFilePath, intermediateAssemblyPath) is { } built) return built;
         }
 
         throw new UserErrorException(
             $"The spec project '{projectName}' has no built output" +
-            (string.IsNullOrEmpty(outputFilePath) ? "" : $" at '{outputFilePath}'") +
+            (evaluatedPaths.Count == 0 ? "" : $" at '{string.Join("' or '", evaluatedPaths)}'") +
             ". Build the solution first (dotnet build).");
-    }
-
-    // Given an evaluated output path bin/<config>/<tfm>/<assembly>.dll that does not exist, look for the
-    // same assembly under a sibling build configuration — bin/<otherConfig>/<tfm>/<assembly>.dll — and
-    // return the most recently written match, or null when no configuration is built. Scoped to the sibling
-    // <config> directories at the same depth (not a recursive walk), so it never picks up a ref-assembly
-    // or an unrelated nested copy. Only engages when the evaluated path is absent, so the common
-    // output-present path keeps its exact former behaviour.
-    private static string? FindBuiltOutputInSiblingConfiguration(string evaluatedOutputPath)
-    {
-        string? targetFrameworkDirectory = Path.GetDirectoryName(evaluatedOutputPath);
-        string? configurationDirectory =
-            targetFrameworkDirectory is null ? null : Path.GetDirectoryName(targetFrameworkDirectory);
-        string? binDirectory =
-            configurationDirectory is null ? null : Path.GetDirectoryName(configurationDirectory);
-        if (string.IsNullOrEmpty(targetFrameworkDirectory)
-            || string.IsNullOrEmpty(binDirectory)
-            || !Directory.Exists(binDirectory))
-            return null;
-
-        string assemblyFileName = Path.GetFileName(evaluatedOutputPath);
-        string targetFramework = Path.GetFileName(targetFrameworkDirectory);
-
-        return Directory.EnumerateDirectories(binDirectory)
-            .Select(configuration => Path.Combine(configuration, targetFramework, assemblyFileName))
-            .Where(File.Exists)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
     }
 
     // Compares a user-supplied --spec csproj path against a Roslyn project.FilePath. Both are

@@ -18,6 +18,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
         string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
         var diagnostics = new List<string>();
         LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
-        return new SolutionHandle(loaded.Solution, solutionPath, diagnostics, loaded);
+        return new SolutionHandle(
+            loaded.Solution, solutionPath, diagnostics, loaded, targetFrameworks: loaded.TargetFrameworks);
     }
 }

@@ -23,6 +23,7 @@ internal sealed class DiagnosticInjectingSolutionSource(IReadOnlyList<string> di
     public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
     {
         SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solution, workingDirectory, ct);
-        return new SolutionHandle(real.Solution, real.SolutionPath, diagnostics, real, real.WarmCodebase);
+        return new SolutionHandle(
+            real.Solution, real.SolutionPath, diagnostics, real, real.WarmCodebase, real.TargetFrameworks);
     }
 }

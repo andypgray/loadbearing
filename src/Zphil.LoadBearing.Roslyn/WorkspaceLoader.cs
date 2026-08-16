@@ -6,9 +6,9 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     One-shot MSBuild solution loading for the enforcement path: create a workspace, open the
-///     solution, strip unresolved references, return. A check/render run is one-shot, so none of
-///     the machinery a long-lived workspace server would need (watcher, reload, external-edit
-///     reconcile, incremental sync, semaphores, two-phase ready tasks, warmup) exists here.
+///     solution, strip unresolved references, normalize the project names, return. A check/render run is
+///     one-shot, so none of the machinery a long-lived workspace server would need (watcher, reload,
+///     external-edit reconcile, incremental sync, semaphores, two-phase ready tasks, warmup) exists here.
 /// </summary>
 /// <remarks>
 ///     This is the one-shot <em>primitive</em>. The CLI and the xUnit adapter build directly on it and
@@ -60,7 +60,9 @@ public static class WorkspaceLoader
 
         Solution solution = await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
         (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
+        (Solution normalized, var targetFrameworks) =
+            stripped.NormalizeProjectNames();
 
-        return new LoadedSolution(workspace, stripped);
+        return new LoadedSolution(workspace, normalized, targetFrameworks);
     }
 }

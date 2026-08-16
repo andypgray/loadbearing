@@ -19,12 +19,14 @@ namespace Zphil.LoadBearing.Cli.Replay;
 internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
     string solutionPath,
-    IReadOnlyList<string> diagnostics) : ISolutionSource
+    IReadOnlyList<string> diagnostics,
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : ISolutionSource
 {
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
     {
         ModelPipeline.DiscoverSolution(solution, workingDirectory);
-        return Task.FromResult(new SolutionHandle(replayedSolution, solutionPath, diagnostics, null));
+        return Task.FromResult(new SolutionHandle(
+            replayedSolution, solutionPath, diagnostics, null, targetFrameworks: targetFrameworks));
     }
 }

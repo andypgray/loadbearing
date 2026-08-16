@@ -5,15 +5,22 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     A loaded MSBuild solution paired with its owning workspace. Dispose to release the workspace
-///     and its out-of-process BuildHost. <see cref="Solution" /> is the unresolved-reference-stripped
-///     snapshot the extractor reads.
+///     and its out-of-process BuildHost. <see cref="Solution" /> is the unresolved-reference-stripped,
+///     project-name-normalized snapshot the extractor reads, and <see cref="TargetFrameworks" /> carries
+///     the discriminators the normalization removed.
 /// </summary>
 public sealed class LoadedSolution : IDisposable
 {
-    internal LoadedSolution(MSBuildWorkspace workspace, Solution solution)
+    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
+        new Dictionary<ProjectId, string>();
+
+    internal LoadedSolution(
+        MSBuildWorkspace workspace, Solution solution,
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null)
     {
         Workspace = workspace;
         Solution = solution;
+        TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
     }
 
     /// <summary>The MSBuild workspace that produced <see cref="Solution" />.</summary>
@@ -21,6 +28,14 @@ public sealed class LoadedSolution : IDisposable
 
     /// <summary>The loaded, unresolved-reference-stripped solution.</summary>
     public Solution Solution { get; }
+
+    /// <summary>
+    ///     The target framework each multi-target-framework project was loaded for, keyed by
+    ///     <see cref="ProjectId" /> — the discriminator
+    ///     <see cref="SolutionExtensions.NormalizeProjectNames" /> took out of the project names. Empty for a
+    ///     solution whose projects each target one framework.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
     /// <summary>Disposes the underlying workspace.</summary>
     public void Dispose()

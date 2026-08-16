@@ -816,8 +816,9 @@ internal static class FragmentExtractor
                 .ToList();
 
             return new CodebaseFragment(
-                input.ProjectName, input.ProjectReferences, declaredTypes, externals, edges, memberEdges, constructorEdges,
-                injectionEdges, catchEdges, throwEdges, exposureEdges, serviceRegistrations);
+                input.ProjectName, input.TargetFramework, input.ProjectReferences, declaredTypes, externals, edges,
+                memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
+                serviceRegistrations);
         }
     }
 

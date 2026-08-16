@@ -360,8 +360,9 @@ internal sealed class BinlogCaptureStore
 
     // ── project collection ───────────────────────────────────────────────────────────────────────────────
 
-    // One entry per C# project (collapsing a multi-target-framework project's several Projects by name, as
-    // SolutionCacheInputs does), with the FULL document set — obj-generated sources included, deliberately.
+    // One entry per C# project (collapsing a multi-target-framework project's several Projects onto the one
+    // name the load boundary normalized them to, as SolutionCacheInputs does), with the FULL document set —
+    // obj-generated sources included, deliberately.
     private static IReadOnlyList<CaptureProjectEntry> CollectProjects(Solution solution)
     {
         var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);

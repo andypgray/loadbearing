@@ -103,23 +103,32 @@ public sealed class CodebaseModel
     public IReadOnlyList<ProjectNode> Projects { get; }
 
     /// <summary>
-    ///     Advisory notes the fragment merge raised while assembling this model, ordered by the
-    ///     fully-qualified name each keys on so the list is stable across runs.
+    ///     Advisory notes the fragment merge raised while assembling this model: the project-level notes
+    ///     first, ordinal by project name, then the per-type notes, ordinal by fully-qualified name — so the
+    ///     list is stable across runs and the coarser fact is read first.
     /// </summary>
     /// <remarks>
-    ///     In v1 the sole source is same-FQN cross-project conflation: two or more
-    ///     <em>
-    ///         differently
-    ///         named
-    ///     </em>
-    ///     projects declaring one fully-qualified type name, where the first declarer wins the
-    ///     node's facts and <see cref="TypeNode.ProjectName" /> and every later declarer's copy is
-    ///     therefore invisible to <c>arch.Project</c> selections. One note per conflated type names all of
-    ///     them, so a type several projects shadow costs one line. Purely informational — the model is
-    ///     complete and correct, just ambiguous in its project attribution — so these never denote a
-    ///     failed load and never gate <c>check</c> (unlike workspace-load diagnostics). Empty for the
-    ///     overwhelming common case, including a project's own several target frameworks (same name,
-    ///     silent).
+    ///     <para>
+    ///         <b>Per-type — same-FQN cross-project conflation.</b> Two or more <em>differently named</em>
+    ///         projects declare one fully-qualified type name; the first declarer wins the node's facts and
+    ///         <see cref="TypeNode.ProjectName" />, so every later declarer's copy is invisible to
+    ///         <c>arch.Project</c> selections. One note per conflated type names all of them, so a type
+    ///         several projects shadow costs one line.
+    ///     </para>
+    ///     <para>
+    ///         <b>Per-project — a multi-target-framework collapse.</b> One project file's several target
+    ///         frameworks share a name, so they union into one project; where two of them declare the same
+    ///         type, that type can only carry one framework's facts (the first extracted), and a rule about
+    ///         it is therefore checked against that framework alone. One note per project, naming every
+    ///         framework it targets and the winning one. A project whose frameworks share <em>no</em> type —
+    ///         and a framework-exclusive type, which keeps its own framework's facts — stays silent, because
+    ///         nothing collapsed.
+    ///     </para>
+    ///     <para>
+    ///         Both kinds are purely informational — the model is complete and correct, just ambiguous in its
+    ///         attribution — so they never denote a failed load and never gate <c>check</c> (unlike
+    ///         workspace-load diagnostics). Empty for the overwhelming common case.
+    ///     </para>
     /// </remarks>
     public IReadOnlyList<string> MergeNotes { get; }
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.ArchSpec;
@@ -169,9 +170,11 @@ public sealed class SelfSpecTests
         // here the extraction decides card placement, and a card must land where the command puts it.
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, TestContext.Current.CancellationToken);
-        SpecResolution resolution = SpecResolver.Resolve(snapshot.Solution, RepoRoot.Solution, RepoRoot.ArchSpecCsproj);
+        SpecResolution resolution = SpecResolver.Resolve(
+            snapshot.Solution, RepoRoot.Solution, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, resolution.ExcludeProjectNames, TestContext.Current.CancellationToken);
+            snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks,
+            TestContext.Current.CancellationToken);
 
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
         ContextComposition composition = ContextFileComposer.Compose(model, codebase, RepoRoot.Directory, SpecName);
@@ -399,6 +402,47 @@ public sealed class SelfSpecTests
         // attribute landed on the method, and the two parts merge onto one symbol — so it must survive the
         // narrowing, and an equality above is what proves it was not quietly taken along.
         authored.ShouldContain("Zphil.LoadBearing.Roslyn.NuGetAuditDiagnostics");
+    }
+
+    /// <summary>
+    ///     The live oracle for the signal the built-output search refuses an intermediate assembly with.
+    ///     Every probe test <em>fabricates</em> <c>CompilationOutputInfo.AssemblyPath</c>; nothing else in the
+    ///     suite proves Roslyn populates it. If it ever stops — a Workspaces change, a BuildHost that no
+    ///     longer reads <c>@(IntermediateAssembly)</c> — the refusal degrades to a silent no-op with every
+    ///     other test still green, and this is the only gate that can catch it. Asserted as three facts per
+    ///     project (present, rooted, and not the output path) because a path that is merely non-empty could
+    ///     be the bin-side one, which would exclude the real output instead of the intermediate.
+    /// </summary>
+    [Fact]
+    public async Task CompilationOutputInfo_CarriesARootedIntermediateAssemblyForEveryCSharpProject()
+    {
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
+            RepoRoot.Solution, TestContext.Current.CancellationToken);
+
+        var cSharpProjects = snapshot.Solution.Projects
+            .Where(project => project.Language == LanguageNames.CSharp)
+            .ToList();
+
+        // The guard against a vacuous pass: an empty project set satisfies every claim below.
+        cSharpProjects.ShouldNotBeEmpty();
+
+        var unusable = cSharpProjects
+            .Where(project => !IsUsableIntermediateAssemblyPath(project))
+            .Select(project => $"{project.Name}: '{project.CompilationOutputInfo.AssemblyPath}'")
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToList();
+
+        unusable.ShouldBeEmpty(
+            "these projects carry no usable intermediate assembly path, so the built-output search has " +
+            "nothing to refuse an obj-side result with — it would silently answer with one.");
+    }
+
+    private static bool IsUsableIntermediateAssemblyPath(Project project)
+    {
+        string? assemblyPath = project.CompilationOutputInfo.AssemblyPath;
+        return !string.IsNullOrWhiteSpace(assemblyPath)
+               && Path.IsPathRooted(assemblyPath)
+               && !string.Equals(assemblyPath, project.OutputFilePath, PathComparison.Comparison);
     }
 
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)

@@ -8,11 +8,13 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A multi-target-framework project surfaces as several <see cref="Project" />s that share one name
-///         and one project file; they collapse to a single <see cref="ProjectInputs" /> whose documents and
-///         references are the union across frameworks, so a change under any framework still dirties the one
-///         project entry. Document paths are absolute and ordinal-sorted for a stable fingerprint; the store
-///         re-sorts internally, so this ordering is for determinism, not correctness.
+///         A multi-target-framework project surfaces as several <see cref="Project" />s that share one project
+///         file and — because
+///         <see cref="SolutionExtensions.NormalizeProjectNames">the load boundary normalizes their names</see>
+///         — one name; they collapse to a single <see cref="ProjectInputs" />
+///         whose documents and references are the union across frameworks, so a change under any framework
+///         still dirties the one project entry. Document paths are absolute and ordinal-sorted for a stable
+///         fingerprint; the store re-sorts internally, so this ordering is for determinism, not correctness.
 ///     </para>
 ///     <para>
 ///         <b>Generated documents under <c>bin</c>/<c>obj</c> are deliberately not tracked.</b> A project's

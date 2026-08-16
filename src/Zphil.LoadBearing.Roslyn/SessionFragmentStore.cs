@@ -86,8 +86,9 @@ internal sealed class SessionFragmentStore
     private static readonly IReadOnlySet<string> NoProjects = new HashSet<string>(StringComparer.Ordinal);
 
     // Keyed by project name; a LIST per name because a multi-target-framework project surfaces as several
-    // same-name Projects and therefore several fragments. Each list preserves the cold within-name order
-    // (ExtractFragmentsAsync's stable order), which OrderedFragments relies on to reproduce cold order.
+    // Projects under the one name the load boundary normalized them to, and therefore several fragments. Each
+    // list preserves the cold within-name order — ExtractFragmentsAsync orders those fragments by target
+    // framework — which OrderedFragments relies on to reproduce cold order.
     private readonly Dictionary<string, List<CodebaseFragment>> fragmentsByProject = new(StringComparer.Ordinal);
 
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -202,8 +203,9 @@ internal sealed class SessionFragmentStore
 
     private async Task<SessionFragmentSet> FullWalkAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
     {
-        var fragments =
-            await CodebaseExtractor.ExtractFragmentsAsync(snapshot.Solution, null, ct).ConfigureAwait(false);
+        var fragments = await CodebaseExtractor
+            .ExtractFragmentsAsync(snapshot.Solution, null, snapshot.TargetFrameworks, ct)
+            .ConfigureAwait(false);
 
         fragmentsByProject.Clear();
         Index(fragments);
@@ -220,8 +222,9 @@ internal sealed class SessionFragmentStore
         var dirty = ExpandToDependents(ContentDirtyProjects(snapshot), snapshot.Solution);
         if (dirty.Count > 0)
         {
-            var reExtracted =
-                await CodebaseExtractor.ExtractFragmentsAsync(snapshot.Solution, dirty, ct).ConfigureAwait(false);
+            var reExtracted = await CodebaseExtractor
+                .ExtractFragmentsAsync(snapshot.Solution, dirty, snapshot.TargetFrameworks, ct)
+                .ConfigureAwait(false);
 
             // Replace only the re-extracted names' lists; the clean projects' fragments ride through untouched.
             foreach (string name in dirty) fragmentsByProject.Remove(name);

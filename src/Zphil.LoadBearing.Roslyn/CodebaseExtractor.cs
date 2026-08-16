@@ -33,6 +33,11 @@ public static class CodebaseExtractor
     ///     Project names to drop from the checked universe — the way a spec project that is itself a
     ///     member of the target solution stays out of its own check. Null excludes nothing.
     /// </param>
+    /// <param name="targetFrameworks">
+    ///     The per-project target frameworks the load reported (see
+    ///     <see cref="SolutionExtensions.NormalizeProjectNames" />). Null — or a project absent from it —
+    ///     leaves the framework unstamped, which is the single-framework norm.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
     ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving Roslyn types before
@@ -40,10 +45,13 @@ public static class CodebaseExtractor
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<CodebaseModel> ExtractFromSolutionAsync(
-        Solution solution, IReadOnlyCollection<string>? excludeProjects = null, CancellationToken ct = default)
+        Solution solution,
+        IReadOnlyCollection<string>? excludeProjects = null,
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        CancellationToken ct = default)
     {
         IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
-            solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), ct);
+            solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks, ct);
         return CodebaseModelBuilder.Build(inputs);
     }
 
@@ -62,24 +70,37 @@ public static class CodebaseExtractor
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static async Task<IReadOnlyList<CodebaseFragment>> ExtractFragmentsAsync(
-        Solution solution, IReadOnlyCollection<string>? includeProjects, CancellationToken ct = default)
+        Solution solution,
+        IReadOnlyCollection<string>? includeProjects,
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        CancellationToken ct = default)
     {
         IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
-            solution, p => includeProjects is null || includeProjects.Contains(p.Name), ct);
+            solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks, ct);
         return inputs.Select(FragmentExtractor.Extract).ToList();
     }
 
-    // The shared project enumeration behind both entry points: C# projects passing the filter, in ordinal
-    // name order (multi-target-framework projects preserve their solution order within a name), each turned
-    // into a CompilationInput carrying its forward project-reference names. One enumeration means the
-    // extract-all-then-merge cold path, the extract-fragments cache path, and cache hits all order identically.
+    // The shared project enumeration behind both entry points: C# projects passing the filter, ordered by
+    // (name, target framework), each turned into a CompilationInput carrying its forward project-reference
+    // names and its framework. One enumeration means the extract-all-then-merge cold path, the
+    // extract-fragments cache path, and cache hits all order identically.
+    //
+    // The framework tiebreak is load-bearing, not cosmetic. One project file's several compilations now share
+    // a name, so ordering by name alone would leave them in whatever order the solution enumerated them —
+    // <TargetFrameworks> declaration order — and the merge gives the FIRST input's facts to every type they
+    // share. Ordering on the framework fixes which one that is, so reordering a csproj's framework list
+    // cannot silently move a type's facts.
     private static async Task<List<CompilationInput>> CollectInputsAsync(
-        Solution solution, Func<Project, bool> include, CancellationToken ct)
+        Solution solution,
+        Func<Project, bool> include,
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks,
+        CancellationToken ct)
     {
         var projects = solution.Projects
             .Where(p => p.Language == LanguageNames.CSharp)
             .Where(include)
             .OrderBy(p => p.Name, StringComparer.Ordinal)
+            .ThenBy(p => TargetFrameworkOf(targetFrameworks, p) ?? "", StringComparer.Ordinal)
             .ToList();
 
         List<CompilationInput> inputs = [];
@@ -97,9 +118,17 @@ public static class CodebaseExtractor
                 .OrderBy(n => n, StringComparer.Ordinal)
                 .ToList();
 
-            inputs.Add(new CompilationInput(compilation, project.Name, projectReferences));
+            inputs.Add(new CompilationInput(
+                compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project)));
         }
 
         return inputs;
+    }
+
+    private static string? TargetFrameworkOf(IReadOnlyDictionary<ProjectId, string>? targetFrameworks, Project project)
+    {
+        if (targetFrameworks is null) return null;
+
+        return targetFrameworks.TryGetValue(project.Id, out string? targetFramework) ? targetFramework : null;
     }
 }

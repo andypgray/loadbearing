@@ -59,11 +59,29 @@ internal readonly record struct WorkspaceDiagnostics(
     internal IReadOnlyList<string> RenderedWithMergeNotes => Compose([.. LoadFailures, .. MergeNotes]);
 
     /// <summary>
+    ///     The load failures that make the model incomplete: every one that is not a NuGetAudit advisory.
+    /// </summary>
+    /// <remarks>
+    ///     What a bounded refusal must quote from. Quoting <see cref="LoadFailures" /> instead lets three
+    ///     freshly published GHSA advisories push the one actionable failure past the end of the quote —
+    ///     which is the same "the message names something other than the cause" defect a bounded quote
+    ///     exists to prevent, in a new costume.
+    /// </remarks>
+    internal IReadOnlyList<string> IncompleteReasons =>
+        LoadFailures.Where(diagnostic => !NuGetAuditDiagnostics.IsAudit(diagnostic))
+            .ToList();
+
+    /// <summary>
     ///     Whether the model is incomplete — a load failure that is not a NuGetAudit advisory — independently
     ///     of whether the operator opted in. This is the fact the JSON documents carry: the opt-out changes
     ///     the exit code, never the truth about the model.
     /// </summary>
-    internal bool IsIncomplete => LoadFailures.Any(diagnostic => !NuGetAuditDiagnostics.IsAudit(diagnostic));
+    /// <remarks>
+    ///     Defined in terms of <see cref="IncompleteReasons" /> so the audit carve-out lives in exactly one
+    ///     expression: a gate that fired on a different set from the one a refusal quotes would be a refusal
+    ///     that cannot name its own reason.
+    /// </remarks>
+    internal bool IsIncomplete => IncompleteReasons.Count > 0;
 
     /// <summary>
     ///     Whether the fail-closed gate fires: the model is incomplete and the caller did not opt into the

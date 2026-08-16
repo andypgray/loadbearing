@@ -17,10 +17,21 @@ internal sealed class SolutionHandle(
     string solutionPath,
     IReadOnlyList<string> diagnostics,
     IDisposable? owned,
-    Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null) : IDisposable
+    Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : IDisposable
 {
+    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
+        new Dictionary<ProjectId, string>();
+
     /// <summary>The loaded, unresolved-reference-stripped solution the command reads.</summary>
     public Solution Solution { get; } = solution;
+
+    /// <summary>
+    ///     The target framework each multi-target-framework project was loaded for, keyed by
+    ///     <see cref="ProjectId" /> — what the extraction stamps onto its fragments so the merge can name the
+    ///     framework whose facts won. Empty for a solution whose projects each target one framework.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; } = targetFrameworks ?? NoTargetFrameworks;
 
     /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>.</summary>
     public string SolutionPath { get; } = solutionPath;

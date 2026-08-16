@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!-- The multi-target-framework fixture: this one csproj yields TWO Roslyn Projects, which is the
+             whole point of the solution. The pair matches the field report that motivated the work.
+             The declaration order is deliberately the OPPOSITE of the order extraction consumes them in
+             (ordinal, so 'net10.0' < 'netstandard2.0'): net10.0 must win the shared types' facts because
+             the extractor sorts on the framework, never because it happened to be declared first. Swap
+             these and the multi-framework merge note's winner must not move. -->
+        <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- A throwaway test fixture needs no NuGet vulnerability audit, and an unreachable private feed
+             emits NU1900 warnings that MSBuildWorkspace surfaces as workspace diagnostics. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+</Project>
