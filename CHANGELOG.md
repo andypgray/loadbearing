@@ -150,6 +150,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a declared type's base chain and interface closure are walked straight through metadata, so an external
   anchor matches — including through an intermediate external base.
 
+- **A warm MCP server resolves the spec once per workspace load rather than once per tool call.** The
+  server holds a loaded workspace across calls, but spec resolution ran again on every one of them —
+  re-walking the discovery convention, re-reading the project, re-probing the built output — to arrive at
+  the answer the call before it had already reached. It is resolved once per load now and reused until
+  that load is replaced, and the paths the resolution walk has already resolved are carried rather than
+  derived a second time downstream. No answer moves: it is the same walk against the same disk,
+  reconciled when the workspace is, so a rebuilt spec is picked up exactly as it was before. What this
+  buys is felt where the cost was paid — a per-edit `arch_check` hook, which calls a warm server on every
+  write and had been re-deriving a settled answer each time.
+
 ### Fixed
 
 - **An agent hook now checks the working tree the edit landed in, not the tree the session happens to
@@ -307,6 +317,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the alternative is a coercer inventing a value nobody can watch it invent. The advertised schema is
   unchanged, and a test now derives the covered set from the tool surface itself, so the next
   parameter of a type nothing coerces fails the build rather than drifting silently.
+- **The derive recipe now warns that a spec namespace ending in `Arch` shadows the type the spec is
+  written against.** The `arch/` folder convention makes `MyApp.Arch` the natural name to reach for, and
+  inside a namespace whose last segment is `Arch` the simple name `Arch` binds to that namespace rather
+  than to the `Arch` type `Define` takes — so the spec does not compile, and neither error that follows
+  can say why. Both are the compiler's: a `CS0118` that `Arch` is a namespace used like a type, beside a
+  `CS0535` that the class does not implement `Define(Arch)`. The recipe now says to name the project so
+  its last segment is not `Arch` where the scaffold is introduced, and carries both errors verbatim among
+  the ones a reader may see. Qualifying `Zphil.LoadBearing.Arch` in the signature is noted there and not
+  recommended: it compiles, and leaves the shadow armed for every file the spec grows.
 - **The docs no longer imply that installing the .NET 10 SDK is enough for `dnx` to resolve.**
   `dnx` is a .NET 10 SDK command, and `dotnet` picks an SDK per directory from the nearest
   `global.json`, so inside a repository pinning an SDK below 10 the command does not exist
@@ -318,6 +337,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the launch shape the MCP registry defines for NuGet packages, and no manifest field can
   express a global-tool install or override a consumer repository's SDK pin, so the manifest
   serves the repositories that can use it and the prose carries the boundary.
+- **The MCP registry lists this server now, instead of answering empty while nuget.org advertised it.**
+  The manifest, the readme marker and the namespace have all been in place since before 0.4.0, but
+  listing a release at `registry.modelcontextprotocol.io` was a manual step that had never been run — so
+  a client searching the registry for the server found nothing, while the same server sat on nuget.org
+  with an MCP configuration ready to generate from it. A second release job closes that: once the
+  packages are live, it lists the released version. Ownership is proven twice with no credential stored
+  anywhere — the job's GitHub OIDC token buys publish rights on the namespace, the same id-token
+  mechanism the NuGet login already uses, and the registry independently fetches the package readme from
+  nuget.org and requires the `mcp-name` marker it carries. That second check is why the job waits on the
+  marker rather than on the package: the readme is served only once indexing has run, measurably later
+  than the flat container has the bytes — about eighteen minutes at 0.3.1 — and publishing before then
+  fails validation. The publisher binary is pinned by version and digest, the standing every other
+  third-party step in the release has, and the job needs the release itself, so a NuGet push that failed
+  can never be advertised as a listing.
 
 ## [0.4.0] - 2026-08-09
 
