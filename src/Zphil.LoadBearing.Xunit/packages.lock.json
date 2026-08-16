@@ -19,8 +19,8 @@
       },
       "Basic.CompilerLog.Util": {
         "type": "Transitive",
-        "resolved": "0.9.49",
-        "contentHash": "UJGwJSJhypjss1OWPrMPNwG9A3ZD0sweChTjtNGHKHP/CohbVRK/SbjfG42+tMSYd9FrUn49JWYVvPhyHA3oJQ==",
+        "resolved": "0.9.53",
+        "contentHash": "MaaZ8L+Pld7PHDT1vZgQkTCaz69IRyE4mucc8q/k82lvEnM5AKdBSirJt4bPW9CHFZ/cxw3JDi+xFP/gVJQtcg==",
         "dependencies": {
           "MSBuild.StructuredLogger": "2.3.213",
           "MessagePack": "3.1.8",
@@ -189,11 +189,6 @@
         "resolved": "10.0.1",
         "contentHash": "oIy8fQxxbUsSrrOvgBqlVgOeCtDmrcynnTG+FQufcUWBrwyPfwlUkCDB2vaiBeYPyT+20u9/HeuHeBf+H4F/8g=="
       },
-      "Microsoft.Extensions.FileSystemGlobbing": {
-        "type": "Transitive",
-        "resolved": "10.0.10",
-        "contentHash": "jSOCVxEwCd4Aq925kJVz1kSO1EpX2OHYKL04qVREXkDU7Ce3pVDdHPYm+fEy8y/th2kJf/DAstRHpJAqoNWP8w=="
-      },
       "Microsoft.Extensions.Logging": {
         "type": "Transitive",
         "resolved": "10.0.1",
@@ -307,12 +302,11 @@
       "zphil.loadbearing.roslyn": {
         "type": "Project",
         "dependencies": {
-          "Basic.CompilerLog.Util": "[0.9.49, )",
+          "Basic.CompilerLog.Util": "[0.9.53, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis": "[5.6.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.6.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.6.0, )",
-          "Microsoft.Extensions.FileSystemGlobbing": "[10.0.10, )",
           "Zphil.LoadBearing": "[0.4.0, )"
         }
       }
