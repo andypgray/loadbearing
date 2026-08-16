@@ -5,6 +5,7 @@
   "projects": [
     {
       "name": "MyApp.Domain",
+      "solutionMember": true,
       "projectReferences": [
         "MyApp.Web"
       ],
@@ -12,11 +13,13 @@
     },
     {
       "name": "MyApp.Legacy.Billing",
+      "solutionMember": true,
       "projectReferences": [],
       "types": 4
     },
     {
       "name": "MyApp.Web",
+      "solutionMember": true,
       "projectReferences": [
         "MyApp.Legacy.Billing"
       ],

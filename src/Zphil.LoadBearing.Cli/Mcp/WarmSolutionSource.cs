@@ -34,7 +34,7 @@ internal sealed class WarmSolutionSource(WorkspaceSession session, SessionFragme
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(solutionPath, ct);
         return new SolutionHandle(
             snapshot.Solution, solutionPath, snapshot.Diagnostics, null,
-            (exclude, token) => store.GetCodebaseAsync(snapshot, exclude, token),
+            (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
             snapshot.TargetFrameworks, snapshot.FailedProjects, snapshot.UncheckedProjects,
             snapshot.RestoreFailedProjects);
     }

@@ -100,10 +100,13 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
 
     // The diagram target. It runs its own extraction, with no project exclusions, which is the same call
     // `graph` makes: the scoped-card extraction above passes the spec resolution's excluded projects (the
-    // spec project plus the private plumbing only it references), and reusing it would draw a diagram that
-    // disagrees with the survey it is supposed to be. Both feed one GraphSummarizer, so there is still one
-    // summary shape; the second extraction is the cost, and only when --diagram and scoped cards coincide.
-    // The law fence beside it costs nothing extra — it is pure over the model already in hand.
+    // spec project plus the private plumbing only it references), and reusing it would extract a different
+    // universe than the survey does. The surviving invariant is one summarizer and one summary shape. What
+    // the two now differ on is the view: the survey fence draws only declared solution members, while
+    // `graph` reports every project it loaded and labels which is which — so a project missing from the
+    // drawing is a question `graph` answers rather than the two disagreeing. The second extraction is the
+    // cost, and only when --diagram and scoped cards coincide. The law fence beside it costs nothing extra
+    // — it is pure over the model already in hand.
     private async Task WriteDiagramAsync(
         RenderRequest request, CodebaseSource source, string specName, string diagramPath, CancellationToken ct)
     {

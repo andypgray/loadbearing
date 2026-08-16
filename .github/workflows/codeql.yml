@@ -2,6 +2,14 @@
 # to the repo's Security tab. build-mode: none does buildless analysis, so it does not depend on
 # CodeQL supporting the net10.0 build. Also satisfies OpenSSF Scorecard's SAST check, which credits
 # the presence of a github/codeql-action/analyze step.
+#
+# Two bounds, so a green run here is not read as "nothing to find". Buildless extraction resolves
+# what it can from source rather than from a compiled assembly graph, so dataflow that leaves this
+# repository's own code — through a NuGet dependency, or through a type CodeQL could not resolve —
+# is weaker than a build-mode run's would be; the trade is that the analysis cannot be broken by an
+# SDK CodeQL does not yet build. And `languages: csharp` is the whole scan: the bash these workflows
+# carry in `run:` blocks — much of ci.yml, and the publish steps in release.yml — is analysed by
+# nothing here. Adding `actions` alongside `csharp` in `languages` is what would cover it.
 name: CodeQL
 
 on:
@@ -25,6 +33,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4

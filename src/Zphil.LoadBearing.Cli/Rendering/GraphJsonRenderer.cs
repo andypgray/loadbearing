@@ -66,6 +66,7 @@ internal static class GraphJsonRenderer
     {
         return new GraphProjectJson(
             project.Name,
+            project.SolutionMember,
             project.ProjectReferences,
             project.Types,
             grain >= DocumentGrain.Overview

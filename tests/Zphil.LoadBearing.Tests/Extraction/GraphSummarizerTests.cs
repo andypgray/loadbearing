@@ -121,6 +121,68 @@ public sealed class GraphSummarizerTests
     }
 
     [Fact]
+    public void Summarize_MixedSolutionMembership_CarriesEachProjectsLabelThrough()
+    {
+        // Arrange — App is declared, Lib is a passenger, and Loose was extracted with nothing read about it.
+        CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
+                                                                            namespace Lib;
+                                                                            public class Service {}
+                                                                            """)) with
+        {
+            SolutionMember = false
+        };
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib", ("App.cs", """
+                                                                                                               namespace App;
+                                                                                                               public class Client { public Lib.Service S; }
+                                                                                                               """)) with
+        {
+            SolutionMember = true
+        };
+        CompilationInput loose = CompilationFactory.Compile("Loose", ("Loose.cs", """
+                                                                                  namespace Loose;
+                                                                                  public class Thing {}
+                                                                                  """));
+
+        // Act
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app, loose]);
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert — all three survive the survey; only the label differs. Dropping the passenger here would
+        // hide the one project a reader opened the survey to find.
+        summary.Projects.Select(p => (p.Name, p.SolutionMember))
+            .ShouldBe([("App", true), ("Lib", false), ("Loose", null)]);
+    }
+
+    [Fact]
+    public void Scope_MatchedProjects_CarryTheirMembershipLabelVerbatim()
+    {
+        // Arrange — a passenger and a declared member, both matched by the glob.
+        CompilationInput lib = CompilationFactory.Compile("Acme.Lib", ("Lib.cs", """
+                                                                                 namespace Acme.Lib;
+                                                                                 public class Service {}
+                                                                                 """)) with
+        {
+            SolutionMember = false
+        };
+        CompilationInput app = CompilationFactory.CompileReferencing("Acme.App", lib.Compilation, "Acme.Lib", ("App.cs", """
+                                                                                                                         namespace Acme.App;
+                                                                                                                         public class Client { public Acme.Lib.Service S; }
+                                                                                                                         """)) with
+        {
+            SolutionMember = true
+        };
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+
+        // Act
+        GraphSummary scoped = GraphSummarizer.Scope(GraphSummarizer.Summarize(model), ["Acme.*"]);
+
+        // Assert — Scope passes ProjectSummary instances through by reference, so the label rides with them.
+        scoped.Projects.Select(p => (p.Name, p.SolutionMember))
+            .ShouldBe([("Acme.App", true), ("Acme.Lib", false)]);
+    }
+
+    [Fact]
     public void Scope_ProjectGlob_KeepsMatchingProjectsAndTheirExternalEdges()
     {
         // Arrange

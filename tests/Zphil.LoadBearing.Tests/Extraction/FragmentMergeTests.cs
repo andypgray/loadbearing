@@ -497,4 +497,35 @@ public sealed class FragmentMergeTests
         model.MergeNotes[0]
             .ShouldContain("Project 'P' targets 'net10.0' and 'netstandard2.0'");
     }
+
+    // ── Multi-target-framework membership union ───────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, null, true)]
+    [InlineData(null, true, true)]
+    [InlineData(false, null, false)]
+    [InlineData(null, false, false)]
+    [InlineData(false, false, false)]
+    [InlineData(null, null, null)]
+    public void ExtractFromCompilations_MultiFrameworkProject_UnionsMembershipWithUnknownLosing(
+        bool? first, bool? second, bool? expected)
+    {
+        // One project file, several compilations, one ProjectNode — so the label has to union like the
+        // reference edges do. Declared by either wins; unknown never overrides a fragment that actually read
+        // the solution, and only an all-unknown project stays unlabeled.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            """);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "net10.0", first);
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "netstandard2.0", second);
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+
+        model.Projects.Single()
+            .SolutionMember.ShouldBe(expected);
+    }
 }

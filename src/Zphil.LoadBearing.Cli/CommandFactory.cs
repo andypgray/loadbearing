@@ -160,19 +160,23 @@ internal static class CommandFactory
             Description =
                 "Also render two Mermaid diagrams into <path>'s managed block: the codebase graph "
                 + "(projects and their cross-project references; solid = observed, dotted = declared but unobserved), "
-                + "then the spec's law (the places it names, what they must not reference, and the debt it grandfathers)."
+                + "then the spec's law (the places it names, what they must not reference, and the debt it grandfathers). "
+                + "The graph draws the projects the solution file declares, so a project a ProjectReference "
+                + "dragged into the build is not drawn; `graph` lists every loaded project and says which is which."
         };
         Option<string?> diagramOnly = new("--diagram-only")
         {
             Description =
-                "Draw only the projects matching these name globs (semicolon-separated, '*' allowed); "
-                + "scopes the codebase survey fence only, never the law fence. With --diagram."
+                "Draw only the declared projects matching these name globs (semicolon-separated, '*' allowed) — "
+                + "for legibility on a large solution, not to keep a foreign project out. "
+                + "Scopes the codebase survey fence only, never the law fence. With --diagram."
         };
         Option<string?> diagramExclude = new("--diagram-exclude")
         {
             Description =
-                "Drop the projects matching these name globs (semicolon-separated, '*' allowed); "
-                + "scopes the codebase survey fence only, never the law fence. With --diagram."
+                "Drop the declared projects matching these name globs (semicolon-separated, '*' allowed) — "
+                + "for legibility on a large solution, not to keep a foreign project out. "
+                + "Scopes the codebase survey fence only, never the law fence. With --diagram."
         };
 
         Command render = new(

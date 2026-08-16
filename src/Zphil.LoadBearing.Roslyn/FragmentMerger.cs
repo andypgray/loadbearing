@@ -498,6 +498,7 @@ internal static class FragmentMerger
         private static List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
+            Dictionary<string, bool?> memberByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in fragments)
             {
                 if (!refsByProject.TryGetValue(fragment.ProjectName, out var refs))
@@ -507,12 +508,28 @@ internal static class FragmentMerger
                 }
 
                 foreach (string reference in fragment.ProjectReferences) refs.Add(reference);
+
+                memberByProject[fragment.ProjectName] = UnionMembership(
+                    memberByProject.GetValueOrDefault(fragment.ProjectName), fragment.SolutionMember);
             }
 
             return refsByProject
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => new ProjectNode(kv.Key, kv.Value.ToList()))
+                .Select(kv => new ProjectNode(kv.Key, kv.Value.ToList(), memberByProject[kv.Key]))
                 .ToList();
+        }
+
+        // A multi-targeted project arrives as one fragment per framework under the one name the load boundary
+        // normalized them to, so its membership unions the way its reference edges do: declared by any
+        // fragment is declared. Unknown loses to either verdict — a fragment that read nothing has nothing to
+        // contradict one that did — so the result is null only when every fragment was unlabeled, which is the
+        // fail-open answer the whole thread degrades to.
+        private static bool? UnionMembership(bool? left, bool? right)
+        {
+            if (left is null) return right;
+            if (right is null) return left;
+
+            return left.Value || right.Value;
         }
 
         private static IReadOnlyList<SourceLocation> ToLocations(SortedSet<FragmentSite> sites)

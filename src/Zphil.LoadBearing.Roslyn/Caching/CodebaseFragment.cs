@@ -27,6 +27,13 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         single-framework project, and the merge's framework-collapse note is gated on both sides being
 ///         known.
 ///     </para>
+///     <para>
+///         <see cref="SolutionMember" /> is the third identity fact and the one that is about the
+///         <em>solution</em> rather than the compilation: whether the solution file declares this project, or
+///         <see langword="null" /> where membership was never read. It trails the collections, and carries a
+///         default, only so a hand-built fragment need not name a fact it has no way to know — the default is
+///         the honest answer there, not a convenience.
+///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(
     string ProjectName,
@@ -41,4 +48,5 @@ internal sealed record CodebaseFragment(
     IReadOnlyList<FragmentCatchEdge> CatchEdges,
     IReadOnlyList<FragmentThrowEdge> ThrowEdges,
     IReadOnlyList<FragmentExposureEdge> ExposureEdges,
-    IReadOnlyList<FragmentServiceRegistration> ServiceRegistrations);
+    IReadOnlyList<FragmentServiceRegistration> ServiceRegistrations,
+    bool? SolutionMember = null);

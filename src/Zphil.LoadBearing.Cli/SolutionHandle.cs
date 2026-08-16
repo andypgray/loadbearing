@@ -18,7 +18,7 @@ internal sealed class SolutionHandle(
     string solutionPath,
     IReadOnlyList<string> diagnostics,
     IDisposable? owned,
-    Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
+    Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
     IReadOnlyList<string>? failedProjects = null,
     IReadOnlyList<string>? uncheckedProjects = null,
@@ -71,11 +71,12 @@ internal sealed class SolutionHandle(
     ///     clean projects' fragments, re-extracts only the dirty ∪ dependent set, and hands back the merged
     ///     model — memoized, so a call that re-walked nothing re-merges nothing either. It takes the caller's
     ///     excluded project names because the exclusion is applied at merge time, which is what lets one
-    ///     store serve every tool whatever each drops. Null falls straight through to today's full
-    ///     <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.
+    ///     store serve every tool whatever each drops, and the caller's declared solution membership because
+    ///     the read belongs to the one seam that already knows the solution path. Null falls straight through
+    ///     to today's full <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.
     /// </summary>
-    public Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? WarmCodebase { get; } =
-        warmCodebase;
+    public Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
+        WarmCodebase { get; } = warmCodebase;
 
     /// <summary>
     ///     Disposes the owned workspace on the cold path; a no-op when the source owns nothing — a warm

@@ -168,4 +168,23 @@ internal static class SpecExclusion
 
         return declaredMembers.Contains(PathCanonicalizer.Resolve(projectFilePath));
     }
+
+    /// <summary>
+    ///     The same question asked as a fact to <em>report</em> rather than a set to subtract:
+    ///     <see langword="true" /> declared, <see langword="false" /> a passenger, <see langword="null" />
+    ///     when nothing was read — unreadable membership, or a project whose path the load never reported.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately not <see cref="IsDeclaredMember" /> with its answer widened. That method's
+    ///     <see langword="true" /> for the unread cases is the safe direction for <em>exclusion</em>, where
+    ///     the cost of guessing wrong is a silently shrunken universe; here the cost runs the other way, and
+    ///     an answer of "declared" that no solution file was ever read for would be an asserted fact with
+    ///     nothing behind it. The two callers want opposite fallbacks, so they get two methods.
+    /// </remarks>
+    internal static bool? SolutionMembershipOf(IReadOnlySet<string>? declaredMembers, string? projectFilePath)
+    {
+        if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return null;
+
+        return IsDeclaredMember(declaredMembers, projectFilePath);
+    }
 }

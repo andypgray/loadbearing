@@ -22,10 +22,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     <para>
 ///         Every tree here is fabricated <em>after</em> any load, so one axis sits structurally outside this
 ///         class: the design-time build <c>check</c>'s own workspace load runs creates the evaluated output
-///         directory — empty — before resolution reads the disk. Both field layouts are covered against a
+///         directory — empty — before resolution reads the disk. Both field layouts are carried through a
 ///         real SDK restore, a real <c>-c Release</c> build and a live workspace load by
 ///         <c>Cli/OutputLayoutSpecResolutionE2ETests</c>, which is where that axis is measured rather than
-///         described.
+///         described — on its artifacts arm alone. Only there does the evaluated path name a directory no
+///         build had created; on the hostile-props layout it names <c>bin</c>, which the real build already
+///         made, so the empty-shell hazard cannot arise and that arm pins the resolution instead.
 ///     </para>
 /// </remarks>
 public sealed class BuiltOutputProbeTests

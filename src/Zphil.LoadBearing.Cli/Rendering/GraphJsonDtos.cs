@@ -76,11 +76,19 @@ internal sealed record GraphJson(
     IReadOnlyList<string>? RestoreFailedProjects);
 
 /// <summary>
-///     One project: its declared references, solution-declared type count, and namespace inventory — the
-///     last of which is null (omitted) at overview grain, being the one thing that grain elides.
+///     One project: whether the solution declares it, its declared references, solution-declared type count,
+///     and namespace inventory — the last of which is null (omitted) at overview grain, being the one thing
+///     that grain elides.
 /// </summary>
+/// <remarks>
+///     <c>solutionMember</c> follows the document-wide optional-field convention, and here it carries real
+///     weight: absent means membership was never read, so a reader must not take a missing key for
+///     <c>false</c>. An explicit <c>false</c> is a project the workspace loaded through a
+///     <c>ProjectReference</c> that the solution file does not declare.
+/// </remarks>
 internal sealed record GraphProjectJson(
     string Name,
+    bool? SolutionMember,
     IReadOnlyList<string> ProjectReferences,
     int Types,
     IReadOnlyList<GraphNamespaceJson>? Namespaces);

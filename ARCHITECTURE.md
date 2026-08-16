@@ -93,11 +93,16 @@ Nobody drew either of those, and nobody can let them go stale:
 [`SelfSpecTests.ArchitectureMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs)
 composes the block in process and asserts the committed file already equals it.
 
-The two fences are scoped differently, which the redraw command below shows. `--diagram-only` and
-`--diagram-exclude` narrow the survey fence and nothing else: only the shipping projects are
-surveyed, and the fixture solutions the tests check against stay out of it. The law fence is never
-scoped, because what the spec forbids is not a property of the projects someone chose to draw. So the
-law can name a place the survey dropped. That is the pair being honest, not the two disagreeing.
+The two fences are scoped differently, which the redraw command below shows. The survey fence draws
+the projects this solution file declares, which is why the MyApp fixture solutions the tests check
+against are absent from it: a spec fixture's project reference drags them into the build, and the
+solution never claims them. `--diagram-only` and `--diagram-exclude` narrow within that set and
+nothing else. They earn their place here on legibility rather than correctness: nineteen declared
+projects would be drawn against a readability guardrail of roughly twenty nodes, so the enumeration
+below keeps the picture to the four shipping packages, the rule pack and the spec. The law fence is
+never scoped, because what the spec forbids is not a property of the projects someone chose to draw.
+So the law can name a place the survey dropped. That is the pair being honest, not the two
+disagreeing.
 
 The line under the law fence lists the rules no diagram can place. A rule about a name, a shape, an
 attribute or a member has no arrow to draw, so it is named there by ID and expanded with

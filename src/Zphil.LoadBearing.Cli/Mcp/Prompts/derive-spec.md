@@ -59,6 +59,9 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 
 - `projects[]` — each project's declared `projectReferences`, type count, and exact namespace
   inventory with type counts. The namespace inventory is your raw material for layer globs.
+  `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
+  the solution file does not declare — a passenger, not part of the estate you are writing law
+  for, so keep it out of your layer globs. An absent key means membership could not be read.
 - `projectEdges[]` — **observed** project→project references (distinct type pairs). Compare
   against the declared references: a declared reference with no observed edge is a dead
   reference (note it for the human; it is cleanup evidence, not a rule). An observed edge you
@@ -70,7 +73,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]      { name, projectReferences[], types, namespaces[]{ namespace, types } }
+projects[]      { name, solutionMember?, projectReferences[], types, namespaces[]{ namespace, types } }
 projectEdges[]  { source, target, references }
 externalEdges[] { source, targetNamespaceRoot, references }
 ```

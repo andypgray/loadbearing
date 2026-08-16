@@ -253,6 +253,45 @@ public sealed class SpecExclusionTests : IDisposable
             .ShouldBeFalse();
     }
 
+    [Fact]
+    public void SolutionMembershipOf_ReadMembership_SeparatesDeclaredMembersFromPassengers()
+    {
+        var declared = Declared("/repo/src/App.csproj");
+
+        SpecExclusion.SolutionMembershipOf(declared, "/repo/src/App.csproj")
+            .ShouldBe(true);
+        SpecExclusion.SolutionMembershipOf(declared, "/elsewhere/Core.csproj")
+            .ShouldBe(false);
+    }
+
+    [Fact]
+    public void SolutionMembershipOf_UnreadMembershipOrUnknownPath_IsNullWhereIsDeclaredMemberSaysTrue()
+    {
+        // The inversion this method exists for, asserted against its sibling on the same inputs: true is the
+        // safe answer when the question is what to exclude, and an invented fact when the question is what
+        // to report.
+        SpecExclusion.SolutionMembershipOf(null, "/repo/src/App.csproj")
+            .ShouldBeNull();
+        SpecExclusion.SolutionMembershipOf(Declared("/repo/src/App.csproj"), null)
+            .ShouldBeNull();
+    }
+
+    [Fact]
+    public void SolutionMembershipOf_UnownedFormatOrUnparseableSolution_DegradesToNull()
+    {
+        // Both disk-side fallbacks reach this method as a null set, so the chain from a bad solution file
+        // through to an unlabeled project is pinned end to end rather than as two halves nothing joins.
+        string unowned = _temp.PathOf("MyApp.csproj");
+        File.WriteAllText(unowned, "<Project />");
+        string malformed = _temp.PathOf("Unparseable.slnx");
+        File.WriteAllText(malformed, "<Solution><Project Path=\"a.csproj\">");
+
+        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(unowned), "/repo/src/App.csproj")
+            .ShouldBeNull();
+        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(malformed), "/repo/src/App.csproj")
+            .ShouldBeNull();
+    }
+
     private static IReadOnlySet<string> Declared(params string[] csprojPaths)
     {
         return SpecExclusion.CanonicalMemberSet(csprojPaths);

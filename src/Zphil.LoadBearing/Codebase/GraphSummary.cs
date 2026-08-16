@@ -35,19 +35,26 @@ public sealed class GraphSummary
 }
 
 /// <summary>
-///     One project in the survey: its name, its declared forward project references (verbatim from the
-///     <see cref="ProjectNode" />), the count of its solution-declared types, and its namespace inventory.
-///     Comparing <see cref="ProjectReferences" /> against the <see cref="GraphSummary.ProjectEdges" />
-///     surfaces declared-but-unobserved references (the dead-reference signal).
+///     One project in the survey: its name, whether the solution declares it, its declared forward project
+///     references (verbatim from the <see cref="ProjectNode" />), the count of its solution-declared types,
+///     and its namespace inventory. Comparing <see cref="ProjectReferences" /> against the
+///     <see cref="GraphSummary.ProjectEdges" /> surfaces declared-but-unobserved references (the
+///     dead-reference signal).
 /// </summary>
 public sealed class ProjectSummary
 {
-    internal ProjectSummary(string name, IReadOnlyList<string> projectReferences, int types, IReadOnlyList<NamespaceCount> namespaces)
+    internal ProjectSummary(
+        string name,
+        IReadOnlyList<string> projectReferences,
+        int types,
+        IReadOnlyList<NamespaceCount> namespaces,
+        bool? solutionMember = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
         Types = types;
         Namespaces = namespaces;
+        SolutionMember = solutionMember;
     }
 
     /// <summary>The project (assembly) name.</summary>
@@ -61,6 +68,14 @@ public sealed class ProjectSummary
 
     /// <summary>The distinct namespaces of this project's declared types with per-namespace counts, ordinal by namespace.</summary>
     public IReadOnlyList<NamespaceCount> Namespaces { get; }
+
+    /// <summary>
+    ///     <see cref="ProjectNode.SolutionMember" /> verbatim: whether the solution declares this project,
+    ///     <see langword="false" /> for a passenger a reference edge dragged in, <see langword="null" /> when
+    ///     membership was not read. The survey is where a passenger is meant to be investigated, so it is
+    ///     reported here rather than filtered out.
+    /// </summary>
+    public bool? SolutionMember { get; }
 }
 
 /// <summary>A namespace and the number of a project's solution-declared types that reside in it.</summary>

@@ -51,8 +51,9 @@ public sealed class SelfSpecTests
 
     /// <summary>
     ///     This repository's own codebase, extracted once for every gate below that reads all of it: the
-    ///     workspace comes from the warm pool (so the ~17-second load is shared with the rest of the suite)
-    ///     and nothing is excluded, which is the call <c>graph</c> makes.
+    ///     workspace comes from the warm pool (so the ~17-second load is shared with the rest of the suite),
+    ///     nothing is excluded, and the solution's declared membership rides in — which is the call
+    ///     <c>graph</c> makes.
     /// </summary>
     /// <remarks>
     ///     The model is immutable and already shared assembly-wide by <see cref="WorkspaceFixture" />, so
@@ -65,7 +66,8 @@ public sealed class SelfSpecTests
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, CancellationToken.None);
 
-        return await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
+        return await CodebaseExtractor.ExtractFromSolutionAsync(
+            snapshot.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution));
     });
 
     /// <summary>
@@ -134,6 +136,37 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
+    ///     The membership label's <see langword="false" /> arm, against the only real passenger set on hand:
+    ///     this repository. Its <c>.slnx</c> declares the shipping projects; the three MyApp fixture projects
+    ///     are dragged into the workspace by the fixture spec projects' own <c>ProjectReference</c>s and are
+    ///     not declared anywhere. No fixture reproduces that — a fixture solution that declared its own
+    ///     passengers would not have any — so this is where the arm is proven.
+    /// </summary>
+    /// <remarks>
+    ///     Also the gate on the <c>render --diagram</c> default: the survey fence draws declared members, so
+    ///     a regression that labelled these three <see langword="true" /> would put them in the committed
+    ///     drawing. Asserted as an exact roster rather than a count, because the failure worth catching is a
+    ///     project changing sides, which a count cannot see.
+    /// </remarks>
+    [Fact]
+    public async Task WholeCodebase_LabelsFixturePassengersAndShippingProjects()
+    {
+        CodebaseModel codebase = await WholeCodebase.Value;
+
+        codebase.Projects
+            .Where(project => project.SolutionMember == false)
+            .Select(project => project.Name)
+            .ShouldBe(["MyApp.Domain", "MyApp.Legacy.Billing", "MyApp.Web"]);
+
+        // The true arm on the same model, so a membership read that silently returned nothing (which would
+        // label everything null and pass the assertion above) cannot hide here.
+        codebase.Projects
+            .Where(project => ShippingProjects.Contains(project.Name, StringComparer.Ordinal))
+            .Select(project => project.SolutionMember)
+            .ShouldAllBe(member => member == true);
+    }
+
+    /// <summary>
     ///     The shape guard behind <see cref="ArchitectureMd_IsCurrent" />, and the cheaper half: no
     ///     workspace, just the committed file. The block is supposed to carry two drawings of the same
     ///     system — the codebase survey drawn from what exists, and the architecture law drawn from the
@@ -173,7 +206,7 @@ public sealed class SelfSpecTests
         SpecResolution resolution = SpecResolver.Resolve(
             snapshot.Solution, RepoRoot.Solution, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks,
+            snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks, null,
             TestContext.Current.CancellationToken);
 
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());

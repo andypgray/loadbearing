@@ -17,8 +17,8 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///         contains. The claim it is used for is larger —
 ///         <em>SDK-style projects write an assets file when they restore, and legacy ones never do</em>
 ///         — and nothing about reading an attribute establishes
-///         that. So the corpus below pairs each verdict with the file it predicts: every project this repo and
-///         its fixtures contain, classified, and beside each one whether an assets file is actually on disk at
+///         that. So the corpus below pairs each verdict with the file it predicts: every project under the
+///         three roots it scans, classified, and beside each one whether an assets file is actually on disk at
 ///         a location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. Eighteen projects, and the
 ///         only rows where the two columns come apart are the three beds deliberately left unrestored — which
 ///         is the whole state the gate exists to catch — plus the two of the output-layout bed, which is
@@ -33,13 +33,25 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///         <c>FieldMini.Core.csproj</c> and <c>BrokenApp.Web.csproj</c> carry their root element under
 ///         twenty-nine and forty lines of XML comment.
 ///     </para>
+///     <para>
+///         <b>Where the corpus stops.</b> Three roots — the fixture trees as the test output holds them,
+///         <c>src/</c> and <c>arch/</c> — and not every project file this repository tracks. Out are the
+///         spec-fixture projects under <c>tests/Fixtures/</c> and the test project itself, which are solution
+///         members and so would every one read <c>SDK-style, assets file present</c>; and everything under
+///         <c>examples/</c>, which no run of this suite restores, so their assets column would report
+///         whether somebody had built the examples lately rather than anything about the discriminator. What
+///         is licensed here is the gate over the trees the suite loads through <c>MSBuildWorkspace</c> — a
+///         legacy or unrestored project appearing in either of those places would not be caught by this
+///         table.
+///     </para>
 /// </remarks>
 public sealed class SdkStyleProjectTests
 {
-    // Every project this repo and its fixture trees contain, hand-written: the name, whether it is SDK-style,
-    // and whether a restore has actually left an assets file where the layout in force puts it. A row that
-    // moves is either a new fixture (extend this) or the discriminator failing on a real file (stop and
-    // restate the limit instead of gating). Order is irrelevant — both sides are sorted before the compare.
+    // Every project under the three roots RealProjectFiles scans, hand-written: the name, whether it is
+    // SDK-style, and whether a restore has actually left an assets file where the layout in force puts it. A
+    // row that moves is either a new fixture (extend this) or the discriminator failing on a real file (stop
+    // and restate the limit instead of gating). Order is irrelevant — both sides are sorted before the
+    // compare. The roots are not the whole repository; the class remarks say what is out and why.
     private static readonly string[] GroundTruth =
     [
         // The one non-SDK-style project in the corpus: 2003 XML namespace, net48, and no assets file — the
@@ -162,10 +174,10 @@ public sealed class SdkStyleProjectTests
         measured.ShouldBe(
             GroundTruth.Order(StringComparer.Ordinal),
             Case.Sensitive,
-            "The SDK-style discriminator was measured against a hand-written map of every project in this "
-            + "repo and its fixtures. A row that moved is either a fixture that was added or removed — extend "
-            + "the map — or the discriminator being wrong about a real file, which is the measurement "
-            + "refusing to license the gate in RestoreFailures.");
+            "The SDK-style discriminator was measured against a hand-written map of every project under "
+            + "the three roots this corpus scans. A row that moved is either a fixture that was added or "
+            + "removed — extend the map — or the discriminator being wrong about a real file, which is the "
+            + "measurement refusing to license the gate in RestoreFailures.");
     }
 
     [Fact]
@@ -194,7 +206,8 @@ public sealed class SdkStyleProjectTests
 
     // Every project file the corpus covers: the fixture trees as the test output holds them (which is what
     // FixtureRestorer restores, so the assets column reads the same files the suite runs against), plus this
-    // repo's own shipping and dogfood projects.
+    // repo's own shipping and dogfood projects. These three roots are the whole scan — nothing under
+    // tests/Fixtures/ or examples/ is read, which the class remarks state as a limit rather than an omission.
     private static IEnumerable<string> RealProjectFiles()
     {
         string[] roots = [FixturesRoot, RepoRoot.Absolute("src"), RepoRoot.Absolute("arch")];

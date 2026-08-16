@@ -136,14 +136,22 @@ internal sealed class SessionFragmentStore
     ///     reference-graph dependents, and reuses the rest. The fragments come back in the ordinal-project-name
     ///     order a cold run produces, so the caller's <see cref="FragmentMerger" /> yields the identical model.
     /// </summary>
-    internal async Task<SessionFragmentSet> GetFragmentsAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
+    /// <remarks>
+    ///     <paramref name="declaredMembers" /> rides down to the extraction rather than being applied to the
+    ///     stored set, and a reused fragment therefore keeps the membership it was extracted with. That is
+    ///     safe for the one reason worth stating: membership can only change when the solution file does, and
+    ///     the solution file is a structural input of the paired session's reconcile sweep — so the change
+    ///     arrives as a new generation, which flushes this store before any of it is read again.
+    /// </remarks>
+    internal async Task<SessionFragmentSet> GetFragmentsAsync(
+        WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             return snapshot.Generation != extractedGeneration
-                ? await FullWalkAsync(snapshot, ct).ConfigureAwait(false)
-                : await IncrementalWalkAsync(snapshot, ct).ConfigureAwait(false);
+                ? await FullWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false)
+                : await IncrementalWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -165,9 +173,12 @@ internal sealed class SessionFragmentStore
     ///     model.
     /// </remarks>
     internal async Task<SessionCodebase> GetCodebaseAsync(
-        WorkspaceSnapshot snapshot, IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
+        WorkspaceSnapshot snapshot,
+        IReadOnlyCollection<string> excludeProjectNames,
+        IReadOnlySet<string>? declaredMembers,
+        CancellationToken ct)
     {
-        SessionFragmentSet set = await GetFragmentsAsync(snapshot, ct).ConfigureAwait(false);
+        SessionFragmentSet set = await GetFragmentsAsync(snapshot, declaredMembers, ct).ConfigureAwait(false);
         return new SessionCodebase(Merge(set, excludeProjectNames), set.ReExtractedProjects);
     }
 
@@ -201,10 +212,11 @@ internal sealed class SessionFragmentStore
         return string.Join("\n", excludeProjectNames.OrderBy(name => name, StringComparer.Ordinal));
     }
 
-    private async Task<SessionFragmentSet> FullWalkAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
+    private async Task<SessionFragmentSet> FullWalkAsync(
+        WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
         var fragments = await CodebaseExtractor
-            .ExtractFragmentsAsync(snapshot.Solution, null, snapshot.TargetFrameworks, ct)
+            .ExtractFragmentsAsync(snapshot.Solution, null, snapshot.TargetFrameworks, declaredMembers, ct)
             .ConfigureAwait(false);
 
         fragmentsByProject.Clear();
@@ -217,13 +229,14 @@ internal sealed class SessionFragmentStore
         return new SessionFragmentSet(OrderedFragments(), LastReExtractedProjects, fragmentSetVersion);
     }
 
-    private async Task<SessionFragmentSet> IncrementalWalkAsync(WorkspaceSnapshot snapshot, CancellationToken ct)
+    private async Task<SessionFragmentSet> IncrementalWalkAsync(
+        WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
         var dirty = ExpandToDependents(ContentDirtyProjects(snapshot), snapshot.Solution);
         if (dirty.Count > 0)
         {
             var reExtracted = await CodebaseExtractor
-                .ExtractFragmentsAsync(snapshot.Solution, dirty, snapshot.TargetFrameworks, ct)
+                .ExtractFragmentsAsync(snapshot.Solution, dirty, snapshot.TargetFrameworks, declaredMembers, ct)
                 .ConfigureAwait(false);
 
             // Replace only the re-extracted names' lists; the clean projects' fragments ride through untouched.

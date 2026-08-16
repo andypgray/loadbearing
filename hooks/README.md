@@ -23,7 +23,9 @@ Claude Code blocks on exit 2 and feeds that process's stderr back to the agent, 
 
 Each wrapper also reads the `PostToolUse` payload on stdin and returns early when the edited file is not code, so a docs edit pays nothing. With no payload, as in a hand-run, it checks.
 
-Both behaviours are executed by tests rather than described: `HookWrapperTests` runs each wrapper as a real child process against a stub tool, once per row of the table above plus both sides of the payload filter, and holds every wrapper in this repository to one shared contract region.
+That same payload answers a second question: which working tree the edit landed in. A wrapper checks the tree `CLAUDE_PROJECT_DIR` names and returns early when the edited file belongs to a different one, so an agent working inside a linked worktree, and a session in the main checkout writing into one, both stop buying a verdict about code the edit never touched. Which tree a path is in is a question for git rather than for string comparison, and asking it that way is also what keeps a session below the repository root inside its own project instead of silently skipping. Where neither side resolves to a tree the check runs anyway: when in doubt, check.
+
+All three behaviours are executed by tests rather than described: `HookWrapperTests` runs each wrapper as a real child process against a stub tool, once per row of the table above, once per side of the payload filter, and once per shape the tree guard has to tell apart, against a real linked worktree. It holds every wrapper in this repository to one shared contract region.
 
 ## Turning it on in a clone of this repository
 

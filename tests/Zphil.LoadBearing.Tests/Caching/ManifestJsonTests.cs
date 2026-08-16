@@ -302,7 +302,8 @@ public sealed class ManifestJsonTests
             CatchEdges: [catchEdge],
             ThrowEdges: [throwEdge],
             ExposureEdges: [exposureEdge],
-            ServiceRegistrations: [registration]);
+            ServiceRegistrations: [registration],
+            SolutionMember: false);
     }
 
     /// <summary>

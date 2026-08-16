@@ -109,7 +109,8 @@ public static class GraphSummarizer
             .Select(group => new NamespaceCount(DisplayNamespace(group.Key), group.Count()))
             .ToList();
 
-        return new ProjectSummary(project.Name, project.ProjectReferences, declaredTypes.Count, namespaces);
+        return new ProjectSummary(
+            project.Name, project.ProjectReferences, declaredTypes.Count, namespaces, project.SolutionMember);
     }
 
     // The external-reference bucket: the first two dot-segments of the target's namespace (one segment →

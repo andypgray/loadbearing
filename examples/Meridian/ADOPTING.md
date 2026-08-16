@@ -32,6 +32,7 @@ $ loadbearing graph examples/Meridian/Meridian.slnx --json
   "projects": [
     {
       "name": "Meridian.Clearance",
+      "solutionMember": true,
       "projectReferences": [],
       "types": 5,
       "namespaces": [
@@ -43,6 +44,7 @@ $ loadbearing graph examples/Meridian/Meridian.slnx --json
     },
     {
       "name": "Meridian.Domain",
+      "solutionMember": true,
       "projectReferences": [],
       "types": 7,
       "namespaces": [
@@ -54,6 +56,7 @@ $ loadbearing graph examples/Meridian/Meridian.slnx --json
     },
     {
       "name": "Meridian.Web",
+      "solutionMember": true,
       "projectReferences": [
         "Meridian.Clearance",
         "Meridian.Domain"

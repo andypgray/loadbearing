@@ -38,6 +38,11 @@ public static class CodebaseExtractor
     ///     <see cref="SolutionExtensions.NormalizeProjectNames" />). Null — or a project absent from it —
     ///     leaves the framework unstamped, which is the single-framework norm.
     /// </param>
+    /// <param name="declaredMembers">
+    ///     The solution's declared <c>.csproj</c> membership (<see cref="SpecExclusion.TryReadDeclaredMembers" />),
+    ///     stamped onto each project as <see cref="ProjectNode.SolutionMember" />. Null leaves every project
+    ///     unlabeled, which is what an unreadable solution file must degrade to.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
     ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving Roslyn types before
@@ -48,10 +53,12 @@ public static class CodebaseExtractor
         Solution solution,
         IReadOnlyCollection<string>? excludeProjects = null,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        IReadOnlySet<string>? declaredMembers = null,
         CancellationToken ct = default)
     {
         IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
-            solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks, ct);
+            solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
+            declaredMembers, ct);
         return CodebaseModelBuilder.Build(inputs);
     }
 
@@ -73,10 +80,12 @@ public static class CodebaseExtractor
         Solution solution,
         IReadOnlyCollection<string>? includeProjects,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        IReadOnlySet<string>? declaredMembers = null,
         CancellationToken ct = default)
     {
         IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
-            solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks, ct);
+            solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
+            declaredMembers, ct);
         return inputs.Select(FragmentExtractor.Extract).ToList();
     }
 
@@ -94,6 +103,7 @@ public static class CodebaseExtractor
         Solution solution,
         Func<Project, bool> include,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks,
+        IReadOnlySet<string>? declaredMembers,
         CancellationToken ct)
     {
         var projects = solution.Projects
@@ -119,7 +129,8 @@ public static class CodebaseExtractor
                 .ToList();
 
             inputs.Add(new CompilationInput(
-                compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project)));
+                compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project),
+                SpecExclusion.SolutionMembershipOf(declaredMembers, project.FilePath)));
         }
 
         return inputs;

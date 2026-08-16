@@ -91,6 +91,5 @@ To redraw both from a checkout:
 ```bash
 dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
 loadbearing render examples/Meridian.Operations/Meridian.Operations.slnx \
-  --diagram examples/Meridian.Operations/ARCHITECTURE.md \
-  --diagram-only "Meridian*"
+  --diagram examples/Meridian.Operations/ARCHITECTURE.md
 ```

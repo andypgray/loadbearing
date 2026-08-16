@@ -37,7 +37,7 @@ public sealed class SessionFragmentStoreTests
 
         // Act 1 — the first call has nothing cached, so it flushes and walks every C# project.
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet first = await store.GetFragmentsAsync(snap1, Ct);
+        SessionFragmentSet first = await store.GetFragmentsAsync(snap1, null, Ct);
 
         // Assert 1 — all three re-extracted, and the merged model is byte-identical to a cold full extraction.
         first.ReExtractedProjects.ShouldBe([Billing, Domain, Web], true);
@@ -50,7 +50,7 @@ public sealed class SessionFragmentStoreTests
 
         // Act 2 — a second call with disk untouched must reuse everything.
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet second = await store.GetFragmentsAsync(snap2, Ct);
+        SessionFragmentSet second = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert 2 — zero re-extraction, no extra full walk, and the reused fragments merge to the same model.
         second.ReExtractedProjects.ShouldBeEmpty();
@@ -68,13 +68,13 @@ public sealed class SessionFragmentStoreTests
         await using var session = new WorkspaceSession();
         var store = new SessionFragmentStore();
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        await store.GetFragmentsAsync(snap1, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
 
         // Act — append a new type to a Web source file (a content edit the sweep folds in place), then re-get.
         string webFile = fixture.PathOf(Web, "WebTextExtensions.cs");
         FixtureEdits.EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — re-extraction is EXACTLY Web (content-dirty) ∪ Domain (its only reverse-dependent); Billing,
         // which Web references but which references nothing, stays clean and is reused. No new full walk.
@@ -99,13 +99,13 @@ public sealed class SessionFragmentStoreTests
         await using var session = new WorkspaceSession();
         var store = new SessionFragmentStore();
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        await store.GetFragmentsAsync(snap1, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
         long walksBefore = store.FullWalkCount;
 
         // Act — a structural touch forces a full session reload (new generation), the store's flush signal.
         File.SetLastWriteTimeUtc(fixture.PathOf(Domain, "MyApp.Domain.csproj"), DateTime.UtcNow.AddSeconds(2));
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet reloaded = await store.GetFragmentsAsync(snap2, Ct);
+        SessionFragmentSet reloaded = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — the generation moved, so the store flushed and re-walked every project via the reload path.
         snap2.Generation.ShouldBeGreaterThan(snap1.Generation);
@@ -122,7 +122,7 @@ public sealed class SessionFragmentStoreTests
         await using var session = new WorkspaceSession();
         var store = new SessionFragmentStore();
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet all = await store.GetFragmentsAsync(snapshot, Ct);
+        SessionFragmentSet all = await store.GetFragmentsAsync(snapshot, null, Ct);
 
         // Act — merge the store's fragments minus Billing (as CodebaseSource.Retain does) versus a cold
         // extraction that excludes Billing at the input stage.
@@ -130,7 +130,7 @@ public sealed class SessionFragmentStoreTests
             .ToList();
         CodebaseModel mergedExcluded = FragmentMerger.Merge(retained);
         CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, [Billing], snapshot.TargetFrameworks, Ct);
+            snapshot.Solution, [Billing], snapshot.TargetFrameworks, null, Ct);
 
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
@@ -149,7 +149,7 @@ public sealed class SessionFragmentStoreTests
         await using var session = new WorkspaceSession();
         var store = new SessionFragmentStore();
         WorkspaceSnapshot clean = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet first = await store.GetFragmentsAsync(clean, Ct);
+        SessionFragmentSet first = await store.GetFragmentsAsync(clean, null, Ct);
 
         // Both frameworks' fragments are held under the one project name from the start.
         first.Fragments.Where(fragment => fragment.ProjectName == MultiTfmCore)
@@ -162,7 +162,7 @@ public sealed class SessionFragmentStoreTests
             widget,
             content => content + "\nnamespace MultiTfm.Core\n{\n    public class WidgetProbe\n    {\n    }\n}\n");
         WorkspaceSnapshot edited = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet reExtracted = await store.GetFragmentsAsync(edited, Ct);
+        SessionFragmentSet reExtracted = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — one name went dirty (plus its reverse-dependent), and BOTH of its fragments came back,
         // each still carrying its own framework, with the new type in the merged model.

@@ -77,6 +77,12 @@ internal enum CodebaseSourceOutcome
 internal sealed class CodebaseSource : IDisposable
 {
     private readonly CacheReadResult cacheRead;
+
+    // The solution's declared membership, read at most once per source and handed to every extraction path so
+    // each project it collects carries ProjectNode.SolutionMember. Lazy because a cache hit merges stored
+    // fragments and never extracts, and the point of a hit is that it touches nothing it does not have to.
+    private readonly Lazy<IReadOnlySet<string>?> declaredMembers;
+
     private readonly IReadOnlyList<string> failedProjects;
     private readonly SolutionHandle? handle;
     private readonly IReadOnlyList<string> loadFailures;
@@ -111,6 +117,7 @@ internal sealed class CodebaseSource : IDisposable
         Outcome = outcome;
         SolutionPath = solutionPath;
         SolutionDirectory = SolutionProjectFileParser.AnchorDirectory(solutionPath);
+        declaredMembers = new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
         loadFailures = diagnostics;
         this.failedProjects = failedProjects;
         this.uncheckedProjects = uncheckedProjects;
@@ -299,13 +306,13 @@ internal sealed class CodebaseSource : IDisposable
                 // the model unchanged. Exclusion goes down as an argument because it is applied at merge
                 // time, so one store serves every tool whatever it drops; the store's re-extraction set
                 // becomes this source's observable so the runner counters keep meaning.
-                SessionCodebase warm = await warmCodebase(excludeProjectNames, ct);
+                SessionCodebase warm = await warmCodebase(excludeProjectNames, declaredMembers.Value, ct);
                 reExtractedProjects = new HashSet<string>(warm.ReExtractedProjects, StringComparer.Ordinal);
                 return warm.Model;
             }
 
             return await CodebaseExtractor.ExtractFromSolutionAsync(
-                solution, excludeProjectNames, handle.TargetFrameworks, ct);
+                solution, excludeProjectNames, handle.TargetFrameworks, declaredMembers.Value, ct);
         }
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
@@ -328,7 +335,7 @@ internal sealed class CodebaseSource : IDisposable
         if (Outcome == CodebaseSourceOutcome.Partial)
         {
             var reExtracted = await CodebaseExtractor.ExtractFragmentsAsync(
-                solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, ct);
+                solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, declaredMembers.Value, ct);
             reExtractedProjects = new HashSet<string>(cacheRead.DirtyProjects, StringComparer.Ordinal);
             return cacheRead.ReusableFragments
                 .Concat(reExtracted)
@@ -337,7 +344,10 @@ internal sealed class CodebaseSource : IDisposable
         }
 
         List<CodebaseFragment> all =
-            [.. await CodebaseExtractor.ExtractFragmentsAsync(solution, null, handle!.TargetFrameworks, ct)];
+        [
+            .. await CodebaseExtractor.ExtractFragmentsAsync(
+                solution, null, handle!.TargetFrameworks, declaredMembers.Value, ct)
+        ];
         reExtractedProjects = all.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
         return all;
     }

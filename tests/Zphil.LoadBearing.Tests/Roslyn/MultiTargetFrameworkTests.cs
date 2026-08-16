@@ -174,6 +174,6 @@ public sealed class MultiTargetFrameworkTests
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, Ct);
         return await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, Ct);
+            snapshot.Solution, null, snapshot.TargetFrameworks, null, Ct);
     }
 }

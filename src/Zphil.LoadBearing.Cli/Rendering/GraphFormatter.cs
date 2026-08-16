@@ -54,10 +54,15 @@ internal static class GraphFormatter
         return grain >= DocumentGrain.Overview ? [OverviewElisionLine] : summary.Projects.Select(NamespaceLine);
     }
 
+    // Only the passenger is annotated. Membership is the unremarkable case — every project of a healthy
+    // solution has it — so marking it would put a badge on every line and leave the one line worth reading
+    // no easier to find. An unread membership says nothing at all, for the same reason it serializes absent.
     private static string ProjectLine(ProjectSummary project)
     {
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
-        return $"  {project.Name} — {project.Types} {Plurals.Noun(project.Types, "type")}; references: {references}";
+        string membership = project.SolutionMember == false ? " (not a solution member)" : "";
+        return $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}; "
+               + $"references: {references}";
     }
 
     private static string NamespaceLine(ProjectSummary project)

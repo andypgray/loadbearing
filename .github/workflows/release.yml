@@ -15,7 +15,10 @@
 #
 # Build/test scope: the whole solution is built and tested directly — the slnx is the
 # entire tree here (no transitive-proxy trick needed). The pack step then repacks the
-# solution so ContinuousIntegrationBuild applies to the four shipped packages.
+# solution so ContinuousIntegrationBuild applies to the four shipped packages. That test
+# run is ubuntu-only, so every Windows-gated fact skips here — the .NET Framework fixtures
+# above all. This is not the gate for those: ci.yml's four-image matrix is, and it runs on
+# this same commit because the release flow pushes the branch and the tag together.
 #
 # Provenance: after packing, actions/attest emits signed SLSA build provenance for the
 # .nupkg/.snupkg, and the Sigstore bundle ships as a release asset (offline verification,

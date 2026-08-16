@@ -162,6 +162,15 @@ jobs:
             exit 1
           fi
 
+      # The same command on four images is not the same test run, and no leg here covers the suite. Around
+      # a dozen facts gate themselves on the machine and report `skipped` with a reason rather than
+      # failing. Windows-only: the .NET Framework axis (ClassicApp's non-SDK load, the Framework binlog
+      # replay), the Windows-x64 process-footprint scans, the drive-letter path vectors, and the
+      # registration facts that read a Git for Windows install. Never on Windows: the POSIX rooted-path
+      # vectors, and the case-sensitive path matching — which needs a case-sensitive filesystem, so ubuntu
+      # is the only image that runs it at all. One more skips everywhere: the live agent-hook wrapper
+      # comparison needs `.claude/arch-hook.sh`, which is gitignored, so no runner has ever had it.
+      # Each skip carries its own reason in the log; that is where to read what a given leg left out.
       - name: Test
         run: dotnet test Zphil.LoadBearing.slnx --no-build --logger "console;verbosity=normal"
 
@@ -722,17 +731,17 @@ jobs:
       # above builds it. dotnet test restores and builds it (and the Xunit adapter it references).
       - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
         run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --logger "console;verbosity=normal"
-      # --diagram-only is load-bearing, not cosmetic: the survey fence extracts with no exclusions so
-      # that it agrees with `graph`, and every example spec project references the LoadBearing packages
-      # it is written against. Unscoped, each example would draw this repository's own projects under a
-      # caption reading "Projects in this solution". A pattern beats an enumeration here, so a future
-      # Meridian.* project is drawn rather than silently dropped.
+      # No scope flag on any of these four, which is the property being exercised: every example spec
+      # project references the LoadBearing packages it is written against, so the workspace loads this
+      # repository's projects on each render and only the survey fence's declared-members default keeps
+      # them off a page captioned "Projects in this solution". These lines are also what an adopter copies,
+      # so they carry nothing an adopter would not need.
       - name: Render all four with their drawings and assert a single zero diff (the provably-current property)
         run: |
-          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian/Meridian.slnx --diagram examples/Meridian/ARCHITECTURE.md --diagram-only "Meridian*"
-          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Quoting/Meridian.Quoting.slnx --diagram examples/Meridian.Quoting/ARCHITECTURE.md --diagram-only "Meridian*"
-          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx --diagram examples/Meridian.Operations/ARCHITECTURE.md --diagram-only "Meridian*"
-          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx --diagram examples/Meridian.Interchange/ARCHITECTURE.md --diagram-only "Meridian*"
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian/Meridian.slnx --diagram examples/Meridian/ARCHITECTURE.md
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Quoting/Meridian.Quoting.slnx --diagram examples/Meridian.Quoting/ARCHITECTURE.md
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx --diagram examples/Meridian.Operations/ARCHITECTURE.md
+          dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx --diagram examples/Meridian.Interchange/ARCHITECTURE.md
           git diff --exit-code -- examples/
 
   # The one check a Dependabot NuGet PR is meant to fail. Every job above relocks so it can test the

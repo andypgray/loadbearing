@@ -52,13 +52,30 @@ public static class GraphDiagramRenderer
     /// <param name="summary">The codebase survey to draw.</param>
     /// <param name="solutionName">The solution file name, named in the caption and the accessible title.</param>
     /// <param name="scope">The project filter; null means <see cref="DiagramScope.Everything" />.</param>
+    /// <remarks>
+    ///     <b>The drawing is of the solution, not of the workspace.</b> Only projects the solution declares
+    ///     are drawn, so the caption is literally true under any <paramref name="scope" />: a workspace also
+    ///     loads whatever a <see cref="ProjectSummary.ProjectReferences">ProjectReference</see> reaches, and
+    ///     an unscoped drawing of a codebase with a spec project would otherwise put that spec's contract
+    ///     library on a page captioned "Projects in this solution". The scope narrows <em>within</em> that
+    ///     set and is a legibility knob, never the thing keeping a foreign project out.
+    ///     <para>
+    ///         Membership that was never read draws, which is the whole of the fail-open contract:
+    ///         <see cref="ProjectSummary.SolutionMember" /> is null when nothing could be read, and treating
+    ///         null as "not a member" would empty the diagram for an unparseable solution file rather than
+    ///         degrading to today's behaviour. The <c>graph</c> survey is where the excluded projects can be
+    ///         seen, which is why there is no render-side flag to draw them here.
+    ///     </para>
+    /// </remarks>
     public static string Block(GraphSummary summary, string solutionName, DiagramScope? scope = null)
     {
         Guard.NotNull(summary, nameof(summary));
         Guard.NotNullOrWhiteSpace(solutionName, nameof(solutionName));
 
         DiagramScope filter = scope ?? DiagramScope.Everything;
-        var projects = summary.Projects.Where(project => filter.Includes(project.Name)).ToList();
+        var projects = summary.Projects
+            .Where(project => project.SolutionMember != false && filter.Includes(project.Name))
+            .ToList();
         var ids = NodeIds(projects);
 
         var lines = new List<string>

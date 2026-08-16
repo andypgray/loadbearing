@@ -81,11 +81,12 @@ To redraw both from a checkout:
 ```bash
 dotnet build examples/Meridian/Meridian.slnx
 loadbearing render examples/Meridian/Meridian.slnx \
-  --diagram examples/Meridian/ARCHITECTURE.md \
-  --diagram-only "Meridian*"
+  --diagram examples/Meridian/ARCHITECTURE.md
 ```
 
-`--diagram-only` narrows the survey fence to this example's own projects. A spec project references
-the LoadBearing packages it is written against, and unscoped those would be surveyed too, under a
-caption reading "Projects in this solution". The law fence is never scoped, because what the spec
-forbids is not a property of the projects someone chose to draw.
+Nothing on that line scopes the survey, and nothing needs to. A spec project references the
+LoadBearing contract it is written against, so the build loads those projects too; the survey fence
+draws only what `Meridian.slnx` declares, which is what makes the caption "Projects in this solution"
+true rather than aspirational. `graph` is where the rest of the loaded set can be seen, each project
+labelled with whether the solution declares it. The law fence is never scoped either, because what
+the spec forbids is not a property of the projects someone chose to draw.

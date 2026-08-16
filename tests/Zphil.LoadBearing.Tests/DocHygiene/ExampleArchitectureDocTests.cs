@@ -76,15 +76,16 @@ public sealed class ExampleArchitectureDocTests
     }
 
     /// <summary>
-    ///     The regression guard behind the <c>--diagram-only</c> on every example render line. Each
-    ///     example's spec project references the LoadBearing packages it is written against, and the
-    ///     survey fence extracts with no exclusions so that it agrees with <c>graph</c>. Drop the
-    ///     pattern and every example ships a drawing of this repository's own projects under a caption
-    ///     reading "Projects in this solution". Nothing else in this suite would notice.
+    ///     The gate on the survey fence's declared-members default, read straight off the committed
+    ///     artifacts. Each example's spec project references the LoadBearing packages it is written
+    ///     against, so the workspace loads this repository's projects on every example render; only the
+    ///     fence's membership filter keeps them off a page captioned "Projects in this solution". The
+    ///     render lines carry no scope flag any more, which is the point — so if that default regressed
+    ///     there would be nothing else between the passengers and the four committed drawings.
     ///     <para>
-    ///         The second half closes the same hole from the other side: a pattern narrow enough to keep
-    ///         the passengers out can also be narrow enough to drop a project the example genuinely owns,
-    ///         and an allow-list cannot say which it did. The solution file can.
+    ///         The second half closes the same hole from the other side: whatever narrows the fence could
+    ///         narrow it too far and drop a project the example genuinely owns, and reading the drawing
+    ///         alone cannot say which it did. The solution file can.
     ///     </para>
     /// </summary>
     [Theory]
@@ -105,10 +106,11 @@ public sealed class ExampleArchitectureDocTests
         // Assert
         body.ShouldNotContain(
             "Zphil.LoadBearing",
-            $"{relativePath} draws this repository's own projects; the render line lost its --diagram-only.");
+            $"{relativePath} draws this repository's own projects, which {solutionFileName} does not "
+            + "declare; the survey fence's declared-members default has regressed.");
         missing.ShouldBeEmpty(
-            $"{relativePath} omits project(s) {solutionFileName} declares, which its --diagram-only pattern "
-            + $"no longer matches (spec {specName}):\n{string.Join("\n", missing)}");
+            $"{relativePath} omits project(s) {solutionFileName} declares, so the survey fence narrowed "
+            + $"further than declared membership (spec {specName}):\n{string.Join("\n", missing)}");
     }
 
     /// <summary>

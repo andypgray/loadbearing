@@ -63,6 +63,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
         "projectEdges[] (source/target, declared vs observed dependencies), and externalEdges[] grouped by " +
         "namespace root. " +
+        "Every project the workspace loaded is here, which is wider than the solution: solutionMember false " +
+        "marks a passenger a ProjectReference dragged in, and an absent key means membership was unreadable. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +

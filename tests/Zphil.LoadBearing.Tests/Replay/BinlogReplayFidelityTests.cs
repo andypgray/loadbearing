@@ -46,6 +46,37 @@ public sealed class BinlogReplayFidelityTests
     }
 
     [Fact]
+    public async Task Replay_SolutionMembership_LandsOnTheReplayedProjectsToo()
+    {
+        // A binlog records what was built, not what a solution declares, so membership on this path comes
+        // from the discovered solution file exactly as it does on the MSBuild path — and lands only because
+        // SolutionReader gives each replayed project its csproj FilePath to be matched on. Worth pinning
+        // rather than assuming: if that path were ever absent the label would silently degrade to null on
+        // every replayed run, which fails open and therefore reds nothing else.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.SolutionPath));
+
+        model.Projects.Select(project => (project.Name, project.SolutionMember))
+            .ShouldBe([("MyApp.Domain", true), ("MyApp.Legacy.Billing", true), ("MyApp.Web", true)]);
+    }
+
+    [Fact]
+    public async Task Replay_UnreadableMembership_LeavesEveryReplayedProjectUnlabeled()
+    {
+        // The fail-open half, on the path most likely to hit it: a replay driven from a binlog whose
+        // solution never resolves (or resolves to a format the parser does not own) must leave the label
+        // absent rather than call every project a passenger — which, once `render` filters on it, would
+        // empty the drawing.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.BinlogPath));
+
+        model.Projects.Select(project => project.SolutionMember)
+            .ShouldAllBe(member => member == null);
+    }
+
+    [Fact]
     public void Replay_ReportsNoFailedProjects_BecauseEveryReplayedProjectWasReallyBuilt()
     {
         // The gate's input on this path, pinned empty rather than assumed empty. A replayed project comes

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`graph` now says which of the projects it surveys the solution actually declares.** A workspace
+  loads every project a `ProjectReference` reaches, which is a wider set than the solution file names:
+  a spec project's references drag its contract library — and, in an example repository, the
+  LoadBearing packages themselves — in as passengers, and until now nothing on any surface told them
+  apart from the codebase under law. Each project in the survey carries `solutionMember`, the text
+  roster annotates the undeclared with `(not a solution member)`, and `arch_graph` inherits both. The
+  survey keeps every project either way — investigating a passenger is exactly what the survey is
+  for, and a fence that hid them would leave a reader wondering why the counts disagreed with their
+  solution. The label is threaded onto the model at extraction rather than joined on afterwards,
+  because a cache hit replays a model with no live workspace to join against, and the extraction cache
+  schema is bumped so a manifest written by an earlier build rebuilds rather than replaying an
+  unlabeled model as a labeled one — a one-off local rebuild, on disposable derived data. Membership
+  that cannot be read labels nothing: an unowned solution format or a parse failure leaves the key
+  absent, which is why absent means unknown and never `false`. `schemaVersion` stays 1 and the key is
+  optional, so a consumer of a solution whose membership reads cleanly sees one new key and nothing
+  else moves.
+
 - **An over-budget check report now comes back whole at a coarser grain instead of cut in half.**
   `check --overview` elides each violation's sites, reporting them as `siteCount`; `check --skeleton`
   elides the violations themselves, reporting them as `violationCount` and keeping every rule with its
@@ -64,6 +81,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `restoreFailedProjects`. Key order and nothing else — `schemaVersion` stays 3, nulls stay omitted, and a
   clean document differs from the one before it only in the sequence of its keys.
 
+- **`render --diagram`'s survey fence now draws the projects the solution declares, so its caption is
+  literally true under any flags.** The fence extracts with no exclusions, which is what keeps it
+  agreeing with `graph` — but a workspace also loads whatever a `ProjectReference` reaches, so an
+  unscoped drawing of any codebase with a spec project put that spec's contract library on a page
+  captioned "Projects in this solution". The remedy was a scope glob on every render line, which meant
+  the taught recipe carried a flag whose job was correctness rather than legibility, and an adopter
+  who left it off got a wrong drawing with nothing to tell them so. `--diagram-only` and
+  `--diagram-exclude` now narrow *within* the declared set and are what they read as: legibility knobs
+  for a solution with more projects than a diagram can carry. There is no render-side way back in —
+  `graph` is where a passenger is investigated, and it labels every loaded project. Membership that
+  could not be read filters nothing, so an unparseable solution file degrades to the old drawing
+  rather than to an empty one; an all-passenger survey keeps the existing `(no projects in scope)`
+  placeholder. The four example solutions drop `--diagram-only "Meridian*"` from their render lines
+  and their documented redraw commands, and every committed drawing — theirs and this repository's —
+  re-renders byte-identical, which the zero-diff gates prove rather than assert.
+
 - **The string anchor is now stated where an author is reading, and demonstrated where an adopter is
   looking.** The shared-framework load failure already offered `.DerivedFrom("…ControllerBase")` as its
   remedy, but `derive_spec`'s authoring reference — the section that page calls canonical — listed only
@@ -81,6 +114,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anchor matches — including through an intermediate external base.
 
 ### Fixed
+
+- **An agent hook now checks the working tree the edit landed in, not the tree the session happens to
+  be sitting in.** Claude Code fires a `PostToolUse` hook from the session's directory and names the
+  project root in `CLAUDE_PROJECT_DIR`, and neither has to be where the edit went. An agent working
+  inside a linked worktree, and a session in the main checkout writing into one by absolute path,
+  both bought a full `loadbearing check` of a tree their edit never touched and read back a verdict
+  about the wrong code, on every matching write. Each wrapper now resolves the tree that contains the
+  edited file and returns early when that is not the tree `CLAUDE_PROJECT_DIR` names, reading the
+  file path out of the payload it already parses for the code filter. Neither cheaper test can stand
+  in for the git one. Path containment cannot, because Claude Code puts a worktree *under* the
+  project directory, so by path it reads as inside; and comparing the two `.git` directories cannot,
+  because git spells them absolutely from the repository root and relatively from a subdirectory of
+  it, which makes that comparison answer differently depending on where the session sits.
+  `rev-parse --show-toplevel` is absolute, identical from any depth, and names a linked worktree's
+  own root, so one comparison settles it. Path containment still runs first, before any process is
+  spawned, and is what catches an edit to a file in no repository at all. Every remaining fallback
+  runs the check rather than skipping it: an unset `CLAUDE_PROJECT_DIR`, a relative payload path, a
+  path neither side can resolve to a tree. The guard lives in the contract region every committed
+  wrapper shares, so an adopting repository copies it along with the exit-code mapping.
 
 - **A rule every operand of which was skipped is now listed under the law fence instead of vanishing
   from the page.** The drawing omits the self-arrow an `only`-verb produces when it names its own

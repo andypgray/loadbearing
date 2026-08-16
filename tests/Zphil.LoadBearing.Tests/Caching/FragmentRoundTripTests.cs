@@ -362,6 +362,46 @@ public sealed class FragmentRoundTripTests
             .ShouldBe(ModelDump.Render(direct));
     }
 
+    [Fact]
+    public void RoundTrip_SolutionMembership_SurvivesAllThreeStatesOntoTheProjectNodes()
+    {
+        // Arrange — a declared member, a passenger, and a project nothing was read about. The cache is the
+        // one place all three can be flattened into the same absent-or-default value, which is precisely the
+        // failure this pins: a hit replaying a passenger as a member would have `render` draw it.
+        CompilationInput member = CompilationFactory.Compile("Member", ("Member.cs", """
+                                                                                     namespace Member;
+                                                                                     public class A {}
+                                                                                     """)) with
+        {
+            SolutionMember = true
+        };
+        CompilationInput passenger = CompilationFactory.Compile("Passenger", ("Passenger.cs", """
+                                                                                              namespace Passenger;
+                                                                                              public class B {}
+                                                                                              """)) with
+        {
+            SolutionMember = false
+        };
+        CompilationInput unread = CompilationFactory.Compile("Unread", ("Unread.cs", """
+                                                                                     namespace Unread;
+                                                                                     public class C {}
+                                                                                     """));
+        IReadOnlyList<CodebaseFragment> fragments = new[] { member, passenger, unread }
+            .Select(FragmentExtractor.Extract)
+            .ToList();
+
+        // Act
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert — the field, then the model it lands on, since the fragment is only a carrier.
+        roundTripped.Select(fragment => fragment.SolutionMember)
+            .ShouldBe([true, false, null]);
+        FragmentMerger.Merge(roundTripped)
+            .Projects.Select(project => (project.Name, project.SolutionMember))
+            .ShouldBe([("Member", true), ("Passenger", false), ("Unread", null)]);
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

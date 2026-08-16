@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
@@ -31,11 +29,11 @@ internal sealed class TempGitRepo : IDisposable
     {
         _workspace = new TempFixtureWorkspace(callerFilePath: callerFilePath);
         File.WriteAllText(Path.Combine(Root, ".gitignore"), "bin/\nobj/\n");
-        Git("init");
-        Git("config", "user.email", "loadbearing-test@example.invalid");
-        Git("config", "user.name", "LoadBearing Test");
-        Git("add", "-A");
-        Git("-c", "commit.gpgsign=false", "commit", "-m", "fixture baseline");
+        GitCommand.Run(Root, "init");
+        GitCommand.Run(Root, "config", "user.email", "loadbearing-test@example.invalid");
+        GitCommand.Run(Root, "config", "user.name", "LoadBearing Test");
+        GitCommand.Run(Root, "add", "-A");
+        GitCommand.Run(Root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture baseline");
     }
 
     /// <summary>Absolute path to the committed solution file.</summary>
@@ -53,25 +51,5 @@ internal sealed class TempGitRepo : IDisposable
     public string PathOf(params string[] relativeSegments)
     {
         return _workspace.PathOf(relativeSegments);
-    }
-
-    // Runs `git -C <root> <args...>`; throws on non-zero exit. Launched through ChildProcess so this git
-    // gets the closed stdin, the bounded wait and the kill-tree every child in this repository gets.
-    private void Git(params string[] args)
-    {
-        var startInfo = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = Root,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-C");
-        startInfo.ArgumentList.Add(Root);
-        foreach (string argument in args) startInfo.ArgumentList.Add(argument);
-
-        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"'git {string.Join(" ", args)}' failed with exit code {result.ExitCode}."
-                + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
     }
 }

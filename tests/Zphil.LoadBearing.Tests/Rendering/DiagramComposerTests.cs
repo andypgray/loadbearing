@@ -76,17 +76,42 @@ public sealed class DiagramComposerTests
         body.ShouldEndWith(LawDiagramRenderer.Block(model, SpecName));
     }
 
-    // App references Lib and touches it — the smallest survey with an edge in it.
-    private static GraphSummary TwoProjectSummary()
+    [Fact]
+    public void Compose_APassenger_DropsFromTheSurveyAndLeavesTheLawWhole()
+    {
+        // Arrange — the same independence as the scoped case, on the fence's own default rather than a
+        // flag: Lib is a passenger, and the law is written about Lib.
+        GraphSummary summary = TwoProjectSummary(libMembership: false, appMembership: true);
+        ArchitectureModel model = LawModel();
+
+        // Act — no scope argument at all.
+        string body = DiagramComposer.Compose(summary, SolutionName, model, SpecName);
+
+        // Assert — the survey drops it, and the law fence still names it, because LawDiagramRenderer takes
+        // no scope and draws from the spec rather than from the project graph.
+        body.ShouldNotContain("p_Lib[");
+        body.ShouldContain("p_App[\"App\"]");
+        body.ShouldEndWith(LawDiagramRenderer.Block(model, SpecName));
+    }
+
+    // App references Lib and touches it — the smallest survey with an edge in it. Membership defaults to
+    // unread, which draws, so the cases predating the declared-members fence are unaffected by it.
+    private static GraphSummary TwoProjectSummary(bool? libMembership = null, bool? appMembership = null)
     {
         CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
                                                                             namespace Lib;
                                                                             public class Service {}
-                                                                            """));
+                                                                            """)) with
+        {
+            SolutionMember = libMembership
+        };
         CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib", ("App.cs", """
                                                                                                                namespace App;
                                                                                                                public class Client { public Lib.Service S; }
-                                                                                                               """));
+                                                                                                               """)) with
+        {
+            SolutionMember = appMembership
+        };
 
         return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app]));
     }

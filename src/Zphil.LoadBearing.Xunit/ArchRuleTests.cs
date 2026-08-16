@@ -229,12 +229,14 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
                     // The same closure the CLI applies: the spec project plus the plumbing only it references,
                     // with the solution's declared members subtracted so a spec that references the code it
-                    // governs never excludes it.
+                    // governs never excludes it. One read of that membership serves both consumers — the
+                    // subtraction here, and the per-project label the extraction stamps on the model.
+                    var declaredMembers = SpecExclusion.TryReadDeclaredMembers(fullSolutionPath);
                     var exclude = excludeProjectName is null
                         ? null
-                        : SpecExclusion.Compute(loaded.Solution, fullSolutionPath, excludeProjectName);
+                        : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-                        loaded.Solution, exclude, loaded.TargetFrameworks, ct);
+                        loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
                     // The unchecked projects come out of this load, which is why they ride the extraction
                     // rather than the call: nothing above this line has opened a workspace to measure them.
                     return new ExtractedCodebase(codebase, loaded.UncheckedProjects);

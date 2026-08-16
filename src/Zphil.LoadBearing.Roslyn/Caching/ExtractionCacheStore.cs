@@ -159,7 +159,7 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
     // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 19;
+    private const int CurrentSchemaVersion = 20;
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;

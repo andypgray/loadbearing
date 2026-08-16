@@ -125,6 +125,69 @@ public sealed class GraphDiagramRendererTests
     }
 
     [Fact]
+    public void Block_Passenger_IsNotDrawnAndTakesItsEdgeWithIt()
+    {
+        // Arrange — Lib is a passenger a ProjectReference dragged into the workspace; both other projects
+        // reference it, so this also exercises the edge half.
+        GraphSummary summary = ThreeProjectSummary(libMembership: false, appMembership: true, orphanMembership: true);
+
+        // Act — no scope at all: the default is what keeps Lib out.
+        string block = GraphDiagramRenderer.Block(summary, SolutionName);
+
+        // Assert — no Lib node, and neither the observed nor the declared-but-unobserved edge into it
+        // survives, because an edge is drawn only when both endpoints resolve to nodes.
+        Diagram(block)
+            .ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
+    }
+
+    [Fact]
+    public void Block_UnreadMembership_DrawsEveryProject()
+    {
+        // The fail-open contract: an unreadable solution file labels nothing, and a fence that treated
+        // unknown as "not a member" would answer with an empty drawing instead of today's whole one.
+        GraphSummary summary = ThreeProjectSummary();
+
+        string block = GraphDiagramRenderer.Block(summary, SolutionName);
+
+        Diagram(block)
+            .ShouldBe([
+                "p_App[\"App\"]", "p_Lib[\"Lib\"]", "p_Orphan[\"Orphan\"]", "",
+                "p_App --> p_Lib", "p_Orphan -.-> p_Lib"
+            ]);
+    }
+
+    [Fact]
+    public void Block_OnlyListOverPassengers_NarrowsWithinTheDeclaredMembers()
+    {
+        // Arrange — the two knobs compose one way only: the glob selects from the declared members, and
+        // naming a passenger cannot put it back.
+        GraphSummary summary = ThreeProjectSummary(libMembership: false, appMembership: true, orphanMembership: true);
+
+        // Act
+        string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["App", "Lib"], []));
+
+        // Assert
+        Diagram(block)
+            .ShouldBe(["p_App[\"App\"]"]);
+    }
+
+    [Fact]
+    public void Block_EveryProjectAPassenger_DrawsThePlaceholderNode()
+    {
+        // Arrange — a solution whose whole loaded universe is passengers, which is what a spec-only
+        // solution file would produce.
+        GraphSummary summary = ThreeProjectSummary(
+            libMembership: false, appMembership: false, orphanMembership: false);
+
+        // Act
+        string block = GraphDiagramRenderer.Block(summary, SolutionName);
+
+        // Assert — the same empty-scope convention an over-narrow glob gets, rather than an empty fence.
+        Diagram(block)
+            .ShouldBe(["p_none[\"(no projects in scope)\"]"]);
+    }
+
+    [Fact]
     public void Block_ProjectNamesThatSlugAlike_GetDistinctNodeIds()
     {
         // Arrange — 'My-App' and 'My.App' both slug to My_App; 'My.App2' keeps its digit.
@@ -210,21 +273,33 @@ public sealed class GraphDiagramRendererTests
         second.ShouldBe(first);
     }
 
-    // App references Lib and touches it; Orphan declares the same reference and touches nothing.
-    private static GraphSummary ThreeProjectSummary()
+    // App references Lib and touches it; Orphan declares the same reference and touches nothing. Membership
+    // defaults to unread on all three, which is what every case predating the declared-members fence wants:
+    // unknown draws, so those pins are unaffected by it.
+    private static GraphSummary ThreeProjectSummary(
+        bool? libMembership = null, bool? appMembership = null, bool? orphanMembership = null)
     {
         CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
                                                                             namespace Lib;
                                                                             public class Service {}
-                                                                            """));
+                                                                            """)) with
+        {
+            SolutionMember = libMembership
+        };
         CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib", ("App.cs", """
                                                                                                                namespace App;
                                                                                                                public class Client { public Lib.Service S; }
-                                                                                                               """));
+                                                                                                               """)) with
+        {
+            SolutionMember = appMembership
+        };
         CompilationInput orphan = CompilationFactory.CompileReferencing("Orphan", lib.Compilation, "Lib", ("Orphan.cs", """
                                                                                                                         namespace Orphan;
                                                                                                                         public class Standalone {}
-                                                                                                                        """));
+                                                                                                                        """)) with
+        {
+            SolutionMember = orphanMembership
+        };
 
         return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app, orphan]));
     }

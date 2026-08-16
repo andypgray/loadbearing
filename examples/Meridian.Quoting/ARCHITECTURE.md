@@ -78,6 +78,5 @@ To redraw both from a checkout:
 ```bash
 dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
 loadbearing render examples/Meridian.Quoting/Meridian.Quoting.slnx \
-  --diagram examples/Meridian.Quoting/ARCHITECTURE.md \
-  --diagram-only "Meridian*"
+  --diagram examples/Meridian.Quoting/ARCHITECTURE.md
 ```
