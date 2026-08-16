@@ -13,10 +13,11 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
 ///     unexpected-error, truncated success, unknown-parameter guard — end to end (acceptance box
-///     2). Every row but one rides the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
-///     workspace), so the whole stack is proven in milliseconds; the narrowing-hint row must call
-///     <c>arch_graph</c>, because the hint is keyed on the tool name and only a real survey proves it
-///     travels. Serialized with the watchdog suites: the
+///     2). Most rows ride the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
+///     workspace), so the whole stack is proven in milliseconds; the truncation rows must call
+///     <c>arch_graph</c>, because the narrowing hint is keyed on the tool name and only a real survey
+///     proves it travels, and the bool-coercer row calls it as the only tool declaring a flag — that one
+///     fails at binding, ahead of any survey. Serialized with the watchdog suites: the
 ///     filter brackets each call with the shared
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />
 ///     in-flight counter, so it must not run concurrently with the tests that read/reset that static.
@@ -137,6 +138,29 @@ public sealed class GlobalCallToolFilterTests
         document.RootElement.GetProperty("grain")
             .GetString()
             .ShouldBe("skeleton");
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_UnparseableBool_ReturnsCoercerErrorAndLogsNothing()
+    {
+        // Arrange — "yes" for a flag is the mis-spelling BoolCoercerFactory exists for. Before it, Web
+        // defaults read numbers from strings but never booleans, so this threw a raw JsonException:
+        // CliErrorMapper does not recognise one as a user error, so the filter classified it as a bug and
+        // returned a byte position. Binding fails ahead of dispatch, so no workspace is ever opened.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync(
+            "arch_graph",
+            new Dictionary<string, object?> { ["overview"] = "yes" },
+            cancellationToken: Ct);
+
+        // Assert — the coercer's actionable message surfaces as an error, unlogged.
+        result.IsError.ShouldBe(true);
+        result.ShouldHaveTextContent()
+            .ShouldContain("Expected true or false");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 

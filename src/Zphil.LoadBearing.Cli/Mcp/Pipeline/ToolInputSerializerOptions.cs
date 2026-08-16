@@ -24,7 +24,8 @@ internal static class ToolInputSerializerOptions
             new EnumValidationConverterFactory(),
             new EnumArrayCoercerFactory(),
             new StringArrayCoercerFactory(),
-            new StringCoercerFactory()
+            new StringCoercerFactory(),
+            new BoolCoercerFactory()
         }
     };
 }

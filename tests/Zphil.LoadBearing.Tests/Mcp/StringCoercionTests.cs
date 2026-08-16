@@ -20,10 +20,11 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         production converter stack rather than a re-registration of it.
 ///     </para>
 ///     <para>
-///         The array coercer has no live consumer: every <c>arch_*</c> parameter today is
-///         <c>string</c>, <c>string?</c> or <c>bool</c>, so nothing reaches
-///         <see cref="StringArrayCoercerFactory" /> through a real <c>tools/call</c>. It ships registered
-///         and ready for the first array-shaped parameter, and this is the only harness that reaches it.
+///         The array coercer has no live consumer: every <c>arch_*</c> parameter today is scalar —
+///         <c>string</c>, <c>string?</c> or a <c>bool</c> served by <see cref="BoolCoercerFactory" /> — so
+///         nothing reaches <see cref="StringArrayCoercerFactory" /> through a real <c>tools/call</c>. It
+///         ships registered and ready for the first array-shaped parameter, and this is the only harness
+///         that reaches it. <c>CoercerCoverageTests</c> holds that ledger.
 ///     </para>
 /// </remarks>
 public sealed class StringCoercionTests

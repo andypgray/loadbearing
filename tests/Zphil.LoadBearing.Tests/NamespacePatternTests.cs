@@ -27,7 +27,7 @@ public class NamespacePatternTests
     [InlineData("MyApp.Legacy*", "MyApp.LegacyBilling", true)]
     [InlineData("MyApp.Legacy*", "MyApp.Legacy.Billing", false)]
     // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
-    // (NamespacePattern.cs:108-110): `Legacy*` diverges from `Ledger` at the third character.
+    // (Wildcard.Match's final else): `Legacy*` diverges from `Ledger` at the third character.
     [InlineData("MyApp.Legacy*", "MyApp.Ledger", false)]
     // * — everything.
     [InlineData("*", "MyApp", true)]

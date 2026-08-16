@@ -157,6 +157,11 @@ public sealed class ArchSpec : IArchitectureSpec
 }
 ```
 
+Name the project — and with it its root namespace — so the **last segment is not `Arch`**: inside
+a namespace ending in `.Arch`, the simple name `Arch` binds to that namespace rather than to the
+`Arch` type `Define` takes, and the spec does not compile (CS0118, verbatim below).
+`MyApp.ArchSpec` is safe, and so is the `arch/` folder — only the namespace segment collides.
+
 Add it to the solution (`dotnet sln add arch/MyApp.ArchSpec/MyApp.ArchSpec.csproj`) and build.
 Spec discovery is by convention: **the unique solution project that references
 `Zphil.LoadBearing.dll`** — via the package or via a project reference. As a solution member,
@@ -194,6 +199,13 @@ Errors you may see, verbatim, and what they mean:
   spec csproj. Put it back rather than adding a `PackageVersion` entry to the central file: the
   spec's pin belongs to LoadBearing and moves when the tool does, not with the repository's own
   dependencies.
+- `error CS0118: 'Arch' is a namespace but is used like a type`, beside a CS0535 that the spec
+  class does not implement `IArchitectureSpec.Define(Arch)` — the compiler's, not this tool's, so
+  nothing in either names the cause. The spec project's namespace ends in `.Arch`, and inside that
+  namespace the simple name `Arch` is the namespace itself, shadowing the contract type. Rename the
+  project and namespace so the last segment is not `Arch` (the scaffold's `MyApp.ArchSpec` shape);
+  qualifying `Zphil.LoadBearing.Arch` in the signature also compiles, but leaves the shadow armed
+  for every file the spec grows.
 - `No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec
   to name one.` — the spec project is not in the solution yet (`dotnet sln add`), or you need
   an explicit `--spec`.

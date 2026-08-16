@@ -724,6 +724,7 @@ internal static class FragmentExtractor
         ///     through the memo, and the same symbol is displayed once per compilation rather than once per
         ///     site.
         /// </summary>
+        // ReSharper disable once MemberHidesStaticFromOuterClass
         private string FullNameOf(INamedTypeSymbol symbol)
         {
             INamedTypeSymbol definition = symbol.OriginalDefinition;

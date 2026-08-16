@@ -117,6 +117,24 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_WarnsThatAnArchNamespaceSegmentShadowsTheContractType()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — the recipe's own arch/ folder convention makes an Arch-suffixed project name the
+        // natural reach, and neither resulting compiler error mentions this library: the recipe must
+        // carry the cause (a namespace segment named Arch shadows the contract type) and the way out.
+        string text = result.ShouldHaveTextContent();
+        text.ShouldContain("CS0118");
+        text.ShouldContain("'Arch' is a namespace but is used like a type");
+    }
+
+    [Fact]
     public void DeriveSpec_LoadsEmbeddedRecipe_NonTrivial()
     {
         // A rename of the .md or its manifest id would otherwise surface only when a client calls

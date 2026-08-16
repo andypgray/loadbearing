@@ -20,9 +20,9 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         type makes STJ's schema exporter erase that parameter — it can no longer infer the shape.
 ///         Every converter-bound parameter is affected: a <c>string[]</c> parameter would collapse
 ///         from an array-of-strings to nothing at all, and (verified empirically) every scalar
-///         <c>string?</c> parameter erases too. <see cref="ReinjectErasedSchema" /> is the
-///         <c>SchemaCreateOptions.TransformSchemaNode</c> hook that restores the erased shape from the
-///         underlying CLR type.
+///         <c>string?</c> and <c>bool</c> parameter erases too. <see cref="ReinjectErasedSchema" /> is
+///         the <c>SchemaCreateOptions.TransformSchemaNode</c> hook that restores the erased shape from
+///         the underlying CLR type.
 ///     </para>
 ///     <para>
 ///         This is deliberately narrow: it wires only the coercers and re-injects the schema they
@@ -36,7 +36,8 @@ internal static class CoercingToolRegistration
     /// <summary>
     ///     The schema hook every tool registered here is created with. Internal rather than private so a
     ///     test can create a probe tool through it: the array and enum repairs below serve parameter
-    ///     shapes no <c>arch_*</c> tool has yet, so no real tool can reach them.
+    ///     shapes no <c>arch_*</c> tool has yet, so no real tool can reach them. The scalar-string and
+    ///     bool repairs are the live ones — between them they cover every parameter this server declares.
     /// </summary>
     internal static readonly AIJsonSchemaCreateOptions SchemaOptions = new()
     {
@@ -86,8 +87,8 @@ internal static class CoercingToolRegistration
 
     /// <summary>
     ///     Re-injects the shape the custom converters erased, reading it back from the underlying CLR
-    ///     type: array + <c>items</c> for string/enum arrays, <c>string</c> for scalars, and — for enum
-    ///     parameters — the <c>enum</c> value list. The value list is otherwise lost entirely (the
+    ///     type: array + <c>items</c> for string/enum arrays, <c>string</c> or <c>boolean</c> for scalars,
+    ///     and — for enum parameters — the <c>enum</c> value list. The value list is otherwise lost (the
     ///     converter hides the enum from the exporter), so restoring it here is what lets the allowed
     ///     values travel in the schema rather than being duplicated into the description prose. Every
     ///     branch is guarded on <c>!ContainsKey</c>, so it is a no-op whenever the exporter already
@@ -122,6 +123,14 @@ internal static class CoercingToolRegistration
             // would advertise no type at all. (The advertised shape is a plain "string"; no
             // ["string","null"] union appears.)
             obj["type"] = "string";
+        }
+        else if (t == typeof(bool) && !obj.ContainsKey("type"))
+        {
+            // Live too since BoolCoercerFactory landed: arch_graph's three flags erase exactly as the
+            // scalar strings do. Their description and `default: false` survive the erasure, so this puts
+            // back the one keyword that did not — all that changes in the advertised schema is where
+            // `type` sits in the object, which no client reads as meaning.
+            obj["type"] = "boolean";
         }
         else
         {

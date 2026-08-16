@@ -407,15 +407,23 @@ client rather than arriving as a server that would not start. However the server
 the rule from Installing still applies: restore and build the solution first; the checker
 never builds, and a stale build gives stale verdicts.
 
-`dnx` launches the server straight from nuget.org without the global install, and it ships
-with the same .NET 10 SDK the tool already requires; the `--` hands everything after it to
-the tool:
+`dnx` launches the server straight from nuget.org without the global install; the `--` hands
+everything after it to the tool:
 
 ```bash
 dnx Zphil.LoadBearing.Cli -- mcp MyApp.sln
 ```
 
-This is how MCP-registry clients run the server; note the `mcp` subcommand.
+This is how MCP-registry clients run the server; note the `mcp` subcommand. `dnx` ships with
+the .NET 10 SDK, but installing that SDK is not what makes the command exist: `dotnet` picks
+an SDK per directory, honouring the nearest `global.json` at or above the working directory,
+and `dnx` is present only where the SDK picked there is 10 or newer. A repository pinning an
+older SDK (the normal state of the codebases this tool is built for) has no `dnx` at its root
+however much .NET 10 is installed beside it, and a registry client launching there sees a
+server that died before the handshake, with the reason on stderr alone. Wire such a
+repository with the installed `loadbearing` command instead: the global tool needs a .NET 10
+SDK installed on the machine, `dnx` needs one selected in the working directory, and a
+`global.json` pinning lower blocks only the second.
 
 ## Building
 

@@ -30,7 +30,7 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         <see cref="CoercingToolRegistration.SchemaOptions" />, because the array and enum repairs serve
 ///         parameter shapes no <c>arch_*</c> tool has yet: every real parameter today is <c>string</c>,
 ///         <c>string?</c> or <c>bool</c>, and every one of them is described, so only the described
-///         scalar-string branch is reachable through a real <c>tools/list</c>.
+///         scalar-string and bool branches are reachable through a real <c>tools/list</c>.
 ///     </para>
 /// </remarks>
 public sealed class CoercedToolSchemaTests
@@ -107,15 +107,44 @@ public sealed class CoercedToolSchemaTests
     }
 
     [Fact]
-    public void ShapeTheExporterStillEmits_IsLeftAlone()
+    public void ErasedBool_IsRestoredToABoolean()
     {
-        // bool has no custom converter, so the exporter emits its shape and every repair branch is
-        // guarded on !ContainsKey. A repair that overwrote here would silently retype live parameters:
-        // arch_graph's overview and allowWorkspaceDiagnostics are both bool.
+        // The other live branch, since BoolCoercerFactory: arch_graph's three flags are bool, and without
+        // this repair each would advertise no type at all.
         JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithBool), "flag");
 
         property["type"]!.GetValue<string>()
             .ShouldBe("boolean");
+    }
+
+    [Fact]
+    public void ShapeTheExporterStillEmits_IsLeftAlone()
+    {
+        // int has no custom converter, so the exporter emits its shape and every repair branch is guarded
+        // on !ContainsKey. A repair that overwrote here would silently retype a live parameter the moment
+        // one of an unclaimed type landed.
+        JsonObject property = ShouldHaveSchemaPropertyFor(nameof(Probe.WithInt), "count");
+
+        property["type"]!.GetValue<string>()
+            .ShouldBe("integer");
+    }
+
+    [Fact]
+    public void LiveBoolParameter_KeepsItsTypeDescriptionAndDefault()
+    {
+        // The repair puts back only the erased type, so the keywords the exporter still emits must survive
+        // it. Their order in the object shifts — `type` lands last rather than first — which is not
+        // something a client can read as meaning; their presence and values are.
+        JsonObject property = ShouldHaveLiveSchemaPropertyFor("arch_graph", "overview");
+
+        property["type"]!.GetValue<string>()
+            .ShouldBe("boolean");
+        property["default"]!.GetValue<bool>()
+            .ShouldBeFalse();
+        JsonNode? description = property["description"];
+        description.ShouldNotBeNull($"arch_graph.overview lost its description: {property.ToJsonString()}");
+        description.GetValue<string>()
+            .ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -218,6 +247,26 @@ public sealed class CoercedToolSchemaTests
                 options));
     }
 
+    /// <summary>
+    ///     The advertised schema node for <paramref name="parameterName" /> on the real
+    ///     <paramref name="toolName" />, so a claim about the repair can be made against a shipped
+    ///     parameter rather than a probe standing in for one.
+    /// </summary>
+    private static JsonObject ShouldHaveLiveSchemaPropertyFor(string toolName, string parameterName)
+    {
+        McpServerTool? tool = LiveArchTools()
+            .SingleOrDefault(candidate => candidate.ProtocolTool.Name == toolName);
+        tool.ShouldNotBeNull($"no live tool is named '{toolName}'");
+
+        JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
+        JsonNode? property = schema["properties"]?[parameterName];
+        property.ShouldNotBeNull($"{toolName} advertises no '{parameterName}' property: {schema.ToJsonString()}");
+        property.ShouldBeOfType<JsonObject>(
+            $"{toolName}.{parameterName} is not an object schema: {property.ToJsonString()}");
+
+        return property.AsObject();
+    }
+
     private static string[] EnumNamesOf(JsonObject property)
     {
         return property["enum"]!.AsArray()
@@ -268,7 +317,7 @@ public sealed class CoercedToolSchemaTests
 
     /// <summary>
     ///     Carries one parameter of every shape the repair handles, described and undescribed so both
-    ///     erasures are reachable, plus a <c>bool</c> the exporter still describes on its own and an
+    ///     erasures are reachable, plus an <c>int</c> the exporter still describes on its own and an
     ///     <c>object</c> no branch claims. Not discoverable as a real tool: <c>ToolAttributeDiscovery</c>
     ///     reflects over the CLI assembly, and this lives in the test assembly.
     /// </summary>
@@ -335,6 +384,11 @@ public sealed class CoercedToolSchemaTests
         public bool WithBool(bool flag)
         {
             return flag;
+        }
+
+        public int WithInt(int count)
+        {
+            return count;
         }
     }
 }

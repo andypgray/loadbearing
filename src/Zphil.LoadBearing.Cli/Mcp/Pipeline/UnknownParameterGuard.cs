@@ -1,8 +1,6 @@
 using System.Collections.Frozen;
 using System.Reflection;
 using System.Text.Json;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
 namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
@@ -35,7 +33,7 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///         names are not snake-cased — only the tool method name is), so reflection here is
 ///         identical to the advertised schema, not an approximation. Context/service-bound
 ///         parameters (everything the SDK binds rather than reading from JSON) are excluded;
-///         see <see cref="IsJsonBoundParameter" />.
+///         see <see cref="ToolAttributeDiscovery.IsJsonBoundParameter" />.
 ///     </para>
 /// </remarks>
 internal static class UnknownParameterGuard
@@ -76,7 +74,7 @@ internal static class UnknownParameterGuard
             if (method.GetCustomAttribute<McpServerToolAttribute>()?.Name is not { } toolName) continue;
 
             string[] orderedNames = method.GetParameters()
-                .Where(IsJsonBoundParameter)
+                .Where(ToolAttributeDiscovery.IsJsonBoundParameter)
                 .Select(p => p.Name!)
                 .ToArray();
 
@@ -86,33 +84,6 @@ internal static class UnknownParameterGuard
         }
 
         return map.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    ///     True when a parameter is bound from JSON arguments (and thus part of the advertised
-    ///     schema), false when the SDK binds it from request context or DI. In this server the only
-    ///     excluded type in practice is <see cref="CancellationToken" /> (every tool) — services
-    ///     arrive via primary constructors, not method parameters. The remaining types are excluded
-    ///     defensively, mirroring the SDK's own augmentation set, so a future context-bound parameter
-    ///     cannot become a false positive.
-    /// </summary>
-    private static bool IsJsonBoundParameter(ParameterInfo p)
-    {
-        Type t = p.ParameterType;
-
-        if (t == typeof(CancellationToken) || t == typeof(AIFunctionArguments)) return false;
-
-        if (typeof(IServiceProvider).IsAssignableFrom(t) || typeof(McpServer).IsAssignableFrom(t)) return false;
-
-        if (t.IsGenericType)
-        {
-            Type definition = t.GetGenericTypeDefinition();
-            if (definition == typeof(RequestContext<>) || definition == typeof(IProgress<>)) return false;
-        }
-
-        if (p.GetCustomAttribute<FromKeyedServicesAttribute>() is not null) return false;
-
-        return p.Name is not null;
     }
 
     private sealed record ToolParamInfo(string[] OrderedNames, FrozenSet<string> Lookup);

@@ -16,8 +16,6 @@ public sealed class NamespacePattern
 
     private readonly bool _matchesEverything;
 
-    private readonly string _pattern;
-
     private readonly string[]? _patternSegments;
 
     private readonly string? _subtreePrefix;
@@ -27,23 +25,24 @@ public sealed class NamespacePattern
     /// <summary>Creates a matcher for the given namespace glob.</summary>
     public NamespacePattern(string pattern)
     {
-        _pattern = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
+        string glob = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
 
         // The pattern is immutable, so the whole of what it means is invariant: which of the three shapes
         // it is, the subtree prefix and its `prefix + "."` probe, or the literal segments. Deriving it here
         // rather than inside Matches is what makes matching allocation-free — Matches runs once per type in
         // the universe, per pattern, per rule, and the alternative is a substring or a split per candidate.
-        _matchesEverything = _pattern == "*";
+        // Those three are the whole of what matching reads, so the glob text itself needs no field.
+        _matchesEverything = glob == "*";
         if (_matchesEverything) return;
 
-        if (TryParseSubtree(_pattern, out string prefix))
+        if (TryParseSubtree(glob, out string prefix))
         {
             _subtreePrefix = prefix;
             _subtreePrefixDot = prefix + ".";
             return;
         }
 
-        _patternSegments = _pattern.Split('.');
+        _patternSegments = glob.Split('.');
     }
 
     /// <summary>Validates a namespace glob at spec-build time (GRAMMAR §8 items 15–16).</summary>

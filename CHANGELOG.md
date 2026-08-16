@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-08-09
+### Fixed
+
+- **A flag spelled as a string is now coerced, instead of coming back as a server bug.**
+  `{"overview": "true"}` is the likeliest mis-spelling of an MCP flag and was the one shape the
+  forgiving-input layer did not cover: Web JSON defaults read numbers from strings but never
+  booleans, so the call returned a byte-position deserializer message — and, since that exception
+  is not one the error mapper recognises as user input, the server logged its own user error as an
+  unexpected one. `arch_graph`'s three flags now take `"true"`, `"False"` and `" TRUE "`, plus the
+  one-element array (`[true]`) their string siblings already forgave, and refuse everything else —
+  `"1"`, `"yes"`, a number, `null` — naming what they were sent rather than a byte offset. Those
+  last spellings are refused rather than guessed at: a caller who meant true has a word for it, and
+  the alternative is a coercer inventing a value nobody can watch it invent. The advertised schema is
+  unchanged, and a test now derives the covered set from the tool surface itself, so the next
+  parameter of a type nothing coerces fails the build rather than drifting silently.
+- **The docs no longer imply that installing the .NET 10 SDK is enough for `dnx` to resolve.**
+  `dnx` is a .NET 10 SDK command, and `dotnet` picks an SDK per directory from the nearest
+  `global.json`, so inside a repository pinning an SDK below 10 the command does not exist
+  however much .NET 10 is installed beside it — and a registry client launching there reports
+  a server that failed to start, with the reason on stderr alone. README and SECURITY.md now
+  state the precondition where the recipe appears and route pinned repositories to the
+  installed `loadbearing` tool, which needs the SDK installed on the machine rather than
+  selected in the working directory. `.mcp/server.json` stays as it is on purpose: `dnx` is
+  the launch shape the MCP registry defines for NuGet packages, and no manifest field can
+  express a global-tool install or override a consumer repository's SDK pin, so the manifest
+  serves the repositories that can use it and the prose carries the boundary.
 
 ### Added
 
