@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli;
@@ -19,6 +20,7 @@ internal sealed class SolutionHandle(
     WorkspaceDiagnostics loadDiagnostics,
     IDisposable? owned,
     Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
+    Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : IDisposable
 {
     /// <summary>The loaded, unresolved-reference-stripped solution the command reads.</summary>
@@ -56,6 +58,24 @@ internal sealed class SolutionHandle(
     /// </summary>
     public Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
         WarmCodebase { get; } = warmCodebase;
+
+    /// <summary>
+    ///     The warm path's spec-resolution memo, or null on the cold/one-shot path. When present (the warm
+    ///     MCP source), the resolution seam hands it the normalized <c>--spec</c> argument and the cold
+    ///     resolution as a callback, and gets back either a replay of the resolution this session already
+    ///     computed under the same load generation or the result of running that callback. It captures the
+    ///     session's <see cref="SpecResolutionCache" /> and this call's generation, which is what makes an
+    ///     edit to a <c>.cs</c> file free and a structural change a miss. Null falls straight through to the
+    ///     callback, so the CLI path resolves exactly as it always did.
+    /// </summary>
+    /// <remarks>
+    ///     The cold resolution goes down as a callback rather than the seam handing over its inputs, so
+    ///     everything resolution knows — which spec argument means what, which membership read serves both
+    ///     halves, how a failure surfaces — stays at that one seam, and the warm side contributes only the
+    ///     memo and the generation to stamp it with.
+    /// </remarks>
+    public Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? WarmSpecResolution { get; } =
+        warmSpecResolution;
 
     /// <summary>
     ///     Disposes the owned workspace on the cold path; a no-op when the source owns nothing — a warm

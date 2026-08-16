@@ -121,6 +121,10 @@ public static class CodebaseExtractor
         IEnumerable<Task<Compilation?>> compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
         Compilation?[] compilations = await Task.WhenAll(compilationTasks);
 
+        // One canonicalizer for the whole enumeration: every project's membership is tested against a
+        // canonicalized path, and the projects of one solution share nearly all of their ancestors.
+        var canonicalProjectFiles = new ProjectFileCanonicalizer();
+
         List<CompilationInput> inputs = [];
         for (var i = 0; i < projects.Count; i++)
         {
@@ -136,7 +140,8 @@ public static class CodebaseExtractor
 
             inputs.Add(new CompilationInput(
                 compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project),
-                SpecExclusion.SolutionMembershipOf(declaredMembers, project.FilePath)));
+                SpecExclusion.SolutionMembershipOf(
+                    declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath))));
         }
 
         return inputs;

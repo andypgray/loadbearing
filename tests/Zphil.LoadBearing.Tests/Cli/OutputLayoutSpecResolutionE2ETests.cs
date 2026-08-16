@@ -49,13 +49,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class OutputLayoutSpecResolutionE2ETests
 {
-    private const string SpecAssembly = "LayoutApp.Spec.dll";
+    private const string SpecAssembly = LayoutAppFixture.SpecAssembly;
 
-    private const string SpecProject = "LayoutApp.Spec";
+    private const string SpecProject = LayoutAppFixture.SpecProject;
 
-    // The fixture spec's one rule. Asserting the rendered verdict rather than a returned path is what makes
-    // the fact say the DLL was found *and* loaded *and* run.
-    private const string RuleId = "layout/naming-interfaces";
+    private const string RuleId = LayoutAppFixture.RuleId;
 
     // The field layout: a parent props file spelling the configuration into OutputPath. A props file is
     // imported before the SDK defaults Configuration, so the evaluation yields a flat `bin\` while every
@@ -69,10 +67,6 @@ public sealed class OutputLayoutSpecResolutionE2ETests
     // The other field layout. UseArtifactsOutput is only honoured from a Directory.Build.props, which is one
     // more reason the arm writes one rather than setting the property per project.
     private static readonly string[] ArtifactsLayout = ["<UseArtifactsOutput>true</UseArtifactsOutput>"];
-
-    // The contract the fixture spec compiles against: this assembly's own copy, so the spec's
-    // IArchitectureSpec is the identity the CLI's load context already carries rather than a second one.
-    private static string ContractPath => Path.Combine(AppContext.BaseDirectory, "Zphil.LoadBearing.dll");
 
     [Fact]
     public async Task Check_FlatOutputPathFromAParentPropsFile_ResolvesTheSpecTheBuildActuallyWrote()
@@ -138,10 +132,10 @@ public sealed class OutputLayoutSpecResolutionE2ETests
         // Dedicated, not leased: the leased copy resets by pruning anything the fixture source does not
         // contain, which would delete the build output the arm exists to produce.
         TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(
-            "OutputLayoutSolutions/LayoutApp", "LayoutApp.slnx", restore: false);
+            LayoutAppFixture.FixtureDirectory, LayoutAppFixture.SolutionFileName, restore: false);
         string workingDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
 
-        File.WriteAllText(workspace.PathOf("Directory.Build.props"), PropsFile(layoutProperties));
+        File.WriteAllText(workspace.PathOf("Directory.Build.props"), LayoutAppFixture.PropsFile(layoutProperties));
         FixtureRestorer.Restore(workspace.SolutionPath);
 
         // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
@@ -149,24 +143,5 @@ public sealed class OutputLayoutSpecResolutionE2ETests
         DotnetCli.Run($"build \"{workspace.SolutionPath}\" -c Release --disable-build-servers", workingDirectory);
 
         return workspace;
-    }
-
-    // The root props the arm writes: the layout under test, plus the one property the fixture spec project's
-    // <Reference> HintPath needs. Written rather than committed because the layout is the variable between
-    // the arms, and because a committed file could not name this assembly's output directory anyway.
-    private static string PropsFile(IEnumerable<string> layoutProperties)
-    {
-        var lines = new List<string>
-        {
-            "<Project>",
-            "    <PropertyGroup>",
-            $"        <LoadBearingContractPath>{ContractPath}</LoadBearingContractPath>"
-        };
-        IEnumerable<string> indented = layoutProperties.Select(property => "        " + property);
-        lines.AddRange(indented);
-        lines.Add("    </PropertyGroup>");
-        lines.Add("</Project>");
-
-        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
 }

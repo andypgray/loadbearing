@@ -9,7 +9,18 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     projects it references. Reduced to a tuple so the walk is unit-testable over synthetic graphs, with no
 ///     workspace and no disk.
 /// </summary>
-internal sealed record SpecExclusionProject(string Name, string? FilePath, IReadOnlyList<string> ProjectReferenceNames);
+/// <remarks>
+///     <see cref="CanonicalFilePath" /> is <see cref="FilePath" /> already canonicalized, for a producer that
+///     resolved it anyway — spec resolution holds every project's canonical spelling by the time it asks this
+///     walk anything. It is defaulted and trailing so the synthetic graphs stay two-and-a-list, which is the
+///     tuple shape that keeps the pure core testable with no disk: a slot only a workspace-backed caller can
+///     fill must not become one every caller has to spell.
+/// </remarks>
+internal sealed record SpecExclusionProject(
+    string Name,
+    string? FilePath,
+    IReadOnlyList<string> ProjectReferenceNames,
+    string? CanonicalFilePath = null);
 
 /// <summary>
 ///     Which projects a solution-member spec drops from the checked universe:
@@ -47,24 +58,16 @@ internal sealed record SpecExclusionProject(string Name, string? FilePath, IRead
 internal static class SpecExclusion
 {
     /// <summary>
-    ///     The exclusion set for <paramref name="specProjectName" />, reading the solution's declared
-    ///     membership from <paramref name="solutionPath" />. Callers that already needed the membership
-    ///     (spec resolution flags its candidates with it) pass their set to the overload instead of reading
-    ///     the file twice.
-    /// </summary>
-    internal static IReadOnlyCollection<string> Compute(Solution solution, string solutionPath, string specProjectName)
-    {
-        return Compute(solution, TryReadDeclaredMembers(solutionPath), specProjectName);
-    }
-
-    /// <summary>
     ///     The exclusion set for <paramref name="specProjectName" /> over a loaded
     ///     <paramref name="solution" />, against an already-read <paramref name="declaredMembers" /> set
-    ///     (<see langword="null" /> ⇒ membership unreadable ⇒ the <c>{spec project}</c> fallback).
+    ///     (<see langword="null" /> ⇒ membership unreadable ⇒ the <c>{spec project}</c> fallback). For a
+    ///     caller with no canonical view of the solution's project files; one that has already resolved them
+    ///     — spec resolution does — projects its own tuples and calls the pure core directly.
     /// </summary>
     internal static IReadOnlyCollection<string> Compute(
         Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName)
     {
+        var canonicalProjectFiles = new ProjectFileCanonicalizer();
         List<SpecExclusionProject> projects = solution.Projects
             .Select(project => new SpecExclusionProject(
                 project.Name,
@@ -73,7 +76,8 @@ internal static class SpecExclusion
                     .Select(reference => solution.GetProject(reference.ProjectId)?.Name)
                     .Where(name => !string.IsNullOrEmpty(name))
                     .Select(name => name!)
-                    .ToList()))
+                    .ToList(),
+                canonicalProjectFiles.Resolve(project.FilePath)))
             .ToList();
 
         return Compute(projects, declaredMembers, specProjectName);
@@ -103,7 +107,8 @@ internal static class SpecExclusion
             // A multi-targeted project arrives once per framework, under the one name the load boundary
             // normalized its Projects to; declared by any entry is declared, and its reference edges union.
             declaredByName[project.Name] = declaredByName.GetValueOrDefault(project.Name)
-                                           || IsDeclaredMember(declaredMembers, project.FilePath);
+                                           || IsDeclaredMember(
+                                               declaredMembers, project.FilePath, project.CanonicalFilePath);
         }
 
         var excluded = new SortedSet<string>(StringComparer.Ordinal) { specProjectName };
@@ -160,13 +165,35 @@ internal static class SpecExclusion
     /// <summary>
     ///     Whether <paramref name="projectFilePath" /> is one of <paramref name="declaredMembers" />.
     ///     Unreadable membership and an unknown project path both answer <see langword="true" />: neither
-    ///     disproves membership, and a false negative would silently shrink the checked universe.
+    ///     disproves membership, and a false negative would silently shrink the checked universe. A caller
+    ///     holding the canonical spelling already passes it as <paramref name="canonicalProjectFilePath" />
+    ///     rather than have it derived a second time.
     /// </summary>
-    internal static bool IsDeclaredMember(IReadOnlySet<string>? declaredMembers, string? projectFilePath)
+    /// <remarks>
+    ///     <para>
+    ///         <b>The canonical slot is a caller-honoured guarantee, and deliberately not a type-level one.</b>
+    ///         Canonicalizing probes the filesystem at every path segment, and spec resolution already holds
+    ///         every project's resolved spelling by the time it gets here — so deriving it again costs one such
+    ///         chain per project on every warm tool call, for an answer the caller has in hand. A newtype would
+    ///         make the promise checkable, and would also have to be threaded through
+    ///         <see cref="SpecExclusionProject" />, whose tuple shape is what keeps the pure core testable with
+    ///         no workspace and no disk. So the promise rides on the parameter's name: pass what
+    ///         <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or pass nothing.
+    ///     </para>
+    ///     <para>
+    ///         Nothing validates it, and nothing can afford to: a check that re-resolved in order to compare
+    ///         would pay exactly the walk the slot exists to avoid. A caller that passes a spelling the
+    ///         solution file never declared gets "not a member" — the silent-shrink direction this type says it
+    ///         must never be wrong in — which is why the slot is filled by the one caller that resolved the
+    ///         path itself and left null by everyone else.
+    ///     </para>
+    /// </remarks>
+    internal static bool IsDeclaredMember(
+        IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)
     {
         if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return true;
 
-        return declaredMembers.Contains(PathCanonicalizer.Resolve(projectFilePath));
+        return declaredMembers.Contains(canonicalProjectFilePath ?? PathCanonicalizer.Resolve(projectFilePath));
     }
 
     /// <summary>
@@ -181,10 +208,11 @@ internal static class SpecExclusion
     ///     an answer of "declared" that no solution file was ever read for would be an asserted fact with
     ///     nothing behind it. The two callers want opposite fallbacks, so they get two methods.
     /// </remarks>
-    internal static bool? SolutionMembershipOf(IReadOnlySet<string>? declaredMembers, string? projectFilePath)
+    internal static bool? SolutionMembershipOf(
+        IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)
     {
         if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return null;
 
-        return IsDeclaredMember(declaredMembers, projectFilePath);
+        return IsDeclaredMember(declaredMembers, projectFilePath, canonicalProjectFilePath);
     }
 }

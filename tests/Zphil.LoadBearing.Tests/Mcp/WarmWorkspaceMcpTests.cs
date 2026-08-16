@@ -3,6 +3,7 @@ using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -21,10 +22,21 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     net (it now runs warm by default); this suite pins the warm-specific behaviour that parity cannot see.
 /// </summary>
 /// <remarks>
-///     Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync(string[])" />, never the warm-by-default
-///     <see cref="CliRunner.InvokeAsync" />. The oracle in each case is a <em>freshly loaded</em> run over the
-///     edited tree: warm-equals-cold is the claim, so the reference side has to be genuinely cold or the
-///     comparison proves nothing.
+///     <para>
+///         Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync(string[])" />, never the
+///         warm-by-default <see cref="CliRunner.InvokeAsync" />. The oracle in each case is a <em>freshly loaded</em> run
+///         over the edited tree: warm-equals-cold is the claim, so the reference side has to be genuinely cold or the
+///         comparison proves nothing.
+///     </para>
+///     <para>
+///         <b>Two fixtures, and the second one is not interchangeable.</b> Most cases drive the MyApp copy
+///         with a prebuilt spec DLL, which is the cheap way to vary the checked universe. The two
+///         spec-resolution cases cannot: a <c>--spec &lt;dll&gt;</c> resolves before the workspace is touched,
+///         so it never reaches the walk they are about. They take
+///         <see cref="LayoutAppFixture">the output-layout fixture</see> instead — the only fixture solution
+///         that declares a spec project — and pay a real restore and build for it, once per class thanks to
+///         the lease.
+///     </para>
 /// </remarks>
 [Collection("Serial")]
 public sealed class WarmWorkspaceMcpTests
@@ -493,7 +505,123 @@ public sealed class WarmWorkspaceMcpTests
             .ShouldBe(coldCheck.Err.NormalizedTrimmed());
     }
 
+    [Fact]
+    public async Task ArchCheck_SpecResolvedWarm_ReplaysUntilAStructuralChangeInvalidatesIt()
+    {
+        // Arrange — a warm server over the only fixture solution that DECLARES a spec project, bound by the
+        // csproj that resolution has to walk the workspace to answer (the dogfooded shape: this repo's own
+        // .mcp.json binds --spec <csproj>). A --spec <dll> binding resolves with no workspace at all and
+        // would exercise none of this.
+        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        string specCsproj = workspace.PathOf(LayoutAppFixture.SpecProject, "LayoutApp.Spec.csproj");
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, specCsproj), Ct);
+        var resolutions = harness.Services.GetRequiredService<SpecResolutionCache>();
+
+        // Act/Assert — the first call pays the walk once.
+        string first = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        resolutions.FullResolveCount.ShouldBe(1);
+        RuleStatusOf(first, LayoutAppFixture.RuleId)
+            .ShouldBe("passed");
+
+        // …a second call with disk untouched replays it rather than walking again, and answers identically.
+        string second = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        resolutions.FullResolveCount.ShouldBe(1);
+        second.NormalizedTrimmed()
+            .ShouldBe(first.NormalizedTrimmed());
+
+        // …and so does a call after a source edit, which is the grain made visible. A .cs edit mints a fresh
+        // snapshot per changed document but no new load generation, so keying on snapshot identity would
+        // miss here — on exactly the per-edit hook this cache exists for — and spare nothing. The report
+        // still reflects the edit (the new unprefixed interface reds the fixture's one rule) and still
+        // matches a freshly cold run over the edited tree.
+        FixtureEdits.EditOnDisk(
+            workspace.PathOf("LayoutApp.Core", "ILedger.cs"),
+            source => FixtureEdits.SpliceMemberLine(source, "    public interface Reconciler { }"));
+        string edited = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
+            "check", workspace.SolutionPath, "--spec", specCsproj, "--no-cache", "--json");
+
+        resolutions.FullResolveCount.ShouldBe(1);
+        RuleStatusOf(edited, LayoutAppFixture.RuleId)
+            .ShouldBe("failed");
+        edited.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
+
+        // Act/Assert — a structural touch reloads the workspace wholesale, which is the one change that can
+        // move what resolution reads, so the next call walks again. The vector is the one
+        // ArchCheck_CsprojTouchedOnDisk_NextCallTripsExactlyOneReload already proves trips exactly one reload.
+        File.SetLastWriteTimeUtc(
+            workspace.PathOf("LayoutApp.Core", "LayoutApp.Core.csproj"), DateTime.UtcNow.AddSeconds(2));
+        CallToolResult afterReload = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+
+        resolutions.FullResolveCount.ShouldBe(2);
+        afterReload.IsError.ShouldNotBe(true);
+    }
+
+    [Fact]
+    public async Task ArchCheck_SpecOutputDeletedAfterWarming_RefusesExactlyAsTheColdCliDoes()
+    {
+        // Arrange — the same declared-spec fixture, resolved by convention this time (the other branch that
+        // has to walk the workspace), warmed with a real arch_check so the resolution is genuinely cached.
+        // ArchCheck_SpecDllDeletedMidSession_ReturnsSameErrorAsColdCli does NOT cover this: it binds a DLL
+        // and warms through spec-free arch_graph, so no resolution is ever recorded to go stale.
+        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, null), Ct);
+        var resolutions = harness.Services.GetRequiredService<SpecResolutionCache>();
+
+        (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        resolutions.FullResolveCount.ShouldBe(1);
+
+        // Act — delete the built spec output and re-check the still-warm server. The spec is loaded from
+        // bytes (SpecLoadNoLockTests pins that), so the file is deletable mid-session.
+        File.Delete(workspace.PathOf(
+            LayoutAppFixture.SpecProject, "bin", "Debug", "net10.0", LayoutAppFixture.SpecAssembly));
+        CallToolResult afterDelete = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+        CliResult coldCheck = await CliRunner.InvokeColdAsync(
+            "check", workspace.SolutionPath, "--no-cache", "--json");
+        // Named, not merely "some refusal": byte-equality against a cold run that had refused for another
+        // reason entirely — a spec project it could no longer find, say — would read exactly as green here.
+        coldCheck.ShouldRefuseWith(
+            $"The spec project '{LayoutAppFixture.SpecProject}' has no built output",
+            "Build the solution first (dotnet build).");
+
+        // Assert — only the candidate half is cached, so the built-output search still runs live on every
+        // call and the refusal is byte-identical to the cold CLI's in the same state. And the cache was not
+        // driven to a second walk to produce it: the replay refused, which is the point of the split.
+        afterDelete.IsError.ShouldBe(true);
+        afterDelete.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(coldCheck.Err.NormalizedTrimmed());
+        resolutions.FullResolveCount.ShouldBe(1);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
+
+    // The output-layout fixture, copied, restored and really built under the default layout. Leased per
+    // class, and the lease's reset leaves bin/ alone — so the copy, the restore and the build are paid by
+    // whichever of the two spec-resolution cases runs first and the other reuses the output. The build is
+    // re-run only when the spec assembly is absent, which is precisely the state the deleted-output case
+    // leaves behind.
+    private static TempFixtureWorkspace BuiltLayoutCopy()
+    {
+        var workspace = new TempFixtureWorkspace(
+            LayoutAppFixture.FixtureDirectory, LayoutAppFixture.SolutionFileName, restore: false);
+        LayoutAppFixture.WritePropsFile(workspace);
+
+        string specAssembly = workspace.PathOf(
+            LayoutAppFixture.SpecProject, "bin", "Debug", "net10.0", LayoutAppFixture.SpecAssembly);
+        if (File.Exists(specAssembly)) return workspace;
+
+        FixtureRestorer.Restore(workspace.SolutionPath);
+        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
+        // persistent worker that would wedge the output pipe.
+        DotnetCli.Run(
+            $"build \"{workspace.SolutionPath}\" --disable-build-servers",
+            Path.GetDirectoryName(workspace.SolutionPath)!);
+        return workspace;
+    }
 
     // Turns HomeController's tokenless Save into one accepting a CancellationToken — the compliant signature,
     // so its member-shape red under async/accept-cancellation clears (its DocId changes as the parameter joins

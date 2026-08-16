@@ -137,6 +137,10 @@ internal static class McpServerCommand
         // against the DLLs they came from. Registered unconditionally for the same reason as the store.
         services.AddSingleton(_ => new SpecModelCache());
 
+        // And the walk that produces those DLL paths, stamped against the load generation it was computed
+        // under. Same lifetime, same unconditional registration.
+        services.AddSingleton(_ => new SpecResolutionCache());
+
         services.AddSingleton<ISolutionSource>(provider =>
         {
             var environment = provider.GetRequiredService<IEnvironment>();
@@ -145,8 +149,9 @@ internal static class McpServerCommand
             var session = provider.GetRequiredService<WorkspaceSession>();
             var store = provider.GetRequiredService<SessionFragmentStore>();
             var specs = provider.GetRequiredService<SpecModelCache>();
+            var resolutions = provider.GetRequiredService<SpecResolutionCache>();
             ServerShutdown.RegisterDisposer(session.DisposeAsync);
-            return new WarmSolutionSource(session, store, specs);
+            return new WarmSolutionSource(session, store, specs, resolutions);
         });
     }
 

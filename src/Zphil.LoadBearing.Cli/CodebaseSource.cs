@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
@@ -372,19 +373,49 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
         try
         {
-            // Forced here and travelling on as the same Lazy, so what resolution read is what extraction gets.
-            var declaredMembers = new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
-            SpecResolution resolution = SpecResolver.Resolve(
-                handle.Solution, declaredMembers.Value, spec, handle.LoadDiagnostics);
-            ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
+            SessionSpecResolution resolved = ResolveSpec(handle, solutionPath, spec, normalizedSpec);
+            ArchitectureModel model = source.LoadSpecModel(resolved.Resolution.DllPath);
+            // The membership set travels on as the one resolution read (or replayed), so what resolution
+            // saw is what extraction gets — already computed, hence the value-taking Lazy.
             return new CodebaseSource(
-                outcome, solutionPath, handle.LoadDiagnostics, model, resolution, handle, store, cacheRead,
-                normalizedSpec, declaredMembers);
+                outcome, solutionPath, handle.LoadDiagnostics, model, resolved.Resolution, handle, store, cacheRead,
+                normalizedSpec, new Lazy<IReadOnlySet<string>?>(resolved.DeclaredMembers));
         }
         catch
         {
             handle.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    ///     Resolves the spec against the acquired handle, through the session's memo where the handle
+    ///     carries one (<see cref="SolutionHandle.WarmSpecResolution" />) and cold where it does not.
+    /// </summary>
+    /// <remarks>
+    ///     A prebuilt-DLL <c>--spec</c> is answered first, before the memo is consulted at all — exactly as
+    ///     <see cref="ResolveSpecOnHit" /> answers it first. That branch needs no workspace and no walk, so
+    ///     there is nothing for a cache to spare; and replaying it would refuse in the built-output search's
+    ///     words, which name a spec project a DLL spec does not have.
+    /// </remarks>
+    private static SessionSpecResolution ResolveSpec(
+        SolutionHandle handle, string solutionPath, string? spec, string normalizedSpec)
+    {
+        if (SpecResolver.TryResolveWithoutSolution(spec) is { } dllResolution)
+            return new SessionSpecResolution(dllResolution, SpecExclusion.TryReadDeclaredMembers(solutionPath));
+
+        return handle.WarmSpecResolution is { } warm
+            ? warm(normalizedSpec, ResolveFully)
+            : ResolveFully();
+
+        // The cold resolution, and the only reader of the solution's declared membership on this path: both
+        // halves need the same set, so it is read once here and travels out with the resolution.
+        SessionSpecResolution ResolveFully()
+        {
+            IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+            SpecResolution resolution = SpecResolver.Resolve(
+                handle.Solution, declaredMembers, spec, handle.LoadDiagnostics);
+            return new SessionSpecResolution(resolution, declaredMembers);
         }
     }
 
@@ -409,7 +440,9 @@ internal sealed class CodebaseSource : IDisposable
     /// <remarks>
     ///     The recorded intermediate assembly path is replayed rather than left null, because that is what
     ///     makes the search's refusal of an intermediate result identical on both paths: without it a hit
-    ///     would answer with the <c>obj</c>-side assembly a cold run refuses.
+    ///     would answer with the <c>obj</c>-side assembly a cold run refuses. That whole live half runs
+    ///     through <see cref="SpecResolver.Replay" />, the one owner the warm session's
+    ///     <see cref="SpecResolutionCache" /> replays through too.
     /// </remarks>
     internal static SpecResolution? ResolveSpecOnHit(string? spec, IReadOnlyList<SpecResolutionRecord> records)
     {
@@ -419,10 +452,8 @@ internal sealed class CodebaseSource : IDisposable
         SpecResolutionRecord? record = records.FirstOrDefault(r => string.Equals(r.NormalizedSpecArgument, normalized, StringComparison.Ordinal));
         if (record is null) return null;
 
-        string dll = SpecResolver.RequireBuiltOutput(
-            record.SpecProjectName ?? normalized, record.OutputFilePaths, record.IntermediateAssemblyPath);
-        return new SpecResolution(
-            dll, record.SpecProjectName, record.ExcludeProjectNames, record.OutputFilePaths,
+        return SpecResolver.Replay(
+            record.SpecProjectName, normalized, record.ExcludeProjectNames, record.OutputFilePaths,
             record.IntermediateAssemblyPath);
     }
 

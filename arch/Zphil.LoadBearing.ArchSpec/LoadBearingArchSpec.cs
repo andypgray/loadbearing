@@ -173,9 +173,9 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Enforce(arch.Registered(Lifetime.Singleton).InNamespace("Zphil.LoadBearing.*")
                 .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
             .Because("The MCP server is one long-lived process wired all-singleton by design (IEnvironment, " +
-                     "WorkspaceSession, SessionFragmentStore, ISolutionSource); a scoped or transient service " +
-                     "injected into a singleton is captured for the whole process and silently shared across " +
-                     "every tool call.")
+                     "WorkspaceSession, SessionFragmentStore, SpecModelCache, SpecResolutionCache, " +
+                     "ISolutionSource); a scoped or transient service injected into a singleton is captured " +
+                     "for the whole process and silently shared across every tool call.")
             .Fix("Keep singletons depending only on singletons; resolve any scoped or transient work per call " +
                  "inside an IServiceScopeFactory scope instead of injecting it into the singleton.");
 
@@ -262,10 +262,14 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                 .Except(arch.Types.WithNameMatching("McpServerCommand"))
                 .MustNotConstruct(
                     arch.Type<WorkspaceSession>(),
-                    arch.Types.WithNameMatching("SessionFragmentStore")))
-            .Because("The warm server holds exactly one workspace session and one fragment store for " +
-                     "its lifetime; a second construction forks the reconcile state and the caches " +
-                     "silently diverge.")
+                    arch.Types.WithNameMatching("SessionFragmentStore"),
+                    arch.Types.WithNameMatching("SpecModelCache"),
+                    arch.Types.WithNameMatching("SpecResolutionCache")))
+            .Because("The warm server holds exactly one of each piece of session state for its lifetime — " +
+                     "the workspace session, the fragment store, and the two spec caches that hang off the " +
+                     "same load. A second construction forks the reconcile state and the caches silently " +
+                     "diverge: the fork answers from an empty cache while the real one keeps ratcheting, so " +
+                     "the cost the cache exists to remove comes back and nothing reports it.")
             .Fix("Resolve them from DI; only McpServerCommand's composition root constructs them.");
 
         arch.Rule("roslyn/no-engine-types-on-seam")

@@ -19,10 +19,15 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///     The extraction seam consults it instead of re-extracting the whole solution on every tool call.
 ///     <see cref="LoadSpecModel" /> is the same idea on the other input: the spec's model is cached against
 ///     its DLL's file stamp, so a server answering a hook on every edit reloads it only when the spec
-///     project is rebuilt.
+///     project is rebuilt. The handle's spec-resolution memo closes the gap between the two — the walk that
+///     produces the DLL path in the first place, stamped with this call's load generation, so it is re-run
+///     only when a structural change has already forced a reload.
 /// </remarks>
-internal sealed class WarmSolutionSource(WorkspaceSession session, SessionFragmentStore store, SpecModelCache specs)
-    : ISolutionSource
+internal sealed class WarmSolutionSource(
+    WorkspaceSession session,
+    SessionFragmentStore store,
+    SpecModelCache specs,
+    SpecResolutionCache resolutions) : ISolutionSource
 {
     /// <inheritdoc />
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
@@ -31,6 +36,7 @@ internal sealed class WarmSolutionSource(WorkspaceSession session, SessionFragme
         return new SolutionHandle(
             snapshot.Solution, solutionPath, snapshot.LoadDiagnostics, null,
             (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
+            (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
             snapshot.TargetFrameworks);
     }
 

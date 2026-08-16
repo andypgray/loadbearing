@@ -50,6 +50,20 @@ public static class PathCanonicalizer
         return current;
     }
 
+    /// <summary>
+    ///     Whether <paramref name="path" /> is itself a reparse point — the single probe
+    ///     <see cref="Resolve" /> makes before it starts climbing, asked on its own.
+    /// </summary>
+    /// <remarks>
+    ///     For a caller that has already resolved every ancestor and only needs to know whether the leaf can
+    ///     be reattached as-is. A <c>.csproj</c> that is a symlink resolves here exactly as a directory does,
+    ///     which is precisely why the question has to be asked rather than assumed away.
+    /// </remarks>
+    internal static bool IsLink(string path)
+    {
+        return TryResolveLinkTarget(new DirectoryInfo(path)) is not null;
+    }
+
     // Walks ancestors leaf→root; at the first (deepest) symlinked ancestor, returns the path with that
     // ancestor replaced by its final target and the remainder reattached. Returns null when no ancestor
     // is a symlink.

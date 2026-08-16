@@ -142,7 +142,7 @@ internal static class SpecResolver
                     "Pass a built spec DLL or a csproj that is a member of the target solution.");
 
             BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
-            return MemberResolution(solution, declaredMembers, sharingProjects[0].Project.Name, built);
+            return MemberResolution(solution, projects, declaredMembers, sharingProjects[0].Project.Name, built);
         }
 
         // A DLL path — the branch that needs no solution.
@@ -161,14 +161,14 @@ internal static class SpecResolver
                 ReferencePathsOf(entry.Project, solution),
                 entry.Project.OutputFilePath,
                 entry.Project.FilePath,
-                SpecExclusion.IsDeclaredMember(declaredMembers, entry.Project.FilePath),
+                SpecExclusion.IsDeclaredMember(declaredMembers, entry.Project.FilePath, entry.CanonicalFilePath),
                 entry.Project.CompilationOutputInfo.AssemblyPath))
             .ToList();
 
         SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
         BuiltOutputInputs built = BuiltOutputsOfProjectFile(
             projects, chosen.FilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
-        return MemberResolution(solution, declaredMembers, chosen.Name, built);
+        return MemberResolution(solution, projects, declaredMembers, chosen.Name, built);
     }
 
     // The shared tail of both solution-member branches: the built DLL plus the projects the checked universe
@@ -178,6 +178,7 @@ internal static class SpecResolver
     // ride on to the extraction cache, which has to record the set the search actually consumed.
     private static SpecResolution MemberResolution(
         Solution solution,
+        IReadOnlyList<CanonicalProject> projects,
         IReadOnlySet<string>? declaredMembers,
         string specProjectName,
         BuiltOutputInputs built)
@@ -187,9 +188,34 @@ internal static class SpecResolver
         return new SpecResolution(
             RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
             specProjectName,
-            SpecExclusion.Compute(solution, declaredMembers, specProjectName),
+            SpecExclusion.Compute(ExclusionProjectsOf(solution, projects), declaredMembers, specProjectName),
             evaluatedPaths,
             built.IntermediateAssemblyPath);
+    }
+
+    // The exclusion walk's view of the solution, projected off this resolution's own canonical view rather
+    // than re-derived from the workspace: the walk's membership test canonicalizes each project file, and
+    // every one of those paths is already resolved here. Calling the pure core directly is what carries the
+    // canonical spelling in — the workspace-taking overload has no view to carry.
+    private static List<SpecExclusionProject> ExclusionProjectsOf(
+        Solution solution, IReadOnlyList<CanonicalProject> projects)
+    {
+        return projects
+            .Select(entry => new SpecExclusionProject(
+                entry.Project.Name,
+                entry.Project.FilePath,
+                ReferencedProjectNames(entry.Project, solution),
+                entry.CanonicalFilePath))
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ReferencedProjectNames(Project project, Solution solution)
+    {
+        return project.ProjectReferences
+            .Select(reference => solution.GetProject(reference.ProjectId)?.Name)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => name!)
+            .ToList();
     }
 
     // Both built-output facts about one project file, from one pass over the solution.
@@ -433,6 +459,46 @@ internal static class SpecResolver
             $"The spec project '{projectName}' has no built output" +
             (evaluatedPaths.Count == 0 ? "" : $" at '{string.Join("' or '", evaluatedPaths)}'") +
             ". Build the solution first (dotnet build).");
+    }
+
+    /// <summary>
+    ///     Replays a recorded resolution: the candidate half is kept exactly as recorded, and only the built
+    ///     output is resolved again — live, against disk, through the same
+    ///     <see cref="RequireBuiltOutput" /> a cold run uses.
+    /// </summary>
+    /// <remarks>
+    ///     The one owner of that split, because two caches now need it. The persisted extraction cache
+    ///     replays a record it read off disk; the warm session replays a resolution it computed under an
+    ///     earlier tool call. Both hold a candidate half derived from a workspace they no longer have, and a
+    ///     spec output that has since been rebuilt, moved or deleted has to answer in the cold run's words —
+    ///     the bounded search from the output root, what that search refuses, and its refusal text. Running
+    ///     that half here rather than in each caller is what makes the two agreeing structural instead of a
+    ///     thing to remember.
+    /// </remarks>
+    /// <param name="specProjectName">The recorded spec project's name, or null when the record has none.</param>
+    /// <param name="fallbackProjectName">
+    ///     What a refusal names when <paramref name="specProjectName" /> is null — the normalized
+    ///     <c>--spec</c> argument, which is the only spelling of the spec the reader ever typed.
+    /// </param>
+    /// <param name="excludeProjectNames">The recorded exclusion set, carried through untouched.</param>
+    /// <param name="outputFilePaths">The recorded evaluated output paths the search chooses from.</param>
+    /// <param name="intermediateAssemblyPath">
+    ///     The recorded <c>obj</c>-side assembly the search refuses a result under. Replayed rather than
+    ///     dropped, because without it a replay answers with the intermediate a cold run refuses.
+    /// </param>
+    internal static SpecResolution Replay(
+        string? specProjectName,
+        string fallbackProjectName,
+        IReadOnlyCollection<string> excludeProjectNames,
+        IReadOnlyList<string>? outputFilePaths,
+        string? intermediateAssemblyPath)
+    {
+        IReadOnlyList<string> evaluatedPaths = outputFilePaths ?? [];
+        string dllPath = RequireBuiltOutput(
+            specProjectName ?? fallbackProjectName, evaluatedPaths, intermediateAssemblyPath);
+
+        return new SpecResolution(
+            dllPath, specProjectName, excludeProjectNames, evaluatedPaths, intermediateAssemblyPath);
     }
 
     // The evaluated output paths in the one order the built-output search consumes them: blanks dropped,

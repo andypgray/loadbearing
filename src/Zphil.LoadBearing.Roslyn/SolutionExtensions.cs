@@ -97,16 +97,16 @@ internal static class SolutionExtensions
     public static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks)
         NormalizeProjectNames(this Solution solution)
     {
-        var resolvedDirectories = new Dictionary<string, string>(PathComparison.Comparer);
+        var canonicalProjectFiles = new ProjectFileCanonicalizer();
         var byProjectFile = new Dictionary<string, List<Project>>(StringComparer.Ordinal);
         foreach (Project project in solution.Projects)
         {
             // A project with no file path cannot be grouped with anything: folding the unknown-path projects
             // together would decorate genuinely unrelated projects, and '\0' cannot occur in a path so the
             // per-project sentinel cannot collide with a real key.
-            string key = string.IsNullOrEmpty(project.FilePath)
-                ? $"\0{project.Id.Id}"
-                : PathComparison.Fold(CanonicalProjectFile(project.FilePath, resolvedDirectories));
+            string key = canonicalProjectFiles.Resolve(project.FilePath) is { } canonicalFile
+                ? PathComparison.Fold(canonicalFile)
+                : $"\0{project.Id.Id}";
 
             if (!byProjectFile.TryGetValue(key, out List<Project>? group)) byProjectFile[key] = group = [];
             group.Add(project);
@@ -133,26 +133,6 @@ internal static class SolutionExtensions
         }
 
         return (solution, targetFrameworks);
-    }
-
-    // Canonicalization probes every ancestor of a path for reparse points, and the projects of one solution
-    // share nearly all of theirs — so the walk is paid once per directory and reused, which is the difference
-    // between one probe chain and one per project on a large solution. The leaf file name has no ancestors of
-    // its own to resolve, so reattaching it to the resolved directory is the same answer. A path with no
-    // directory part cannot be memoized and keeps the whole-path resolve, which is also what makes it absolute.
-    private static string CanonicalProjectFile(string projectFilePath, Dictionary<string, string> resolvedDirectories)
-    {
-        string? directory = Path.GetDirectoryName(projectFilePath);
-        if (string.IsNullOrEmpty(directory)) return PathCanonicalizer.Resolve(projectFilePath);
-
-        if (!resolvedDirectories.TryGetValue(directory, out string? resolvedDirectory))
-        {
-            resolvedDirectory = PathCanonicalizer.Resolve(directory);
-            resolvedDirectories[directory] = resolvedDirectory;
-        }
-
-        string fileName = Path.GetFileName(projectFilePath);
-        return Path.Combine(resolvedDirectory, fileName);
     }
 
     // The MSBuild arm. MSBuildProjectLoader spells a discriminated project exactly
