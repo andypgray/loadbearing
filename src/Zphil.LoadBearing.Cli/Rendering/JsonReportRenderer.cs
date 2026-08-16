@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -17,9 +18,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         dependency-free; the options are the shared <see cref="LoadBearingJson.Options" />.
 ///     </para>
 ///     <para>
-///         Composing the document and writing it are separate calls so a caller with a response budget can
-///         measure the report and, if it overruns, re-compose it one grain coarser from the same result
-///         model — one check, two renders, and never a document cut mid-array.
+///         The document is composed as a string rather than written straight out, so a caller with a
+///         response budget can measure the report and, if it overruns, re-compose it one grain coarser from
+///         the same result model — one check, two renders, and never a document cut mid-array.
 ///     </para>
 /// </remarks>
 internal static class JsonReportRenderer
@@ -28,6 +29,9 @@ internal static class JsonReportRenderer
     ///     The report document as a string. <paramref name="grain" /> decides how much of each rule is
     ///     rendered and stamps itself on the document; the counts in <c>summary</c> are of what the run
     ///     evaluated and never move with it, so a coarser report still totals the same solution.
+    ///     <paramref name="workspaceDiagnostics" /> is the rendered stream the caller composed (with or
+    ///     without merge notes) and <paramref name="diagnostics" /> the load's own verdict, whose project
+    ///     lists become the trust stamps.
     /// </summary>
     public static string Document(
         CheckReport report,
@@ -36,20 +40,17 @@ internal static class JsonReportRenderer
         string specAssembly,
         string? diffBase,
         IReadOnlyList<string> workspaceDiagnostics,
-        bool modelIncomplete,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects,
+        WorkspaceDiagnostics diagnostics,
         IReadOnlyList<string> rulesFilter,
         DocumentGrain grain)
     {
         // One relativizer for the whole document: the base directory is the same string for every site,
         // and normalizing plus splitting it is the constant half of the walk.
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
-        // Named throughout: five adjacent slots are IReadOnlyList<string>, so a positional call would let a
-        // slot reorder swap two project lists past the compiler and out to the wire. The arguments mirror
-        // the record's declaration order for a reader's sake only — the key order is the record's to state.
+        // Every argument is named, which is what holds the four trust slots to the record's declaration
+        // order for a reader; the key order is the DTO's to state.
         var document = new CheckJson(
             SchemaVersion: 3,
             Solution: solutionName,
@@ -57,10 +58,10 @@ internal static class JsonReportRenderer
             Grain: DocumentGrains.Wire(grain),
             DiffBase: diffBase,
             RulesFilter: rulesFilter.Count > 0 ? rulesFilter : null,
-            ModelIncomplete: modelIncomplete ? true : null,
-            FailedProjects: RelativeProjects(failedProjects, relativizer),
-            UncheckedProjects: RelativeProjects(uncheckedProjects, relativizer),
-            RestoreFailedProjects: RelativeProjects(restoreFailedProjects, relativizer),
+            ModelIncomplete: trust.ModelIncomplete,
+            FailedProjects: trust.FailedProjects,
+            UncheckedProjects: trust.UncheckedProjects,
+            RestoreFailedProjects: trust.RestoreFailedProjects,
             Summary: new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -72,28 +73,6 @@ internal static class JsonReportRenderer
             WorkspaceDiagnostics: workspaceDiagnostics);
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson);
-    }
-
-    /// <summary>Writes a composed document as the run's stdout line.</summary>
-    public static void Render(TextWriter output, string document)
-    {
-        output.WriteLine(document);
-    }
-
-    /// <summary>
-    ///     A project list as the documents carry it — solution-relative and forward-slashed, like every
-    ///     other path in them, so a machine path never lands in a document a golden pins — or null when the
-    ///     list is empty, which omits the key entirely. Shared by all three documents and by all three of
-    ///     their project slots: what failed to load, what failed to restore, and what a solution filter left
-    ///     unchecked.
-    /// </summary>
-    internal static IReadOnlyList<string>? RelativeProjects(
-        IReadOnlyList<string> projects, PathFormat.Relativizer relativizer)
-    {
-        return projects.Count == 0
-            ? null
-            : projects.Select(relativizer.Relative)
-                .ToList();
     }
 
     // Everything above the violations survives every rung: the id, the verdict, the prose, the baseline and

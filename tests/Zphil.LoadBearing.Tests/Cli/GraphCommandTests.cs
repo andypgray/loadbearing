@@ -223,7 +223,7 @@ public sealed class GraphCommandTests
         int overviewLength = await LengthAt(DocumentGrain.Overview);
 
         // Act
-        await Runner(degraded, Budgeted(overviewLength))
+        await Runner(degraded, FixedResponseBudget.Fitter(overviewLength))
             .RunAsync(Request(), Ct);
         await Runner(overview)
             .RunAsync(Request(DocumentGrain.Overview), Ct);
@@ -251,7 +251,7 @@ public sealed class GraphCommandTests
         var skeleton = new StringWriter();
 
         // Act
-        await Runner(degraded, Budgeted(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(500))
             .RunAsync(Request(), Ct);
         await Runner(skeleton)
             .RunAsync(Request(DocumentGrain.Skeleton), Ct);
@@ -274,7 +274,7 @@ public sealed class GraphCommandTests
         var degraded = new StringWriter();
 
         // Act
-        await Runner(degraded, Budgeted(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(500))
             .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert
@@ -292,7 +292,7 @@ public sealed class GraphCommandTests
         var withoutBudget = new StringWriter();
 
         // Act
-        await Runner(withBudget, Budgeted(100_000))
+        await Runner(withBudget, FixedResponseBudget.Fitter(100_000))
             .RunAsync(Request(), Ct);
         await Runner(withoutBudget)
             .RunAsync(Request(), Ct);
@@ -348,7 +348,7 @@ public sealed class GraphCommandTests
         var output = new StringWriter();
 
         // Act — the runner degrades against the budget, then the truncator sees what it produced.
-        await Runner(output, Budgeted(budget))
+        await Runner(output, FixedResponseBudget.Fitter(budget))
             .RunAsync(Request(), Ct);
         string document = output.ToString()
             .TrimEnd('\r', '\n');
@@ -370,7 +370,7 @@ public sealed class GraphCommandTests
         var output = new StringWriter();
 
         // Act
-        await Runner(output, Budgeted(belowSkeleton))
+        await Runner(output, FixedResponseBudget.Fitter(belowSkeleton))
             .RunAsync(Request(), Ct);
         string document = output.ToString()
             .TrimEnd('\r', '\n');
@@ -390,13 +390,6 @@ public sealed class GraphCommandTests
     private static GraphRunner Runner(TextWriter output, IResponseFitter? fitter = null)
     {
         return new GraphRunner(output, TextWriter.Null, WarmWorkspacePool.Source, fitter: fitter);
-    }
-
-    // The MCP server's fitter at a budget named in characters, which is what these rows reason in: the
-    // production budget arrives in tokens and cannot express "one character below the skeleton document".
-    private static IResponseFitter Budgeted(int maxChars)
-    {
-        return new BudgetedResponseFitter(new FixedResponseBudget(maxChars));
     }
 
     // The composed document's length, not the writer's: the runner measures the document against the budget

@@ -194,7 +194,7 @@ public static class ArchChecker
     {
         var ordered = Order(violations);
         RuleStatus status = ordered.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
-        return new RuleResult(rule, status, ordered, warnings, null, Array.Empty<Violation>(), 0, false);
+        return new RuleResult(rule, status, ordered, warnings);
     }
 
     // The ratchet, shared by Migrate and Quarantine containment: a violation whose identity
@@ -228,12 +228,21 @@ public static class ArchChecker
 
         var orderedRed = Order(red);
         var orderedGrandfathered = OrderPairs(grandfatheredPairs);
+
+        // Split in one pass so the two lists are index-aligned by construction: Grandfathered[i] is the
+        // violation the entry at GrandfatheredEntries[i] blessed.
+        var grandfathered = new List<Violation>(orderedGrandfathered.Count);
+        var grandfatheredEntries = new List<BaselineEntry>(orderedGrandfathered.Count);
+        for (var i = 0; i < orderedGrandfathered.Count; i++)
+        {
+            grandfathered.Add(orderedGrandfathered[i].Violation);
+            grandfatheredEntries.Add(orderedGrandfathered[i].Entry);
+        }
+
         int stale = section is null ? 0 : section.Count - matched.Count;
         RuleStatus status = orderedRed.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
         return new RuleResult(
-            rule, status, orderedRed, warnings, null,
-            orderedGrandfathered.Select(p => p.Violation).ToList(), stale, captured,
-            orderedGrandfathered.Select(p => p.Entry).ToList());
+            rule, status, orderedRed, warnings, null, grandfathered, stale, captured, grandfatheredEntries);
     }
 
     // The Quarantine tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
@@ -258,7 +267,7 @@ public static class ArchChecker
             .Select(path => new CheckWarning(CheckWarningKind.QuarantinedScopeTouched, TripwireMessage(path, scopeId)))
             .ToList();
 
-        return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched, null, Array.Empty<Violation>(), 0, false);
+        return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched);
     }
 
     private static string TripwireMessage(string relativePath, string scopeId)
@@ -286,32 +295,27 @@ public static class ArchChecker
         bool captured = rule.BaselinePath is not null && baselines.TryGet(rule.Id, out _);
         return new RuleResult(
             rule, RuleStatus.Skipped, Array.Empty<Violation>(), warnings, narrowing.RuleSkipReason,
-            Array.Empty<Violation>(), 0, captured);
+            baselineCaptured: captured);
     }
 
     private static RuleResult Skipped(ArchRule rule, string reason)
     {
-        return new RuleResult(
-            rule, RuleStatus.Skipped, Array.Empty<Violation>(), Array.Empty<CheckWarning>(), reason,
-            Array.Empty<Violation>(), 0, false);
+        return new RuleResult(rule, RuleStatus.Skipped, Array.Empty<Violation>(), skipReason: reason);
     }
 
     private static RuleResult Errored(ArchRule rule, string detail)
     {
-        return new RuleResult(
-            rule, RuleStatus.Failed, new[] { Violation.RuleError(detail) }, Array.Empty<CheckWarning>(), null,
-            Array.Empty<Violation>(), 0, false);
+        return new RuleResult(rule, RuleStatus.Failed, new[] { Violation.RuleError(detail) });
     }
 
-    // Deterministic within-rule order: (Source|Subject FullName, Target FullName, Member SymbolId),
-    // ordinal. A MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
-    // MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId).
+    // Deterministic within-rule order: Violation.OrderKey, compared ordinal slot by slot (never as a
+    // tuple, whose default string comparison is culture-sensitive).
     private static IReadOnlyList<Violation> Order(IReadOnlyList<Violation> violations)
     {
         return violations
-            .OrderBy(OrderPrimary, StringComparer.Ordinal)
-            .ThenBy(OrderSecondary, StringComparer.Ordinal)
-            .ThenBy(OrderTertiary, StringComparer.Ordinal)
+            .OrderBy(v => v.OrderKey.Primary, StringComparer.Ordinal)
+            .ThenBy(v => v.OrderKey.Secondary, StringComparer.Ordinal)
+            .ThenBy(v => v.OrderKey.Tertiary, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -322,32 +326,9 @@ public static class ArchChecker
         List<(Violation Violation, BaselineEntry Entry)> pairs)
     {
         return pairs
-            .OrderBy(p => OrderPrimary(p.Violation), StringComparer.Ordinal)
-            .ThenBy(p => OrderSecondary(p.Violation), StringComparer.Ordinal)
-            .ThenBy(p => OrderTertiary(p.Violation), StringComparer.Ordinal)
+            .OrderBy(p => p.Violation.OrderKey.Primary, StringComparer.Ordinal)
+            .ThenBy(p => p.Violation.OrderKey.Secondary, StringComparer.Ordinal)
+            .ThenBy(p => p.Violation.OrderKey.Tertiary, StringComparer.Ordinal)
             .ToList();
-    }
-
-    // The three ordinal sort keys, single-sourced so Order and OrderPairs cannot drift.
-    private static string OrderPrimary(Violation violation)
-    {
-        return (violation.Source ?? violation.Subject)?.FullName ?? MemberDeclaringFullName(violation);
-    }
-
-    private static string OrderSecondary(Violation violation)
-    {
-        return violation.Target?.FullName ?? string.Empty;
-    }
-
-    private static string OrderTertiary(Violation violation)
-    {
-        return violation.Member?.SymbolId ?? violation.SubjectMember?.SymbolId ?? string.Empty;
-    }
-
-    // A MemberShape violation's declaring-type FullName — its primary sort key (empty for every other kind,
-    // which already sort on Source/Subject). The declaring type is always the owning TypeNode.
-    private static string MemberDeclaringFullName(Violation violation)
-    {
-        return violation.SubjectMember is { } member ? ((TypeNode)member.DeclaringType).FullName : string.Empty;
     }
 }

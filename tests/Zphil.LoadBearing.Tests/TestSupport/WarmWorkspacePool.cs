@@ -172,24 +172,20 @@ internal static class WarmWorkspacePool
     private sealed record Entry(string Key, WorkspaceSession Session);
 
     /// <summary>
-    ///     The pool behind the <see cref="ISolutionSource" /> seam: discover exactly as the cold path does
-    ///     (so a discovery failure raises the byte-identical <see cref="UserErrorException" />), then serve
-    ///     the pooled session's reconciled snapshot.
+    ///     The pool behind the <see cref="ISolutionSource" /> seam: serve the pooled session's reconciled
+    ///     snapshot for the solution the caller has already discovered.
     /// </summary>
     private sealed class PooledSolutionSource : ISolutionSource
     {
-        public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+        public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
         {
-            string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
             WorkspaceSnapshot snapshot = await GetCurrentAsync(solutionPath, ct);
-            // Every field the snapshot carries, including the two load-report ones: composed without them,
-            // no warm-pool test could ever observe a failed project, a narrowed universe, or the stamps and
-            // refusals keyed on either — the pool would silently answer "nothing to report" for both.
+            // The snapshot's whole load verdict, not a hand-picked part of it: composed without the project
+            // lists, no warm-pool test could ever observe a failed project, a narrowed universe, or the
+            // stamps and refusals keyed on either — the pool would silently answer "nothing to report".
             return new SolutionHandle(
-                snapshot.Solution, solutionPath, snapshot.Diagnostics, null,
-                targetFrameworks: snapshot.TargetFrameworks,
-                failedProjects: snapshot.FailedProjects,
-                uncheckedProjects: snapshot.UncheckedProjects);
+                snapshot.Solution, solutionPath, snapshot.LoadDiagnostics, null,
+                targetFrameworks: snapshot.TargetFrameworks);
         }
     }
 }

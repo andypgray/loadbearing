@@ -20,10 +20,6 @@ namespace Zphil.LoadBearing;
 /// </remarks>
 public sealed class Member
 {
-    private const BindingFlags MemberFlags =
-        BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
-        BindingFlags.Instance | BindingFlags.Static;
-
     private readonly Type? _declaringType;
     private readonly bool _isMethod;
     private readonly string? _name;
@@ -94,14 +90,13 @@ public sealed class Member
             "the anchor expression was unresolvable and its PoisonError is reported at spec build first.");
     }
 
-    // Normalize a closed/constructed generic anchor to its definition (Task<int> → Task<>), then look
-    // for a declared member of that name: any hit that is a MethodInfo makes this a method. A blank or
-    // typo'd name yields no hits (false); validation rejects those later (GRAMMAR §8 items 11–12).
+    // Any declared member of that name that is a MethodInfo makes this a method. The lookup is
+    // DeclaredMember's — the same one validation asks whether the anchor declares the member at all, so
+    // the two cannot disagree. A blank or typo'd name yields no hits (false); validation rejects those
+    // later (GRAMMAR §8 items 11–12).
     private static bool ResolveIsMethod(Type declaringType, string name)
     {
-        Type anchor = Generics.Definition(declaringType);
-
-        foreach (MemberInfo hit in anchor.GetMember(name, MemberFlags))
+        foreach (MemberInfo hit in DeclaredMember.Of(declaringType, name))
             if (hit is MethodInfo)
                 return true;
 

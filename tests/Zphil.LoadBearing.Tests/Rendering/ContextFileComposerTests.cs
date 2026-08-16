@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -119,7 +120,7 @@ public class ContextFileComposerTests
             .ShouldBeLessThan(body.IndexOf("## Quarantined scope `legacy/billing`", StringComparison.Ordinal));
 
         // And exactly one provenance line for the merged file, not one per card.
-        Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
+        TextNormalization.Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
             .ShouldBe(1);
     }
 
@@ -150,16 +151,5 @@ public class ContextFileComposerTests
 
         composition.Warnings.ShouldBe(["scope 'legacy/billing' matched no types; no scoped context emitted"]);
         composition.Files.Count.ShouldBe(1);
-    }
-
-    private static int Occurrences(string haystack, string needle)
-    {
-        var count = 0;
-        for (int index = haystack.IndexOf(needle, StringComparison.Ordinal);
-             index >= 0;
-             index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal))
-            count++;
-
-        return count;
     }
 }

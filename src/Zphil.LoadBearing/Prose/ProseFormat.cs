@@ -1,4 +1,3 @@
-using System.Text;
 using Zphil.LoadBearing.Model;
 
 namespace Zphil.LoadBearing.Prose;
@@ -173,20 +172,9 @@ internal static class ProseFormat
                 return string.Empty;
             case 1:
                 return references[0];
-            case 2:
-                return references[0] + " or " + references[1];
             default:
-                var builder = new StringBuilder();
-                for (var i = 0; i < references.Count - 1; i++)
-                {
-                    if (i > 0) builder.Append(", ");
-
-                    builder.Append(references[i]);
-                }
-
-                builder.Append(" or ");
-                builder.Append(references[references.Count - 1]);
-                return builder.ToString();
+                string head = string.Join(", ", references.Take(references.Count - 1));
+                return head + " or " + references[references.Count - 1];
         }
     }
 

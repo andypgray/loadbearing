@@ -20,13 +20,13 @@ public sealed class CliErrorMapperTests
     {
         // A real validation failure: two rules each missing the required .Because.
         var validation = Should.Throw<SpecValidationException>(() =>
-            ArchModelBuilder.Build(new InlineSpec(arch =>
+            Checker.Model(arch =>
             {
                 arch.Rule("area/one")
                     .Enforce(arch.Types.MustHavePrefix("X"));
                 arch.Rule("area/two")
                     .Enforce(arch.Types.MustHaveSuffix("Y"));
-            })));
+            }));
 
         var error = new StringWriter();
         int exit = CliErrorMapper.Write(validation, error);
@@ -98,13 +98,13 @@ public sealed class CliErrorMapperTests
     public void Write_MatchesUserFacingMessage_ForSpecValidation()
     {
         var validation = Should.Throw<SpecValidationException>(() =>
-            ArchModelBuilder.Build(new InlineSpec(arch =>
+            Checker.Model(arch =>
             {
                 arch.Rule("area/one")
                     .Enforce(arch.Types.MustHavePrefix("X"));
                 arch.Rule("area/two")
                     .Enforce(arch.Types.MustHaveSuffix("Y"));
-            })));
+            }));
         var error = new StringWriter();
 
         CliErrorMapper.Write(validation, error);

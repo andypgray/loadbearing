@@ -62,7 +62,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["App", "Lib"], []));
 
         // Assert — Orphan leaves, and its dotted edge leaves with it.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
     }
 
@@ -77,7 +77,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["My.*"], []));
 
         // Assert — the hyphenated sibling is out; both dotted ones are in.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_My_App[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
     }
 
@@ -92,7 +92,7 @@ public sealed class GraphDiagramRendererTests
             summary, SolutionName, new DiagramScope(["App", "Lib", "Orphan"], ["Orphan"]));
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]", "p_Lib[\"Lib\"]", "", "p_App --> p_Lib"]);
     }
 
@@ -106,7 +106,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope([], ["Lib"]));
 
         // Assert — two nodes, no phantom Lib node, no dangling edge.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
     }
 
@@ -120,7 +120,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["Nothing"], []));
 
         // Assert — the (none) convention the text survey uses: an empty section keeps its shape.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_none[\"(no projects in scope)\"]"]);
     }
 
@@ -136,7 +136,7 @@ public sealed class GraphDiagramRendererTests
 
         // Assert — no Lib node, and neither the observed nor the declared-but-unobserved edge into it
         // survives, because an edge is drawn only when both endpoints resolve to nodes.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
     }
 
@@ -149,7 +149,7 @@ public sealed class GraphDiagramRendererTests
 
         string block = GraphDiagramRenderer.Block(summary, SolutionName);
 
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([
                 "p_App[\"App\"]", "p_Lib[\"Lib\"]", "p_Orphan[\"Orphan\"]", "",
                 "p_App --> p_Lib", "p_Orphan -.-> p_Lib"
@@ -167,7 +167,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName, new DiagramScope(["App", "Lib"], []));
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]"]);
     }
 
@@ -183,7 +183,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName);
 
         // Assert — the same empty-scope convention an over-narrow glob gets, rather than an empty fence.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_none[\"(no projects in scope)\"]"]);
     }
 
@@ -198,7 +198,7 @@ public sealed class GraphDiagramRendererTests
 
         // Assert — first come (ordinal order) keeps the plain slug and the collision takes the ordinal
         // suffix, which the underscore keeps clear of a name that genuinely ends in a digit.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_My_App[\"My-App\"]", "p_My_App_2[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
     }
 
@@ -238,7 +238,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(GraphSummarizer.Summarize(model), SolutionName);
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([$"{expectedId}[\"{reserved}\"]"]);
     }
 
@@ -253,7 +253,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(GraphSummarizer.Summarize(model), SolutionName);
 
         // Assert — the '#' is escaped, and the ID's slug flattens it to an underscore.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["p_A_1[\"A#35;1\"]"]);
     }
 
@@ -313,19 +313,5 @@ public sealed class GraphDiagramRendererTests
         CompilationInput digit = CompilationFactory.Compile("My.App2", ("C.cs", "namespace C; public class Three {}"));
 
         return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([hyphen, dot, digit]));
-    }
-
-    // The diagram's node and edge lines, unindented: everything between the accDescr directive and the
-    // closing fence, so a test asserts on the drawing rather than re-pinning the frame each time.
-    private static IReadOnlyList<string> Diagram(string block)
-    {
-        var lines = block.Split('\n')
-            .ToList();
-        int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
-        int end = lines.FindLastIndex(line => line == "```");
-
-        return lines.GetRange(start, end - start)
-            .Select(line => line.Trim())
-            .ToList();
     }
 }

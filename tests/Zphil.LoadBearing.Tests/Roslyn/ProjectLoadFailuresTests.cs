@@ -35,7 +35,7 @@ public sealed class ProjectLoadFailuresTests
         // analyzer counts — which is exactly why those counts are not the predicate: two healthy projects
         // measured had zero analyzer references, and one had four metadata references.
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace, Healthy("P", @"C:\repo\P\P.csproj"));
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("P", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveLoadedEverything();
@@ -48,7 +48,7 @@ public sealed class ProjectLoadFailuresTests
         // csproj XML is malformed. Both loaded as a Project with no documents, no analyzers and both paths
         // null, so the model is missing that project entirely while the load still "succeeded".
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace, Empty("P", @"C:\repo\P\P.csproj"));
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("P", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveFailed(@"C:\repo\P\P.csproj");
@@ -61,9 +61,9 @@ public sealed class ProjectLoadFailuresTests
         // the very defect this predicate replaces — needs two independent Roslyn facts to go missing at once.
         // This is the direction that separates the two spellings: under `||` it would red.
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
+        Solution solution = AdhocSolution.Of(
             workspace,
-            Empty("HasOutput", @"C:\repo\A\A.csproj").WithOutputFilePath(@"C:\repo\A\bin\A.dll"));
+            AdhocSolution.Empty("HasOutput", @"C:\repo\A\A.csproj").WithOutputFilePath(@"C:\repo\A\bin\A.dll"));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveLoadedEverything();
@@ -75,10 +75,10 @@ public sealed class ProjectLoadFailuresTests
         // One csproj behind several Projects: the reader has one file to go and fix, so the answer names it
         // once rather than once per framework.
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
+        Solution solution = AdhocSolution.Of(
             workspace,
-            Empty("P(net10.0)", @"C:\repo\P\P.csproj"),
-            Empty("P(netstandard2.0)", @"C:\repo\P\P.csproj"));
+            AdhocSolution.Empty("P(net10.0)", @"C:\repo\P\P.csproj"),
+            AdhocSolution.Empty("P(netstandard2.0)", @"C:\repo\P\P.csproj"));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveFailed(@"C:\repo\P\P.csproj");
@@ -92,7 +92,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-absent");
         string solutionPath = WriteSolution(temp, "Present", "Absent");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace, Healthy("Present", temp.PathOf("Present", "Present.csproj")));
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
@@ -104,10 +104,10 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-present");
         string solutionPath = WriteSolution(temp, "One", "Two");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
+        Solution solution = AdhocSolution.Of(
             workspace,
-            Healthy("One", temp.PathOf("One", "One.csproj")),
-            Healthy("Two", temp.PathOf("Two", "Two.csproj")));
+            AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
+            AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveLoadedEverything();
@@ -121,7 +121,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-filtered");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace, Healthy("Kept", temp.PathOf("Kept", "Kept.csproj")));
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")));
 
         ProjectLoadFailures.Detect(solution, filterPath)
             .ShouldHaveLeftUnchecked(temp.PathOf("Dropped", "Dropped.csproj"));
@@ -137,7 +137,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace);
+        Solution solution = AdhocSolution.Of(workspace);
 
         ProjectLoadReport report = ProjectLoadFailures.Detect(solution, filterPath);
 
@@ -154,10 +154,10 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-empty");
         string filterPath = WriteFilter(temp, ["One", "Two"]);
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
+        Solution solution = AdhocSolution.Of(
             workspace,
-            Healthy("One", temp.PathOf("One", "One.csproj")),
-            Healthy("Two", temp.PathOf("Two", "Two.csproj")));
+            AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
+            AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
         ProjectLoadFailures.Detect(solution, filterPath)
             .ShouldHaveLoadedEverything();
@@ -173,10 +173,10 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-transitive");
         string filterPath = WriteFilter(temp, ["Kept", "Pulled"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
+        Solution solution = AdhocSolution.Of(
             workspace,
-            Healthy("Kept", temp.PathOf("Kept", "Kept.csproj")),
-            Healthy("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
+            AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")),
+            AdhocSolution.Loaded("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
 
         ProjectLoadFailures.Detect(solution, filterPath)
             .ShouldHaveLoadedEverything();
@@ -190,36 +190,13 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("both-arms");
         string solutionPath = WriteSolution(temp, "Zed", "Absent");
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(workspace, Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
-
-    // A project the design-time build evaluated. Only the output path is set: CompilationOutputInfo has no
-    // public constructor, so an AdhocWorkspace project's intermediate assembly path is always null — which
-    // makes every "healthy" project here the strictest case the predicate can be handed, one carrying only
-    // one of the two facts.
-    private static ProjectInfo Healthy(string name, string filePath)
-    {
-        return Empty(name, filePath)
-            .WithOutputFilePath(Path.Combine(Path.GetDirectoryName(filePath)!, "bin", name + ".dll"));
-    }
-
-    // Roslyn's CreateEmpty shape: no documents, no references, and neither output path.
-    private static ProjectInfo Empty(string name, string filePath)
-    {
-        return ProjectInfo.Create(
-            ProjectId.CreateNewId(), VersionStamp.Default, name, name, LanguageNames.CSharp, filePath);
-    }
-
-    private static Solution WithProjects(AdhocWorkspace workspace, params ProjectInfo[] projects)
-    {
-        foreach (ProjectInfo project in projects) workspace.AddProject(project);
-        return workspace.CurrentSolution;
-    }
 
     // A classic .sln declaring one project line per name. Only the project paths are read, so the rest of the
     // file is the minimum a real solution carries.

@@ -61,6 +61,26 @@ public sealed class Violation
     /// <summary>Free text for EmptySubject/RuleError; null otherwise.</summary>
     public string? Detail { get; }
 
+    /// <summary>
+    ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
+    ///     FullName, Member SymbolId), compared ordinal by the checker. A MemberUse mirrors Reference's
+    ///     (source, target) as (source FullName, member SymbolId); a MemberShape mirrors Shape's subject
+    ///     as (declaring-type FullName, member SymbolId).
+    /// </summary>
+    internal (string Primary, string Secondary, string Tertiary) OrderKey
+    {
+        get
+        {
+            // A MemberShape's declaring-type FullName is the only primary key that is not a Source or a
+            // Subject; every other kind leaves SubjectMember null and never reaches it.
+            string primary = (Source ?? Subject)?.FullName
+                             ?? (SubjectMember is { } member ? member.DeclaringTypeFullName : string.Empty);
+            string secondary = Target?.FullName ?? string.Empty;
+            string tertiary = Member?.SymbolId ?? SubjectMember?.SymbolId ?? string.Empty;
+            return (primary, secondary, tertiary);
+        }
+    }
+
     /// <summary>This violation's stable baseline identity (GRAMMAR §4.3).</summary>
     /// <remarks>
     ///     An edge key for the dependency kinds — (<see cref="Source" />, <see cref="Target" />) symbol
@@ -76,12 +96,9 @@ public sealed class Violation
     {
         return Kind switch
         {
-            ViolationKind.Reference => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
-            ViolationKind.Construction => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
-            ViolationKind.Injection => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
-            ViolationKind.Catch => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
-            ViolationKind.Throw => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
-            ViolationKind.Expose => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            ViolationKind.Reference or ViolationKind.Construction or ViolationKind.Injection
+                or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose =>
+                BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
@@ -91,32 +108,32 @@ public sealed class Violation
 
     internal static Violation Reference(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Reference, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Reference, source, target, sites);
     }
 
     internal static Violation Construction(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Construction, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Construction, source, target, sites);
     }
 
     internal static Violation Injection(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Injection, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Injection, source, target, sites);
     }
 
     internal static Violation Catch(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Catch, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Catch, source, target, sites);
     }
 
     internal static Violation Throw(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Throw, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Throw, source, target, sites);
     }
 
     internal static Violation Expose(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Expose, source, target, null, null, null, sites, null);
+        return Edge(ViolationKind.Expose, source, target, sites);
     }
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)
@@ -142,5 +159,13 @@ public sealed class Violation
     internal static Violation RuleError(string detail)
     {
         return new Violation(ViolationKind.RuleError, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
+    }
+
+    // The one constructor call the six edge factories share: an edge violation is a (source, target) pair
+    // with its sites, and every other slot empty.
+    private static Violation Edge(
+        ViolationKind kind, TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(kind, source, target, null, null, null, sites, null);
     }
 }

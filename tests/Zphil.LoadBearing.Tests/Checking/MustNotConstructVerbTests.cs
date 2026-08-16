@@ -125,7 +125,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ConstructionPairs()
             .ShouldBe(["App.WidgetFactory -> Widgets.Widget"]);
     }
@@ -156,7 +156,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("resolve via DI"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ConstructionPairs()
             .ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
         result.ShouldHaveGrandfathered(1);

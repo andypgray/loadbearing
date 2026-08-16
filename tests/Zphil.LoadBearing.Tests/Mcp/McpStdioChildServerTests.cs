@@ -59,7 +59,7 @@ public sealed class McpStdioChildServerTests
             "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
 
         ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(
-            McpChildHarness.TestsBinCliDll(),
+            TestsBinCli.Dll(),
             repo.SolutionPath,
             CliRunner.QuarantinedSpecDll,
             repo.Root);

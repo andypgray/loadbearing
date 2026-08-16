@@ -101,6 +101,16 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the rule failed. Says nothing about which violations did it — for the rows whose subject is
+    ///     the violation list itself, which then read it in its own right.
+    /// </summary>
+    internal static RuleResult ShouldHaveFailed(this RuleResult result)
+    {
+        result.Status.ShouldBe(RuleStatus.Failed, Describe(result));
+        return result;
+    }
+
+    /// <summary>
     ///     Asserts the rule failed on exactly one edge violation of <paramref name="kind" />, running from
     ///     <paramref name="source" /> to <paramref name="target" /> and carrying at least one site.
     /// </summary>

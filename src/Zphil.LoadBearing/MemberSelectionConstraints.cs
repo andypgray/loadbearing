@@ -1,4 +1,3 @@
-using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using static Zphil.LoadBearing.Internal.Guard;
 
@@ -110,7 +109,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustNotBeAttributedWith(this MemberSelection subject, Type first, params Type[] more)
     {
-        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
+        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -126,7 +125,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustNotBeAttributedWith(this MemberSelection subject, string first, params string[] more)
     {
-        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), AnchorNames(first, more));
+        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -152,21 +151,5 @@ public static class MemberSelectionConstraints
     private static MemberSelection Subject(MemberSelection subject)
     {
         return NotNull(subject, nameof(subject));
-    }
-
-    // The raw-Type anchor list of the negative attribute verb, minted as typeof TypeAnchors — the
-    // member twin of the type side's AnchorTypes helper (the hierarchy-verb shape, GRAMMAR §10);
-    // both project through the one shared (first, params more) builder.
-    private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
-    {
-        return OperandList.OneOrMore(first, more, type => TypeAnchor.FromType(type));
-    }
-
-    // The string twin of AnchorTypes: the same (first, params more) shape over attribute-definition names.
-    // Only null is refused here — a blank name reaches the validation catalog (GRAMMAR §8 item 15) so it
-    // reports with every other error rather than throwing first.
-    private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
-    {
-        return OperandList.OneOrMore(first, more, name => TypeAnchor.FromName(name));
     }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
@@ -176,9 +177,16 @@ internal static class GrandfatheredCounts
     /// </summary>
     public static string BaselinePath(string exampleRoot, string ruleId)
     {
+        return $"{BaselineDirectoryOf(exampleRoot)}{ruleId}.json";
+    }
+
+    // The directory an example root's baselines live in, trailing slash included: the one place the
+    // empty-root case is spelled, so a path, a prefix match and a failure message cannot disagree about it.
+    private static string BaselineDirectoryOf(string exampleRoot)
+    {
         return exampleRoot.Length == 0
-            ? $"{BaselineDirectory}/{ruleId}.json"
-            : $"{exampleRoot}/{BaselineDirectory}/{ruleId}.json";
+            ? $"{BaselineDirectory}/"
+            : $"{exampleRoot}/{BaselineDirectory}/";
     }
 
     /// <summary>
@@ -190,9 +198,7 @@ internal static class GrandfatheredCounts
     /// </summary>
     public static IReadOnlyList<string> BaselineFiles(string exampleRoot, IEnumerable<string> trackedPaths)
     {
-        string prefix = exampleRoot.Length == 0
-            ? $"{BaselineDirectory}/"
-            : $"{exampleRoot}/{BaselineDirectory}/";
+        string prefix = BaselineDirectoryOf(exampleRoot);
 
         return trackedPaths
             .Where(path => path.StartsWith(prefix, StringComparison.Ordinal))
@@ -285,9 +291,7 @@ internal static class GrandfatheredCounts
         IEnumerable<string> trackedPaths,
         Func<string, string?> readText)
     {
-        string directory = exampleRoot.Length == 0
-            ? $"{BaselineDirectory}/"
-            : $"{exampleRoot}/{BaselineDirectory}/";
+        string directory = BaselineDirectoryOf(exampleRoot);
         var paths = ruleId == RootTotal
             ? BaselineFiles(exampleRoot, trackedPaths)
             : [BaselinePath(exampleRoot, ruleId)];
@@ -364,7 +368,7 @@ internal static class GrandfatheredCounts
     /// </summary>
     public static CollapsedText Collapse(string docText)
     {
-        string normalized = docText.Replace("\r\n", "\n");
+        string normalized = docText.NormalizedLines();
         StringBuilder builder = new(normalized.Length);
         List<int> lines = new(normalized.Length);
         var line = 1;
@@ -407,20 +411,11 @@ internal static class GrandfatheredCounts
     /// </summary>
     public static IReadOnlyList<ProseMention> ProseMentions(string doc, string docText)
     {
-        var fenced = SourceAnchors.FencedLines(docText)
-            .Select(static line => line.Number)
-            .ToHashSet();
-        string[] lines = docText.Replace("\r\n", "\n")
-            .Split('\n');
         List<ProseMention> mentions = new();
 
-        for (var index = 0; index < lines.Length; index++)
-        {
-            int number = index + 1;
-            if (fenced.Contains(number)) continue;
-
-            if (HasCountNearGrandfathered(lines[index])) mentions.Add(new ProseMention(doc, number, lines[index]));
-        }
+        foreach ((string text, int number) in SourceAnchors.UnfencedLines(docText))
+            if (HasCountNearGrandfathered(text))
+                mentions.Add(new ProseMention(doc, number, text));
 
         return mentions;
     }

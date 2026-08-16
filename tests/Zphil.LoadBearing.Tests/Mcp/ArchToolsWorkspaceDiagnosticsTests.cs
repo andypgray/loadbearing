@@ -2,11 +2,9 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
-using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
-using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -43,11 +41,14 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     [Fact]
     public async Task ArchCheck_WorkspaceLoadDiagnostic_CarriesTheMsBuildNoteLastInTheDocument()
     {
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([LoadDiagnostic]), ResponseFitter.FirstRung);
+        var tools = new ArchTools(
+            McpServerBindings.MyAppWithCleanSpec(),
+            new DiagnosticInjectingSolutionSource([LoadDiagnostic]),
+            ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
-        WorkspaceDiagnosticsOf(document)
+        CheckJson.Strings(document, "workspaceDiagnostics")
             .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
     }
 
@@ -56,11 +57,14 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The negative control that keeps the note diagnostic context rather than a banner: an empty
         // composition stays empty, so a clean call's document says nothing about MSBuild at all.
-        var tools = new ArchTools(Binding(), new DiagnosticInjectingSolutionSource([]), ResponseFitter.FirstRung);
+        var tools = new ArchTools(
+            McpServerBindings.MyAppWithCleanSpec(),
+            new DiagnosticInjectingSolutionSource([]),
+            ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
-        WorkspaceDiagnosticsOf(document)
+        CheckJson.Strings(document, "workspaceDiagnostics")
             .ShouldBeEmpty();
     }
 
@@ -71,7 +75,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         // It follows the gate rather than either cause, which is exactly why a second cause could be added
         // without touching a single tool.
         var tools = new ArchTools(
-            Binding(),
+            McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
             ResponseFitter.FirstRung);
 
@@ -90,7 +94,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         // error writer — and it is the entry point a stranger reaches for first, so the refusal names the
         // remedy and the opt-out in both dialects rather than assuming which surface asked.
         var tools = new ArchTools(
-            Binding(),
+            McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
             ResponseFitter.FirstRung);
 
@@ -111,7 +115,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         // The opt-out the refusal names, taken: one flag for one question, whichever way the model came up
         // short.
         var tools = new ArchTools(
-            Binding(),
+            McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
             ResponseFitter.FirstRung);
 
@@ -121,20 +125,5 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         parsed.RootElement.GetProperty("modelIncomplete")
             .GetBoolean()
             .ShouldBeTrue();
-    }
-
-    private static McpServerBinding Binding()
-    {
-        string solution = CliRunner.MyAppSolution;
-        return new McpServerBinding(solution, CliRunner.CleanSpecDll, Path.GetDirectoryName(Path.GetFullPath(solution))!);
-    }
-
-    private static string[] WorkspaceDiagnosticsOf(string document)
-    {
-        using JsonDocument parsed = JsonDocument.Parse(document);
-        return parsed.RootElement.GetProperty("workspaceDiagnostics")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? string.Empty)
-            .ToArray();
     }
 }

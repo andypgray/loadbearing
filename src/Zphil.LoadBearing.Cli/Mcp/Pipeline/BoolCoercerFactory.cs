@@ -68,7 +68,13 @@ internal sealed class BoolCoercerFactory : JsonConverterFactory
     {
         public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == JsonTokenType.StartArray) return ReadCoercedFromArray(ref reader);
+            if (reader.TokenType == JsonTokenType.StartArray)
+                return ScalarArrayUnwrap.Read(
+                    ref reader,
+                    ReadCoercedScalar,
+                    static () => throw new UserErrorException("Expected true or false; got an empty array."),
+                    "Expected true or false; got an array with multiple elements. " +
+                    "Pass a scalar boolean, not an array.");
 
             return ReadCoercedScalar(ref reader, insideArray: false);
         }
@@ -76,30 +82,6 @@ internal sealed class BoolCoercerFactory : JsonConverterFactory
         public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)
         {
             writer.WriteBooleanValue(value);
-        }
-
-        /// <summary>
-        ///     Reads a JSON array opened by the caller and collapses it to a single boolean per the rules in
-        ///     the class remarks. Hand-rolled to avoid recursing through <see cref="BoolCoercerFactory" />
-        ///     via <c>JsonSerializer.Deserialize&lt;bool&gt;</c>.
-        /// </summary>
-        private static bool ReadCoercedFromArray(ref Utf8JsonReader reader)
-        {
-            if (!reader.Read()) throw new JsonException("Unexpected end of JSON while reading array.");
-
-            if (reader.TokenType == JsonTokenType.EndArray)
-                throw new UserErrorException("Expected true or false; got an empty array.");
-
-            bool value = ReadCoercedScalar(ref reader, insideArray: true);
-
-            if (!reader.Read()) throw new JsonException("Unexpected end of JSON while reading array.");
-
-            if (reader.TokenType != JsonTokenType.EndArray)
-                throw new UserErrorException(
-                    "Expected true or false; got an array with multiple elements. " +
-                    "Pass a scalar boolean, not an array.");
-
-            return value;
         }
 
         /// <summary>

@@ -177,7 +177,7 @@ public sealed class RuleSelectionTests
     // no-implicit-subtree row has something to not select.
     private static ArchitectureModel Model()
     {
-        return ArchModelBuilder.Build(new InlineSpec(arch =>
+        return Checker.Model(arch =>
         {
             arch.Rule("layering/web-not-data")
                 .Enforce(arch.Namespace("App.Web.*")
@@ -198,6 +198,6 @@ public sealed class RuleSelectionTests
                 .Enforce(arch.Namespace("App.Data.*")
                     .MustNotReference(arch.Namespace("App.Legacy.*")))
                 .Because("The data layer must not depend on the ledger it feeds.");
-        }));
+        });
     }
 }

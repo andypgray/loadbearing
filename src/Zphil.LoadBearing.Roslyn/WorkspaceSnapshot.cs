@@ -21,9 +21,6 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     private static readonly IReadOnlyDictionary<string, int> NoEditVersions =
         new Dictionary<string, int>(StringComparer.Ordinal);
 
-    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
-        new Dictionary<ProjectId, string>();
-
     /// <summary>
     ///     The session load generation that produced this snapshot — bumped on every full (re)load, stable
     ///     across the in-place content edits folded into the same load. A session-scoped consumer (the
@@ -59,7 +56,7 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     <see cref="Solution.WithDocumentText(DocumentId,Microsoft.CodeAnalysis.Text.SourceText,PreservationMode)" />,
     ///     so the map a load produced stays valid across every in-place content edit folded into it.
     /// </remarks>
-    internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = NoTargetFrameworks;
+    internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = TargetFrameworkMaps.None;
 
     /// <summary>
     ///     The absolute <c>.csproj</c> paths of the projects that failed to load, from the load that produced
@@ -96,4 +93,12 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     content edit folded into one generation cannot change it.
     /// </remarks>
     internal IReadOnlyList<string> RestoreFailedProjects { get; init; } = [];
+
+    /// <summary>
+    ///     This snapshot's load verdict as the one value every surface reads: the diagnostics and the three
+    ///     project lists above, bundled so no consumer re-pairs them. Merge notes are empty by construction —
+    ///     only extraction produces them, and a snapshot describes a load.
+    /// </summary>
+    internal WorkspaceDiagnostics LoadDiagnostics =>
+        new(Diagnostics, [], FailedProjects, UncheckedProjects, RestoreFailedProjects);
 }

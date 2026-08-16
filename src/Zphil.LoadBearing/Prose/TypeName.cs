@@ -127,7 +127,11 @@ internal static class TypeName
         return segments;
     }
 
-    private static string StripArity(string name)
+    /// <summary>
+    ///     The reflection name with any backtick arity suffix removed: <c>IHandler`1</c> →
+    ///     <c>IHandler</c>. Shared with validation, whose <c>typeof(...)</c> steer spells the same bare name.
+    /// </summary>
+    internal static string StripArity(string name)
     {
         int tick = name.IndexOf('`');
         return tick < 0 ? name : name.Substring(0, tick);

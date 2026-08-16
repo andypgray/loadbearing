@@ -11,13 +11,13 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <b>Verbs that report over the universe declare; verbs that read absence as evidence refuse.</b> A
 ///         narrowed universe is a smaller true answer, so <c>check</c>, <c>status</c>, <c>graph</c> and
 ///         <c>context</c> answer over it and stamp what was not checked — unlike
-///         <see cref="IncompleteModelGate" />, whose shape these blocks borrow (lede, indented evidence,
-///         tail) and whose subject is a broken model rather than a small one. But <c>baseline --init</c>,
-///         <c>baseline --accept-reductions</c> and <c>render</c> read what is absent as evidence — zero debt
-///         to capture, an entry no longer occurring, a card with no home — and write files that outlive the
-///         run, so under a narrowing filter they refuse on the gate's own terms (exit 2, nothing written),
-///         and the adapter's completeness test skips rather than pass under a name the filtered run cannot
-///         vouch for.
+///         <see cref="IncompleteModelGate" />, with which these blocks share a composer
+///         (<see cref="EvidenceBlock" />) but not a subject: a broken model rather than a small one. But
+///         <c>baseline --init</c>, <c>baseline --accept-reductions</c> and <c>render</c> read what is absent
+///         as evidence — zero debt to capture, an entry no longer occurring, a card with no home — and write
+///         files that outlive the run, so under a narrowing filter they refuse on the gate's own terms
+///         (exit 2, nothing written), and the adapter's completeness test skips rather than pass under a name
+///         the filtered run cannot vouch for.
 ///     </para>
 ///     <para>
 ///         <b>It names what was not checked, never what the filter did not select.</b> Those are different
@@ -110,7 +110,7 @@ internal static class NarrowedUniverseNotice
     /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string BaselineRefusal(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
-        return Assemble(
+        return EvidenceBlock.Compose(
             $"error: '{filterName}' narrowed this run — {Subject(uncheckedProjects.Count)}, so no baseline was "
             + "written: a baseline captured through a filter signs off debt in projects it never measured, "
             + "and --accept-reductions deletes real entries as \"no longer occurring\" when the only thing "
@@ -128,7 +128,7 @@ internal static class NarrowedUniverseNotice
     /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string RenderRefusal(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
-        return Assemble(
+        return EvidenceBlock.Compose(
             $"error: '{filterName}' narrowed this run — {Subject(uncheckedProjects.Count)}, so nothing was "
             + "rendered: rendered files are committed context, a card from an unchecked project places "
             + "nowhere and would be dropped from the committed files, and --diagram would draw a survey "
@@ -176,15 +176,14 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     Writes <paramref name="stamp" /> and a blank line, one <c>WriteLine</c> per LF-split line — as the
-    ///     gate blocks do — so it adopts the writer's own newline rather than carrying embedded LFs onto a
-    ///     CRLF console.
+    ///     Writes <paramref name="stamp" /> as <see cref="LineBlocks" /> writes every block, then the blank
+    ///     line that separates a stamp from the answer it scopes.
     /// </summary>
     /// <param name="output">The verb's stdout writer.</param>
     /// <param name="stamp">One of the per-verb stamps.</param>
     internal static void Write(TextWriter output, string stamp)
     {
-        foreach (string line in stamp.Split('\n')) output.WriteLine(line);
+        LineBlocks.Write(output, stamp);
         output.WriteLine();
     }
 
@@ -206,28 +205,20 @@ internal static class NarrowedUniverseNotice
     // to say first. The refusals write their own, since what they refuse is the point of the sentence.
     private static string Block(string filterName, IReadOnlyList<string> uncheckedProjects, string tail)
     {
-        return Assemble(
-            $"'{filterName}' narrowed this run: {Subject(uncheckedProjects.Count)}.", uncheckedProjects, tail);
+        var lede = $"'{filterName}' narrowed this run: {Subject(uncheckedProjects.Count)}.";
+        return EvidenceBlock.Compose(lede, uncheckedProjects, tail);
     }
 
     // The count as a clause every lede can take, in both numbers: a block that read "1 projects ... were not
     // checked" is the sentence a reader stops trusting. Taken as a count rather than the list, because the
-    // per-rule skip reason names the number without ever showing the paths.
+    // per-rule skip reason names the number without ever showing the paths. The noun comes from the one
+    // inflection owner; the copula stays here, since this is the only sentence in the codebase that needs
+    // was/were and a helper for one caller would be a rule with nowhere else to hold.
     private static string Subject(int uncheckedProjectCount)
     {
-        return uncheckedProjectCount == 1
-            ? "1 project the solution declares was not checked"
-            : $"{uncheckedProjectCount} projects the solution declares were not checked";
-    }
+        string noun = Plurals.Noun(uncheckedProjectCount, "project");
+        string copula = uncheckedProjectCount == 1 ? "was" : "were";
 
-    // The lede, then every unchecked project two-space-indented, then the tail. Only the literals differ; the
-    // assembly was never the part that varied.
-    private static string Assemble(string lede, IReadOnlyList<string> uncheckedProjects, string tail)
-    {
-        var lines = new List<string> { lede };
-        lines.AddRange(uncheckedProjects.Select(project => "  " + project));
-        lines.Add(tail);
-
-        return string.Join("\n", lines);
+        return $"{uncheckedProjectCount} {noun} the solution declares {copula} not checked";
     }
 }

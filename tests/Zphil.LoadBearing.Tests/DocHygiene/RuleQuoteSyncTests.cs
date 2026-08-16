@@ -173,7 +173,7 @@ public sealed class RuleQuoteSyncTests
         List<string> unregistered = new();
 
         // Act
-        foreach (string path in TrackedFiles.All.Where(static path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)))
+        foreach (string path in TrackedFiles.Markdown)
         {
             if (registered.Contains(path)) continue;
 
@@ -194,7 +194,7 @@ public sealed class RuleQuoteSyncTests
 
     private static IReadOnlyList<RuleQuote> ExtractDoc(string doc)
     {
-        string text = File.ReadAllText(RepoRoot.Absolute(doc));
+        string text = RepoRoot.ReadText(doc);
         return RuleQuotes.Extract(doc, text);
     }
 

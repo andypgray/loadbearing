@@ -184,7 +184,7 @@ public sealed class LawDiagramRendererTests
 
         // Assert — the facades sit inside the box in the spec's own Boundary order, and no edge is drawn
         // at all: the box is the whole statement.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([
                 "subgraph s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
                 "s_IPricingFacade[[\"IPricingFacade\"]]",
@@ -202,17 +202,13 @@ public sealed class LawDiagramRendererTests
     public void Block_AHermeticScope_IsARectangleCarryingTheSameLabel()
     {
         // Arrange — no sanctioned surface at all, so there is nothing to draw inside the box.
-        ArchitectureModel model = Checker.Model(arch =>
-            arch.Scope("legacy/pricing")
-                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
-                .Dragons("Rounding happens at line-item level.")
-                .Because("x"));
+        ArchitectureModel model = HermeticScopeSpec();
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldContain("s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]");
     }
 
@@ -220,11 +216,7 @@ public sealed class LawDiagramRendererTests
     public void Block_TheTripwire_DrawsNothingAndIsListed()
     {
         // Arrange
-        ArchitectureModel model = Checker.Model(arch =>
-            arch.Scope("legacy/pricing")
-                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
-                .Dragons("Rounding happens at line-item level.")
-                .Because("x"));
+        ArchitectureModel model = HermeticScopeSpec();
 
         // Act
         string block = LawDiagramRenderer.Block(model, SpecName);
@@ -250,7 +242,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — nothing placed, so the fence keeps its shape through the placeholder.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
         block.ShouldEndWith("Not drawn in full: `r/union`. Expand any of them with `loadbearing explain <rule-id>`.");
     }
@@ -296,7 +288,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([
                 "subgraph s_A[\"A.*\"]",
                 "s_A_B[\"A.B.*\"]",
@@ -339,7 +331,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — flat rather than a hierarchy the spec never declared, and no nesting legend row.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([
                 "s_A_B_C[\"A.B.C.*\"]",
                 "s_Z(\"Z.*\")",
@@ -377,7 +369,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — one node, named in the spec's own vocabulary.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe([
                 "s_Web[\"Web\"]",
                 "s_Z(\"Z.*\")",
@@ -431,7 +423,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — and no ID may begin with the two letters the link rules read as an arrowhead.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldContain($"{expectedId}[\"{reserved}\"]");
         IdsIn(block)
             .ShouldAllBe(id => !id.StartsWith("o", StringComparison.Ordinal)
@@ -453,7 +445,7 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldContain(
                 "s_System_Collections_Generic_List_System_String_(\"System.Collections.Generic.List#lt;System.String#gt;\")");
     }
@@ -473,7 +465,7 @@ public sealed class LawDiagramRendererTests
 
         // Assert — the fence's shape stays stable, and the legend disappears with the constructs it
         // would have explained.
-        Diagram(block)
+        MermaidBlock.Diagram(block)
             .ShouldBe(["s_none[\"(no rules this drawing can place)\"]"]);
         block.ShouldNotContain("Legend");
     }
@@ -572,24 +564,21 @@ public sealed class LawDiagramRendererTests
         });
     }
 
-    // The diagram's node, edge and legend lines, unindented: everything between the accDescr directive and
-    // the closing fence, so a test asserts on the drawing rather than re-pinning the frame each time.
-    private static IReadOnlyList<string> Diagram(string block)
+    // The same scope with no sanctioned surface at all: the degenerate quarantine, which is both a bare
+    // rectangle and a rule whose tripwire draws nothing.
+    private static ArchitectureModel HermeticScopeSpec()
     {
-        var lines = block.Split('\n')
-            .ToList();
-        int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
-        int end = lines.FindLastIndex(line => line == "```");
-
-        return lines.GetRange(start, end - start)
-            .Select(line => line.Trim())
-            .ToList();
+        return Checker.Model(arch =>
+            arch.Scope("legacy/pricing")
+                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x"));
     }
 
     // Just the edge lines, which is what a direction or posture pin is about.
     private static IReadOnlyList<string> Edges(string block)
     {
-        return Diagram(block)
+        return MermaidBlock.Diagram(block)
             .Where(line => !line.StartsWith("l_", StringComparison.Ordinal))
             .Where(line => line.Contains("--x", StringComparison.Ordinal)
                            || line.Contains("-->", StringComparison.Ordinal)
@@ -600,7 +589,7 @@ public sealed class LawDiagramRendererTests
     // Every emitted node ID, however it is shaped.
     private static IReadOnlyList<string> IdsIn(string block)
     {
-        return Diagram(block)
+        return MermaidBlock.Diagram(block)
             .Select(line => line.StartsWith("subgraph ", StringComparison.Ordinal) ? line.Substring(9) : line)
             .Select(line => new string(line.TakeWhile(character => character is '_' or >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9')
                 .ToArray()))

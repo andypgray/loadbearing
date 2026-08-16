@@ -302,7 +302,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         answer.ShouldNotContain(InvariantViolationFragment);
 
         // ... and the answer the partial model still supports follows, one blank line below the caveat.
-        string[] lines = answer.Replace("\r\n", "\n")
+        string[] lines = answer.NormalizedLines()
             .TrimEnd()
             .Split('\n');
         int pointer = Array.FindIndex(lines, line => line.StartsWith("No architecture scope covers", StringComparison.Ordinal));

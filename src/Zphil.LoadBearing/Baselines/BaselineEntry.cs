@@ -59,6 +59,24 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
         return new BaselineEntry(null, null, Guard.NotNull(subject, nameof(subject)), null);
     }
 
+    /// <summary>
+    ///     <paramref name="entries" /> in the canonical baseline order —
+    ///     <c>
+    ///         ((Source ?? Subject),
+    ///         (Target ?? ""))
+    ///     </c>
+    ///     , ordinal. Single-sourced here because the on-disk file, a parsed section's
+    ///     <see cref="RuleBaseline.Entries" /> and the integrity digest are all computed over it: a drift
+    ///     between any two of them would change a stored file's digest without changing an entry.
+    /// </summary>
+    internal static IReadOnlyList<BaselineEntry> InCanonicalOrder(IEnumerable<BaselineEntry> entries)
+    {
+        return entries
+            .OrderBy(e => e.Source ?? e.Subject, StringComparer.Ordinal)
+            .ThenBy(e => e.Target ?? string.Empty, StringComparer.Ordinal)
+            .ToList();
+    }
+
     /// <summary>A copy of this entry carrying <paramref name="because" /> — same identity, new attribution.</summary>
     /// <exception cref="ArgumentException"><paramref name="because" /> is blank or spans more than one line.</exception>
     public BaselineEntry WithBecause(string because)

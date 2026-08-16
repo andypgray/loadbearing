@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
@@ -44,11 +45,12 @@ internal sealed class DiagnosticInjectingSolutionSource(
     IReadOnlyList<string>? uncheckedProjects = null,
     IReadOnlyList<string>? restoreFailedProjects = null) : ISolutionSource
 {
-    public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solution, workingDirectory, ct);
+        SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solutionPath, ct);
+        var injected = new WorkspaceDiagnostics(
+            diagnostics, [], failedProjects ?? [], uncheckedProjects ?? [], restoreFailedProjects ?? []);
         return new SolutionHandle(
-            real.Solution, real.SolutionPath, diagnostics, real, real.WarmCodebase, real.TargetFrameworks,
-            failedProjects ?? [], uncheckedProjects ?? [], restoreFailedProjects ?? []);
+            real.Solution, real.SolutionPath, injected, real, real.WarmCodebase, real.TargetFrameworks);
     }
 }

@@ -46,7 +46,7 @@ public sealed class ResponseFitterTests
     {
         // Arrange — a budget the finest rung sits inside, which is every call on a codebase small enough.
         List<string> composed = [];
-        IResponseFitter fitter = Budgeted(10);
+        IResponseFitter fitter = FixedResponseBudget.Fitter(10);
 
         // Act
         string fitted = fitter.Fit(Ladder(composed, "12345678", "1234", "12"));
@@ -61,7 +61,7 @@ public sealed class ResponseFitterTests
     {
         // Arrange — the whole point: answer whole at a coarser grain rather than cut at the finer one.
         List<string> composed = [];
-        IResponseFitter fitter = Budgeted(5);
+        IResponseFitter fitter = FixedResponseBudget.Fitter(5);
 
         // Act
         string fitted = fitter.Fit(Ladder(composed, "12345678", "1234", "12"));
@@ -76,7 +76,7 @@ public sealed class ResponseFitterTests
     public void Budgeted_BudgetExactlyTheRungLength_TakesThatRung()
     {
         // Arrange — the boundary the truncator uses too: at the cap, nothing is cut.
-        IResponseFitter fitter = Budgeted(4);
+        IResponseFitter fitter = FixedResponseBudget.Fitter(4);
 
         // Act
         string fitted = fitter.Fit(Ladder([], "12345678", "1234", "12"));
@@ -92,7 +92,7 @@ public sealed class ResponseFitterTests
         // out over budget and the truncator behind it cuts like it does for any other response: a ladder
         // with a last rung, not a guarantee.
         List<string> composed = [];
-        IResponseFitter fitter = Budgeted(1);
+        IResponseFitter fitter = FixedResponseBudget.Fitter(1);
 
         // Act
         string fitted = fitter.Fit(Ladder(composed, "12345678", "1234", "12"));
@@ -138,11 +138,6 @@ public sealed class ResponseFitterTests
         environment.SetVariable(LoadBearingEnvVars.MaxMcpOutputTokens, "4000");
         budget.MaxChars()
             .ShouldBe(10_000);
-    }
-
-    private static IResponseFitter Budgeted(int maxChars)
-    {
-        return new BudgetedResponseFitter(new FixedResponseBudget(maxChars));
     }
 
     // A ladder that records what it was asked to compose, so the rows above can assert on how far the

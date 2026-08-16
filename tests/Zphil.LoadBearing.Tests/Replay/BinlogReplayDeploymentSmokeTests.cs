@@ -52,7 +52,7 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
     [Fact]
     public void Check_BinlogReplayOutOfProcess_RegistersMsBuildAndMatchesColdWithoutLoaderError()
     {
-        string cli = ResolveCliDll();
+        string cli = TestsBinCli.Dll();
 
         // (a) the shipped condition: `check --binlog` in a child process with no pre-registered MSBuild. Before
         //     the fix this crashed here with "could not be replayed: Could not load file or assembly
@@ -99,19 +99,5 @@ public sealed class BinlogReplayDeploymentSmokeTests : IDisposable
     private string FreshCache()
     {
         return _cacheRootBase.UniqueChildPath();
-    }
-
-    // The tests project references the CLI project, so its build output (loadbearing.dll + runtimeconfig +
-    // deps) is copied beside the test assembly. Fail loudly if it is not, so the test can never pass by
-    // running against a stale or absent binary.
-    private static string ResolveCliDll()
-    {
-        string path = Path.Combine(AppContext.BaseDirectory, "loadbearing.dll");
-        if (!File.Exists(path))
-            throw new InvalidOperationException(
-                $"The CLI build output 'loadbearing.dll' was not found beside the test assembly at '{path}'. "
-                + "The tests project references Zphil.LoadBearing.Cli, so its output should be copied here.");
-
-        return path;
     }
 }

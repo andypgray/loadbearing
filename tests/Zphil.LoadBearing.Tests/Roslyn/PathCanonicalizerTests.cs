@@ -13,27 +13,19 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// </summary>
 public sealed class PathCanonicalizerTests : IDisposable
 {
-    // Canonical so the "unchanged" and "real target" expectations are exact even on macOS (/var symlink).
-    private readonly string _root =
-        PathCanonicalizer.Resolve(Directory.CreateTempSubdirectory("loadbearing-canon-")
-            .FullName);
+    // Already canonical, so the "unchanged" and "real target" expectations are exact even on macOS (/var
+    // symlink): TestTempRoot resolves the temp base once per run, and every path below hangs off that.
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("canon");
 
     public void Dispose()
     {
-        try
-        {
-            if (Directory.Exists(_root)) Directory.Delete(_root, true);
-        }
-        catch
-        {
-            // best-effort: a leftover symlink or handle survives to OS temp cleanup.
-        }
+        _temp.Dispose();
     }
 
     [Fact]
     public void Resolve_PlainCanonicalPath_IsUnchanged()
     {
-        string dir = Directory.CreateDirectory(Path.Combine(_root, "plain"))
+        string dir = Directory.CreateDirectory(_temp.PathOf("plain"))
             .FullName;
 
         PathCanonicalizer.Resolve(dir)
@@ -43,14 +35,14 @@ public sealed class PathCanonicalizerTests : IDisposable
     [Fact]
     public void Resolve_ThroughSymlinkedAncestor_ReturnsRealTarget()
     {
-        string real = Directory.CreateDirectory(Path.Combine(_root, "real"))
+        string real = Directory.CreateDirectory(_temp.PathOf("real"))
             .FullName;
         string sub = Directory.CreateDirectory(Path.Combine(real, "sub"))
             .FullName;
         string file = Path.Combine(sub, "solution.slnx");
         File.WriteAllText(file, "");
 
-        string link = Path.Combine(_root, "link");
+        string link = _temp.PathOf("link");
         SymlinkSupport.CreateDirectorySymlink(link, real);
 
         // Reached through the symlinked ancestor 'link' → resolves to the real 'real/sub/solution.slnx'.
@@ -61,7 +53,7 @@ public sealed class PathCanonicalizerTests : IDisposable
     [Fact]
     public void Resolve_DriveRootOrRootDirectory_DoesNotThrow()
     {
-        string root = Path.GetPathRoot(_root)!;
+        string root = Path.GetPathRoot(_temp.Path)!;
 
         Should.NotThrow(() => PathCanonicalizer.Resolve(root));
     }
@@ -69,7 +61,7 @@ public sealed class PathCanonicalizerTests : IDisposable
     [Fact]
     public void Resolve_NonexistentPath_FallsBackToGetFullPath()
     {
-        string nonexistent = Path.Combine(_root, "does-not-exist", "Ghost.slnx");
+        string nonexistent = _temp.PathOf("does-not-exist", "Ghost.slnx");
 
         PathCanonicalizer.Resolve(nonexistent)
             .ShouldBe(Path.GetFullPath(nonexistent));

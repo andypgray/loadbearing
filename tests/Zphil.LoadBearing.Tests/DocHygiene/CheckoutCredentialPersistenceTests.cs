@@ -75,7 +75,7 @@ public sealed class CheckoutCredentialPersistenceTests
 
     private static IEnumerable<CheckoutStep> StepsIn(string workflow)
     {
-        string[] lines = File.ReadAllLines(RepoRoot.Absolute(workflow));
+        string[] lines = RepoRoot.ReadLines(workflow);
 
         return Enumerable.Range(0, lines.Length)
             .Where(index => IsCheckoutUse(lines[index]))

@@ -8,18 +8,10 @@ namespace Zphil.LoadBearing.Model;
 ///     by this rule)" caveat — MustOnlyThrow constrains external thrown types too, so the caveat's
 ///     absence IS the strictness rendering. Do not add a parenthetical.
 /// </summary>
-internal sealed class MustOnlyThrowConstraint : Constraint
+internal sealed class MustOnlyThrowConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    internal MustOnlyThrowConstraint(Selection subject, IReadOnlyList<Selection> targets)
-        : base(subject)
-    {
-        Targets = targets;
-    }
-
     /// <summary>The permitted throw targets.</summary>
-    internal IReadOnlyList<Selection> Targets { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Targets;
+    internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must throw only " + SentenceRenderer.TargetList(Targets);
 }

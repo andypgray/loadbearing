@@ -2,7 +2,6 @@ using System.Globalization;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
@@ -80,8 +79,8 @@ public sealed class CliMcpParityTests
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--skeleton"));
 
     // The three cold check documents, memoized for the same reason and against the same spec every row here
-    // binds to. The full one is not among them: HarnessA already runs it inline, and it is the one document
-    // the diff-base row would invalidate if it were shared.
+    // binds to. Nothing mutates the solution behind them either — the diff-base row runs against its own
+    // TempGitRepo copy — so the same full document answers the parity row and the budget row alike.
     private static readonly Lazy<Task<CliResult>> ColdCheckFull =
         new(() => CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
@@ -100,13 +99,12 @@ public sealed class CliMcpParityTests
     public async Task HarnessA_ViolatedSpec_CheckStatusExplain_MatchCli()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // arch_check ≡ check --json (CLI exits 1 on the violation; the tool never reports IsError). The
         // ViolatedSpec carries every violation kind including the member-subject rule naming/async-suffix
         // (memberShape / subjectMember, GRAMMAR §4.6), so this byte-parity covers member subjects too.
-        CliResult cliCheck = await CliRunner.InvokeColdAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        CliResult cliCheck = await ColdCheckFull.Value;
         cliCheck.ShouldReportViolations();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         mcpCheck.IsError.ShouldNotBe(true);
@@ -154,7 +152,7 @@ public sealed class CliMcpParityTests
     public async Task HarnessB_CleanSpec_Check_MatchesCli()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.CleanSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.CleanSpecDll), Ct);
 
         CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll, "--json");
@@ -170,7 +168,7 @@ public sealed class CliMcpParityTests
     public async Task HarnessC_RenderSpec_Context_InScopeCardAndOutOfScopePointer()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.RenderSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.RenderSpecDll), Ct);
 
         // A path inside the quarantined scope → that scope's card body.
         CallToolResult inScope = await harness.Client.CallToolAsync(
@@ -200,7 +198,7 @@ public sealed class CliMcpParityTests
             "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
+            McpServerBindings.For(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
 
         CliResult cliCheck = await CliRunner.InvokeColdAsync(
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--diff-base", "HEAD");
@@ -217,7 +215,7 @@ public sealed class CliMcpParityTests
     public async Task HarnessE_LayerSpec_Context_InLayerCardAndOutOfScopePointer()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.LayerSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.LayerSpecDll), Ct);
 
         // A path inside the Web layer directory → that layer's local-rules card.
         CallToolResult inLayer = await harness.Client.CallToolAsync(
@@ -240,7 +238,7 @@ public sealed class CliMcpParityTests
     public async Task HarnessF_NarrowedCalls_MatchTheirCliTwins()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // arch_graph overview ≡ graph --overview --json: the whole survey at coarser grain.
         CliResult cliOverview = await ColdGraphOverview.Value;
@@ -300,115 +298,77 @@ public sealed class CliMcpParityTests
     [Fact]
     public async Task HarnessG_GraphOverTheResponseBudget_ReturnsExactlyTheCliDocumentForTheGrainItLandsOn()
     {
-        // Arrange — each budget is derived from the CLI documents either side of the rung under test rather
-        // than guessed, so this row proves the degrade instead of assuming a fixture size: it must sit at or
-        // above the document that should survive the truncator whole, and below the one that should overrun.
-        CliResult cliFull = await ColdGraph.Value;
-        CliResult cliOverview = await ColdGraphOverview.Value;
-        CliResult cliSkeleton = await ColdGraphSkeleton.Value;
-        cliFull.ShouldSucceed();
-        cliOverview.ShouldSucceed();
-        cliSkeleton.ShouldSucceed();
-
-        int fullChars = cliFull.Out.TrimEnd('\r', '\n')
-            .Length;
-        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n')
-            .Length;
-        int skeletonChars = cliSkeleton.Out.TrimEnd('\r', '\n')
-            .Length;
-        var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
-        int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
-
-        budget.ShouldBeGreaterThanOrEqualTo(overviewChars + Environment.NewLine.Length);
-        budget.ShouldBeLessThan(fullChars);
-
-        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
-        harness.Environment.SetVariable(
-            LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
-
-        // Act — the plain call, with no grain argument: the degrade is the server's own decision.
-        CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-
-        // Assert — a complete document at coarser grain, byte-identical to what --overview writes. Nothing was
-        // cut, so the JSON still parses; the client reads a whole survey rather than half of one.
-        string text = mcpGraph.ShouldHaveTextContent();
-        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        text.NormalizedTrimmed()
-            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
-
-        // The rung below, on the same harness — the tool re-reads the budget per call, so a tighter one takes
-        // effect without a second server. The claim is ladder-wide, not overview-shaped: what comes back is
-        // whatever grain the response landed on, spelled exactly as that grain's own flag spells it.
-        var skeletonTokens = (int)Math.Ceiling((overviewChars + skeletonChars) / 2.0 / CharsPerToken);
-        int skeletonBudget = ResponseTruncator.ComputeMaxChars(skeletonTokens.ToString(CultureInfo.InvariantCulture));
-
-        skeletonBudget.ShouldBeGreaterThanOrEqualTo(skeletonChars + Environment.NewLine.Length);
-        skeletonBudget.ShouldBeLessThan(overviewChars);
-
-        harness.Environment.SetVariable(
-            LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
-        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-
-        string skeletonText = mcpSkeleton.ShouldHaveTextContent();
-        skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        skeletonText.NormalizedTrimmed()
-            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+        await ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
+            "arch_graph", ColdGraph, ColdGraphOverview, ColdGraphSkeleton, result => result.ShouldSucceed());
     }
 
     [Fact]
     public async Task HarnessH_CheckOverTheResponseBudget_ReturnsExactlyTheCliDocumentForTheGrainItLandsOn()
     {
-        // Arrange — HarnessG's twin, and the row that matters most of the two: arch_check is the tool agents
-        // are told to call before finishing work, and its bulk driver is an uncapped per-site dump, so this
-        // is the response most likely to overrun on the codebases the product is for. Budgets are derived
-        // from the CLI documents either side of the rung under test rather than guessed.
-        CliResult cliFull = await ColdCheckFull.Value;
-        CliResult cliOverview = await ColdCheckOverview.Value;
-        CliResult cliSkeleton = await ColdCheckSkeleton.Value;
-        cliFull.ShouldReportViolations();
-        cliOverview.ShouldReportViolations();
-        cliSkeleton.ShouldReportViolations();
+        // HarnessG's twin, and the row that matters most of the two: arch_check is the tool agents are told
+        // to call before finishing work, and its bulk driver is an uncapped per-site dump, so this is the
+        // response most likely to overrun on the codebases the product is for. A cut report there evicts an
+        // agent from the tool surface entirely, which is the failure the ladder exists for.
+        await ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
+            "arch_check",
+            ColdCheckFull,
+            ColdCheckOverview,
+            ColdCheckSkeleton,
+            result => result.ShouldReportViolations());
+    }
 
-        int fullChars = cliFull.Out.TrimEnd('\r', '\n')
-            .Length;
-        int overviewChars = cliOverview.Out.TrimEnd('\r', '\n')
-            .Length;
-        int skeletonChars = cliSkeleton.Out.TrimEnd('\r', '\n')
-            .Length;
-        var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
-        int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
+    /// <summary>
+    ///     Walks <paramref name="tool" /> down the grain ladder a rung at a time and asserts that each answer
+    ///     is byte-identical to the CLI document for the grain it landed on: over a budget between
+    ///     <paramref name="full" /> and <paramref name="overview" /> the tool must return the whole overview
+    ///     document, and over one between <paramref name="overview" /> and <paramref name="skeleton" /> the
+    ///     whole skeleton — nothing cut, so the JSON still parses and the client reads a whole answer rather
+    ///     than half of one. <paramref name="verdict" /> is the exit contract every CLI leg must meet.
+    /// </summary>
+    /// <remarks>
+    ///     Both budgets are derived from the CLI documents either side of the rung under test rather than
+    ///     guessed, so this proves the degrade instead of assuming a fixture size. The two calls share one
+    ///     harness on purpose: the tool re-reads the budget per call, so a tighter one takes effect without a
+    ///     second server, and neither call names a grain — the degrade is the server's own decision.
+    /// </remarks>
+    private static async Task ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
+        string tool,
+        Lazy<Task<CliResult>> full,
+        Lazy<Task<CliResult>> overview,
+        Lazy<Task<CliResult>> skeleton,
+        Action<CliResult> verdict)
+    {
+        // Arrange
+        CliResult cliFull = await full.Value;
+        CliResult cliOverview = await overview.Value;
+        CliResult cliSkeleton = await skeleton.Value;
+        verdict(cliFull);
+        verdict(cliOverview);
+        verdict(cliSkeleton);
 
-        budget.ShouldBeGreaterThanOrEqualTo(overviewChars + Environment.NewLine.Length);
-        budget.ShouldBeLessThan(fullChars);
+        int tokens = ShouldHaveBudgetBetween(cliFull, cliOverview);
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable(
             LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
 
-        // Act — the plain call, with no grain argument: the degrade is the server's own decision.
-        CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+        // Act — the plain call, with no grain argument.
+        CallToolResult mcpOverview = await harness.Client.CallToolAsync(tool, cancellationToken: Ct);
 
-        // Assert — a complete document at coarser grain, byte-identical to what --overview writes. Nothing
-        // was cut, so the JSON still parses; the client reads a whole verdict rather than half of one, which
-        // is the failure this exists for — a cut report evicts an agent from the tool surface entirely.
-        string text = mcpCheck.ShouldHaveTextContent();
+        // Assert — a complete document at coarser grain, byte-identical to what --overview writes.
+        string text = mcpOverview.ShouldHaveTextContent();
         text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
         text.NormalizedTrimmed()
             .ShouldBe(cliOverview.Out.NormalizedTrimmed());
 
-        // The rung below, on the same harness — the budget is re-read per call, so a tighter one takes effect
-        // without a second server. The claim is ladder-wide, not overview-shaped.
-        var skeletonTokens = (int)Math.Ceiling((overviewChars + skeletonChars) / 2.0 / CharsPerToken);
-        int skeletonBudget = ResponseTruncator.ComputeMaxChars(skeletonTokens.ToString(CultureInfo.InvariantCulture));
-
-        skeletonBudget.ShouldBeGreaterThanOrEqualTo(skeletonChars + Environment.NewLine.Length);
-        skeletonBudget.ShouldBeLessThan(overviewChars);
+        // The rung below, on the same harness: the claim is ladder-wide, not overview-shaped — what comes
+        // back is whatever grain the response landed on, spelled exactly as that grain's own flag spells it.
+        int skeletonTokens = ShouldHaveBudgetBetween(cliOverview, cliSkeleton);
 
         harness.Environment.SetVariable(
             LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
-        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync(tool, cancellationToken: Ct);
 
         string skeletonText = mcpSkeleton.ShouldHaveTextContent();
         skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");
@@ -416,11 +376,23 @@ public sealed class CliMcpParityTests
             .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
     }
 
-    private static McpServerBinding Binding(string? solution, string? spec)
+    /// <summary>
+    ///     The client-declared token budget that lands between <paramref name="larger" /> and
+    ///     <paramref name="smaller" />, asserting that the cap it converts to really does sit at or above the
+    ///     document that should survive the truncator whole and below the one that should overrun.
+    /// </summary>
+    private static int ShouldHaveBudgetBetween(CliResult larger, CliResult smaller)
     {
-        string workingDirectory = solution is null
-            ? Directory.GetCurrentDirectory()
-            : Path.GetDirectoryName(Path.GetFullPath(solution))!;
-        return new McpServerBinding(solution, spec, workingDirectory);
+        int largerChars = larger.Out.TrimEnd('\r', '\n')
+            .Length;
+        int smallerChars = smaller.Out.TrimEnd('\r', '\n')
+            .Length;
+        var tokens = (int)Math.Ceiling((largerChars + smallerChars) / 2.0 / CharsPerToken);
+        int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
+
+        budget.ShouldBeGreaterThanOrEqualTo(smallerChars + Environment.NewLine.Length);
+        budget.ShouldBeLessThan(largerChars);
+
+        return tokens;
     }
 }

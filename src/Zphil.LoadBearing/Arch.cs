@@ -80,9 +80,7 @@ public sealed class Arch
     public Selection AnyOf(Selection first, params Selection[] more)
     {
         Guard.NotNull(more, nameof(more));
-        var parts = new List<Selection>(1 + more.Length) { Guard.NotNull(first, nameof(first)) };
-        foreach (Selection part in more) parts.Add(Guard.NotNull(part, nameof(more)));
-
+        var parts = OperandList.OneOrMore(first, more, selection => selection);
         return UnionSelection.Create(this, parts);
     }
 
@@ -95,9 +93,7 @@ public sealed class Arch
     public Selection AnyOf(Type first, params Type[] more)
     {
         Guard.NotNull(more, nameof(more));
-        var parts = new List<Selection>(1 + more.Length) { Type(Guard.NotNull(first, nameof(first))) };
-        foreach (Type part in more) parts.Add(Type(Guard.NotNull(part, nameof(more))));
-
+        var parts = OperandList.OneOrMore(first, more, type => Type(type));
         return UnionSelection.Create(this, parts);
     }
 

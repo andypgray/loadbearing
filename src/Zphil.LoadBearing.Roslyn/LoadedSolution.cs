@@ -11,9 +11,6 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </summary>
 public sealed class LoadedSolution : IDisposable
 {
-    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
-        new Dictionary<ProjectId, string>();
-
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
@@ -22,7 +19,7 @@ public sealed class LoadedSolution : IDisposable
     {
         Workspace = workspace;
         Solution = solution;
-        TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
+        TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
         FailedProjects = (report ?? ProjectLoadReport.Empty).Failed;
         UncheckedProjects = (report ?? ProjectLoadReport.Empty).Unchecked;
         RestoreFailedProjects = restoreFailedProjects ?? [];
@@ -74,6 +71,18 @@ public sealed class LoadedSolution : IDisposable
     ///     reading as a green over the solution.
     /// </summary>
     public IReadOnlyList<string> UncheckedProjects { get; }
+
+    /// <summary>
+    ///     This load's verdict as the one value every surface reads — the three project lists above beside
+    ///     the failure messages the load reported, which only the caller has: the loader writes them to a
+    ///     sink it was handed, so they never land on this type. Merge notes are empty by construction, since
+    ///     only extraction produces them and none has run at load time.
+    /// </summary>
+    /// <param name="loadFailures">The workspace-load failure messages this load wrote to the caller's sink.</param>
+    internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
+    {
+        return new WorkspaceDiagnostics(loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects);
+    }
 
     /// <summary>Disposes the underlying workspace.</summary>
     public void Dispose()

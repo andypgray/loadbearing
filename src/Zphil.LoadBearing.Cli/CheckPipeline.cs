@@ -59,7 +59,6 @@ internal static class CheckPipeline
     // unmatched-project one also take.
     private static string UnmatchedRulesMessage(IReadOnlyList<string> ruleIdGlobs, ArchitectureModel model)
     {
-        return Refusals.NotFoundMessage(
-            $"No rule matched '{string.Join(";", ruleIdGlobs)}'", "Available rule IDs", Refusals.AvailableRuleIds(model));
+        return Refusals.RuleNotFound($"No rule matched '{string.Join(";", ruleIdGlobs)}'", model);
     }
 }

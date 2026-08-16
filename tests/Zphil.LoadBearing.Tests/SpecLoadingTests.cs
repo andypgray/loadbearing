@@ -3,6 +3,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Discovery;
+using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests;
 
@@ -31,7 +32,7 @@ public class SpecLoadingTests
                 .ShouldBeAssignableTo<IArchitectureSpec>();
 
             ArchitectureModel model = ArchModelBuilder.Build(specs);
-            ArchRule rule = model.Rules.Single(r => r.Id == "fixture/interfaces");
+            ArchRule rule = model.Rule("fixture/interfaces");
             rule.Sentence.ShouldBe("Interfaces in `Fixture.*` must be named `I*`.");
         }
         finally

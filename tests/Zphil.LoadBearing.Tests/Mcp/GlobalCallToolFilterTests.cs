@@ -2,7 +2,6 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -32,7 +31,7 @@ public sealed class GlobalCallToolFilterTests
     {
         // Arrange — arch_explain of an unknown rule ID throws UserErrorException on the DLL fast path.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // Act
         CallToolResult result = await harness.Client.CallToolAsync(
@@ -57,7 +56,7 @@ public sealed class GlobalCallToolFilterTests
         File.WriteAllText(garbageDll, "this is not a portable executable");
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, garbageDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, garbageDll), Ct);
 
         // Act
         CallToolResult result = await harness.Client.CallToolAsync(
@@ -76,7 +75,7 @@ public sealed class GlobalCallToolFilterTests
     {
         // Arrange — a 10-token budget (25-char cap) forces truncation of a real explain body.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "10");
 
         // Act
@@ -99,7 +98,7 @@ public sealed class GlobalCallToolFilterTests
         // whole ladder down to skeleton and the truncator still fires. That is the backstop case, and the one
         // that has to teach: with grain exhausted, the footer names the knob that is actually left.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "10");
 
         // Act
@@ -124,7 +123,7 @@ public sealed class GlobalCallToolFilterTests
         // back cut, because the runner stepped once to overview and the filter then truncated that document
         // at the same number it had just been measured against.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "400"); // 1000-char cap
 
         // Act
@@ -149,7 +148,7 @@ public sealed class GlobalCallToolFilterTests
         // CliErrorMapper does not recognise one as a user error, so the filter classified it as a bug and
         // returned a byte position. Binding fails ahead of dispatch, so no workspace is ever opened.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // Act
         CallToolResult result = await harness.Client.CallToolAsync(
@@ -169,7 +168,7 @@ public sealed class GlobalCallToolFilterTests
     {
         // Arrange — "rule" is the classic typo of the "ruleId" parameter; the guard fires pre-dispatch.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // Act
         CallToolResult result = await harness.Client.CallToolAsync(
@@ -183,13 +182,5 @@ public sealed class GlobalCallToolFilterTests
         text.ShouldContain("\"rule\"");
         text.ShouldContain("arch_explain");
         harness.Logs.Warnings.ShouldBeEmpty();
-    }
-
-    private static McpServerBinding Binding(string? solution, string? spec)
-    {
-        string workingDirectory = solution is null
-            ? Directory.GetCurrentDirectory()
-            : Path.GetDirectoryName(Path.GetFullPath(solution))!;
-        return new McpServerBinding(solution, spec, workingDirectory);
     }
 }

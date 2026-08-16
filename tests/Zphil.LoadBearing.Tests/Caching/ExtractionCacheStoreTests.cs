@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -15,8 +16,30 @@ namespace Zphil.LoadBearing.Tests.Caching;
 /// </summary>
 public sealed class ExtractionCacheStoreTests
 {
-    [Fact]
-    public void ReadAndValidate_SchemaVersionMismatch_ReturnsMiss()
+    /// <summary>
+    ///     The recorded schema version is the one thing a read can trust before it has deserialized
+    ///     anything, so any version but the current one is a miss — whether it is ahead of this reader or
+    ///     behind it. Each case below names the wrong answer that version would give on a hit.
+    /// </summary>
+    [Theory]
+    // Ahead: a cache written by a future schema version was written by a writer that knew fields this
+    // reader does not.
+    [InlineData(999)]
+    // A v13 cache predates the catch edge's swallowing-site subset (schema bumped 13→14): its catch edges
+    // carry no SwallowingSites, so every one would replay with a null subset and the rethrow fact would read
+    // wrong on a hit.
+    [InlineData(13)]
+    // A v16 cache predates FailedProjects (schema bumped 16→17): it records which diagnostics the load
+    // produced but not which projects failed, so a hit would deserialize an empty list and answer green on
+    // the one solution shape check exists to refuse. That is the single worst wrong answer this cache could
+    // give, so the version it was written under has to be enough to reject it.
+    [InlineData(16)]
+    // A v18 cache predates RestoreFailedProjects (schema bumped 18→19): it records which projects failed to
+    // load but not which projects' NuGet packages were missing, so a hit would deserialize an empty list and
+    // answer green on a model missing every package edge — the exact silent pass this field was added to
+    // close. The version it was written under has to be enough to reject it.
+    [InlineData(18)]
+    public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
         using var solution = new SyntheticSolution();
@@ -26,75 +49,10 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
             .ShouldBeTrue();
 
-        // Act — a cache written by a future schema version is unusable.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 999);
+        // Act — restamp the cache with a version this reader does not write.
+        solution.MutateCacheJson(root => root["SchemaVersion"] = schemaVersion);
 
-        // Assert
-        store.ReadAndValidate()
-            .Outcome.ShouldBe(CacheOutcome.Miss);
-    }
-
-    [Fact]
-    public void ReadAndValidate_PriorSchemaVersion13_ReturnsMiss()
-    {
-        // Arrange — a v13 cache predates the catch edge's swallowing-site subset (schema bumped 13→14): its catch
-        // edges carry no SwallowingSites, so every one would replay with a null subset and the rethrow fact would
-        // read wrong on a hit. It must degrade cleanly instead.
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", "class A {}"));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
-            .ShouldBeTrue();
-
-        // Act — downgrade the recorded schema to that superseded version.
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 13);
-
-        // Assert — an old-schema cache degrades cleanly to a rebuild, never a wrong answer.
-        store.ReadAndValidate()
-            .Outcome.ShouldBe(CacheOutcome.Miss);
-    }
-
-    [Fact]
-    public void ReadAndValidate_PriorSchemaVersion16_ReturnsMiss()
-    {
-        // Arrange — a v16 cache predates FailedProjects (schema bumped 16→17): it records which diagnostics
-        // the load produced but not which projects failed, so a hit would deserialize an empty list and
-        // answer green on the one solution shape check exists to refuse. That is the single worst wrong
-        // answer this cache could give, so the version it was written under has to be enough to reject it.
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", "class A {}"));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
-            .ShouldBeTrue();
-
-        // Act
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 16);
-
-        // Assert
-        store.ReadAndValidate()
-            .Outcome.ShouldBe(CacheOutcome.Miss);
-    }
-
-    [Fact]
-    public void ReadAndValidate_PriorSchemaVersion18_ReturnsMiss()
-    {
-        // Arrange — a v18 cache predates RestoreFailedProjects (schema bumped 18→19): it records which
-        // projects failed to load but not which projects' NuGet packages were missing, so a hit would
-        // deserialize an empty list and answer green on a model missing every package edge — the exact silent
-        // pass this field was added to close. The version it was written under has to be enough to reject it.
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", "class A {}"));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
-            .ShouldBeTrue();
-
-        // Act
-        solution.MutateCacheJson(root => root["SchemaVersion"] = 18);
-
-        // Assert
+        // Assert — an off-schema cache degrades cleanly to a rebuild, never a wrong answer.
         store.ReadAndValidate()
             .Outcome.ShouldBe(CacheOutcome.Miss);
     }
@@ -113,10 +71,7 @@ public sealed class ExtractionCacheStoreTests
             solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
                 .ToList(),
             [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
-            [],
-            [],
-            [],
-            []);
+            WorkspaceDiagnostics.None);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -391,7 +346,7 @@ public sealed class ExtractionCacheStoreTests
         store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "first"))
             .ShouldBeTrue();
         store.ReadAndValidate()
-            .Diagnostics.ShouldBe(["first"]);
+            .LoadDiagnostics.LoadFailures.ShouldBe(["first"]);
 
         // Act — a second atomic write fully replaces the file.
         store.Write(store.CaptureFingerprint(solution.Projects), OneFragment(solution, "second"))
@@ -400,7 +355,7 @@ public sealed class ExtractionCacheStoreTests
 
         // Assert — the new content, whole (no partial state from the overwrite).
         result.Outcome.ShouldBe(CacheOutcome.Hit);
-        result.Diagnostics.ShouldBe(["second"]);
+        result.LoadDiagnostics.LoadFailures.ShouldBe(["second"]);
     }
 
     [Fact]
@@ -417,10 +372,9 @@ public sealed class ExtractionCacheStoreTests
             solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
                 .ToList(),
             specs,
-            ["load-diag-1", "load-diag-2"],
-            ["/repo/Broken/Broken.csproj"],
-            [],
-            ["/repo/Unrestored/Unrestored.csproj"]);
+            new WorkspaceDiagnostics(
+                ["load-diag-1", "load-diag-2"], [], ["/repo/Broken/Broken.csproj"], [],
+                ["/repo/Unrestored/Unrestored.csproj"]));
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -442,11 +396,11 @@ public sealed class ExtractionCacheStoreTests
         // The intermediate assembly path round-trips too: a hit that lost it would resolve a built output the
         // cold run refused, which is the whole reason it is persisted rather than recomputed.
         replayed.IntermediateAssemblyPath.ShouldBe("/obj/A.dll");
-        result.Diagnostics.ShouldBe(["load-diag-1", "load-diag-2"]);
+        result.LoadDiagnostics.LoadFailures.ShouldBe(["load-diag-1", "load-diag-2"]);
         // And both halves of the gate's own input round-trip beside them. A hit owns no workspace to recompute
         // either from, so a manifest that lost one would answer green exactly where the cold run refuses.
-        result.FailedProjects.ShouldBe(["/repo/Broken/Broken.csproj"]);
-        result.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
+        result.LoadDiagnostics.FailedProjects.ShouldBe(["/repo/Broken/Broken.csproj"]);
+        result.LoadDiagnostics.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
     }
 
     [Fact]
@@ -466,10 +420,7 @@ public sealed class ExtractionCacheStoreTests
                 new CodebaseFragment("A", "netstandard2.0", [], [], [], [], [], [], [], [], [], [], [])
             ],
             [],
-            [],
-            [],
-            [],
-            []);
+            WorkspaceDiagnostics.None);
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -493,7 +444,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], ["diag"], [], [], []);
+        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], []));
     }
 
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
@@ -501,7 +452,7 @@ public sealed class ExtractionCacheStoreTests
         var fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], [diagnostic], [], [], []);
+        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics([diagnostic], [], [], [], []));
     }
 
     /// <summary>
@@ -613,9 +564,7 @@ public sealed class ExtractionCacheStoreTests
         // on-disk-but-excluded stray (a <Compile Remove> file) the cone scan sees but the compiler does not.
         public void AddStrayFile(string project, string relativePath, string content)
         {
-            string path = Path.Combine(Root, project, relativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, content);
+            temp.WriteFile([project, relativePath], content);
         }
 
         public string PathOf(string project, string file)

@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -65,14 +66,16 @@ internal static class StatusFormatter
     }
 
     // Shared by Migrate and Quarantine containment. The promotable branch fires only for Migrate — quarantine
-    // promotion (Quarantine→Migrate) is a human decision, so a burned-to-zero containment reads plain.
+    // promotion (Quarantine→Migrate) is a human decision, so a burned-to-zero containment reads plain. The
+    // suggestion is the model's own RuleResult.Promotable rather than a second reading of the same counts,
+    // so this line and the status document can never disagree about which rules are ready.
     private static string RatchetLine(RuleResult result, string postureLabel)
     {
         int remaining = result.Grandfathered.Count;
         int newCount = result.Violations.Count;
         int stale = result.StaleBaselineEntries;
         string marker = result.Status == RuleStatus.Failed ? "FAIL" : "pass";
-        bool promotable = postureLabel == "migrate";
+        bool promotable = result.Promotable;
         return $"{marker} {result.Rule.Id} ({postureLabel}) — {RatchetDetail(result.BaselineCaptured, remaining, newCount, stale, promotable)}";
     }
 

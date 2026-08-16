@@ -3,7 +3,6 @@ using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
-using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -73,7 +72,7 @@ public sealed class WarmWorkspaceMcpTests
         // check report.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -110,7 +109,7 @@ public sealed class WarmWorkspaceMcpTests
         // (uncaptured) is already red on HomeController's two ambient-clock reads (GRAMMAR §4.5).
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -150,7 +149,7 @@ public sealed class WarmWorkspaceMcpTests
         // methods Save/Load (GRAMMAR §4.6). This is the member-SUBJECT analog of the member-USE test above.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -201,7 +200,7 @@ public sealed class WarmWorkspaceMcpTests
 
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, specDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, specDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -239,7 +238,7 @@ public sealed class WarmWorkspaceMcpTests
         // of the member edit tests above — an on-disk REGISTRATION change (not a reference/member edit).
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -279,7 +278,7 @@ public sealed class WarmWorkspaceMcpTests
         // (source, caught) identity, so the one catch violation just grows a second site — not a new identity.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -329,7 +328,7 @@ public sealed class WarmWorkspaceMcpTests
         // constant that makes the ReportEndpoint drop legible.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
 
         string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -374,7 +373,7 @@ public sealed class WarmWorkspaceMcpTests
         // measured steady state is a pure O(stat) no-op (the steady-state case, driven through the tool).
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);
 
         var session = harness.Services.GetRequiredService<WorkspaceSession>();
         var store = harness.Services.GetRequiredService<SessionFragmentStore>();
@@ -411,7 +410,7 @@ public sealed class WarmWorkspaceMcpTests
         // Arrange
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);
 
         var session = harness.Services.GetRequiredService<WorkspaceSession>();
         await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct); // warm load
@@ -432,7 +431,7 @@ public sealed class WarmWorkspaceMcpTests
     {
         // Arrange
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.CleanSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.CleanSpecDll), Ct);
 
         // Act — flip the disable flag on the fake environment, then resolve the composed source. The factory
         // reads the flag lazily on first resolve, so setting it before this resolve selects the cold path.
@@ -448,7 +447,7 @@ public sealed class WarmWorkspaceMcpTests
     {
         // Arrange
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
 
         // Act — fire two tool calls at once. The MCP SDK dispatches them in parallel; the session gate
         // serializes the concurrent first-load, and both callers share the one immutable snapshot.
@@ -473,7 +472,7 @@ public sealed class WarmWorkspaceMcpTests
         File.Copy(CliRunner.CleanSpecDll, tempSpec);
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            Binding(CliRunner.MyAppSolution, tempSpec), Ct);
+            McpServerBindings.For(CliRunner.MyAppSolution, tempSpec), Ct);
 
         // Warm the session WITHOUT loading the spec: arch_graph opens the workspace (it is spec-free), so
         // the spec DLL stays unlocked and can be deleted to model a mid-session removal.
@@ -495,14 +494,6 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
-
-    private static McpServerBinding Binding(string? solution, string? spec)
-    {
-        string workingDirectory = solution is null
-            ? Directory.GetCurrentDirectory()
-            : Path.GetDirectoryName(Path.GetFullPath(solution))!;
-        return new McpServerBinding(solution, spec, workingDirectory);
-    }
 
     // Turns HomeController's tokenless Save into one accepting a CancellationToken — the compliant signature,
     // so its member-shape red under async/accept-cancellation clears (its DocId changes as the parameter joins

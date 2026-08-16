@@ -13,8 +13,6 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 /// </summary>
 internal static class CompilationFactory
 {
-    private static readonly MetadataReference CoreLib = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
-
     // The full trusted-platform-assemblies set for the DI-aware overloads: the shared-framework assemblies
     // plus the test project's own dependency assemblies (deployed to the output directory), which include the
     // real Microsoft.Extensions.DependencyInjection.Abstractions (IServiceCollection, ServiceLifetime, the
@@ -38,7 +36,7 @@ internal static class CompilationFactory
 
     public static CompilationInput Compile(string projectName, params (string Path, string Source)[] files)
     {
-        return new CompilationInput(CreateCompilation(projectName, [CoreLib], files), projectName, []);
+        return new CompilationInput(CreateCompilation(projectName, [CoreLibrary], files), projectName, []);
     }
 
     public static CompilationInput Compile(string projectName, string source)
@@ -50,16 +48,29 @@ internal static class CompilationFactory
     public static CompilationInput CompileReferencing(
         string projectName, Compilation referenced, string referencedProjectName, params (string Path, string Source)[] files)
     {
-        return new CompilationInput(CreateCompilation(projectName, [CoreLib, referenced.ToMetadataReference()], files), projectName, [referencedProjectName]);
+        return new CompilationInput(CreateCompilation(projectName, [CoreLibrary, referenced.ToMetadataReference()], files), projectName, [referencedProjectName]);
     }
+
+    /// <summary>The runtime core library — the one metadata reference the MSBuild-free path needs.</summary>
+    public static MetadataReference CoreLibrary { get; } = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
 
     public static CSharpCompilation CreateCompilation(
         string name, IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)
     {
+        return CreateCompilation(name, references, OutputKind.DynamicallyLinkedLibrary, files);
+    }
+
+    /// <summary>
+    ///     The same, at <paramref name="kind" /> — <see cref="OutputKind.ConsoleApplication" /> being the kind
+    ///     that makes Roslyn synthesize the top-level-statements <c>Program</c> entry point.
+    /// </summary>
+    public static CSharpCompilation CreateCompilation(
+        string name, IReadOnlyList<MetadataReference> references, OutputKind kind, params (string Path, string Source)[] files)
+    {
         var trees = files
             .Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
             .ToArray();
-        return CSharpCompilation.Create(name, trees, references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return CSharpCompilation.Create(name, trees, references, new CSharpCompilationOptions(kind));
     }
 
     /// <summary>Single-source convenience: extract a model from one file in project <c>TestProject</c>.</summary>
@@ -75,10 +86,7 @@ internal static class CompilationFactory
     /// </summary>
     public static CodebaseModel ExtractConsoleApp(params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
-            .ToArray();
-        var compilation = CSharpCompilation.Create(
-            "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+        CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
         return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
     }
 
@@ -91,10 +99,7 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractConsoleAppWithGenerator(
         IIncrementalGenerator generator, params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
-            .ToArray();
-        var compilation = CSharpCompilation.Create(
-            "TestProject", trees, [CoreLib], new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+        CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
         driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out _);
@@ -159,10 +164,7 @@ internal static class CompilationFactory
     /// </summary>
     public static CodebaseModel ExtractConsoleAppWithDi(params (string Path, string Source)[] files)
     {
-        var trees = files.Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
-            .ToArray();
-        var compilation = CSharpCompilation.Create(
-            "TestProject", trees, DiReferences, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+        CSharpCompilation compilation = CreateCompilation("TestProject", DiReferences, OutputKind.ConsoleApplication, files);
         return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
     }
 }

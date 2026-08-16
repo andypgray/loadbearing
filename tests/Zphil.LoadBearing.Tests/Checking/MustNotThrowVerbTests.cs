@@ -117,7 +117,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["App.Broad -> System.Exception"]);
     }
@@ -151,7 +151,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["N.Worker -> N.AppError"]);
     }
@@ -233,7 +233,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("throw types a caller can dispatch on"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["N.Worker -> N.Beta"]);
         result.ShouldHaveGrandfathered(1);

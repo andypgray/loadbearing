@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -31,52 +30,46 @@ internal enum CacheOutcome
 ///     Carries everything a caller needs to finish a run without re-reading the cache.
 /// </summary>
 /// <remarks>
-///     The recorded spec resolutions, workspace diagnostics, failed projects and restore-failed projects are
-///     replayed on a hit, so cached and cold output — and the fail-closed verdict — are identical on a solution
-///     that does not load completely or did not restore.
+///     The recorded spec resolutions and the recorded load verdict are replayed on a hit, so cached and cold
+///     output — and the fail-closed decision — are identical on a solution that does not load completely or
+///     did not restore.
 /// </remarks>
+/// <param name="LoadDiagnostics">
+///     The recorded load verdict, carried whole rather than as the four lists the manifest stores it in:
+///     every surface downstream reads this one value, so a hit hands them exactly what a cold load hands
+///     them and no caller can pair the lists up differently. Merge notes are empty by construction — the
+///     cache stores fragments, and every path regenerates the notes from them at merge time.
+/// </param>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
     IReadOnlyList<CodebaseFragment> ReusableFragments,
     IReadOnlySet<string> DirtyProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
-    IReadOnlyList<string> Diagnostics,
-    IReadOnlyList<string> FailedProjects,
-    IReadOnlyList<string> UncheckedProjects,
-    IReadOnlyList<string> RestoreFailedProjects)
+    WorkspaceDiagnostics LoadDiagnostics)
 {
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
 
     internal static CacheReadResult Miss()
     {
-        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], [], [], []);
+        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], WorkspaceDiagnostics.None);
     }
 
     internal static CacheReadResult Hit(
         IReadOnlyList<CodebaseFragment> fragments,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
-        IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects)
+        WorkspaceDiagnostics loadDiagnostics)
     {
-        return new CacheReadResult(
-            CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics, failedProjects,
-            uncheckedProjects, restoreFailedProjects);
+        return new CacheReadResult(CacheOutcome.Hit, fragments, EmptySet, specResolutions, loadDiagnostics);
     }
 
     internal static CacheReadResult Partial(
         IReadOnlyList<CodebaseFragment> reusableFragments,
         IReadOnlySet<string> dirtyProjects,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
-        IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects)
+        WorkspaceDiagnostics loadDiagnostics)
     {
         return new CacheReadResult(
-            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics, failedProjects,
-            uncheckedProjects, restoreFailedProjects);
+            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, loadDiagnostics);
     }
 }
 
@@ -114,14 +107,16 @@ internal sealed record CacheFingerprint(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ProjectCacheEntry> Projects);
 
-/// <summary>What a workspace-loaded run produced and wants persisted: the fragments plus their sidecar data.</summary>
+/// <summary>
+///     What a workspace-loaded run produced and wants persisted: the fragments, the spec resolutions to
+///     replay, and the load verdict whole — the same value the run itself rendered from, so a hit replays it
+///     rather than a re-paired copy of it. Only its four persisted lists reach the manifest; the merge notes
+///     it carries are regenerated from the fragments on every path and are never stored.
+/// </summary>
 internal sealed record ExtractionResult(
     IReadOnlyList<CodebaseFragment> Fragments,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
-    IReadOnlyList<string> Diagnostics,
-    IReadOnlyList<string> FailedProjects,
-    IReadOnlyList<string> UncheckedProjects,
-    IReadOnlyList<string> RestoreFailedProjects);
+    WorkspaceDiagnostics LoadDiagnostics);
 
 /// <summary>
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
@@ -163,6 +158,7 @@ internal sealed class ExtractionCacheStore
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;
+    private long contentHashCount;
 
     /// <summary>
     ///     Creates a store for <paramref name="solutionPath" />'s cache. The file lives under
@@ -183,7 +179,12 @@ internal sealed class ExtractionCacheStore
     ///     persisted-cache analog of <see cref="WorkspaceSession.SweepContentReads" />; never consulted in
     ///     production.
     /// </summary>
-    internal long ContentHashCount { get; private set; }
+    /// <remarks>
+    ///     Counted through <see cref="Interlocked" /> because the per-project sweep is parallel, and the
+    ///     tests that read this assert exact deltas — a lost increment would not be a slightly-off number, it
+    ///     would be a flaky pin on the promise that a steady-state validation opens nothing.
+    /// </remarks>
+    internal long ContentHashCount => Volatile.Read(ref contentHashCount);
 
     /// <summary>
     ///     Stats and hashes every input <em>now</em>, returning the pre-extraction fingerprint to hand to
@@ -192,26 +193,28 @@ internal sealed class ExtractionCacheStore
     /// </summary>
     public CacheFingerprint CaptureFingerprint(IReadOnlyList<ProjectInputs> projects, CancellationToken ct = default)
     {
-        var structuralStamps = new List<FileStamp>();
-        var seenStructural = new HashSet<string>(PathComparison.Comparer);
-        foreach (string path in EnumerateStructuralPaths(projects))
-            if (seenStructural.Add(path))
-                structuralStamps.Add(FileStamping.StampOf(path));
+        var structuralStamps = StructuralPathsOf(projects)
+            .Select(FileStamping.StampOf)
+            .ToList();
 
         var structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
 
-        var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        var documentsByName = new Dictionary<string, IReadOnlyList<FileStamp>>(StringComparer.Ordinal);
+        // Each project's fingerprint reads only its own files, so the whole SHA-256 pass over the solution's
+        // sources runs in parallel — the one place a cold run spends real wall-clock — and lands in
+        // position-indexed slots. The Merkle pass below needs every content key before it can start, so it
+        // stays sequential; only the independent half moves.
+        var contentKeyByIndex = new string[projects.Count];
+        var documentsByIndex = new IReadOnlyList<FileStamp>[projects.Count];
 
-        foreach (ProjectInputs project in projects)
+        Parallel.For(0, projects.Count, new ParallelOptions { CancellationToken = ct }, index =>
         {
-            ct.ThrowIfCancellationRequested();
+            ProjectInputs project = projects[index];
 
             var documents = project.DocumentPaths.Select(FileStamping.StampOf).ToList();
             var documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
             string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
-            string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
+            string? assetsSha = structuralShaByPath.GetValueOrDefault(
+                IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
 
             // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
             // full paths). Hardcoding an empty adds list here would be wrong: a *.cs on disk under the
@@ -220,9 +223,20 @@ internal sealed class ExtractionCacheStore
             // routine, they agree.
             var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
             var adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
-            contentKeys[project.ProjectName] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
+            contentKeyByIndex[index] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
+            documentsByIndex[index] = documents;
+        });
+
+        // Re-keyed by name in input order, so a repeated name resolves to the same entry it always did.
+        var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        var documentsByName = new Dictionary<string, IReadOnlyList<FileStamp>>(StringComparer.Ordinal);
+        for (var index = 0; index < projects.Count; index++)
+        {
+            ProjectInputs project = projects[index];
+            contentKeys[project.ProjectName] = contentKeyByIndex[index];
             referencesByName[project.ProjectName] = project.ProjectReferences;
-            documentsByName[project.ProjectName] = documents;
+            documentsByName[project.ProjectName] = documentsByIndex[index];
         }
 
         var memo = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -271,10 +285,10 @@ internal sealed class ExtractionCacheStore
             fingerprint.StructuralStamps,
             fingerprint.Projects,
             extraction.SpecResolutions,
-            extraction.Diagnostics,
-            extraction.FailedProjects,
-            extraction.UncheckedProjects,
-            extraction.RestoreFailedProjects,
+            extraction.LoadDiagnostics.LoadFailures,
+            extraction.LoadDiagnostics.FailedProjects,
+            extraction.LoadDiagnostics.UncheckedProjects,
+            extraction.LoadDiagnostics.RestoreFailedProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -314,21 +328,31 @@ internal sealed class ExtractionCacheStore
         foreach (FileStamp stamp in manifest.StructuralStamps)
         {
             ct.ThrowIfCancellationRequested();
-            (bool missed, FileStamp refreshed) = FileStamping.CheckStructural(stamp, () => ContentHashCount++);
+            (bool missed, FileStamp refreshed) = FileStamping.CheckStructural(
+                stamp, () => Interlocked.Increment(ref contentHashCount));
             if (missed) return CacheReadResult.Miss();
             refreshedStructural.Add(refreshed);
         }
 
         var structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
-        // Per-document sweep + cone scan ⇒ each project's recomputed content key.
+        // Per-document sweep + cone scan ⇒ each project's recomputed content key. Independent per project —
+        // each reads only its own documents and its own cone — so it runs in parallel into position-indexed
+        // slots; the Merkle pass below needs them all and stays sequential.
+        var checkedByIndex = new (string ContentKey, IReadOnlyList<FileStamp> RefreshedDocuments)[manifest.Projects.Count];
+
+        Parallel.For(0, manifest.Projects.Count, new ParallelOptions { CancellationToken = ct },
+            index => checkedByIndex[index] = CheckProject(manifest.Projects[index], structuralShaByPath, ct));
+
+        // Rebuilt in manifest order: DocumentStampsEqual compares the refreshed list against the manifest's
+        // index-wise, so the order is what makes a promotion write the same file back.
         var recomputedContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var refreshedProjects = new List<ProjectCacheEntry>(manifest.Projects.Count);
-        foreach (ProjectCacheEntry project in manifest.Projects)
+        for (var index = 0; index < manifest.Projects.Count; index++)
         {
-            ct.ThrowIfCancellationRequested();
-            (string contentKey, var refreshedDocuments) = CheckProject(project, structuralShaByPath, ct);
+            ProjectCacheEntry project = manifest.Projects[index];
+            (string contentKey, var refreshedDocuments) = checkedByIndex[index];
             recomputedContentKeys[project.ProjectName] = contentKey;
             referencesByName[project.ProjectName] = project.ProjectReferences;
             refreshedProjects.Add(project with { Documents = refreshedDocuments });
@@ -346,18 +370,20 @@ internal sealed class ExtractionCacheStore
                 dirtyProjects.Add(project.ProjectName);
         }
 
+        // Re-paired once, here, from the flat lists the manifest persists — the only place the four become a
+        // verdict again, so no consumer can assemble them in a different order.
+        var loadDiagnostics = new WorkspaceDiagnostics(
+            manifest.Diagnostics, [], manifest.FailedProjects, manifest.UncheckedProjects,
+            manifest.RestoreFailedProjects);
+
         if (dirtyProjects.Count == 0)
         {
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects);
-            return CacheReadResult.Hit(
-                manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
-                manifest.UncheckedProjects, manifest.RestoreFailedProjects);
+            return CacheReadResult.Hit(manifest.Fragments, manifest.SpecResolutions, loadDiagnostics);
         }
 
         var reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
-        return CacheReadResult.Partial(
-            reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects,
-            manifest.UncheckedProjects, manifest.RestoreFailedProjects);
+        return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics);
     }
 
     // ── structural + document checks ────────────────────────────────────────────────────────────────────
@@ -399,7 +425,8 @@ internal sealed class ExtractionCacheStore
         // so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
         var adds = ProjectCone.Adds(project.ProjectDirectory, knownDocuments);
         string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
-        string? assetsSha = structuralShaByPath.GetValueOrDefault(FileStamping.AssetsPathOf(project.ProjectDirectory));
+        string? assetsSha = structuralShaByPath.GetValueOrDefault(
+            IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
         string contentKey = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
         return (contentKey, refreshedDocuments);
     }
@@ -484,33 +511,17 @@ internal sealed class ExtractionCacheStore
         TryWriteAtomic(promoted); // best-effort; a later change is still caught by the next validation's stat delta
     }
 
+    // ManifestJson owns both halves and the degradation contract they share with the capture store; all this
+    // pair adds is which file and which generated metadata. No File.Exists probe: an absent cache reads back
+    // as null through the same catch a torn one does, and both mean the same thing here — a Miss.
     private bool TryWriteAtomic(CacheManifest manifest)
     {
-        try
-        {
-            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJson.Context.CacheManifest);
-            AtomicFile.WriteAllBytes(cacheFilePath, bytes);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return false; // the cache is disposable — a failed write is simply rebuilt next run, never an error
-        }
+        return ManifestJson.TryWriteAtomic(cacheFilePath, manifest, ManifestJson.Context.CacheManifest);
     }
 
     private CacheManifest? TryRead()
     {
-        if (!File.Exists(cacheFilePath)) return null;
-
-        try
-        {
-            byte[] bytes = File.ReadAllBytes(cacheFilePath);
-            return JsonSerializer.Deserialize(bytes, ManifestJson.Context.CacheManifest);
-        }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null; // torn / garbled / unreadable ⇒ miss
-        }
+        return ManifestJson.TryRead(cacheFilePath, ManifestJson.Context.CacheManifest);
     }
 
     // ── stamping + hashing ──────────────────────────────────────────────────────────────────────────────
@@ -525,34 +536,23 @@ internal sealed class ExtractionCacheStore
 
     private string? HashDuringValidation(string path)
     {
-        ContentHashCount++;
+        Interlocked.Increment(ref contentHashCount);
         return FileStamping.TryHashFile(path);
     }
 
     // ── structural enumeration ──────────────────────────────────────────────────────────────────────────
 
-    private IEnumerable<string> EnumerateStructuralPaths(IReadOnlyList<ProjectInputs> projects)
+    // ProjectCone owns the composition — solution, the solution a filter points at, then each project's file
+    // and probe set — so the build capture stamps the identical set from the identical routine.
+    private IReadOnlyList<string> StructuralPathsOf(IReadOnlyList<ProjectInputs> projects)
     {
-        string fullSolution = Path.GetFullPath(solutionPath);
-        yield return fullSolution;
-
-        // Under a .slnf the file above is the filter, not the solution. Editing the solution changes what a
-        // run loads — adding a member the filter selects, or any member at all when its projects array is
-        // empty — while leaving the filter's own bytes and timestamp untouched, so without this the edit
-        // never dirties the cache and the stale answer is served indefinitely.
-        if (SolutionProjectFileParser.TryReadReferencedSolution(fullSolution) is { } referencedSolution)
-            yield return referencedSolution;
-
-        foreach (ProjectInputs project in projects)
-        {
-            yield return Path.GetFullPath(project.CsprojPath);
-
-            foreach (string path in ProjectCone.StructuralPaths(
-                         Path.GetFullPath(project.ProjectDirectory),
-                         project.EvaluatedOutputPath,
-                         project.IntermediateAssemblyPath))
-                yield return path;
-        }
+        return ProjectCone.SolutionStructuralPaths(
+            solutionPath,
+            projects.Select(project => (
+                Path.GetFullPath(project.CsprojPath),
+                Path.GetFullPath(project.ProjectDirectory),
+                project.EvaluatedOutputPath,
+                project.IntermediateAssemblyPath)));
     }
 
     // ── small helpers ───────────────────────────────────────────────────────────────────────────────────

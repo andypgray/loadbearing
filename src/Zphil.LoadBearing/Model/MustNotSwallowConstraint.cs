@@ -12,18 +12,10 @@ namespace Zphil.LoadBearing.Model;
 ///     and <see cref="MustNotCatchUnfilteredConstraint" /> — so the generic operand/prose/foreign-Arch walks
 ///     reach it with no special-casing.
 /// </summary>
-internal sealed class MustNotSwallowConstraint : Constraint
+internal sealed class MustNotSwallowConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    internal MustNotSwallowConstraint(Selection subject, IReadOnlyList<Selection> targets)
-        : base(subject)
-    {
-        Targets = targets;
-    }
-
     /// <summary>The catch targets that may not be swallowed.</summary>
-    internal IReadOnlyList<Selection> Targets { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Targets;
+    internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not swallow " + SentenceRenderer.TargetList(Targets);
 }

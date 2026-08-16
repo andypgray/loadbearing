@@ -58,7 +58,7 @@ public sealed class MigrateRatchetTests
         RuleResult result = Checker.Run(OneController, Checker.Baselines("data/x"), NoDataAccess)
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.Count.ShouldBe(1);
         result.Grandfathered.ShouldBeEmpty();
         result.BaselineCaptured.ShouldBeTrue();
@@ -84,7 +84,7 @@ public sealed class MigrateRatchetTests
         RuleResult result = Checker.Run(source, index, NoDataAccess)
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ReferencePairs()
             .ShouldBe(["App.Web.OldController -> App.Data.Cache"]);
         result.ShouldHaveGrandfathered(1);
@@ -155,7 +155,7 @@ public sealed class MigrateRatchetTests
         RuleResult result = Checker.Run(OneController, BaselineIndex.Empty, NoDataAccess)
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.Count.ShouldBe(1);
         result.BaselineCaptured.ShouldBeFalse();
     }
@@ -191,7 +191,7 @@ public sealed class MigrateRatchetTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.ShouldHaveSingleItem()
             .Kind.ShouldBe(ViolationKind.EmptySubject);
         result.Grandfathered.ShouldBeEmpty();
@@ -209,7 +209,7 @@ public sealed class MigrateRatchetTests
             "data/x",
             BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
-        var narrowing = new NarrowedUniverse("BillingOnly.slnf", 2, NarrowingSkipReason);
+        var narrowing = new NarrowedUniverse(NarrowingSkipReason);
 
         RuleResult result = Checker.Run("namespace App { public class X {} }", index, narrowing, arch =>
                 arch.Rule("data/x")
@@ -230,13 +230,13 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateRuleError_IsFailedNeverBaselinable()
     {
-        RuleResult result = Checker.Run(Sources.Hierarchy, Checker.Baselines("data/x"), arch =>
+        RuleResult result = Checker.Run(Sources.HierarchyModel, Checker.Baselines("data/x"), arch =>
                 arch.Rule("data/x")
                     .Migrate("old", arch.Types.MustNotReference(typeof(IHandler<Order>)))
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.ShouldHaveSingleItem()
             .Kind.ShouldBe(ViolationKind.RuleError);
         result.Grandfathered.ShouldBeEmpty();
@@ -264,7 +264,7 @@ public sealed class MigrateRatchetTests
         RuleResult result = Checker.Run(OneController, NoDataAccess)
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.BaselineCaptured.ShouldBeFalse();
     }
 
@@ -281,7 +281,7 @@ public sealed class MigrateRatchetTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Grandfathered.ShouldBeEmpty();
     }
 }

@@ -330,10 +330,10 @@ public sealed class SpecResolverTests
     [Fact]
     public void RequireBuiltOutput_MissingFile_ThrowsUserErrorPointingAtBuild()
     {
-        // Pinned whole: the several-outputs overload widened this message, and the one-output rendering has
-        // to stay byte-identical to what a single-target-framework spec project has always produced.
+        // Pinned whole: naming every path tried widened this message, and the one-output rendering has to
+        // stay byte-identical to what a single-target-framework spec project has always produced.
         var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.RequireBuiltOutput("MyApp.Arch", "C:/nope/does-not-exist.dll"));
+            SpecResolver.RequireBuiltOutput("MyApp.Arch", ["C:/nope/does-not-exist.dll"]));
 
         error.Message.ShouldBe(
             "The spec project 'MyApp.Arch' has no built output at 'C:/nope/does-not-exist.dll'. "
@@ -343,9 +343,9 @@ public sealed class SpecResolverTests
     [Fact]
     public void RequireBuiltOutput_NullOutput_ThrowsUserError()
     {
-        // The argument is named because a bare null is ambiguous between the one-path and several-paths
-        // overloads — and "no evaluated output at all" is the case this pins.
-        Should.Throw<UserErrorException>(() => SpecResolver.RequireBuiltOutput("MyApp.Arch", outputFilePath: null));
+        // A project the workspace carried with no evaluated output path at all: the null is filtered out
+        // rather than probed, leaving nothing to name and the bare "no built output" refusal.
+        Should.Throw<UserErrorException>(() => SpecResolver.RequireBuiltOutput("MyApp.Arch", [null]));
     }
 
     [Fact]
@@ -359,11 +359,9 @@ public sealed class SpecResolverTests
         // particular number of segments above the assembly.
         using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
         string evaluatedDebugOutput = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
-        string builtReleaseOutput = temp.PathOf("bin", "Release", "net10.0", "MyApp.Arch.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(builtReleaseOutput)!);
-        File.WriteAllText(builtReleaseOutput, "");
+        string builtReleaseOutput = temp.WriteFile(["bin", "Release", "net10.0", "MyApp.Arch.dll"], "");
 
-        string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", evaluatedDebugOutput);
+        string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", [evaluatedDebugOutput]);
 
         resolved.ShouldBe(builtReleaseOutput);
     }
@@ -377,9 +375,7 @@ public sealed class SpecResolverTests
         // would fail here instead of loading the spec that exists.
         using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
         string modernOutput = temp.PathOf("bin", "Debug", "net10.0", "MyApp.Arch.dll");
-        string legacyOutput = temp.PathOf("bin", "Debug", "netstandard2.0", "MyApp.Arch.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(legacyOutput)!);
-        File.WriteAllText(legacyOutput, "");
+        string legacyOutput = temp.WriteFile(["bin", "Debug", "netstandard2.0", "MyApp.Arch.dll"], "");
 
         string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", [modernOutput, legacyOutput]);
 
@@ -410,11 +406,9 @@ public sealed class SpecResolverTests
         // purpose. The intermediate refusal is scoped to search results only: refusing here would refuse every
         // replayed run.
         using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
-        string intermediateAssembly = temp.PathOf("obj", "Debug", "net10.0", "MyApp.Arch.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(intermediateAssembly)!);
-        File.WriteAllText(intermediateAssembly, "");
+        string intermediateAssembly = temp.WriteFile(["obj", "Debug", "net10.0", "MyApp.Arch.dll"], "");
 
-        string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", intermediateAssembly, intermediateAssembly);
+        string resolved = SpecResolver.RequireBuiltOutput("MyApp.Arch", [intermediateAssembly], intermediateAssembly);
 
         resolved.ShouldBe(intermediateAssembly);
     }
@@ -428,13 +422,11 @@ public sealed class SpecResolverTests
         // was really built, so it going missing means the capture is stale — and "build the solution first" is
         // the right answer to that, not silently loading a different build.
         using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
-        string siblingIntermediate = temp.PathOf("obj", "Release", "net10.0", "MyApp.Arch.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(siblingIntermediate)!);
-        File.WriteAllText(siblingIntermediate, "");
+        temp.WriteFile(["obj", "Release", "net10.0", "MyApp.Arch.dll"], "");
         string recordedIntermediate = temp.PathOf("obj", "Debug", "net10.0", "MyApp.Arch.dll");
 
         var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.RequireBuiltOutput("MyApp.Arch", recordedIntermediate));
+            SpecResolver.RequireBuiltOutput("MyApp.Arch", [recordedIntermediate]));
 
         error.Message.ShouldContain("Build the solution first (dotnet build).");
     }

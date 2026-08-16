@@ -37,8 +37,8 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///     </para>
 ///     <para>
 ///         <b>The limit this file inherits.</b> <c>CompilationOutputInfo</c> has no public constructor, so an
-///         <see cref="AdhocWorkspace" /> project's intermediate assembly path is always null — the same limit
-///         <see cref="ProjectLoadFailuresTests" /> documents. Every project below therefore reaches
+///         <see cref="AdhocWorkspace" /> project's intermediate assembly path is always null — the limit
+///         <see cref="AdhocSolution" /> documents. Every project below therefore reaches
 ///         <see cref="IntermediateOutputTree.AssetsPathsOf" /> with one of its two evaluated paths unknown,
 ///         which is the degraded case that yields the default <c>obj/</c> location alone. The derived
 ///         candidates for the artifacts and redirected-intermediate layouts are
@@ -228,8 +228,8 @@ public sealed class RestoreFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("restore-absent-multi-tfm");
         string csproj = WriteProject(temp, "Core", SdkStyleProjectXml);
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
-            workspace, Loaded("Core(net10.0)", csproj), Loaded("Core(netstandard2.0)", csproj));
+        Solution solution = AdhocSolution.Of(
+            workspace, AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
 
         RestoreFailures.Detect(solution, [])
             .ShouldBe([csproj]);
@@ -352,8 +352,8 @@ public sealed class RestoreFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("restore-multi-tfm");
         string csproj = WriteAssets(temp, "Core", FailedRestoreAssets);
         using var workspace = new AdhocWorkspace();
-        Solution solution = WithProjects(
-            workspace, Loaded("Core(net10.0)", csproj), Loaded("Core(netstandard2.0)", csproj));
+        Solution solution = AdhocSolution.Of(
+            workspace, AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
 
         RestoreFailures.Detect(solution, [])
             .ShouldBe([csproj]);
@@ -430,25 +430,12 @@ public sealed class RestoreFailuresTests
         return $$"""{ "version": 3, "libraries": {}, "logs": [ {{string.Join(",", entries)}} ] }""";
     }
 
+    // Every project loaded completely — which is the whole point: a failed restore leaves the project
+    // carrying its evaluated output path, so ProjectLoadFailures sees nothing wrong with it.
     private static Solution SolutionOf(AdhocWorkspace workspace, params string[] csprojPaths)
     {
-        return WithProjects(
+        return AdhocSolution.Of(
             workspace,
-            [.. csprojPaths.Select(path => Loaded(Path.GetFileNameWithoutExtension(path), path))]);
-    }
-
-    // A project that loaded completely — which is the whole point: a failed restore leaves the project
-    // carrying its evaluated output path, so ProjectLoadFailures sees nothing wrong with it.
-    private static ProjectInfo Loaded(string name, string csprojPath)
-    {
-        return ProjectInfo
-            .Create(ProjectId.CreateNewId(), VersionStamp.Default, name, name, LanguageNames.CSharp, csprojPath)
-            .WithOutputFilePath(Path.Combine(Path.GetDirectoryName(csprojPath)!, "bin", name + ".dll"));
-    }
-
-    private static Solution WithProjects(AdhocWorkspace workspace, params ProjectInfo[] projects)
-    {
-        foreach (ProjectInfo project in projects) workspace.AddProject(project);
-        return workspace.CurrentSolution;
+            [.. csprojPaths.Select(path => AdhocSolution.Loaded(Path.GetFileNameWithoutExtension(path), path))]);
     }
 }

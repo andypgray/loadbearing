@@ -47,7 +47,7 @@ public sealed class ArtifactsOutputCacheE2ETests
     public async Task ArtifactsLayout_AssetsFileChangedBetweenRuns_IsSeen()
     {
         using TempFixtureWorkspace workspace = RestoredCopy(true);
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("artifacts-output-cache");
 
         // The layout claim, asserted rather than assumed: the assets file is outside the project directory.
         string assets = workspace.PathOf("artifacts", "obj", Web, "project.assets.json");
@@ -68,7 +68,7 @@ public sealed class ArtifactsOutputCacheE2ETests
     public async Task DefaultLayout_AssetsFileChangedBetweenRuns_IsSeen()
     {
         using TempFixtureWorkspace workspace = RestoredCopy(false);
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("artifacts-output-cache");
 
         string assets = workspace.PathOf(Web, "obj", "project.assets.json");
         File.Exists(assets)
@@ -103,7 +103,7 @@ public sealed class ArtifactsOutputCacheE2ETests
         var error = new StringWriter();
         FakeEnvironment environment = new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheRoot);
         var runner = new GraphRunner(output, error, new ColdSolutionSource(), environment);
-        string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!;
+        string workingDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
 
         int exit = await runner.RunAsync(
             new GraphRequest(
@@ -112,23 +112,5 @@ public sealed class ArtifactsOutputCacheE2ETests
 
         exit.ShouldBe(0, error.ToString());
         return runner.LastOutcome;
-    }
-
-    private sealed class TempCacheDir : IDisposable
-    {
-        private readonly TempDirectory temp = TestTempRoot.Fresh("artifacts-output-cache");
-
-        // Not created: the cache root is the store's to mint, and every run here starts from its absence.
-        public string Root { get; }
-
-        public TempCacheDir()
-        {
-            Root = temp.UniqueChildPath();
-        }
-
-        public void Dispose()
-        {
-            temp.Dispose();
-        }
     }
 }

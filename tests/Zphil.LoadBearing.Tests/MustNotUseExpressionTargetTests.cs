@@ -19,9 +19,9 @@ public class MustNotUseExpressionTargetTests
     [Fact]
     public void MustNotUse_VerbStaticProperty_ReifiesIdenticallyToArchMemberAndTypeof()
     {
-        string verb = Sentence(arch => arch.Types.MustNotUse(() => DateTime.Now));
-        string expression = Sentence(arch => arch.Types.MustNotUse(arch.Member(() => DateTime.Now)));
-        string typeofForm = Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))));
+        string verb = Checker.Sentence(arch => arch.Types.MustNotUse(() => DateTime.Now));
+        string expression = Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(() => DateTime.Now)));
+        string typeofForm = Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))));
 
         verb.ShouldBe(expression);
         verb.ShouldBe(typeofForm);
@@ -31,9 +31,9 @@ public class MustNotUseExpressionTargetTests
     public void MustNotUse_VerbStaticVoidMethod_ReifiesIdenticallyToArchMemberAndTypeof()
     {
         // The Action form: a void static method lambda binds the Expression<Action> overload.
-        string verb = Sentence(arch => arch.Types.MustNotUse(() => GC.Collect()));
-        string expression = Sentence(arch => arch.Types.MustNotUse(arch.Member(() => GC.Collect())));
-        string typeofForm = Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(GC), nameof(GC.Collect))));
+        string verb = Checker.Sentence(arch => arch.Types.MustNotUse(() => GC.Collect()));
+        string expression = Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(() => GC.Collect())));
+        string typeofForm = Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(GC), nameof(GC.Collect))));
 
         verb.ShouldBe(expression);
         verb.ShouldBe(typeofForm);
@@ -47,8 +47,8 @@ public class MustNotUseExpressionTargetTests
         // conversion from expression" picks the Func form — the same betterness the four Arch.Member overloads
         // already rely on — so this compiles unambiguously; the compile itself is the disambiguation proof.
         // The sentence pin confirms the resolved method leaf matches the typeof spelling.
-        string verb = Sentence(arch => arch.Types.MustNotUse(() => Guid.NewGuid()));
-        string typeofForm = Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(Guid), nameof(Guid.NewGuid))));
+        string verb = Checker.Sentence(arch => arch.Types.MustNotUse(() => Guid.NewGuid()));
+        string typeofForm = Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(Guid), nameof(Guid.NewGuid))));
 
         verb.ShouldBe(typeofForm);
     }
@@ -57,20 +57,11 @@ public class MustNotUseExpressionTargetTests
     public void MustNotUse_VerbMultipleStaticTargets_ReifiesIdenticallyToArchMemberList()
     {
         // The adoption shape: the whole all-static list passed bare to the verb equals the two-arch.Member spelling.
-        string verb = Sentence(arch => arch.Types.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow));
-        string expression = Sentence(arch => arch.Types.MustNotUse(
+        string verb = Checker.Sentence(arch => arch.Types.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow));
+        string expression = Checker.Sentence(arch => arch.Types.MustNotUse(
             arch.Member(() => DateTime.Now),
             arch.Member(() => DateTime.UtcNow)));
 
         verb.ShouldBe(expression);
-    }
-
-    private static string Sentence(Func<Arch, Constraint> constraint)
-    {
-        return ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("area/rule")
-                .Enforce(constraint(arch))
-                .Because("b")))
-            .Rules.Single()
-            .Sentence;
     }
 }

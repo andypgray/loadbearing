@@ -69,7 +69,7 @@ internal static class CacheLocations
     /// </summary>
     internal static string CaptureManifestPath(string solutionPath, string? cacheRootOverride)
     {
-        return Path.Combine(CacheDirectory(solutionPath, cacheRootOverride), CaptureManifestFileName);
+        return CaptureManifestPathIn(CacheDirectory(solutionPath, cacheRootOverride));
     }
 
     /// <summary>
@@ -79,6 +79,23 @@ internal static class CacheLocations
     /// </summary>
     internal static string CaptureBinlogPath(string solutionPath, string? cacheRootOverride)
     {
-        return Path.Combine(CacheDirectory(solutionPath, cacheRootOverride), CaptureBinlogFileName);
+        return CaptureBinlogPathIn(CacheDirectory(solutionPath, cacheRootOverride));
+    }
+
+    /// <summary>The capture manifest inside an already-derived <paramref name="cacheDirectory" />.</summary>
+    /// <remarks>
+    ///     Deriving the directory costs a symlink resolve, a fold and a SHA-256, so the store that wants both
+    ///     capture files — and the directory itself, to create it — asks for the directory once and names the
+    ///     files against it. The naming scheme stays here either way; only the derivation moves.
+    /// </remarks>
+    internal static string CaptureManifestPathIn(string cacheDirectory)
+    {
+        return Path.Combine(cacheDirectory, CaptureManifestFileName);
+    }
+
+    /// <summary>The captured binlog copy inside an already-derived <paramref name="cacheDirectory" />.</summary>
+    internal static string CaptureBinlogPathIn(string cacheDirectory)
+    {
+        return Path.Combine(cacheDirectory, CaptureBinlogFileName);
     }
 }

@@ -7,7 +7,23 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>The result of an in-process CLI invocation.</summary>
-internal sealed record CliResult(int Exit, string Out, string Err);
+internal sealed record CliResult(int Exit, string Out, string Err)
+{
+    /// <summary>
+    ///     Runs <paramref name="invoke" /> against a fresh writer pair and captures both channels beside the
+    ///     exit code — the shape every in-process driver shares, whether it goes through the whole CLI or
+    ///     constructs one runner directly to inject a seam the command line cannot spell.
+    /// </summary>
+    internal static async Task<CliResult> CapturedAsync(Func<TextWriter, TextWriter, Task<int>> invoke)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        int exit = await invoke(output, error);
+
+        return new CliResult(exit, output.ToString(), error.ToString());
+    }
+}
 
 /// <summary>
 ///     Drives the CLI in-process through the real <see cref="CliEntry" /> and command tree, capturing
@@ -93,14 +109,10 @@ internal static class CliRunner
         return RunAsync(null, environment, args);
     }
 
-    private static async Task<CliResult> RunAsync(ISolutionSource? hostSource, IEnvironment? environment, string[] args)
+    private static Task<CliResult> RunAsync(ISolutionSource? hostSource, IEnvironment? environment, string[] args)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var configuration = new InvocationConfiguration { Output = output, Error = error };
-
-        int exit = await CliEntry.InvokeAsync(args, configuration, hostSource, environment);
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => CliEntry.InvokeAsync(
+            args, new InvocationConfiguration { Output = output, Error = error }, hostSource, environment));
     }
 
     private static string Metadata(string key)

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn;
 
@@ -71,30 +72,63 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 internal static class ReferenceWalker
 {
-    public static IEnumerable<(INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, bool CaughtEndsInThrow, INamedTypeSymbol? Thrown, string File, int Line)> Walk(
-        SyntaxNode root, SemanticModel model)
+    /// <param name="root">The type-declaration part to walk.</param>
+    /// <param name="model">The semantic model for <paramref name="root" />'s tree.</param>
+    /// <param name="bareCatchType">
+    ///     What a bare <c>catch</c> catches here — <see cref="BareCatchTypeOf" />, resolved once per
+    ///     compilation by the caller rather than per clause.
+    /// </param>
+    public static IEnumerable<(WalkChannels Channels, FragmentSite Site)> Walk(
+        SyntaxNode root, SemanticModel model, INamedTypeSymbol? bareCatchType)
     {
         foreach (SyntaxNode node in root.DescendantNodes(n => ReferenceEquals(n, root)
                                                               || n is not (BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)))
         {
-            (INamedTypeSymbol? target, ISymbol? member, INamedTypeSymbol? constructed, INamedTypeSymbol? caught, bool caughtHasFilter, bool caughtEndsInThrow, INamedTypeSymbol? thrown) = Resolve(node, model);
+            WalkChannels resolved = Resolve(node, model, bareCatchType);
 
             // Each channel is normalized to its OriginalDefinition and gated independently, so an explicit
             // `new Foo()` (which rides on Target: null, Constructed: Foo) — and a bare `catch` (Target: null,
             // Caught: Exception) — is never dropped by a type-channel guard. The co-existence matrix rows are
             // what catch a regression here.
-            INamedTypeSymbol? targetDefinition = ReferencedDefinition(target);
-            INamedTypeSymbol? constructedDefinition = ReferencedDefinition(constructed);
-            INamedTypeSymbol? caughtDefinition = ReferencedDefinition(caught);
-            INamedTypeSymbol? thrownDefinition = ReferencedDefinition(thrown);
+            INamedTypeSymbol? targetDefinition = ReferencedDefinition(resolved.Target);
+            INamedTypeSymbol? constructedDefinition = ReferencedDefinition(resolved.Constructed);
+            INamedTypeSymbol? caughtDefinition = ReferencedDefinition(resolved.Caught);
+            INamedTypeSymbol? thrownDefinition = ReferencedDefinition(resolved.Thrown);
             if (targetDefinition is null && constructedDefinition is null && caughtDefinition is null && thrownDefinition is null) continue;
 
             // A member use rides the type channel; if that channel is gated out, its member goes with it.
-            ISymbol? memberUse = targetDefinition is not null ? member : null;
+            ISymbol? memberUse = targetDefinition is not null ? resolved.Member : null;
 
-            int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            yield return (targetDefinition, memberUse, constructedDefinition, caughtDefinition, caughtHasFilter, caughtEndsInThrow, thrownDefinition, node.SyntaxTree.FilePath, line);
+            // The two catch bits are syntactic, so they ride through the gate untouched — `with` is what
+            // says so, rather than a seventh argument that could be transposed.
+            WalkChannels gated = resolved with
+            {
+                Target = targetDefinition,
+                Member = memberUse,
+                Constructed = constructedDefinition,
+                Caught = caughtDefinition,
+                Thrown = thrownDefinition
+            };
+
+            yield return (gated, FragmentSite.Of(node));
         }
+    }
+
+    /// <summary>
+    ///     What a bare <c>catch</c> catches (GRAMMAR §4.8): <c>System.Exception</c> as
+    ///     <paramref name="compilation" /> resolves it, or <see langword="null" /> where it cannot be
+    ///     resolved at all — nothing in a bare catch's syntax names the type, so this lookup is the only
+    ///     source of that channel and a null answer mints nothing.
+    /// </summary>
+    /// <remarks>
+    ///     Exposed for the caller to resolve <em>once per compilation</em> and hand to <see cref="Walk" />.
+    ///     The compilation keeps no special-type entry for <c>System.Exception</c>, so each lookup is a real
+    ///     metadata name resolution across the assembly and its references — a cost a file with a dozen bare
+    ///     catches should pay once, not a dozen times.
+    /// </remarks>
+    internal static INamedTypeSymbol? BareCatchTypeOf(Compilation compilation)
+    {
+        return compilation.GetTypeByMetadataName("System.Exception");
     }
 
     /// <summary>
@@ -125,8 +159,7 @@ internal static class ReferenceWalker
     ///     thrown channel only on the two throw arms (a bare rethrow leaves it null). Both catch bits are
     ///     <see langword="false" /> on every arm but the <c>catch</c>-clause one.
     /// </summary>
-    private static (INamedTypeSymbol? Target, ISymbol? Member, INamedTypeSymbol? Constructed, INamedTypeSymbol? Caught, bool CaughtHasFilter, bool CaughtEndsInThrow, INamedTypeSymbol? Thrown) Resolve(
-        SyntaxNode node, SemanticModel model)
+    private static WalkChannels Resolve(SyntaxNode node, SemanticModel model, INamedTypeSymbol? bareCatchType)
     {
         switch (node)
         {
@@ -134,22 +167,21 @@ internal static class ReferenceWalker
             // Covers type references and member references (invocations, property/field/event access,
             // static receivers, attribute names, method groups, extension methods, nameof operands).
             case SimpleNameSyntax name when name is not IdentifierNameSyntax { IsVar: true }:
-                SymbolInfo info = model.GetSymbolInfo(name);
-                ISymbol? symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
-                return (ContainingTypeOf(symbol), MemberUseOf(symbol, name), null, null, false, false, null);
+                ISymbol? symbol = model.GetSymbolInfo(name).BestCandidate();
+                return new WalkChannels(ContainingTypeOf(symbol), MemberUseOf(symbol, name));
 
             // Explicit `new Foo()`: the inner `Foo` name syntax already mints the type edge on its own visit,
             // so this node contributes the construct channel ONLY — re-minting the type edge here would
             // double-count the §4.1 reference.
             case ObjectCreationExpressionSyntax creation:
-                return (null, null, ConstructedChannelOf(CreatedTypeOf(creation, model)), null, false, false, null);
+                return new WalkChannels(Constructed: ConstructedChannelOf(CreatedTypeOf(creation, model)));
 
             // Target-typed `new()`: no inner type-name syntax exists, so this node is the sole source of BOTH
             // the type edge to the created type AND the construct edge (the type edge rides even for a
             // delegate `new()`, only the construct channel is delegate-gated).
             case ImplicitObjectCreationExpressionSyntax creation:
                 INamedTypeSymbol? created = CreatedTypeOf(creation, model);
-                return (created, null, ConstructedChannelOf(created), null, false, false, null);
+                return new WalkChannels(created, Constructed: ConstructedChannelOf(created));
 
             // A `catch` clause (§4.8): the ONE arm for catches — it reads `.Declaration` for the typed form
             // and synthesizes System.Exception for a bare `catch`, so there is no separate CatchDeclaration
@@ -160,20 +192,23 @@ internal static class ReferenceWalker
             // a throw — two separate bits, syntactic only, that leave the caught channel and every edge-minting
             // rule exactly as they were.
             case CatchClauseSyntax catchClause:
-                return (null, null, null, CaughtTypeOf(catchClause, model), catchClause.Filter is not null, EndsInThrow(catchClause), null);
+                return new WalkChannels(
+                    Caught: CaughtTypeOf(catchClause, model, bareCatchType),
+                    CaughtHasFilter: catchClause.Filter is not null,
+                    CaughtEndsInThrow: EndsInThrow(catchClause));
 
             // A `throw` statement with a non-null expression (§4.8): a bare rethrow `throw;` has a null
             // expression, so it never matches this arm and falls through — it throws nothing.
             case ThrowStatementSyntax { Expression: { } thrownExpression }:
-                return (null, null, null, null, false, false, ThrownTypeOf(thrownExpression, model));
+                return new WalkChannels(Thrown: ThrownTypeOf(thrownExpression, model));
 
             // A throw expression (§4.8): `?? throw …`, a conditional/switch-expression arm, and the
             // expression-bodied `=> throw new X()` — its operand is always present.
             case ThrowExpressionSyntax throwExpression:
-                return (null, null, null, null, false, false, ThrownTypeOf(throwExpression.Expression, model));
+                return new WalkChannels(Thrown: ThrownTypeOf(throwExpression.Expression, model));
 
             default:
-                return (null, null, null, null, false, false, null);
+                return WalkChannels.None;
         }
     }
 
@@ -191,17 +226,18 @@ internal static class ReferenceWalker
 
     /// <summary>
     ///     The named type a <c>catch</c> clause catches (GRAMMAR §4.8): the declared type of a typed
-    ///     <c>catch (T e)</c> / <c>catch (T)</c> read off <see cref="CatchClauseSyntax.Declaration" />, or
-    ///     synthesized <c>System.Exception</c> for a bare <c>catch</c> — nothing in source names the type, so
-    ///     the synthesized type is the only source of the caught channel there. A null metadata lookup (a
+    ///     <c>catch (T e)</c> / <c>catch (T)</c> read off <see cref="CatchClauseSyntax.Declaration" />, or —
+    ///     for a bare <c>catch</c>, whose syntax names no type at all — the
+    ///     <paramref name="bareCatchType" /> the caller resolved for the whole compilation. A null there (a
     ///     compilation lacking <c>System.Exception</c>) yields null, minting nothing.
     /// </summary>
-    private static INamedTypeSymbol? CaughtTypeOf(CatchClauseSyntax catchClause, SemanticModel model)
+    private static INamedTypeSymbol? CaughtTypeOf(
+        CatchClauseSyntax catchClause, SemanticModel model, INamedTypeSymbol? bareCatchType)
     {
         if (catchClause.Declaration is { } declaration)
             return model.GetTypeInfo(declaration.Type).Type as INamedTypeSymbol;
 
-        return model.Compilation.GetTypeByMetadataName("System.Exception");
+        return bareCatchType;
     }
 
     /// <summary>
@@ -222,8 +258,7 @@ internal static class ReferenceWalker
     /// </summary>
     private static INamedTypeSymbol? CreatedTypeOf(BaseObjectCreationExpressionSyntax creation, SemanticModel model)
     {
-        SymbolInfo ctorInfo = model.GetSymbolInfo(creation);
-        ISymbol? ctor = ctorInfo.Symbol ?? ctorInfo.CandidateSymbols.FirstOrDefault();
+        ISymbol? ctor = model.GetSymbolInfo(creation).BestCandidate();
         return (ctor as IMethodSymbol)?.ContainingType ?? model.GetTypeInfo(creation).Type as INamedTypeSymbol;
     }
 
@@ -302,4 +337,37 @@ internal static class ReferenceWalker
 
         return false;
     }
+}
+
+/// <summary>
+///     What one syntax node contributed to each of <see cref="ReferenceWalker" />'s five channels, plus the
+///     two syntactic bits that ride beside the caught one. Every member defaults to "contributed nothing", so
+///     a <c>Resolve</c> arm names only the channels it actually sets and the reader of an arm sees its whole
+///     effect in one line.
+/// </summary>
+/// <remarks>
+///     The channels are deliberately independent: a node can carry a construction and no type reference, a
+///     catch and no type reference, or a throw and a construction at once, and nothing here couples them.
+///     What the shape buys over the seven-position tuple it replaces is that a channel can no longer be
+///     transposed with its neighbour at a call site — the two <see cref="bool" />s in the middle were the
+///     hazard, being the only pair the compiler could not tell apart.
+/// </remarks>
+/// <param name="Target">The type a name binds to (GRAMMAR §4.1).</param>
+/// <param name="Member">The member a name uses (§4.5); rides the <paramref name="Target" /> channel.</param>
+/// <param name="Constructed">The type an object creation creates (§4.5).</param>
+/// <param name="Caught">The type a <c>catch</c> clause catches (§4.8).</param>
+/// <param name="CaughtHasFilter">Whether that clause spells a <c>when</c> filter.</param>
+/// <param name="CaughtEndsInThrow">Whether that clause's block ends in a <c>throw</c>.</param>
+/// <param name="Thrown">The type a <c>throw</c> throws (§4.8).</param>
+internal readonly record struct WalkChannels(
+    INamedTypeSymbol? Target = null,
+    ISymbol? Member = null,
+    INamedTypeSymbol? Constructed = null,
+    INamedTypeSymbol? Caught = null,
+    bool CaughtHasFilter = false,
+    bool CaughtEndsInThrow = false,
+    INamedTypeSymbol? Thrown = null)
+{
+    /// <summary>The all-empty result: what a node that binds nothing resolves to.</summary>
+    internal static WalkChannels None => default;
 }

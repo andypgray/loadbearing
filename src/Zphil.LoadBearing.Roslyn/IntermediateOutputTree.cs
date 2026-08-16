@@ -36,6 +36,25 @@ internal static class IntermediateOutputTree
     internal const string AssetsFileName = "project.assets.json";
 
     /// <summary>
+    ///     The project's restore assets file in the <em>default</em> output layout
+    ///     (<c>&lt;projectDirectory&gt;/obj/project.assets.json</c>) — the first, and always present,
+    ///     candidate <see cref="AssetsPathsOf" /> yields.
+    /// </summary>
+    /// <remarks>
+    ///     Spelled here and nowhere else, because a second spelling of it is a layout assumption living
+    ///     outside the type that owns the derivation, free to drift from it. The extraction cache's
+    ///     per-project content key names this one path rather than the whole candidate set, which is sound
+    ///     for the narrow reason that the key is a manifest-diff aid and not the invalidation mechanism: an
+    ///     assets file that moves or changes is a structural change, and the structural sweep misses the
+    ///     whole cache before any content key is recomputed.
+    /// </remarks>
+    /// <param name="projectDirectory">The directory holding the project file.</param>
+    internal static string DefaultAssetsPathOf(string projectDirectory)
+    {
+        return Path.GetFullPath(Path.Combine(projectDirectory, "obj", AssetsFileName));
+    }
+
+    /// <summary>
     ///     The root of the project's intermediate tree, derived by peeling the shared prefix off the
     ///     evaluated and intermediate assembly paths — so the rule never has to name <c>obj</c>, and holds
     ///     for a <c>BaseIntermediateOutputPath</c> redirected anywhere. Null when the two paths share no
@@ -100,7 +119,7 @@ internal static class IntermediateOutputTree
         var paths = new List<string>();
         var seen = new HashSet<string>(PathComparison.Comparer);
 
-        Add(Path.GetFullPath(Path.Combine(projectDirectory, "obj", AssetsFileName)));
+        Add(DefaultAssetsPathOf(projectDirectory));
 
         if (evaluatedOutputPath is null || RootOf(evaluatedOutputPath, intermediateAssemblyPath) is not { } root)
             return paths;

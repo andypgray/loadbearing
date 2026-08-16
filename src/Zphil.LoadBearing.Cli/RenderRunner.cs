@@ -46,24 +46,16 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         // Fail closed before the first byte hits disk: the files render writes are committed context, and a
         // partial model composes them wrong — a card whose project failed to load resolves no directory and
         // is dropped, and --diagram draws the very survey graph refuses to print.
-        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
-        {
-            foreach (string line in IncompleteModelGate.RenderMessage(diagnostics).Split('\n'))
-                error.WriteLine(line);
+        if (IncompleteModelNotices.Refused(
+                error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.RenderMessage))
             return 2;
-        }
 
         // And the narrowing refusal in the same position, for the same reason one step over: a card from a
         // project the filter left unchecked places nowhere and would be dropped from files that outlive the
         // run, and --diagram would draw a survey missing whole projects.
-        if (diagnostics.UncheckedProjects.Count > 0)
+        if (diagnostics.IsNarrowed)
         {
-            var uncheckedProjects = NarrowedUniverseNotice.Relative(
-                diagnostics.UncheckedProjects, source.SolutionDirectory);
-            string refusal = NarrowedUniverseNotice.RenderRefusal(
-                Path.GetFileName(source.SolutionPath), uncheckedProjects);
-            foreach (string line in refusal.Split('\n'))
-                error.WriteLine(line);
+            NarrowingNotices.Refusal(error, source, NarrowedUniverseNotice.RenderRefusal);
             return 2;
         }
 
@@ -113,7 +105,7 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         CodebaseModel codebase = await source.ExtractAsync([], ct);
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
         string body = DiagramComposer.Compose(
-            summary, Path.GetFileName(source.SolutionPath), source.Model, specName, DiagramScopeFrom(request));
+            summary, source.SolutionName, source.Model, specName, DiagramScopeFrom(request));
 
         WriteOutcome outcome = ManagedBlockFile.Splice(diagramPath, body);
         output.WriteLine(WriteReport.Line(outcome, source.SolutionDirectory, diagramPath));

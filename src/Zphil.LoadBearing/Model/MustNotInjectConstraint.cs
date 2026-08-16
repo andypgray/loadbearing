@@ -9,18 +9,10 @@ namespace Zphil.LoadBearing.Model;
 ///     <see cref="Operands" />, exactly like <see cref="MustNotConstructConstraint" /> — so the generic
 ///     operand/prose/foreign-Arch walks reach it with no special-casing.
 /// </summary>
-internal sealed class MustNotInjectConstraint : Constraint
+internal sealed class MustNotInjectConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    internal MustNotInjectConstraint(Selection subject, IReadOnlyList<Selection> targets)
-        : base(subject)
-    {
-        Targets = targets;
-    }
-
     /// <summary>The forbidden injection targets.</summary>
-    internal IReadOnlyList<Selection> Targets { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Targets;
+    internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not inject " + SentenceRenderer.TargetList(Targets);
 }

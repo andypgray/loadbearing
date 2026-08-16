@@ -166,32 +166,8 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_NonStringBecause_Throws()
     {
-        string numberPath = Write("number.json", """
-                                                 {
-                                                   "schemaVersion": 1,
-                                                   "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                                   "rules": {
-                                                     "data/x": {
-                                                       "entries": [
-                                                         { "subject": "T:A", "because": 3 }
-                                                       ]
-                                                     }
-                                                   }
-                                                 }
-                                                 """);
-        string emptyPath = Write("empty.json", """
-                                               {
-                                                 "schemaVersion": 1,
-                                                 "digest": "0000000000000000000000000000000000000000000000000000000000000000",
-                                                 "rules": {
-                                                   "data/x": {
-                                                     "entries": [
-                                                       { "subject": "T:A", "because": "" }
-                                                     ]
-                                                   }
-                                                 }
-                                               }
-                                               """);
+        string numberPath = WriteEntryDoc("number.json", """{ "subject": "T:A", "because": 3 }""");
+        string emptyPath = WriteEntryDoc("empty.json", """{ "subject": "T:A", "because": "" }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(numberPath))
             .Message.ShouldContain("empty or non-string 'because'");
@@ -365,9 +341,6 @@ public sealed class BaselineStoreTests : IDisposable
 
     private string Write(string relativePath, string content)
     {
-        string path = Path.Combine(_temp.Path, relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, content);
-        return path;
+        return _temp.WriteFile([relativePath], content);
     }
 }

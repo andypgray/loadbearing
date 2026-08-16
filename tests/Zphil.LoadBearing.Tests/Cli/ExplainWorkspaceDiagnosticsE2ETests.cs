@@ -58,14 +58,10 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
         result.Err.ShouldBeEmpty();
     }
 
-    private static async Task<CliResult> RunAsync(ExplainRequest request)
+    private static Task<CliResult> RunAsync(ExplainRequest request)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var runner = new ExplainRunner(output, error, new DiagnosticInjectingSolutionSource([LoadDiagnostic]));
+        var source = new DiagnosticInjectingSolutionSource([LoadDiagnostic]);
 
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, source).RunAsync(request, Ct));
     }
 }

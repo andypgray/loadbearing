@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.Extraction;
 using CoreAccessibility = Zphil.LoadBearing.Accessibility;
 using RoslynAccessibility = Microsoft.CodeAnalysis.Accessibility;
 using RoslynTypeKind = Microsoft.CodeAnalysis.TypeKind;
@@ -97,10 +98,11 @@ public sealed class AccessibilityMapperTests
             .Single();
     }
 
+    // The MSBuild-free compilation every case here reads symbols out of — an empty one for the array and
+    // special-type symbols, a one-file one for the declared types.
     private static CSharpCompilation Compilation(string? source)
     {
-        MetadataReference coreLib = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
-        SyntaxTree[] trees = source is null ? [] : [CSharpSyntaxTree.ParseText(source)];
-        return CSharpCompilation.Create("t", trees, [coreLib]);
+        (string Path, string Source)[] files = source is null ? [] : [("Test.cs", source)];
+        return CompilationFactory.CreateCompilation("t", [CompilationFactory.CoreLibrary], files);
     }
 }

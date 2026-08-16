@@ -22,4 +22,4 @@ internal sealed record StatusRequest(
     string WorkingDirectory,
     bool NoCache,
     string? Binlog,
-    bool AllowWorkspaceDiagnostics);
+    bool AllowWorkspaceDiagnostics) : IReplayableRequest;

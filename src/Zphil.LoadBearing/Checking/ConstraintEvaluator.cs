@@ -31,64 +31,28 @@ internal sealed class ConstraintEvaluator
 
     private static readonly IReadOnlyList<CheckWarning> NoWarnings = Array.Empty<CheckWarning>();
 
-    private readonly IReadOnlyList<CatchEdge> _catchEdges;
-    private readonly IReadOnlyList<ConstructorEdge> _constructorEdges;
-    private readonly IReadOnlyList<ReferenceEdge> _edges;
-    private readonly IReadOnlyList<ExposureEdge> _exposureEdges;
-    private readonly IReadOnlyList<InjectionEdge> _injectionEdges;
-    private readonly IReadOnlyList<MemberEdge> _memberEdges;
-    private readonly MemberSelectionEvaluator _memberSelections;
+    private readonly EdgeIndex<CatchEdge> _catchEdgesBySource;
+    private readonly EdgeIndex<ConstructorEdge> _constructorEdgesBySource;
+    private readonly EdgeIndex<ReferenceEdge> _edgesBySource;
+    private readonly EdgeIndex<ReferenceEdge> _edgesByTarget;
+    private readonly EdgeIndex<ExposureEdge> _exposureEdgesBySource;
+    private readonly EdgeIndex<InjectionEdge> _injectionEdgesBySource;
+    private readonly EdgeIndex<MemberEdge> _memberEdgesBySource;
     private readonly SelectionEvaluator _selections;
-    private readonly IReadOnlyList<ThrowEdge> _throwEdges;
-
-    // The per-kind edge indexes, built on first use so a spec that never uses (say) a catch verb never
-    // pays for a catch index. Keyed on the endpoint the SUBJECT set is tested against — Source for the
-    // outbound verbs, Target for the two referenced-by verbs — with the default (reference) comparer,
-    // the same identity HashSet<TypeNode>.Contains used before them. Nodes are unique instances after
-    // the merge conflates same-FQN declarers, so a key is a node, not a name.
-    private ILookup<TypeNode, CatchEdge>? _catchEdgesBySource;
-    private ILookup<TypeNode, ConstructorEdge>? _constructorEdgesBySource;
-    private ILookup<TypeNode, ReferenceEdge>? _edgesBySource;
-    private ILookup<TypeNode, ReferenceEdge>? _edgesByTarget;
-    private ILookup<TypeNode, ExposureEdge>? _exposureEdgesBySource;
-    private ILookup<TypeNode, InjectionEdge>? _injectionEdgesBySource;
-    private ILookup<TypeNode, MemberEdge>? _memberEdgesBySource;
-    private ILookup<TypeNode, ThrowEdge>? _throwEdgesBySource;
+    private readonly EdgeIndex<ThrowEdge> _throwEdgesBySource;
 
     internal ConstraintEvaluator(CodebaseModel model, SelectionEvaluator selections)
     {
-        _edges = model.Edges;
-        _memberEdges = model.MemberEdges;
-        _constructorEdges = model.ConstructorEdges;
-        _injectionEdges = model.InjectionEdges;
-        _catchEdges = model.CatchEdges;
-        _throwEdges = model.ThrowEdges;
-        _exposureEdges = model.ExposureEdges;
+        _edgesBySource = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Source);
+        _edgesByTarget = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Target);
+        _memberEdgesBySource = new EdgeIndex<MemberEdge>(model.MemberEdges, e => e.Source);
+        _constructorEdgesBySource = new EdgeIndex<ConstructorEdge>(model.ConstructorEdges, e => e.Source);
+        _injectionEdgesBySource = new EdgeIndex<InjectionEdge>(model.InjectionEdges, e => e.Source);
+        _catchEdgesBySource = new EdgeIndex<CatchEdge>(model.CatchEdges, e => e.Source);
+        _throwEdgesBySource = new EdgeIndex<ThrowEdge>(model.ThrowEdges, e => e.Source);
+        _exposureEdgesBySource = new EdgeIndex<ExposureEdge>(model.ExposureEdges, e => e.Source);
         _selections = selections;
-        _memberSelections = new MemberSelectionEvaluator(selections);
     }
-
-    private ILookup<TypeNode, ReferenceEdge> EdgesBySource => _edgesBySource ??= _edges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, ReferenceEdge> EdgesByTarget => _edgesByTarget ??= _edges.ToLookup(e => e.Target);
-
-    private ILookup<TypeNode, MemberEdge> MemberEdgesBySource =>
-        _memberEdgesBySource ??= _memberEdges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, ConstructorEdge> ConstructorEdgesBySource =>
-        _constructorEdgesBySource ??= _constructorEdges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, InjectionEdge> InjectionEdgesBySource =>
-        _injectionEdgesBySource ??= _injectionEdges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, CatchEdge> CatchEdgesBySource =>
-        _catchEdgesBySource ??= _catchEdges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, ThrowEdge> ThrowEdgesBySource =>
-        _throwEdgesBySource ??= _throwEdges.ToLookup(e => e.Source);
-
-    private ILookup<TypeNode, ExposureEdge> ExposureEdgesBySource =>
-        _exposureEdgesBySource ??= _exposureEdges.ToLookup(e => e.Source);
 
     /// <summary>
     ///     The pinned message on an empty union <em>operand</em> in subject position (GRAMMAR §9): a typo'd
@@ -250,13 +214,11 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
     {
-        return inbound
-            ? ForbiddenEdge(
-                Keyed(subjects, EdgesByTarget), operands, e => e.Source, e => e.Sites,
-                (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true)
-            : ForbiddenEdge(
-                Keyed(subjects, EdgesBySource), operands, e => e.Target, e => e.Sites,
-                (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true);
+        var index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
+        Func<ReferenceEdge, TypeNode> operandOf = inbound ? e => e.Source : e => e.Target;
+        return ForbiddenEdge(
+            Keyed(subjects, index), operands, operandOf, e => e.Sites,
+            (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true);
     }
 
     // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
@@ -277,7 +239,7 @@ internal sealed class ConstraintEvaluator
         }
 
         var violations = new List<Violation>();
-        foreach (MemberEdge edge in Keyed(subjects, MemberEdgesBySource))
+        foreach (MemberEdge edge in Keyed(subjects, _memberEdgesBySource.Lookup))
             if (banned.Contains((edge.Member.ContainingType.FullName, edge.Member.Name)))
                 violations.Add(Violation.MemberUse(edge.Source, edge.Member, edge.Sites));
 
@@ -297,7 +259,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, ConstructorEdgesBySource), operands, e => e.Constructed, e => e.Sites,
+            Keyed(subjects, _constructorEdgesBySource.Lookup), operands, e => e.Constructed, e => e.Sites,
             (e, sites) => Violation.Construction(e.Source, e.Constructed, sites), requireSites: false, warnInert: true);
     }
 
@@ -316,7 +278,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, InjectionEdgesBySource), operands, e => e.Injected, e => e.Sites,
+            Keyed(subjects, _injectionEdgesBySource.Lookup), operands, e => e.Injected, e => e.Sites,
             (e, sites) => Violation.Injection(e.Source, e.Injected, sites), requireSites: false, warnInert: false);
     }
 
@@ -332,7 +294,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.Sites,
+            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.Sites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: false, warnInert: true);
     }
 
@@ -353,7 +315,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.UnfilteredSites,
+            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.UnfilteredSites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
     }
 
@@ -374,7 +336,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, CatchEdgesBySource), operands, e => e.Caught, e => e.SwallowingSites,
+            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.SwallowingSites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
     }
 
@@ -392,7 +354,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, ThrowEdgesBySource), operands, e => e.Thrown, e => e.Sites,
+            Keyed(subjects, _throwEdgesBySource.Lookup), operands, e => e.Thrown, e => e.Sites,
             (e, sites) => Violation.Throw(e.Source, e.Thrown, sites), requireSites: false, warnInert: true);
     }
 
@@ -407,7 +369,7 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, ExposureEdgesBySource), operands, e => e.Exposed, e => e.Sites,
+            Keyed(subjects, _exposureEdgesBySource.Lookup), operands, e => e.Exposed, e => e.Sites,
             (e, sites) => Violation.Expose(e.Source, e.Exposed, sites), requireSites: false, warnInert: true);
     }
 
@@ -419,7 +381,7 @@ internal sealed class ConstraintEvaluator
 
         // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
         // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
-        foreach (ReferenceEdge edge in Keyed(subjects, EdgesBySource))
+        foreach (ReferenceEdge edge in Keyed(subjects, _edgesBySource.Lookup))
             if (!edge.Target.IsExternal && !allowed.Contains(edge.Target))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
@@ -434,7 +396,7 @@ internal sealed class ConstraintEvaluator
 
         // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
         // Edge sources are always solution-declared, so no external caveat is needed.
-        foreach (ReferenceEdge edge in Keyed(subjects, EdgesByTarget))
+        foreach (ReferenceEdge edge in Keyed(subjects, _edgesByTarget.Lookup))
             if (!allowed.Contains(edge.Source))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
@@ -454,7 +416,7 @@ internal sealed class ConstraintEvaluator
         var allowed = ResolveOperands(allowedThrows);
         var violations = new List<Violation>();
 
-        foreach (ThrowEdge edge in Keyed(subjects, ThrowEdgesBySource))
+        foreach (ThrowEdge edge in Keyed(subjects, _throwEdgesBySource.Lookup))
             if (!allowed.Contains(edge.Thrown))
                 violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
@@ -517,7 +479,14 @@ internal sealed class ConstraintEvaluator
         IReadOnlyList<TypeAnchor> anchors, Func<TypeAnchor, Func<TSubject, bool>> matcher)
     {
         var matchers = anchors.Select(matcher).ToList();
-        return subject => !matchers.Any(match => match(subject));
+        return subject =>
+        {
+            for (var i = 0; i < matchers.Count; i++)
+                if (matchers[i](subject))
+                    return false;
+
+            return true;
+        };
     }
 
     // The member modal verbs (GRAMMAR §5.7): resolve the member subject, then test each surviving member
@@ -531,7 +500,7 @@ internal sealed class ConstraintEvaluator
         // MemberConstraint.Subject IS MemberSubject.Source, so the union gate's operand sets are this
         // member selection's source types — resolved from them rather than evaluated a second time.
         var sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
-        var members = _memberSelections.Resolve(constraint.MemberSubject, sourceTypes);
+        var members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
         if (members.Count == 0) return (new[] { Violation.EmptySubject(EmptyMemberSubjectMessage) }, NoWarnings);
 
         switch (constraint)
@@ -572,7 +541,7 @@ internal sealed class ConstraintEvaluator
                 // subject resolution — a divergence observable only for a validation-bypassed empty subject.)
                 string parameterAnchor = SelectionEvaluator.DefinitionFullName(
                     c.ParameterType, "member parameter matching is definition-level. Anchor on the open definition instead.");
-                return MemberShape(members, m => m.Parameters.Any(p => p.TypeFullName == parameterAnchor));
+                return MemberShape(members, m => AcceptsParameter(m, parameterAnchor));
             case MemberMustConstraint c:
                 return MemberShape(members, m => SelectionEvaluator.InvokePredicate(c.Predicate, m, "Must"));
             default:
@@ -580,6 +549,18 @@ internal sealed class ConstraintEvaluator
                 // arm, not a pass — throw so it surfaces (contained per-rule by ArchChecker), never green.
                 throw new InvalidOperationException($"Unhandled member constraint '{constraint.GetType().Name}'.");
         }
+    }
+
+    // The parameter scan behind MustAcceptParameter: an index walk rather than a LINQ Any, because it runs
+    // once per member of the subject.
+    private static bool AcceptsParameter(IMemberInfo member, string parameterAnchor)
+    {
+        var parameters = member.Parameters;
+        for (var i = 0; i < parameters.Count; i++)
+            if (parameters[i].TypeFullName == parameterAnchor)
+                return true;
+
+        return false;
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) MemberShape(
@@ -599,5 +580,25 @@ internal sealed class ConstraintEvaluator
         foreach (Selection operand in operands) set.UnionWith(_selections.Evaluate(operand, SelectionPosition.Target));
 
         return set;
+    }
+
+    // One edge kind's index, built on first use so a spec that never uses (say) a catch verb never pays
+    // for a catch index. Keyed on the endpoint the SUBJECT set is tested against — Source for the
+    // outbound verbs, Target for the two referenced-by verbs — with the default (reference) comparer,
+    // the same identity HashSet<TypeNode>.Contains used before them. Nodes are unique instances after
+    // the merge conflates same-FQN declarers, so a key is a node, not a name.
+    private sealed class EdgeIndex<TEdge>
+    {
+        private readonly IReadOnlyList<TEdge> _edges;
+        private readonly Func<TEdge, TypeNode> _key;
+        private ILookup<TypeNode, TEdge>? _lookup;
+
+        internal EdgeIndex(IReadOnlyList<TEdge> edges, Func<TEdge, TypeNode> key)
+        {
+            _edges = edges;
+            _key = key;
+        }
+
+        internal ILookup<TypeNode, TEdge> Lookup => _lookup ??= _edges.ToLookup(_key);
     }
 }

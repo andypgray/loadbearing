@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
@@ -18,35 +19,15 @@ internal static class DocProse
 
     /// <summary>Returns <paramref name="text" /> with every fenced code block removed.</summary>
     /// <remarks>
-    ///     A fence opens on a line whose first non-whitespace content is a run of three or more backticks
-    ///     or tildes; it closes on the next line that, after optional leading whitespace, is a run of at
-    ///     least as many of the same fence character with nothing after it but whitespace. The opening and
-    ///     closing lines and everything between them are removed, and an unclosed fence removes everything
-    ///     to the end of the text. Input newlines are normalized to <c>"\n"</c> first.
+    ///     The opening and closing fence lines and everything between them are removed, and an unclosed
+    ///     fence removes everything to the end of the text. Where a fence opens and closes is
+    ///     <see cref="SourceAnchors.ProseLines" />'s decision — the quote gates and the prose gates read
+    ///     one scanner, or a doc could be fenced for one of them and not the other.
     /// </remarks>
     public static string StripFences(string text)
     {
-        string normalized = text.Replace("\r\n", "\n");
-        string[] lines = normalized.Split('\n');
-        List<string> kept = new();
-        var insideFence = false;
-        var fenceChar = '\0';
-        var fenceLength = 0;
-
-        foreach (string line in lines)
-            if (!insideFence)
-            {
-                if (TryOpenFence(line, out fenceChar, out fenceLength))
-                    insideFence = true;
-                else
-                    kept.Add(line);
-            }
-            else if (ClosesFence(line, fenceChar, fenceLength))
-            {
-                insideFence = false;
-                fenceChar = '\0';
-                fenceLength = 0;
-            }
+        var kept = SourceAnchors.ProseLines(text)
+            .Select(static line => line.Text);
 
         return string.Join("\n", kept);
     }
@@ -79,7 +60,7 @@ internal static class DocProse
     public static IReadOnlyList<string> FindForbidden(string text, IEnumerable<Regex> patterns)
     {
         var patternList = patterns as Regex[] ?? patterns.ToArray();
-        string normalized = text.Replace("\r\n", "\n");
+        string normalized = text.NormalizedLines();
 
         var present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
             .ToArray();
@@ -109,56 +90,5 @@ internal static class DocProse
         var source = pattern.ToString();
 
         return source.Contains('^') || source.Contains('$');
-    }
-
-    private static bool TryOpenFence(string line, out char fenceChar, out int fenceLength)
-    {
-        fenceChar = '\0';
-        fenceLength = 0;
-        int index = SkipLeadingWhitespace(line);
-        if (index >= line.Length) return false;
-
-        char candidate = line[index];
-        if (candidate != '`' && candidate != '~') return false;
-
-        int run = RunLength(line, index, candidate);
-        if (run < 3) return false;
-
-        fenceChar = candidate;
-        fenceLength = run;
-        return true;
-    }
-
-    private static bool ClosesFence(string line, char fenceChar, int minimumLength)
-    {
-        int index = SkipLeadingWhitespace(line);
-        int run = RunLength(line, index, fenceChar);
-        if (run < minimumLength) return false;
-
-        int afterRun = index + run;
-        while (afterRun < line.Length)
-        {
-            if (line[afterRun] != ' ' && line[afterRun] != '\t') return false;
-
-            afterRun++;
-        }
-
-        return true;
-    }
-
-    private static int SkipLeadingWhitespace(string line)
-    {
-        var index = 0;
-        while (index < line.Length && (line[index] == ' ' || line[index] == '\t')) index++;
-
-        return index;
-    }
-
-    private static int RunLength(string line, int start, char character)
-    {
-        int index = start;
-        while (index < line.Length && line[index] == character) index++;
-
-        return index - start;
     }
 }

@@ -165,9 +165,12 @@ public sealed class RenderCommandE2ETests
     private static string Architecture => Path.Combine(SolutionDirectory, "ARCHITECTURE.md");
 
     [Fact]
-    public async Task Render_Fresh_WritesPinnedRootAndScopeFiles()
+    public async Task Render_Fresh_WritesPinnedRootAndScopeFilesAndNoLayerCards()
     {
-        Delete(RootAgents, ScopeAgents);
+        // The layer files are deleted alongside the ones under test because their absence is half the claim:
+        // MyAppRenderSpec declares Domain and Web layers but anchors no rule on either (and quarantines
+        // billing), so render emits the root and the billing scope card only — never a layer card.
+        Delete(RootAgents, WebAgents, DomainAgents, ScopeAgents);
 
         CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
 
@@ -178,6 +181,10 @@ public sealed class RenderCommandE2ETests
             .ShouldBe(Wrap(RootBody, "\n"));
         File.ReadAllText(ScopeAgents)
             .ShouldBe(Wrap(ScopeBody, "\n"));
+        File.Exists(WebAgents)
+            .ShouldBeFalse();
+        File.Exists(DomainAgents)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -270,24 +277,6 @@ public sealed class RenderCommandE2ETests
         second.Out.NormalizedTrimmed()
             .ShouldBe(
                 "unchanged AGENTS.md\nunchanged MyApp.Web/AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
-    }
-
-    [Fact]
-    public async Task Render_LayersWithoutAnchoredRules_WriteNoLayerCards()
-    {
-        // MyAppRenderSpec declares Domain and Web layers but anchors no rule on either (and quarantines
-        // billing), so render emits the root and the billing scope card only — never a layer card.
-        Delete(RootAgents, WebAgents, DomainAgents, ScopeAgents);
-
-        CliResult result = await CliRunner.InvokeAsync("render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll);
-
-        result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
-        File.Exists(WebAgents)
-            .ShouldBeFalse();
-        File.Exists(DomainAgents)
-            .ShouldBeFalse();
     }
 
     [Fact]

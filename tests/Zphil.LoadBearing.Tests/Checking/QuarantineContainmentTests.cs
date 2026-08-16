@@ -4,7 +4,6 @@ using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -19,7 +18,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 public sealed class QuarantineContainmentTests
 {
     private const string ContainmentId = "legacy/quarantined/containment";
-    private static readonly CodebaseModel Codebase = CompilationFactory.Extract(Sources.Containment);
+    private static readonly CodebaseModel Codebase = Sources.ContainmentModel;
 
     // Boundary variant: IFacade is the sanctioned surface, resolved by full name via the name-carrier
     // App.Legacy.IFacade (ContainmentFacadeStub.cs).
@@ -54,7 +53,7 @@ public sealed class QuarantineContainmentTests
 
     private static RuleResult Containment(BaselineIndex baselines, Action<Arch> scope)
     {
-        return Checker.Run(Codebase, baselines, null, scope)
+        return Checker.Run(Codebase, baselines, scope)
             .ForRule(ContainmentId);
     }
 
@@ -63,7 +62,7 @@ public sealed class QuarantineContainmentTests
     {
         RuleResult containment = Containment(BaselineIndex.Empty, BoundaryScope);
 
-        containment.Status.ShouldBe(RuleStatus.Failed);
+        containment.ShouldHaveFailed();
         containment.ReferencePairs()
             .ShouldContain("App.Client.User -> App.Legacy.Internal");
         containment.ReferencePairs()
@@ -93,7 +92,7 @@ public sealed class QuarantineContainmentTests
 
         RuleResult containment = Containment(baselines, HermeticScope);
 
-        containment.Status.ShouldBe(RuleStatus.Failed);
+        containment.ShouldHaveFailed();
         containment.ReferencePairs()
             .ShouldBe(["App.Client.User -> App.Legacy.IFacade"]);
         containment.ShouldHaveGrandfathered(1);
@@ -120,7 +119,7 @@ public sealed class QuarantineContainmentTests
     {
         RuleResult containment = Containment(BaselineIndex.Empty, HermeticScope);
 
-        containment.Status.ShouldBe(RuleStatus.Failed);
+        containment.ShouldHaveFailed();
         containment.ReferencePairs()
             .ShouldBe(
             [

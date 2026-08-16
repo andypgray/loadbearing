@@ -33,6 +33,13 @@ public sealed class MultiTargetFrameworkTests
     private static readonly string SolutionPath =
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
 
+    /// <summary>
+    ///     The fixture's codebase, extracted once for the five gates below that read it. The model is
+    ///     immutable and the snapshot behind it is pooled for the whole class, so the extraction itself is
+    ///     the only part that was being repeated.
+    /// </summary>
+    private static readonly Lazy<Task<CodebaseModel>> MultiTfmCodebase = new(ExtractAsync);
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -87,7 +94,7 @@ public sealed class MultiTargetFrameworkTests
     [Fact]
     public async Task ExtractFromSolutionAsync_MultiTargetedProject_AttributesItsTypesToTheUndiscriminatedName()
     {
-        CodebaseModel model = await ExtractAsync();
+        CodebaseModel model = await MultiTfmCodebase.Value;
 
         // The field report's exact failure: a type attributed to "MultiTfm.Core(net10.0)" is invisible to
         // arch.Project("MultiTfm.Core"), and no spelling of the discriminated name is even typeable.
@@ -106,7 +113,7 @@ public sealed class MultiTargetFrameworkTests
     [Fact]
     public async Task Check_ProjectRuleOverMultiTargetedProject_SelectsItsTypes()
     {
-        CodebaseModel model = await ExtractAsync();
+        CodebaseModel model = await MultiTfmCodebase.Value;
 
         // A rule that must red, and must red NAMING Widget: a green here could otherwise be an
         // empty-subject false negative rather than a selection that worked.
@@ -132,7 +139,7 @@ public sealed class MultiTargetFrameworkTests
     [Fact]
     public async Task ExtractFromSolutionAsync_MultiTargetedProject_RecordsNoCrossProjectConflationNote()
     {
-        CodebaseModel model = await ExtractAsync();
+        CodebaseModel model = await MultiTfmCodebase.Value;
 
         // Both compilations of the csproj now carry one project name, so the same-FQN conflation note —
         // which fires only across DIFFERENT project names — never runs. One csproj is never a conflation.
@@ -143,7 +150,7 @@ public sealed class MultiTargetFrameworkTests
     [Fact]
     public async Task ExtractFromSolutionAsync_MultiTargetedProject_RecordsOneMultiFrameworkNoteNamingTheWinningFramework()
     {
-        CodebaseModel model = await ExtractAsync();
+        CodebaseModel model = await MultiTfmCodebase.Value;
 
         // The one thing normalization deliberately does not cure: Widget is declared by both frameworks and
         // can only carry one framework's facts. net10.0 wins on the extractor's ordinal framework order, not
@@ -159,7 +166,7 @@ public sealed class MultiTargetFrameworkTests
     [Fact]
     public async Task ExtractFromSolutionAsync_SingleTargetedConsumer_ResolvesItsProjectReferenceToTheUndiscriminatedName()
     {
-        CodebaseModel model = await ExtractAsync();
+        CodebaseModel model = await MultiTfmCodebase.Value;
 
         // Reference names are resolved through the same Project.Name, so a consumer's ProjectReference to a
         // multi-framework project names it once rather than naming a framework of it.
@@ -169,11 +176,12 @@ public sealed class MultiTargetFrameworkTests
     }
 
     // The shared read: the pool loads the fixture once for the whole class, and the framework map rides
-    // with the snapshot into extraction exactly as the warm server passes it.
+    // with the snapshot into extraction exactly as the warm server passes it. It takes no test's
+    // cancellation token, because the task it produces outlives the test that first awaits it.
     private static async Task<CodebaseModel> ExtractAsync()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, Ct);
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, CancellationToken.None);
         return await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, Ct);
+            snapshot.Solution, null, snapshot.TargetFrameworks, null, CancellationToken.None);
     }
 }

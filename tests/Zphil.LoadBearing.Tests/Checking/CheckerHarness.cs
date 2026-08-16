@@ -5,6 +5,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -23,7 +24,7 @@ internal static class Checker
 {
     public static CheckReport Run(CodebaseModel codebase, Action<Arch> define)
     {
-        return ArchChecker.Check(ArchModelBuilder.Build(new InlineSpec(define)), codebase);
+        return ArchChecker.Check(Model(define), codebase);
     }
 
     public static CheckReport Run(string source, Action<Arch> define)
@@ -33,7 +34,7 @@ internal static class Checker
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, Action<Arch> define)
     {
-        return ArchChecker.Check(ArchModelBuilder.Build(new InlineSpec(define)), codebase, baselines);
+        return ArchChecker.Check(Model(define), codebase, baselines);
     }
 
     public static CheckReport Run(string source, BaselineIndex baselines, Action<Arch> define)
@@ -43,7 +44,7 @@ internal static class Checker
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff, Action<Arch> define)
     {
-        return ArchChecker.Check(ArchModelBuilder.Build(new InlineSpec(define)), codebase, baselines, diff);
+        return ArchChecker.Check(Model(define), codebase, baselines, diff);
     }
 
     /// <summary>
@@ -52,16 +53,70 @@ internal static class Checker
     ///     universe that is smaller than the solution.
     /// </summary>
     public static CheckReport Run(
+        CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
+    {
+        return ArchChecker.Check(Model(define).Rules, codebase, baselines, null, narrowing);
+    }
+
+    /// <summary>The same narrowed run, extracting <paramref name="source" /> first.</summary>
+    public static CheckReport Run(
         string source, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(define));
-        return ArchChecker.Check(model.Rules, CompilationFactory.Extract(source), baselines, null, narrowing);
+        return Run(CompilationFactory.Extract(source), baselines, narrowing, define);
     }
 
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
     public static ArchitectureModel Model(Action<Arch> define)
     {
         return ArchModelBuilder.Build(new InlineSpec(define));
+    }
+
+    /// <summary>The rule <paramref name="id" /> names, for the tests that reach into a multi-rule model.</summary>
+    /// <remarks>
+    ///     A raw <c>Rules.Single(rule =&gt; rule.Id == id)</c> reds "Sequence contains no matching element",
+    ///     which names neither the id that was wanted nor what the model does carry — the two things that
+    ///     settle whether the spec moved or the test's expectation did.
+    /// </remarks>
+    public static ArchRule Rule(this ArchitectureModel model, string id)
+    {
+        var matching = model.Rules.Where(rule => rule.Id == id)
+            .ToList();
+        string declared = string.Join(", ", model.Rules.Select(rule => rule.Id));
+
+        return matching.ShouldHaveSingleItem($"Looking for rule '{id}'; the model declares: {declared}.");
+    }
+
+    /// <summary>
+    ///     The rendered sentence of a one-rule spec carrying <paramref name="constraint" /> — the model is
+    ///     the sole source of prose, so two spellings that render one sentence reified to one thing.
+    /// </summary>
+    public static string Sentence(Func<Arch, Constraint> constraint)
+    {
+        return Model(arch => arch.Rule("area/rule")
+                .Enforce(constraint(arch))
+                .Because("b"))
+            .Rules.Single()
+            .Sentence;
+    }
+
+    /// <summary>
+    ///     The subjects <paramref name="select" /> matches over <paramref name="codebase" />, in report
+    ///     order — for the rows whose whole question is which types a selection reaches.
+    /// </summary>
+    /// <remarks>
+    ///     Read back through a probe rule nothing can satisfy: no fixture type is named <c>ZZZ*</c>, so every
+    ///     selected type lands as a shape violation and the violation list IS the selected set. The verb is
+    ///     incidental — only the selection is under test — which is why it is spelled once here rather than
+    ///     scaffolded at each site, and explained once rather than in a comment per site.
+    /// </remarks>
+    public static IReadOnlyList<string> Selects(CodebaseModel codebase, Func<Arch, Selection> select)
+    {
+        return Run(codebase, arch => arch.Rule("probe/selection")
+                .Enforce(select(arch)
+                    .MustHavePrefix("ZZZ"))
+                .Because("b"))
+            .Single()
+            .ShapeSubjects();
     }
 
     /// <summary>A baseline index carrying <paramref name="entries" /> under one rule — the ratchet's input.</summary>
@@ -157,7 +212,7 @@ internal static class Checker
     public static string JsonReport(this CheckReport report)
     {
         return JsonReportRenderer.Document(
-            report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], [], [], [],
+            report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], WorkspaceDiagnostics.None, [],
             DocumentGrain.Full);
     }
 
@@ -230,6 +285,9 @@ internal static class Checker
         this CheckReport report, string kind, string source, string targetMember)
     {
         using JsonDocument document = JsonDocument.Parse(report.JsonReport());
+        document.RootElement.GetProperty("schemaVersion")
+            .GetInt32()
+            .ShouldBe(3);
         JsonElement violation = FirstViolation(document);
         violation.GetProperty("kind")
             .GetString()

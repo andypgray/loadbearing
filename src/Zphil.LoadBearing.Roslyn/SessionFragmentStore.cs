@@ -115,6 +115,13 @@ internal sealed class SessionFragmentStore
     // The fragment-set version the memo above holds models for; -1 until the first merge.
     private long mergedVersion = -1;
 
+    // The ordered whole set for the version in orderedVersion, and that version (-1 until the first walk).
+    // Same discipline as the merge memo one field up, for the same reason: a steady-state call re-sorted
+    // every fragment in the solution to produce a list the merge memo then made no use of. Both fields are
+    // only ever touched under the extraction gate, which the two walks and their one reader all hold.
+    private IReadOnlyList<CodebaseFragment>? orderedFragments;
+    private long orderedVersion = -1;
+
     /// <summary>
     ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked: every C# project on a full
     ///     walk, the dirty ∪ dependents set on an incremental one, empty on a pure steady-state call.
@@ -325,13 +332,22 @@ internal sealed class SessionFragmentStore
 
     // The whole stored set in ordinal-project-name order. OrderBy is a stable sort, so within a name the
     // fragments keep their stored (cold) order — reproducing a cold run's fragment order exactly, and with
-    // it the merged model byte for byte.
+    // it the merged model byte for byte. Held against the fragment-set version, which is bumped by exactly
+    // the two walks that can change what is stored, so a call that re-walked nothing hands back the list its
+    // predecessor built. Sharing the instance is safe for the reason the shared model is: a fragment is
+    // immutable data and every consumer reads.
     private IReadOnlyList<CodebaseFragment> OrderedFragments()
     {
-        return fragmentsByProject.Values
+        if (orderedVersion == fragmentSetVersion && orderedFragments is { } cached) return cached;
+
+        var ordered = fragmentsByProject.Values
             .SelectMany(list => list)
             .OrderBy(f => f.ProjectName, StringComparer.Ordinal)
             .ToList();
+
+        orderedFragments = ordered;
+        orderedVersion = fragmentSetVersion;
+        return ordered;
     }
 
     private static IReadOnlyDictionary<string, int> Copy(IReadOnlyDictionary<string, int> versions)

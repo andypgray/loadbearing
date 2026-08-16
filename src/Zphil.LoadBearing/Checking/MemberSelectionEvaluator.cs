@@ -20,37 +20,22 @@ namespace Zphil.LoadBearing.Checking;
 ///     invoke. The result is ordered by <c>(DeclaringType.FullName, SymbolId)</c> so violations are
 ///     deterministic.
 /// </remarks>
-internal sealed class MemberSelectionEvaluator
+internal static class MemberSelectionEvaluator
 {
-    private readonly SelectionEvaluator _selections;
-
-    internal MemberSelectionEvaluator(SelectionEvaluator selections)
-    {
-        _selections = selections;
-    }
-
     /// <summary>
-    ///     The declared members the selection ranges over, deterministically ordered. Throws
-    ///     <see cref="RuleEvaluationException" /> when a <c>Returning</c> anchor is a closed generic
-    ///     construction (the check-time backstop for GRAMMAR §8 item 14) — the checker surfaces it as a
-    ///     <see cref="ViolationKind.RuleError" /> rather than crashing the run.
+    ///     The declared members the selection ranges over, deterministically ordered, taken from a
+    ///     source-type set the caller has already evaluated in subject position (so a union member subject
+    ///     is not evaluated twice). Throws <see cref="RuleEvaluationException" /> when a <c>Returning</c>
+    ///     anchor is a closed generic construction (the check-time backstop for GRAMMAR §8 item 14) — the
+    ///     checker surfaces it as a <see cref="ViolationKind.RuleError" /> rather than crashing the run.
     /// </summary>
-    internal IReadOnlyList<MemberNode> Resolve(MemberSelection selection)
-    {
-        return Resolve(selection, _selections.Evaluate(selection.Source, SelectionPosition.Subject));
-    }
-
-    /// <summary>
-    ///     The same resolution over a source-type set the caller has already evaluated in subject
-    ///     position, so a union member subject is not evaluated twice.
-    /// </summary>
-    internal IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
+    internal static IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
     {
         var members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
         foreach (MemberAdjective adjective in selection.Adjectives) members = ApplyAdjective(members, adjective);
 
         return members
-            .OrderBy(DeclaringFullName, StringComparer.Ordinal)
+            .OrderBy(member => member.DeclaringTypeFullName, StringComparer.Ordinal)
             .ThenBy(member => member.SymbolId, StringComparer.Ordinal)
             .ToList();
     }
@@ -118,9 +103,16 @@ internal sealed class MemberSelectionEvaluator
     internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {
         (string key, bool onDefinition) = SelectionEvaluator.AnchorKey(anchor);
-        return onDefinition
-            ? member => member.Attributes.Any(a => a.DefinitionFullName == key)
-            : member => member.Attributes.Any(a => a.FullName == key);
+        Func<IAttributeInfo, string> nameOf = onDefinition ? a => a.DefinitionFullName : a => a.FullName;
+        return member =>
+        {
+            var attributes = member.Attributes;
+            for (var i = 0; i < attributes.Count; i++)
+                if (nameOf(attributes[i]) == key)
+                    return true;
+
+            return false;
+        };
     }
 
     // The definition-level FQNs a .Returning anchor set matches against, byte-identical to the extraction's
@@ -135,11 +127,5 @@ internal sealed class MemberSelectionEvaluator
                 type, "member return-type matching is definition-level. Anchor on the open definition instead."));
 
         return anchors;
-    }
-
-    private static string DeclaringFullName(MemberNode member)
-    {
-        // A member's DeclaringType is always the TypeNode that owns it (reference equality, MemberNode remarks).
-        return ((TypeNode)member.DeclaringType).FullName;
     }
 }

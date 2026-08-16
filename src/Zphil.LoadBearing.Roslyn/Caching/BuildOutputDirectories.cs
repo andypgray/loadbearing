@@ -6,14 +6,12 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     <see cref="SolutionCacheInputs">document filter</see> cannot drift on what counts as a build artifact.
 /// </summary>
 /// <remarks>
-///     The two consumers apply the rule through different mechanisms, so the shared thing is the directory
-///     <em>names</em>, not one matcher. <see cref="ProjectCone" /> walks the disk with
-///     <c>Microsoft.Extensions.FileSystemGlobbing</c> and consumes <see cref="ExcludeGlobs" />. The
-///     <see cref="SolutionCacheInputs" /> filter runs over an in-memory list of absolute Roslyn document paths
-///     and must keep a document that lives <em>above</em> the project directory (a
-///     <c>&lt;Compile Include="..\Shared\X.cs"&gt;</c> link), so it uses <see cref="IsUnderBuildOutput" /> — a
-///     relative-segment test the globbing library's root-scoped matcher cannot reproduce, because that matcher
-///     only enumerates paths under its root and would silently drop an above-root link.
+///     The two consumers ask at different moments, so what they share is the names and the comparison rather
+///     than one matcher. <see cref="ProjectCone" /> prunes a live disk walk by directory name and never
+///     descends. The <see cref="SolutionCacheInputs" /> filter runs over an in-memory list of absolute Roslyn
+///     document paths and must keep a document that lives <em>above</em> the project directory (a
+///     <c>&lt;Compile Include="..\Shared\X.cs"&gt;</c> link), so it reads the relative path instead — which a
+///     root-scoped disk walk could never express, because it never leaves its root.
 /// </remarks>
 internal static class BuildOutputDirectories
 {
@@ -22,19 +20,43 @@ internal static class BuildOutputDirectories
     private static readonly string[] Names = ["bin", "obj"];
 
     /// <summary>
-    ///     Ant-style glob excludes (<c>**/bin/**</c>, <c>**/obj/**</c>) for a FileSystemGlobbing
-    ///     <c>Matcher</c> whose root is the project directory.
+    ///     Whether <paramref name="directoryName" /> names a build-output directory — the ordinal test both
+    ///     probes reduce to. Takes a span so the disk walk can ask it of a directory entry without
+    ///     materializing the name.
     /// </summary>
-    internal static IEnumerable<string> ExcludeGlobs => Names.Select(name => $"**/{name}/**");
+    internal static bool IsBuildOutputName(ReadOnlySpan<char> directoryName)
+    {
+        foreach (string name in Names)
+            if (directoryName.Equals(name, StringComparison.Ordinal))
+                return true;
+
+        return false;
+    }
 
     /// <summary>
     ///     True when <paramref name="path" />, taken relative to <paramref name="projectDirectory" />, crosses
     ///     a build-output segment. A path above the project directory yields a <c>..</c>-prefixed relative path
     ///     with no such segment, so a linked source file outside the cone stays tracked.
     /// </summary>
+    /// <remarks>
+    ///     Walked as spans over the single relative path it has to materialize. This is asked once per
+    ///     document per project on every cold load — the largest input any cache probe faces — where a split
+    ///     plus a LINQ pass allocated an array and a string per segment to answer a question that reads three
+    ///     characters.
+    /// </remarks>
     internal static bool IsUnderBuildOutput(string projectDirectory, string path)
     {
-        string relative = Path.GetRelativePath(projectDirectory, path).Replace('\\', '/');
-        return relative.Split('/').Any(segment => Names.Contains(segment));
+        ReadOnlySpan<char> remaining = Path.GetRelativePath(projectDirectory, path);
+        while (!remaining.IsEmpty)
+        {
+            int separator = remaining.IndexOfAny('\\', '/');
+            var segment = separator < 0 ? remaining : remaining[..separator];
+            if (IsBuildOutputName(segment)) return true;
+            if (separator < 0) break;
+
+            remaining = remaining[(separator + 1)..];
+        }
+
+        return false;
     }
 }

@@ -47,9 +47,10 @@ public sealed class EvaluatorFailClosedTests
         var arch = new Arch();
         var memberSelection = new KindMemberSelection(
             arch.Types, MemberKindFilter.Any, new MemberAdjective[] { new UnknownMemberAdjective() });
-        var evaluator = new MemberSelectionEvaluator(new SelectionEvaluator(EmptyCodebase));
+        var selections = new SelectionEvaluator(EmptyCodebase);
+        var sourceTypes = selections.Evaluate(memberSelection.Source, SelectionPosition.Subject);
 
-        var ex = Should.Throw<InvalidOperationException>(() => evaluator.Resolve(memberSelection));
+        var ex = Should.Throw<InvalidOperationException>(() => MemberSelectionEvaluator.Resolve(memberSelection, sourceTypes));
         ex.Message.ShouldBe("Unhandled member adjective 'UnknownMemberAdjective'.");
     }
 

@@ -1,4 +1,4 @@
-using Zphil.LoadBearing.Roslyn.MsBuild;
+using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Roslyn;
 
@@ -269,13 +269,13 @@ internal static class IncompleteModelGate
 
     private static string Counted(int count)
     {
-        return count == 1 ? "1 project" : $"{count} projects";
+        return $"{count} {Plurals.Noun(count, "project")}";
     }
 
-    // A surface's whole refusal: one block per cause it has, load failures first. Both ledes are built by the
-    // caller and the unused one is simply dropped, which is what keeps a single-cause message byte-identical
-    // to the one this class emitted before restore failures could gate — no branch in the caller, no
-    // conditional in any literal.
+    // A surface's whole refusal: one EvidenceBlock per cause it has, load failures first. Both ledes are
+    // built by the caller and the unused one is simply dropped, which is what keeps a single-cause message
+    // byte-identical to the one this class emitted before restore failures could gate — no branch in the
+    // caller, no conditional in any literal.
     private static string Message(
         WorkspaceDiagnostics diagnostics,
         bool withSelectionNote,
@@ -287,25 +287,13 @@ internal static class IncompleteModelGate
         var blocks = new List<string>();
 
         if (diagnostics.FailedProjects.Count > 0)
-            blocks.Add(Block(loadLede, diagnostics.FailedProjects, withSelectionNote, loadTail));
+            blocks.Add(EvidenceBlock.Compose(loadLede, diagnostics.FailedProjects, loadTail, withSelectionNote));
 
         if (diagnostics.RestoreFailedProjects.Count > 0)
-            blocks.Add(Block(restoreLede, diagnostics.RestoreFailedProjects, withSelectionNote, restoreTail));
+            blocks.Add(
+                EvidenceBlock.Compose(
+                    restoreLede, diagnostics.RestoreFailedProjects, restoreTail, withSelectionNote));
 
         return string.Join("\n", blocks);
-    }
-
-    // How a block is assembled, stated once: the lede, then every blamed project two-space-indented, then —
-    // inside the indented run, never after the tail — the MSBuild selection note, then the tail. Only the
-    // literals differ between the messages, and the class's remarks defend those as separate messages; the
-    // assembly was never the part that varied.
-    private static string Block(
-        string lede, IReadOnlyList<string> projects, bool withSelectionNote, string? tail)
-    {
-        var lines = new List<string> { lede };
-        lines.AddRange(projects.Select(project => "  " + project));
-        if (withSelectionNote) lines.Add("  " + MsBuildBootstrap.SelectionNote());
-        if (tail is not null) lines.Add(tail);
-        return string.Join("\n", lines);
     }
 }

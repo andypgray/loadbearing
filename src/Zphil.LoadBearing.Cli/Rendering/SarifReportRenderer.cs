@@ -5,6 +5,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
@@ -52,13 +53,9 @@ internal static class SarifReportRenderer
         string solutionDirectory,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
-        IReadOnlyList<string>? failedProjects = null,
-        IReadOnlyList<string>? restoreFailedProjects = null,
-        IReadOnlyList<string>? uncheckedProjects = null)
+        WorkspaceDiagnostics diagnostics)
     {
-        string json = Serialize(
-            report, solutionDirectory, executionSuccessful, workspaceDiagnostics, failedProjects,
-            restoreFailedProjects, uncheckedProjects);
+        string json = Serialize(report, solutionDirectory, executionSuccessful, workspaceDiagnostics, diagnostics);
         AtomicFile.WriteAllBytes(sarifPath, Utf8NoBom.GetBytes(json + "\n"));
     }
 
@@ -68,18 +65,16 @@ internal static class SarifReportRenderer
     ///     every site path solution-relative; <paramref name="executionSuccessful" /> becomes the
     ///     invocation verdict (false when the incomplete-model gate will exit 2); and
     ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty).
-    ///     <paramref name="failedProjects" />, <paramref name="restoreFailedProjects" /> and
-    ///     <paramref name="uncheckedProjects" /> each add one further structured notification when non-empty;
-    ///     omitting them all renders exactly what a whole, healthy run always rendered.
+    ///     The failed, restore-failed and unchecked projects <paramref name="diagnostics" /> carries each add
+    ///     one further structured notification when non-empty, so a whole, healthy run
+    ///     (<see cref="WorkspaceDiagnostics.None" />) renders exactly what it always rendered.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
         string solutionDirectory,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
-        IReadOnlyList<string>? failedProjects = null,
-        IReadOnlyList<string>? restoreFailedProjects = null,
-        IReadOnlyList<string>? uncheckedProjects = null)
+        WorkspaceDiagnostics diagnostics)
     {
         // One relativizer for the whole log: the solution directory is the same string for every site, and
         // normalizing plus splitting it is the constant half of the walk.
@@ -87,14 +82,20 @@ internal static class SarifReportRenderer
 
         var driver = new SarifDriver(DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report));
 
+        // The documents' own trust stamp, with its nulls read back as empty. This file's "each renderer
+        // formats independently" convention is about message composition; which projects a load left
+        // untrustworthy, and how their paths are spelled, is shared plumbing all three documents already run
+        // through. An empty list emits no notification here, which is the same omission the null encodes there.
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
+        var failedProjects = trust.FailedProjects ?? [];
+        var restoreFailedProjects = trust.RestoreFailedProjects ?? [];
+        var uncheckedProjects = trust.UncheckedProjects ?? [];
+
         var run = new SarifRun(
             new SarifTool(driver),
             BuildInvocations(
-                executionSuccessful,
-                workspaceDiagnostics,
-                Relative(failedProjects, relativizer),
-                Relative(restoreFailedProjects, relativizer),
-                Relative(uncheckedProjects, relativizer)),
+                executionSuccessful, workspaceDiagnostics, failedProjects, restoreFailedProjects,
+                uncheckedProjects),
             BuildOriginalUriBaseIds(),
             BuildResults(report, relativizer));
         var log = new SarifLog(SchemaUri, SarifVersion, new[] { run });
@@ -147,7 +148,7 @@ internal static class SarifReportRenderer
     // different exit code, not a different truth about the model.
     private static SarifNotification LoadFailureNotification(IReadOnlyList<string> failedProjects)
     {
-        string subject = failedProjects.Count == 1 ? "1 project" : $"{failedProjects.Count} projects";
+        string subject = ProjectSubject(failedProjects);
 
         return new SarifNotification(
             new SarifMessage(
@@ -163,9 +164,7 @@ internal static class SarifReportRenderer
     // consequence are identical and this channel has no room to say which.
     private static SarifNotification RestoreFailureNotification(IReadOnlyList<string> restoreFailedProjects)
     {
-        string subject = restoreFailedProjects.Count == 1
-            ? "1 project"
-            : $"{restoreFailedProjects.Count} projects";
+        string subject = ProjectSubject(restoreFailedProjects);
 
         return new SarifNotification(
             new SarifMessage(
@@ -175,11 +174,21 @@ internal static class SarifReportRenderer
             ErrorLevel);
     }
 
+    // The counted head both incomplete-model notifications open with. Local to this file rather than taken
+    // from the human stamp or the narrowing notice, per the convention that each renderer composes its own
+    // messages; the narrowing notification below inflects its own, because it carries a was/were clause too.
+    private static string ProjectSubject(IReadOnlyList<string> projects)
+    {
+        int count = projects.Count;
+        return $"{count} {Plurals.Noun(count, "project")}";
+    }
+
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
     // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
     // raised. Warning rather than error: the results are true, they are simply not the whole solution's.
     // Composed here rather than shared with the human stamp, per this file's convention that each renderer
     // formats independently; the paths arrive already solution-relative, like every other path in the log.
+    // The subject stays hand-inflected rather than taking Plurals: it carries a was/were clause too.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
     {
         string subject = uncheckedProjects.Count == 1
@@ -191,14 +200,6 @@ internal static class SarifReportRenderer
                 $"A solution filter narrowed this run: {subject}, so these results cover part of the "
                 + $"solution: {string.Join(", ", uncheckedProjects)}"),
             WarningLevel);
-    }
-
-    private static IReadOnlyList<string> Relative(
-        IReadOnlyList<string>? projects, PathFormat.Relativizer relativizer)
-    {
-        return (projects ?? [])
-            .Select(relativizer.Relative)
-            .ToList();
     }
 
     // {"SRCROOT": {}} — the one solution-root URI base every artifact location resolves against, so no
@@ -275,34 +276,23 @@ internal static class SarifReportRenderer
     }
 
     // The per-kind result body, duplicated from HumanReportRenderer per house convention (each renderer
-    // formats independently). EmptySubject/RuleError are site-less, so this is never reached for them.
+    // formats independently). What is not duplicated is how a member is spelled: that form is also what
+    // 'baseline --add' resolves names against, so it lives in MemberDisplay rather than in each surface.
+    // EmptySubject/RuleError are site-less, so this is never reached for them.
     private static string MessageText(Violation violation)
     {
         return violation.Kind switch
         {
             ViolationKind.Reference => $"{violation.Source!.FullName} references {violation.Target!.FullName}",
-            ViolationKind.MemberUse => $"{violation.Source!.FullName} uses {MemberDisplay(violation.Member!)}",
+            ViolationKind.MemberUse => $"{violation.Source!.FullName} uses {MemberDisplay.Of(violation.Member!)}",
             ViolationKind.Construction => $"{violation.Source!.FullName} constructs {violation.Target!.FullName}",
             ViolationKind.Injection => $"{violation.Source!.FullName} injects {violation.Target!.FullName}",
             ViolationKind.Catch => $"{violation.Source!.FullName} catches {violation.Target!.FullName}",
             ViolationKind.Throw => $"{violation.Source!.FullName} throws {violation.Target!.FullName}",
             ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
             ViolationKind.Shape => violation.Subject!.FullName,
-            ViolationKind.MemberShape => MemberSubjectDisplay(violation.SubjectMember!),
+            ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
             _ => string.Empty
         };
-    }
-
-    // declaring-type-dot-member, with () appended iff a method — the human analog of the §6 prose form.
-    private static string MemberDisplay(MemberReference member)
-    {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
-    }
-
-    private static string MemberSubjectDisplay(MemberNode member)
-    {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
     }
 }

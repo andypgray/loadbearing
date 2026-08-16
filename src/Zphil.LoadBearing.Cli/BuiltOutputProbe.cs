@@ -111,19 +111,6 @@ internal static class BuiltOutputProbe
     }
 
     /// <summary>
-    ///     The directory the search anchors at first: walking up from
-    ///     <paramref name="evaluatedOutputPath" />'s own directory, no higher than the nearest ancestor named
-    ///     <c>bin</c> or <c>artifacts</c>, the deepest directory that exists on disk. Null when no such
-    ///     ancestor exists (a renamed output root, or a path directly under a drive root) or when nothing in
-    ///     the chain was ever created.
-    /// </summary>
-    internal static string? AnchorFor(string evaluatedOutputPath)
-    {
-        return AnchorChainFor(evaluatedOutputPath)
-            .FirstOrDefault();
-    }
-
-    /// <summary>
     ///     Every directory the search may anchor at, deepest first: the existing directories on the walk from
     ///     <paramref name="evaluatedOutputPath" />'s own directory up to and including the nearest ancestor
     ///     named <c>bin</c> or <c>artifacts</c>. Empty when no such ancestor exists or when nothing on the

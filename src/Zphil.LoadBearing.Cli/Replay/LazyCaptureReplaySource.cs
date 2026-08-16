@@ -8,8 +8,7 @@ namespace Zphil.LoadBearing.Cli.Replay;
 ///     replay-free and sub-second and byte-identical to a plain cached run.
 /// </summary>
 /// <remarks>
-///     Discovers first for error-text parity, then replays the capture's binlog copy on the one
-///     <see cref="AcquireAsync" /> call the runner makes.
+///     Replays the capture's binlog copy on the one <see cref="AcquireAsync" /> call the runner makes.
 ///     The produced <see cref="ReplayedSolution" /> is exposed on <see cref="Replayed" /> for the gate
 ///     to dispose (the handle itself is non-owning, <c>owned: null</c>); a runtime replay failure of a copy
 ///     the store validated as usable is not fatal — it raises <see cref="CaptureReplayFailedException" /> so
@@ -23,10 +22,8 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
     public ReplayedSolution? Replayed { get; private set; }
 
     /// <inheritdoc />
-    public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
-
         var diagnostics = new List<string>();
         ReplayedSolution replayed;
         try
@@ -46,8 +43,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
 
         Replayed = replayed;
         return Task.FromResult(new SolutionHandle(
-            replayed.Solution, solutionPath, diagnostics, null, targetFrameworks: replayed.TargetFrameworks,
-            failedProjects: replayed.FailedProjects,
-            restoreFailedProjects: replayed.RestoreFailedProjects));
+            replayed.Solution, solutionPath, replayed.LoadDiagnosticsWith(diagnostics), null,
+            targetFrameworks: replayed.TargetFrameworks));
     }
 }

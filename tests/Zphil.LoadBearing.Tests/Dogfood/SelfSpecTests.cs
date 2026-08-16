@@ -9,6 +9,7 @@ using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -71,6 +72,17 @@ public sealed class SelfSpecTests
     });
 
     /// <summary>
+    ///     This repository's own spec, built once for the four gates that render or read it. The model is
+    ///     immutable and each of them only reads it, so one instance answers all four.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="CoreLayer_MatchesTheCoreProject" /> deliberately builds its own: it reaches back
+    ///     through a constraint's subject to the builder that made it and names a second selection from
+    ///     there, which is a question about one instance rather than about the spec.
+    /// </remarks>
+    private static readonly ArchitectureModel SelfModel = ArchModelBuilder.Build(new LoadBearingArchSpec());
+
+    /// <summary>
     ///     The CI-equivalent self-spec gate, and — on the same run — the gate on the advisory channel
     ///     beside it. <c>workspaceDiagnostics</c> is what every MCP consumer of this repo's own check
     ///     reads, the arch hook included, so it is asserted <em>empty</em>: a channel that is never empty
@@ -105,8 +117,7 @@ public sealed class SelfSpecTests
     [Fact]
     public void AgentsMd_IsCurrent()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
-        string composed = AgentContextRenderer.RootBlock(model, SpecName);
+        string composed = AgentContextRenderer.RootBlock(SelfModel, SpecName);
         string committed = File.ReadAllText(RepoRoot.AgentsMd);
 
         // Exactly one marker pair (ExtractBody throws on any other count), and its body is current.
@@ -124,9 +135,8 @@ public sealed class SelfSpecTests
         CodebaseModel codebase = await WholeCodebase.Value;
 
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
-        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
         string composed = DiagramComposer.Compose(
-            summary, Path.GetFileName(RepoRoot.Solution), model, SpecName, new DiagramScope(ShippingProjects, []));
+            summary, Path.GetFileName(RepoRoot.Solution), SelfModel, SpecName, new DiagramScope(ShippingProjects, []));
         string committed = File.ReadAllText(RepoRoot.ArchitectureMd);
 
         MarkerPairCount(committed)
@@ -181,7 +191,7 @@ public sealed class SelfSpecTests
         string? body = ManagedBlock.ExtractBody(File.ReadAllText(RepoRoot.ArchitectureMd));
         body.ShouldNotBeNull("ARCHITECTURE.md carries no managed block.");
 
-        Occurrences(body, "```mermaid")
+        TextNormalization.Occurrences(body, "```mermaid")
             .ShouldBe(2, "the managed block must carry both drawings.");
         body.ShouldContain("accTitle: Codebase survey:");
         body.ShouldContain("accTitle: Architecture law:");
@@ -203,14 +213,14 @@ public sealed class SelfSpecTests
         // here the extraction decides card placement, and a card must land where the command puts it.
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
             RepoRoot.Solution, TestContext.Current.CancellationToken);
+        var declaredMembers = SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution);
         SpecResolution resolution = SpecResolver.Resolve(
-            snapshot.Solution, RepoRoot.Solution, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
+            snapshot.Solution, declaredMembers, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
             snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks, null,
             TestContext.Current.CancellationToken);
 
-        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
-        ContextComposition composition = ContextFileComposer.Compose(model, codebase, RepoRoot.Directory, SpecName);
+        ContextComposition composition = ContextFileComposer.Compose(SelfModel, codebase, RepoRoot.Directory, SpecName);
 
         // A skip warning means a declared layer or scope matched no type — a spec that no longer describes
         // this codebase, and a card silently not written.
@@ -248,10 +258,9 @@ public sealed class SelfSpecTests
     [Fact]
     public void VerbLedger_AccountsForEveryUnusedVerb()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
         string ledger = File.ReadAllText(RepoRoot.ArchSpecSource);
 
-        var used = model.Rules
+        var used = SelfModel.Rules
             .Where(rule => rule.Constraint is not null)
             .Select(rule => VerbName(rule.Constraint!.GetType()))
             .ToHashSet(StringComparer.Ordinal);
@@ -342,7 +351,7 @@ public sealed class SelfSpecTests
         // The layer selection is taken from the built model rather than re-declared, so this pins the globs
         // the spec actually ships. layering/core-no-roslyn's subject is the bare Core layer.
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
-        Selection coreLayer = model.Rules.Single(rule => rule.Id == "layering/core-no-roslyn")
+        Selection coreLayer = model.Rule("layering/core-no-roslyn")
             .Constraint!.Subject;
         Selection coreProject = coreLayer.Owner.Project("Zphil.LoadBearing");
 
@@ -518,19 +527,8 @@ public sealed class SelfSpecTests
 
     private static int MarkerPairCount(string text)
     {
-        int begins = Occurrences(text, ManagedBlock.BeginMarker);
-        int ends = Occurrences(text, ManagedBlock.EndMarker);
+        int begins = TextNormalization.Occurrences(text, ManagedBlock.BeginMarker);
+        int ends = TextNormalization.Occurrences(text, ManagedBlock.EndMarker);
         return begins == ends ? begins : -1;
-    }
-
-    private static int Occurrences(string haystack, string needle)
-    {
-        var count = 0;
-        for (int index = haystack.IndexOf(needle, StringComparison.Ordinal);
-             index >= 0;
-             index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal))
-            count++;
-
-        return count;
     }
 }

@@ -50,9 +50,10 @@ internal enum DocumentGrain
 }
 
 /// <summary>
-///     The two things every laddered document does with a <see cref="DocumentGrain" />: read one off the
-///     caller's flags, and spell it on the wire. Sited here rather than in each renderer so the CLI and the
-///     MCP surface cannot drift on either — a survey and a report stamped <c>overview</c> mean the same rung.
+///     The three things every laddered document does with a <see cref="DocumentGrain" />: read one off the
+///     caller's flags, walk the ladder from it, and spell it on the wire. Sited here rather than in each
+///     renderer so the CLI and the MCP surface cannot drift on any of them — a survey and a report stamped
+///     <c>overview</c> mean the same rung, and both walk down to the same coarsest one.
 /// </summary>
 internal static class DocumentGrains
 {
@@ -66,6 +67,22 @@ internal static class DocumentGrains
         if (skeleton) return DocumentGrain.Skeleton;
 
         return overview ? DocumentGrain.Overview : DocumentGrain.Full;
+    }
+
+    /// <summary>
+    ///     Every rung from <paramref name="floor" /> down to the coarsest, each document composed by
+    ///     <paramref name="compose" /> — what a runner offers an <see cref="IResponseFitter" />.
+    /// </summary>
+    /// <remarks>
+    ///     Lazy on purpose: each rung costs a full serialization of the document, so a fitter that stops at
+    ///     the first pays for exactly one. The ladder cannot spin — every rung is strictly coarser than the
+    ///     one before it, and <see cref="DocumentGrain.Skeleton" /> is last.
+    /// </remarks>
+    /// <param name="floor">The grain the caller asked for: the finest rung offered, and always yielded.</param>
+    /// <param name="compose">Composes the whole document at one grain.</param>
+    public static IEnumerable<string> Ladder(DocumentGrain floor, Func<DocumentGrain, string> compose)
+    {
+        for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return compose(at);
     }
 
     /// <summary>

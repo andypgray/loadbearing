@@ -37,12 +37,9 @@ public sealed class BinlogReplayFidelityTests
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
         CodebaseModel viaReplay = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
 
-        // Act
-        string msBuildDump = ModelDump.Render(viaMsBuild);
-        string replayDump = ModelDump.Render(viaReplay);
-
-        // Assert — byte-for-byte, raw paths included so a slash/spelling drift fails here (never papered over).
-        replayDump.ShouldBe(msBuildDump);
+        // Act + Assert — fact for fact, raw paths included so a slash/spelling drift fails here (never
+        // papered over).
+        viaReplay.ShouldModelTheSameAs(viaMsBuild);
     }
 
     [Fact]

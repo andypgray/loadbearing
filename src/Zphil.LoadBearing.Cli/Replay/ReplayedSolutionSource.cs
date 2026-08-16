@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Replay;
 
@@ -9,27 +10,20 @@ namespace Zphil.LoadBearing.Cli.Replay;
 ///     workspace.
 /// </summary>
 /// <remarks>
-///     Like <see cref="Mcp.WarmSolutionSource" /> it discovers first (<see cref="ModelPipeline.DiscoverSolution" />)
-///     for byte-for-byte error-text parity with the cold path,
-///     then hands back a non-owning handle (<c>owned: null</c>): the gate owns the underlying
+///     Hands back a non-owning handle (<c>owned: null</c>): the gate owns the underlying
 ///     <see cref="Roslyn.Replay.ReplayedSolution" /> and disposes it once the run completes. No
 ///     MSBuildWorkspace and no design-time build — the whole point of the bypass (the gate registers
 ///     MSBuildLocator up front so the binlog parser can resolve its MSBuild assemblies).
 /// </remarks>
 internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
-    string solutionPath,
-    IReadOnlyList<string> diagnostics,
-    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-    IReadOnlyList<string>? failedProjects = null,
-    IReadOnlyList<string>? restoreFailedProjects = null) : ISolutionSource
+    WorkspaceDiagnostics loadDiagnostics,
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : ISolutionSource
 {
     /// <inheritdoc />
-    public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        ModelPipeline.DiscoverSolution(solution, workingDirectory);
         return Task.FromResult(new SolutionHandle(
-            replayedSolution, solutionPath, diagnostics, null, targetFrameworks: targetFrameworks,
-            failedProjects: failedProjects, restoreFailedProjects: restoreFailedProjects));
+            replayedSolution, solutionPath, loadDiagnostics, null, targetFrameworks: targetFrameworks));
     }
 }

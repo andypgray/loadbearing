@@ -165,17 +165,14 @@ public sealed class NarrowingGateOrderE2ETests
         // they name different repairs and a reader who ran only the one they were told about would still be
         // stuck.
         using var workspace = new TempFixtureWorkspace();
-        var output = new StringWriter();
-        var error = new StringWriter();
         var source = new DiagnosticInjectingSolutionSource(
             [], [BrokenProject], [SkippedProject(workspace)], [UnrestoredProject]);
         var request = new RenderRequest(
             workspace.SolutionPath, CliRunner.CleanSpecDll,
-            Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, false);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), false);
 
-        int exit = await new RenderRunner(output, error, source).RunAsync(request, Ct);
+        CliResult render = await CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
 
-        var render = new CliResult(exit, output.ToString(), error.ToString());
         render.ShouldRefuseWith(RenderGateLede, BrokenProject, RenderRestoreGateLede, UnrestoredProject);
         render.Err.IndexOf(RenderRestoreGateLede, StringComparison.Ordinal)
             .ShouldBeGreaterThan(render.Err.IndexOf(RenderGateLede, StringComparison.Ordinal));
@@ -193,35 +190,25 @@ public sealed class NarrowingGateOrderE2ETests
         return Path.Combine(solutionDirectory, "MyApp.Skipped", "MyApp.Skipped.csproj");
     }
 
-    private static async Task<CliResult> RunBaselineAsync(
+    private static Task<CliResult> RunBaselineAsync(
         TempFixtureWorkspace workspace, bool allowWorkspaceDiagnostics)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
-        var runner = new BaselineRunner(output, error, source);
         var request = new BaselineRequest(
             workspace.SolutionPath, CliRunner.ViolatedSpecDll, true, false, false, null, null, null, null, null,
-            Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, allowWorkspaceDiagnostics);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), allowWorkspaceDiagnostics);
 
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source).RunAsync(request, Ct));
     }
 
-    private static async Task<CliResult> RunRenderAsync(
+    private static Task<CliResult> RunRenderAsync(
         TempFixtureWorkspace workspace, bool allowWorkspaceDiagnostics)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
-        var runner = new RenderRunner(output, error, source);
         var request = new RenderRequest(
             workspace.SolutionPath, CliRunner.CleanSpecDll,
-            Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, allowWorkspaceDiagnostics);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), allowWorkspaceDiagnostics);
 
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
     }
 }

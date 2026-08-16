@@ -38,10 +38,14 @@ internal sealed class CheckRunner(
     TextWriter error,
     ISolutionSource? source = null,
     IEnvironment? environment = null,
-    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment)
+    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
     {
+        // This run's human channel. --json owns stdout, where the document is the only thing written, so
+        // under it every stamp and notice below goes nowhere.
+        TextWriter human = request.Json ? TextWriter.Null : output;
+
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
@@ -50,8 +54,11 @@ internal sealed class CheckRunner(
         // so. The stamp goes out just as early, because it says what the operator is about to wait for.
         var ruleGlobs = GlobList.Parse(request.Rules);
         var rules = CheckPipeline.SelectRules(source.Model, ruleGlobs);
-        WriteNarrowingStamp(request, source);
-        WriteFilterStamp(request, ruleGlobs, rules.Count, source.Model.Rules.Count);
+
+        // Both stamps are human-channel only: under --json the document carries the same two facts in
+        // uncheckedProjects and rulesFilter.
+        NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.CheckStamp);
+        WriteFilterStamp(human, ruleGlobs, rules.Count, source.Model.Rules.Count);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, request.DiffBase, rules, ct);
         RecordCacheOutcome(source);
@@ -67,75 +74,51 @@ internal sealed class CheckRunner(
 
         // Fail closed on an incomplete model (a project failed to load, or to restore): a workspace-load diagnostic makes
         // exit 2 take precedence over 0/1, unless the operator opted into the partial model. The NuGetAudit
-        // carve-out lives with the rest of the shared answer. Both computed above Render so the document and
-        // the SARIF stamp carry the same verdict the gate below returns.
-        bool modelIncomplete = diagnostics.IsIncomplete;
+        // carve-out lives with the rest of the shared answer. Computed above Render, which reads the same
+        // value, so the document and the SARIF stamp carry the verdict the gate below returns.
         bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
 
         Render(
-            request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
-            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete,
-            diagnostics.FailedProjects, diagnostics.UncheckedProjects, diagnostics.RestoreFailedProjects,
-            ruleGlobs);
+            request, human, report, source.SolutionDirectory, source.SolutionName,
+            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, diagnostics, !gated, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
-        if (gated)
-        {
-            // WriteLine per LF-split line, as CliErrorMapper does, so the block adopts the writer's own
-            // newline rather than carrying embedded LFs onto a CRLF console.
-            foreach (string line in IncompleteModelGate.CheckMessage(diagnostics).Split('\n'))
-                error.WriteLine(line);
+        if (IncompleteModelNotices.Refused(
+                error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.CheckMessage))
             return 2;
-        }
 
         return report.HasViolations ? 1 : 0;
     }
 
-    // The human narrowing stamp, sited beside the rules-filter stamp for the same reasons: a runner concern,
-    // suppressed under --json (where the document carries the same fact in uncheckedProjects), and
-    // byte-silent on every run that narrowed nothing — which is every unfiltered run, and a filtered one
-    // whose selection pulled the whole solution in transitively.
-    private void WriteNarrowingStamp(CheckRequest request, CodebaseSource source)
-    {
-        var uncheckedProjects = source.Diagnostics.UncheckedProjects;
-        if (uncheckedProjects.Count == 0 || request.Json) return;
-
-        NarrowedUniverseNotice.Write(
-            output,
-            NarrowedUniverseNotice.CheckStamp(
-                Path.GetFileName(source.SolutionPath),
-                NarrowedUniverseNotice.Relative(uncheckedProjects, source.SolutionDirectory)));
-    }
-
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an
     // unfiltered run is byte-identical to what it always was and the xUnit adapter never sees a CLI concern.
-    // It says what the report cannot: how much of the spec this verdict covers. Suppressed under --json,
-    // which owns stdout — the document carries the same fact in rulesFilter.
-    private void WriteFilterStamp(CheckRequest request, IReadOnlyList<string> ruleGlobs, int selected, int total)
+    // It says what the report cannot: how much of the spec this verdict covers. Human-channel only — under
+    // --json the document carries the same fact in rulesFilter.
+    private static void WriteFilterStamp(
+        TextWriter human, IReadOnlyList<string> ruleGlobs, int selected, int total)
     {
-        if (ruleGlobs.Count == 0 || request.Json) return;
+        if (ruleGlobs.Count == 0) return;
 
-        output.WriteLine(
+        human.WriteLine(
             $"Checking {selected} of {total} rules matching '{string.Join(";", ruleGlobs)}'; the verdict below "
             + "covers only those, so a clean result here is not a clean solution.");
-        output.WriteLine();
+        human.WriteLine();
     }
 
     private void Render(
-        CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
-        IReadOnlyList<string> diagnostics, bool executionSuccessful, bool modelIncomplete,
-        IReadOnlyList<string> failedProjects, IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects, IReadOnlyList<string> ruleGlobs)
+        CheckRequest request, TextWriter human, CheckReport report, string solutionDirectory, string solutionName,
+        string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
+        bool executionSuccessful, IReadOnlyList<string> ruleGlobs)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
-        WorkspaceDiagnosticsRenderer.Render(error, diagnostics, request.Json);
+        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         if (request.Json)
             WriteJson(
-                request, report, solutionDirectory, solutionName, specAssembly, diagnostics, modelIncomplete,
-                failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs);
+                request, report, solutionDirectory, solutionName, specAssembly, renderedDiagnostics, diagnostics,
+                ruleGlobs);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 
@@ -144,9 +127,8 @@ internal sealed class CheckRunner(
         if (request.Sarif is { } sarifPath)
         {
             SarifReportRenderer.Render(
-                sarifPath, report, solutionDirectory, executionSuccessful, diagnostics, failedProjects,
-                restoreFailedProjects, uncheckedProjects);
-            if (!request.Json) output.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
+                sarifPath, report, solutionDirectory, executionSuccessful, renderedDiagnostics, diagnostics);
+            human.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
         }
     }
 
@@ -158,25 +140,19 @@ internal sealed class CheckRunner(
     // here with its verdict, and the summary counts still cover exactly what ran.
     private void WriteJson(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName,
-        string specAssembly, IReadOnlyList<string> diagnostics, bool modelIncomplete,
-        IReadOnlyList<string> failedProjects, IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects, IReadOnlyList<string> ruleGlobs)
+        string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
+        IReadOnlyList<string> ruleGlobs)
     {
-        JsonReportRenderer.Render(output, (fitter ?? ResponseFitter.FirstRung).Fit(Ladder(request.Grain)));
+        var ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        string document = Fitter.Fit(ladder);
+        output.WriteLine(document);
         return;
-
-        // Lazy on purpose: each rung costs a full serialization of the report, so a fitter that stops at the
-        // first pays for exactly one. The ladder cannot spin — every rung is strictly coarser, Skeleton last.
-        IEnumerable<string> Ladder(DocumentGrain floor)
-        {
-            for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return Compose(at);
-        }
 
         string Compose(DocumentGrain at)
         {
             return JsonReportRenderer.Document(
-                report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
-                modelIncomplete, failedProjects, uncheckedProjects, restoreFailedProjects, ruleGlobs, at);
+                report, solutionDirectory, solutionName, specAssembly, request.DiffBase, renderedDiagnostics,
+                diagnostics, ruleGlobs, at);
         }
     }
 }

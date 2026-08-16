@@ -6,6 +6,7 @@ using Xunit;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Discovery;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Cli;
 
 namespace Zphil.LoadBearing.Tests.Legacy;
@@ -43,10 +44,10 @@ public sealed class LegacySpecLoadingTests
                 .ShouldBeAssignableTo<IArchitectureSpec>();
 
             // The model builds, and the second sentence comes from a typeof() anchor on a net48 product type.
-            model.Rules.Single(rule => rule.Id == "legacy/interfaces")
+            model.Rule("legacy/interfaces")
                 .Sentence
                 .ShouldBe("Interfaces in `Legacy.*` must be named `I*`.");
-            model.Rules.Single(rule => rule.Id == "legacy/gateway-through-interface")
+            model.Rule("legacy/gateway-through-interface")
                 .Sentence
                 .ShouldBe("Types in `Legacy.*` must not construct `BillingGateway`.");
 

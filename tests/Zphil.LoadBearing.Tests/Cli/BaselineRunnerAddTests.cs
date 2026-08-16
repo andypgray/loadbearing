@@ -69,15 +69,15 @@ public sealed class BaselineRunnerAddTests : IDisposable
     public void AddEntry_MemberUseViolationByFullNameTarget_AppendsMemberEntryWithPinnedEcho()
     {
         // Arrange — a captured (empty-section) member ratchet and one observed DateTime.Now use.
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule(RuleId)
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(RuleId)
             .Migrate(
                 "controllers read the ambient clock",
                 arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
             .Baseline("member.json")
-            .Because("b")));
+            .Because("b"));
         CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
         string path = Path.Combine(_temp.Path, "member.json");
-        File.WriteAllText(path, Compose([]));
+        File.WriteAllText(path, BaselineComposer.Compose(RuleId));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
@@ -96,31 +96,30 @@ public sealed class BaselineRunnerAddTests : IDisposable
         echo.ShouldContain("wrote member.json");
 
         string written = File.ReadAllText(path)
-            .Replace("\r\n", "\n");
+            .NormalizedLines();
         written.ShouldContain(
             "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"because\": \"INC-1234\" }");
         // Composer as oracle: the whole file is the canonical composition of exactly that one entry.
-        written.ShouldBe(Compose(
-        [
+        written.ShouldBe(BaselineComposer.Compose(
+            RuleId,
             BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "P:System.DateTime.Now")
-                .WithBecause("INC-1234")
-        ]));
+                .WithBecause("INC-1234")));
     }
 
     [Fact]
     public void AddEntry_ConstructionViolationByFullNameTarget_AppendsEdgeEntryWithPinnedEcho()
     {
         // Arrange — a captured (empty-section) construction ratchet and one observed `new MyApp.Data.Db()`.
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule(CtorRuleId)
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(CtorRuleId)
             .Migrate(
                 "controllers `new` the data layer directly",
                 arch.Namespace("MyApp.Web.*")
                     .MustNotConstruct(arch.Namespace("MyApp.Data.*")))
             .Baseline("ctor.json")
-            .Because("b")));
+            .Because("b"));
         CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
         string path = Path.Combine(_temp.Path, "ctor.json");
-        File.WriteAllText(path, ComposeCtor([]));
+        File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
@@ -140,15 +139,14 @@ public sealed class BaselineRunnerAddTests : IDisposable
         echo.ShouldContain("wrote ctor.json");
 
         string written = File.ReadAllText(path)
-            .Replace("\r\n", "\n");
+            .NormalizedLines();
         written.ShouldContain(
             "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"because\": \"INC-9\" }");
         // Composer as oracle: the whole file is the canonical composition of exactly that one edge entry.
-        written.ShouldBe(ComposeCtor(
-        [
+        written.ShouldBe(BaselineComposer.Compose(
+            CtorRuleId,
             BaselineEntry.ForEdge("T:MyApp.Web.OrderController", "T:MyApp.Data.Db")
-                .WithBecause("INC-9")
-        ]));
+                .WithBecause("INC-9")));
     }
 
     [Fact]
@@ -156,20 +154,20 @@ public sealed class BaselineRunnerAddTests : IDisposable
     {
         // Arrange — a captured (empty-section) ratchet over the filter-aware catch verb, and a codebase with two
         // unfiltered catches of the banned type plus one behind a `when` filter.
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule(UnfilteredCatchRuleId)
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(UnfilteredCatchRuleId)
             .Migrate(
                 "legacy handlers wrap their work in an unfiltered broad catch",
                 arch.Namespace("App.*")
                     .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
             .Baseline("catch.json")
-            .Because("b")));
+            .Because("b"));
         CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);
         CheckReport report = ArchChecker.Check(model, codebase, BaselineIndex.Empty);
         report.Single()
             .CatchPairs()
             .ShouldBe(["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"], true);
         string path = Path.Combine(_temp.Path, "catch.json");
-        File.WriteAllText(path, ComposeCatch([]));
+        File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
@@ -187,47 +185,19 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .ShouldContain(
                 "exceptions/no-unfiltered-catch: added 1 grandfathered entry — App.LegacyHandler -> Errors.DbError (because: INC-77).");
         File.ReadAllText(path)
-            .Replace("\r\n", "\n")
-            .ShouldBe(ComposeCatch(
-            [
+            .NormalizedLines()
+            .ShouldBe(BaselineComposer.Compose(
+                UnfilteredCatchRuleId,
                 BaselineEntry.ForEdge("T:App.LegacyHandler", "T:Errors.DbError")
-                    .WithBecause("INC-77")
-            ]));
+                    .WithBecause("INC-77")));
 
         // …and the ratchet holds on the bytes the valve wrote: re-checking against the file grandfathers the
         // added edge and leaves ImportHandler's identical-looking catch — a distinct identity — red.
         RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path))
             .Single();
-        ratcheted.Status.ShouldBe(RuleStatus.Failed);
+        ratcheted.ShouldHaveFailed();
         ratcheted.CatchPairs()
             .ShouldBe(["App.ImportHandler -> Errors.DbError"]);
         ratcheted.ShouldHaveGrandfathered(1);
-    }
-
-    private static string Compose(BaselineEntry[] entries)
-    {
-        var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal)
-        {
-            [RuleId] = entries
-        };
-        return BaselineFormat.ComposeFile(rules);
-    }
-
-    private static string ComposeCtor(BaselineEntry[] entries)
-    {
-        var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal)
-        {
-            [CtorRuleId] = entries
-        };
-        return BaselineFormat.ComposeFile(rules);
-    }
-
-    private static string ComposeCatch(BaselineEntry[] entries)
-    {
-        var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal)
-        {
-            [UnfilteredCatchRuleId] = entries
-        };
-        return BaselineFormat.ComposeFile(rules);
     }
 }

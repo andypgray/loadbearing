@@ -259,7 +259,7 @@ public sealed class BuiltOutputProbeTests
     }
 
     [Fact]
-    public void AnchorFor_DescendsToTheDeepestExistingDirectoryBelowTheOutputRoot()
+    public void AnchorChainFor_HeadIsTheDeepestExistingDirectoryBelowTheOutputRoot()
     {
         // The named directory is the ceiling of the walk, never the anchor. Starting at artifacts/bin would
         // pull every other project's output into scope and make the right answer a ranking problem; the
@@ -268,7 +268,8 @@ public sealed class BuiltOutputProbeTests
         WriteAssembly(temp, "artifacts", "bin", "MyApp.Arch", "release", Assembly);
         string evaluated = temp.PathOf("artifacts", "bin", "MyApp.Arch", "debug", Assembly);
 
-        BuiltOutputProbe.AnchorFor(evaluated)
+        BuiltOutputProbe.AnchorChainFor(evaluated)
+            .FirstOrDefault()
             .ShouldBe(temp.PathOf("artifacts", "bin", "MyApp.Arch"));
     }
 
@@ -292,10 +293,7 @@ public sealed class BuiltOutputProbeTests
     // A zero-byte assembly at the given path, with its directory created.
     private static string WriteAssembly(TempDirectory temp, params string[] segments)
     {
-        string path = temp.PathOf(segments);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, "");
-        return path;
+        return temp.WriteFile(segments, "");
     }
 
     // The same, with an explicit write time — for the facts where a ranking key is the thing under test. The

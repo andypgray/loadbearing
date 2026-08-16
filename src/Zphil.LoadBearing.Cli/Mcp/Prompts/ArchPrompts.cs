@@ -38,9 +38,19 @@ internal sealed class ArchPrompts
     /// </summary>
     internal const string ScaffoldVersionPlaceholder = "Version=\"...\"";
 
+    // The served body, composed once: both halves are fixed for the process's life (an embedded resource
+    // and the running build's own version), so a prompts/get is a field read rather than a resource
+    // read plus a scan of the whole recipe.
+    private static readonly string DeriveSpecBody = ComposeDeriveSpecBody();
+
     [McpServerPrompt(Name = DeriveSpecName, Title = "Derive an architecture spec")]
     [Description(DeriveSpecDescription)]
     internal static string DeriveSpec()
+    {
+        return DeriveSpecBody;
+    }
+
+    private static string ComposeDeriveSpecBody()
     {
         string template = EmbeddedResourceText.Load("derive-spec.md");
         return template.Replace(ScaffoldVersionPlaceholder, $"Version=\"{ServerVersion.SemVer}\"");

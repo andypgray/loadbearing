@@ -672,17 +672,17 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MemberSubjectRatchet_GrandfathersMember_ThenNewMemberIsRed()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("naming/async-suffix")
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("naming/async-suffix")
             .Migrate("legacy Task-returning methods lack the Async suffix",
                 arch.Namespace("App.Async.*")
                     .Methods.Returning(typeof(Task))
                     .MustHaveSuffix("Async"))
-            .Because("Async discovery is suffix-based.")));
+            .Because("Async discovery is suffix-based."));
 
         // Empty baseline → Save() is red (SaveAsync passes); capture its member-subject identity (a M: DocId).
         RuleResult red = ArchChecker.Check(model, AsyncModel, BaselineIndex.Empty)
             .Single();
-        red.Status.ShouldBe(RuleStatus.Failed);
+        red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
         BaselineEntry identity = observed.BaselineIdentity()!;
         identity.Subject.ShouldBe("M:App.Async.HomeController.Save");
@@ -716,7 +716,7 @@ public sealed class MemberSubjectVerbTests
                              """;
         RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index)
             .Single();
-        regressed.Status.ShouldBe(RuleStatus.Failed);
+        regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
         FailedMemberIds(regressed)
             .ShouldBe(["M:App.Async.HomeController.Delete"]);
@@ -725,13 +725,13 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void MemberSubjectRatchet_MustAcceptParameter_GrandfathersMember_ThenNewMemberIsRed()
     {
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("async/accept-cancellation")
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("async/accept-cancellation")
             .Migrate("legacy Task-returning methods do not accept a CancellationToken",
                 arch.Namespace("App.Cancel.*")
                     .Methods
                     .Returning(typeof(Task), typeof(Task<>))
                     .MustAcceptParameter(typeof(CancellationToken)))
-            .Because("Async methods must honor cancellation.")));
+            .Because("Async methods must honor cancellation."));
 
         const string before = """
                               namespace App.Cancel
@@ -750,7 +750,7 @@ public sealed class MemberSubjectVerbTests
         // Empty baseline → Poll() is red (Fetch passes); capture its member-subject identity (a M: DocId).
         RuleResult red = ArchChecker.Check(model, beforeModel, BaselineIndex.Empty)
             .Single();
-        red.Status.ShouldBe(RuleStatus.Failed);
+        red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
         BaselineEntry identity = observed.BaselineIdentity()!;
         identity.Subject.ShouldBe("M:App.Cancel.Api.Poll");
@@ -785,7 +785,7 @@ public sealed class MemberSubjectVerbTests
                              """;
         RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index)
             .Single();
-        regressed.Status.ShouldBe(RuleStatus.Failed);
+        regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
         FailedMemberIds(regressed)
             .ShouldBe(["M:App.Cancel.Api.Purge"]);

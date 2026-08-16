@@ -110,4 +110,10 @@ public sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; }
+
+    /// <summary>
+    ///     The owning type's <see cref="TypeNode.FullName" />, read off the documented invariant that
+    ///     <see cref="DeclaringType" /> is the <see cref="TypeNode" /> that declares this member.
+    /// </summary>
+    internal string DeclaringTypeFullName => ((TypeNode)DeclaringType).FullName;
 }

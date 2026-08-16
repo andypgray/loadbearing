@@ -61,7 +61,7 @@ public sealed class McpRegistrationTests
     [Fact]
     public void Readme_RegistersThePosixShellAndNamesOnlyPathsThatExist()
     {
-        string readme = ReadRepoFile("hooks/README.md");
+        string readme = RepoRoot.ReadText("hooks/README.md");
 
         readme.ShouldContain(
             PosixCommandLine,
@@ -85,7 +85,7 @@ public sealed class McpRegistrationTests
     [Fact]
     public void Readme_NamesTheWindowsShellByWhereItLives()
     {
-        string readme = ReadRepoFile("hooks/README.md");
+        string readme = RepoRoot.ReadText("hooks/README.md");
 
         readme.ShouldContain(
             WindowsCommandLine,
@@ -97,7 +97,7 @@ public sealed class McpRegistrationTests
     [Fact]
     public void LauncherHeader_NamesTheSameWindowsShell()
     {
-        string launcher = ReadRepoFile("hooks/mcp-launch.sh");
+        string launcher = RepoRoot.ReadText("hooks/mcp-launch.sh");
 
         launcher.ShouldContain(
             WindowsCommandLine,
@@ -146,10 +146,5 @@ public sealed class McpRegistrationTests
                 $"{shell} exists, so a default install now puts a shell where the machine PATH reaches it and "
                 + "the README's reason for naming the shell absolutely no longer holds. Revisit what it tells a "
                 + "reader to paste.");
-    }
-
-    private static string ReadRepoFile(string repoRelativePath)
-    {
-        return File.ReadAllText(RepoRoot.Absolute(repoRelativePath));
     }
 }

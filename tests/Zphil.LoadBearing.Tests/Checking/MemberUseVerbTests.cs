@@ -69,7 +69,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Source!.FullName.ShouldBe("App.Dashboard");
@@ -202,7 +202,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         // The Ticks read plus both Advance overloads — the ban spans both named members.
         MemberIds(result)
             .OrderBy(id => id, StringComparer.Ordinal)
@@ -229,7 +229,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Source!.FullName.ShouldBe("App.Calc");
         violation.Member!.SymbolId.ShouldBe("M:System.Math.Sqrt(System.Double)");
@@ -240,16 +240,16 @@ public sealed class MemberUseVerbTests
     {
         using TempDirectory dir = TestTempRoot.Fresh("member-ratchet");
 
-        ArchitectureModel model = ArchModelBuilder.Build(new InlineSpec(arch => arch.Rule("mig/no-wait")
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("mig/no-wait")
             .Migrate("legacy blocking waits", arch.Types.MustNotUse(arch.Member(typeof(Task), nameof(Task.Wait))))
             .Baseline("member.json")
-            .Because("b")));
+            .Because("b"));
 
         // Empty baseline → the blocking Wait() is red; capture its exact member identity.
         CodebaseModel before = CompilationFactory.Extract(WaitSource("t.Wait();"));
         RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty)
             .Single();
-        red.Status.ShouldBe(RuleStatus.Failed);
+        red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberUse);
         observed.Member!.SymbolId.ShouldBe("M:System.Threading.Tasks.Task.Wait");
 
@@ -274,7 +274,7 @@ public sealed class MemberUseVerbTests
         CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
         RuleResult regressed = ArchChecker.Check(model, after, loaded)
             .Single();
-        regressed.Status.ShouldBe(RuleStatus.Failed);
+        regressed.ShouldHaveFailed();
         regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse)
             .Member!.SymbolId
             .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
@@ -316,7 +316,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
@@ -365,7 +365,7 @@ public sealed class MemberUseVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Member!.SymbolId.ShouldBe("P:System.DateTime.Now");

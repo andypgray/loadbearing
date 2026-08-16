@@ -18,7 +18,7 @@ public sealed class ExplainFormatterTests
 
     private static string Dump(string id)
     {
-        return string.Join("\n", ExplainFormatter.Lines(Canonical.Rules.Single(rule => rule.Id == id)));
+        return string.Join("\n", ExplainFormatter.Lines(Canonical.Rule(id)));
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class ExplainFormatterTests
                 .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .DragonsDoc("arch/billing-dragons.md")
                 .Because("Replacement scheduled; see the linked doc."));
-        string dump = string.Join("\n", ExplainFormatter.Lines(model.Rules.Single(rule => rule.Id == "legacy/billing/containment")));
+        string dump = string.Join("\n", ExplainFormatter.Lines(model.Rule("legacy/billing/containment")));
 
         dump.ShouldContain("  dragons-doc: arch/billing-dragons.md");
         dump.ShouldNotContain("  dragons:");

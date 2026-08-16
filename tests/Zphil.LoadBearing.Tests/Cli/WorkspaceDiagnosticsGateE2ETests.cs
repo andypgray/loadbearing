@@ -6,6 +6,8 @@ using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
+// The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
+using CheckJson = Zphil.LoadBearing.Tests.TestSupport.CheckJson;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -218,7 +220,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document)
+        CheckJson.Strings(document, "workspaceDiagnostics")
             .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
         result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
     }
@@ -234,7 +236,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        WorkspaceDiagnosticsOf(document)
+        CheckJson.Strings(document, "workspaceDiagnostics")
             .ShouldBe([AuditDiagnostic, MsBuildBootstrap.SelectionNote()]);
         document.RootElement.TryGetProperty("modelIncomplete", out _)
             .ShouldBeFalse();
@@ -413,11 +415,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeTrue();
         // Solution-relative and forward-slashed, like every other path in the document, so no machine path
         // ever lands in one a golden pins.
-        var failedProjects = document.RootElement.GetProperty("failedProjects")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? "")
-            .ToList();
-        failedProjects.ShouldHaveSingleItem()
+        CheckJson.Strings(document, "failedProjects")
+            .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Broken/MyApp.Broken.csproj");
     }
 
@@ -440,11 +439,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         // Solution-relative and forward-slashed, like failedProjects beside it and every other path here.
-        var uncheckedProjects = document.RootElement.GetProperty("uncheckedProjects")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? "")
-            .ToList();
-        uncheckedProjects.ShouldHaveSingleItem()
+        CheckJson.Strings(document, "uncheckedProjects")
+            .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Skipped/MyApp.Skipped.csproj");
     }
 
@@ -531,7 +527,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
-        ProjectsAt(document, "restoreFailedProjects")
+        CheckJson.Strings(document, "restoreFailedProjects")
             .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Unrestored/MyApp.Unrestored.csproj");
     }
@@ -548,7 +544,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.GetProperty("modelIncomplete")
             .GetBoolean()
             .ShouldBeTrue();
-        ProjectsAt(document, "restoreFailedProjects")
+        CheckJson.Strings(document, "restoreFailedProjects")
             .ShouldHaveSingleItem();
     }
 
@@ -611,22 +607,6 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static string[] WorkspaceDiagnosticsOf(JsonDocument document)
-    {
-        return document.RootElement.GetProperty("workspaceDiagnostics")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? string.Empty)
-            .ToArray();
-    }
-
-    private static List<string> ProjectsAt(JsonDocument document, string slot)
-    {
-        return document.RootElement.GetProperty(slot)
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? "")
-            .ToList();
-    }
-
     // The load-failure shape: the diagnostic renders, and the project beside it is what gates.
     private static Task<CliResult> RunWithInjectedDiagnosticAsync(
         string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
@@ -651,22 +631,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<string>? restoreFailedProjects = null)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
         string solution = CliRunner.MyAppSolution;
-        var runner = new CheckRunner(
-            output, error,
-            new DiagnosticInjectingSolutionSource(
-                diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects),
-            new FakeEnvironment());
+        var source = new DiagnosticInjectingSolutionSource(
+            diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects);
+        var request = new CheckRequest(
+            solution, spec, json, null, SolutionPaths.SolutionDirectoryOf(solution), true, null,
+            allowWorkspaceDiagnostics, sarif, null, DocumentGrain.Full);
 
-        int exit = await runner.RunAsync(
-            new CheckRequest(
-                solution, spec, json, null, Path.GetDirectoryName(Path.GetFullPath(solution))!, true, null,
-                allowWorkspaceDiagnostics, sarif, null, DocumentGrain.Full),
-            Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return await CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
     }
 
     // Declares Shared.Widget in two projects that do not reference each other (Domain → Web → Billing, so

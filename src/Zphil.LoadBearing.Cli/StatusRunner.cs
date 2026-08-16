@@ -32,6 +32,10 @@ internal sealed class StatusRunner(
 {
     public async Task<int> RunAsync(StatusRequest request, CancellationToken ct)
     {
+        // This run's human channel. --json owns stdout, where the burndown document is the only thing
+        // written, so under it the stamp below goes nowhere.
+        TextWriter human = request.Json ? TextWriter.Null : output;
+
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
@@ -48,42 +52,24 @@ internal sealed class StatusRunner(
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
         var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
-        WriteNarrowingStamp(request, source, diagnostics);
+
+        // The narrowing stamp is human-channel only, where the document carries the same fact in
+        // uncheckedProjects.
+        NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.StatusStamp);
 
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
-        bool modelIncomplete = diagnostics.IsIncomplete;
-
         if (request.Json)
             StatusJsonRenderer.Render(
-                output, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
-                Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects, diagnostics.UncheckedProjects,
-                diagnostics.RestoreFailedProjects);
+                output, report, source.SolutionDirectory, source.SolutionName,
+                Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, diagnostics);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);
 
-        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
-        {
-            foreach (string line in IncompleteModelGate.StatusMessage(diagnostics).Split('\n'))
-                error.WriteLine(line);
+        if (IncompleteModelNotices.Refused(
+                error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.StatusMessage))
             return 2;
-        }
 
         return 0;
-    }
-
-    // The human narrowing stamp, byte-silent on every run that narrowed nothing and suppressed under --json,
-    // where the document carries the same fact in uncheckedProjects. Sited in the runner for the rules-filter
-    // stamp's reason: an unfiltered run's output stays byte-identical to what it always was.
-    private void WriteNarrowingStamp(StatusRequest request, CodebaseSource source, WorkspaceDiagnostics diagnostics)
-    {
-        if (diagnostics.UncheckedProjects.Count == 0 || request.Json) return;
-
-        NarrowedUniverseNotice.Write(
-            output,
-            NarrowedUniverseNotice.StatusStamp(
-                Path.GetFileName(source.SolutionPath),
-                NarrowedUniverseNotice.Relative(diagnostics.UncheckedProjects, source.SolutionDirectory)));
     }
 }

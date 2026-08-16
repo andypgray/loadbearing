@@ -1,6 +1,19 @@
+using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Tests.Extraction;
+
 namespace Zphil.LoadBearing.Tests.Checking;
 
-/// <summary>Shared source strings for the fast-path checker tests (extracted via CompilationFactory).</summary>
+/// <summary>
+///     Shared source strings for the fast-path checker tests, each beside the one
+///     <see cref="CodebaseModel" /> extracted from it.
+/// </summary>
+/// <remarks>
+///     Two jobs, and the second is why the catch scenes moved here. A scene many rows check is compiled
+///     once rather than once per row — extraction is the expensive half of a fast-path test. And a scene
+///     several <em>classes</em> check is held once rather than copied into each, because those copies are
+///     the claim: sibling verbs asserting different verdicts over the same input only mean that while the
+///     input is literally the same, and a copy edited in one class desynchronises the others silently.
+/// </remarks>
 internal static class Sources
 {
     /// <summary>
@@ -120,4 +133,84 @@ internal static class Sources
                                             [Plain] public class TaggedPlain {}
                                             public class Untagged {}
                                             """;
+
+    /// <summary>
+    ///     The exact-FQN matching scene the three catch verbs share: <c>Broad</c> catches
+    ///     <c>System.Exception</c> while <c>Narrow</c> catches <c>System.IO.IOException</c>, so a ban on
+    ///     <c>typeof(Exception)</c> reds the first and never the second — the narrow catch is the good state
+    ///     each verb rewards, and Broad's presence proves the ban is live rather than vacuously empty.
+    /// </summary>
+    public const string CatchBroadVsNarrow = """
+                                             namespace App
+                                             {
+                                                 public class Broad
+                                                 {
+                                                     public void Run() { try { } catch (System.Exception) { } }
+                                                 }
+                                                 public class Narrow
+                                                 {
+                                                     public void Run() { try { } catch (System.IO.IOException) { } }
+                                                 }
+                                             }
+                                             """;
+
+    /// <summary>
+    ///     The hierarchy-adjective operand scene the three catch verbs share: <c>Worker</c> catches its own
+    ///     <c>N.AppError</c> — solution-declared and derived from <c>Exception</c>, so an
+    ///     <c>arch.Types.DerivedFrom</c> operand matches it — and an external
+    ///     <c>System.InvalidOperationException</c>, which such an operand never matches, external types
+    ///     carrying a shallow hierarchy.
+    /// </summary>
+    public const string CatchDerivedFrom = """
+                                           namespace N
+                                           {
+                                               public class AppError : System.Exception {}
+                                               public class Worker
+                                               {
+                                                   public void Run()
+                                                   {
+                                                       try { } catch (N.AppError) { }
+                                                       try { } catch (System.InvalidOperationException) { }
+                                                   }
+                                               }
+                                           }
+                                           """;
+
+    /// <summary>
+    ///     The type-pair ratchet scene the three catch verbs share: one <c>Handler</c> catching both
+    ///     <c>Errors.AErr</c> and <c>Errors.BErr</c>, so a baseline blessing the first edge leaves the
+    ///     second a distinct identity and red (GRAMMAR §4.3).
+    /// </summary>
+    public const string CatchRatchet = """
+                                       namespace Errors { public class AErr : System.Exception {} public class BErr : System.Exception {} }
+                                       namespace App
+                                       {
+                                           public class Handler
+                                           {
+                                               public void Run()
+                                               {
+                                                   try { } catch (Errors.AErr) { }
+                                                   try { } catch (Errors.BErr) { }
+                                               }
+                                           }
+                                       }
+                                       """;
+
+    /// <summary>The one extracted model of <see cref="Layered" />.</summary>
+    public static readonly CodebaseModel LayeredModel = CompilationFactory.Extract(Layered);
+
+    /// <summary>The one extracted model of <see cref="Containment" />.</summary>
+    public static readonly CodebaseModel ContainmentModel = CompilationFactory.Extract(Containment);
+
+    /// <summary>The one extracted model of <see cref="Hierarchy" />.</summary>
+    public static readonly CodebaseModel HierarchyModel = CompilationFactory.Extract(Hierarchy);
+
+    /// <summary>The one extracted model of <see cref="CatchBroadVsNarrow" />.</summary>
+    public static readonly CodebaseModel CatchBroadVsNarrowModel = CompilationFactory.Extract(CatchBroadVsNarrow);
+
+    /// <summary>The one extracted model of <see cref="CatchDerivedFrom" />.</summary>
+    public static readonly CodebaseModel CatchDerivedFromModel = CompilationFactory.Extract(CatchDerivedFrom);
+
+    /// <summary>The one extracted model of <see cref="CatchRatchet" />.</summary>
+    public static readonly CodebaseModel CatchRatchetModel = CompilationFactory.Extract(CatchRatchet);
 }

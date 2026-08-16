@@ -338,7 +338,7 @@ public sealed class ShapeVerbTests
     {
         // A subject-selection Where predicate that throws becomes a contained RuleError, not an aborted run;
         // the detail names the `Where` hatch and echoes the thrown exception (SelectionEvaluator.InvokePredicate).
-        RuleResult result = Checker.Run(Sources.Layered, arch =>
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("throwing/x")
                     .Enforce(arch.Types.Where(_ => throw new Exception("boom"), "d")
                         .MustHavePrefix("I"))

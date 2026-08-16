@@ -39,26 +39,34 @@ internal static class DirectoryPlacement
     // the first path so its original root and separators survive verbatim.
     internal static string DeepestCommonDirectory(IReadOnlyList<string> filePaths)
     {
-        var segmentLists = filePaths.Select(DirectorySegments).ToList();
-        int common = segmentLists[0].Count;
-        for (var i = 1; i < segmentLists.Count; i++) common = CommonPrefixLength(segmentLists[0], segmentLists[i], common);
+        // Only the first path's segments are ever read back, and the answer can only shrink, so the rest
+        // are split one at a time and abandoned — and the walk stops the moment two paths share no root
+        // at all, however many sites are still queued behind them.
+        string[] prefix = filePaths[0].Split('/', '\\');
+        int common = DirectorySegmentCount(prefix);
+        for (var i = 1; i < filePaths.Count && common > 0; i++)
+        {
+            string[] segments = filePaths[i].Split('/', '\\');
+            int directories = DirectorySegmentCount(segments);
+            common = CommonPrefixLength(prefix, segments, directories, common);
+        }
 
         char separator = filePaths[0].IndexOf('\\') >= 0 ? '\\' : '/';
-        return string.Join(separator.ToString(), segmentLists[0].Take(common));
+        return string.Join(separator.ToString(), prefix.Take(common));
     }
 
-    // A path's directory portion as segments: split on both separators, drop the file name (last
-    // segment). Empties are kept so a leading separator (POSIX absolute paths) survives as a leading
-    // empty segment that rejoins to a leading separator.
-    private static IReadOnlyList<string> DirectorySegments(string path)
+    // A split path's directory portion is everything but the file name (the last segment). Empties are
+    // kept so a leading separator (POSIX absolute paths) survives as a leading empty segment that rejoins
+    // to a leading separator.
+    private static int DirectorySegmentCount(string[] segments)
     {
-        string[] segments = path.Split('/', '\\');
-        return segments.Take(segments.Length - 1).ToList();
+        return segments.Length - 1;
     }
 
-    private static int CommonPrefixLength(IReadOnlyList<string> a, IReadOnlyList<string> b, int max)
+    // Both bounds are directory-segment counts, so the file names sitting past them are never compared.
+    private static int CommonPrefixLength(string[] a, string[] b, int bDirectorySegments, int max)
     {
-        int limit = Math.Min(max, Math.Min(a.Count, b.Count));
+        int limit = Math.Min(max, bDirectorySegments);
         var length = 0;
         while (length < limit && string.Equals(a[length], b[length], StringComparison.Ordinal)) length++;
 

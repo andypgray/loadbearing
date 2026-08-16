@@ -16,7 +16,7 @@ internal sealed class NoticingSolutionSource(string notice, TextWriter error, IS
     private bool _noticed;
 
     /// <inheritdoc />
-    public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         if (!_noticed)
         {
@@ -24,6 +24,6 @@ internal sealed class NoticingSolutionSource(string notice, TextWriter error, IS
             _noticed = true;
         }
 
-        return inner.AcquireAsync(solution, workingDirectory, ct);
+        return inner.AcquireAsync(solutionPath, ct);
     }
 }

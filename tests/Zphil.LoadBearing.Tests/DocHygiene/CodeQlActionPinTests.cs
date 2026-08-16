@@ -95,7 +95,7 @@ public sealed class CodeQlActionPinTests
 
     private static IEnumerable<Pin> PinsIn(string workflow)
     {
-        string text = File.ReadAllText(RepoRoot.Absolute(workflow));
+        string text = RepoRoot.ReadText(workflow);
 
         return PinnedUse.Matches(text)
             .Select(match => ToPin(workflow, match));

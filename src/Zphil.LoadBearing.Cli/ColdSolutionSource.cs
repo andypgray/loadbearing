@@ -3,8 +3,7 @@ using Zphil.LoadBearing.Roslyn;
 namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
-///     The one-shot solution source: today's discover-then-load path
-///     (<see cref="ModelPipeline.DiscoverSolution" /> → <see cref="WorkspaceLoader.LoadAsync" />) behind the
+///     The one-shot solution source: today's load path (<see cref="WorkspaceLoader.LoadAsync" />) behind the
 ///     <see cref="ISolutionSource" /> seam. Every <see cref="AcquireAsync" /> opens a fresh
 ///     <see cref="LoadedSolution" /> and hands it to the returned handle to own, so a <c>using</c> in the
 ///     caller bounds the workspace to the call — the enforcement path's lifetime. Stateless; the default
@@ -13,14 +12,12 @@ namespace Zphil.LoadBearing.Cli;
 internal sealed class ColdSolutionSource : ISolutionSource
 {
     /// <inheritdoc />
-    public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
         var diagnostics = new List<string>();
         LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
         return new SolutionHandle(
-            loaded.Solution, solutionPath, diagnostics, loaded, targetFrameworks: loaded.TargetFrameworks,
-            failedProjects: loaded.FailedProjects, uncheckedProjects: loaded.UncheckedProjects,
-            restoreFailedProjects: loaded.RestoreFailedProjects);
+            loaded.Solution, solutionPath, loaded.LoadDiagnosticsWith(diagnostics), loaded,
+            targetFrameworks: loaded.TargetFrameworks);
     }
 }

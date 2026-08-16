@@ -35,12 +35,19 @@ internal static class GitChangedFiles
     /// </summary>
     public static async Task<DiffContext> ResolveAsync(string baseRef, string solutionDirectory, CancellationToken ct)
     {
-        string toplevelOutput = await RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
+        // The three commands share nothing and process spawn dominates, so they run together. They are
+        // awaited in launch order because that order is the refusal precedence: a directory that is not a
+        // repository still surfaces rev-parse's message, not whichever child failed first.
+        var toplevelRun = RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
+        var trackedRun = RunGitAsync(solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "--");
+        var untrackedRun = RunGitAsync(
+            solutionDirectory, ct, "ls-files", "--others", "--exclude-standard", "--full-name", "-z");
+
+        string toplevelOutput = await toplevelRun;
         string toplevel = Path.GetFullPath(toplevelOutput.Trim());
 
-        string trackedOutput = await RunGitAsync(solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "--");
-        string untrackedOutput = await RunGitAsync(
-            solutionDirectory, ct, "ls-files", "--others", "--exclude-standard", "--full-name", "-z");
+        string trackedOutput = await trackedRun;
+        string untrackedOutput = await untrackedRun;
 
         var tracked = ParseZTerminated(trackedOutput);
         var untracked = ParseZTerminated(untrackedOutput);

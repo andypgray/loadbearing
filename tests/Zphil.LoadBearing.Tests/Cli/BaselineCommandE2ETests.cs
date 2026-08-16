@@ -16,6 +16,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class BaselineCommandE2ETests
 {
+    private const string InlineSqlRule = "data-access/no-inline-sql";
+
     private const string FixedInvoiceController =
         """
         using MyApp.Legacy.Billing;
@@ -133,35 +135,23 @@ public sealed class BaselineCommandE2ETests
 
     private static string BothPairsComposed()
     {
-        return Compose(
+        return BaselineComposer.Compose(
+            InlineSqlRule,
             BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable"),
             BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable"));
     }
 
     private static string EmptySectionComposed()
     {
-        return Compose();
+        return BaselineComposer.Compose(InlineSqlRule);
     }
 
     // The quarantine containment section captured by --init: InvoiceController's two interior references.
     private static string ContainmentPairsComposed()
     {
-        return Compose(
+        return BaselineComposer.Compose(
             "legacy/billing/containment",
             BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.BillingCalculator"),
             BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.RoundingMode"));
-    }
-
-    private static string Compose(params BaselineEntry[] entries)
-    {
-        return Compose("data-access/no-inline-sql", entries);
-    }
-
-    private static string Compose(string ruleId, params BaselineEntry[] entries)
-    {
-        return BaselineFormat.ComposeFile(new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal)
-        {
-            [ruleId] = entries
-        });
     }
 }

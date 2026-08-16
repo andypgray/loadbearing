@@ -36,7 +36,7 @@ internal sealed class SpecModelCache
 {
     private readonly Dictionary<string, Entry> entries = new(StringComparer.Ordinal);
 
-    private readonly object gate = new();
+    private readonly Lock gate = new();
 
     /// <summary>
     ///     The model behind <paramref name="specDllPath" />: the cached one when the DLL's stamp still

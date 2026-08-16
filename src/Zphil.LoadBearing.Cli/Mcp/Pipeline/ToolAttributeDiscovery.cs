@@ -12,15 +12,21 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// </summary>
 internal static class ToolAttributeDiscovery
 {
+    // One assembly-wide reflection pass for the process. The tool surface is fixed at compile time, and
+    // startup asks for it twice — the coercing registration, then the unknown-parameter map — which without
+    // this is two full GetTypes() walks of every type in the CLI assembly.
+    private static readonly MethodInfo[] ToolMethods = typeof(ToolAttributeDiscovery).Assembly
+        .GetTypes()
+        .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null)
+        .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+        .ToArray();
+
     /// <summary>
     ///     Returns all public methods on <see cref="McpServerToolTypeAttribute" />-annotated classes.
     /// </summary>
     internal static IEnumerable<MethodInfo> GetToolMethods()
     {
-        return typeof(ToolAttributeDiscovery).Assembly
-            .GetTypes()
-            .Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null)
-            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static));
+        return ToolMethods;
     }
 
     /// <summary>

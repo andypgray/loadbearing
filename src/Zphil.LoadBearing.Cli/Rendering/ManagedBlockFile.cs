@@ -56,7 +56,7 @@ internal static class ManagedBlockFile
 
     private static bool StartsWithBom(byte[] bytes)
     {
-        return bytes.Length >= 3 && bytes[0] == Utf8Bom[0] && bytes[1] == Utf8Bom[1] && bytes[2] == Utf8Bom[2];
+        return bytes.AsSpan().StartsWith(Utf8Bom);
     }
 
     // Decode UTF-8 text, skipping a leading BOM so it never enters the string the splicer sees (the

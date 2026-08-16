@@ -202,14 +202,23 @@ internal static class RuleQuotes
 
     /// <summary>
     ///     A whole-text reader rooted at <paramref name="repoRoot" />: it maps a repository-relative path
-    ///     to its text, or <see langword="null" /> when the file does not exist.
+    ///     to its text, or <see langword="null" /> when the file does not exist. Each reader remembers
+    ///     every path it has answered for, absent ones included: the gates that read through one ask for
+    ///     the same handful of cards and baselines once per quote.
     /// </summary>
     public static Func<string, string?> DiskTextReader(string repoRoot)
     {
+        Dictionary<string, string?> read = new(StringComparer.Ordinal);
+
         return repoRelative =>
         {
+            if (read.TryGetValue(repoRelative, out string? cached)) return cached;
+
             string full = Path.Combine(repoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar));
-            return File.Exists(full) ? File.ReadAllText(full) : null;
+            string? text = File.Exists(full) ? File.ReadAllText(full) : null;
+            read[repoRelative] = text;
+
+            return text;
         };
     }
 

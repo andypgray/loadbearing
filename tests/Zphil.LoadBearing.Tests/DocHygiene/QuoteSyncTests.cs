@@ -190,7 +190,7 @@ public sealed class QuoteSyncTests
         // no longer distinctive.
         foreach (var group in Excerpts.GroupBy(excerpt => excerpt.Doc))
         {
-            var fences = SourceAnchors.Fences(ReadDoc(group.Key));
+            var fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
             foreach (Excerpt excerpt in group)
             {
                 int matches = fences.Count(fence => ContainsMarker(fence, excerpt.Marker));
@@ -214,7 +214,7 @@ public sealed class QuoteSyncTests
         // substring of its source's lines; a miss means the quote has drifted from the committed file.
         foreach (var group in Excerpts.GroupBy(excerpt => excerpt.Doc))
         {
-            var fences = SourceAnchors.Fences(ReadDoc(group.Key));
+            var fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
             foreach (Excerpt excerpt in group)
             {
                 if (excerpt.Source is null) continue;
@@ -248,18 +248,13 @@ public sealed class QuoteSyncTests
         // out from under this gate. Every registered doc is reported, not just the first to come up empty.
         foreach (string doc in Excerpts.Select(excerpt => excerpt.Doc)
                      .Distinct())
-            if (SourceAnchors.Fences(ReadDoc(doc))
+            if (SourceAnchors.Fences(RepoRoot.ReadText(doc))
                     .Count == 0)
                 empty.Add(doc);
 
         // Assert
         empty.ShouldBeEmpty(
             $"These docs yielded no fenced code blocks; the fence scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
-    }
-
-    private static string ReadDoc(string doc)
-    {
-        return File.ReadAllText(RepoRoot.Absolute(doc));
     }
 
     private static bool ContainsMarker(IReadOnlyList<string> fence, string marker)

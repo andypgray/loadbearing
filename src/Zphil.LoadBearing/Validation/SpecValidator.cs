@@ -1,4 +1,3 @@
-using System.Reflection;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Prose;
@@ -52,7 +51,7 @@ internal static class SpecValidator
             // duplicate-name error above, these are spec-wide (null ID, named by layer in the message) and
             // location-free: a layer name is a unique, trivially greppable string.
             foreach (string glob in layer.Globs)
-                CheckPattern(glob, true, "namespace pattern", null, $"layer '{layer.Name}'", null, errors);
+                CheckPattern(glob, PatternKind.NamespacePattern, null, $"layer '{layer.Name}'", null, errors);
         }
     }
 
@@ -184,9 +183,9 @@ internal static class SpecValidator
     }
 
     private static void CheckPatterns(
-        IEnumerable<(string Value, bool Namespace, string Label)> patterns, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
+        IEnumerable<(string Value, PatternKind Kind)> patterns, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
-        foreach ((string value, bool ns, string label) in patterns) CheckPattern(value, ns, label, id, $"'{id}'", location, errors);
+        foreach ((string value, PatternKind kind) in patterns) CheckPattern(value, kind, id, $"'{id}'", location, errors);
     }
 
     // GRAMMAR §8 items 15–16. A blank glob or affix is BlankPattern (the shared catalog-wide code, one
@@ -199,19 +198,19 @@ internal static class SpecValidator
     // rule/scope ID or a layer name); the location is that anchor's spec-source position (null for a layer
     // glob, which is spec-wide).
     private static void CheckPattern(
-        string value, bool isNamespace, string label, string? id, string subject, SpecSourceLocation? location, List<SpecValidationError> errors)
+        string value, PatternKind kind, string? id, string subject, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new SpecValidationError(Code.BlankPattern, id, $"Blank {label} on {subject}.", location));
+            errors.Add(new SpecValidationError(Code.BlankPattern, id, $"Blank {kind.Label} on {subject}.", location));
             return;
         }
 
-        if (!isNamespace) return;
+        if (!kind.IsNamespace) return;
 
         string? reason = NamespacePattern.Validate(value);
         if (reason is not null)
-            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {label} '{value}' on {subject} {reason}.", location));
+            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {kind.Label} '{value}' on {subject} {reason}.", location));
     }
 
     private static void CheckForeign(
@@ -308,29 +307,34 @@ internal static class SpecValidator
                     t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
                 break;
             case MustBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsSubclassOf(typeof(Attribute)),
-                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustBeAttributedWith requires an attribute anchor");
+                CheckAttributeAnchors(rule, errors, new[] { c.Anchor }, "MustBeAttributedWith");
                 break;
             case MustNotBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsSubclassOf(typeof(Attribute)),
-                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustNotBeAttributedWith requires an attribute anchor");
+                CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
                 break;
 
-            // The member attribute verbs (GRAMMAR §5.7) carry the identical category rule and the identical
-            // message: the verb name in the steer is the same word on either side, so a member author reads
-            // the same sentence a type author does. Only the VERBS are checked — a wrong-category member
-            // attribute ADJECTIVE stays unchecked, exactly like its type-side twin: it empties the subject,
-            // which the fail-on-empty gate reds loudly, whereas the always-passing MustNot verb is the silent
-            // slip this item exists to catch.
+            // The member attribute verbs (GRAMMAR §5.7) carry the identical category rule and, through
+            // CheckAttributeAnchors, the identical message — the verb name in the steer is the same word on
+            // either side, so a member author reads the same sentence a type author does. Only the VERBS are
+            // checked — a wrong-category member attribute ADJECTIVE stays unchecked, exactly like its
+            // type-side twin: it empties the subject, which the fail-on-empty gate reds loudly, whereas the
+            // always-passing MustNot verb is the silent slip this item exists to catch.
             case MemberMustBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(new[] { c.Anchor }), t => !t.IsSubclassOf(typeof(Attribute)),
-                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustBeAttributedWith requires an attribute anchor");
+                CheckAttributeAnchors(rule, errors, new[] { c.Anchor }, "MustBeAttributedWith");
                 break;
             case MemberMustNotBeAttributedWithConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsSubclassOf(typeof(Attribute)),
-                    t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; MustNotBeAttributedWith requires an attribute anchor");
+                CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
                 break;
         }
+    }
+
+    // The attribute-anchor half of item 21, shared by the four attribute verbs (type and member, both
+    // polarities): one predicate and one message template with the caller's verb name in the steer.
+    private static void CheckAttributeAnchors(
+        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors, string verbName)
+    {
+        CheckAnchorCategory(rule, errors, TypedAnchors(anchors), t => !t.IsSubclassOf(typeof(Attribute)),
+            t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; {verbName} requires an attribute anchor");
     }
 
     // Walks a hierarchy verb's anchors (one for a positive, the whole list for a negative), emitting the
@@ -436,18 +440,14 @@ internal static class SpecValidator
 
     private static bool Declares(Type type, string name)
     {
-        const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
-                                   BindingFlags.Instance | BindingFlags.Static;
-        return type.GetMember(name, flags).Length > 0;
+        return DeclaredMember.Of(type, name).Length > 0;
     }
 
     // The C#-writable typeof operand for a (normalized) type: non-generic → bare name (`Task`); generic
     // definition → name without arity plus empty type-argument brackets (`HandlerBase<>`, `Foo<,>`).
     private static string TypeofForm(Type type)
     {
-        string name = type.Name;
-        int tick = name.IndexOf('`');
-        string bare = tick < 0 ? name : name.Substring(0, tick);
+        string bare = TypeName.StripArity(type.Name);
         if (!type.IsGenericType) return bare;
 
         int arity = type.GetGenericArguments().Length;
@@ -535,150 +535,122 @@ internal static class SpecValidator
 
     private static IEnumerable<Selection> RuleSelections(RuleRegistration rule)
     {
-        return rule.Constraint == null ? Enumerable.Empty<Selection>() : ConstraintSelections(rule.Constraint);
-    }
-
-    private static IEnumerable<Selection> ConstraintSelections(Constraint constraint)
-    {
-        foreach (Selection selection in ExpandSelection(constraint.Subject)) yield return selection;
-
-        foreach (Selection operand in constraint.Operands)
-        foreach (Selection selection in ExpandSelection(operand))
-            yield return selection;
+        return rule.Constraint == null ? Enumerable.Empty<Selection>() : SelectionWalk.ConstraintSelections(rule.Constraint);
     }
 
     private static IEnumerable<Selection> ScopeSelections(ScopeRegistration scope)
     {
-        return scope.Quarantined == null ? Enumerable.Empty<Selection>() : ExpandSelection(scope.Quarantined);
-    }
-
-    private static IEnumerable<Selection> ExpandSelection(Selection selection)
-    {
-        yield return selection;
-
-        // As in SelectionProse: the operands, then this selection's own Except payloads — a union carries
-        // adjectives of its own, so AnyOf(a, b).Except(bad) must reach the payload walk.
-        if (selection is UnionSelection union)
-            foreach (Selection member in union.Parts)
-            foreach (Selection nested in ExpandSelection(member))
-                yield return nested;
-
-        foreach (SelectionAdjective adjective in selection.Adjectives)
-            if (adjective is ExceptAdjective except)
-                foreach (Selection nested in ExpandSelection(except.Payload))
-                    yield return nested;
+        return scope.Quarantined == null ? Enumerable.Empty<Selection>() : SelectionWalk.ExpandSelection(scope.Quarantined);
     }
 
     // The glob/affix walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks: every
-    // glob and affix a rule carries, each tagged namespace-glob (the full structural check) or plain
-    // (blank only). A namespace glob is `Namespace: true`; a type/member name glob or a suffix/prefix is
-    // `Namespace: false`. A string attribute anchor rides this walk too — blank is the only
-    // well-formedness a definition FQN has, so it joins the plain kinds under its own label.
-    private static IEnumerable<(string Value, bool Namespace, string Label)> RulePatterns(RuleRegistration rule)
+    // glob and affix a rule carries, each tagged with the PatternKind that names it in the error and says
+    // whether the full structural check applies (namespace globs) or only the blank check (every other
+    // kind). A string attribute anchor rides this walk too — blank is the only well-formedness a
+    // definition FQN has, so it joins the plain kinds under its own label.
+    private static IEnumerable<(string Value, PatternKind Kind)> RulePatterns(RuleRegistration rule)
     {
         return rule.Constraint == null
-            ? Enumerable.Empty<(string, bool, string)>()
+            ? Enumerable.Empty<(string, PatternKind)>()
             : ConstraintPatterns(rule.Constraint);
     }
 
-    private static IEnumerable<(string Value, bool Namespace, string Label)> ScopePatterns(ScopeRegistration scope)
+    private static IEnumerable<(string Value, PatternKind Kind)> ScopePatterns(ScopeRegistration scope)
     {
         return scope.Quarantined == null
-            ? Enumerable.Empty<(string, bool, string)>()
+            ? Enumerable.Empty<(string, PatternKind)>()
             : SelectionPatterns(scope.Quarantined);
     }
 
-    private static IEnumerable<(string Value, bool Namespace, string Label)> ConstraintPatterns(Constraint constraint)
+    private static IEnumerable<(string Value, PatternKind Kind)> ConstraintPatterns(Constraint constraint)
     {
         // The verb's own glob/affix (the shape/naming verbs carry one; dependency and boolean verbs none).
         switch (constraint)
         {
             case MustResideInNamespaceConstraint c:
-                yield return (c.Glob, true, "namespace pattern");
+                yield return (c.Glob, PatternKind.NamespacePattern);
                 break;
             case MustHaveNameMatchingConstraint c:
-                yield return (c.Glob, false, "name pattern");
+                yield return (c.Glob, PatternKind.NamePattern);
                 break;
             case MustHaveSuffixConstraint c:
-                yield return (c.Suffix, false, "suffix");
+                yield return (c.Suffix, PatternKind.Suffix);
                 break;
             case MustHavePrefixConstraint c:
-                yield return (c.Prefix, false, "prefix");
+                yield return (c.Prefix, PatternKind.Prefix);
                 break;
             case MemberMustHaveNameMatchingConstraint c:
-                yield return (c.Glob, false, "member name pattern");
+                yield return (c.Glob, PatternKind.MemberNamePattern);
                 break;
             case MemberMustHaveSuffixConstraint c:
-                yield return (c.Suffix, false, "member suffix");
+                yield return (c.Suffix, PatternKind.MemberSuffix);
                 break;
             case MemberMustHavePrefixConstraint c:
-                yield return (c.Prefix, false, "member prefix");
+                yield return (c.Prefix, PatternKind.MemberPrefix);
                 break;
 
             // The attribute verbs' string anchors (GRAMMAR §8 item 15, the "attribute name" label): a blank
             // name is a slip that would otherwise mint an anchor matching nothing, silently. Only the string
             // arm has a name to check; a typeof anchor yields nothing here.
-            case MustBeAttributedWithConstraint c when c.Anchor.DefinitionFullName is { } attributeName:
-                yield return (attributeName, false, "attribute name");
+            case MustBeAttributedWithConstraint c:
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.AttributeName)) yield return pattern;
                 break;
             case MustNotBeAttributedWithConstraint c:
-                foreach (TypeAnchor anchor in c.Anchors)
-                    if (anchor.DefinitionFullName is { } name)
-                        yield return (name, false, "attribute name");
-
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.AttributeName)) yield return pattern;
                 break;
 
             // The hierarchy verbs' string anchors, on the same item-15 terms under their own labels, so the
             // error names which kind of anchor was left blank ("Blank interface name on 'rule/id'.").
-            case MustImplementConstraint c when c.Anchor.DefinitionFullName is { } interfaceName:
-                yield return (interfaceName, false, "interface name");
+            case MustImplementConstraint c:
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.InterfaceName)) yield return pattern;
                 break;
             case MustNotImplementConstraint c:
-                foreach (TypeAnchor anchor in c.Anchors)
-                    if (anchor.DefinitionFullName is { } name)
-                        yield return (name, false, "interface name");
-
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.InterfaceName)) yield return pattern;
                 break;
-            case MustDeriveFromConstraint c when c.Anchor.DefinitionFullName is { } baseTypeName:
-                yield return (baseTypeName, false, "base type name");
+            case MustDeriveFromConstraint c:
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.BaseTypeName)) yield return pattern;
                 break;
             case MustNotDeriveFromConstraint c:
-                foreach (TypeAnchor anchor in c.Anchors)
-                    if (anchor.DefinitionFullName is { } name)
-                        yield return (name, false, "base type name");
-
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.BaseTypeName)) yield return pattern;
                 break;
 
             // The member attribute verbs' string anchors, on the same terms and under the same label — blank
             // is the whole of a definition FQN's well-formedness on either side of the axis (item 15).
-            case MemberMustBeAttributedWithConstraint c when c.Anchor.DefinitionFullName is { } memberAttributeName:
-                yield return (memberAttributeName, false, "attribute name");
+            case MemberMustBeAttributedWithConstraint c:
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(new[] { c.Anchor }, PatternKind.AttributeName)) yield return pattern;
                 break;
             case MemberMustNotBeAttributedWithConstraint c:
-                foreach (TypeAnchor anchor in c.Anchors)
-                    if (anchor.DefinitionFullName is { } name)
-                        yield return (name, false, "attribute name");
-
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.AttributeName)) yield return pattern;
                 break;
         }
 
         // The subject selection tree (for a member constraint this is the underlying type selection,
         // Subject => MemberSubject.Source) and the dependency-verb operands.
-        foreach ((string, bool, string) pattern in SelectionPatterns(constraint.Subject)) yield return pattern;
+        foreach ((string, PatternKind) pattern in SelectionPatterns(constraint.Subject)) yield return pattern;
 
         foreach (Selection operand in constraint.Operands)
-        foreach ((string, bool, string) pattern in SelectionPatterns(operand))
+        foreach ((string, PatternKind) pattern in SelectionPatterns(operand))
             yield return pattern;
 
         // The member subject's own adjectives (name/affix) — off the type-side selection walk, reached
         // like CheckMemberReturning reaches the member .Returning anchor.
         if (constraint is MemberConstraint memberConstraint)
             foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
-            foreach ((string, bool, string) pattern in MemberAdjectivePatterns(adjective))
+            foreach ((string, PatternKind) pattern in MemberAdjectivePatterns(adjective))
                 yield return pattern;
     }
 
-    private static IEnumerable<(string Value, bool Namespace, string Label)> SelectionPatterns(Selection selection)
+    // The string arm of an anchor list, under one kind: an anchor spelled as a definition FQN yields its
+    // name for the item-15 blank check, and a typeof anchor yields nothing. One projection for both anchor
+    // shapes — the single-anchor verbs pass a one-element list — so every arm above stays one line.
+    private static IEnumerable<(string Value, PatternKind Kind)> AnchorNamePatterns(IReadOnlyList<TypeAnchor> anchors, PatternKind kind)
+    {
+        foreach (TypeAnchor anchor in anchors)
+            if (anchor.DefinitionFullName is { } name)
+                yield return (name, kind);
+    }
+
+    private static IEnumerable<(string Value, PatternKind Kind)> SelectionPatterns(Selection selection)
     {
         // A NamespaceNoun carries a glob; a LayerNoun's globs are validated once in ValidateLayers (their
         // use-independent home), so they are not re-checked here. A UnionSelection has no single noun, so
@@ -686,63 +658,92 @@ internal static class SpecValidator
         // carries adjectives of its own (AnyOf(a, b).InNamespace("") must reach the blank-pattern check).
         if (selection is UnionSelection union)
             foreach (Selection member in union.Parts)
-            foreach ((string, bool, string) pattern in SelectionPatterns(member))
+            foreach ((string, PatternKind) pattern in SelectionPatterns(member))
                 yield return pattern;
-        else if (selection.Noun is NamespaceNoun ns) yield return (ns.Glob, true, "namespace pattern");
+        else if (selection.Noun is NamespaceNoun ns) yield return (ns.Glob, PatternKind.NamespacePattern);
 
         foreach (SelectionAdjective adjective in selection.Adjectives)
             switch (adjective)
             {
                 case InNamespaceAdjective a:
-                    yield return (a.Glob, true, "namespace pattern");
+                    yield return (a.Glob, PatternKind.NamespacePattern);
                     break;
                 case WithNameMatchingAdjective a:
-                    yield return (a.Glob, false, "name pattern");
+                    yield return (a.Glob, PatternKind.NamePattern);
                     break;
                 case WithSuffixAdjective a:
-                    yield return (a.Suffix, false, "suffix");
+                    yield return (a.Suffix, PatternKind.Suffix);
                     break;
                 case WithPrefixAdjective a:
-                    yield return (a.Prefix, false, "prefix");
+                    yield return (a.Prefix, PatternKind.Prefix);
                     break;
                 case AttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
                     // The adjective's string anchor, on the same terms as the two verbs' (item 15).
-                    yield return (attributeName, false, "attribute name");
+                    yield return (attributeName, PatternKind.AttributeName);
                     break;
                 case ImplementingAdjective a when a.Anchor.DefinitionFullName is { } interfaceName:
                     // The hierarchy adjectives' string anchors, likewise. Blankness is checked on an
                     // adjective even though item 21's category rule deliberately is not: a blank name is a
                     // spec-side slip either way, while a wrong CATEGORY on an adjective empties the subject
                     // and the fail-on-empty gate reds it loudly (see CheckHierarchyAnchors).
-                    yield return (interfaceName, false, "interface name");
+                    yield return (interfaceName, PatternKind.InterfaceName);
                     break;
                 case DerivedFromAdjective a when a.Anchor.DefinitionFullName is { } baseTypeName:
-                    yield return (baseTypeName, false, "base type name");
+                    yield return (baseTypeName, PatternKind.BaseTypeName);
                     break;
                 case ExceptAdjective a:
-                    foreach ((string, bool, string) pattern in SelectionPatterns(a.Payload)) yield return pattern;
+                    foreach ((string, PatternKind) pattern in SelectionPatterns(a.Payload)) yield return pattern;
                     break;
             }
     }
 
-    private static IEnumerable<(string Value, bool Namespace, string Label)> MemberAdjectivePatterns(MemberAdjective adjective)
+    private static IEnumerable<(string Value, PatternKind Kind)> MemberAdjectivePatterns(MemberAdjective adjective)
     {
         switch (adjective)
         {
             case MemberWithNameMatchingAdjective a:
-                yield return (a.Glob, false, "member name pattern");
+                yield return (a.Glob, PatternKind.MemberNamePattern);
                 break;
             case MemberWithSuffixAdjective a:
-                yield return (a.Suffix, false, "member suffix");
+                yield return (a.Suffix, PatternKind.MemberSuffix);
                 break;
             case MemberWithPrefixAdjective a:
-                yield return (a.Prefix, false, "member prefix");
+                yield return (a.Prefix, PatternKind.MemberPrefix);
                 break;
             case MemberAttributedWithAdjective a when a.Anchor.DefinitionFullName is { } attributeName:
                 // The member attribute adjective's string anchor (item 15). The category check deliberately
                 // does not reach an adjective on either axis — see CheckHierarchyAnchors.
-                yield return (attributeName, false, "attribute name");
+                yield return (attributeName, PatternKind.AttributeName);
                 break;
         }
+    }
+
+    /// <summary>
+    ///     What a glob, affix or string anchor is, for the pattern walk: the label the error names it by
+    ///     ("Blank interface name on 'rule/id'.") and whether it carries namespace structure, which is what
+    ///     decides between the blank check alone and the full dead-subtree-prefix check.
+    /// </summary>
+    /// <remarks>
+    ///     One instance per kind, so each label literal is written once and the two facts about a kind
+    ///     cannot travel apart.
+    /// </remarks>
+    private sealed class PatternKind(string label, bool isNamespace)
+    {
+        internal static readonly PatternKind NamespacePattern = new("namespace pattern", true);
+        internal static readonly PatternKind NamePattern = new("name pattern", false);
+        internal static readonly PatternKind Suffix = new("suffix", false);
+        internal static readonly PatternKind Prefix = new("prefix", false);
+        internal static readonly PatternKind MemberNamePattern = new("member name pattern", false);
+        internal static readonly PatternKind MemberSuffix = new("member suffix", false);
+        internal static readonly PatternKind MemberPrefix = new("member prefix", false);
+        internal static readonly PatternKind AttributeName = new("attribute name", false);
+        internal static readonly PatternKind InterfaceName = new("interface name", false);
+        internal static readonly PatternKind BaseTypeName = new("base type name", false);
+
+        /// <summary>The noun the BlankPattern / UnanchoredSubtreePattern messages name this kind by.</summary>
+        internal string Label { get; } = label;
+
+        /// <summary>Whether the value is a namespace glob, and so subject to the structural check too.</summary>
+        internal bool IsNamespace { get; } = isNamespace;
     }
 }

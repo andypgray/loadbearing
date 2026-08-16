@@ -10,13 +10,13 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The hierarchy adjectives and their constraint twins (GRAMMAR §5.2–§5.3): open generic matches
 ///     any construction (on the definition FullName), a closed or non-generic type matches that
-///     construction exactly. Shared model extracted once from <see cref="Sources.Hierarchy" />.
+///     construction exactly. Runs over the shared <see cref="Sources.HierarchyModel" />.
 /// </summary>
 public sealed class HierarchyVerbTests
 {
     private const string T = "Zphil.LoadBearing.Tests.Checking.Targets.";
 
-    private static readonly CodebaseModel Model = CompilationFactory.Extract(Sources.Hierarchy);
+    private static readonly CodebaseModel Model = Sources.HierarchyModel;
     private static readonly CodebaseModel TransitiveModel = CompilationFactory.Extract(Sources.HierarchyTransitive);
     private static readonly CodebaseModel GenericAttributeModel = CompilationFactory.Extract(Sources.GenericAttributes);
     private static readonly CodebaseModel ExternalBaseModel = CompilationFactory.Extract(Sources.ExternalBaseHierarchy);
@@ -24,29 +24,14 @@ public sealed class HierarchyVerbTests
     [Fact]
     public void Implementing_OpenGeneric_SelectsEveryConstruction()
     {
-        // ZZZ prefix fails all subjects, so the shape violations reveal exactly who was selected.
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.Implementing(typeof(IHandler<>))
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.Implementing(typeof(IHandler<>)))
             .ShouldBe([$"{T}OrderHandler", $"{T}TextHandler"]);
     }
 
     [Fact]
     public void Implementing_ClosedGeneric_SelectsOnlyThatConstruction()
     {
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.Implementing(typeof(IHandler<Order>))
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.Implementing(typeof(IHandler<Order>)))
             .ShouldBe([$"{T}OrderHandler"]);
     }
 
@@ -66,28 +51,14 @@ public sealed class HierarchyVerbTests
     [Fact]
     public void DerivedFrom_SelectsDeriver()
     {
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.DerivedFrom(typeof(ThingBase))
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.DerivedFrom(typeof(ThingBase)))
             .ShouldBe([$"{T}SubType"]);
     }
 
     [Fact]
     public void AttributedWith_SelectsAttributedType()
     {
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.AttributedWith(typeof(MarkAttribute))
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.AttributedWith(typeof(MarkAttribute)))
             .ShouldBe([$"{T}Tagged"]);
     }
 
@@ -308,16 +279,9 @@ public sealed class HierarchyVerbTests
     [Fact]
     public void AttributedWith_StringAnchor_SelectsWhatTheTypeofTwinSelects()
     {
-        // The same fixture and the same ZZZ-prefix probe as AttributedWith_SelectsAttributedType: naming
+        // The same fixture and the same probe as AttributedWith_SelectsAttributedType: naming
         // MarkAttribute by FQN string picks out the identical subject.
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute")
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.AttributedWith($"{T}MarkAttribute"))
             .ShouldBe([$"{T}Tagged"]);
     }
 
@@ -364,14 +328,7 @@ public sealed class HierarchyVerbTests
     {
         // A string names the DEFINITION, so it reads like an open-generic typeof anchor: `MarkAttribute<T>`
         // reaches both [Mark<int>] and [Mark<string>].
-        RuleResult result = Checker.Run(GenericAttributeModel, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute<T>")
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(GenericAttributeModel, arch => arch.Types.AttributedWith($"{T}MarkAttribute<T>"))
             .ShouldBe([$"{T}TaggedInt", $"{T}TaggedText"]);
     }
 
@@ -443,14 +400,7 @@ public sealed class HierarchyVerbTests
     {
         // A string names the DEFINITION, so it reads like typeof(IHandler<>) rather than a construction:
         // the same two handlers Implementing_OpenGeneric_SelectsEveryConstruction picks out.
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.Implementing($"{T}IHandler<T>")
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.Implementing($"{T}IHandler<T>"))
             .ShouldBe([$"{T}OrderHandler", $"{T}TextHandler"]);
     }
 
@@ -474,14 +424,7 @@ public sealed class HierarchyVerbTests
     [Fact]
     public void DerivedFrom_StringAnchor_SelectsWhatTheTypeofTwinSelects()
     {
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.DerivedFrom($"{T}ThingBase")
-                        .MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.ShapeSubjects()
+        Checker.Selects(Model, arch => arch.Types.DerivedFrom($"{T}ThingBase"))
             .ShouldBe([$"{T}SubType"]);
     }
 

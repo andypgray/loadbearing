@@ -126,6 +126,14 @@ internal readonly record struct WorkspaceDiagnostics(
     internal bool IsIncomplete => FailedProjects.Count > 0 || RestoreFailedProjects.Count > 0;
 
     /// <summary>
+    ///     Whether a solution filter narrowed the universe — at least one declared project went unchecked.
+    ///     Never a gate input, unlike <see cref="IsIncomplete" />: a narrowed run is a smaller true answer, so
+    ///     this scopes the verdict rather than deciding it, and the verbs that read absence as evidence
+    ///     (<c>baseline --init</c>, <c>--accept-reductions</c>, <c>render</c>) refuse on their own terms.
+    /// </summary>
+    internal bool IsNarrowed => UncheckedProjects.Count > 0;
+
+    /// <summary>
     ///     Whether the fail-closed gate fires: the model is incomplete and the caller did not opt into the
     ///     partial model. The verbs that render before gating ask twice over — once for the verdict they
     ///     stamp into their document, once for the exit code — so this stays a pure predicate.

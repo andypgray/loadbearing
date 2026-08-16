@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -15,6 +16,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </remarks>
 internal static class StatusJsonRenderer
 {
+    /// <summary>
+    ///     Writes the burndown document as the run's stdout line.
+    ///     <paramref name="workspaceDiagnostics" /> is the rendered stream the caller composed and
+    ///     <paramref name="diagnostics" /> the load's own verdict, whose project lists become the trust stamps.
+    /// </summary>
     public static void Render(
         TextWriter output,
         CheckReport report,
@@ -22,12 +28,10 @@ internal static class StatusJsonRenderer
         string solutionName,
         string specAssembly,
         IReadOnlyList<string> workspaceDiagnostics,
-        bool modelIncomplete,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects)
+        WorkspaceDiagnostics diagnostics)
     {
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
         var document = new StatusJson(
             2,
@@ -35,10 +39,10 @@ internal static class StatusJsonRenderer
             specAssembly,
             report.Results.Select(ToRule).ToList(),
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
-            modelIncomplete ? true : null,
-            JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
-            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer),
-            JsonReportRenderer.RelativeProjects(restoreFailedProjects, relativizer),
+            trust.ModelIncomplete,
+            trust.FailedProjects,
+            trust.UncheckedProjects,
+            trust.RestoreFailedProjects,
             new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -61,22 +65,15 @@ internal static class StatusJsonRenderer
             ToRatchet(result));
     }
 
-    // The burndown block for any ratcheted rule (Migrate or Quarantine containment). Promotable is populated
-    // for Migrate only — omitted (null) for quarantine, since Quarantine→Migrate is a human decision — and
-    // never for a rule the run reached no verdict on: a narrowing skip keeps BaselineCaptured truthful and
-    // zeroes the counts, which is burned-to-zero's exact shape, so arch_status would suggest promoting to
-    // Enforce a rule whose subject a filter had merely erased.
+    // The burndown block for any ratcheted rule (Migrate or Quarantine containment). Whether the ratchet has
+    // burned to zero is RuleResult.Promotable's answer, one model fact the human line reads too; the wire
+    // shape adds only that quarantine omits the key rather than carrying a permanent false, since
+    // Quarantine→Migrate is a human decision this document has nothing to say about.
     private static RatchetStatusJson? ToRatchet(RuleResult result)
     {
         if (result.Rule.BaselinePath is not { } path) return null;
 
-        bool? promotable = result.Rule.Posture == Posture.Migrate
-            ? result.Status != RuleStatus.Skipped
-              && result.BaselineCaptured
-              && result.Grandfathered.Count == 0
-              && result.Violations.Count == 0
-              && result.StaleBaselineEntries == 0
-            : null;
+        bool? promotable = result.Rule.Posture == Posture.Migrate ? result.Promotable : null;
         return new RatchetStatusJson(
             path,
             result.BaselineCaptured,

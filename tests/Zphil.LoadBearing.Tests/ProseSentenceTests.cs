@@ -18,7 +18,7 @@ public class ProseSentenceTests
     private static string SentenceFor(string id)
     {
         return BuildCanonical()
-            .Rules.Single(rule => rule.Id == id)
+            .Rule(id)
             .Sentence;
     }
 
@@ -87,7 +87,7 @@ public class ProseSentenceTests
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
                 .Fix("Take IClock in the constructor; see OrderService for the pattern."))
-            .Rules.Single(rule => rule.Id == "time/inject-clock")
+            .Rule("time/inject-clock")
             .Sentence
             .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
     }
@@ -106,7 +106,7 @@ public class ProseSentenceTests
                         .MustHaveSuffix("Async"))
                     .Because("Async methods are discovered by suffix; agents grep by *Async.");
             })
-            .Rules.Single(rule => rule.Id == "naming/async-suffix")
+            .Rule("naming/async-suffix")
             .Sentence
             .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task` must be named `*Async`.");
     }
@@ -126,7 +126,7 @@ public class ProseSentenceTests
                         .MustAcceptParameter(typeof(CancellationToken)))
                     .Because("Async Web methods must honor cancellation; agents thread the token through.");
             })
-            .Rules.Single(rule => rule.Id == "async/accept-cancellation")
+            .Rule("async/accept-cancellation")
             .Sentence
             .ShouldBe("Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.");
     }
@@ -139,7 +139,7 @@ public class ProseSentenceTests
         Checker.Model(arch => arch.Rule("member/no-wait")
                 .Enforce(arch.Types.MustNotUse(arch.Member<Task>(t => t.Wait())))
                 .Because("Blocking waits deadlock the request thread."))
-            .Rules.Single(rule => rule.Id == "member/no-wait")
+            .Rule("member/no-wait")
             .Sentence
             .ShouldBe("Types must not use `Task.Wait()`.");
     }
@@ -151,7 +151,7 @@ public class ProseSentenceTests
         Checker.Model(arch => arch.Rule("member/no-now")
                 .Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
                 .Because("Wall-clock reads are untestable."))
-            .Rules.Single(rule => rule.Id == "member/no-now")
+            .Rule("member/no-now")
             .Sentence
             .ShouldBe("Types must not use `DateTime.Now`.");
     }
@@ -164,7 +164,7 @@ public class ProseSentenceTests
         Checker.Model(arch => arch.Rule("member/verb-collect")
                 .Enforce(arch.Types.MustNotUse(() => GC.Collect()))
                 .Because("Forced GCs stall the process."))
-            .Rules.Single(rule => rule.Id == "member/verb-collect")
+            .Rule("member/verb-collect")
             .Sentence
             .ShouldBe("Types must not use `GC.Collect()`.");
     }
@@ -176,7 +176,7 @@ public class ProseSentenceTests
         Checker.Model(arch => arch.Rule("member/verb-now")
                 .Enforce(arch.Types.MustNotUse(() => DateTime.Now))
                 .Because("Wall-clock reads are untestable."))
-            .Rules.Single(rule => rule.Id == "member/verb-now")
+            .Rule("member/verb-now")
             .Sentence
             .ShouldBe("Types must not use `DateTime.Now`.");
     }

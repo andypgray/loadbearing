@@ -24,4 +24,19 @@ internal static class TextNormalization
         return value.Replace("\r\n", "\n")
             .Trim();
     }
+
+    /// <summary>
+    ///     How many times <paramref name="needle" /> occurs in <paramref name="haystack" />, ordinally and
+    ///     without overlaps — for the gates that count a marker rather than assert one is present.
+    /// </summary>
+    internal static int Occurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (int index = haystack.IndexOf(needle, StringComparison.Ordinal);
+             index >= 0;
+             index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal))
+            count++;
+
+        return count;
+    }
 }

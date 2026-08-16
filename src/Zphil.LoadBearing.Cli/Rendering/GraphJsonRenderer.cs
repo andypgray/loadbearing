@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -10,8 +11,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     machine-independent (<c>solution</c> is a file name). Grouped counts only, no per-site dumps.
 /// </summary>
 /// <remarks>
-///     Composing the document and writing it are separate calls so a caller with a response budget can
-///     measure the full survey and, if it overruns, re-compose it at overview grain from the same
+///     The document is composed as a string rather than written straight out, so a caller with a response
+///     budget can measure the full survey and, if it overruns, re-compose it at overview grain from the same
 ///     summary — one extraction, two renders, and never a document cut mid-array.
 /// </remarks>
 internal static class GraphJsonRenderer
@@ -20,21 +21,21 @@ internal static class GraphJsonRenderer
     ///     The survey document as a string. <paramref name="grain" /> decides how much of each project is
     ///     rendered and stamps itself on the document; <paramref name="projectsScope" /> is the filter the
     ///     summary was already narrowed by, recorded so the document says what it covers.
+    ///     <paramref name="workspaceDiagnostics" /> is the rendered stream the caller composed and
+    ///     <paramref name="diagnostics" /> the load's own verdict, whose project lists become the trust stamps.
     /// </summary>
     public static string Document(
         GraphSummary summary,
         string solutionDirectory,
         string solutionName,
         IReadOnlyList<string> workspaceDiagnostics,
-        bool modelIncomplete,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects,
+        WorkspaceDiagnostics diagnostics,
         DocumentGrain grain,
         IReadOnlyList<string> projectsScope)
     {
         bool elideExternalEdges = grain >= DocumentGrain.Skeleton;
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
         var document = new GraphJson(
             1,
@@ -48,18 +49,12 @@ internal static class GraphJsonRenderer
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
             elideExternalEdges ? summary.ExternalEdges.Count : null,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
-            modelIncomplete ? true : null,
-            JsonReportRenderer.RelativeProjects(failedProjects, relativizer),
-            JsonReportRenderer.RelativeProjects(uncheckedProjects, relativizer),
-            JsonReportRenderer.RelativeProjects(restoreFailedProjects, relativizer));
+            trust.ModelIncomplete,
+            trust.FailedProjects,
+            trust.UncheckedProjects,
+            trust.RestoreFailedProjects);
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
-    }
-
-    /// <summary>Writes a composed document as the run's stdout line.</summary>
-    public static void Render(TextWriter output, string document)
-    {
-        output.WriteLine(document);
     }
 
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)

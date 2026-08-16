@@ -59,6 +59,16 @@ internal static class SpecAssemblyCompiler
     }
 
     /// <summary>
+    ///     <see cref="EmitSpecDll(string,string,string)" />'s image form, against the contract this host
+    ///     carries — for a caller that writes one spec into several workspaces and would otherwise pay for
+    ///     the same compilation once per copy.
+    /// </summary>
+    internal static byte[] EmitImage(string source, string assemblyName)
+    {
+        return EmitImage(source, assemblyName, HostContract);
+    }
+
+    /// <summary>
     ///     Compiles <paramref name="source" /> against <paramref name="references" /> and hands back the
     ///     emitted image, for a caller that <em>references</em> the result rather than loads it.
     /// </summary>

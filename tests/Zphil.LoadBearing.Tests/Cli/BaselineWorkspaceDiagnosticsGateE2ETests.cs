@@ -242,7 +242,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
             Path.GetDirectoryName(Path.GetFullPath(solution))!, allowWorkspaceDiagnostics);
     }
 
-    private static async Task<CliResult> RunBaselineAsync(
+    private static Task<CliResult> RunBaselineAsync(
         TempFixtureWorkspace workspace,
         IReadOnlyList<string> diagnostics,
         Func<string, bool, BaselineRequest> request,
@@ -250,34 +250,23 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string>? failedProjects = null,
         IReadOnlyList<string>? restoreFailedProjects = null)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var runner = new BaselineRunner(
-            output, error,
-            new DiagnosticInjectingSolutionSource(
-                diagnostics, failedProjects, restoreFailedProjects: restoreFailedProjects));
+        var source = new DiagnosticInjectingSolutionSource(
+            diagnostics, failedProjects, restoreFailedProjects: restoreFailedProjects);
 
-        int exit = await runner.RunAsync(request(workspace.SolutionPath, allowWorkspaceDiagnostics), Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source)
+            .RunAsync(request(workspace.SolutionPath, allowWorkspaceDiagnostics), Ct));
     }
 
-    private static async Task<CliResult> RunCheckAsync(
+    private static Task<CliResult> RunCheckAsync(
         TempFixtureWorkspace workspace, IReadOnlyList<string> diagnostics, bool allowWorkspaceDiagnostics,
         IReadOnlyList<string>? failedProjects = null)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var runner = new CheckRunner(
-            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects), new FakeEnvironment());
+        var source = new DiagnosticInjectingSolutionSource(diagnostics, failedProjects);
+        var request = new CheckRequest(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, null,
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, null,
+            allowWorkspaceDiagnostics, null, null, DocumentGrain.Full);
 
-        int exit = await runner.RunAsync(
-            new CheckRequest(
-                workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, null,
-                Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!, true, null,
-                allowWorkspaceDiagnostics, null, null, DocumentGrain.Full),
-            Ct);
-
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
     }
 }

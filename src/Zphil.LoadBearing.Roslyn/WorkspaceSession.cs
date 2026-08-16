@@ -46,9 +46,6 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 public sealed class WorkspaceSession : IAsyncDisposable
 {
-    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
-        new Dictionary<ProjectId, string>();
-
     private readonly Action<string>? diagnosticSink;
 
     // Known-document fingerprints, keyed by canonical full path. Covers only the project's COMPILED documents,
@@ -93,22 +90,13 @@ public sealed class WorkspaceSession : IAsyncDisposable
     // reuses its work. Starts at 0; the first load makes it 1, so a never-loaded generation never aliases one.
     private long generation;
 
-    // The projects that failed to load in the current generation, carried onto every snapshot it produces.
-    // Beside loadDiagnostics rather than derived from them: the diagnostics render, this decides.
-    private IReadOnlyList<string> failedProjects = [];
-
-    // The declared members the current generation's load did not check, carried onto every snapshot it
-    // produces. Non-empty only when the session is bound to a solution filter; it scopes, never gates.
-    private IReadOnlyList<string> uncheckedProjects = [];
-
-    // The projects whose NuGet packages were not in the model at the current generation's load, carried onto
-    // every snapshot it produces. Generation-scoped for the same reason as failedProjects, and safely so: a
-    // repairing restore writes an assets file the reconcile sweep already stamps — present or absent, so its
-    // first appearance counts too — which forces a full reload.
-    private IReadOnlyList<string> restoreFailedProjects = [];
-
-    // Workspace-load diagnostics of the current generation, carried onto every snapshot it produces.
-    private IReadOnlyList<string> loadDiagnostics = [];
+    // The current generation's load verdict — the diagnostics that render beside the three project lists that
+    // decide — carried whole onto every snapshot the generation produces. One field rather than four because
+    // one load writes them and one mint reads them: kept apart, they are four chances to describe two
+    // different loads. Generation-scoped, and safely so: a repairing restore writes an assets file the
+    // reconcile sweep already stamps — present or absent, so its first appearance counts too — which forces a
+    // full reload rather than letting a verdict go stale inside a generation.
+    private WorkspaceDiagnostics loadVerdict = WorkspaceDiagnostics.None;
 
     // The owning workspace of the current load generation. Null until the first load, and between a
     // reset-to-unloaded and the next successful load.
@@ -123,7 +111,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     // Per-project target frameworks of the current load generation, carried onto every snapshot it produces.
     // ProjectIds survive WithDocumentText, so one load's map stays valid for every edit folded into it.
-    private IReadOnlyDictionary<ProjectId, string> targetFrameworks = NoTargetFrameworks;
+    private IReadOnlyDictionary<ProjectId, string> targetFrameworks = TargetFrameworkMaps.None;
 
     /// <summary>
     ///     Creates an unloaded session. The workspace is opened lazily on the first
@@ -232,11 +220,8 @@ public sealed class WorkspaceSession : IAsyncDisposable
         current = null;
         loadedSolutionPath = null;
         snapshot = null;
-        loadDiagnostics = [];
-        failedProjects = [];
-        uncheckedProjects = [];
-        restoreFailedProjects = [];
-        targetFrameworks = NoTargetFrameworks;
+        loadVerdict = WorkspaceDiagnostics.None;
+        targetFrameworks = TargetFrameworkMaps.None;
         documentFingerprints.Clear();
         documentIds.Clear();
         structuralFingerprints.Clear();
@@ -255,10 +240,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loaded = freshlyLoaded;
         current = materialized;
         loadedSolutionPath = solutionPath;
-        loadDiagnostics = collected;
-        failedProjects = freshlyLoaded.FailedProjects;
-        uncheckedProjects = freshlyLoaded.UncheckedProjects;
-        restoreFailedProjects = freshlyLoaded.RestoreFailedProjects;
+        loadVerdict = freshlyLoaded.LoadDiagnosticsWith(collected);
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         generation++;
         SeedEditVersions(materialized);
@@ -284,14 +266,9 @@ public sealed class WorkspaceSession : IAsyncDisposable
     /// </summary>
     private async Task ReconcileAsync(CancellationToken ct)
     {
-        if (StructuralSweepDetectsChange() || ConeScanDetectsNewFile())
-        {
-            await LoadFreshAsync(loadedSolutionPath!, ct).ConfigureAwait(false);
-            return;
-        }
-
-        bool needsReload = await ReconcileDocumentsAsync(ct).ConfigureAwait(false);
-        if (needsReload)
+        // Cheapest-first is the short-circuit itself: the document sweep is the only arm that reads file
+        // content, so it must not run once a reload is already decided.
+        if (StructuralSweepDetectsChange() || ConeScanDetectsNewFile() || await ReconcileDocumentsAsync(ct).ConfigureAwait(false))
             await LoadFreshAsync(loadedSolutionPath!, ct).ConfigureAwait(false);
     }
 
@@ -410,12 +387,12 @@ public sealed class WorkspaceSession : IAsyncDisposable
     /// </summary>
     private WorkspaceSnapshot MintSnapshot()
     {
-        return new WorkspaceSnapshot(current!, loadDiagnostics)
+        return new WorkspaceSnapshot(current!, loadVerdict.LoadFailures)
         {
             Generation = generation,
-            FailedProjects = failedProjects,
-            UncheckedProjects = uncheckedProjects,
-            RestoreFailedProjects = restoreFailedProjects,
+            FailedProjects = loadVerdict.FailedProjects,
+            UncheckedProjects = loadVerdict.UncheckedProjects,
+            RestoreFailedProjects = loadVerdict.RestoreFailedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };
@@ -513,21 +490,44 @@ public sealed class WorkspaceSession : IAsyncDisposable
     ///     (the on-disk content is the loaded content at this instant) fixes the version to compare against,
     ///     and it is the same work the caller's extraction would do, so it is not double-read.
     /// </summary>
+    /// <remarks>
+    ///     Read first, fork after. Every text is taken from the one solution the caller handed in — a Roslyn
+    ///     <see cref="Solution" /> is immutable, so the reads are safe together and overlap rather than
+    ///     queueing — and only then are they folded in by a tight run of
+    ///     <see cref="Solution.WithDocumentText(DocumentId,SourceText,PreservationMode)" />. Interleaving the
+    ///     two made every read walk a solution one fork deeper than the last, for a result identical to this one.
+    /// </remarks>
     private static async Task<Solution> MaterializeDocumentTextsAsync(Solution solution, CancellationToken ct)
     {
+        var ids = solution.Projects
+            .SelectMany(project => project.DocumentIds)
+            .ToList();
+
+        var reads = ids
+            .Select(id => ReadLoadedTextAsync(solution, id, ct))
+            .ToList();
+
+        var texts = await Task.WhenAll(reads).ConfigureAwait(false);
+
         Solution result = solution;
-        foreach (DocumentId id in solution.Projects.SelectMany(p => p.DocumentIds).ToList())
+        for (var index = 0; index < ids.Count; index++)
         {
             ct.ThrowIfCancellationRequested();
 
-            Document? document = result.GetDocument(id);
-            if (document?.FilePath is null) continue;
-
-            SourceText text = await document.GetTextAsync(ct).ConfigureAwait(false);
-            result = result.WithDocumentText(id, text);
+            if (texts[index] is { } text) result = result.WithDocumentText(ids[index], text);
         }
 
         return result;
+    }
+
+    // A document with no file path is not on disk, so no fingerprint will ever compare against it: null asks
+    // the caller to leave it on its loader rather than fold a text in.
+    private static async Task<SourceText?> ReadLoadedTextAsync(Solution solution, DocumentId id, CancellationToken ct)
+    {
+        Document? document = solution.GetDocument(id);
+        if (document?.FilePath is null) return null;
+
+        return await document.GetTextAsync(ct).ConfigureAwait(false);
     }
 
     private static async Task<SourceText> ReadTextAsync(string path, CancellationToken ct)

@@ -119,7 +119,7 @@ public sealed class DependabotCoverageTests
     // key, which ends at the first line that is not one of its items.
     private static IReadOnlyList<string> ReadNuGetDirectories()
     {
-        string[] lines = File.ReadAllLines(RepoRoot.Absolute(DependabotConfig));
+        string[] lines = RepoRoot.ReadLines(DependabotConfig);
         string[] entry = ReadNuGetEntry(lines);
         int keyIndex = Array.FindIndex(entry, DirectoriesKey.IsMatch);
         if (keyIndex < 0) return [];

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -53,6 +52,10 @@ internal static class TrackedFiles
             .Where(IsText)
             .ToArray());
 
+    private static readonly Lazy<IReadOnlyList<string>> LazyMarkdown =
+        new(() => LazyAll.Value.Where(IsMarkdown)
+            .ToArray());
+
     /// <summary>Every tracked path, repository-relative with forward slashes, as git reports it.</summary>
     public static IReadOnlyList<string> All => LazyAll.Value;
 
@@ -65,9 +68,20 @@ internal static class TrackedFiles
     /// </summary>
     public static IReadOnlyList<string> NonSourceText => LazyNonSourceText.Value;
 
+    /// <summary>
+    ///     The tracked markdown — the hand-written docs, which is the set every quote gate sweeps for a
+    ///     doc nobody registered.
+    /// </summary>
+    public static IReadOnlyList<string> Markdown => LazyMarkdown.Value;
+
     private static bool IsCSharp(string relativePath)
     {
         return relativePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMarkdown(string relativePath)
+    {
+        return relativePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
     }
 
     // Text or binary the way `git grep -I` decides it — a NUL byte near the start means binary. An
@@ -83,26 +97,9 @@ internal static class TrackedFiles
             .IndexOf((byte)0) < 0;
     }
 
-    // Runs `git -C <root> ls-files`; throws on non-zero exit. Launched through ChildProcess so this
-    // git gets the closed stdin, the bounded wait and the kill-tree every child here gets.
     private static IReadOnlyList<string> Enumerate()
     {
-        var startInfo = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = RepoRoot.Directory,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-C");
-        startInfo.ArgumentList.Add(RepoRoot.Directory);
-        startInfo.ArgumentList.Add("ls-files");
-
-        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"'git ls-files' failed with exit code {result.ExitCode}."
-                + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
-
-        return result.StandardOutput
+        return GitCommand.Output(RepoRoot.Directory, "ls-files")
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 }

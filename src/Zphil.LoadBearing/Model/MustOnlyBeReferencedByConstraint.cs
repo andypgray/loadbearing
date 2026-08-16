@@ -7,18 +7,10 @@ namespace Zphil.LoadBearing.Model;
 ///     §5.3). No external-packages caveat is needed: only solution types can be observed
 ///     referencing (GRAMMAR §4.1). This is the containment verb Quarantine desugars to (GRAMMAR §7).
 /// </summary>
-internal sealed class MustOnlyBeReferencedByConstraint : Constraint
+internal sealed class MustOnlyBeReferencedByConstraint(Selection subject, IReadOnlyList<Selection> sources) : OperandConstraint(subject, sources)
 {
-    internal MustOnlyBeReferencedByConstraint(Selection subject, IReadOnlyList<Selection> sources)
-        : base(subject)
-    {
-        Sources = sources;
-    }
-
     /// <summary>The permitted referencing sources.</summary>
-    internal IReadOnlyList<Selection> Sources { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Sources;
+    internal IReadOnlyList<Selection> Sources => Operands;
 
     internal override string VerbPhrase => "must be referenced only by " + SentenceRenderer.TargetList(Sources);
 }

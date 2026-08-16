@@ -140,15 +140,7 @@ public static class BaselineFormat
     {
         return Guard.NotNull(rules, nameof(rules))
             .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => new SortedRule(kv.Key, SortEntries(kv.Value)))
-            .ToList();
-    }
-
-    private static IReadOnlyList<BaselineEntry> SortEntries(IReadOnlyCollection<BaselineEntry> entries)
-    {
-        return entries
-            .OrderBy(e => e.Source ?? e.Subject, StringComparer.Ordinal)
-            .ThenBy(e => e.Target ?? string.Empty, StringComparer.Ordinal)
+            .Select(kv => new SortedRule(kv.Key, BaselineEntry.InCanonicalOrder(kv.Value)))
             .ToList();
     }
 

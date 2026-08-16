@@ -88,7 +88,7 @@ public sealed class BaselineAddE2ETests
         // Pre-write a digest-valid file that co-hosts the real section AND a foreign section, to prove --add
         // rides the foreign section through byte-identical.
         string migratePath = workspace.PathOf(MigrateBaselineFile);
-        File.WriteAllText(migratePath, ComposeSections(
+        File.WriteAllText(migratePath, BaselineComposer.Compose(
             (MigrateRule, [BaselineEntry.ForEdge(InvoiceId, DataTableId)]),
             (ForeignRule, [BaselineEntry.ForSubject(ForeignSubjectId)])));
         string beforeText = File.ReadAllText(migratePath);
@@ -106,7 +106,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: the new entry renders attributed (because last) AND the foreign section is byte-identical.
         string afterText = File.ReadAllText(migratePath);
         afterText.NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
                 [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
@@ -161,7 +161,7 @@ public sealed class BaselineAddE2ETests
 
         File.ReadAllText(workspace.PathOf(QuarantineBaselineFile))
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (ContainmentRule,
                 [
                     BaselineEntry.ForEdge(HomeId, BillingCalculatorId)
@@ -190,15 +190,7 @@ public sealed class BaselineAddE2ETests
         // reads (GRAMMAR §4.5) are current memberUse violations.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement redRule = CheckJson.Rule(red.Out, ClockRule);
-        redRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        redRule.GetProperty("violations")
-            .EnumerateArray()
-            .Select(v => v.GetProperty("targetMember")
-                .GetString())
-            .ShouldBe([NowMemberId, UtcNowMemberId], true);
+        ShouldHaveFailedWith(red, ClockRule, "targetMember", [NowMemberId, UtcNowMemberId]);
 
         // Capture: --init grandfathers both member identities (T: source x P: member DocId entries), and the
         // re-check sees the rule green with both reads riding the baseline.
@@ -208,19 +200,12 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement capturedRule = CheckJson.Rule(captured.Out, ClockRule);
-        capturedRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        capturedRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(2);
+        ShouldHaveCaptured(captured, ClockRule, 2);
 
         // Un-capture the pair (composer as arrangement, the Migrate fact's idiom): a digest-valid EMPTY
         // section turns both reads red again on a captured rule — the state the valve exists for.
         string clockPath = workspace.PathOf(ClockBaselineFile);
-        File.WriteAllText(clockPath, ComposeSections((ClockRule, [])));
+        File.WriteAllText(clockPath, BaselineComposer.Compose((ClockRule, [])));
         string beforeText = File.ReadAllText(clockPath);
 
         // The valve, member flavor: a full-name --target (no P: prefix) resolves the member violation.
@@ -236,7 +221,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: exactly one appended entry line keying the P: member DocId, plus the digest change.
         string afterText = File.ReadAllText(clockPath);
         afterText.NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (ClockRule, [
                     BaselineEntry.ForEdge(HomeId, NowMemberId)
                         .WithBecause("INC-1234")
@@ -270,17 +255,7 @@ public sealed class BaselineAddE2ETests
 
         // The attribution round-trips: --accept-reductions keeps the still-observed Now entry (refusing the
         // UtcNow growth) and a second --init leaves the captured section be — byte-identical both ways.
-        byte[] snapshot = File.ReadAllBytes(clockPath);
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.ShouldSucceed();
-        File.ReadAllBytes(clockPath)
-            .ShouldBe(snapshot);
-        CliResult reinit = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.ShouldSucceed();
-        File.ReadAllBytes(clockPath)
-            .ShouldBe(snapshot);
+        await ShouldRoundTripByteIdenticalAsync(workspace, clockPath);
     }
 
     [Fact]
@@ -293,15 +268,7 @@ public sealed class BaselineAddE2ETests
         // memberShape violations, each keyed by the member's own DocId in the subjectMember field.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement redRule = CheckJson.Rule(red.Out, AsyncRule);
-        redRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        redRule.GetProperty("violations")
-            .EnumerateArray()
-            .Select(v => v.GetProperty("subjectMember")
-                .GetString())
-            .ShouldBe([SaveMemberId, LoadMemberId], true);
+        ShouldHaveFailedWith(red, AsyncRule, "subjectMember", [SaveMemberId, LoadMemberId]);
 
         // Capture: --init grandfathers both member identities (M: member DocId, ForSubject entries), and the
         // re-check sees the rule green with both methods riding the baseline.
@@ -311,19 +278,12 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement capturedRule = CheckJson.Rule(captured.Out, AsyncRule);
-        capturedRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        capturedRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(2);
+        ShouldHaveCaptured(captured, AsyncRule, 2);
 
         // Un-capture the pair (composer as arrangement, the Migrate/clock fact's idiom): a digest-valid EMPTY
         // section turns both methods red again on a captured rule — the state the valve exists for.
         string asyncPath = workspace.PathOf(AsyncBaselineFile);
-        File.WriteAllText(asyncPath, ComposeSections((AsyncRule, [])));
+        File.WriteAllText(asyncPath, BaselineComposer.Compose((AsyncRule, [])));
 
         // The valve, member-subject flavor: a full-name --subject (no M: prefix, no parens) resolves the
         // member-shape violation, and the echo renders Save() WITH parens exactly as 'loadbearing check' does.
@@ -339,7 +299,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: exactly one appended entry keying the M: member DocId via ForSubject, plus the digest.
         File.ReadAllText(asyncPath)
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (AsyncRule, [
                     BaselineEntry.ForSubject(SaveMemberId)
                         .WithBecause("INC-1234")
@@ -372,17 +332,7 @@ public sealed class BaselineAddE2ETests
 
         // The attribution round-trips: --accept-reductions keeps the still-observed Save entry (refusing the
         // Load growth) and a second --init leaves the captured section be — byte-identical both ways.
-        byte[] snapshot = File.ReadAllBytes(asyncPath);
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.ShouldSucceed();
-        File.ReadAllBytes(asyncPath)
-            .ShouldBe(snapshot);
-        CliResult reinit = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.ShouldSucceed();
-        File.ReadAllBytes(asyncPath)
-            .ShouldBe(snapshot);
+        await ShouldRoundTripByteIdenticalAsync(workspace, asyncPath);
     }
 
     [Fact]
@@ -400,7 +350,7 @@ public sealed class BaselineAddE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         init.ShouldSucceed("di/handlers-via-registry: captured 2 grandfathered violations.");
         string diPath = workspace.PathOf(ConstructionBaselineFile);
-        File.WriteAllText(diPath, ComposeSections((ConstructionRule, [])));
+        File.WriteAllText(diPath, BaselineComposer.Compose((ConstructionRule, [])));
 
         // The valve, construction flavor: full-name --source/--target (no T: prefix) resolve the (source,
         // constructed) type-pair violation, echoed exactly as 'loadbearing check' renders it.
@@ -416,7 +366,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: exactly one appended entry keying the (source, constructed) type pair via ForEdge.
         File.ReadAllText(diPath)
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (ConstructionRule, [
                     BaselineEntry.ForEdge(InvoiceServiceId, InvoiceCreatedHandlerId)
                         .WithBecause("INC-1234")
@@ -462,15 +412,7 @@ public sealed class BaselineAddE2ETests
         // IOrderFeed and a transient IOrderFormatter, each keyed by the (source, injected) type pair.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement redRule = CheckJson.Rule(red.Out, CaptiveRule);
-        redRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        redRule.GetProperty("violations")
-            .EnumerateArray()
-            .Select(v => v.GetProperty("target")
-                .GetString())
-            .ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
+        ShouldHaveFailedWith(red, CaptiveRule, "target", ["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"]);
 
         // Capture: --init grandfathers both injection identities (T: source × T: injected ForEdge entries), and
         // the re-check sees the rule green with both captive edges riding the baseline.
@@ -480,19 +422,12 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement capturedRule = CheckJson.Rule(captured.Out, CaptiveRule);
-        capturedRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        capturedRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(2);
+        ShouldHaveCaptured(captured, CaptiveRule, 2);
 
         // Un-capture the pair (composer as arrangement, the member/construction facts' idiom): a digest-valid
         // EMPTY section turns both captive edges red again on a captured rule — the state the valve exists for.
         string captivePath = workspace.PathOf(CaptiveBaselineFile);
-        File.WriteAllText(captivePath, ComposeSections((CaptiveRule, [])));
+        File.WriteAllText(captivePath, BaselineComposer.Compose((CaptiveRule, [])));
 
         // The valve, injection flavor: full-name --source/--target (no T: prefix) resolve the (source, injected)
         // type-pair violation, echoed exactly as 'loadbearing check' renders it.
@@ -508,7 +443,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: exactly one appended entry keying the (source, injected) type pair via ForEdge.
         File.ReadAllText(captivePath)
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (CaptiveRule, [
                     BaselineEntry.ForEdge(ReportSchedulerId, OrderFeedInterfaceId)
                         .WithBecause("INC-1234")
@@ -545,17 +480,7 @@ public sealed class BaselineAddE2ETests
 
         // The attribution round-trips: --accept-reductions keeps the still-observed IOrderFeed entry (refusing
         // the IOrderFormatter growth) and a second --init leaves the captured section be — byte-identical both ways.
-        byte[] snapshot = File.ReadAllBytes(captivePath);
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.ShouldSucceed();
-        File.ReadAllBytes(captivePath)
-            .ShouldBe(snapshot);
-        CliResult reinit = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.ShouldSucceed();
-        File.ReadAllBytes(captivePath)
-            .ShouldBe(snapshot);
+        await ShouldRoundTripByteIdenticalAsync(workspace, captivePath);
     }
 
     [Fact]
@@ -569,15 +494,7 @@ public sealed class BaselineAddE2ETests
         // distinguish between.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement redRule = CheckJson.Rule(red.Out, CatchRule);
-        redRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        redRule.GetProperty("violations")
-            .EnumerateArray()
-            .Select(v => v.GetProperty("source")
-                .GetString())
-            .ShouldBe(["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"], true);
+        ShouldHaveFailedWith(red, CatchRule, "source", ["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"]);
 
         // Capture: --init grandfathers both catch identities (T: source × T: caught ForEdge entries, minting the
         // arch/baselines/exceptions/ directory), and the re-check sees the rule green with both baselined.
@@ -587,19 +504,12 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement capturedRule = CheckJson.Rule(captured.Out, CatchRule);
-        capturedRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        capturedRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(2);
+        ShouldHaveCaptured(captured, CatchRule, 2);
 
         // Un-capture (composer as arrangement, the member/construction/injection facts' idiom): a digest-valid
         // EMPTY section turns both catches red again on a captured rule — the state the valve exists for.
         string catchPath = workspace.PathOf(CatchBaselineFile);
-        File.WriteAllText(catchPath, ComposeSections((CatchRule, [])));
+        File.WriteAllText(catchPath, BaselineComposer.Compose((CatchRule, [])));
 
         // The valve, catch flavor: full-name --source/--target (no T: prefix) resolve the (source, caught)
         // type-pair violation, echoed exactly as 'loadbearing check' renders it.
@@ -616,7 +526,7 @@ public sealed class BaselineAddE2ETests
         // ReportPublisher's identical caught type is a distinct source, so it is not swept in.
         File.ReadAllText(catchPath)
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (CatchRule, [
                     BaselineEntry.ForEdge(ReportEndpointId, SystemExceptionId)
                         .WithBecause("INC-1234")
@@ -672,17 +582,7 @@ public sealed class BaselineAddE2ETests
 
         // The attribution round-trips: --accept-reductions keeps the still-observed swallow entry (refusing the
         // ReportPublisher growth) and a second --init leaves the captured section be — byte-identical both ways.
-        byte[] snapshot = File.ReadAllBytes(catchPath);
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.ShouldSucceed();
-        File.ReadAllBytes(catchPath)
-            .ShouldBe(snapshot);
-        CliResult catchReinit = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        catchReinit.ShouldSucceed();
-        File.ReadAllBytes(catchPath)
-            .ShouldBe(snapshot);
+        await ShouldRoundTripByteIdenticalAsync(workspace, catchPath);
     }
 
     [Fact]
@@ -697,15 +597,7 @@ public sealed class BaselineAddE2ETests
         // path (BaselineAddMatcher matches ViolationKind.Expose on both type endpoints, exactly as it does Catch).
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement redRule = CheckJson.Rule(red.Out, ExposeRule);
-        redRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        redRule.GetProperty("violations")
-            .EnumerateArray()
-            .Select(v => v.GetProperty("source")
-                .GetString())
-            .ShouldBe(["MyApp.Web.HomeController", "MyApp.Web.InvoiceController"], true);
+        ShouldHaveFailedWith(red, ExposeRule, "source", ["MyApp.Web.HomeController", "MyApp.Web.InvoiceController"]);
 
         // Capture: --init grandfathers both exposure identities (T: source × T: exposed ForEdge entries, minting
         // the arch/baselines/api/ directory), and the re-check sees the rule green with both surfaces baselined.
@@ -715,19 +607,12 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement capturedRule = CheckJson.Rule(captured.Out, ExposeRule);
-        capturedRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        capturedRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(2);
+        ShouldHaveCaptured(captured, ExposeRule, 2);
 
         // Un-capture the pair (composer as arrangement, the catch/injection facts' idiom): a digest-valid EMPTY
         // section turns both surfaces red again on a captured rule — the state the valve exists for.
         string exposePath = workspace.PathOf(ExposeBaselineFile);
-        File.WriteAllText(exposePath, ComposeSections((ExposeRule, [])));
+        File.WriteAllText(exposePath, BaselineComposer.Compose((ExposeRule, [])));
 
         // The valve, exposure flavor: full-name --source/--target (no T: prefix) resolve the (source, exposed)
         // type-pair violation, echoed exactly as 'loadbearing check' renders it.
@@ -743,7 +628,7 @@ public sealed class BaselineAddE2ETests
         // Composer as oracle: exactly one appended entry keying the (source, exposed) type pair via ForEdge.
         File.ReadAllText(exposePath)
             .NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (ExposeRule, [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
                         .WithBecause("INC-1234")
@@ -781,17 +666,7 @@ public sealed class BaselineAddE2ETests
 
         // The attribution round-trips: --accept-reductions keeps the still-observed HomeController entry (refusing
         // the InvoiceController growth) and a second --init leaves the captured section be — byte-identical both ways.
-        byte[] snapshot = File.ReadAllBytes(exposePath);
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
-        accept.ShouldSucceed();
-        File.ReadAllBytes(exposePath)
-            .ShouldBe(snapshot);
-        CliResult reinit = await CliRunner.InvokeAsync(
-            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
-        reinit.ShouldSucceed();
-        File.ReadAllBytes(exposePath)
-            .ShouldBe(snapshot);
+        await ShouldRoundTripByteIdenticalAsync(workspace, exposePath);
     }
 
     [Fact]
@@ -817,7 +692,7 @@ public sealed class BaselineAddE2ETests
         second.Out.ShouldContain("wrote");
         // No second entry — the count is unchanged and only the attribution (and its digest) moved.
         afterSecond.NormalizedLines()
-            .ShouldBe(ComposeSections(
+            .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
                 [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
@@ -912,11 +787,63 @@ public sealed class BaselineAddE2ETests
         status.Err.ShouldNotContain("--add");
     }
 
-    private static string ComposeSections(params (string RuleId, BaselineEntry[] Entries)[] sections)
+    /// <summary>
+    ///     Asserts <paramref name="rule" /> is red in <paramref name="check" />'s JSON document with exactly
+    ///     the violations <paramref name="expected" /> names — each read off the violation's
+    ///     <paramref name="endpoint" /> field, which is the kind's own identity (the caught, injected or
+    ///     exposed type; the member DocId a member rule keys on). The "red first" state every valve fact
+    ///     starts from, in any order.
+    /// </summary>
+    private static void ShouldHaveFailedWith(CliResult check, string rule, string endpoint, string[] expected)
     {
-        var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal);
-        foreach ((string ruleId, var entries) in sections) rules[ruleId] = entries;
-        return BaselineFormat.ComposeFile(rules);
+        JsonElement red = CheckJson.Rule(check.Out, rule);
+        red.GetProperty("status")
+            .GetString()
+            .ShouldBe("failed");
+        red.GetProperty("violations")
+            .EnumerateArray()
+            .Select(violation => violation.GetProperty(endpoint)
+                .GetString())
+            .ShouldBe(expected, true);
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="rule" /> is green in <paramref name="check" />'s JSON document on
+    ///     <paramref name="count" /> grandfathered violations — captured, not fixed.
+    /// </summary>
+    private static void ShouldHaveCaptured(CliResult check, string rule, int count)
+    {
+        JsonElement captured = CheckJson.Rule(check.Out, rule);
+        captured.GetProperty("status")
+            .GetString()
+            .ShouldBe("passed");
+        captured.GetProperty("baseline")
+            .GetProperty("grandfathered")
+            .GetInt32()
+            .ShouldBe(count);
+    }
+
+    /// <summary>
+    ///     Asserts the baseline file at <paramref name="path" /> survives both writing verbs byte for byte:
+    ///     <c>--accept-reductions</c> keeps the still-observed entry (refusing the bystander's growth), and a
+    ///     second <c>--init</c> leaves the captured section be. Attribution is the fragile half — it is the
+    ///     one field neither verb composes for itself.
+    /// </summary>
+    private static async Task ShouldRoundTripByteIdenticalAsync(TempFixtureWorkspace workspace, string path)
+    {
+        byte[] snapshot = File.ReadAllBytes(path);
+
+        CliResult accept = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--accept-reductions");
+        accept.ShouldSucceed();
+        File.ReadAllBytes(path)
+            .ShouldBe(snapshot);
+
+        CliResult reinit = await CliRunner.InvokeAsync(
+            "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
+        reinit.ShouldSucceed();
+        File.ReadAllBytes(path)
+            .ShouldBe(snapshot);
     }
 
     private static HashSet<string> LineSet(string text)

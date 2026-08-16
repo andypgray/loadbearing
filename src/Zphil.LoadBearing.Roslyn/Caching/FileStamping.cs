@@ -71,11 +71,17 @@ internal static class FileStamping
     ///     Lowercase-hex SHA-256 of the file's bytes, or null when it is unreadable — an I/O failure degrades, never
     ///     throws. Streamed, because this runs over every source document in the solution on a cold run.
     /// </summary>
+    /// <remarks>
+    ///     Unbuffered and declared sequential rather than opened through <see cref="File.OpenRead" />: the
+    ///     digest already reads front to back in large blocks, so the default 4 KB buffer only bought a
+    ///     second copy of every byte in the solution.
+    /// </remarks>
     internal static string? TryHashFile(string path)
     {
         try
         {
-            using FileStream stream = File.OpenRead(path);
+            using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.Read, 0, FileOptions.SequentialScan);
             return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -117,40 +123,29 @@ internal static class FileStamping
     }
 
     /// <summary>
-    ///     The absolute path of a project's restore assets file in the <em>default</em> output layout
-    ///     (<c>obj/project.assets.json</c>) — a structural input. Every layout's candidate locations come from
-    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" />, which is what the structural stamp set uses;
-    ///     this single default-layout spelling stays because the per-project content key names one assets
-    ///     hash, and that key is a manifest-diff aid rather than the invalidation mechanism — an assets file
-    ///     that changes is a structural change, and the structural sweep misses the whole cache before any
-    ///     content key is recomputed.
-    /// </summary>
-    internal static string AssetsPathOf(string projectDirectory)
-    {
-        return Path.GetFullPath(
-            Path.Combine(projectDirectory, "obj", IntermediateOutputTree.AssetsFileName));
-    }
-
-    /// <summary>
     ///     Validates one structural stamp against disk: an existence flip is a change; a promoted stat match is
     ///     trusted without a read; otherwise the file is re-hashed (invoking <paramref name="onHash" /> first,
     ///     so the caller can count the read) — a real content change is a change, a bare touch refreshes the
     ///     stamp so the next sweep is pure-stat.
     /// </summary>
     /// <param name="stamp">The recorded stamp to check against current disk state.</param>
-    /// <param name="onHash">Invoked once immediately before each content hash, so a store can maintain its own read counter.</param>
+    /// <param name="onHash">
+    ///     Invoked once immediately before each content hash, so a store can maintain its own read counter.
+    ///     Required: both stores expose that count as a test observable, and a caller that passed nothing
+    ///     would be silently uncounted rather than visibly opting out.
+    /// </param>
     /// <returns>
     ///     <c>Changed</c> is true on an existence flip or real content change; <c>Refreshed</c> is the stamp to carry
     ///     forward.
     /// </returns>
-    internal static (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp, Action? onHash = null)
+    internal static (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp, Action onHash)
     {
         FileFreshness current = FileFreshness.Capture(stamp.Path);
         if (stamp.Exists != current.Exists) return (true, stamp);
         if (!stamp.Exists) return (false, stamp);
         if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp);
 
-        onHash?.Invoke();
+        onHash();
         string? sha = TryHashFile(stamp.Path);
         if (sha is null || !string.Equals(sha, stamp.Sha256, StringComparison.Ordinal)) return (true, stamp);
 

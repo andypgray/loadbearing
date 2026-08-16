@@ -40,10 +40,26 @@ internal sealed record SpecProjectCandidate(
 ///     projects to exclude from the checked universe — the spec project and its private plumbing
 ///     (<see cref="SpecExclusion" />). Both are empty/null for a prebuilt DLL, which excludes nothing.
 /// </summary>
+/// <param name="DllPath">The built spec assembly to load.</param>
+/// <param name="SpecProjectName">The spec project's name, or null for a prebuilt DLL.</param>
+/// <param name="ExcludeProjectNames">The projects the checked universe drops, empty for a prebuilt DLL.</param>
+/// <param name="OutputFilePaths">
+///     The evaluated output paths <see cref="DllPath" /> was chosen from — every framework's, ordinal-sorted
+///     — or null for a prebuilt DLL, which was never searched for. Carried because the extraction cache
+///     records what the resolution consumed: re-deriving it can only group the spec project's Roslyn projects
+///     by name, where resolution grouped them by canonicalized project file.
+/// </param>
+/// <param name="IntermediateAssemblyPath">
+///     The <c>obj</c>-side assembly path the built-output search refused an intermediate result under, or
+///     null for a prebuilt DLL. Recorded for the same reason as <see cref="OutputFilePaths" />: without it a
+///     cache hit would answer with the intermediate a cold run refuses.
+/// </param>
 internal sealed record SpecResolution(
     string DllPath,
     string? SpecProjectName,
-    IReadOnlyCollection<string> ExcludeProjectNames);
+    IReadOnlyCollection<string> ExcludeProjectNames,
+    IReadOnlyList<string>? OutputFilePaths = null,
+    string? IntermediateAssemblyPath = null);
 
 /// <summary>
 ///     Resolves which spec DLL to load. The CLI
@@ -65,7 +81,11 @@ internal static class SpecResolver
     ///     Resolves the spec against a loaded solution.
     /// </summary>
     /// <param name="solution">The loaded solution.</param>
-    /// <param name="solutionPath">The solution file, read for its declared membership.</param>
+    /// <param name="declaredMembers">
+    ///     The solution's declared <c>.csproj</c> members, or null when membership could not be read. Passed
+    ///     in rather than read here because both branches need it and the caller needs the same set again for
+    ///     extraction — one read serves all three.
+    /// </param>
     /// <param name="specArgument">The <c>--spec</c> value, or null/blank for the convention default.</param>
     /// <param name="diagnostics">
     ///     How well the workspace loaded. Not defaulted, and deliberately: an unresolved package reference
@@ -76,11 +96,12 @@ internal static class SpecResolver
     ///     <c>default(WorkspaceDiagnostics)</c> carries null lists.
     /// </param>
     internal static SpecResolution Resolve(
-        Solution solution, string solutionPath, string? specArgument, WorkspaceDiagnostics diagnostics)
+        Solution solution, IReadOnlySet<string>? declaredMembers, string? specArgument,
+        WorkspaceDiagnostics diagnostics)
     {
         return string.IsNullOrWhiteSpace(specArgument)
-            ? ResolveByConvention(solution, solutionPath, diagnostics)
-            : ResolveExplicit(solution, solutionPath, specArgument);
+            ? ResolveByConvention(solution, declaredMembers, diagnostics)
+            : ResolveExplicit(solution, declaredMembers, specArgument);
     }
 
     /// <summary>
@@ -107,21 +128,21 @@ internal static class SpecResolver
         return new SpecResolution(fullPath, null, []);
     }
 
-    private static SpecResolution ResolveExplicit(Solution solution, string solutionPath, string specArgument)
+    private static SpecResolution ResolveExplicit(
+        Solution solution, IReadOnlySet<string>? declaredMembers, string specArgument)
     {
         if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
-            string fullPath = Path.GetFullPath(specArgument);
-            Project project = solution.Projects.FirstOrDefault(p => PathsEqual(p.FilePath, fullPath))
-                              ?? throw new UserErrorException(
-                                  $"--spec '{specArgument}' is not a project in the solution. " +
-                                  "Pass a built spec DLL or a csproj that is a member of the target solution.");
-            var declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
-            var outputFilePaths = OutputsOfProjectFile(solution, project.FilePath, project.OutputFilePath);
-            string? intermediateAssemblyPath =
-                IntermediateOfProjectFile(solution, project.FilePath, project.CompilationOutputInfo.AssemblyPath);
-            return MemberResolution(
-                solution, declaredMembers, project.Name, outputFilePaths, intermediateAssemblyPath);
+            string canonicalPath = PathCanonicalizer.Resolve(Path.GetFullPath(specArgument));
+            var projects = CanonicalProjectsOf(solution);
+            var sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+            if (sharingProjects.Count == 0)
+                throw new UserErrorException(
+                    $"--spec '{specArgument}' is not a project in the solution. " +
+                    "Pass a built spec DLL or a csproj that is a member of the target solution.");
+
+            BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
+            return MemberResolution(solution, declaredMembers, sharingProjects[0].Project.Name, built);
         }
 
         // A DLL path — the branch that needs no solution.
@@ -129,78 +150,117 @@ internal static class SpecResolver
     }
 
     private static SpecResolution ResolveByConvention(
-        Solution solution, string solutionPath, WorkspaceDiagnostics diagnostics)
+        Solution solution, IReadOnlySet<string>? declaredMembers, WorkspaceDiagnostics diagnostics)
     {
-        // Read declared membership once: the convention filters candidates by it, and the exclusion walk
-        // subtracts the same set.
-        var declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+        var projects = CanonicalProjectsOf(solution);
 
-        var candidates = solution.Projects
-            .Where(p => p.Language == LanguageNames.CSharp)
-            .Select(p => new SpecProjectCandidate(
-                p.Name,
-                ReferencePathsOf(p, solution),
-                p.OutputFilePath,
-                p.FilePath,
-                SpecExclusion.IsDeclaredMember(declaredMembers, p.FilePath),
-                p.CompilationOutputInfo.AssemblyPath))
+        var candidates = projects
+            .Where(entry => entry.Project.Language == LanguageNames.CSharp)
+            .Select(entry => new SpecProjectCandidate(
+                entry.Project.Name,
+                ReferencePathsOf(entry.Project, solution),
+                entry.Project.OutputFilePath,
+                entry.Project.FilePath,
+                SpecExclusion.IsDeclaredMember(declaredMembers, entry.Project.FilePath),
+                entry.Project.CompilationOutputInfo.AssemblyPath))
             .ToList();
 
         SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
-        var outputFilePaths = OutputsOfProjectFile(solution, chosen.FilePath, chosen.OutputFilePath);
-        string? intermediateAssemblyPath =
-            IntermediateOfProjectFile(solution, chosen.FilePath, chosen.IntermediateAssemblyPath);
-        return MemberResolution(
-            solution, declaredMembers, chosen.Name, outputFilePaths, intermediateAssemblyPath);
+        BuiltOutputInputs built = BuiltOutputsOfProjectFile(
+            projects, chosen.FilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
+        return MemberResolution(solution, declaredMembers, chosen.Name, built);
     }
 
     // The shared tail of both solution-member branches: the built DLL plus the projects the checked universe
     // drops — the spec project and the plumbing only it references. A null declaredMembers is the unreadable
-    // case, which SpecExclusion degrades to just the spec project.
+    // case, which SpecExclusion degrades to just the spec project. The evaluated paths are normalized once
+    // here — the search's own filter-and-sort, which is idempotent — because they both feed the search and
+    // ride on to the extraction cache, which has to record the set the search actually consumed.
     private static SpecResolution MemberResolution(
         Solution solution,
         IReadOnlySet<string>? declaredMembers,
         string specProjectName,
-        IReadOnlyList<string?> outputFilePaths,
-        string? intermediateAssemblyPath)
+        BuiltOutputInputs built)
     {
+        var evaluatedPaths = NormalizeEvaluatedPaths(built.OutputFilePaths);
+
         return new SpecResolution(
-            RequireBuiltOutput(specProjectName, outputFilePaths, intermediateAssemblyPath),
+            RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
             specProjectName,
-            SpecExclusion.Compute(solution, declaredMembers, specProjectName));
+            SpecExclusion.Compute(solution, declaredMembers, specProjectName),
+            evaluatedPaths,
+            built.IntermediateAssemblyPath);
     }
 
-    // Every output path the projects sharing one project file evaluate to. A multi-target-framework csproj
-    // yields one Roslyn project per framework, so any single project's OutputFilePath names an arbitrary
-    // framework's DLL; the built-output check needs them all so it can pick one that is actually on disk —
-    // and so a cache hit, which records the same set, replays the identical choice.
-    private static IReadOnlyList<string?> OutputsOfProjectFile(
-        Solution solution, string? projectFilePath, string? evaluatedOutputFilePath)
+    // Both built-output facts about one project file, from one pass over the solution.
+    //
+    // A multi-target-framework csproj yields one Roslyn project per framework, so any single project's
+    // OutputFilePath names an arbitrary framework's DLL; the built-output check needs them all so it can pick
+    // one that is actually on disk — and so a cache hit, which records the same set, replays the identical
+    // choice. One intermediate path suffices even then: the search derives the intermediate ROOT by peeling
+    // the prefix the evaluated and intermediate paths share, and the two diverge at the same segment level
+    // whichever framework's pair it starts from, so the derived root is framework-invariant. Ordinal-first
+    // keeps that choice deterministic rather than load-order dependent.
+    //
+    // Both sides of the scan are canonicalized exactly once: canonicalizing probes the filesystem for a
+    // reparse point per path segment, so re-resolving the needle per candidate — or the haystack per scan —
+    // costs one such walk per project in the solution, on every warm tool call.
+    private static BuiltOutputInputs BuiltOutputsOfProjectFile(
+        IReadOnlyList<CanonicalProject> projects,
+        string? projectFilePath,
+        string? evaluatedOutputFilePath,
+        string? evaluatedIntermediatePath)
     {
-        if (string.IsNullOrEmpty(projectFilePath)) return [evaluatedOutputFilePath];
+        if (string.IsNullOrEmpty(projectFilePath))
+            return new BuiltOutputInputs([evaluatedOutputFilePath], evaluatedIntermediatePath);
 
-        return solution.Projects
-            .Where(p => PathsEqual(p.FilePath, projectFilePath))
-            .Select(p => p.OutputFilePath)
+        string canonicalPath = PathCanonicalizer.Resolve(projectFilePath);
+        var sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+        return BuiltOutputsOf(sharingProjects);
+    }
+
+    // The two built-output facts, read off the projects one .csproj was built into.
+    private static BuiltOutputInputs BuiltOutputsOf(IReadOnlyList<CanonicalProject> sharingProjects)
+    {
+        var outputFilePaths = sharingProjects
+            .Select(entry => entry.Project.OutputFilePath)
             .ToList();
-    }
-
-    // The one intermediate assembly path to hand the built-output search, out of however many the projects
-    // sharing a project file carry. One suffices even for a multi-target-framework spec project: the search
-    // derives the intermediate ROOT by peeling the prefix the evaluated and intermediate paths share, and the
-    // two diverge at the same segment level whichever framework's pair it starts from — so the derived root
-    // is framework-invariant. Ordinal-first keeps the choice deterministic rather than load-order dependent.
-    private static string? IntermediateOfProjectFile(
-        Solution solution, string? projectFilePath, string? evaluatedIntermediatePath)
-    {
-        if (string.IsNullOrEmpty(projectFilePath)) return evaluatedIntermediatePath;
-
-        return solution.Projects
-            .Where(p => PathsEqual(p.FilePath, projectFilePath))
-            .Select(p => p.CompilationOutputInfo.AssemblyPath)
+        string? intermediateAssemblyPath = sharingProjects
+            .Select(entry => entry.Project.CompilationOutputInfo.AssemblyPath)
             .Where(path => !string.IsNullOrEmpty(path))
             .OrderBy(path => path, StringComparer.Ordinal)
             .FirstOrDefault();
+
+        return new BuiltOutputInputs(outputFilePaths, intermediateAssemblyPath);
+    }
+
+    // Every project the solution carries, beside the canonicalized spelling of its own .csproj, resolved
+    // once for the whole resolution: both scans a resolution runs — which project a --spec needle names, and
+    // which projects a chosen .csproj was built into — ask their question against this one view.
+    private static List<CanonicalProject> CanonicalProjectsOf(Solution solution)
+    {
+        return solution.Projects
+            .Select(project => new CanonicalProject(project, CanonicalFileOf(project)))
+            .ToList();
+    }
+
+    private static string? CanonicalFileOf(Project project)
+    {
+        return string.IsNullOrEmpty(project.FilePath) ? null : PathCanonicalizer.Resolve(project.FilePath);
+    }
+
+    // The projects built from one already-canonicalized .csproj, in solution order — a multi-target-framework
+    // project file yields one Roslyn project per framework. Canonicalizing this side too (symlinks resolved)
+    // is what lets a solution opened through a symlinked root still match, and the per-OS comparison
+    // (PathComparison) is what stops the match from missing across symlink spellings or over-matching
+    // case-variant paths on a case-sensitive file system.
+    private static List<CanonicalProject> ProjectsSharingFile(
+        IReadOnlyList<CanonicalProject> projects, string canonicalProjectFile)
+    {
+        return projects
+            .Where(entry => entry.CanonicalFilePath is { } canonical
+                            && string.Equals(canonical, canonicalProjectFile, PathComparison.Comparison))
+            .ToList();
     }
 
     /// <summary>
@@ -280,44 +340,32 @@ internal static class SpecResolver
     private static UserErrorException NoSpecProjectFound(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
-        var lines = new List<string>();
-        if (diagnostics.IsIncomplete)
-        {
-            lines.Add(
-                "No spec project found: one or more projects failed to load, so a project that references "
-                + "Zphil.LoadBearing.dll may be among them:");
-            lines.AddRange(Quoted(diagnostics.FailedProjects));
-        }
-        else if (diagnostics.ActionableDiagnostics.Count > 0)
-        {
-            lines.Add(
-                "No spec project found: the workspace did not load cleanly, so a project that references "
-                + "Zphil.LoadBearing.dll may have failed to resolve it:");
-            lines.AddRange(Quoted(diagnostics.ActionableDiagnostics));
-        }
-        else
-        {
-            return new UserErrorException(
-                "No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec to name one.\n"
-                + $"Considered {candidates.Count} C# project(s) in the workspace.");
-        }
-
-        lines.Add("Restore and build the solution first (dotnet restore, dotnet build), then retry.");
-
         // The refusal is thrown before a CodebaseSource exists, so no runner renders the evidence beside it —
-        // the message has to carry it itself. CliErrorMapper.Write splits on \n and writes a line apiece, so
-        // this reads the same on stderr and in an MCP error result.
-        return new UserErrorException(string.Join("\n", lines));
-    }
+        // the message has to carry it itself, in the shape every other evidence block takes. CliErrorMapper
+        // writes it a line apiece, so this reads the same on stderr and in an MCP error result.
+        const string tail = "Restore and build the solution first (dotnet restore, dotnet build), then retry.";
 
-    // Up to MaxQuotedDiagnostics entries, two-space indented as every other evidence block renders them, then
-    // a count of the rest.
-    private static IEnumerable<string> Quoted(IReadOnlyList<string> evidence)
-    {
-        foreach (string entry in evidence.Take(MaxQuotedDiagnostics)) yield return "  " + entry;
+        if (diagnostics.IsIncomplete)
+            return new UserErrorException(
+                EvidenceBlock.Compose(
+                    "No spec project found: one or more projects failed to load, so a project that references "
+                    + "Zphil.LoadBearing.dll may be among them:",
+                    diagnostics.FailedProjects,
+                    tail,
+                    quoteCap: MaxQuotedDiagnostics));
 
-        if (evidence.Count > MaxQuotedDiagnostics)
-            yield return $"  ... and {evidence.Count - MaxQuotedDiagnostics} more.";
+        if (diagnostics.ActionableDiagnostics.Count > 0)
+            return new UserErrorException(
+                EvidenceBlock.Compose(
+                    "No spec project found: the workspace did not load cleanly, so a project that references "
+                    + "Zphil.LoadBearing.dll may have failed to resolve it:",
+                    diagnostics.ActionableDiagnostics,
+                    tail,
+                    quoteCap: MaxQuotedDiagnostics));
+
+        return new UserErrorException(
+            "No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec to name one.\n"
+            + $"Considered {candidates.Count} C# project(s) in the workspace.");
     }
 
     // One csproj that yields several Roslyn Projects (multi-TFM) is ONE candidate, not many. Group on
@@ -340,20 +388,12 @@ internal static class SpecResolver
             : $"{candidate.Name}  ({candidate.FilePath})";
     }
 
+    // Over the file name as a span: a large solution carries tens of thousands of metadata reference paths,
+    // and the substring GetFileName(string) would allocate for each is one comparison's worth of garbage.
     private static bool ReferencesCore(SpecProjectCandidate candidate)
     {
         return candidate.ReferencePaths.Any(path =>
-            Path.GetFileName(path).Equals(CoreAssemblyFile, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>
-    ///     The one built output the spec loads from, given the single path a project evaluated to. Delegates
-    ///     to the list overload, which is where the resolution and the error text live.
-    /// </summary>
-    internal static string RequireBuiltOutput(
-        string projectName, string? outputFilePath, string? intermediateAssemblyPath = null)
-    {
-        return RequireBuiltOutput(projectName, [outputFilePath], intermediateAssemblyPath);
+            Path.GetFileName(path.AsSpan()).Equals(CoreAssemblyFile, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -371,11 +411,7 @@ internal static class SpecResolver
     internal static string RequireBuiltOutput(
         string projectName, IReadOnlyList<string?> outputFilePaths, string? intermediateAssemblyPath = null)
     {
-        var evaluatedPaths = outputFilePaths
-            .Where(path => !string.IsNullOrEmpty(path))
-            .Select(path => path!)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToList();
+        var evaluatedPaths = NormalizeEvaluatedPaths(outputFilePaths);
 
         foreach (string outputFilePath in evaluatedPaths)
         {
@@ -399,14 +435,32 @@ internal static class SpecResolver
             ". Build the solution first (dotnet build).");
     }
 
-    // Compares a user-supplied --spec csproj path against a Roslyn project.FilePath. Both are
-    // canonicalized (symlinks resolved) so a solution opened through a symlinked root still matches, and
-    // compared per-OS (PathComparison) so the match neither misses across symlink spellings nor
-    // over-matches case-variant paths on a case-sensitive file system.
-    private static bool PathsEqual(string? a, string? b)
+    // The evaluated output paths in the one order the built-output search consumes them: blanks dropped,
+    // ordinal-sorted, and idempotent. One owner because MemberResolution records for the extraction cache
+    // exactly the set RequireBuiltOutput chose from — a hit replays the recorded set, so the two agreeing on
+    // that shape is what keeps the replayed choice identical to the cold one.
+    private static List<string> NormalizeEvaluatedPaths(IReadOnlyList<string?> outputFilePaths)
     {
-        if (a is null || b is null) return false;
-
-        return string.Equals(PathCanonicalizer.Resolve(a), PathCanonicalizer.Resolve(b), PathComparison.Comparison);
+        return outputFilePaths
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => path!)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
     }
+
+    /// <summary>
+    ///     One Roslyn project beside the canonicalized spelling of its <c>.csproj</c> — <see langword="null" />
+    ///     where the workspace reported no project file at all, which is its own answer to every path
+    ///     question and never a match.
+    /// </summary>
+    private sealed record CanonicalProject(Project Project, string? CanonicalFilePath);
+
+    /// <summary>
+    ///     The built-output inputs one project file yields, read together because one scan produces both:
+    ///     every framework's evaluated output path (nulls included, as the workspace carried them) and the
+    ///     single intermediate assembly path the search refuses an <c>obj</c>-side result under.
+    /// </summary>
+    private sealed record BuiltOutputInputs(
+        IReadOnlyList<string?> OutputFilePaths,
+        string? IntermediateAssemblyPath);
 }

@@ -12,11 +12,20 @@ internal static class SolutionExtensions
     ///     cleaned solution and counts of each removed.
     /// </summary>
     /// <remarks>
-    ///     Unresolved analyzer references crash Roslyn cross-project traversal APIs (SymbolFinder,
-    ///     Renamer) with a switch-expression failure; unresolved metadata references are stripped
-    ///     defensively for the same reason. This is a read-only transform — the returned
-    ///     <see cref="Solution" /> is carried forward, never applied back to the workspace, so csproj
-    ///     files on disk are left untouched.
+    ///     <para>
+    ///         Unresolved analyzer references crash Roslyn cross-project traversal APIs (SymbolFinder,
+    ///         Renamer) with a switch-expression failure; unresolved metadata references are stripped
+    ///         defensively for the same reason. This is a read-only transform — the returned
+    ///         <see cref="Solution" /> is carried forward, never applied back to the workspace, so csproj
+    ///         files on disk are left untouched.
+    ///     </para>
+    ///     <para>
+    ///         Each project's surviving references are set in one call rather than removed one at a time,
+    ///         because every removal forks the whole <see cref="Solution" /> and the case this transform
+    ///         exists for is the unrestored solution, where <em>every</em> reference is unresolved: one fork
+    ///         per project instead of one per reference. A project with nothing unresolved is not forked at
+    ///         all.
+    ///     </para>
     /// </remarks>
     public static (Solution Solution, int AnalyzerCount, int MetadataCount) StripUnresolvedReferences(this Solution solution)
     {
@@ -25,19 +34,25 @@ internal static class SolutionExtensions
 
         foreach (Project project in solution.Projects.ToList())
         {
-            foreach (AnalyzerReference analyzerRef in project.AnalyzerReferences)
-                if (analyzerRef is UnresolvedAnalyzerReference)
-                {
-                    solution = solution.RemoveAnalyzerReference(project.Id, analyzerRef);
-                    analyzerCount++;
-                }
+            var resolvedAnalyzers = project.AnalyzerReferences
+                .Where(analyzerRef => analyzerRef is not UnresolvedAnalyzerReference)
+                .ToList();
+            int unresolvedAnalyzers = project.AnalyzerReferences.Count - resolvedAnalyzers.Count;
+            if (unresolvedAnalyzers > 0)
+            {
+                solution = solution.WithProjectAnalyzerReferences(project.Id, resolvedAnalyzers);
+                analyzerCount += unresolvedAnalyzers;
+            }
 
-            foreach (MetadataReference metadataRef in project.MetadataReferences)
-                if (metadataRef is UnresolvedMetadataReference)
-                {
-                    solution = solution.RemoveMetadataReference(project.Id, metadataRef);
-                    metadataCount++;
-                }
+            var resolvedMetadata = project.MetadataReferences
+                .Where(metadataRef => metadataRef is not UnresolvedMetadataReference)
+                .ToList();
+            int unresolvedMetadata = project.MetadataReferences.Count - resolvedMetadata.Count;
+            if (unresolvedMetadata > 0)
+            {
+                solution = solution.WithProjectMetadataReferences(project.Id, resolvedMetadata);
+                metadataCount += unresolvedMetadata;
+            }
         }
 
         return (solution, analyzerCount, metadataCount);
@@ -82,6 +97,7 @@ internal static class SolutionExtensions
     public static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks)
         NormalizeProjectNames(this Solution solution)
     {
+        var resolvedDirectories = new Dictionary<string, string>(PathComparison.Comparer);
         var byProjectFile = new Dictionary<string, List<Project>>(StringComparer.Ordinal);
         foreach (Project project in solution.Projects)
         {
@@ -90,7 +106,7 @@ internal static class SolutionExtensions
             // per-project sentinel cannot collide with a real key.
             string key = string.IsNullOrEmpty(project.FilePath)
                 ? $"\0{project.Id.Id}"
-                : PathComparison.Fold(PathCanonicalizer.Resolve(project.FilePath));
+                : PathComparison.Fold(CanonicalProjectFile(project.FilePath, resolvedDirectories));
 
             if (!byProjectFile.TryGetValue(key, out var group)) byProjectFile[key] = group = [];
             group.Add(project);
@@ -117,6 +133,26 @@ internal static class SolutionExtensions
         }
 
         return (solution, targetFrameworks);
+    }
+
+    // Canonicalization probes every ancestor of a path for reparse points, and the projects of one solution
+    // share nearly all of theirs — so the walk is paid once per directory and reused, which is the difference
+    // between one probe chain and one per project on a large solution. The leaf file name has no ancestors of
+    // its own to resolve, so reattaching it to the resolved directory is the same answer. A path with no
+    // directory part cannot be memoized and keeps the whole-path resolve, which is also what makes it absolute.
+    private static string CanonicalProjectFile(string projectFilePath, Dictionary<string, string> resolvedDirectories)
+    {
+        string? directory = Path.GetDirectoryName(projectFilePath);
+        if (string.IsNullOrEmpty(directory)) return PathCanonicalizer.Resolve(projectFilePath);
+
+        if (!resolvedDirectories.TryGetValue(directory, out string? resolvedDirectory))
+        {
+            resolvedDirectory = PathCanonicalizer.Resolve(directory);
+            resolvedDirectories[directory] = resolvedDirectory;
+        }
+
+        string fileName = Path.GetFileName(projectFilePath);
+        return Path.Combine(resolvedDirectory, fileName);
     }
 
     // The MSBuild arm. MSBuildProjectLoader spells a discriminated project exactly

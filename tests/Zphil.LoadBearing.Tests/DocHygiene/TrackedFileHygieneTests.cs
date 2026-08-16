@@ -159,7 +159,7 @@ public sealed class TrackedFileHygieneTests
     {
         return paths
             .AsParallel()
-            .Select(path => (Path: path, Text: prepare(File.ReadAllText(RepoRoot.Absolute(path)))))
+            .Select(path => (Path: path, Text: prepare(RepoRoot.ReadText(path))))
             .OrderBy(static entry => entry.Path, StringComparer.Ordinal)
             .ToArray();
     }

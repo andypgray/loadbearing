@@ -128,9 +128,17 @@ internal static class FragmentMerger
             foreach (FragmentExternal external in fragment.Externals)
                 RecordExternal(external);
 
-            // Hierarchy from the winning fragment only; every reference rewired to a merged node.
+            // Hierarchy from the winning fragment only; every reference rewired to a merged node. Declared
+            // members (GRAMMAR §4.6) are winner-only in the same way — the winning fragment's inventory
+            // becomes the node's MemberNode list — so they are taken in the same pass: the inventory is a
+            // function of the fragment and the node alone, and nothing between here and the model reads or
+            // writes it. Externals keep their empty default; the member axis is solution-declared-only.
             foreach ((string fqn, FragmentType declared) in _hierarchy)
-                PopulateHierarchy(_nodes[fqn], declared);
+            {
+                TypeNode node = _nodes[fqn];
+                PopulateHierarchy(node, declared);
+                PopulateMembers(node, declared);
+            }
 
             // Edge site-sets union per (src, tgt).
             foreach (CodebaseFragment fragment in fragments)
@@ -142,12 +150,6 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
                 MergeMemberEdge(memberEdge);
-
-            // Declared members (GRAMMAR §4.6) are winner-only like the hierarchy: the winning fragment's
-            // inventory becomes the node's MemberNode list, each member's DeclaringType the same merged node.
-            // Externals keep their empty default — the member axis is solution-declared-only.
-            foreach ((string fqn, FragmentType declared) in _hierarchy)
-                PopulateMembers(_nodes[fqn], declared);
 
             // Construction edges (GRAMMAR §4.5) key on (src, constructed).
             foreach (CodebaseFragment fragment in fragments)
@@ -412,10 +414,8 @@ internal static class FragmentMerger
             foreach ((string fqn, var sites) in _declarationSites)
             {
                 TypeNode node = _nodes[fqn];
-                node.DeclarationSites = ToLocations(sites);
-                // The sites set is already (file, line) ordinal-ordered, so Distinct preserves
-                // first-occurrence file order (the GRAMMAR §5.6 FilePaths contract).
-                node.FilePaths = sites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList();
+                node.DeclarationSites = FragmentSiteSets.Locations(sites);
+                node.FilePaths = FragmentSiteSets.FilePaths(sites);
             }
 
             var types = _nodes.Values
@@ -423,37 +423,35 @@ internal static class FragmentMerger
                 .ToList();
 
             var edges = FragmentSiteSets.OrderedPairs(
-                _edgeSites, (src, tgt, sites) => new ReferenceEdge(_nodes[src], _nodes[tgt], ToLocations(sites)));
+                _edgeSites, (src, tgt, sites) => new ReferenceEdge(_nodes[src], _nodes[tgt], FragmentSiteSets.Locations(sites)));
 
             var memberEdges = BuildMemberEdges();
 
             var constructorEdges = FragmentSiteSets.OrderedPairs(
-                _constructorEdgeSites, (src, ctor, sites) => new ConstructorEdge(_nodes[src], _nodes[ctor], ToLocations(sites)));
+                _constructorEdgeSites, (src, ctor, sites) => new ConstructorEdge(_nodes[src], _nodes[ctor], FragmentSiteSets.Locations(sites)));
 
             var injectionEdges = FragmentSiteSets.OrderedPairs(
-                _injectionEdgeSites, (src, injected, sites) => new InjectionEdge(_nodes[src], _nodes[injected], ToLocations(sites)));
+                _injectionEdgeSites, (src, injected, sites) => new InjectionEdge(_nodes[src], _nodes[injected], FragmentSiteSets.Locations(sites)));
 
             // All three site lists come out of SortedSets, so each is (file, line) ordered and each is a subset
             // of the one before it; an edge with no unfiltered (or no swallowing) site materializes the empty list.
             var catchEdges = FragmentSiteSets.OrderedPairs(
                 _catchEdgeSites,
                 (src, caught, sites) => new CatchEdge(
-                    _nodes[src], _nodes[caught], ToLocations(sites),
-                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? ToLocations(unfiltered) : [],
-                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? ToLocations(swallowing) : []));
+                    _nodes[src], _nodes[caught], FragmentSiteSets.Locations(sites),
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out var unfiltered) ? FragmentSiteSets.Locations(unfiltered) : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out var swallowing) ? FragmentSiteSets.Locations(swallowing) : []));
 
             var throwEdges = FragmentSiteSets.OrderedPairs(
-                _throwEdgeSites, (src, thrown, sites) => new ThrowEdge(_nodes[src], _nodes[thrown], ToLocations(sites)));
+                _throwEdgeSites, (src, thrown, sites) => new ThrowEdge(_nodes[src], _nodes[thrown], FragmentSiteSets.Locations(sites)));
 
             var exposureEdges = FragmentSiteSets.OrderedPairs(
-                _exposureEdgeSites, (src, exposed, sites) => new ExposureEdge(_nodes[src], _nodes[exposed], ToLocations(sites)));
+                _exposureEdgeSites, (src, exposed, sites) => new ExposureEdge(_nodes[src], _nodes[exposed], FragmentSiteSets.Locations(sites)));
 
-            var serviceRegistrations = _registrationSites
-                .OrderBy(kv => kv.Key.Lifetime)
-                .ThenBy(kv => kv.Key.Service, StringComparer.Ordinal)
-                .ThenBy(kv => kv.Key.Impl ?? "", StringComparer.Ordinal)
-                .Select(kv => new ServiceRegistration(kv.Key.Lifetime, kv.Key.Service, kv.Key.Impl, ToLocations(kv.Value)))
-                .ToList();
+            var serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
+                _registrationSites,
+                (lifetime, service, impl, sites) => new ServiceRegistration(
+                    lifetime, service, impl, FragmentSiteSets.Locations(sites)));
 
             // The advisory notes: project-level first (ordinal by project), then per-type (ordinal by FQN) —
             // coarse fact before fine, and each half sorted on the key it groups by, so the list is stable
@@ -492,7 +490,7 @@ internal static class FragmentMerger
 
             return FragmentSiteSets.OrderedPairs(
                 _memberEdgeSites,
-                (src, symbolId, sites) => new MemberEdge(_nodes[src], MemberReferenceFor(symbolId), ToLocations(sites)));
+                (src, symbolId, sites) => new MemberEdge(_nodes[src], MemberReferenceFor(symbolId), FragmentSiteSets.Locations(sites)));
         }
 
         private static List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
@@ -530,11 +528,6 @@ internal static class FragmentMerger
             if (right is null) return left;
 
             return left.Value || right.Value;
-        }
-
-        private static IReadOnlyList<SourceLocation> ToLocations(SortedSet<FragmentSite> sites)
-        {
-            return sites.Select(s => new SourceLocation(s.File, s.Line)).ToList();
         }
 
         /// <summary>

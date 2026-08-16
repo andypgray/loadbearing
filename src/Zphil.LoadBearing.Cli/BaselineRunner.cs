@@ -59,25 +59,17 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         // Fail closed before extraction, and so before any mode writes a byte: the workspace's own load
         // failures are the whole gate input here (merge notes are minted later, inside extraction), filtered
         // for NuGetAudit advisories exactly as check filters them.
-        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
-        {
-            foreach (string line in IncompleteModelGate.BaselineMessage(diagnostics).Split('\n'))
-                error.WriteLine(line);
+        if (IncompleteModelNotices.Refused(
+                error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.BaselineMessage))
             return 2;
-        }
 
         // Then the narrowing refusal, on the gate's own terms and in the same position — before extraction,
         // so nothing is written. Both modes below read absence as evidence: --init captures "zero debt" for
         // rules whose subjects the filter left out, and --accept-reductions deletes real entries as
         // violations that stopped occurring. --add rides through: it records what the run did see.
-        if ((request.Init || request.AcceptReductions) && diagnostics.UncheckedProjects.Count > 0)
+        if ((request.Init || request.AcceptReductions) && diagnostics.IsNarrowed)
         {
-            var uncheckedProjects = NarrowedUniverseNotice.Relative(
-                diagnostics.UncheckedProjects, source.SolutionDirectory);
-            string refusal = NarrowedUniverseNotice.BaselineRefusal(
-                Path.GetFileName(source.SolutionPath), uncheckedProjects);
-            foreach (string line in refusal.Split('\n'))
-                error.WriteLine(line);
+            NarrowingNotices.Refusal(error, source, NarrowedUniverseNotice.BaselineRefusal);
             return 2;
         }
 
@@ -100,7 +92,12 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
             return 0;
         }
 
-        foreach (FileGroup group in GroupByFile(ratchetResults, source.SolutionDirectory))
+        // Ordinal grouping in first-appearance order, so two rules sharing a baseline file are read, spliced
+        // and written once between them.
+        var fileGroups = ratchetResults
+            .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, source.SolutionDirectory), StringComparer.Ordinal);
+
+        foreach (var group in fileGroups)
             ApplyFile(request, group, source.SolutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
@@ -151,8 +148,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
             throw new UserErrorException(
                 $"rule '{ruleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
-        (_, bool baselinable) = CurrentEntries(result);
-        if (!baselinable)
+        if (CurrentEntries(result) is null)
             throw new UserErrorException(
                 $"cannot add to rule '{ruleId}' — the rule has an empty subject or an evaluation error.");
 
@@ -191,46 +187,45 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         return 0;
     }
 
-    private void ApplyFile(BaselineRequest request, FileGroup group, string solutionDirectory)
+    private void ApplyFile(BaselineRequest request, IGrouping<string, RuleResult> group, string solutionDirectory)
     {
         // Read + verify once (tamper throws here — --init cannot distinguish tamper from corruption).
-        BaselineDocument? existing = BaselineStore.TryReadDocument(group.Path);
+        BaselineDocument? existing = BaselineStore.TryReadDocument(group.Key);
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
         if (existing is not null)
             foreach (var section in existing.Sections)
                 sections[section.Key] = section.Value; // sections for rules not in this run (e.g. a removed rule) ride through untouched
 
-        foreach (RuleResult result in group.Rules) ApplyRule(request, result, sections);
+        foreach (RuleResult result in group) ApplyRule(request, result, sections);
 
-        WriteOutcome outcome = BaselineStore.Write(group.Path, new BaselineDocument(sections));
-        output.WriteLine(WriteReport.Line(outcome, solutionDirectory, group.Path));
+        WriteOutcome outcome = BaselineStore.Write(group.Key, new BaselineDocument(sections));
+        output.WriteLine(WriteReport.Line(outcome, solutionDirectory, group.Key));
     }
 
     private void ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         string ruleId = result.Rule.Id;
-        (var current, bool baselinable) = CurrentEntries(result);
-        if (!baselinable)
+        if (CurrentEntries(result) is not { } current)
         {
             output.WriteLine($"{ruleId}: cannot capture — the rule has an empty subject or an evaluation error; skipped.");
             return;
         }
 
-        bool captured = sections.TryGetValue(ruleId, out var existingEntries);
+        sections.TryGetValue(ruleId, out var existingEntries);
         if (request.Init)
-            InitRule(ruleId, current, captured, existingEntries, sections);
+            InitRule(ruleId, current, existingEntries, sections);
         else
-            AcceptReductions(ruleId, current, captured, existingEntries, sections);
+            AcceptReductions(ruleId, current, existingEntries, sections);
     }
 
     // --init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.
     private void InitRule(
-        string ruleId, IReadOnlyList<BaselineEntry> current, bool captured,
+        string ruleId, IReadOnlyList<BaselineEntry> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
-        if (captured)
+        if (existingEntries is { } captured)
         {
-            output.WriteLine($"{ruleId}: already captured ({existingEntries!.Count} entries) — unchanged.");
+            output.WriteLine($"{ruleId}: already captured ({captured.Count} entries) — unchanged.");
             return;
         }
 
@@ -242,19 +237,19 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
     // no longer occurs is the whole point of the mode — which is why the incomplete-model gate fires long
     // before this runs, since a project that stopped loading looks exactly like a violation that stopped.
     private void AcceptReductions(
-        string ruleId, IReadOnlyList<BaselineEntry> current, bool captured,
+        string ruleId, IReadOnlyList<BaselineEntry> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
-        if (!captured)
+        if (existingEntries is not { } captured)
         {
             output.WriteLine($"{ruleId}: no baseline section — run 'loadbearing baseline --init' first.");
             return;
         }
 
         var currentSet = new HashSet<BaselineEntry>(current);
-        var existingSet = new HashSet<BaselineEntry>(existingEntries!);
-        var kept = existingEntries!.Where(currentSet.Contains).ToList();
-        int removed = existingEntries!.Count - kept.Count;
+        var existingSet = new HashSet<BaselineEntry>(captured);
+        var kept = captured.Where(currentSet.Contains).ToList();
+        int removed = captured.Count - kept.Count;
         int additions = current.Count(entry => !existingSet.Contains(entry));
 
         sections[ruleId] = kept;
@@ -266,43 +261,18 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
                 $"{ruleId}: refused {additions} {Plurals.Noun(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
     }
 
-    // A ratcheted rule's current baseline entries (from an empty-baseline check). Any EmptySubject/RuleError
-    // violation makes the whole rule unbaselinable (its identity is not stable).
-    private static (IReadOnlyList<BaselineEntry> Entries, bool Baselinable) CurrentEntries(RuleResult result)
+    // A ratcheted rule's current baseline entries (from an empty-baseline check), or null when the rule is
+    // unbaselinable: any EmptySubject/RuleError violation makes the whole rule so (its identity is not stable).
+    private static IReadOnlyList<BaselineEntry>? CurrentEntries(RuleResult result)
     {
         var entries = new List<BaselineEntry>();
         foreach (Violation violation in result.Violations)
         {
             BaselineEntry? entry = violation.BaselineIdentity();
-            if (entry is null) return (Array.Empty<BaselineEntry>(), false);
+            if (entry is null) return null;
             entries.Add(entry);
         }
 
-        return (entries, true);
-    }
-
-    private static IEnumerable<FileGroup> GroupByFile(IReadOnlyList<RuleResult> ratchetResults, string solutionDirectory)
-    {
-        var groups = new List<FileGroup>();
-        foreach (RuleResult result in ratchetResults)
-        {
-            string absolutePath = BaselineStore.ResolvePath(result.Rule.BaselinePath!, solutionDirectory);
-            FileGroup? group = groups.FirstOrDefault(g => string.Equals(g.Path, absolutePath, StringComparison.Ordinal));
-            if (group is null)
-            {
-                group = new FileGroup(absolutePath);
-                groups.Add(group);
-            }
-
-            group.Rules.Add(result);
-        }
-
-        return groups;
-    }
-
-    private sealed class FileGroup(string path)
-    {
-        public string Path { get; } = path;
-        public List<RuleResult> Rules { get; } = [];
+        return entries;
     }
 }

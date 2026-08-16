@@ -96,7 +96,7 @@ public sealed class WrittenPathSyncTests
         List<string> unregistered = new();
 
         // Act
-        foreach (string path in TrackedFiles.All.Where(static path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)))
+        foreach (string path in TrackedFiles.Markdown)
         {
             if (registered.Contains(path)) continue;
 
@@ -112,7 +112,7 @@ public sealed class WrittenPathSyncTests
 
     private static IReadOnlyList<WrittenPath> ExtractDoc(string doc)
     {
-        string text = File.ReadAllText(RepoRoot.Absolute(doc));
+        string text = RepoRoot.ReadText(doc);
         return WrittenPaths.Extract(doc, text);
     }
 }

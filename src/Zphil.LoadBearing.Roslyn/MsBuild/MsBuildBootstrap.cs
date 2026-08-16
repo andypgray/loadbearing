@@ -40,6 +40,12 @@ public static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
 
+    // The layout every Visual Studio install puts MSBuild under, as the two sentences that quote it spell it:
+    // Windows separators, because it is prose about a VS install root. The probe itself lives in
+    // TryRegisterFromVsRoot, and a reader sent to a directory the code never probed is the drift this exists
+    // to stop.
+    private const string MsBuildBinLayout = @"MSBuild\Current\Bin";
+
     // The tail an instance taken outside the preferred VS 16/17 set carries in its description. The
     // preferred arm needs no counterpart: an ordinary pick is the unremarkable case, and a note on every
     // line would stop the exceptional one from reading as exceptional.
@@ -68,7 +74,7 @@ public static class MsBuildBootstrap
     {
         string selection = LastSelection ?? "not registered by this process";
         return $"MSBuild for this run: {selection}. Set {LoadBearingEnvVars.VsInstallPath} to a Visual Studio "
-               + "install root (the parent of MSBuild\\Current\\Bin) to select a different MSBuild.";
+               + $"install root (the parent of {MsBuildBinLayout}) to select a different MSBuild.";
     }
 
     /// <summary>
@@ -177,23 +183,19 @@ public static class MsBuildBootstrap
                 "Set it to the VS install root (e.g. " +
                 "'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community').");
 
-        string msBuildBin = Path.Combine(vsRoot, "MSBuild", "Current", "Bin");
-        string msBuildExe = Path.Combine(msBuildBin, "MSBuild.exe");
-        if (!File.Exists(msBuildExe))
+        (string msBuildBin, string msBuildExe, bool registered) = TryRegisterFromVsRoot(vsRoot);
+        if (!registered)
             throw new InvalidOperationException(
                 $"{LoadBearingEnvVars.VsInstallPath}='{overridePath}': MSBuild.exe not found at '{msBuildExe}'. " +
-                "Set the env var to the VS install root (the parent of 'MSBuild\\Current\\Bin').");
-
-        ApplyDevConsoleEnv(vsRoot);
-        MSBuildLocator.RegisterMSBuildPath(msBuildBin);
+                $"Set the env var to the VS install root (the parent of '{MsBuildBinLayout}').");
 
         return new MsBuildSelection(msBuildBin, null, $"{LoadBearingEnvVars.VsInstallPath} override ('{vsRoot}')");
     }
 
     private static MsBuildSelection RegisterFromVsInstance(VsInstance instance)
     {
-        string msBuildBin = Path.Combine(instance.InstallationPath, "MSBuild", "Current", "Bin");
-        if (!File.Exists(Path.Combine(msBuildBin, "MSBuild.exe")))
+        (string msBuildBin, _, bool registered) = TryRegisterFromVsRoot(instance.InstallationPath);
+        if (!registered)
         {
             // VS install missing MSBuild — extremely unusual but degrade gracefully.
             MSBuildLocator.RegisterDefaults();
@@ -201,10 +203,24 @@ public static class MsBuildBootstrap
                 null, null, $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild at '{msBuildBin}')");
         }
 
-        ApplyDevConsoleEnv(instance.InstallationPath);
+        return new MsBuildSelection(msBuildBin, instance.Version.ToString(), DescribeSelection(instance));
+    }
+
+    // The registration sequence both arms run: find the bin directory under the VS root, prove MSBuild.exe is
+    // in it, and only then point this process and the BuildHost subprocess at it. A missed probe registers
+    // nothing and hands both probed paths back, because that is the whole of what the two arms disagree
+    // about — an operator who named this root has to be told it was wrong, while a VS install we picked
+    // ourselves degrades to MSBuildLocator's defaults rather than failing a run over it.
+    private static (string MsBuildBin, string MsBuildExe, bool Registered) TryRegisterFromVsRoot(string vsRoot)
+    {
+        string msBuildBin = Path.Combine(vsRoot, "MSBuild", "Current", "Bin");
+        string msBuildExe = Path.Combine(msBuildBin, "MSBuild.exe");
+        if (!File.Exists(msBuildExe)) return (msBuildBin, msBuildExe, false);
+
+        ApplyDevConsoleEnv(vsRoot);
         MSBuildLocator.RegisterMSBuildPath(msBuildBin);
 
-        return new MsBuildSelection(msBuildBin, instance.Version.ToString(), DescribeSelection(instance));
+        return (msBuildBin, msBuildExe, true);
     }
 
     /// <summary>

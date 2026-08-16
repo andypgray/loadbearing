@@ -35,11 +35,6 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </remarks>
 internal static class AccessibilityMapper
 {
-    public static CoreAccessibility Map(INamedTypeSymbol symbol)
-    {
-        return Map((ISymbol)symbol);
-    }
-
     /// <summary>
     ///     The member overload (GRAMMAR §4.6): the same six-way declared-accessibility mapping over any
     ///     inventoried member symbol — private included (a member-only accessibility, §5.7). Throws on

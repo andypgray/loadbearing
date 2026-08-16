@@ -20,6 +20,36 @@ internal static class GitCommand
     /// </summary>
     internal static void Run(string workingDirectory, params string[] args)
     {
+        Execute(workingDirectory, args);
+    }
+
+    /// <summary>
+    ///     The same, returning git's standard output — line-oriented and LF-normalized, as
+    ///     <see cref="ChildProcess.Run" /> captures it.
+    /// </summary>
+    internal static string Output(string workingDirectory, params string[] args)
+    {
+        return Execute(workingDirectory, args)
+            .StandardOutput;
+    }
+
+    /// <summary>
+    ///     <c>git init</c> in <paramref name="directory" /> plus the local identity a commit there needs, so
+    ///     a commit succeeds whatever the host's global git config says — or does not say.
+    /// </summary>
+    /// <remarks>
+    ///     Signing stays a per-commit <c>-c commit.gpgsign=false</c> at the callers rather than a repository
+    ///     setting here: it is a property of the commit being made, and the callers do not all make one.
+    /// </remarks>
+    internal static void InitRepository(string directory)
+    {
+        Run(directory, "init");
+        Run(directory, "config", "user.email", "loadbearing-test@example.invalid");
+        Run(directory, "config", "user.name", "LoadBearing Test");
+    }
+
+    private static ChildProcess.ProcessResult Execute(string workingDirectory, string[] args)
+    {
         var startInfo = new ProcessStartInfo("git")
         {
             WorkingDirectory = workingDirectory,
@@ -34,5 +64,7 @@ internal static class GitCommand
             throw new InvalidOperationException(
                 $"'git {string.Join(" ", args)}' failed with exit code {result.ExitCode}."
                 + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
+
+        return result;
     }
 }

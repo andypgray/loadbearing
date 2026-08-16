@@ -42,6 +42,18 @@ internal static class RepoRoot
         return Path.Combine([Directory, .. repoRelativePath.Split('/')]);
     }
 
+    /// <summary>The whole text of a committed file, named by its forward-slash repo-relative path.</summary>
+    public static string ReadText(string repoRelativePath)
+    {
+        return File.ReadAllText(Absolute(repoRelativePath));
+    }
+
+    /// <summary>The lines of a committed file, named by its forward-slash repo-relative path.</summary>
+    public static string[] ReadLines(string repoRelativePath)
+    {
+        return File.ReadAllLines(Absolute(repoRelativePath));
+    }
+
     /// <summary>The forward-slash repo-relative path for an absolute one — how the repo spells its own files.</summary>
     public static string Relative(string absolutePath)
     {

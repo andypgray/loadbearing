@@ -47,7 +47,7 @@ internal enum CodebaseSourceOutcome
 ///         answer. On a hit the spec is replayed without a workspace: an explicit DLL through
 ///         <see cref="SpecResolver.TryResolveWithoutSolution" />, a convention/csproj spec through the
 ///         recorded resolution re-run over
-///         <see cref="SpecResolver.RequireBuiltOutput(string,IReadOnlyList{string},string)" /> (so the bounded
+///         <see cref="SpecResolver.RequireBuiltOutput" /> (so the bounded
 ///         search from the output root, what that search refuses, and its error text all match a cold run); a
 ///         spec with no matching record falls back to the cold path.
 ///     </para>
@@ -83,15 +83,12 @@ internal sealed class CodebaseSource : IDisposable
     // fragments and never extracts, and the point of a hit is that it touches nothing it does not have to.
     private readonly Lazy<IReadOnlySet<string>?> declaredMembers;
 
-    private readonly IReadOnlyList<string> failedProjects;
     private readonly SolutionHandle? handle;
-    private readonly IReadOnlyList<string> loadFailures;
+    private readonly WorkspaceDiagnostics loadDiagnostics;
     private readonly ArchitectureModel? model;
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
-    private readonly IReadOnlyList<string> restoreFailedProjects;
     private readonly ExtractionCacheStore? store;
-    private readonly IReadOnlyList<string> uncheckedProjects;
 
     // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
     // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
@@ -100,28 +97,31 @@ internal sealed class CodebaseSource : IDisposable
 
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
+    /// <param name="declaredMembers">
+    ///     The membership reader to adopt, or null to mint an unforced one. The cold spec path passes its own,
+    ///     already forced: resolution had to read the membership to pick the spec project, and extraction
+    ///     needs the same set to label every project it collects, so sharing the one Lazy is what makes that
+    ///     a single read. Every other path leaves it null and keeps the lazy behaviour a hit depends on.
+    /// </param>
     private CodebaseSource(
         CodebaseSourceOutcome outcome,
         string solutionPath,
-        IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<string> restoreFailedProjects,
+        WorkspaceDiagnostics loadDiagnostics,
         ArchitectureModel? model,
         SpecResolution? resolution,
         SolutionHandle? handle,
         ExtractionCacheStore? store,
         CacheReadResult cacheRead,
-        string normalizedSpecArgument)
+        string normalizedSpecArgument,
+        Lazy<IReadOnlySet<string>?>? declaredMembers = null)
     {
         Outcome = outcome;
         SolutionPath = solutionPath;
+        SolutionName = Path.GetFileName(solutionPath);
         SolutionDirectory = SolutionProjectFileParser.AnchorDirectory(solutionPath);
-        declaredMembers = new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
-        loadFailures = diagnostics;
-        this.failedProjects = failedProjects;
-        this.uncheckedProjects = uncheckedProjects;
-        this.restoreFailedProjects = restoreFailedProjects;
+        this.declaredMembers = declaredMembers
+                               ?? new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
+        this.loadDiagnostics = loadDiagnostics;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -148,13 +148,23 @@ internal sealed class CodebaseSource : IDisposable
     ///     produced (empty before it runs). Read per call rather than captured, so a verb that renders after
     ///     extracting sees the notes and one that gates before it does not have to wait for them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics =>
-        new(loadFailures, mergeNotes, failedProjects, uncheckedProjects, restoreFailedProjects);
+    public WorkspaceDiagnostics Diagnostics => loadDiagnostics with { MergeNotes = mergeNotes };
 
     /// <summary>
     ///     Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.
     /// </summary>
     public string SolutionPath { get; }
+
+    /// <summary>
+    ///     The solution's file name — what every document names the run's subject by, and what a narrowing
+    ///     notice names the filter by. Machine-independent, which is why no document carries
+    ///     <see cref="SolutionPath" /> itself. Under a <c>.slnf</c> this is the filter's own name, unlike
+    ///     <see cref="SolutionDirectory" />: the filter is what the run was pointed at, and naming it is how a
+    ///     reader learns the answer covers a lens rather than the whole solution.
+    /// </summary>
+    // Assigned once in the ctor beside SolutionDirectory, for the same reason: every rendering verb reads it,
+    // and two of them read it twice.
+    public string SolutionName { get; }
 
     /// <summary>
     ///     The solution directory — baselines, render targets, diff resolution, <c>context --path</c> and every
@@ -184,7 +194,7 @@ internal sealed class CodebaseSource : IDisposable
     ///     and the spec resolved against it. Discovery, spec-resolution, and spec-load failures surface
     ///     exactly as a cold run raises them.
     /// </summary>
-    public static async Task<CodebaseSource> CreateWithSpecAsync(
+    public static Task<CodebaseSource> CreateWithSpecAsync(
         ISolutionSource source,
         IEnvironment environment,
         string? solution,
@@ -194,29 +204,8 @@ internal sealed class CodebaseSource : IDisposable
         CancellationToken ct)
     {
         string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
-        string normalized = NormalizeSpecArgument(spec);
         ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
-
-        if (store is null)
-            return await CreateColdWithSpecAsync(
-                source, solutionPath, spec, normalized, null, CacheReadResult.Miss(),
-                CodebaseSourceOutcome.Disabled, ct);
-
-        CacheReadResult read = store.ReadAndValidate(ct);
-        if (read.Outcome == CacheOutcome.Hit
-            && ResolveSpecOnHit(spec, read.SpecResolutions) is { } hitResolution)
-        {
-            ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
-            return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
-                read.UncheckedProjects, read.RestoreFailedProjects, hitModel, hitResolution, null, store, read,
-                normalized);
-        }
-
-        // A miss, a partial, or a hit whose spec was not recorded: acquire the workspace and resolve cold.
-        CodebaseSourceOutcome coldOutcome =
-            read.Outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
-        return await CreateColdWithSpecAsync(source, solutionPath, spec, normalized, store, read, coldOutcome, ct);
+        return CreateWithSpecCoreAsync(source, solutionPath, spec, store, ct);
     }
 
     /// <summary>
@@ -236,9 +225,36 @@ internal sealed class CodebaseSource : IDisposable
     public static Task<CodebaseSource> CreateWithSpecAsync(
         ISolutionSource source, string? solution, string? spec, string workingDirectory, CancellationToken ct)
     {
-        // The environment seam only ever locates the cache root, and this path has no cache to locate.
-        return CreateWithSpecAsync(
-            source, new SystemEnvironment(), solution, spec, workingDirectory, true, ct);
+        string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
+        return CreateWithSpecCoreAsync(source, solutionPath, spec, store: null, ct);
+    }
+
+    // The shared tail of both spec-ful entry points, from the point the cache store — the one thing they
+    // decide differently — is settled. A null store is a Disabled run: nothing read from cache.json and
+    // nothing written to it, which is what --no-cache and the four cache-free verbs both mean.
+    private static async Task<CodebaseSource> CreateWithSpecCoreAsync(
+        ISolutionSource source, string solutionPath, string? spec, ExtractionCacheStore? store, CancellationToken ct)
+    {
+        string normalized = NormalizeSpecArgument(spec);
+
+        if (store is null)
+            return await CreateColdWithSpecAsync(
+                source, solutionPath, spec, normalized, null, CacheReadResult.Miss(),
+                CodebaseSourceOutcome.Disabled, ct);
+
+        CacheReadResult read = store.ReadAndValidate(ct);
+        if (read.Outcome == CacheOutcome.Hit
+            && ResolveSpecOnHit(spec, read.SpecResolutions) is { } hitResolution)
+        {
+            ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
+            return new CodebaseSource(
+                CodebaseSourceOutcome.Hit, solutionPath, read.LoadDiagnostics, hitModel, hitResolution, null,
+                store, read, normalized);
+        }
+
+        // A miss, a partial, or a hit whose spec was not recorded: acquire the workspace and resolve cold.
+        CodebaseSourceOutcome coldOutcome = ColdOutcomeFor(read.Outcome);
+        return await CreateColdWithSpecAsync(source, solutionPath, spec, normalized, store, read, coldOutcome, ct);
     }
 
     /// <summary>
@@ -263,11 +279,9 @@ internal sealed class CodebaseSource : IDisposable
         CacheReadResult read = store.ReadAndValidate(ct);
         if (read.Outcome == CacheOutcome.Hit)
             return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects,
-                read.UncheckedProjects, read.RestoreFailedProjects, null, null, null, store, read, "");
+                CodebaseSourceOutcome.Hit, solutionPath, read.LoadDiagnostics, null, null, null, store, read, "");
 
-        CodebaseSourceOutcome coldOutcome =
-            read.Outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
+        CodebaseSourceOutcome coldOutcome = ColdOutcomeFor(read.Outcome);
         return await CreateColdSpeclessAsync(source, solutionPath, store, read, coldOutcome, ct);
     }
 
@@ -322,7 +336,7 @@ internal sealed class CodebaseSource : IDisposable
         CodebaseModel merged = FragmentMerger.Merge(FragmentMerger.Retain(allFragments, excludeProjectNames));
 
         if (fingerprint is not null)
-            TryWrite(solution, fingerprint, allFragments, ct);
+            TryWrite(fingerprint, allFragments, ct);
 
         return merged;
     }
@@ -358,20 +372,20 @@ internal sealed class CodebaseSource : IDisposable
         ISolutionSource source, string solutionPath, string? spec, string normalizedSpec,
         ExtractionCacheStore? store, CacheReadResult cacheRead, CodebaseSourceOutcome outcome, CancellationToken ct)
     {
-        SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
+        SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
         try
         {
-            // Merge notes are empty by construction here: extraction has not run, and only extraction
-            // produces them. What spec resolution needs from this value is the load's own verdict.
-            var diagnostics = new WorkspaceDiagnostics(
-                handle.Diagnostics, [], handle.FailedProjects, handle.UncheckedProjects,
-                handle.RestoreFailedProjects);
-            SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec, diagnostics);
+            // One read of the declared membership for the whole source: resolution filters its candidates by
+            // it and subtracts the same set for the exclusion, and the extraction that follows labels every
+            // project it collects with it. The Lazy itself travels into the source — already forced — so what
+            // resolution read here is what extraction gets.
+            var declaredMembers = new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
+            SpecResolution resolution = SpecResolver.Resolve(
+                handle.Solution, declaredMembers.Value, spec, handle.LoadDiagnostics);
             ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
-                outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
-                handle.RestoreFailedProjects, model, resolution, handle,
-                store, cacheRead, normalizedSpec);
+                outcome, solutionPath, handle.LoadDiagnostics, model, resolution, handle, store, cacheRead,
+                normalizedSpec, declaredMembers);
         }
         catch
         {
@@ -384,18 +398,9 @@ internal sealed class CodebaseSource : IDisposable
         ISolutionSource source, string solutionPath, ExtractionCacheStore? store, CacheReadResult cacheRead,
         CodebaseSourceOutcome outcome, CancellationToken ct)
     {
-        SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
+        SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
         return new CodebaseSource(
-            outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, handle.UncheckedProjects,
-            handle.RestoreFailedProjects, null, null, handle, store,
-            cacheRead, "");
-    }
-
-    // The solution is already discovered, so hand the acquired path straight to the source: discovery over an
-    // explicit file is idempotent, and a warm source still reconciles the snapshot for it.
-    private static Task<SolutionHandle> AcquireAsync(ISolutionSource source, string solutionPath, CancellationToken ct)
-    {
-        return source.AcquireAsync(solutionPath, Path.GetDirectoryName(solutionPath)!, ct);
+            outcome, solutionPath, handle.LoadDiagnostics, null, null, handle, store, cacheRead, "");
     }
 
     // ── spec replay on a hit ──────────────────────────────────────────────────────────────────────────────
@@ -422,7 +427,9 @@ internal sealed class CodebaseSource : IDisposable
 
         string dll = SpecResolver.RequireBuiltOutput(
             record.SpecProjectName ?? normalized, record.OutputFilePaths, record.IntermediateAssemblyPath);
-        return new SpecResolution(dll, record.SpecProjectName, record.ExcludeProjectNames);
+        return new SpecResolution(
+            dll, record.SpecProjectName, record.ExcludeProjectNames, record.OutputFilePaths,
+            record.IntermediateAssemblyPath);
     }
 
     // ── cache write ───────────────────────────────────────────────────────────────────────────────────────
@@ -440,16 +447,12 @@ internal sealed class CodebaseSource : IDisposable
         }
     }
 
-    private void TryWrite(Solution solution, CacheFingerprint fingerprint, IReadOnlyList<CodebaseFragment> allFragments, CancellationToken ct)
+    private void TryWrite(CacheFingerprint fingerprint, IReadOnlyList<CodebaseFragment> allFragments, CancellationToken ct)
     {
         try
         {
-            var records = BuildWriteSpecRecords(solution);
-            store!.Write(
-                fingerprint,
-                new ExtractionResult(
-                    allFragments, records, loadFailures, failedProjects, uncheckedProjects,
-                    restoreFailedProjects), ct);
+            var records = BuildWriteSpecRecords();
+            store!.Write(fingerprint, new ExtractionResult(allFragments, records, loadDiagnostics), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -462,38 +465,21 @@ internal sealed class CodebaseSource : IDisposable
     // project) is recorded, since that is the resolution a hit cannot replay without one; an explicit DLL
     // resolves on a hit with no record, and graph has no spec at all. The whole excluded set rides along:
     // the hit path has no workspace to re-walk the spec project's ProjectReference closure with.
-    private IReadOnlyList<SpecResolutionRecord> BuildWriteSpecRecords(Solution solution)
+    private IReadOnlyList<SpecResolutionRecord> BuildWriteSpecRecords()
     {
         var existing = cacheRead.SpecResolutions;
         if (resolution?.SpecProjectName is not { } specProjectName) return existing;
 
-        // One lookup, both facts: a multi-target-framework spec project is several Roslyn projects under one
-        // name, and each carries its own evaluated output and its own intermediate assembly.
-        var specProjects = solution.Projects
-            .Where(p => string.Equals(p.Name, specProjectName, StringComparison.Ordinal))
-            .ToList();
-
-        // Every framework's output, not the first: recording one of them would let a hit resolve a different
-        // DLL than the cold run chose. The same ordinal order the built-output check consumes.
-        var outputFilePaths = specProjects
-            .Select(p => p.OutputFilePath)
-            .Where(path => !string.IsNullOrEmpty(path))
-            .Select(path => path!)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToList();
-
-        // One intermediate path, deterministically the ordinal-first: the search derives the intermediate
-        // root from the prefix it shares with the evaluated path, and obj and bin diverge at the same segment
-        // level whichever framework's pair it starts from, so the root is framework-invariant.
-        string? intermediateAssemblyPath = specProjects
-            .Select(p => p.CompilationOutputInfo.AssemblyPath)
-            .Where(path => !string.IsNullOrEmpty(path))
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .FirstOrDefault();
+        // The built-output inputs come off the resolution that consumed them rather than being re-derived
+        // here. Re-deriving could only group the spec project's Roslyn projects by NAME, while resolution
+        // groups them by canonicalized project file — the distinction that keeps two same-named csprojs from
+        // recording each other's outputs. Both slots are non-null on this branch: naming a spec project is
+        // exactly what the solution-member resolution does, and that is the branch that fills them.
+        var outputFilePaths = resolution.OutputFilePaths ?? [];
 
         var record = new SpecResolutionRecord(
             normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,
-            intermediateAssemblyPath);
+            resolution.IntermediateAssemblyPath);
         return existing
             .Where(r => !string.Equals(r.NormalizedSpecArgument, normalizedSpecArgument, StringComparison.Ordinal))
             .Append(record)
@@ -501,6 +487,14 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     // ── small helpers ─────────────────────────────────────────────────────────────────────────────────────
+
+    // What a run that has to open a workspace calls itself: a partial read keeps its clean fragments and
+    // re-extracts only the dirty ones, and every other read (a miss, or a hit the spec could not replay)
+    // extracts the lot.
+    private static CodebaseSourceOutcome ColdOutcomeFor(CacheOutcome outcome)
+    {
+        return outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;
+    }
 
     private static string NormalizeSpecArgument(string? spec)
     {
@@ -511,8 +505,7 @@ internal sealed class CodebaseSource : IDisposable
     {
         try
         {
-            string? cacheRoot = environment.GetVariable(LoadBearingEnvVars.CacheDirectory);
-            return new ExtractionCacheStore(solutionPath, string.IsNullOrWhiteSpace(cacheRoot) ? null : cacheRoot);
+            return new ExtractionCacheStore(solutionPath, environment.CacheRootOverride());
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

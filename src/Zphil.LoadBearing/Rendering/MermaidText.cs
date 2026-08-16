@@ -3,10 +3,10 @@ using System.Text;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     The Mermaid text primitives both diagram renderers share: node-ID slugging with a
-///     collision-safe dedupe, and label escaping for the characters Mermaid reads as markup. One escaping
-///     rule serves both fences of one artifact, so a character that is safe in the survey cannot be
-///     unsafe in the law.
+///     The Mermaid text primitives both diagram renderers share: the fence skeleton their sections are
+///     assembled into, node-ID slugging with a collision-safe dedupe, and label escaping for the
+///     characters Mermaid reads as markup. One escaping rule serves both fences of one artifact, so a
+///     character that is safe in the survey cannot be unsafe in the law.
 /// </summary>
 internal static class MermaidText
 {
@@ -73,5 +73,59 @@ internal static class MermaidText
         }
 
         return ids;
+    }
+
+    /// <summary>
+    ///     One node ID per key, in order: <see cref="UniqueIds" /> over the names
+    ///     <paramref name="nameOf" /> reads, zipped back onto the keys that produced them.
+    /// </summary>
+    /// <remarks>
+    ///     The zip lives beside the method that defines the index alignment, so no caller holds the two
+    ///     halves of that contract apart. Duplicate keys collapse to the last ID minted for them, which is
+    ///     what a caller keying on a name already relied on.
+    /// </remarks>
+    internal static Dictionary<TKey, string> IdMap<TKey>(
+        string prefix, IReadOnlyList<TKey> keys, Func<TKey, string> nameOf, IEqualityComparer<TKey>? comparer = null)
+        where TKey : notnull
+    {
+        var names = keys.Select(nameOf).ToList();
+        var ids = UniqueIds(prefix, names);
+
+        var map = new Dictionary<TKey, string>(comparer);
+        for (var i = 0; i < keys.Count; i++) map[keys[i]] = ids[i];
+
+        return map;
+    }
+
+    /// <summary>
+    ///     The fence skeleton both drawings sit in: the opening code fence, the <c>flowchart LR</c>
+    ///     directive and the accessible title and description, then every non-empty section, then the
+    ///     closing fence.
+    /// </summary>
+    /// <remarks>
+    ///     A blank line precedes each section that has content, so a section the drawing has nothing for
+    ///     leaves no gap behind it and the fence's shape stays a function of what is in it.
+    /// </remarks>
+    internal static IReadOnlyList<string> Fence(string accTitle, string accDescr, params IReadOnlyList<string>[] sections)
+    {
+        var lines = new List<string>
+        {
+            "```mermaid",
+            "flowchart LR",
+            $"    accTitle: {accTitle}",
+            $"    accDescr: {accDescr}"
+        };
+
+        foreach (var section in sections)
+        {
+            if (section.Count == 0) continue;
+
+            lines.Add("");
+            lines.AddRange(section);
+        }
+
+        lines.Add("```");
+
+        return lines;
     }
 }

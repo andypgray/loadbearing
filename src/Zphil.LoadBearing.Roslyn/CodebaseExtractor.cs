@@ -86,7 +86,7 @@ public static class CodebaseExtractor
         IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct);
-        return inputs.Select(FragmentExtractor.Extract).ToList();
+        return FragmentExtractor.ExtractAll(inputs);
     }
 
     // The shared project enumeration behind both entry points: C# projects passing the filter, ordered by
@@ -113,14 +113,20 @@ public static class CodebaseExtractor
             .ThenBy(p => TargetFrameworkOf(targetFrameworks, p) ?? "", StringComparer.Ordinal)
             .ToList();
 
+        ct.ThrowIfCancellationRequested();
+
+        // Binding is the expensive half and the projects are independent, so they bind together rather than
+        // one after another. The ordered list above still decides input order — the results are read back by
+        // index, never in completion order — so the merge's first-declarer-wins rule sees what it always did.
+        var compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
+        var compilations = await Task.WhenAll(compilationTasks);
+
         List<CompilationInput> inputs = [];
-        foreach (Project project in projects)
+        for (var i = 0; i < projects.Count; i++)
         {
-            ct.ThrowIfCancellationRequested();
+            if (compilations[i] is not { } compilation) continue;
 
-            Compilation? compilation = await project.GetCompilationAsync(ct);
-            if (compilation is null) continue;
-
+            Project project = projects[i];
             var projectReferences = project.ProjectReferences
                 .Select(r => solution.GetProject(r.ProjectId)?.Name)
                 .Where(n => n is not null)

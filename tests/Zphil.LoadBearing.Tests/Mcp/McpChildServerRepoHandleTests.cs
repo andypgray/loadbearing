@@ -131,7 +131,7 @@ public sealed class McpChildServerRepoHandleTests
         // directory inside the repository. No tool call — a child's own images are mapped at startup, which
         // is all this control needs, and the handshake is the cheapest proof it got that far.
         ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(
-            McpChildHarness.TestsBinCliDll(),
+            TestsBinCli.Dll(),
             CliRunner.MyAppSolution,
             CliRunner.QuarantinedSpecDll,
             AppContext.BaseDirectory);

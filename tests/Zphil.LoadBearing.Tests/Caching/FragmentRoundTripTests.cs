@@ -47,8 +47,7 @@ public sealed class FragmentRoundTripTests
             .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
 
         // Total-fact equality: the round-trip is invisible to the merged model.
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -110,8 +109,7 @@ public sealed class FragmentRoundTripTests
         direct.MemberEdges.Select(e => e.Member.SymbolId)
             .ShouldBe(
                 ["E:N.Api.Evt", "F:N.Api.Field", "M:N.Api.Do", "P:N.Api.Prop"]);
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -152,8 +150,7 @@ public sealed class FragmentRoundTripTests
         direct.ConstructorEdges.Select(e => (e.Source.FullName, e.Constructed.FullName))
             .ShouldBe(
                 [("M.User", "N.Box<T>"), ("M.User", "N.Widget")]);
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -194,8 +191,7 @@ public sealed class FragmentRoundTripTests
         direct.ServiceRegistrations
             .Any(r => r.Lifetime == Lifetime.Singleton && r.ServiceFullName == "N.IFoo" && r.ImplementationFullName == "N.Foo")
             .ShouldBeTrue();
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -269,8 +265,7 @@ public sealed class FragmentRoundTripTests
         direct.CatchEdge("M.Handler", "System.Exception")
             .SwallowingLines()
             .ShouldBeEmpty();
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -323,8 +318,7 @@ public sealed class FragmentRoundTripTests
                 ("M.Service", "N.Widget"),
                 ("M.Service", "System.Threading.Tasks.Task<TResult>")
             ]);
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
@@ -358,8 +352,7 @@ public sealed class FragmentRoundTripTests
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
         direct.MergeNotes.ShouldNotBeEmpty();
         fromCache.MergeNotes.ShouldBe(direct.MergeNotes);
-        ModelDump.Render(fromCache)
-            .ShouldBe(ModelDump.Render(direct));
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]

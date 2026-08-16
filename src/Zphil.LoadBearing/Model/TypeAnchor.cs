@@ -68,6 +68,25 @@ internal sealed class TypeAnchor
         return new TypeAnchor(null, Guard.NotNull(definitionFullName, nameof(definitionFullName)));
     }
 
+    /// <summary>
+    ///     The <c>(first, params more)</c> anchor list of a negative hierarchy verb, each operand a
+    ///     <c>typeof</c> anchor — the hierarchy-verb shape (GRAMMAR §10), stored on the node as anchors
+    ///     and never wrapped as selections.
+    /// </summary>
+    internal static IReadOnlyList<TypeAnchor> FromTypes(Type first, Type[] more)
+    {
+        return OperandList.OneOrMore(first, more, type => FromType(type));
+    }
+
+    /// <summary>
+    ///     The string twin of <see cref="FromTypes" />: the same shape over type-definition names, each
+    ///     minted through <see cref="FromName" />.
+    /// </summary>
+    internal static IReadOnlyList<TypeAnchor> FromNames(string first, string[] more)
+    {
+        return OperandList.OneOrMore(first, more, name => FromName(name));
+    }
+
     // Splits a fully-qualified name on the dots OUTSIDE any <...>: "N.Sub.MarkAttribute<T>" is
     // ["N", "Sub", "MarkAttribute<T>"] and "N.IHandler<System.Int32>" is ["N", "IHandler<System.Int32>"],
     // because the dots inside a type-argument list belong to the ARGUMENT's path, not this name's. Depth

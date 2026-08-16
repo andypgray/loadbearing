@@ -30,9 +30,7 @@ public sealed class MethodSelection : MemberSelection
     /// </summary>
     public MethodSelection Returning(Type first, params Type[] more)
     {
-        var types = new List<Type>(1 + more.Length) { Guard.NotNull(first, nameof(first)) };
-        foreach (Type type in more) types.Add(Guard.NotNull(type, nameof(more)));
-
+        var types = OperandList.OneOrMore(first, more, type => type);
         return (MethodSelection)Refined(new ReturningAdjective(types));
     }
 

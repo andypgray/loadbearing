@@ -29,9 +29,7 @@ internal sealed class TempGitRepo : IDisposable
     {
         _workspace = new TempFixtureWorkspace(callerFilePath: callerFilePath);
         File.WriteAllText(Path.Combine(Root, ".gitignore"), "bin/\nobj/\n");
-        GitCommand.Run(Root, "init");
-        GitCommand.Run(Root, "config", "user.email", "loadbearing-test@example.invalid");
-        GitCommand.Run(Root, "config", "user.name", "LoadBearing Test");
+        GitCommand.InitRepository(Root);
         GitCommand.Run(Root, "add", "-A");
         GitCommand.Run(Root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture baseline");
     }

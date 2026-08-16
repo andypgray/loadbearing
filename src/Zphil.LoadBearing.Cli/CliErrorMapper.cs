@@ -41,9 +41,9 @@ internal static class CliErrorMapper
             return 2;
         }
 
-        // WriteLine per LF-split line so a multi-line message adopts the writer's own newline rather than
-        // carrying embedded LFs onto a CRLF console (and matches the MCP surface after normalization).
-        foreach (string line in userFacing.Split('\n')) error.WriteLine(line);
+        // Line by line, as every composed block is written, so this reads the same on a CRLF console as the
+        // MCP surface renders it after normalization.
+        LineBlocks.Write(error, userFacing);
         return 2;
     }
 }

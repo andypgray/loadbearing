@@ -123,12 +123,6 @@
           "System.Composition": "10.0.1"
         }
       },
-      "Microsoft.Extensions.FileSystemGlobbing": {
-        "type": "Direct",
-        "requested": "[10.0.10, )",
-        "resolved": "10.0.10",
-        "contentHash": "jSOCVxEwCd4Aq925kJVz1kSO1EpX2OHYKL04qVREXkDU7Ce3pVDdHPYm+fEy8y/th2kJf/DAstRHpJAqoNWP8w=="
-      },
       "Microsoft.NET.StringTools": {
         "type": "Direct",
         "requested": "[18.8.2, )",

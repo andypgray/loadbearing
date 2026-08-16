@@ -358,7 +358,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotImplement(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotImplementConstraint(Subject(subject), AnchorTypes(first, more));
+        return new MustNotImplementConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -373,13 +373,13 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotImplement(this Selection subject, string first, params string[] more)
     {
-        return new MustNotImplementConstraint(Subject(subject), AnchorNames(first, more));
+        return new MustNotImplementConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>The subject must not derive from any of the base-type anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
     public static Constraint MustNotDeriveFrom(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotDeriveFromConstraint(Subject(subject), AnchorTypes(first, more));
+        return new MustNotDeriveFromConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -393,13 +393,13 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotDeriveFrom(this Selection subject, string first, params string[] more)
     {
-        return new MustNotDeriveFromConstraint(Subject(subject), AnchorNames(first, more));
+        return new MustNotDeriveFromConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>The subject must not be attributed with any of the attribute anchors — none-of semantics (GRAMMAR §5.3, §10).</summary>
     public static Constraint MustNotBeAttributedWith(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorTypes(first, more));
+        return new MustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -415,7 +415,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotBeAttributedWith(this Selection subject, string first, params string[] more)
     {
-        return new MustNotBeAttributedWithConstraint(Subject(subject), AnchorNames(first, more));
+        return new MustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -493,23 +493,6 @@ public static class SelectionConstraints
     {
         NotNull(subject, nameof(subject));
         return OperandList.OneOrMore(first, more, type => Wrap(subject, type));
-    }
-
-    // The typeof anchor list of a negative hierarchy verb (MustNotImplement / MustNotDeriveFrom /
-    // MustNotBeAttributedWith): stored directly on the node as anchors (the hierarchy-verb shape,
-    // GRAMMAR §10), never wrapped as selections. Null/empty-params edges mirror the WrappedTypes helper
-    // exactly.
-    private static IReadOnlyList<TypeAnchor> AnchorTypes(Type first, Type[] more)
-    {
-        return OperandList.OneOrMore(first, more, type => TypeAnchor.FromType(type));
-    }
-
-    // The string twin of AnchorTypes, shared by all three negatives: the same (first, params more) shape
-    // over type-definition names, each minted as a string TypeAnchor. Only null is refused here — a
-    // blank name reaches the validation catalog (GRAMMAR §8 item 15) so it reports with every other error.
-    private static IReadOnlyList<TypeAnchor> AnchorNames(string first, string[] more)
-    {
-        return OperandList.OneOrMore(first, more, name => TypeAnchor.FromName(name));
     }
 
     private static IReadOnlyList<Member> Members(Selection subject, Member first, Member[] more)

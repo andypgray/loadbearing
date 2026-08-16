@@ -92,8 +92,7 @@ internal sealed class RegistrationRecognizer
         // below and is decided exactly as before.
         if (InvokedName(invocation) is { } invoked && !ArmedCalls.Contains(invoked)) return [];
 
-        SymbolInfo info = model.GetSymbolInfo(invocation);
-        if ((info.Symbol ?? info.CandidateSymbols.FirstOrDefault()) is not IMethodSymbol method) return [];
+        if (model.GetSymbolInfo(invocation).BestCandidate() is not IMethodSymbol method) return [];
 
         // The unreduced signature carries the IServiceCollection `this` parameter and the true namespace/name
         // (an extension call resolves to the reduced method, whose first parameter is the first value arg).
@@ -141,30 +140,44 @@ internal sealed class RegistrationRecognizer
         return SymbolEqualityComparer.Default.Equals(signature.Parameters[0].Type.OriginalDefinition, _serviceCollection);
     }
 
+    /// <summary>
+    ///     The (service, implementation) pair a generic registration call's type arguments name, or
+    ///     <see langword="null" /> when they name none this recognizer can use.
+    /// </summary>
+    /// <remarks>
+    ///     The three generic arms decode the same shape and must keep deciding it identically, so the split
+    ///     lives here once: two type arguments are (service, implementation) with an unusable second slot
+    ///     recorded as "no distinct implementation"; one is the service, whose implementation is either
+    ///     itself or nothing, and <paramref name="selfWhenSingle" /> is the axis the arms genuinely differ on
+    ///     — <c>AddHttpClient&lt;TClient&gt;</c> and <c>AddDbContext&lt;TContext&gt;</c> always register the
+    ///     type as its own implementation, while the Add family does so only in the receiver-only form (a
+    ///     factory or instance overload names no implementation type). An unusable <em>first</em> type
+    ///     argument — a type parameter, an array, <c>dynamic</c> — makes the whole call unreadable, which is
+    ///     the §4.7 honesty boundary: absent from the model rather than guessed at.
+    /// </remarks>
+    private static (INamedTypeSymbol Service, INamedTypeSymbol? Implementation)? ServiceAndImplementation(
+        ImmutableArray<ITypeSymbol> typeArguments, bool selfWhenSingle)
+    {
+        if (typeArguments.Length is not (1 or 2)) return null;
+        if (AsNamed(typeArguments[0]) is not { } service) return null;
+
+        if (typeArguments.Length == 2) return (service, AsNamed(typeArguments[1]));
+
+        return selfWhenSingle ? (service, service) : (service, null);
+    }
+
     private IEnumerable<RecognizedRegistration> RecognizeAddFamily(
         string name, IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
         Lifetime lifetime = LifetimeFromName(name);
-        var typeArguments = method.TypeArguments;
 
-        // Two type-args → (service, impl); e.g. AddSingleton<IFoo, Foo>().
-        if (typeArguments.Length == 2)
-        {
-            if (AsNamed(typeArguments[0]) is { } service)
-                return [new RecognizedRegistration(lifetime, service, AsNamed(typeArguments[1]))];
-            return [];
-        }
+        // AddSingleton<IFoo, Foo>() → (service, impl); AddSingleton<Foo>() → self only when the call is
+        // receiver-only, a factory/instance overload naming no implementation type.
+        bool receiverOnly = method.Parameters.Length == 0;
+        if (ServiceAndImplementation(method.TypeArguments, receiverOnly) is { } decoded)
+            return [new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation)];
 
-        // One type-arg → self iff receiver-only (AddSingleton<Foo>()), else impl null (factory/instance form).
-        if (typeArguments.Length == 1)
-        {
-            if (AsNamed(typeArguments[0]) is not { } service) return [];
-            return method.Parameters.Length == 0
-                ? [new RecognizedRegistration(lifetime, service, service)]
-                : [new RecognizedRegistration(lifetime, service, null)];
-        }
-
-        // No type-args → the typeof overloads, mirroring the split by Type-parameter count.
+        // No usable type-args → the typeof overloads, mirroring the split by Type-parameter count.
         return RecognizeTypeofAddFamily(lifetime, method, invocation, model);
     }
 
@@ -203,49 +216,23 @@ internal sealed class RegistrationRecognizer
 
     private static IEnumerable<RecognizedRegistration> RecognizeHttpClient(IMethodSymbol method)
     {
-        var typeArguments = method.TypeArguments;
-
         // AddHttpClient<TClient, TImpl>() → (TClient, TImpl); AddHttpClient<TClient>() → (TClient, TClient);
         // the named-only string form (no type-args) registers no user type → nothing.
-        if (typeArguments.Length == 2)
-            return AsNamed(typeArguments[0]) is { } client
-                ? [new RecognizedRegistration(Lifetime.Transient, client, AsNamed(typeArguments[1]))]
-                : [];
+        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return [];
 
-        if (typeArguments.Length == 1)
-            return AsNamed(typeArguments[0]) is { } client
-                ? [new RecognizedRegistration(Lifetime.Transient, client, client)]
-                : [];
-
-        return [];
+        return [new RecognizedRegistration(Lifetime.Transient, decoded.Service, decoded.Implementation)];
     }
 
     private IEnumerable<RecognizedRegistration> RecognizeDbContext(
         IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
-        var typeArguments = method.TypeArguments;
-        INamedTypeSymbol? service;
-        INamedTypeSymbol? impl;
-        switch (typeArguments.Length)
-        {
-            case 1:
-                service = AsNamed(typeArguments[0]);
-                impl = service;
-                break;
-            case 2:
-                service = AsNamed(typeArguments[0]);
-                impl = AsNamed(typeArguments[1]);
-                break;
-            default:
-                return [];
-        }
-
-        if (service is null) return [];
+        // AddDbContext<TContext>() → (TContext, TContext); AddDbContext<TContext, TImpl>() → (TContext, TImpl).
+        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return [];
 
         (bool present, bool literal, Lifetime value) = ContextLifetime(method, invocation, model);
         if (present && !literal) return []; // a non-literal lifetime argument → never guess
         Lifetime lifetime = present ? value : Lifetime.Scoped;
-        return [new RecognizedRegistration(lifetime, service, impl)];
+        return [new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation)];
     }
 
     // The context lifetime of an AddDbContext/AddDbContextPool call: the argument bound to the first

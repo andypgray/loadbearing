@@ -19,23 +19,28 @@ namespace Zphil.LoadBearing.Checking;
 internal sealed class SelectionEvaluator
 {
     private readonly Dictionary<string, TypeNode> _byFullName;
-    private readonly ILookup<string, TypeNode> _byProjectName;
+    private readonly Dictionary<(SelectionNoun, SelectionPosition), IReadOnlyList<TypeNode>> _byNoun = new();
     private readonly CodebaseModel _model;
     private readonly List<TypeNode> _solutionDeclared;
+    private ILookup<string, TypeNode>? _byProjectName;
 
     internal SelectionEvaluator(CodebaseModel model)
     {
         _model = model;
         _solutionDeclared = model.Types.Where(t => !t.IsExternal).ToList();
 
-        // The two noun indexes, built once per evaluator and immutable afterwards: a typeof or project
-        // operand is otherwise a full linear scan of the type universe — the largest list in the model —
-        // per operand per rule. Both preserve Types order within a key, so the sets they feed are
-        // populated in exactly the order the equivalent Where scan populated them.
+        // The FQN noun index, built once per evaluator and immutable afterwards: a typeof operand is
+        // otherwise a full linear scan of the type universe — the largest list in the model — per operand
+        // per rule. It preserves Types order within a key, so the sets it feeds are populated in exactly
+        // the order the equivalent Where scan populated them.
         _byFullName = new Dictionary<string, TypeNode>(model.Types.Count, StringComparer.Ordinal);
         foreach (TypeNode type in model.Types) _byFullName[type.FullName] = type;
-        _byProjectName = model.Types.ToLookup(t => t.ProjectName, StringComparer.Ordinal);
     }
+
+    // The project-name index, built on first use in the same shape ConstraintEvaluator's edge indexes take,
+    // so a spec with no project noun never pays the grouping pass. It preserves Types order within a key.
+    private ILookup<string, TypeNode> ByProjectName =>
+        _byProjectName ??= _model.Types.ToLookup(t => t.ProjectName, StringComparer.Ordinal);
 
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
     internal static bool IsPatternSelection(Selection selection)
@@ -92,17 +97,25 @@ internal sealed class SelectionEvaluator
         switch (noun)
         {
             case TypesNoun:
-                return universe.Where(t => !t.IsExternal); // arch.Types is solution-declared by definition (§5.1)
+                // arch.Types is solution-declared by definition (§5.1), so in subject position the universe
+                // already IS the answer; only the target universe (which holds externals) needs the filter.
+                return subject ? _solutionDeclared : Scanned(noun, position, () => universe.Where(t => !t.IsExternal));
             case LayerNoun layer:
-                var globs = layer.Globs.Select(g => new NamespacePattern(g)).ToList();
-                return universe.Where(t => globs.Any(p => p.Matches(t.Namespace)));
+                return Scanned(noun, position, () =>
+                {
+                    var globs = layer.Globs.Select(g => new NamespacePattern(g)).ToList();
+                    return universe.Where(t => MatchesAnyGlob(globs, t.Namespace));
+                });
             case NamespaceNoun ns:
-                var pattern = new NamespacePattern(ns.Glob);
-                return universe.Where(t => pattern.Matches(t.Namespace));
+                return Scanned(noun, position, () =>
+                {
+                    var pattern = new NamespacePattern(ns.Glob);
+                    return universe.Where(t => pattern.Matches(t.Namespace));
+                });
             case ProjectNoun project:
                 // The ordinal ProjectName index, then the position filter — the same nodes in the same
                 // order the universe scan yielded, because a lookup grouping keeps Types order.
-                var declaring = _byProjectName[project.Name];
+                var declaring = ByProjectName[project.Name];
                 return subject ? declaring.Where(t => !t.IsExternal) : declaring;
             case TypeNoun typeNoun:
                 // Types is unique by FullName (same-FQN declarers are conflated at merge), so the scan
@@ -116,14 +129,44 @@ internal sealed class SelectionEvaluator
                 // (null = any lifetime, §4.7). Filtering the position-correct universe (subject = solution-
                 // declared, target = all types incl. externals) means an external registered type matches in
                 // target position but never enters a subject — exactly the §4.1 universe discipline.
-                var registeredNames = RegisteredFullNames(registered.Lifetime);
-                return universe.Where(t => registeredNames.Contains(t.FullName));
+                return Scanned(noun, position, () =>
+                {
+                    var registeredNames = RegisteredFullNames(registered.Lifetime);
+                    return universe.Where(t => registeredNames.Contains(t.FullName));
+                });
             default:
                 // Fail closed: the closed noun hierarchy makes this arm unreachable for any v1 noun. An
                 // unknown noun means a new noun without a switch arm; throw rather than select nothing (which
                 // would vacuously pass every shape verb over an empty subject). ArchChecker contains it per-rule.
                 throw new InvalidOperationException($"Unhandled selection noun '{noun.GetType().Name}'.");
         }
+    }
+
+    // The scanning nouns' memo, keyed on (noun, position): every one of them walks the whole position-
+    // correct universe, and a spec names the same noun in rule after rule. Caching at the NOUN level is
+    // sound because a noun carries no user predicate — a Where or Must lambda arrives as an adjective, so
+    // one noun in one position always scans to the same list. The materialized list is read-only to every
+    // consumer (Evaluate copies it into a HashSet, ApplyAdjective wraps it in a Where), so sharing it is safe.
+    private IReadOnlyList<TypeNode> Scanned(
+        SelectionNoun noun, SelectionPosition position, Func<IEnumerable<TypeNode>> scan)
+    {
+        (SelectionNoun noun, SelectionPosition position) key = (noun, position);
+        if (_byNoun.TryGetValue(key, out var cached)) return cached;
+
+        var scanned = scan().ToList();
+        _byNoun[key] = scanned;
+        return scanned;
+    }
+
+    // A layer's glob scan: an index walk rather than a LINQ Any, because it runs once per type in the
+    // universe over a list that is usually a single glob.
+    private static bool MatchesAnyGlob(IReadOnlyList<NamespacePattern> globs, string ns)
+    {
+        for (var i = 0; i < globs.Count; i++)
+            if (globs[i].Matches(ns))
+                return true;
+
+        return false;
     }
 
     // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7): the union of the service and
@@ -251,9 +294,16 @@ internal sealed class SelectionEvaluator
         TypeAnchor anchor, Func<TypeNode, IReadOnlyList<TypeConstruction>> constructions)
     {
         (string key, bool onDefinition) = AnchorKey(anchor);
-        return onDefinition
-            ? t => constructions(t).Any(c => c.Definition.FullName == key)
-            : t => constructions(t).Any(c => c.FullName == key);
+        Func<TypeConstruction, string> nameOf = onDefinition ? c => c.Definition.FullName : c => c.FullName;
+        return t =>
+        {
+            var candidates = constructions(t);
+            for (var i = 0; i < candidates.Count; i++)
+                if (nameOf(candidates[i]) == key)
+                    return true;
+
+            return false;
+        };
     }
 
     internal static bool InvokePredicate(Func<ITypeInfo, bool> predicate, TypeNode type, string hatch)

@@ -22,17 +22,17 @@ internal sealed record FragmentMember(
     ///     to the winning fragment's member inventory, taken whole.
     /// </summary>
     /// <remarks>
-    ///     The declaration sites are already (file, line) ordinal-ordered from extraction, so — as in the
-    ///     merge's type-side FilePaths derivation — Distinct preserves first-occurrence file order (the §5.6
-    ///     contract). The parameter facts are already in declaration order and the attribute facts ordinal
-    ///     by constructed name, so each Select preserves order and no merge path duplicates or reorders
-    ///     them. Unlike the type-side attribute list, the member's stays string-side: no external node is
-    ///     minted for an attribute only a member wears.
+    ///     The two site projections are the merge's type-side ones, taken from <see cref="FragmentSiteSets" />
+    ///     rather than restated here — including the §5.6 first-occurrence file-order contract, which is now
+    ///     stated once where both ends of the pipeline read it. The parameter facts are already in
+    ///     declaration order and the attribute facts ordinal by constructed name, so each Select preserves
+    ///     order and no merge path duplicates or reorders them. Unlike the type-side attribute list, the
+    ///     member's stays string-side: no external node is minted for an attribute only a member wears.
     /// </remarks>
     public MemberNode ToMemberNode(TypeNode declaringType)
     {
-        var declarationSites = DeclarationSites.Select(s => new SourceLocation(s.File, s.Line)).ToList();
-        var filePaths = DeclarationSites.Select(s => s.File).Distinct(StringComparer.Ordinal).ToList();
+        var declarationSites = FragmentSiteSets.Locations(DeclarationSites);
+        var filePaths = FragmentSiteSets.FilePaths(DeclarationSites);
         var parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
         var attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
 

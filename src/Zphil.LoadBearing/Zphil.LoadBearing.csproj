@@ -26,8 +26,12 @@
 
     <ItemGroup>
         <!-- The Roslyn extraction project mints and fills Codebase nodes (internal ctors/setters);
-             it is machinery-only and never enters Core's dependency closure. -->
+             it is machinery-only and never enters Core's dependency closure. `loadbearing` is the CLI —
+             its AssemblyName, not its project name, which is what an InternalsVisibleTo entry has to
+             match — and it is here for the internal rendering helpers Core owns (count inflection), so
+             the English both render targets pin has one owner rather than a copy per target. -->
         <InternalsVisibleTo Include="Zphil.LoadBearing.Roslyn" />
+        <InternalsVisibleTo Include="loadbearing" />
         <InternalsVisibleTo Include="Zphil.LoadBearing.Tests" />
         <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     </ItemGroup>

@@ -1,16 +1,19 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Replay;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
-///     The single <see cref="JsonSerializerOptions" /> both persisted manifests are written and read
-///     through — the extraction cache's <see cref="CacheManifest" /> and the build capture's
-///     <see cref="CaptureManifest" /> — paired with the source-generated metadata that carries them. One
+///     How both persisted manifests reach disk and come back — the extraction cache's
+///     <see cref="CacheManifest" /> and the build capture's <see cref="CaptureManifest" />: one
+///     <see cref="JsonSerializerOptions" />, the source-generated metadata that carries them, and the
+///     <see cref="TryRead{T}">read</see>/<see cref="TryWriteAtomic{T}">write</see> pair they share. One
 ///     instance so the two files cannot drift in enum spelling or escaping; one context so neither document
-///     reaches disk through reflection.
+///     reaches disk through reflection; one read/write pair so neither store can quietly degrade differently
+///     from the other.
 /// </summary>
 internal static class ManifestJson
 {
@@ -43,6 +46,56 @@ internal static class ManifestJson
     ///     after <see cref="Options" /> because static initializers run in declaration order.
     /// </summary>
     public static readonly ManifestJsonContext Context = new(Options);
+
+    /// <summary>
+    ///     Reads <paramref name="path" /> back as a <typeparamref name="T" />, or null when it is absent,
+    ///     torn, garbled, or unreadable.
+    /// </summary>
+    /// <remarks>
+    ///     <b>The caught set is the degradation contract</b> both stores' remarks promise, which is why it is
+    ///     stated once here rather than twice in near-identical copies: these files are disposable derived
+    ///     data with no tamper story, so anything unreadable must degrade to "rebuild it" and never to a loud
+    ///     error or — far worse — a wrong answer. Absence needs no separate probe: a missing file or
+    ///     directory arrives as an <see cref="IOException" /> and answers null down the same path. A caller
+    ///     spells <c>File.Exists</c> itself only when it must tell "nothing cached yet" apart from "something
+    ///     cached that no longer holds", because those two are different things to say to an operator.
+    /// </remarks>
+    internal static T? TryRead<T>(string path, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            return JsonSerializer.Deserialize(bytes, typeInfo);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Serializes <paramref name="value" /> and puts it at <paramref name="path" /> atomically, reporting
+    ///     whether it landed.
+    /// </summary>
+    /// <remarks>
+    ///     Best-effort by the same contract <see cref="TryRead{T}" /> reads under: the caller already holds
+    ///     the answer it was going to give, so a write it cannot complete costs the next run a rebuild and
+    ///     nothing more — never the current run. <see cref="AtomicFile" /> is what stops a reader ever seeing
+    ///     half a document; this method is what stops a failed write ever surfacing as an error.
+    /// </remarks>
+    internal static bool TryWriteAtomic<T>(string path, T value, JsonTypeInfo<T> typeInfo)
+    {
+        try
+        {
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, typeInfo);
+            AtomicFile.WriteAllBytes(path, bytes);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return false;
+        }
+    }
 }
 
 // Source-generated metadata for the two manifest roots, plus the bare fragment list the round-trip pin

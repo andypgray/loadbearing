@@ -9,7 +9,9 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     A solution file's declared <c>.csproj</c> membership, split into the two sets a solution filter makes
 ///     different: what the load is <see cref="Required">entitled to demand</see> and what the underlying
 ///     solution <see cref="Declared">contains at all</see>. For an unfiltered <c>.sln</c>/<c>.slnx</c> the two
-///     are the same list and <see cref="ReferencedSolutionPath" /> is <see langword="null" />.
+///     are the same list. Which solution a filter points at is
+///     <see cref="SolutionProjectFileParser.TryReadReferencedSolution">its own question</see>, asked where it
+///     arises: both callers ask before the load, where no membership object exists to read.
 /// </summary>
 /// <param name="Required">
 ///     The members the load must produce — a filter's selected projects, or every member when there is no
@@ -20,20 +22,9 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     Every <c>.csproj</c> the underlying solution declares, filter or no filter. Subtracting what actually
 ///     loaded from this is what makes a narrowed universe nameable.
 /// </param>
-/// <param name="ReferencedSolutionPath">
-///     The <c>.sln</c>/<c>.slnx</c> a filter points at, or <see langword="null" /> when
-///     <see cref="Required" /> came from a solution file directly. Non-null means the run is filtered.
-/// </param>
 internal sealed record SolutionMembership(
     IReadOnlyList<string> Required,
-    IReadOnlyList<string> Declared,
-    // Deliberately carried though nothing reads it: membership resolved through a filter is a three-part
-    // fact, but both consumers of the third part — the extraction cache's structural inputs and the
-    // run's anchor directory — must re-derive it where no membership object exists to read, the anchor
-    // because it is needed before the load and reading membership would throw on a malformed filter the
-    // load itself owns refusing.
-    // ReSharper disable once NotAccessedPositionalProperty.Global
-    string? ReferencedSolutionPath);
+    IReadOnlyList<string> Declared);
 
 /// <summary>
 ///     Reads a solution file's <em>declared</em> <c>.csproj</c> membership textually, with no MSBuild.
@@ -67,7 +58,7 @@ internal sealed record SolutionMembership(
 ///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
 ///         does not evaluate configurations, conditions, or nested-project ownership. Paths are made absolute
 ///         against the solution file's directory but not symlink-canonicalized — callers canonicalize both
-///         sides at comparison time (matching <c>SpecResolver.PathsEqual</c>), so this stays pure and
+///         sides at comparison time (matching <c>SpecResolver.IsProjectFile</c>), so this stays pure and
 ///         disk-independent for its <see cref="ParseCsprojMembers" /> core.
 ///     </para>
 /// </remarks>
@@ -110,7 +101,7 @@ internal static class SolutionProjectFileParser
         if (!IsFilterFormat(fullPath))
         {
             var members = ReadCsprojMembers(fullPath);
-            return new SolutionMembership(members, members, null);
+            return new SolutionMembership(members, members);
         }
 
         (string referencedSolution, var requested) =
@@ -121,14 +112,14 @@ internal static class SolutionProjectFileParser
         // Roslyn's own rule, reproduced exactly: an empty projects array is not an empty selection, it is
         // "no filtering at all". Intersecting instead would load nothing and report the whole solution
         // dropped — the degraded answer this type exists to avoid, arrived at from the other side.
-        if (requested.Count == 0) return new SolutionMembership(declared, declared, referencedSolution);
+        if (requested.Count == 0) return new SolutionMembership(declared, declared);
 
         var selected = new HashSet<string>(requested, PathComparison.Comparer);
         var required = declared
             .Where(selected.Contains)
             .ToList();
 
-        return new SolutionMembership(required, declared, referencedSolution);
+        return new SolutionMembership(required, declared);
     }
 
     /// <summary>
@@ -196,7 +187,7 @@ internal static class SolutionProjectFileParser
         try
         {
             string fullPath = Path.GetFullPath(solutionPath);
-            (string referencedSolution, var _) =
+            (string referencedSolution, _) =
                 ParseFilter(File.ReadAllText(fullPath), Path.GetDirectoryName(fullPath)!);
 
             return referencedSolution;

@@ -1,4 +1,5 @@
 using System.Security;
+using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Rendering;
@@ -171,19 +172,48 @@ internal static class RestoreFailures
     // Whether the assets file records a restore error: any logs entry whose level is Error and whose code is
     // not an audit one. Every fault degrades to false — see the class remarks on why silence is the safe
     // answer for a file that could not be read.
+    //
+    // Read rather than parsed, because of the file this asks about: a real project.assets.json is one to five
+    // megabytes of resolved dependency graph, there is one per project, and a cold load reads every one of
+    // them — to answer a question about a single top-level property. A JsonDocument would index every token
+    // in the file first. The reader still walks the whole document, so the degradation is unchanged.
     private static bool RecordsARestoreError(string assetsPath)
     {
         try
         {
-            using FileStream stream = File.OpenRead(assetsPath);
-            using JsonDocument assets = JsonDocument.Parse(stream);
+            var preamble = Encoding.UTF8.Preamble;
+            ReadOnlySpan<byte> json = File.ReadAllBytes(assetsPath);
 
-            if (assets.RootElement.ValueKind != JsonValueKind.Object) return false;
-            if (!assets.RootElement.TryGetProperty("logs", out JsonElement logs)) return false;
-            if (logs.ValueKind != JsonValueKind.Array) return false;
+            // Every assets file a real restore writes carries a UTF-8 BOM. The stream parse this replaces
+            // skipped it; a reader over bytes does not, and would refuse the exact shape production meets.
+            if (json.StartsWith(preamble)) json = json[preamble.Length..];
 
-            return logs.EnumerateArray()
-                .Any(IsRestoreError);
+            var reader = new Utf8JsonReader(json);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return false;
+
+            var failed = false;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                bool isLogs = reader.ValueTextEquals("logs"u8);
+                reader.Read();
+                if (isLogs)
+                {
+                    // The first 'logs' decides and nothing after it can revise the verdict — the same
+                    // first-wins rule TryGetProperty applied to a duplicated property name.
+                    failed = reader.TokenType == JsonTokenType.StartArray && AnyRestoreError(ref reader);
+                    break;
+                }
+
+                reader.Skip();
+            }
+
+            // The remainder is still read, so a file malformed past the point the verdict was reached lands
+            // on "not failed" rather than letting half a document decide — what parsing gave for free.
+            while (reader.Read())
+            {
+            }
+
+            return failed;
         }
         catch (Exception ex) when (ex is IOException
                                        or UnauthorizedAccessException
@@ -196,21 +226,54 @@ internal static class RestoreFailures
         }
     }
 
-    private static bool IsRestoreError(JsonElement entry)
+    // Whether any entry of the logs array the reader is positioned at records a restore error. Anything that
+    // is not an object is skipped rather than refused, exactly as the element-kind test it replaces did.
+    private static bool AnyRestoreError(ref Utf8JsonReader reader)
     {
-        if (entry.ValueKind != JsonValueKind.Object) return false;
-        if (!entry.TryGetProperty("level", out JsonElement level)) return false;
-        if (level.ValueKind != JsonValueKind.String) return false;
-        if (!string.Equals(level.GetString(), "Error", StringComparison.Ordinal)) return false;
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                reader.Skip();
+                continue;
+            }
 
-        return !IsAudit(entry);
+            if (IsRestoreError(ref reader)) return true;
+        }
+
+        return false;
     }
 
-    private static bool IsAudit(JsonElement entry)
+    // The per-entry predicate over the object the reader is positioned at: level is the string Error, and the
+    // code — where there is one — is not an audit code. Each name is taken first-wins, which is how
+    // TryGetProperty resolved a duplicate; a value of any other kind reads as absent.
+    private static bool IsRestoreError(ref Utf8JsonReader reader)
     {
-        if (!entry.TryGetProperty("code", out JsonElement code)) return false;
-        if (code.ValueKind != JsonValueKind.String) return false;
+        var levelSeen = false;
+        var codeSeen = false;
+        var levelIsError = false;
+        string? code = null;
 
-        return code.GetString() is { } text && NuGetAuditDiagnostics.IsAuditCode(text);
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+        {
+            bool isLevel = !levelSeen && reader.ValueTextEquals("level"u8);
+            bool isCode = !codeSeen && reader.ValueTextEquals("code"u8);
+            reader.Read();
+
+            if (isLevel)
+            {
+                levelSeen = true;
+                levelIsError = reader.TokenType == JsonTokenType.String && reader.ValueTextEquals("Error"u8);
+            }
+            else if (isCode)
+            {
+                codeSeen = true;
+                code = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+            }
+
+            reader.Skip();
+        }
+
+        return levelIsError && (code is null || !NuGetAuditDiagnostics.IsAuditCode(code));
     }
 }

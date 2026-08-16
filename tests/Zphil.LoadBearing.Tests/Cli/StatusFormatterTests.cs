@@ -33,11 +33,6 @@ public sealed class StatusFormatterTests
             .Because("b");
     });
 
-    private static ArchRule Rule(string id)
-    {
-        return Model.Rules.Single(r => r.Id == id);
-    }
-
     private static string Line(RuleResult result)
     {
         return StatusFormatter.Lines(new CheckReport([result]))
@@ -47,28 +42,28 @@ public sealed class StatusFormatterTests
     [Fact]
     public void Enforce_Pass_HasNoDetail()
     {
-        Line(Result(Rule("layering/billing-independent"), RuleStatus.Passed))
+        Line(Result(Model.Rule("layering/billing-independent"), RuleStatus.Passed))
             .ShouldBe("pass layering/billing-independent");
     }
 
     [Fact]
     public void Enforce_Fail_ShowsViolationCount()
     {
-        Line(Result(Rule("layering/domain-independent"), RuleStatus.Failed, 2))
+        Line(Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 2))
             .ShouldBe("FAIL layering/domain-independent — 2 violations");
     }
 
     [Fact]
     public void Enforce_PassWithWarning_ShowsWarningCount()
     {
-        Line(Result(Rule("layering/billing-independent"), RuleStatus.Passed, warnings: 1))
+        Line(Result(Model.Rule("layering/billing-independent"), RuleStatus.Passed, warnings: 1))
             .ShouldBe("pass layering/billing-independent — 1 warning");
     }
 
     [Fact]
     public void QuarantineContainment_Uncaptured_SuggestsInit()
     {
-        Line(Result(Rule("legacy/billing/containment"), RuleStatus.Failed, 2))
+        Line(Result(Model.Rule("legacy/billing/containment"), RuleStatus.Failed, 2))
             .ShouldBe(
                 "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
     }
@@ -76,7 +71,7 @@ public sealed class StatusFormatterTests
     [Fact]
     public void QuarantineContainment_Grandfathered_ShowsBurndownAndNeverPromotes()
     {
-        string line = Line(Result(Rule("legacy/billing/containment"), RuleStatus.Failed, 1, grandfathered: 2, captured: true));
+        string line = Line(Result(Model.Rule("legacy/billing/containment"), RuleStatus.Failed, 1, grandfathered: 2, captured: true));
 
         line.ShouldBe("FAIL legacy/billing/containment (quarantine) — 2 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
         line.ShouldNotContain("promotable");
@@ -86,7 +81,7 @@ public sealed class StatusFormatterTests
     public void QuarantineContainment_BurnedToZero_ReadsPlainNotPromotable()
     {
         // Quarantine→Migrate is a human decision; a burned-to-zero containment never suggests promotion.
-        string line = Line(Result(Rule("legacy/billing/containment"), RuleStatus.Passed, captured: true));
+        string line = Line(Result(Model.Rule("legacy/billing/containment"), RuleStatus.Passed, captured: true));
 
         line.ShouldBe("pass legacy/billing/containment (quarantine) — 0 grandfathered remaining");
         line.ShouldNotContain("promotable");
@@ -95,7 +90,7 @@ public sealed class StatusFormatterTests
     [Fact]
     public void QuarantineTripwire_ReadsDiffAwareSkip()
     {
-        Line(Result(Rule("legacy/billing/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
+        Line(Result(Model.Rule("legacy/billing/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
             .ShouldBe("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
     }
 
@@ -106,7 +101,7 @@ public sealed class StatusFormatterTests
         // rule falls into the ratchet line and reads "pass … 0 new, 2 fixed awaiting acceptance" — a pass
         // and a burndown for a rule the run never measured.
         string line = Line(Result(
-            Rule("data-access/no-inline-sql"), RuleStatus.Skipped, stale: 2, captured: true,
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Skipped, stale: 2, captured: true,
             skipReason: "'BillingOnly.slnf' narrowed this run."));
 
         line.ShouldBe("skip data-access/no-inline-sql — 'BillingOnly.slnf' narrowed this run.");
@@ -117,7 +112,7 @@ public sealed class StatusFormatterTests
     public void Enforce_NarrowingSkipped_ReadsAsASkipCarryingItsReason()
     {
         Line(Result(
-                Rule("layering/billing-independent"), RuleStatus.Skipped,
+                Model.Rule("layering/billing-independent"), RuleStatus.Skipped,
                 skipReason: "'BillingOnly.slnf' narrowed this run."))
             .ShouldBe("skip layering/billing-independent — 'BillingOnly.slnf' narrowed this run.");
     }
@@ -125,21 +120,21 @@ public sealed class StatusFormatterTests
     [Fact]
     public void Migrate_CapturedFailing_ShowsRemainingNewAndAwaiting()
     {
-        Line(Result(Rule("data-access/no-inline-sql"), RuleStatus.Failed, 1, grandfathered: 1, captured: true))
+        Line(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 1, grandfathered: 1, captured: true))
             .ShouldBe("FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
     }
 
     [Fact]
     public void Migrate_PromotableWhenBaselineEmpty()
     {
-        Line(Result(Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true))
+        Line(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true))
             .ShouldBe("pass data-access/no-inline-sql (migrate) — 0 remaining; promotable to Enforce (baseline is empty)");
     }
 
     [Fact]
     public void Migrate_InterimSuggestsAcceptReductions()
     {
-        Line(Result(Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true))
+        Line(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true))
             .ShouldBe(
                 "pass data-access/no-inline-sql (migrate) — 0 remaining, 2 fixed awaiting acceptance; " +
                 "run 'loadbearing baseline --accept-reductions'");
@@ -148,7 +143,7 @@ public sealed class StatusFormatterTests
     [Fact]
     public void Migrate_Uncaptured_SuggestsInit()
     {
-        Line(Result(Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2))
+        Line(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2))
             .ShouldBe("FAIL data-access/no-inline-sql (migrate) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
     }
 
@@ -157,11 +152,11 @@ public sealed class StatusFormatterTests
     {
         var report = new CheckReport(
         [
-            Result(Rule("layering/billing-independent"), RuleStatus.Passed),
-            Result(Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 1, captured: true),
-            Result(Rule("layering/domain-independent"), RuleStatus.Failed, 1),
-            Result(Rule("layering/domain-independent"), RuleStatus.Failed, 1),
-            Result(Rule("layering/domain-independent"), RuleStatus.Failed, 1)
+            Result(Model.Rule("layering/billing-independent"), RuleStatus.Passed),
+            Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 1, captured: true),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1)
         ]);
 
         StatusFormatter.Lines(report)

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
@@ -58,16 +59,12 @@ internal static class SourceAnchors
     /// <summary>
     ///     Splits <paramref name="docText" /> into the content of each fenced code block, one list per
     ///     block in document order, each line paired with its 1-based line number in the doc so a caller
-    ///     can name the exact place a quote lives. A fence opens on a line whose first non-whitespace
-    ///     content is a run of three or more backticks or tildes and closes on the next line with at least
-    ///     as long a run of the same character and nothing after it but whitespace; the fence lines
-    ///     themselves are dropped and the lines between them are kept verbatim. An unclosed fence keeps
-    ///     every line to the end of the text as its final block. Input newlines are normalized to
-    ///     <c>"\n"</c> first, so a <c>\r</c> never reaches the caller.
+    ///     can name the exact place a quote lives. The fence lines themselves are dropped and the lines
+    ///     between them are kept verbatim, and an unclosed fence keeps every line to the end of the text as
+    ///     its final block — <see cref="Scan" /> decides all of that.
     /// </summary>
     /// <remarks>
-    ///     This is the one fence scanner the quote gates share, and the only place the state machine
-    ///     lives: <see cref="FencedLines" /> flattens it, <see cref="Fences" /> drops the line numbers,
+    ///     <see cref="FencedLines" /> flattens this, <see cref="Fences" /> drops the line numbers,
     ///     <see cref="Extract" /> filters it for anchor lines and <c>RuleQuotes.Extract</c> for
     ///     rule-header lines. A caller needing both block identity and position — a
     ///     <c>grandfathered: N</c> sub-line takes its rule id from the header line above it
@@ -75,32 +72,23 @@ internal static class SourceAnchors
     /// </remarks>
     public static IReadOnlyList<IReadOnlyList<(string Text, int Number)>> FencedBlocks(string docText)
     {
-        string normalized = docText.Replace("\r\n", "\n");
-        string[] lines = normalized.Split('\n');
         List<IReadOnlyList<(string Text, int Number)>> blocks = new();
         List<(string Text, int Number)>? current = null;
-        var fenceChar = '\0';
-        var fenceLength = 0;
 
-        for (var index = 0; index < lines.Length; index++)
-        {
-            string line = lines[index];
-            if (current is null)
+        foreach ((string text, int number, LineKind kind) in Scan(docText))
+            if (kind == LineKind.FenceOpen)
             {
-                if (TryOpenFence(line, out fenceChar, out fenceLength)) current = new List<(string, int)>();
+                current = new List<(string, int)>();
             }
-            else if (ClosesFence(line, fenceChar, fenceLength))
+            else if (current is not null && kind == LineKind.FenceClose)
             {
                 blocks.Add(current);
                 current = null;
-                fenceChar = '\0';
-                fenceLength = 0;
             }
-            else
+            else if (current is not null && kind == LineKind.Fenced)
             {
-                current.Add((line, index + 1));
+                current.Add((text, number));
             }
-        }
 
         if (current is not null) blocks.Add(current);
 
@@ -131,6 +119,34 @@ internal static class SourceAnchors
             .Select(static block => (IReadOnlyList<string>)block
                 .Select(static line => line.Text)
                 .ToArray())
+            .ToArray();
+    }
+
+    /// <summary>
+    ///     Every line of <paramref name="docText" /> outside every fenced code block, paired with its
+    ///     1-based line number in the doc — the fence delimiter lines and everything between them dropped.
+    ///     This is the doc's prose, which the prose-hygiene checks measure.
+    /// </summary>
+    public static IReadOnlyList<(string Text, int Number)> ProseLines(string docText)
+    {
+        return Scan(docText)
+            .Where(static line => line.Kind == LineKind.Prose)
+            .Select(static line => (line.Text, line.Number))
+            .ToArray();
+    }
+
+    /// <summary>
+    ///     Every line of <paramref name="docText" /> that <see cref="FencedLines" /> does not cover: the
+    ///     prose <em>and</em> the fence delimiter lines themselves. This is the complement by line number,
+    ///     for the sweeps that ask what a doc says where no fenced gate is watching — only the quoted
+    ///     content between the delimiters is exempt from those, and an opening delimiter's info string is
+    ///     text like any other line.
+    /// </summary>
+    public static IReadOnlyList<(string Text, int Number)> UnfencedLines(string docText)
+    {
+        return Scan(docText)
+            .Where(static line => line.Kind != LineKind.Fenced)
+            .Select(static line => (line.Text, line.Number))
             .ToArray();
     }
 
@@ -208,43 +224,25 @@ internal static class SourceAnchors
     }
 
     /// <summary>
-    ///     Verifies every anchor in <paramref name="docs" /> against the committed sources under
-    ///     <paramref name="repoRoot" />, returning one human-readable failure per unresolved anchor (an
-    ///     empty list is green). Each doc is paired with the example root its anchors resolve against.
-    /// </summary>
-    public static IReadOnlyList<string> Verify(
-        string repoRoot,
-        IReadOnlyList<(string Doc, string ExampleRoot)> docs,
-        IReadOnlyDictionary<AnchorKey, Landmark> landmarks)
-    {
-        var reader = DiskReader(repoRoot);
-        List<string> failures = new();
-
-        foreach ((string doc, string exampleRoot) in docs)
-        {
-            string docPath = Path.Combine(repoRoot, doc.Replace('/', Path.DirectorySeparatorChar));
-            string text = File.ReadAllText(docPath);
-            foreach (SourceAnchor anchor in Extract(doc, text))
-            {
-                AnchorResult result = Classify(anchor, exampleRoot, landmarks, reader);
-                if (result.Bucket == AnchorBucket.Unresolved) failures.Add(result.Failure!);
-            }
-        }
-
-        return failures;
-    }
-
-    /// <summary>
     ///     A line reader rooted at <paramref name="repoRoot" />: it maps a repository-relative path to its
     ///     lines, or <see langword="null" /> when the file does not exist. It reads whole lines, so a
-    ///     trailing newline never presents a phantom empty final line to a beyond-end-of-file check.
+    ///     trailing newline never presents a phantom empty final line to a beyond-end-of-file check. Each
+    ///     reader remembers every path it has answered for, absent ones included: one walkthrough anchors
+    ///     dozens of lines into the same few files, and each anchor is classified more than once per run.
     /// </summary>
     public static Func<string, IReadOnlyList<string>?> DiskReader(string repoRoot)
     {
+        Dictionary<string, IReadOnlyList<string>?> read = new(StringComparer.Ordinal);
+
         return repoRelative =>
         {
+            if (read.TryGetValue(repoRelative, out var cached)) return cached;
+
             string full = Path.Combine(repoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar));
-            return File.Exists(full) ? File.ReadAllLines(full) : null;
+            IReadOnlyList<string>? lines = File.Exists(full) ? File.ReadAllLines(full) : null;
+            read[repoRelative] = lines;
+
+            return lines;
         };
     }
 
@@ -299,6 +297,76 @@ internal static class SourceAnchors
         return segments.Length >= 2
             ? $"{segments[^2]}.{segments[^1]}"
             : dotted;
+    }
+
+    /// <summary>What the fence scan made of one line.</summary>
+    private enum LineKind
+    {
+        /// <summary>Outside every fence.</summary>
+        Prose,
+
+        /// <summary>The delimiter line that opens a fence.</summary>
+        FenceOpen,
+
+        /// <summary>The delimiter line that closes a fence.</summary>
+        FenceClose,
+
+        /// <summary>Inside a fence: quoted content.</summary>
+        Fenced
+    }
+
+    /// <summary>
+    ///     Every line of <paramref name="docText" /> in document order, each labelled with what the scan
+    ///     made of it. A fence opens on a line whose first non-whitespace content is a run of three or more
+    ///     backticks or tildes and closes on the next line with at least as long a run of the same
+    ///     character and nothing after it but whitespace; an unclosed fence holds every line to the end of
+    ///     the text. Input newlines are normalized to <c>"\n"</c> first, so a <c>\r</c> never reaches a
+    ///     caller.
+    /// </summary>
+    /// <remarks>
+    ///     This is the one fence scanner the quote gates share, and the only place the state machine
+    ///     lives. Every view of a doc is a filter over it: <see cref="FencedBlocks" /> groups the fenced
+    ///     lines into blocks (and <see cref="FencedLines" /> and <see cref="Fences" /> reshape those),
+    ///     <see cref="ProseLines" /> keeps what sits outside every fence, and
+    ///     <see cref="UnfencedLines" /> keeps everything the fenced lines do not cover.
+    /// </remarks>
+    private static IEnumerable<(string Text, int Number, LineKind Kind)> Scan(string docText)
+    {
+        string[] lines = docText.NormalizedLines()
+            .Split('\n');
+        var insideFence = false;
+        var fenceChar = '\0';
+        var fenceLength = 0;
+
+        for (var index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index];
+            int number = index + 1;
+
+            if (!insideFence)
+            {
+                if (TryOpenFence(line, out fenceChar, out fenceLength))
+                {
+                    insideFence = true;
+                    yield return (line, number, LineKind.FenceOpen);
+                }
+                else
+                {
+                    yield return (line, number, LineKind.Prose);
+                }
+            }
+            else if (ClosesFence(line, fenceChar, fenceLength))
+            {
+                insideFence = false;
+                fenceChar = '\0';
+                fenceLength = 0;
+                yield return (line, number, LineKind.FenceClose);
+            }
+            else
+            {
+                yield return (line, number, LineKind.Fenced);
+            }
+        }
     }
 
     private static bool TryOpenFence(string line, out char fenceChar, out int fenceLength)

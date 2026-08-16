@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests.Packs;
 
@@ -51,8 +52,8 @@ public class PackParityTests
     [MemberData(nameof(PackRuleIds))]
     public void Rule_PackedAndInline_AgreeFieldByField(string id)
     {
-        ArchRule packed = Rule(Packed, id);
-        ArchRule inline = Rule(Inline, id);
+        ArchRule packed = Packed.Rule(id);
+        ArchRule inline = Inline.Rule(id);
 
         packed.Posture.ShouldBe(inline.Posture);
         packed.Sentence.ShouldBe(inline.Sentence);
@@ -71,13 +72,8 @@ public class PackParityTests
         // to their definition), so Task<object>.Result and typeof(Task<>) + "Result" are the same leaf.
         // This is the assertion that catches the conversion, since Location is diagnostics-only and does
         // not reach the model.
-        Anchors(Rule(Packed, id))
-            .ShouldBe(Anchors(Rule(Inline, id)));
-    }
-
-    private static ArchRule Rule(ArchitectureModel model, string id)
-    {
-        return model.Rules.Single(rule => rule.Id == id);
+        Anchors(Packed.Rule(id))
+            .ShouldBe(Anchors(Inline.Rule(id)));
     }
 
     private static IReadOnlyList<string> Anchors(ArchRule rule)

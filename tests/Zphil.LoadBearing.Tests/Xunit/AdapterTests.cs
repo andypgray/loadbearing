@@ -159,7 +159,7 @@ public sealed class AdapterTests
         Exception? exception = await CaughtAsync(() => new BillingOnlyArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();
-        skip.Message.Replace("\r\n", "\n")
+        skip.Message.NormalizedLines()
             .ShouldContain(
                 "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked.\n"
                 + "  MyApp.Domain/MyApp.Domain.csproj\n"

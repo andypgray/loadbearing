@@ -21,9 +21,6 @@ namespace Zphil.LoadBearing.Roslyn.Replay;
 /// </remarks>
 internal sealed class ReplayedSolution : IDisposable
 {
-    private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
-        new Dictionary<ProjectId, string>();
-
     private readonly SolutionReader _reader;
 
     internal ReplayedSolution(
@@ -34,7 +31,7 @@ internal sealed class ReplayedSolution : IDisposable
         Workspace = workspace;
         _reader = reader;
         Solution = solution;
-        TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
+        TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
         FailedProjects = failedProjects ?? [];
     }
 
@@ -83,6 +80,18 @@ internal sealed class ReplayedSolution : IDisposable
     ///     failure of the kind this detects.
     /// </remarks>
     public IReadOnlyList<string> RestoreFailedProjects { get; } = [];
+
+    /// <summary>
+    ///     This replay's verdict as the one value every surface reads — the two project lists above beside the
+    ///     replay messages the caller's own sink collected, which never land on this type. Unchecked projects
+    ///     are empty: a binlog records what was built, not what a solution declares, so there is nothing to
+    ///     have left out. Merge notes are empty by construction, as on the MSBuild path.
+    /// </summary>
+    /// <param name="loadFailures">The replay messages this load wrote to the caller's sink.</param>
+    internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
+    {
+        return new WorkspaceDiagnostics(loadFailures, [], FailedProjects, [], RestoreFailedProjects);
+    }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
     public void Dispose()

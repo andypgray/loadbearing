@@ -23,7 +23,7 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
                     .Fix("Define an abstraction in Domain and implement it in Web."))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ReferencePairs()
             .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
         result.ReferencePairs()

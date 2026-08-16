@@ -13,19 +13,19 @@ public sealed class RuleResult
         ArchRule rule,
         RuleStatus status,
         IReadOnlyList<Violation> violations,
-        IReadOnlyList<CheckWarning> warnings,
-        string? skipReason,
-        IReadOnlyList<Violation> grandfathered,
-        int staleBaselineEntries,
-        bool baselineCaptured,
+        IReadOnlyList<CheckWarning>? warnings = null,
+        string? skipReason = null,
+        IReadOnlyList<Violation>? grandfathered = null,
+        int staleBaselineEntries = 0,
+        bool baselineCaptured = false,
         IReadOnlyList<BaselineEntry>? grandfatheredEntries = null)
     {
         Rule = rule;
         Status = status;
         Violations = violations;
-        Warnings = warnings;
+        Warnings = warnings ?? Array.Empty<CheckWarning>();
         SkipReason = skipReason;
-        Grandfathered = grandfathered;
+        Grandfathered = grandfathered ?? Array.Empty<Violation>();
         StaleBaselineEntries = staleBaselineEntries;
         BaselineCaptured = baselineCaptured;
         GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
@@ -72,4 +72,24 @@ public sealed class RuleResult
     ///     non-ratcheted rule and whenever <see cref="Grandfathered" /> is empty.
     /// </summary>
     public IReadOnlyList<BaselineEntry> GrandfatheredEntries { get; }
+
+    /// <summary>
+    ///     Whether the Migrate ratchet has burned to zero on a rule this run actually measured, so the
+    ///     posture can move to Enforce: a captured baseline with nothing grandfathered, nothing new, and
+    ///     nothing awaiting acceptance.
+    /// </summary>
+    /// <remarks>
+    ///     False for every other posture, deliberately — a burned-to-zero Quarantine containment reads plain,
+    ///     because Quarantine→Migrate is a human decision and is never suggested. False too for a rule the run
+    ///     reached no verdict on: a narrowing skip keeps <see cref="BaselineCaptured" /> truthful and zeroes
+    ///     the counts, which is burned-to-zero's exact shape, so promoting on it would suggest enforcing a
+    ///     rule whose subject a filter had merely erased.
+    /// </remarks>
+    public bool Promotable =>
+        Rule.Posture == Posture.Migrate
+        && Status != RuleStatus.Skipped
+        && BaselineCaptured
+        && Grandfathered.Count == 0
+        && Violations.Count == 0
+        && StaleBaselineEntries == 0;
 }

@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 
@@ -67,7 +68,7 @@ internal static class BaselineAddMatcher
 
     private static bool MatchesMemberSubject(MemberNode member, string subject)
     {
-        return string.Equals($"{((TypeNode)member.DeclaringType).FullName}.{member.Name}", subject, StringComparison.Ordinal)
+        return string.Equals($"{member.DeclaringTypeFullName}.{member.Name}", subject, StringComparison.Ordinal)
                || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
     }
 
@@ -91,12 +92,12 @@ internal static class BaselineAddMatcher
     {
         return violation.Kind switch
         {
-            ViolationKind.Reference => Matches(violation.Source!, source) && Matches(violation.Target!, target),
-            ViolationKind.Construction => Matches(violation.Source!, source) && Matches(violation.Target!, target),
-            ViolationKind.Injection => Matches(violation.Source!, source) && Matches(violation.Target!, target),
-            ViolationKind.Catch => Matches(violation.Source!, source) && Matches(violation.Target!, target),
-            ViolationKind.Throw => Matches(violation.Source!, source) && Matches(violation.Target!, target),
-            ViolationKind.Expose => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            ViolationKind.Reference
+                or ViolationKind.Construction
+                or ViolationKind.Injection
+                or ViolationKind.Catch
+                or ViolationKind.Throw
+                or ViolationKind.Expose => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.MemberUse => Matches(violation.Source!, source) && MatchesMember(violation.Member!, target),
             _ => false
         };
@@ -132,32 +133,17 @@ internal static class BaselineAddMatcher
     // A violation's full-name listing form: the subject for a type shape, the member subject for a member
     // shape, Source -> Target for a reference edge, Source -> member display for a member use. Shared with
     // BaselineRunner's added-entry echo so the success message and the no-match candidate list render one
-    // way for every kind --add resolves.
+    // way for every kind --add resolves. Members take the shared display, so a candidate list echoes
+    // 'Save()' exactly as 'loadbearing check' renders it (GRAMMAR §4.5, §4.6).
     internal static string FullNameForm(Violation violation)
     {
         return violation.Kind switch
         {
             ViolationKind.Shape => violation.Subject!.FullName,
-            ViolationKind.MemberShape => MemberSubjectDisplay(violation.SubjectMember!),
-            ViolationKind.MemberUse => $"{violation.Source!.FullName} -> {MemberDisplay(violation.Member!)}",
+            ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
+            ViolationKind.MemberUse => $"{violation.Source!.FullName} -> {MemberDisplay.Of(violation.Member!)}",
             _ => $"{violation.Source!.FullName} -> {violation.Target!.FullName}"
         };
-    }
-
-    // The banned member as declaring-type-dot-member, () iff a method — the parens-iff-method display of
-    // the human report line, so the no-match candidate list reads exactly as 'loadbearing check' does.
-    private static string MemberDisplay(MemberReference member)
-    {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{member.ContainingType.FullName}.{member.Name}{suffix}";
-    }
-
-    // The offending member subject, same declaring-type-dot-member, () iff a method convention — so a
-    // member-shape candidate list echoes 'Save()' exactly as 'loadbearing check' renders it (GRAMMAR §4.6).
-    private static string MemberSubjectDisplay(MemberNode member)
-    {
-        string suffix = member.Kind == MemberKind.Method ? "()" : string.Empty;
-        return $"{((TypeNode)member.DeclaringType).FullName}.{member.Name}{suffix}";
     }
 
     private static string SymbolForm(BaselineEntry identity)

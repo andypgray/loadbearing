@@ -99,7 +99,6 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         bool skeleton = false,
         CancellationToken cancellationToken = default)
     {
-        var output = new StringWriter();
         // Exit code and error writer deliberately discarded — everything they would carry is in the document.
         // Violations ride in rules[]; which projects failed to load or to restore rides in failedProjects and
         // restoreFailedProjects, and the load's
@@ -113,10 +112,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // comes back whole at a coarser grain instead of cut mid-array. It matters more here than there —
         // this is the tool agents are told to call before finishing work, and its bulk driver is a per-site
         // dump with no ceiling, so a legacy migration burndown scales it without limit.
-        await new CheckRunner(output, TextWriter.Null, source, fitter: fitter).RunAsync(
-            binding.CheckRequest(diffBase, rules, DocumentGrains.Coarsest(overview, skeleton)),
-            cancellationToken);
-        return output.ToString();
+        return await CaptureAsync(output => new CheckRunner(output, TextWriter.Null, source, fitter: fitter)
+            .RunAsync(
+                binding.CheckRequest(diffBase, rules, DocumentGrains.Coarsest(overview, skeleton)),
+                cancellationToken));
     }
 
     [McpServerTool(
@@ -129,10 +128,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     [Description(StatusDescription)]
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
-        var output = new StringWriter();
-        await new StatusRunner(output, TextWriter.Null, source).RunAsync(
-            binding.StatusRequest(), cancellationToken);
-        return output.ToString();
+        return await CaptureAsync(output => new StatusRunner(output, TextWriter.Null, source)
+            .RunAsync(binding.StatusRequest(), cancellationToken));
     }
 
     [McpServerTool(
@@ -148,12 +145,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         string ruleId,
         CancellationToken cancellationToken = default)
     {
-        var output = new StringWriter();
         // Error writer deliberately discarded: explain's answer is spec-derived and cannot be made wrong by
         // a load failure; the caveat channel for a partial model is arch_context's body, not this tool's.
-        await new ExplainRunner(output, TextWriter.Null, source).RunAsync(
-            binding.ExplainRequest(ruleId), cancellationToken);
-        return output.ToString();
+        return await CaptureAsync(output => new ExplainRunner(output, TextWriter.Null, source)
+            .RunAsync(binding.ExplainRequest(ruleId), cancellationToken));
     }
 
     [McpServerTool(
@@ -169,9 +164,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         string path,
         CancellationToken cancellationToken = default)
     {
-        var output = new StringWriter();
-        await new ContextRunner(output, source).RunAsync(binding.ContextRequest(path), cancellationToken);
-        return output.ToString();
+        // No error writer to discard: context's body is its only channel, so its runner takes stdout alone.
+        return await CaptureAsync(output => new ContextRunner(output, source)
+            .RunAsync(binding.ContextRequest(path), cancellationToken));
     }
 
     [McpServerTool(
@@ -203,7 +198,6 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         string? projects = null,
         CancellationToken cancellationToken = default)
     {
-        var output = new StringWriter();
         // Unlike arch_check and arch_status, the incomplete-model verdict cannot ride this document by
         // default — graph refuses before there is one — so the refusal throws and GlobalCallToolFilter
         // returns it as a clean un-logged error result.
@@ -214,10 +208,20 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // grain it landed on, so a reader can trust the grain stamp rather than diffing two surveys. The cap
         // is the truncator's, so degrading fires against exactly the number that would otherwise have
         // truncated.
-        await new GraphRunner(output, TextWriter.Null, source, fitter: fitter).RunAsync(
-            binding.GraphRequest(
-                allowWorkspaceDiagnostics, DocumentGrains.Coarsest(overview, skeleton), projects),
-            cancellationToken);
+        return await CaptureAsync(output => new GraphRunner(output, TextWriter.Null, source, fitter: fitter)
+            .RunAsync(
+                binding.GraphRequest(
+                    allowWorkspaceDiagnostics, DocumentGrains.Coarsest(overview, skeleton), projects),
+                cancellationToken));
+    }
+
+    // Every tool's shell: give the run a stdout to write into, discard the exit code it returns, and answer
+    // with what it wrote. Only BCL types appear here, so a runner is still reached solely from inside a tool
+    // method's own body and the MSBuildLocator JIT quarantine is exactly as tight as it was.
+    private static async Task<string> CaptureAsync(Func<TextWriter, Task<int>> run)
+    {
+        var output = new StringWriter();
+        await run(output);
         return output.ToString();
     }
 }

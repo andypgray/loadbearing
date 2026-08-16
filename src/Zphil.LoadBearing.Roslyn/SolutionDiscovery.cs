@@ -91,9 +91,11 @@ public static class SolutionDiscovery
     /// <param name="candidates">The solution files found there; rendered by file name.</param>
     internal static string AmbiguousMessage(string directory, IReadOnlyList<string> candidates)
     {
-        return $"Multiple solution files found in '{directory}':\n"
-               + $"  {string.Join("\n  ", candidates.Select(Path.GetFileName))}\n"
-               + FixLine;
+        var names = candidates
+            .Select(candidate => Path.GetFileName(candidate))
+            .ToList();
+
+        return EvidenceBlock.Compose($"Multiple solution files found in '{directory}':", names, FixLine);
     }
 
     /// <summary>
@@ -108,17 +110,19 @@ public static class SolutionDiscovery
     /// </param>
     internal static string NotFoundMessage(string directory, IReadOnlyList<string> nearMisses)
     {
-        var lines = new List<string> { $"No .sln, .slnf or .slnx file found in '{directory}' or any parent directory." };
+        var header = $"No .sln, .slnf or .slnx file found in '{directory}' or any parent directory.";
 
-        if (nearMisses.Count > 0)
-        {
-            lines.Add("Solution files one level down:");
-            lines.AddRange(nearMisses.Take(MaxNearMisses).Select(path => "  " + Path.GetRelativePath(directory, path)));
-            if (nearMisses.Count > MaxNearMisses) lines.Add($"  ... and {nearMisses.Count - MaxNearMisses} more");
-        }
+        // The heading rides the lede rather than standing as its own line: a walk-up that saw nothing one
+        // level down must not announce a list it is about to leave empty.
+        string lede = nearMisses.Count > 0
+            ? header + "\nSolution files one level down:"
+            : header;
 
-        lines.Add(FixLine);
-        return string.Join("\n", lines);
+        var relative = nearMisses
+            .Select(nearMiss => Path.GetRelativePath(directory, nearMiss))
+            .ToList();
+
+        return EvidenceBlock.Compose(lede, relative, FixLine, quoteCap: MaxNearMisses);
     }
 
     /// <summary>
@@ -153,26 +157,14 @@ public static class SolutionDiscovery
     private static string[] FindSlnFiles(string directory)
     {
         string[] candidates = Directory.EnumerateFiles(directory)
-            .Where(IsSolutionFile)
+            .Where(SolutionProjectFileParser.OwnsFormat)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
         string[] fullSolutions = candidates
-            .Where(path => !IsFilter(path))
+            .Where(path => !SolutionProjectFileParser.IsFilterFormat(path))
             .ToArray();
 
         return fullSolutions.Length > 0 ? fullSolutions : candidates;
-    }
-
-    private static bool IsSolutionFile(string path)
-    {
-        return path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
-               || IsFilter(path)
-               || path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsFilter(string path)
-    {
-        return path.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase);
     }
 }

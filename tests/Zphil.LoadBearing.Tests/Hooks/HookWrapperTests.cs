@@ -417,9 +417,7 @@ public sealed class HookWrapperTests
     /// </summary>
     private static void InitialiseRepository(HookSandbox sandbox)
     {
-        GitCommand.Run(sandbox.ProjectDirectory, "init");
-        GitCommand.Run(sandbox.ProjectDirectory, "config", "user.email", "loadbearing-test@example.invalid");
-        GitCommand.Run(sandbox.ProjectDirectory, "config", "user.name", "LoadBearing Test");
+        GitCommand.InitRepository(sandbox.ProjectDirectory);
         GitCommand.Run(
             sandbox.ProjectDirectory, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "baseline");
     }

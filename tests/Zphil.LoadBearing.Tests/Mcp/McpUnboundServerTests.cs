@@ -35,6 +35,12 @@ public sealed class McpUnboundServerTests : IDisposable
         """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_graph","arguments":{}}}""";
 
     /// <summary>
+    ///     What a polluted environment would cost both shapes: discovery walks parents to the drive root, so
+    ///     a stray solution in any ancestor of the temp root would bind the server and quietly void the test.
+    /// </summary>
+    private const string StrayWouldBind = "would bind this server — clean it.";
+
+    /// <summary>
     ///     Shorter than the harness default on purpose, and the only budget this suite names: discovery
     ///     refuses before any workspace opens, so two minutes is already generous.
     /// </summary>
@@ -51,10 +57,10 @@ public sealed class McpUnboundServerTests : IDisposable
     public async Task SeveralSolutionsAtTheRoot_StartsUnboundAndSaysWhyOnBothChannels()
     {
         // The ILSpy / MathNet shape: enough .sln* at the repository root that the walk-up cannot choose.
-        AssertNoSolutionInAnyAncestor(_temp.Path);
-        CreateSln("Alpha.sln");
-        CreateSln("Beta.slnf");
-        CreateSln("Gamma.slnx");
+        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(_temp.Path, StrayWouldBind);
+        SolutionPaths.CreateSln(_temp.Path, "Alpha.sln");
+        SolutionPaths.CreateSln(_temp.Path, "Beta.slnf");
+        SolutionPaths.CreateSln(_temp.Path, "Gamma.slnx");
 
         Conversation conversation = await ConverseAsync();
 
@@ -80,9 +86,9 @@ public sealed class McpUnboundServerTests : IDisposable
     {
         // The nopCommerce shape: nothing at the repository root, the solution under src\ — so the walk-up
         // climbs past the repository to the drive root and finds nothing at all.
-        AssertNoSolutionInAnyAncestor(_temp.Path);
+        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(_temp.Path, StrayWouldBind);
         Directory.CreateDirectory(_temp.PathOf("src"));
-        File.WriteAllText(_temp.PathOf("src", "Storefront.sln"), "");
+        SolutionPaths.CreateSln(_temp.PathOf("src"), "Storefront.sln");
 
         Conversation conversation = await ConverseAsync();
 
@@ -98,39 +104,6 @@ public sealed class McpUnboundServerTests : IDisposable
     }
 
     /// <summary>
-    ///     The precondition both shapes rest on: discovery walks parents to the drive root, so a stray
-    ///     solution in <em>any</em> ancestor of the temp root would bind the server and quietly void the
-    ///     test. Fail loudly on a polluted environment instead — including for the ambiguous shape, whose
-    ///     walk-up does not stop at the first ambiguous directory but keeps climbing for a single one.
-    /// </summary>
-    private static void AssertNoSolutionInAnyAncestor(string directory)
-    {
-        for (DirectoryInfo? dir = new(directory); dir is not null; dir = dir.Parent)
-        {
-            string[] solutionFiles;
-            try
-            {
-                solutionFiles = Directory.EnumerateFiles(dir.FullName, "*.sln")
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnf"))
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnx"))
-                    .ToArray();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-
-            solutionFiles.ShouldBeEmpty(
-                $"Stray solution file under ancestor '{dir.FullName}' would bind this server — clean it.");
-        }
-    }
-
-    private void CreateSln(string name)
-    {
-        File.WriteAllText(_temp.PathOf(name), "");
-    }
-
-    /// <summary>
     ///     Launches the bare <c>mcp</c> child in the prepared root, completes the handshake, calls
     ///     <c>arch_graph</c>, and returns both halves. Asserts the two regressions that matter here inline —
     ///     that <c>initialize</c> answers at all, and that the tool call comes back — because a null
@@ -138,7 +111,7 @@ public sealed class McpUnboundServerTests : IDisposable
     /// </summary>
     private async Task<Conversation> ConverseAsync()
     {
-        ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(McpChildHarness.TestsBinCliDll(), _temp.Path);
+        ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(TestsBinCli.Dll(), _temp.Path);
 
         ChildConversation conversation = await McpChildHarness.ConverseAsync(
             startInfo, [("arch_graph", 2, GraphRequest)], callBudget: DiscoveryRefusalBudget);

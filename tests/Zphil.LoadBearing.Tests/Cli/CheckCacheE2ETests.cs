@@ -31,7 +31,7 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public async Task Check_ColdThenIdenticalRerun_SecondRunHitsWithByteIdenticalOutputAndNoWorkspace()
     {
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("check-cache");
 
         CacheRun cold = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
         CacheRun warm = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
@@ -51,7 +51,7 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public async Task Check_NoCacheBothRuns_DisabledAndWritesNoCacheFile()
     {
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("check-cache");
 
         CacheRun first = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
         CacheRun second = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
@@ -74,7 +74,7 @@ public sealed class CheckCacheE2ETests
     public async Task Graph_SourceEditedBetweenRuns_PartialReExtractsDirtyPlusDependentsAndMatchesFreshCold()
     {
         using var workspace = new TempFixtureWorkspace();
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("check-cache");
 
         // Populate the cache from the clean tree.
         CacheRun cold = await RunGraphAsync(workspace.SolutionPath, cache.Root);
@@ -102,7 +102,7 @@ public sealed class CheckCacheE2ETests
     [Fact]
     public async Task GraphThenCheck_ShareOneStore_CheckHitsOnGraphsFragments()
     {
-        using var cache = new TempCacheDir();
+        using var cache = new TempCacheRoot("check-cache");
 
         // graph extracts every project (no spec, no exclusion) and writes them all.
         CacheRun graph = await RunGraphAsync(CliRunner.MyAppSolution, cache.Root);
@@ -255,7 +255,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, WorkingDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
+            new CheckRequest(solution, spec, true, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
             Ct);
 
         return new CacheRun(
@@ -270,7 +270,7 @@ public sealed class CheckCacheE2ETests
         var runner = new GraphRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new GraphRequest(solution, true, WorkingDirectoryOf(solution), noCache, null, false, DocumentGrain.Full, null), Ct);
+            new GraphRequest(solution, true, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, DocumentGrain.Full, null), Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);
@@ -279,11 +279,6 @@ public sealed class CheckCacheE2ETests
     private static FakeEnvironment EnvironmentFor(string cacheRoot)
     {
         return new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheRoot);
-    }
-
-    private static string WorkingDirectoryOf(string solution)
-    {
-        return Path.GetDirectoryName(Path.GetFullPath(solution))!;
     }
 
     // Writes a brand-new source file the SDK glob will compile in — an add only the cone scan can see.
@@ -296,10 +291,7 @@ public sealed class CheckCacheE2ETests
     // the bytes behind it.
     private static string WriteAssembly(TempDirectory temp, params string[] segments)
     {
-        string path = temp.PathOf(segments);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, "");
-        return path;
+        return temp.WriteFile(segments, "");
     }
 
     private sealed record CacheRun(
@@ -317,35 +309,10 @@ public sealed class CheckCacheE2ETests
 
         public int AcquireCount { get; private set; }
 
-        public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+        public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
         {
             AcquireCount++;
-            return inner.AcquireAsync(solution, workingDirectory, ct);
-        }
-    }
-
-    private sealed class TempCacheDir : IDisposable
-    {
-        private readonly TempDirectory temp = TestTempRoot.Fresh("check-cache");
-
-        // Not created: the cache root is the store's to mint, and every run here starts from its absence.
-        public string Root { get; }
-
-        public TempCacheDir()
-        {
-            Root = temp.UniqueChildPath();
-        }
-
-        public void Dispose()
-        {
-            temp.Dispose();
-        }
-
-        public bool HasCacheFile()
-        {
-            return Directory.Exists(Root)
-                   && Directory.EnumerateFiles(Root, "cache.json", SearchOption.AllDirectories)
-                       .Any();
+            return inner.AcquireAsync(solutionPath, ct);
         }
     }
 }

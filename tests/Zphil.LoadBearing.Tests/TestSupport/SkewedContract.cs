@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Cli.SpecLoading;
 
@@ -97,10 +98,19 @@ internal static class SkewedContract
                                   }
                                   """;
 
+    // The emitted image is a pure function of the version and a MetadataReference is immutable, so one
+    // compile per distinct version serves the whole run rather than one per request.
+    private static readonly ConcurrentDictionary<Version, MetadataReference> ByVersion = new();
+
     /// <summary>
     ///     The stand-in contract at <paramref name="version" />, as a reference to compile a spec against.
     /// </summary>
     internal static MetadataReference Reference(Version version)
+    {
+        return ByVersion.GetOrAdd(version, Emit);
+    }
+
+    private static MetadataReference Emit(Version version)
     {
         byte[] image = SpecAssemblyCompiler.EmitImage(
             Source.Replace("{VERSION}", version.ToString(), StringComparison.Ordinal),

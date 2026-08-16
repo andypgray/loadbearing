@@ -1,5 +1,5 @@
 using Zphil.LoadBearing.Internal;
-using Zphil.LoadBearing.Model;
+using DrawableVerb = Zphil.LoadBearing.Rendering.LawPlaceClassifier.DrawableVerb;
 
 namespace Zphil.LoadBearing.Rendering;
 
@@ -39,15 +39,14 @@ public static class LawDiagramRenderer
 
     private const string EmptyLawLabel = "(no rules this drawing can place)";
 
-    // The edge vocabulary and the legend rows that explain it, declared together so a label and its
-    // legend row cannot drift apart.
+    // The arrow glyphs and the legend rows that explain them, declared together so a glyph and its legend
+    // row cannot drift apart. The words the labels carry belong to the verb, not to the drawing, so
+    // LawPlaceClassifier hands those out.
     private const string BanArrow = "--x";
 
     private const string DebtArrowHead = "-.-x";
 
-    private const string ExposeVerb = "expose";
-
-    private const string OnlyVerb = "only";
+    private const string AllowArrow = "-->";
 
     private const string BanRowId = "ban";
 
@@ -90,7 +89,7 @@ public static class LawDiagramRenderer
         Guard.NotNullOrWhiteSpace(specName, nameof(specName));
 
         var places = new LawPlaces(model.Layers);
-        var edges = new List<(LawPlace Source, LawPlace Target, string Arrow)>();
+        var edges = new List<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)>();
         var unplaced = new List<ArchRule>();
 
         foreach (ArchRule rule in model.Rules) Walk(rule, places, edges, unplaced);
@@ -98,31 +97,15 @@ public static class LawDiagramRenderer
         places.ResolveNesting();
 
         var ids = NodeIds(places);
-        var lines = new List<string>
-        {
-            "```mermaid",
-            "flowchart LR",
-            $"    accTitle: Architecture law: {specName}",
-            "    accDescr: The places this spec names, the references it forbids, and the debt it grandfathers.",
-            ""
-        };
-        lines.AddRange(NodeLines(places, ids));
-
+        var nodeLines = NodeLines(places, ids);
         var edgeLines = EdgeLines(edges, ids);
-        if (edgeLines.Count > 0)
-        {
-            lines.Add("");
-            lines.AddRange(edgeLines);
-        }
-
         var legendLines = LegendLines(places, edges);
-        if (legendLines.Count > 0)
-        {
-            lines.Add("");
-            lines.AddRange(legendLines);
-        }
-
-        lines.Add("```");
+        var lines = MermaidText.Fence(
+            $"Architecture law: {specName}",
+            "The places this spec names, the references it forbids, and the debt it grandfathers.",
+            nodeLines,
+            edgeLines,
+            legendLines);
 
         string block = Caption(specName) + "\n\n" + string.Join("\n", lines);
         string list = CompactList(unplaced);
@@ -146,20 +129,20 @@ public static class LawDiagramRenderer
     private static void Walk(
         ArchRule rule,
         LawPlaces places,
-        List<(LawPlace Source, LawPlace Target, string Arrow)> edges,
+        List<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges,
         List<ArchRule> unplaced)
     {
-        // The quarantine arm runs BEFORE the verb switch. A containment rule is a
-        // MustOnlyBeReferencedBy, so the switch would happily draw it as an "only" edge — on top of the
+        // The quarantine arm runs BEFORE the verb triage. A containment rule is a MustOnlyBeReferencedBy,
+        // so the classifier would happily hand back an allow-list verb and draw its edge — on top of the
         // scope box that already says the same thing, and in the vocabulary of a rule the author never
-        // wrote. The ordering is the cure, not a special case inside the switch.
+        // wrote. The ordering is the cure, not a special case inside the triage.
         if (rule.Posture == Posture.Quarantine)
         {
             WalkQuarantine(rule, places, unplaced);
             return;
         }
 
-        if (!LawPlaceClassifier.IsDrawableVerb(rule.Constraint))
+        if (LawPlaceClassifier.Classify(rule.Constraint) is not { } verb)
         {
             unplaced.Add(rule);
             return;
@@ -173,9 +156,6 @@ public static class LawDiagramRenderer
             return;
         }
 
-        string arrow = Arrow(rule);
-        bool inbound = constraint is MustNotBeReferencedByConstraint or MustOnlyBeReferencedByConstraint;
-        bool only = constraint is MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint;
         var partial = false;
         var drawn = 0;
 
@@ -192,9 +172,11 @@ public static class LawDiagramRenderer
 
             // An only-verb naming its own subject is the permission for a place to reference itself,
             // which no reader needs an arrow to believe.
-            if (only && ReferenceEquals(other, subject)) continue;
+            if (verb.Only && ReferenceEquals(other, subject)) continue;
 
-            edges.Add(inbound ? (other, subject, arrow) : (subject, other, arrow));
+            edges.Add(verb.Inbound
+                ? (other, subject, rule.Posture, verb)
+                : (subject, other, rule.Posture, verb));
             drawn++;
         }
 
@@ -225,38 +207,24 @@ public static class LawDiagramRenderer
         foreach (Type facade in quarantine.Boundary) places.Facade(facade, scope);
     }
 
-    // The edge's middle token, complete with its pipe label. A Migrate rule draws the same relation it
-    // would as an Enforce rule, dotted and labelled as debt; the verb word rides along when the verb has
-    // one, so "grandfathered" never has to stand for two different bans.
-    private static string Arrow(ArchRule rule)
+    // The edge's middle token, complete with its pipe label — the drawing's own knowledge and nothing
+    // else: how a posture is drawn (a Migrate rule draws the same relation it would as an Enforce rule,
+    // dotted and labelled as debt) and which head an allow-list earns. The word comes from the verb, so
+    // "grandfathered" never has to stand for two different bans.
+    private static string Arrow(Posture posture, DrawableVerb verb)
     {
-        string? verb = rule.Constraint switch
-        {
-            MustNotExposeConstraint => ExposeVerb,
-            MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint => OnlyVerb,
-            _ => null
-        };
+        string? word = verb.VerbWord;
+        if (posture == Posture.Migrate)
+            return $"{DebtArrowHead}|\"{(word is null ? "grandfathered" : "grandfathered " + word)}\"|";
 
-        if (rule.Posture == Posture.Migrate)
-            return $"{DebtArrowHead}|\"{(verb is null ? "grandfathered" : "grandfathered " + verb)}\"|";
+        if (verb.Only) return $"{AllowArrow}|\"{word}\"|";
 
-        return verb switch
-        {
-            null => BanArrow,
-            OnlyVerb => $"-->|\"{OnlyVerb}\"|",
-            _ => $"{BanArrow}|\"{verb}\"|"
-        };
+        return word is null ? BanArrow : $"{BanArrow}|\"{word}\"|";
     }
 
     private static Dictionary<LawPlace, string> NodeIds(LawPlaces places)
     {
-        var sources = places.Ordered.Select(place => place.IdSource).ToList();
-        var ids = MermaidText.UniqueIds(PlaceIdPrefix, sources);
-
-        var map = new Dictionary<LawPlace, string>();
-        for (var i = 0; i < places.Ordered.Count; i++) map[places.Ordered[i]] = ids[i];
-
-        return map;
+        return MermaidText.IdMap(PlaceIdPrefix, places.Ordered, place => place.IdSource);
     }
 
     // Roots in registration order, each followed by what it contains. A law that placed nothing emits the
@@ -304,14 +272,15 @@ public static class LawDiagramRenderer
     }
 
     private static List<string> EdgeLines(
-        IReadOnlyList<(LawPlace Source, LawPlace Target, string Arrow)> edges,
+        IReadOnlyList<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges,
         IReadOnlyDictionary<LawPlace, string> ids)
     {
         var lines = new List<string>();
         var drawn = new HashSet<string>(StringComparer.Ordinal);
-        foreach ((LawPlace source, LawPlace target, string arrow) in edges)
+        foreach ((LawPlace source, LawPlace target, Posture posture, DrawableVerb verb) in edges)
         {
             // Two rules can forbid the same relation in the same words; one arrow says it once.
+            string arrow = Arrow(posture, verb);
             var line = $"    {ids[source]} {arrow} {ids[target]}";
             if (drawn.Add(line)) lines.Add(line);
         }
@@ -321,18 +290,20 @@ public static class LawDiagramRenderer
 
     // Every row is gated on its construct actually appearing in this drawing: a legend that explains a
     // dotted arrow the reader cannot see is teaching them about a feature, not about their architecture.
+    // The edge arms read the posture and the classified verb each edge was built from, never the arrow
+    // text composed from those two, so a respelled glyph cannot silently drop the row explaining it.
     private static List<string> LegendLines(
-        LawPlaces places, IReadOnlyList<(LawPlace Source, LawPlace Target, string Arrow)> edges)
+        LawPlaces places,
+        IReadOnlyList<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges)
     {
         var rows = new List<(string Id, string Text)>();
-        if (edges.Any(edge => edge.Arrow == BanArrow)) rows.Add((BanRowId, BanRowText));
+        if (edges.Any(edge => edge.Posture != Posture.Migrate && edge.Verb.VerbWord is null)) rows.Add((BanRowId, BanRowText));
 
-        if (edges.Any(edge => edge.Arrow.Contains(ExposeVerb))) rows.Add((ExposeRowId, ExposeRowText));
+        if (edges.Any(edge => edge.Verb.VerbWord == LawPlaceClassifier.ExposeVerb)) rows.Add((ExposeRowId, ExposeRowText));
 
-        if (edges.Any(edge => edge.Arrow.Contains(OnlyVerb))) rows.Add((OnlyRowId, OnlyRowText));
+        if (edges.Any(edge => edge.Verb.Only)) rows.Add((OnlyRowId, OnlyRowText));
 
-        if (edges.Any(edge => edge.Arrow.StartsWith(DebtArrowHead, StringComparison.Ordinal)))
-            rows.Add((DebtRowId, DebtRowText));
+        if (edges.Any(edge => edge.Posture == Posture.Migrate)) rows.Add((DebtRowId, DebtRowText));
 
         if (places.Ordered.Any(place => place.QuarantineScopeId is not null))
             rows.Add((QuarantineRowId, QuarantineRowText));

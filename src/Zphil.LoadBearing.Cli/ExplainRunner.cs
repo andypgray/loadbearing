@@ -53,7 +53,6 @@ internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISoluti
 
     private static string UnknownRuleMessage(string ruleId, ArchitectureModel model)
     {
-        return Refusals.NotFoundMessage(
-            $"Unknown rule ID '{ruleId}'", "Available rule IDs", Refusals.AvailableRuleIds(model));
+        return Refusals.RuleNotFound($"Unknown rule ID '{ruleId}'", model);
     }
 }

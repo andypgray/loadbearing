@@ -137,7 +137,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Sites.Select(site => site.Line)
             .ShouldBe([11]);
@@ -153,27 +153,13 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // Matching is exact definition-level FQN, not hierarchy: banning typeof(Exception) flags the broad
         // unfiltered `catch (System.Exception)` but NEVER the narrower `catch (IOException)`, filtered or not —
         // the narrow catch is a good state in its own right. Broad's presence proves the ban is live.
-        const string source = """
-                              namespace App
-                              {
-                                  public class Broad
-                                  {
-                                      public void Run() { try { } catch (System.Exception) { } }
-                                  }
-                                  public class Narrow
-                                  {
-                                      public void Run() { try { } catch (System.IO.IOException) { } }
-                                  }
-                              }
-                              """;
-
-        RuleResult result = Checker.Run(source, arch =>
+        RuleResult result = Checker.Run(Sources.CatchBroadVsNarrowModel, arch =>
                 arch.Rule("ex/filter-broad-catches")
                     .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.CatchPairs()
             .ShouldBe(["App.Broad -> System.Exception"]);
     }
@@ -185,29 +171,14 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // external types carry a shallow hierarchy. Worker catches its own N.AppError unfiltered (solution,
         // derives from Exception → matched → red) and an external System.InvalidOperationException, also
         // unfiltered but never matched by a DerivedFrom operand, so not flagged.
-        const string source = """
-                              namespace N
-                              {
-                                  public class AppError : System.Exception {}
-                                  public class Worker
-                                  {
-                                      public void Run()
-                                      {
-                                          try { } catch (N.AppError) { }
-                                          try { } catch (System.InvalidOperationException) { }
-                                      }
-                                  }
-                              }
-                              """;
-
-        RuleResult result = Checker.Run(source, arch =>
+        RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
                 arch.Rule("ex/filter-derived-catches")
                     .Enforce(arch.Namespace("N.*")
                         .MustNotCatchUnfiltered(arch.Types.DerivedFrom(typeof(Exception))))
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.CatchPairs()
             .ShouldBe(["N.Worker -> N.AppError"]);
     }
@@ -266,30 +237,16 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // Identity is the (source, caught) type pair (GRAMMAR §4.3) — the unfiltered sites are evidence, not
         // identity, so a baseline entry written for either catch verb keys the same edge. Handler is grandfathered
         // for catching AErr; its NEW unfiltered `catch (BErr)` is a distinct identity → red.
-        const string source = """
-                              namespace Errors { public class AErr : System.Exception {} public class BErr : System.Exception {} }
-                              namespace App
-                              {
-                                  public class Handler
-                                  {
-                                      public void Run()
-                                      {
-                                          try { } catch (Errors.AErr) { }
-                                          try { } catch (Errors.BErr) { }
-                                      }
-                                  }
-                              }
-                              """;
         BaselineIndex index = Checker.Baselines("ex/filter-catches", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
 
-        RuleResult result = Checker.Run(source, index, arch =>
+        RuleResult result = Checker.Run(Sources.CatchRatchetModel, index, arch =>
                 arch.Rule("ex/filter-catches")
                     .Migrate("legacy unfiltered catches", arch.Namespace("App.*")
                         .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("name what a broad catch expects"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.CatchPairs()
             .ShouldBe(["App.Handler -> Errors.BErr"]);
         result.ShouldHaveGrandfathered(1);

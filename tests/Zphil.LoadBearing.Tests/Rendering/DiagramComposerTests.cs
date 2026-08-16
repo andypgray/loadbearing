@@ -119,11 +119,11 @@ public sealed class DiagramComposerTests
     // A law naming a place the scoped survey drops, so the two halves are visibly independent.
     private static ArchitectureModel LawModel()
     {
-        return ArchModelBuilder.Build(new InlineSpec(arch =>
+        return Checker.Model(arch =>
             arch.Rule("layering/lib-is-a-leaf")
                 .Enforce(arch.Namespace("Lib.*")
                     .MustNotReference(arch.Namespace("App.*")))
-                .Because("A library that reaches back into its caller is not a library.")));
+                .Because("A library that reaches back into its caller is not a library."));
     }
 
     private static int Fences(string body)

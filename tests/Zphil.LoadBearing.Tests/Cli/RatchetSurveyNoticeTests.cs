@@ -29,18 +29,13 @@ public sealed class RatchetSurveyNoticeTests
             .Because("b");
     });
 
-    private static ArchRule Rule(string id)
-    {
-        return Model.Rules.Single(r => r.Id == id);
-    }
-
     [Fact]
     public void NoRatchetedRules_NothingFailing_EmitsNothingToDo()
     {
         var report = new CheckReport(
         [
-            Result(Rule("layering/billing-independent"), RuleStatus.Passed),
-            Result(Rule("layering/domain-independent"), RuleStatus.Passed)
+            Result(Model.Rule("layering/billing-independent"), RuleStatus.Passed),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Passed)
         ]);
 
         RatchetSurveyNotice.Lines(report, anyRatchetedRule: false)
@@ -55,8 +50,8 @@ public sealed class RatchetSurveyNoticeTests
     {
         var report = new CheckReport(
         [
-            Result(Rule("layering/billing-independent"), RuleStatus.Failed, 2),
-            Result(Rule("layering/domain-independent"), RuleStatus.Failed, 3)
+            Result(Model.Rule("layering/billing-independent"), RuleStatus.Failed, 2),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 3)
         ]);
 
         RatchetSurveyNotice.Lines(report, anyRatchetedRule: false)
@@ -76,8 +71,8 @@ public sealed class RatchetSurveyNoticeTests
     {
         var report = new CheckReport(
         [
-            Result(Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true),
-            Result(Rule("layering/domain-independent"), RuleStatus.Failed, 2)
+            Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true),
+            Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 2)
         ]);
 
         var lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: true);
@@ -95,7 +90,7 @@ public sealed class RatchetSurveyNoticeTests
     [Fact]
     public void RatchetedRulesPresent_OnlyRatchetedFailures_EmitsNothing()
     {
-        var report = new CheckReport([Result(Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2)]);
+        var report = new CheckReport([Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2)]);
 
         RatchetSurveyNotice.Lines(report, anyRatchetedRule: true)
             .ShouldBeEmpty();
@@ -104,7 +99,7 @@ public sealed class RatchetSurveyNoticeTests
     [Fact]
     public void SingleRuleSingleViolation_ReadsSingular()
     {
-        var report = new CheckReport([Result(Rule("layering/domain-independent"), RuleStatus.Failed, 1)]);
+        var report = new CheckReport([Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1)]);
 
         var lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: false);
 

@@ -317,10 +317,15 @@ internal sealed class TempFixtureWorkspace : IDisposable
         }
     }
 
+    /// <summary>Whether <paramref name="relativePath" /> lies under a <c>bin/</c> or <c>obj/</c> directory.</summary>
+    internal static bool IsBuildArtifact(string relativePath)
+    {
+        string normalized = relativePath.Replace('\\', '/');
+        return normalized.Contains("/bin/") || normalized.Contains("/obj/");
+    }
+
     private static bool IsBuildArtifact(string path, string source)
     {
-        string relative = path.Substring(source.Length)
-            .Replace('\\', '/');
-        return relative.Contains("/bin/") || relative.Contains("/obj/");
+        return IsBuildArtifact(path.Substring(source.Length));
     }
 }

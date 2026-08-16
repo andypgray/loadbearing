@@ -137,7 +137,7 @@ public sealed class FilteredSolutionE2ETests
         // rule whose subject the filter dropped is skipped rather than red — see the row below — so the only
         // thing narrowing changes about the verdict is what the stamp above it says the verdict covers.
         result.ShouldSucceed();
-        Normalized(result.Out)
+        result.Out.NormalizedLines()
             .ShouldStartWith(CheckStamp + "\n\n"); // a blank line separates the stamp from the verdict it scopes
     }
 
@@ -152,7 +152,7 @@ public sealed class FilteredSolutionE2ETests
             "check", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache");
 
         result.ShouldSucceed();
-        string report = Normalized(result.Out);
+        string report = result.Out.NormalizedLines();
         report.ShouldContain("\nskip data-access/no-inline-sql — ");
         report.ShouldContain("\n  skipped: " + RuleSkipReason);
         // The whole verdict, so a skip that quietly became a pass — or a second rule that started skipping —
@@ -171,7 +171,7 @@ public sealed class FilteredSolutionE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement rule = RuleOf(document, "data-access/no-inline-sql");
+        JsonElement rule = CheckJson.Rule(document, "data-access/no-inline-sql");
         rule.GetProperty("status")
             .GetString()
             .ShouldBe("skipped");
@@ -189,7 +189,7 @@ public sealed class FilteredSolutionE2ETests
             "status", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache");
 
         result.ShouldSucceed();
-        Normalized(result.Out)
+        result.Out.NormalizedLines()
             .ShouldStartWith(StatusStamp + "\n\n");
     }
 
@@ -201,7 +201,7 @@ public sealed class FilteredSolutionE2ETests
         CliResult result = await CliRunner.InvokeColdAsync("graph", BillingOnlyFilter(), "--no-cache");
 
         result.ShouldSucceed();
-        Normalized(result.Out)
+        result.Out.NormalizedLines()
             .ShouldStartWith(GraphStamp + "\n\n");
         result.Out.ShouldContain("MyApp.Legacy.Billing"); // the survey it does have still follows
     }
@@ -219,7 +219,7 @@ public sealed class FilteredSolutionE2ETests
         // once per rule the filter emptied, so "narrowed this run" no longer tells a stamp from a skip
         // reason. The lede's full stop does — a reason continues past it with a comma.
         result.Out.ShouldNotContain(NarrowingLede);
-        UncheckedProjectsOf(document)
+        CheckJson.Strings(document, "uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
         // It scopes the verdict rather than overturning it: nothing failed to load.
         document.RootElement.TryGetProperty("modelIncomplete", out _)
@@ -235,7 +235,7 @@ public sealed class FilteredSolutionE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         result.Out.ShouldNotContain(AnyNarrowing);
-        UncheckedProjectsOf(document)
+        CheckJson.Strings(document, "uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
     }
 
@@ -248,7 +248,7 @@ public sealed class FilteredSolutionE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         result.Out.ShouldNotContain(AnyNarrowing);
-        UncheckedProjectsOf(document)
+        CheckJson.Strings(document, "uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
     }
 
@@ -355,7 +355,8 @@ public sealed class FilteredSolutionE2ETests
             Ct);
 
         exit.ShouldBe(0); // a smaller true answer, so it answers
-        string answer = Normalized(output.ToString());
+        string answer = output.ToString()
+            .NormalizedLines();
         answer.ShouldStartWith(ContextStamp + "\n\n");
         answer.ShouldContain("No architecture scope covers"); // the answer it does have still follows
     }
@@ -507,7 +508,7 @@ public sealed class FilteredSolutionE2ETests
         string[] roots = [FilterDirectory, Path.GetDirectoryName(CliRunner.MyAppSolution)!];
         return roots
             .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-            .Where(path => !IsBuildArtifact(path))
+            .Where(path => !TempFixtureWorkspace.IsBuildArtifact(path))
             .Select(Describe)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -517,12 +518,6 @@ public sealed class FilteredSolutionE2ETests
     {
         var file = new FileInfo(path);
         return $"{path}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
-    }
-
-    private static bool IsBuildArtifact(string path)
-    {
-        string normalized = path.Replace('\\', '/');
-        return normalized.Contains("/bin/") || normalized.Contains("/obj/");
     }
 
     /// <summary>
@@ -537,29 +532,5 @@ public sealed class FilteredSolutionE2ETests
         string declaredPath = solutionPath.Replace('\\', '/');
         File.WriteAllText(filter, $$"""{ "solution": { "path": "{{declaredPath}}", "projects": [] } }""");
         return filter;
-    }
-
-    // The stamps are assembled with LFs and written one WriteLine per line, so they arrive CRLF-separated
-    // through a console writer. Comparing on LF keeps the pinned blocks readable as the blocks they are.
-    private static string Normalized(string output)
-    {
-        return output.Replace("\r\n", "\n");
-    }
-
-    private static string[] UncheckedProjectsOf(JsonDocument document)
-    {
-        return document.RootElement.GetProperty("uncheckedProjects")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? string.Empty)
-            .ToArray();
-    }
-
-    // One rule's object out of a check document, by ID — the documents key rule entries on `id`.
-    private static JsonElement RuleOf(JsonDocument document, string ruleId)
-    {
-        return document.RootElement.GetProperty("rules")
-            .EnumerateArray()
-            .Single(rule => rule.GetProperty("id")
-                .GetString() == ruleId);
     }
 }

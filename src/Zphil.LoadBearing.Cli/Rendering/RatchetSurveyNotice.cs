@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 

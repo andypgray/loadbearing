@@ -18,11 +18,21 @@ namespace Zphil.LoadBearing.Cli;
 /// <param name="environment">
 ///     The environment seam supplying the cache-root override, or <c>null</c> for real process state.
 /// </param>
-internal abstract class CacheWiredRunner(ISolutionSource? source, IEnvironment? environment)
+/// <param name="fitter">
+///     The response fitter a document-shaped verb offers its coarsening ladder to, or <c>null</c> for the
+///     terminal's own — the rung the caller asked for. A verb that writes no document leaves it out.
+/// </param>
+internal abstract class CacheWiredRunner(
+    ISolutionSource? source,
+    IEnvironment? environment,
+    IResponseFitter? fitter = null)
     : WorkspaceRunner(source)
 {
     /// <summary>The environment seam the cache root is resolved through.</summary>
     protected IEnvironment Environment { get; } = environment ?? new SystemEnvironment();
+
+    /// <summary>The fitter deciding which rung of a verb's grain ladder this run's caller actually gets.</summary>
+    protected IResponseFitter Fitter { get; } = fitter ?? ResponseFitter.FirstRung;
 
     /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
     internal CodebaseSourceOutcome? LastOutcome { get; private set; }

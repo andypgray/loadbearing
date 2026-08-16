@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
@@ -108,9 +107,12 @@ internal sealed class BinlogCaptureStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
         this.solutionPath = solutionPath;
-        captureManifestPath = CacheLocations.CaptureManifestPath(solutionPath, cacheRootOverride);
-        captureBinlogPath = CacheLocations.CaptureBinlogPath(solutionPath, cacheRootOverride);
-        cacheDirectory = Path.GetDirectoryName(captureManifestPath)!;
+
+        // Derived once: the directory is a symlink resolve, a case fold and a SHA-256, and this store wants
+        // all three of it — the manifest, the binlog copy, and the directory itself to create.
+        cacheDirectory = CacheLocations.CacheDirectory(solutionPath, cacheRootOverride);
+        captureManifestPath = CacheLocations.CaptureManifestPathIn(cacheDirectory);
+        captureBinlogPath = CacheLocations.CaptureBinlogPathIn(cacheDirectory);
     }
 
     /// <summary>
@@ -133,9 +135,13 @@ internal sealed class BinlogCaptureStore
     /// <summary>The refusal text when the binlog is missing one or more of the solution's csproj members.</summary>
     internal static string MissingCoverageMessage(string binlogArgument, IEnumerable<string> missingCsprojs)
     {
-        string list = string.Join("\n", missingCsprojs.OrderBy(p => p, StringComparer.Ordinal).Select(p => $"  {p}"));
-        return $"--binlog '{binlogArgument}' does not cover the solution; missing from the binlog:\n{list}\n"
-               + "Build the whole solution with -bl and pass that binlog.";
+        var ordered = missingCsprojs
+            .OrderBy(csproj => csproj, StringComparer.Ordinal)
+            .ToList();
+        return EvidenceBlock.Compose(
+            $"--binlog '{binlogArgument}' does not cover the solution; missing from the binlog:",
+            ordered,
+            "Build the whole solution with -bl and pass that binlog.");
     }
 
     /// <summary>The refusal text when the capture target is a solution filter (.slnf) rather than a full solution.</summary>
@@ -149,9 +155,13 @@ internal sealed class BinlogCaptureStore
     internal static string ExtraCoverageMessage(
         string binlogArgument, string solutionFileName, IEnumerable<string> extraCsprojs)
     {
-        string list = string.Join("\n", extraCsprojs.OrderBy(p => p, StringComparer.Ordinal).Select(p => $"  {p}"));
-        return $"--binlog '{binlogArgument}' contains projects that are not in '{solutionFileName}':\n{list}\n"
-               + "Pass a .binlog produced by building exactly this solution.";
+        var ordered = extraCsprojs
+            .OrderBy(csproj => csproj, StringComparer.Ordinal)
+            .ToList();
+        return EvidenceBlock.Compose(
+            $"--binlog '{binlogArgument}' contains projects that are not in '{solutionFileName}':",
+            ordered,
+            "Pass a .binlog produced by building exactly this solution.");
     }
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice when a structural input no longer matches.</summary>
@@ -189,11 +199,17 @@ internal sealed class BinlogCaptureStore
         // The early refusal is also what keeps RefuseIfCoverageMismatch's unguarded ReadCsprojMembers below
         // safe: that is deliberately the raw-membership reader, which runs the classic-.sln regex over a
         // filter's JSON and gets zero members. Reaching it with a .slnf would refuse for a nonsense reason.
-        if (solutionPath.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase))
+        if (SolutionProjectFileParser.IsFilterFormat(solutionPath))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
         var projects = CollectProjects(replayedSolution);
-        var structuralPaths = DedupedStructuralPaths(projects);
+        var structuralPaths = ProjectCone.SolutionStructuralPaths(
+            solutionPath,
+            projects.Select(project => (
+                project.CsprojPath,
+                project.ProjectDirectory,
+                project.EvaluatedOutputPath,
+                project.IntermediateAssemblyPath)));
 
         RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
         RefuseIfCoverageMismatch(projects, binlogArgument);
@@ -232,16 +248,27 @@ internal sealed class BinlogCaptureStore
 
     private void RefuseIfCoverageMismatch(IReadOnlyList<CaptureProjectEntry> projects, string binlogArgument)
     {
-        var solutionCsprojs = SolutionProjectFileParser.ReadCsprojMembers(solutionPath);
-        var replayCsprojs = projects.Select(p => p.CsprojPath).ToList();
+        // Canonicalized once per side, not once per comparison: resolving a path walks its ancestors probing
+        // for reparse points, and the two-way subtraction below asks about every member twice. The refusals
+        // quote the original spellings, which is what the pairing keeps hold of.
+        var solutionCsprojs = CanonicalPairs(SolutionProjectFileParser.ReadCsprojMembers(solutionPath));
+        var replayCsprojs = CanonicalPairs(projects.Select(project => project.CsprojPath));
 
-        var replayCanonical = new HashSet<string>(replayCsprojs.Select(CanonicalKey), PathComparison.Comparer);
-        var missing = solutionCsprojs.Where(p => !replayCanonical.Contains(CanonicalKey(p))).ToList();
+        var replayCanonical = new HashSet<string>(
+            replayCsprojs.Select(csproj => csproj.Canonical), PathComparison.Comparer);
+        var missing = solutionCsprojs
+            .Where(csproj => !replayCanonical.Contains(csproj.Canonical))
+            .Select(csproj => csproj.Original)
+            .ToList();
         if (missing.Count > 0)
             throw new UserErrorException(MissingCoverageMessage(binlogArgument, missing));
 
-        var solutionCanonical = new HashSet<string>(solutionCsprojs.Select(CanonicalKey), PathComparison.Comparer);
-        var extra = replayCsprojs.Where(p => !solutionCanonical.Contains(CanonicalKey(p))).ToList();
+        var solutionCanonical = new HashSet<string>(
+            solutionCsprojs.Select(csproj => csproj.Canonical), PathComparison.Comparer);
+        var extra = replayCsprojs
+            .Where(csproj => !solutionCanonical.Contains(csproj.Canonical))
+            .Select(csproj => csproj.Original)
+            .ToList();
         if (extra.Count > 0)
             throw new UserErrorException(
                 ExtraCoverageMessage(binlogArgument, Path.GetFileName(solutionPath), extra));
@@ -344,14 +371,14 @@ internal sealed class BinlogCaptureStore
 
     // The first cone add — a *.cs present in neither the recorded ConeFiles nor the compiled DocumentPaths,
     // i.e. the SDK-glob add a stat sweep cannot see. An excluded stray that was in the cone at ingest is in
-    // ConeFiles, so it is not read as an add; only a file new since ingest trips this. ProjectCone.Adds owns
-    // the scan and its ordinal sort, so "first" means the same thing here as it does to the fragment cache.
+    // ConeFiles, so it is not read as an add; only a file new since ingest trips this. ProjectCone.FirstAdd
+    // owns the scan and stops at the first hit: this asks whether the membership moved, not by how much.
     private static string? FirstConeAdd(CaptureProjectEntry project)
     {
         var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
         known.UnionWith(project.ConeFiles);
 
-        return ProjectCone.Adds(project.ProjectDirectory, known).FirstOrDefault();
+        return ProjectCone.FirstAdd(project.ProjectDirectory, known);
     }
 
     private void PromoteIfChanged(CaptureManifest manifest, IReadOnlyList<FileStamp> refreshedStructural)
@@ -364,129 +391,57 @@ internal sealed class BinlogCaptureStore
 
     // ── project collection ───────────────────────────────────────────────────────────────────────────────
 
-    // One entry per C# project (collapsing a multi-target-framework project's several Projects onto the one
-    // name the load boundary normalized them to, as SolutionCacheInputs does), with the FULL document set —
-    // obj-generated sources included, deliberately.
+    // One entry per C# project, with the FULL document set — obj-generated sources included, deliberately:
+    // they are csc inputs the binlog's command line fixes and replay cannot regenerate, so a clean that
+    // deletes one must invalidate the capture rather than let replay drift from the real build. That
+    // predicate is this store's only departure from the shared collapse; everything else, the
+    // multi-target-framework collapse included, is SolutionProjects' answer and the fragment cache's too.
     private static IReadOnlyList<CaptureProjectEntry> CollectProjects(Solution solution)
     {
-        var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
-
-        foreach (Project project in solution.Projects)
-        {
-            if (project.Language != LanguageNames.CSharp || project.FilePath is null) continue;
-
-            string csprojFull = Path.GetFullPath(project.FilePath);
-            if (!byName.TryGetValue(project.Name, out Accumulator? accumulator))
-            {
-                accumulator = new Accumulator(
-                    project.Name,
-                    csprojFull,
-                    Path.GetDirectoryName(csprojFull)!,
-                    project.OutputFilePath,
-                    project.CompilationOutputInfo.AssemblyPath);
-                byName[project.Name] = accumulator;
-            }
-
-            foreach (Document document in project.Documents)
-                if (document.FilePath is not null)
-                    accumulator.Documents.Add(Path.GetFullPath(document.FilePath));
-        }
-
-        return byName.Values
-            .OrderBy(a => a.ProjectName, StringComparer.Ordinal)
-            .Select(a => a.ToEntry())
+        return SolutionProjects.Collect(solution, static (_, _) => true)
+            .Select(ToEntry)
             .ToList();
     }
 
-    // ── structural enumeration (mirrors ExtractionCacheStore) ────────────────────────────────────────────
-
-    private IReadOnlyList<string> DedupedStructuralPaths(IReadOnlyList<CaptureProjectEntry> projects)
+    private static CaptureProjectEntry ToEntry(ProjectInputs project)
     {
-        var paths = new List<string>();
-        var seen = new HashSet<string>(PathComparison.Comparer);
-        foreach (string path in EnumerateStructuralPaths(projects))
-            if (seen.Add(path))
-                paths.Add(path);
-        return paths;
+        // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
+        var coneFiles = ProjectCone.Enumerate(project.ProjectDirectory)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        return new CaptureProjectEntry(
+            project.ProjectName,
+            project.CsprojPath,
+            project.ProjectDirectory,
+            project.DocumentPaths,
+            coneFiles,
+            project.EvaluatedOutputPath,
+            project.IntermediateAssemblyPath);
     }
 
-    private IEnumerable<string> EnumerateStructuralPaths(IReadOnlyList<CaptureProjectEntry> projects)
-    {
-        string fullSolution = Path.GetFullPath(solutionPath);
-        yield return fullSolution;
+    // ── read + atomic write ──────────────────────────────────────────────────────────────────────────────
 
-        foreach (CaptureProjectEntry project in projects)
-        {
-            yield return project.CsprojPath;
-
-            // The assets file then the ancestor × probe cross-product, in ProjectCone's order — the same
-            // recipe and the same order the fragment cache stamps, so the two cannot disagree about what
-            // "the structure moved" means.
-            foreach (string path in ProjectCone.StructuralPaths(
-                         project.ProjectDirectory, project.EvaluatedOutputPath, project.IntermediateAssemblyPath))
-                yield return path;
-        }
-    }
-
-    // ── read + atomic write (mirrors ExtractionCacheStore) ───────────────────────────────────────────────
-
+    // ManifestJson owns both halves and the degradation contract they share with the fragment cache; all this
+    // pair adds is which file and which generated metadata. Absence is asked separately by ValidateCore,
+    // which — unlike the fragment cache — must tell "no capture" (silent cold path) from "a capture that no
+    // longer reads" (a notice the operator has to act on).
     private CaptureManifest? TryReadManifest()
     {
-        try
-        {
-            byte[] bytes = File.ReadAllBytes(captureManifestPath);
-            return JsonSerializer.Deserialize(bytes, ManifestJson.Context.CaptureManifest);
-        }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null; // torn / garbled / unreadable ⇒ unreadable notice
-        }
+        return ManifestJson.TryRead(captureManifestPath, ManifestJson.Context.CaptureManifest);
     }
 
     private bool TryWriteManifestAtomic(CaptureManifest manifest)
     {
-        try
-        {
-            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJson.Context.CaptureManifest);
-            AtomicFile.WriteAllBytes(captureManifestPath, bytes);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return false; // the capture is disposable — a failed write is re-captured next run, never an error
-        }
+        return ManifestJson.TryWriteAtomic(captureManifestPath, manifest, ManifestJson.Context.CaptureManifest);
     }
 
     // ── small helpers ────────────────────────────────────────────────────────────────────────────────────
 
-    private static string CanonicalKey(string path)
+    private static IReadOnlyList<(string Original, string Canonical)> CanonicalPairs(IEnumerable<string> paths)
     {
-        return PathCanonicalizer.Resolve(path);
-    }
-
-    // Accumulates one project's identity and its unioned, ordinal-sorted document set across frameworks.
-    private sealed class Accumulator(
-        string projectName,
-        string csprojPath,
-        string projectDirectory,
-        string? evaluatedOutputPath,
-        string? intermediateAssemblyPath)
-    {
-        public string ProjectName { get; } = projectName;
-        public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
-
-        public CaptureProjectEntry ToEntry()
-        {
-            // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
-            var coneFiles = ProjectCone.Enumerate(projectDirectory).OrderBy(p => p, StringComparer.Ordinal).ToList();
-            return new CaptureProjectEntry(
-                ProjectName,
-                csprojPath,
-                projectDirectory,
-                Documents.ToList(),
-                coneFiles,
-                evaluatedOutputPath,
-                intermediateAssemblyPath);
-        }
+        return paths
+            .Select(path => (Original: path, Canonical: PathCanonicalizer.Resolve(path)))
+            .ToList();
     }
 }

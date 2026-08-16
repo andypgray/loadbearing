@@ -15,9 +15,7 @@ internal static class CodebaseModelBuilder
 {
     public static CodebaseModel Build(IReadOnlyList<CompilationInput> inputs)
     {
-        var fragments = inputs
-            .Select(FragmentExtractor.Extract)
-            .ToList();
+        var fragments = FragmentExtractor.ExtractAll(inputs);
 
         return FragmentMerger.Merge(fragments);
     }

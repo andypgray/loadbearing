@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
@@ -35,22 +36,16 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
         if (diagnostics.IsIncomplete)
         {
-            foreach (string line in IncompleteModelGate.ContextCaveat(diagnostics).Split('\n'))
-                output.WriteLine(line);
+            string caveat = IncompleteModelGate.ContextCaveat(diagnostics);
+            LineBlocks.Write(output, caveat);
             output.WriteLine();
         }
 
         // Beside that caveat rather than instead of it — both can be true of one run, and a broken model
         // outranks a small one, so the gate's block goes first. Context still exits 0: a narrowed universe is
-        // a smaller true answer, and this says which paths the pointer line below cannot speak for.
-        if (diagnostics.UncheckedProjects.Count > 0)
-        {
-            var uncheckedProjects = NarrowedUniverseNotice.Relative(
-                diagnostics.UncheckedProjects, source.SolutionDirectory);
-            string stamp = NarrowedUniverseNotice.ContextStamp(
-                Path.GetFileName(source.SolutionPath), uncheckedProjects);
-            NarrowedUniverseNotice.Write(output, stamp);
-        }
+        // a smaller true answer, and this says which paths the pointer line below cannot speak for. There is
+        // no --json to suppress it for; the stamp writes itself only when the run was narrowed.
+        NarrowingNotices.Stamp(output, source, NarrowedUniverseNotice.ContextStamp);
 
         // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost
         // and point at the root block.
@@ -82,8 +77,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         return 0;
     }
 
-    // Each matching card — layer cards before quarantine cards — blank line between cards. The card body is
-    // LF-internal; write it line by line so it adopts the output writer's newline (parity with the CLI).
+    // Each matching card — layer cards before quarantine cards — blank line between cards.
     private void WriteCards(IReadOnlyList<string> cards)
     {
         var first = true;
@@ -92,8 +86,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
             if (!first) output.WriteLine();
             first = false;
 
-            foreach (string line in card.Split('\n'))
-                output.WriteLine(line);
+            LineBlocks.Write(output, card);
         }
     }
 

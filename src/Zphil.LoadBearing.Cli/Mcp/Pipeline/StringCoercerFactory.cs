@@ -66,18 +66,19 @@ internal sealed class StringCoercerFactory : JsonConverterFactory
         {
             switch (reader.TokenType)
             {
-                case JsonTokenType.String:
-                    return reader.GetString();
-
                 case JsonTokenType.Null:
                     return null;
 
                 case JsonTokenType.StartArray:
-                    return ReadCoercedFromArray(ref reader);
+                    return ScalarArrayUnwrap.Read(
+                        ref reader,
+                        ReadCoercedScalar,
+                        static () => null,
+                        "Expected a string; got an array with multiple elements. " +
+                        "Pass a scalar string, not an array.");
 
                 default:
-                    throw new UserErrorException(
-                        $"Expected a string; got {reader.TokenType}.");
+                    return ReadCoercedScalar(ref reader, insideArray: false);
             }
         }
 
@@ -90,30 +91,20 @@ internal sealed class StringCoercerFactory : JsonConverterFactory
         }
 
         /// <summary>
-        ///     Reads a JSON array opened by the caller and collapses it to a single string per
-        ///     the rules in the class remarks. Hand-rolled to avoid recursing through
-        ///     <see cref="StringCoercerFactory" /> via <c>JsonSerializer.Deserialize&lt;string&gt;</c>.
+        ///     The scalar rules, shared by the top level and the single-element-array unwrap.
+        ///     <paramref name="insideArray" /> chooses the wording only: an error naming an "array element"
+        ///     tells the caller the coercer did look inside their array and still could not use what it
+        ///     found there. <see cref="JsonTokenType.Null" /> is deliberately not admitted here — the top
+        ///     level answers a bare null with "absent", which a null <em>inside</em> an array does not mean.
         /// </summary>
-        private static string? ReadCoercedFromArray(ref Utf8JsonReader reader)
+        private static string? ReadCoercedScalar(ref Utf8JsonReader reader, bool insideArray)
         {
-            if (!reader.Read()) throw new JsonException("Unexpected end of JSON while reading array.");
+            if (reader.TokenType == JsonTokenType.String) return reader.GetString();
 
-            if (reader.TokenType == JsonTokenType.EndArray) return null;
-
-            if (reader.TokenType != JsonTokenType.String)
-                throw new UserErrorException(
-                    $"Expected a string; got array element of type {reader.TokenType}.");
-
-            string value = reader.GetString()!;
-
-            if (!reader.Read()) throw new JsonException("Unexpected end of JSON while reading array.");
-
-            if (reader.TokenType != JsonTokenType.EndArray)
-                throw new UserErrorException(
-                    "Expected a string; got an array with multiple elements. " +
-                    "Pass a scalar string, not an array.");
-
-            return value;
+            string tokenSubject = insideArray
+                ? $"array element of type {reader.TokenType}"
+                : reader.TokenType.ToString();
+            throw new UserErrorException($"Expected a string; got {tokenSubject}.");
         }
     }
 }

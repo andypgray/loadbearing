@@ -76,7 +76,7 @@ public sealed class ProseQuotedOutputTests
 
         // Act: a rewrite of the sentence must fail here, because nothing else is watching it.
         foreach ((string doc, string summary) in ProseSummaries)
-            if (!ReadDoc(doc)
+            if (!RepoRoot.ReadText(doc)
                     .Contains(summary, StringComparison.Ordinal))
                 drift.Add($"{doc} no longer quotes '{summary}'.");
 
@@ -94,7 +94,7 @@ public sealed class ProseQuotedOutputTests
         // Act: the inverted guard. These are registered because a fence scanner cannot see them; the day
         // one is fenced, the fenced gates cover it and this entry should go.
         foreach ((string doc, string summary) in ProseSummaries)
-            if (SourceAnchors.Fences(ReadDoc(doc))
+            if (SourceAnchors.Fences(RepoRoot.ReadText(doc))
                 .Any(fence => fence.Any(line => line.Contains(summary, StringComparison.Ordinal))))
                 fenced.Add($"{doc} now quotes '{summary}' inside a fence; remove the exemption and let the fenced gates hold it.");
 
@@ -111,18 +111,13 @@ public sealed class ProseQuotedOutputTests
         List<string> unregistered = new();
 
         // Act
-        foreach (string doc in TrackedMarkdown())
+        foreach (string doc in TrackedFiles.Markdown)
+        foreach ((string line, int number) in SourceAnchors.UnfencedLines(RepoRoot.ReadText(doc)))
         {
-            var fenced = SourceAnchors.FencedLines(ReadDoc(doc))
-                .Select(static line => line.Number)
-                .ToHashSet();
-            foreach ((string line, int number) in Lines(doc))
-            {
-                if (fenced.Contains(number) || !SummaryLine.IsMatch(line)) continue;
+            if (!SummaryLine.IsMatch(line)) continue;
 
-                if (!ProseSummaries.Any(entry => entry.Doc == doc && line.Contains(entry.Summary, StringComparison.Ordinal)))
-                    unregistered.Add($"{doc}:{number} quotes a check summary in prose but is not registered: {line.Trim()}");
-            }
+            if (!ProseSummaries.Any(entry => entry.Doc == doc && line.Contains(entry.Summary, StringComparison.Ordinal)))
+                unregistered.Add($"{doc}:{number} quotes a check summary in prose but is not registered: {line.Trim()}");
         }
 
         // Assert
@@ -138,7 +133,7 @@ public sealed class ProseQuotedOutputTests
         List<string> wrong = new();
 
         // Act
-        foreach (string doc in TrackedMarkdown())
+        foreach (string doc in TrackedFiles.Markdown)
         foreach ((string line, int number) in Lines(doc))
         {
             Match match = SummaryLine.Match(line);
@@ -165,7 +160,7 @@ public sealed class ProseQuotedOutputTests
         // and should be held like every other capture.
         foreach ((string doc, string marker, string _) in TimedCaptures)
         {
-            var fences = SourceAnchors.Fences(ReadDoc(doc))
+            var fences = SourceAnchors.Fences(RepoRoot.ReadText(doc))
                 .Where(fence => fence.Any(line => line.Contains(marker, StringComparison.Ordinal)))
                 .ToArray();
             if (fences.Length != 1)
@@ -184,17 +179,10 @@ public sealed class ProseQuotedOutputTests
             $"These permanently-exempt captures no longer match what the exemption describes:\n{string.Join("\n", dead)}");
     }
 
-    private static IReadOnlyList<string> TrackedMarkdown()
-    {
-        return TrackedFiles.All
-            .Where(static path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-    }
-
     private static IEnumerable<(string Text, int Number)> Lines(string doc)
     {
-        return ReadDoc(doc)
-            .Replace("\r\n", "\n")
+        return RepoRoot.ReadText(doc)
+            .NormalizedLines()
             .Split('\n')
             .Select(static (text, index) => (text, index + 1));
     }
@@ -203,10 +191,5 @@ public sealed class ProseQuotedOutputTests
     {
         return int.Parse(match.Groups[name]
             .Value);
-    }
-
-    private static string ReadDoc(string doc)
-    {
-        return File.ReadAllText(RepoRoot.Absolute(doc));
     }
 }

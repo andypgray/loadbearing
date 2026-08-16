@@ -108,7 +108,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ExposurePairs()
             .ShouldBe(["App.Wide -> System.Exception"]);
     }
@@ -139,7 +139,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ExposurePairs()
             .ShouldBe(["N.Gateway -> N.AppError"]);
     }
@@ -216,7 +216,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("keep the internal types off the public API"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ExposurePairs()
             .ShouldBe(["App.Facade -> Secrets.B"]);
         result.ShouldHaveGrandfathered(1);

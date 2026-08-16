@@ -47,7 +47,7 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.InjectionPairs()
             .ShouldBe(
                 ["App.Consumer -> App.IBar", "App.Consumer -> App.Bar"], true);
@@ -89,7 +89,7 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.InjectionPairs()
             .ShouldBe(
                 ["App.Consumer -> App.ISingletonDep", "App.Consumer -> App.IScopedDep", "App.Consumer -> App.ITransientDep"],
@@ -126,7 +126,7 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.InjectionPairs()
             .ShouldBe(["App.Consumer -> System.IDisposable"]);
     }

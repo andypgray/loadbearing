@@ -137,7 +137,7 @@ public sealed class DocHygieneTests
     public void PublishedDoc_HasNoInternalWorkingReferences(string relativePath)
     {
         // Arrange
-        string content = ReadDoc(relativePath);
+        string content = RepoRoot.ReadText(relativePath);
 
         // Act
         var hits = DocProse.FindForbidden(content, InternalReferencePatterns);
@@ -151,7 +151,7 @@ public sealed class DocHygieneTests
     public void ReaderDoc_HoldsHouseVoice(string relativePath)
     {
         // Arrange
-        string content = ReadDoc(relativePath);
+        string content = RepoRoot.ReadText(relativePath);
 
         // Act
         var hits = DocProse.FindForbidden(content, HouseVoicePatterns);
@@ -165,7 +165,7 @@ public sealed class DocHygieneTests
     public void ReaderDoc_StaysWithinProseBudgets(string relativePath)
     {
         // Arrange
-        string prose = DocProse.StripFences(ReadDoc(relativePath));
+        string prose = DocProse.StripFences(RepoRoot.ReadText(relativePath));
 
         // Act
         int words = DocProse.CountWords(prose);
@@ -225,11 +225,6 @@ public sealed class DocHygieneTests
         // Assert
         uncovered.ShouldBeEmpty(
             $"Tracked reader doc(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
-    }
-
-    private static string ReadDoc(string relativePath)
-    {
-        return File.ReadAllText(RepoRoot.Absolute(relativePath));
     }
 
     private static TheoryData<string> ToTheoryData(string[] docs)

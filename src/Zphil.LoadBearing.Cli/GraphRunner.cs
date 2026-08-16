@@ -42,10 +42,14 @@ internal sealed class GraphRunner(
     TextWriter error,
     ISolutionSource? source = null,
     IEnvironment? environment = null,
-    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment)
+    IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)
     {
+        // This run's human channel. --json owns stdout, where the survey document is the only thing written,
+        // so under it the stamp below goes nowhere.
+        TextWriter human = request.Json ? TextWriter.Null : output;
+
         using var source = await CodebaseSource.CreateSpeclessAsync(
             SolutionSource, Environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
 
@@ -54,14 +58,13 @@ internal sealed class GraphRunner(
         // below, so the MCP surface — which discards this error writer — gets the same actionable message.
         // A cache hit refuses identically: diagnostics persist into the extraction cache and replay with it.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        bool modelIncomplete = diagnostics.IsIncomplete;
         if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
             throw new UserErrorException(IncompleteModelGate.GraphRefusal(diagnostics));
 
         CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
         RecordCacheOutcome(source);
         GraphSummary summary = GraphSummarizer.Summarize(codebase);
-        string solutionName = Path.GetFileName(source.SolutionPath);
+        string solutionName = source.SolutionName;
 
         // Scope, then refuse, then render. The refusal fires here rather than at parse time because the
         // inventory it lists IS the extraction's output: nothing before this point knows the solution's
@@ -76,31 +79,19 @@ internal sealed class GraphRunner(
         // carries.
         var renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
-        WriteNarrowingStamp(request, source, diagnostics);
+
+        // The narrowing stamp is human-channel only, where the document carries the same fact in
+        // uncheckedProjects.
+        NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.GraphStamp);
 
         if (request.Json)
             WriteJson(
-                request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, modelIncomplete,
-                diagnostics.FailedProjects, diagnostics.UncheckedProjects,
-                diagnostics.RestoreFailedProjects, projectGlobs);
+                request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, diagnostics,
+                projectGlobs);
         else
             WriteHuman(request, summary, scoped, solutionName, projectGlobs);
 
         return 0;
-    }
-
-    // The human narrowing stamp, byte-silent on every run that narrowed nothing and suppressed under --json,
-    // where the document carries the same fact in uncheckedProjects. Sited in the runner for the rules-filter
-    // stamp's reason: an unfiltered run's output stays byte-identical to what it always was.
-    private void WriteNarrowingStamp(GraphRequest request, CodebaseSource source, WorkspaceDiagnostics diagnostics)
-    {
-        if (diagnostics.UncheckedProjects.Count == 0 || request.Json) return;
-
-        NarrowedUniverseNotice.Write(
-            output,
-            NarrowedUniverseNotice.GraphStamp(
-                Path.GetFileName(source.SolutionPath),
-                NarrowedUniverseNotice.Relative(diagnostics.UncheckedProjects, source.SolutionDirectory)));
     }
 
     // The JSON survey, degraded rather than cut. The runner offers every grain from the requested floor down
@@ -111,25 +102,18 @@ internal sealed class GraphRunner(
     // caller asked about, and every rung carries the same narrowing.
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionDirectory, string solutionName,
-        IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects, IReadOnlyList<string> restoreFailedProjects,
+        IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         IReadOnlyList<string> projectGlobs)
     {
-        GraphJsonRenderer.Render(output, (fitter ?? ResponseFitter.FirstRung).Fit(Ladder(request.Grain)));
+        var ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        string document = Fitter.Fit(ladder);
+        output.WriteLine(document);
         return;
-
-        // Lazy on purpose: each rung costs a full serialization, so a fitter that stops at the first pays for
-        // exactly one. The ladder cannot spin — every rung is strictly coarser and Skeleton is last.
-        IEnumerable<string> Ladder(DocumentGrain floor)
-        {
-            for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return Compose(at);
-        }
 
         string Compose(DocumentGrain at)
         {
             return GraphJsonRenderer.Document(
-                scoped, solutionDirectory, solutionName, renderedDiagnostics, modelIncomplete, failedProjects,
-                uncheckedProjects, restoreFailedProjects, at, projectGlobs);
+                scoped, solutionDirectory, solutionName, renderedDiagnostics, diagnostics, at, projectGlobs);
         }
     }
 

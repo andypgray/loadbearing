@@ -77,25 +77,13 @@ public static class GraphDiagramRenderer
             .Where(project => project.SolutionMember != false && filter.Includes(project.Name))
             .ToList();
         var ids = NodeIds(projects);
-
-        var lines = new List<string>
-        {
-            "```mermaid",
-            "flowchart LR",
-            $"    accTitle: Codebase survey: {solutionName}",
-            "    accDescr: Projects in this solution and their cross-project references.",
-            ""
-        };
-        lines.AddRange(NodeLines(projects, ids));
-
-        var edges = EdgeLines(summary, projects, ids);
-        if (edges.Count > 0)
-        {
-            lines.Add("");
-            lines.AddRange(edges);
-        }
-
-        lines.Add("```");
+        var nodeLines = NodeLines(projects, ids);
+        var edgeLines = EdgeLines(summary, projects, ids);
+        var lines = MermaidText.Fence(
+            $"Codebase survey: {solutionName}",
+            "Projects in this solution and their cross-project references.",
+            nodeLines,
+            edgeLines);
 
         return ProvenanceLine(solutionName) + "\n\n" + string.Join("\n", lines);
     }
@@ -113,10 +101,10 @@ public static class GraphDiagramRenderer
     // One node per in-scope project, in the summary's ordinal order. An empty scope emits the (none)
     // placeholder rather than an empty diagram, so the artifact's shape stays stable — the same convention
     // the text survey's empty sections follow.
-    private static IEnumerable<string> NodeLines(IReadOnlyList<ProjectSummary> projects, IReadOnlyDictionary<string, string> ids)
+    private static IReadOnlyList<string> NodeLines(IReadOnlyList<ProjectSummary> projects, IReadOnlyDictionary<string, string> ids)
     {
         return projects.Count > 0
-            ? projects.Select(project => $"    {ids[project.Name]}[\"{Label(project.Name)}\"]")
+            ? projects.Select(project => $"    {ids[project.Name]}[\"{MermaidText.Label(project.Name)}\"]").ToList()
             : [$"    {EmptyScopeNodeId}[\"{EmptyScopeLabel}\"]"];
     }
 
@@ -145,22 +133,11 @@ public static class GraphDiagramRenderer
 
     // Project name → Mermaid node ID: the prefix plus a deterministic slug, deduped with an ordinal suffix
     // so two names that slug alike (MyApp.Web and MyApp-Web) still get distinct nodes. Slugging, dedupe
-    // and label escaping are MermaidText's, shared with the law fence in the same artifact.
+    // and label escaping are MermaidText's, shared with the law fence in the same artifact. The map is
+    // keyed by the name, because that is what an edge names at both ends.
     private static Dictionary<string, string> NodeIds(IReadOnlyList<ProjectSummary> projects)
     {
         var names = projects.Select(project => project.Name).ToList();
-        var minted = MermaidText.UniqueIds(NodeIdPrefix, names);
-
-        var ids = new Dictionary<string, string>(StringComparer.Ordinal);
-        for (var i = 0; i < names.Count; i++) ids[names[i]] = minted[i];
-
-        return ids;
-    }
-
-    // Labels are the project name verbatim, inside a quoted label, with the characters Mermaid reads as
-    // markup sent out as the entities it reads back as themselves.
-    private static string Label(string name)
-    {
-        return MermaidText.Label(name);
+        return MermaidText.IdMap(NodeIdPrefix, names, name => name, StringComparer.Ordinal);
     }
 }

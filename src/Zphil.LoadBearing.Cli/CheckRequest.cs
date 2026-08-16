@@ -49,4 +49,4 @@ internal sealed record CheckRequest(
     bool AllowWorkspaceDiagnostics,
     string? Sarif,
     string? Rules,
-    DocumentGrain Grain);
+    DocumentGrain Grain) : IReplayableRequest;

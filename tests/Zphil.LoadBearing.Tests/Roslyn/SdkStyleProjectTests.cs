@@ -189,14 +189,9 @@ public sealed class SdkStyleProjectTests
         string classicBilling = Path.Combine(
             FixturesRoot, "LegacySolutions", "ClassicApp", "Classic.Billing", "Classic.Billing.csproj");
         using var workspace = new AdhocWorkspace();
-        ProjectInfo loaded = ProjectInfo
-            .Create(
-                ProjectId.CreateNewId(), VersionStamp.Default, "Classic.Billing", "Classic.Billing",
-                LanguageNames.CSharp, classicBilling)
-            .WithOutputFilePath(Path.Combine(Path.GetDirectoryName(classicBilling)!, "bin", "Classic.Billing.dll"));
-        workspace.AddProject(loaded);
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Classic.Billing", classicBilling));
 
-        RestoreFailures.Detect(workspace.CurrentSolution, [])
+        RestoreFailures.Detect(solution, [])
             .ShouldBeEmpty();
     }
 

@@ -50,6 +50,23 @@ public static class AgentContextRenderer
 
     private const string GlossaryTail = "Expand any rule ID with `loadbearing explain <rule-id>`.";
 
+    // The axis clauses in emission order, each beside the fact that earns it, so the pairing is stated once
+    // instead of split across a row of booleans and a same-typed positional signature.
+    // The two exception axes gate on the axis, not on one verb: any catch verb renders the catch clause and
+    // any throw verb the throw clause, so a spec that swaps MustNotCatch for MustNotCatchUnfiltered or
+    // MustNotSwallow (or MustOnlyThrow for MustNotThrow) renders byte-identically — the fact being glossed
+    // is the same fact.
+    private static readonly (Func<ArchRule, bool> Applies, string Clause)[] GlossaryAxes =
+    [
+        (rule => rule.Constraint?.MemberOperands.Count > 0, GlossaryUseClause),
+        (rule => rule.Constraint is MustNotConstructConstraint, GlossaryConstructClause),
+        (rule => rule.Constraint is MustNotInjectConstraint, GlossaryInjectClause),
+        (rule => rule.Constraint is MustNotCatchConstraint or MustNotCatchUnfilteredConstraint or MustNotSwallowConstraint,
+            GlossaryCatchClause),
+        (rule => rule.Constraint is MustOnlyThrowConstraint or MustNotThrowConstraint, GlossaryThrowClause),
+        (rule => rule.Constraint is MustNotExposeConstraint, GlossaryExposeClause)
+    ];
+
     /// <summary>
     ///     The provenance/warning line — the first line inside every managed block. Names the
     ///     spec deterministically (assembly file name without extension) so the pin is
@@ -85,23 +102,12 @@ public static class AgentContextRenderer
     {
         Guard.NotNull(model, nameof(model));
 
-        bool hasMemberRule = model.Rules.Any(rule => rule.Constraint?.MemberOperands.Count > 0);
-        bool hasCtorRule = model.Rules.Any(rule => rule.Constraint is MustNotConstructConstraint);
-        bool hasInjectRule = model.Rules.Any(rule => rule.Constraint is MustNotInjectConstraint);
-        // The two exception clauses gate on the axis, not on one verb: any catch verb renders the catch clause
-        // and any throw verb the throw clause, so a spec that swaps MustNotCatch for MustNotCatchUnfiltered or
-        // MustNotSwallow (or MustOnlyThrow for MustNotThrow) renders byte-identically — the fact being glossed
-        // is the same fact.
-        bool hasCatchRule = model.Rules.Any(rule =>
-            rule.Constraint is MustNotCatchConstraint or MustNotCatchUnfilteredConstraint or MustNotSwallowConstraint);
-        bool hasThrowRule = model.Rules.Any(rule => rule.Constraint is MustOnlyThrowConstraint or MustNotThrowConstraint);
-        bool hasExposeRule = model.Rules.Any(rule => rule.Constraint is MustNotExposeConstraint);
         bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
         var sections = new List<string>
         {
             ProvenanceLine(specName),
             Heading,
-            GlossaryLine(hasMemberRule, hasCtorRule, hasInjectRule, hasCatchRule, hasThrowRule, hasExposeRule)
+            GlossaryLine(model.Rules)
         };
 
         // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
@@ -125,39 +131,27 @@ public static class AgentContextRenderer
     // The glossary/drill-down line, composed from the always-on "reference" clause plus the axis clauses the
     // spec actually exercises, then the shared tail — so a spec that exercises no axis beyond references
     // renders the bare "reference." line and nothing more (GRAMMAR §4.1/§4.5/§10).
-    private static string GlossaryLine(
-        bool hasMemberRule, bool hasCtorRule, bool hasInjectRule, bool hasCatchRule, bool hasThrowRule, bool hasExposeRule)
+    private static string GlossaryLine(IReadOnlyList<ArchRule> rules)
     {
+        var exercised = GlossaryAxes
+            .Where(axis => rules.Any(axis.Applies))
+            .Select(axis => axis.Clause);
+
         var clauses = new List<string> { GlossaryReferenceClause };
-        if (hasMemberRule) clauses.Add(GlossaryUseClause);
-        if (hasCtorRule) clauses.Add(GlossaryConstructClause);
-        if (hasInjectRule) clauses.Add(GlossaryInjectClause);
-        if (hasCatchRule) clauses.Add(GlossaryCatchClause);
-        if (hasThrowRule) clauses.Add(GlossaryThrowClause);
-        if (hasExposeRule) clauses.Add(GlossaryExposeClause);
+        clauses.AddRange(exercised);
 
         return string.Join("; ", clauses) + ". " + GlossaryTail;
     }
 
     // True when a rule's subject or any operand carries a Registered noun (GRAMMAR §10) — descending through
     // Except payloads and the internal Quarantine union, since a Registered noun in any of those still renders the
-    // word "registered" in the block's prose and so must gate the glossary line.
+    // word "registered" in the block's prose and so must gate the glossary line. The descent is the shared
+    // SelectionWalk, so the block glosses exactly the nouns validation sees; the union guard is
+    // SpecValidator.CheckLifetimes's, and it is load-bearing because a UnionSelection has no noun to read.
     private static bool CarriesRegisteredNoun(Constraint constraint)
     {
-        return SelectionCarriesRegisteredNoun(constraint.Subject) || constraint.Operands.Any(SelectionCarriesRegisteredNoun);
-    }
-
-    private static bool SelectionCarriesRegisteredNoun(Selection selection)
-    {
-        // A union has no noun of its own, so its operands answer for it; either way the selection's own
-        // Except payloads are walked after — a union carries adjectives too (AnyOf(a, b).Except(registered)
-        // still renders the word "registered").
-        if (selection is UnionSelection union
-                ? union.Parts.Any(SelectionCarriesRegisteredNoun)
-                : selection.Noun is RegisteredNoun)
-            return true;
-
-        return selection.Adjectives.OfType<ExceptAdjective>().Any(except => SelectionCarriesRegisteredNoun(except.Payload));
+        var selections = SelectionWalk.ConstraintSelections(constraint);
+        return selections.Any(selection => selection is not UnionSelection && selection.Noun is RegisteredNoun);
     }
 
     /// <summary>
@@ -228,16 +222,23 @@ public static class AgentContextRenderer
         return string.Join("\n\n", sections);
     }
 
+    // Every section of the root block is an H3 heading over a bullet list, so the shape is written once and
+    // each builder is left saying only what its bullets are.
+    private static string Section(string heading, IEnumerable<string> bullets)
+    {
+        return "### " + heading + "\n" + string.Join("\n", bullets);
+    }
+
     private static string LayersSection(IReadOnlyList<LayerDefinition> layers)
     {
         var bullets = layers.Select(layer => "- " + layer.DefinitionFragment);
-        return "### Layers\n" + string.Join("\n", bullets);
+        return Section("Layers", bullets);
     }
 
     private static string RulesSection(IReadOnlyList<ArchRule> rules)
     {
         var bullets = rules.Select(rule => RuleBullet(rule));
-        return "### Rules\n" + string.Join("\n", bullets);
+        return Section("Rules", bullets);
     }
 
     // The Migrate counter-prior section: one bullet per Migrate rule that names
@@ -246,7 +247,7 @@ public static class AgentContextRenderer
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
     {
         var bullets = rules.Select(rule => RuleBullet(rule, counts));
-        return "### Migrations\n" + string.Join("\n", bullets);
+        return Section("Migrations", bullets);
     }
 
     // One rule's context bullet — the shared composer for the root Rules and Migrations sections and
@@ -280,7 +281,7 @@ public static class AgentContextRenderer
     private static string QuarantinedScopesSection(IReadOnlyList<ArchRule> containmentRules)
     {
         var bullets = containmentRules.Select(QuarantinedScopeBullet);
-        return "### Quarantined scopes\n" + string.Join("\n", bullets);
+        return Section("Quarantined scopes", bullets);
     }
 
     private static string QuarantinedScopeBullet(ArchRule rule)

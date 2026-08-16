@@ -139,6 +139,18 @@ internal sealed class TempDirectory(string path) : IDisposable
     }
 
     /// <summary>
+    ///     Writes <paramref name="content" /> to <paramref name="segments" /> under this directory, minting
+    ///     the parent directories the write needs, and returns the absolute path written.
+    /// </summary>
+    public string WriteFile(string[] segments, string content)
+    {
+        string path = Under(segments);
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    /// <summary>
     ///     A distinct child path, <em>not</em> created — for the callees that mint the directory themselves
     ///     and would rather find it absent.
     /// </summary>

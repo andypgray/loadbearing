@@ -19,14 +19,42 @@ namespace Zphil.LoadBearing.Rendering;
 internal static class LawPlaceClassifier
 {
     /// <summary>
-    ///     The five verbs the fence can draw: the four dependency-direction verbs and the exposure verb.
-    ///     Every other verb constrains a shape, a name, or a member rather than a relation between two
-    ///     places, and an arrow would misrepresent it.
+    ///     The word an exposure edge's label carries. Shared because the legend row that explains that
+    ///     label is gated on the verb rather than on the composed arrow text; the allow-list word needs no
+    ///     such constant, because <see cref="DrawableVerb.Only" /> already names that fact.
     /// </summary>
+    internal const string ExposeVerb = "expose";
+
+    private const string OnlyVerb = "only";
+
+    /// <summary>
+    ///     What the fence draws for a verb, or null when the verb draws nothing. The five drawable verbs
+    ///     are the four dependency-direction verbs and the exposure verb; every other verb constrains a
+    ///     shape, a name, or a member rather than a relation between two places, and an arrow would
+    ///     misrepresent it.
+    /// </summary>
+    /// <remarks>
+    ///     One reading answers the whole drawing — the arrow's direction, the self-edge an allow-list makes
+    ///     redundant, the word the label carries, and the legend rows those imply — so a verb can never be
+    ///     one thing to the arrow and another to the legend.
+    /// </remarks>
+    internal static DrawableVerb? Classify(Constraint? constraint)
+    {
+        return constraint switch
+        {
+            MustNotReferenceConstraint => new DrawableVerb(inbound: false, only: false, verbWord: null),
+            MustNotBeReferencedByConstraint => new DrawableVerb(inbound: true, only: false, verbWord: null),
+            MustOnlyReferenceConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
+            MustOnlyBeReferencedByConstraint => new DrawableVerb(inbound: true, only: true, verbWord: OnlyVerb),
+            MustNotExposeConstraint => new DrawableVerb(inbound: false, only: false, verbWord: ExposeVerb),
+            _ => null
+        };
+    }
+
+    /// <summary>Whether the fence can draw an edge for this verb at all.</summary>
     internal static bool IsDrawableVerb(Constraint? constraint)
     {
-        return constraint is MustNotReferenceConstraint or MustNotBeReferencedByConstraint
-            or MustOnlyReferenceConstraint or MustOnlyBeReferencedByConstraint or MustNotExposeConstraint;
+        return Classify(constraint) is not null;
     }
 
     /// <summary>
@@ -36,7 +64,7 @@ internal static class LawPlaceClassifier
     /// </summary>
     internal static LawPlace? SubjectPlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
-        return Classify(selection, layers, false);
+        return PlaceOf(selection, layers, false);
     }
 
     /// <summary>
@@ -46,7 +74,7 @@ internal static class LawPlaceClassifier
     /// </summary>
     internal static LawPlace? OperandPlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
-        return Classify(selection, layers, true);
+        return PlaceOf(selection, layers, true);
     }
 
     /// <summary>A place standing for one namespace glob, carrying a declared layer's name when one owns that glob.</summary>
@@ -70,7 +98,7 @@ internal static class LawPlaceClassifier
         return new LawPlace(TypeKey(type), TypeName.Simple(type), TypeName.Simple(type), [], false) { IsFacade = true };
     }
 
-    private static LawPlace? Classify(Selection? selection, IReadOnlyList<LayerDefinition> layers, bool typeIsAPlace)
+    private static LawPlace? PlaceOf(Selection? selection, IReadOnlyList<LayerDefinition> layers, bool typeIsAPlace)
     {
         // A union carries no noun head at all, and reading one throws; the guard comes before every
         // other question about the selection.
@@ -146,5 +174,22 @@ internal static class LawPlaceClassifier
     {
         NamespacePattern.TryParseSubtree(glob, out string prefix);
         return prefix;
+    }
+
+    /// <summary>
+    ///     What one drawable verb means to the drawing: which end of the relation the arrow leaves from,
+    ///     whether it states an allow-list rather than a ban, and the word its label carries when it has
+    ///     one.
+    /// </summary>
+    internal sealed class DrawableVerb(bool inbound, bool only, string? verbWord)
+    {
+        /// <summary>Whether the operand is the source of the arrow — the passive voice of a direction verb.</summary>
+        internal bool Inbound { get; } = inbound;
+
+        /// <summary>Whether the verb names an allow-list, which is what makes it naming its own subject a no-op.</summary>
+        internal bool Only { get; } = only;
+
+        /// <summary>The word the edge label carries, or null for the plain ban that needs none.</summary>
+        internal string? VerbWord { get; } = verbWord;
     }
 }

@@ -257,7 +257,7 @@ public sealed class ReadmeAnchorGateTests
 
     private static IReadOnlyList<SourceAnchor> ExtractDoc(string doc)
     {
-        string text = File.ReadAllText(Path.Combine(RepoRoot.Directory, doc.Replace('/', Path.DirectorySeparatorChar)));
+        string text = RepoRoot.ReadText(doc);
         return SourceAnchors.Extract(doc, text);
     }
 }

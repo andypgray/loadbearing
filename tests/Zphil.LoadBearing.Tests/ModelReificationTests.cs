@@ -40,7 +40,7 @@ public class ModelReificationTests
     private static ArchRule Rule(string id)
     {
         return BuildCanonical()
-            .Rules.Single(rule => rule.Id == id);
+            .Rule(id);
     }
 
     [Fact]
@@ -182,11 +182,11 @@ public class ModelReificationTests
     {
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment")
+        QuarantineData containment = model.Rule("legacy/billing/containment")
             .Quarantine!;
         containment.DragonsDoc.ShouldBe("arch/billing-dragons.md");
         containment.Dragons.ShouldBeNull();
-        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire")
+        model.Rule("legacy/billing/tripwire")
             .Quarantine!.DragonsDoc
             .ShouldBe("arch/billing-dragons.md");
     }
@@ -197,12 +197,12 @@ public class ModelReificationTests
         // DragonsDocScopeSpec omits .Baseline, so the containment child falls back to the default.
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rules.Single(rule => rule.Id == "legacy/billing/containment")
+        QuarantineData containment = model.Rule("legacy/billing/containment")
             .Quarantine!;
         // .Baseline omitted ⇒ conventional default derived from the containment rule ID (GRAMMAR §4.4/§7).
         containment.BaselinePath.ShouldBe("arch/baselines/legacy/billing/containment.json");
         // The tripwire's baseline stays null — grandfathering is a containment concern.
-        model.Rules.Single(rule => rule.Id == "legacy/billing/tripwire")
+        model.Rule("legacy/billing/tripwire")
             .Quarantine!.BaselinePath.ShouldBeNull();
     }
 
@@ -217,7 +217,7 @@ public class ModelReificationTests
                         arch.Member(typeof(DateTime), nameof(DateTime.Now)),
                         arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
                 .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn."))
-            .Rules.Single(r => r.Id == "time/inject-clock");
+            .Rule("time/inject-clock");
 
         rule.Posture.ShouldBe(Posture.Migrate);
         var constraint = rule.Constraint.ShouldBeOfType<MustNotUseConstraint>();
@@ -278,7 +278,7 @@ public class ModelReificationTests
                         .MustHaveSuffix("Async"))
                     .Because("Async methods are discovered by suffix.");
             })
-            .Rules.Single(r => r.Id == "naming/async-suffix");
+            .Rule("naming/async-suffix");
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MemberMustHaveSuffixConstraint>();
@@ -338,32 +338,12 @@ public class ModelReificationTests
     [Fact]
     public void MustNotInject_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — the model is identical to
-        // writing arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for SqlConnection either way.
-        var sugar = Checker.Model(arch => arch.Rule("di/no-inject-sql")
-                .Enforce(arch.Types.MustNotInject(typeof(SqlConnection)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotInjectConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("di/no-inject-sql")
-                .Enforce(arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotInjectConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(SqlConnection));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotInjectConstraint>(
+            "di/no-inject-sql",
+            arch => arch.Types.MustNotInject(typeof(SqlConnection)),
+            arch => arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))),
+            constraint => constraint.Targets,
+            typeof(SqlConnection));
     }
 
     [Fact]
@@ -375,63 +355,36 @@ public class ModelReificationTests
                 .Because("Swallowing invalid-operation signals hides real defects."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotCatchConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // MustNotCatch is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustNotCatchConstraint>(rule, constraint => constraint.Targets);
     }
 
     [Fact]
     public void MustNotCatchUnfilteredRule_ReifiesToWalkableCatchConstraint()
     {
-        // A single MustNotCatchUnfiltered-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        // A single MustNotCatchUnfiltered-rule spec, for the dependency-verb reification + empty-member-hook
+        // pins. The filter condition lives in the verb, so the node's shape is the plain catch verb's — no extra
+        // operand carries it, and the member hook stays empty.
         ArchRule rule = Checker.Model(arch => arch.Rule("errors/filter-broad-catches")
                 .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
                 .Because("A broad catch names what it expects in a `when` filter."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // The filter condition lives in the verb, so the node's shape is the plain catch verb's — no extra operand
-        // carries it, and the member hook stays empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustNotCatchUnfilteredConstraint>(
+            rule, constraint => constraint.Targets);
     }
 
     [Fact]
     public void MustNotSwallowRule_ReifiesToWalkableCatchConstraint()
     {
-        // A single MustNotSwallow-rule spec, for the dependency-verb reification + empty-member-hook pins.
+        // A single MustNotSwallow-rule spec, for the dependency-verb reification + empty-member-hook pins. Both
+        // the filter condition and the rethrow condition live in the verb, so the node's shape is the plain catch
+        // verb's — no extra operand carries either, and the member hook stays empty.
         ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-swallowed-broad-catches")
                 .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
                 .Because("A handler that holds a failure and continues hides it."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotSwallowConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // Both the filter condition and the rethrow condition live in the verb, so the node's shape is the plain
-        // catch verb's — no extra operand carries either, and the member hook stays empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustNotSwallowConstraint>(rule, constraint => constraint.Targets);
     }
 
     [Fact]
@@ -443,17 +396,7 @@ public class ModelReificationTests
                 .Because("Bare BCL exception types carry no meaning a caller can dispatch on."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotThrowConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // MustNotThrow is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustNotThrowConstraint>(rule, constraint => constraint.Targets);
     }
 
     [Fact]
@@ -465,172 +408,62 @@ public class ModelReificationTests
                 .Because("Domain code must surface only sanctioned exception types."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustOnlyThrowConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // MustOnlyThrow is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustOnlyThrowConstraint>(rule, constraint => constraint.Targets);
     }
 
     [Fact]
     public void MustNotCatch_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = Checker.Model(arch => arch.Rule("errors/no-catch")
-                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotCatchConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("errors/no-catch")
-                .Enforce(arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotCatchConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(InvalidOperationException));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchConstraint>(
+            "errors/no-catch",
+            arch => arch.Types.MustNotCatch(typeof(InvalidOperationException)),
+            arch => arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))),
+            constraint => constraint.Targets,
+            typeof(InvalidOperationException));
     }
 
     [Fact]
     public void MustNotCatchUnfiltered_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("errors/no-unfiltered-catch")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotCatchUnfilteredConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(Exception));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchUnfilteredConstraint>(
+            "errors/no-unfiltered-catch",
+            arch => arch.Types.MustNotCatchUnfiltered(typeof(Exception)),
+            arch => arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))),
+            constraint => constraint.Targets,
+            typeof(Exception));
     }
 
     [Fact]
     public void MustNotSwallow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = Checker.Model(arch => arch.Rule("errors/no-swallow")
-                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotSwallowConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("errors/no-swallow")
-                .Enforce(arch.Types.MustNotSwallow(arch.Type(typeof(Exception))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotSwallowConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(Exception));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotSwallowConstraint>(
+            "errors/no-swallow",
+            arch => arch.Types.MustNotSwallow(typeof(Exception)),
+            arch => arch.Types.MustNotSwallow(arch.Type(typeof(Exception))),
+            constraint => constraint.Targets,
+            typeof(Exception));
     }
 
     [Fact]
     public void MustNotThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = Checker.Model(arch => arch.Rule("errors/no-throw")
-                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotThrowConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("errors/no-throw")
-                .Enforce(arch.Types.MustNotThrow(arch.Type(typeof(Exception))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotThrowConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(Exception));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotThrowConstraint>(
+            "errors/no-throw",
+            arch => arch.Types.MustNotThrow(typeof(Exception)),
+            arch => arch.Types.MustNotThrow(arch.Type(typeof(Exception))),
+            constraint => constraint.Targets,
+            typeof(Exception));
     }
 
     [Fact]
     public void MustOnlyThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exception type either way.
-        var sugar = Checker.Model(arch => arch.Rule("errors/throw-only")
-                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustOnlyThrowConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("errors/throw-only")
-                .Enforce(arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustOnlyThrowConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(InvalidOperationException));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustOnlyThrowConstraint>(
+            "errors/throw-only",
+            arch => arch.Types.MustOnlyThrow(typeof(InvalidOperationException)),
+            arch => arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))),
+            constraint => constraint.Targets,
+            typeof(InvalidOperationException));
     }
 
     [Fact]
@@ -642,48 +475,18 @@ public class ModelReificationTests
                 .Because("Public signatures must not leak infrastructure types."))
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotExposeConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(constraint.Targets);
-        // MustNotExpose is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        ShouldReifyToWalkableDependencyConstraint<MustNotExposeConstraint>(rule, constraint => constraint.Targets);
     }
 
     [Fact]
     public void MustNotExpose_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        // The Type-sugar overload wraps each bare type as a single-type selection — identical to writing
-        // arch.Type(...) by hand (GRAMMAR §3.3): one bare TypeNoun operand for the exposed type either way.
-        var sugar = Checker.Model(arch => arch.Rule("api/no-expose")
-                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotExposeConstraint>();
-        var wrapped = Checker.Model(arch => arch.Rule("api/no-expose")
-                .Enforce(arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotExposeConstraint>();
-
-        sugar.Targets.Count.ShouldBe(1);
-        Type sugarType = sugar.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        Type wrappedType = wrapped.Targets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Type;
-        sugarType.ShouldBe(typeof(SqlConnection));
-        wrappedType.ShouldBe(sugarType);
-        sugar.Targets[0]
-            .Adjectives.ShouldBeEmpty();
+        ShouldReifyTypeSugarLikeWrappedSelection<MustNotExposeConstraint>(
+            "api/no-expose",
+            arch => arch.Types.MustNotExpose(typeof(SqlConnection)),
+            arch => arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))),
+            constraint => constraint.Targets,
+            typeof(SqlConnection));
     }
 
     // ---- Surface union: arch.AnyOf reification (GRAMMAR §5.1) ----
@@ -761,5 +564,75 @@ public class ModelReificationTests
 
         union.Parts.Count.ShouldBe(1);
         union.Adjectives.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="rule" /> reified to the walkable shape every dependency-shape verb shares:
+    ///     an Enforce <typeparamref name="TConstraint" /> carrying one target, with the generic walk reaching
+    ///     that target through <c>Operands</c>, an empty member hook, and the subject selection intact.
+    /// </summary>
+    /// <remarks>
+    ///     <paramref name="targets" /> is a parameter because each verb declares its own <c>Targets</c> rather
+    ///     than inheriting one from <see cref="OperandConstraint" /> — reading it through the concrete type is
+    ///     what keeps every row pinning the property its own verb publishes.
+    /// </remarks>
+    private static void ShouldReifyToWalkableDependencyConstraint<TConstraint>(
+        ArchRule rule, Func<TConstraint, IReadOnlyList<Selection>> targets)
+        where TConstraint : OperandConstraint
+    {
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<TConstraint>();
+        var declared = targets(constraint);
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        declared.Count.ShouldBe(1);
+        constraint.Operands.ShouldBe(declared);
+        // A dependency-shape verb overrides Operands, not MemberOperands — its member hook is empty.
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    ///     Asserts a verb's bare-<c>Type</c> sugar overload reifies to exactly what the <c>arch.Type(…)</c>
+    ///     spelling does (GRAMMAR §3.3). The sugar wraps each bare type as a single-type selection, so both
+    ///     spellings carry one bare <see cref="TypeNoun" /> operand for <paramref name="expected" />, and it
+    ///     carries no adjectives.
+    /// </summary>
+    private static void ShouldReifyTypeSugarLikeWrappedSelection<TConstraint>(
+        string ruleId,
+        Func<Arch, Constraint> sugar,
+        Func<Arch, Constraint> wrapped,
+        Func<TConstraint, IReadOnlyList<Selection>> targets,
+        Type expected)
+        where TConstraint : OperandConstraint
+    {
+        var sugared = Checker.Model(arch => arch.Rule(ruleId)
+                .Enforce(sugar(arch))
+                .Because("Reason."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<TConstraint>();
+        var handWritten = Checker.Model(arch => arch.Rule(ruleId)
+                .Enforce(wrapped(arch))
+                .Because("Reason."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<TConstraint>();
+        var sugaredTargets = targets(sugared);
+        var handWrittenTargets = targets(handWritten);
+
+        sugaredTargets.Count.ShouldBe(1);
+        Type sugarType = sugaredTargets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        Type wrappedType = handWrittenTargets[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type;
+        sugarType.ShouldBe(expected);
+        wrappedType.ShouldBe(sugarType);
+        sugaredTargets[0]
+            .Adjectives.ShouldBeEmpty();
     }
 }

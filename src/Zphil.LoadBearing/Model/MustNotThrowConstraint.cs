@@ -10,18 +10,10 @@ namespace Zphil.LoadBearing.Model;
 ///     <see cref="MustNotCatchConstraint" /> — so the generic operand/prose/foreign-Arch walks reach it
 ///     with no special-casing.
 /// </summary>
-internal sealed class MustNotThrowConstraint : Constraint
+internal sealed class MustNotThrowConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    internal MustNotThrowConstraint(Selection subject, IReadOnlyList<Selection> targets)
-        : base(subject)
-    {
-        Targets = targets;
-    }
-
     /// <summary>The forbidden throw targets.</summary>
-    internal IReadOnlyList<Selection> Targets { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Targets;
+    internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not throw " + SentenceRenderer.TargetList(Targets);
 }

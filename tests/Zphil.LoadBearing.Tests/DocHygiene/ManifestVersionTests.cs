@@ -89,7 +89,7 @@ public sealed class ManifestVersionTests
 
     private static (string Top, string Package) ManifestVersions()
     {
-        string json = File.ReadAllText(RepoRoot.Absolute(ManifestPath));
+        string json = RepoRoot.ReadText(ManifestPath);
 
         using JsonDocument manifest = JsonDocument.Parse(json);
         JsonElement root = manifest.RootElement;
@@ -105,7 +105,7 @@ public sealed class ManifestVersionTests
     // leaf — the field a bump has to reach and nothing cross-checks against the tag — is read here.
     private static string SarifDriverVersion()
     {
-        string json = File.ReadAllText(RepoRoot.Absolute(SarifGoldenPath));
+        string json = RepoRoot.ReadText(SarifGoldenPath);
 
         using JsonDocument golden = JsonDocument.Parse(json);
         JsonElement firstRun = golden.RootElement.GetProperty("runs")[0];

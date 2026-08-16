@@ -28,10 +28,7 @@ public sealed class RuleBaseline
             if (!_lookup.ContainsKey(entry))
                 _lookup.Add(entry, entry);
 
-        Entries = _lookup.Values
-            .OrderBy(e => e.Source ?? e.Subject, StringComparer.Ordinal)
-            .ThenBy(e => e.Target ?? string.Empty, StringComparer.Ordinal)
-            .ToList();
+        Entries = BaselineEntry.InCanonicalOrder(_lookup.Values);
     }
 
     /// <summary>The grandfathered entries, deduped and tuple-sorted ordinal.</summary>

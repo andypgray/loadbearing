@@ -105,21 +105,6 @@ internal static class McpChildHarness
     }
 
     /// <summary>
-    ///     The CLI build output beside the test assembly — the tests project references the CLI project, so
-    ///     its output lands there. This is the in-repo server: a child launched from it maps its images out
-    ///     of the repository's build tree.
-    /// </summary>
-    internal static string TestsBinCliDll()
-    {
-        string path = Path.Combine(AppContext.BaseDirectory, "loadbearing.dll");
-        if (!File.Exists(path))
-            throw new InvalidOperationException(
-                $"The CLI build output 'loadbearing.dll' was not found beside the test assembly at '{path}'.");
-
-        return path;
-    }
-
-    /// <summary>
     ///     Runs one whole client conversation against a child started from <paramref name="startInfo" />:
     ///     launch, drain stderr, handshake, each of <paramref name="calls" /> in order, kill the tree, drain.
     ///     Returns what came back rather than asserting on it, because every caller's "it never arrived"

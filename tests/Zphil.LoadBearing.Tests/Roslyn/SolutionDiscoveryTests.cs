@@ -16,6 +16,13 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// </summary>
 public sealed class SolutionDiscoveryTests : IDisposable
 {
+    /// <summary>
+    ///     What a polluted environment would cost the rows that need the walk-up to find nothing: a stray
+    ///     solution file in any ancestor makes discovery find one and not throw, so the row would pass — or
+    ///     throw — for the wrong reason.
+    /// </summary>
+    private const string StrayMakesItMeaningless = "makes this test meaningless — clean it.";
+
     private readonly ScopedEnvironmentVariable _solutionPathVariable = new(LoadBearingEnvVars.SolutionPath, null);
 
     private readonly TempDirectory _temp = TestTempRoot.Fresh("discovery");
@@ -33,44 +40,10 @@ public sealed class SolutionDiscoveryTests : IDisposable
         return dir;
     }
 
-    private static string CreateSln(string directory, string name)
-    {
-        string path = Path.Combine(directory, name);
-        File.WriteAllText(path, "");
-        return path;
-    }
-
-    /// <summary>
-    ///     The precondition every "the walk-up finds nothing" test rests on: discovery walks parents to the
-    ///     drive root, so a stray solution file in <em>any</em> ancestor of the temp root would make it find
-    ///     one and not throw. Fail loudly on a polluted environment rather than passing — or throwing — for
-    ///     the wrong reason.
-    /// </summary>
-    private static void AssertNoSolutionInAnyAncestor(string directory)
-    {
-        for (DirectoryInfo? dir = new(directory); dir is not null; dir = dir.Parent)
-        {
-            string[] solutionFiles;
-            try
-            {
-                solutionFiles = Directory.EnumerateFiles(dir.FullName, "*.sln")
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnf"))
-                    .Concat(Directory.EnumerateFiles(dir.FullName, "*.slnx"))
-                    .ToArray();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-
-            solutionFiles.ShouldBeEmpty($"Stray solution file under ancestor '{dir.FullName}' makes this test meaningless — clean it.");
-        }
-    }
-
     [Fact]
     public void DiscoverSolution_ExplicitPath_ReturnsFullPath()
     {
-        string slnPath = CreateSln(_temp.Path, "Explicit.sln");
+        string slnPath = SolutionPaths.CreateSln(_temp.Path, "Explicit.sln");
 
         string result = SolutionDiscovery.DiscoverSolution(slnPath);
 
@@ -90,9 +63,9 @@ public sealed class SolutionDiscoveryTests : IDisposable
     [Fact]
     public void DiscoverSolution_EnvVarSet_TakesPrecedenceOverWalkUp()
     {
-        string envSln = CreateSln(_temp.Path, "FromEnvVar.sln");
+        string envSln = SolutionPaths.CreateSln(_temp.Path, "FromEnvVar.sln");
         string cwdDir = CreateDir("has-its-own-sln");
-        CreateSln(cwdDir, "WalkUpWouldFindThis.sln");
+        SolutionPaths.CreateSln(cwdDir, "WalkUpWouldFindThis.sln");
         Environment.SetEnvironmentVariable(LoadBearingEnvVars.SolutionPath, envSln);
 
         string result = SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir);
@@ -117,7 +90,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     public void DiscoverSolution_SingleSolutionInAncestor_FoundByWalkUp()
     {
         string ancestorDir = CreateDir("ancestor");
-        string ancestorSln = CreateSln(ancestorDir, "Found.sln");
+        string ancestorSln = SolutionPaths.CreateSln(ancestorDir, "Found.sln");
         string cwdDir = CreateDir("ancestor", "src", "app");
 
         string result = SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir);
@@ -129,8 +102,8 @@ public sealed class SolutionDiscoveryTests : IDisposable
     public void DiscoverSolution_MultipleSolutionsInDirectory_ThrowsListingFiles()
     {
         string cwdDir = CreateDir("ambiguous");
-        CreateSln(cwdDir, "Alpha.sln");
-        CreateSln(cwdDir, "Beta.slnx");
+        SolutionPaths.CreateSln(cwdDir, "Alpha.sln");
+        SolutionPaths.CreateSln(cwdDir, "Beta.slnx");
 
         var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir));
 
@@ -152,8 +125,8 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // rival candidate, so this directory is not ambiguous — and a refusal naming the filter would have
         // invited deleting it, which would not have helped.
         string cwdDir = CreateDir("filter-beside-its-solution");
-        string solution = CreateSln(cwdDir, "Alpha.sln");
-        CreateSln(cwdDir, "BillingOnly.slnf");
+        string solution = SolutionPaths.CreateSln(cwdDir, "Alpha.sln");
+        SolutionPaths.CreateSln(cwdDir, "BillingOnly.slnf");
 
         SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir)
             .ShouldBe(solution);
@@ -165,9 +138,9 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // Demotion settles which candidates compete; it never turns two solutions into one answer. The
         // filter is gone from the message because acting on it could not resolve anything.
         string cwdDir = CreateDir("ambiguous-with-a-filter");
-        CreateSln(cwdDir, "Alpha.sln");
-        CreateSln(cwdDir, "Beta.slnf");
-        CreateSln(cwdDir, "Gamma.slnx");
+        SolutionPaths.CreateSln(cwdDir, "Alpha.sln");
+        SolutionPaths.CreateSln(cwdDir, "Beta.slnf");
+        SolutionPaths.CreateSln(cwdDir, "Gamma.slnx");
 
         var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir));
 
@@ -180,7 +153,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     public void DiscoverSolution_NoSolutionAnywhere_ThrowsNamingBothFixes()
     {
         string cwdDir = CreateDir("empty", "deep", "nested");
-        AssertNoSolutionInAnyAncestor(cwdDir);
+        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(cwdDir, StrayMakesItMeaningless);
 
         var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: cwdDir));
 
@@ -197,9 +170,9 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // walk-up climbs past the repository entirely. Discovery still refuses — it never widens the
         // search into a guess — but naming the file turns a dead end into one copy-paste.
         string root = CreateDir("repo");
-        AssertNoSolutionInAnyAncestor(root);
-        CreateSln(CreateDir("repo", "src"), "Storefront.sln");
-        CreateSln(CreateDir("repo", "bin"), "StaleBuildOutput.sln");
+        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(root, StrayMakesItMeaningless);
+        SolutionPaths.CreateSln(CreateDir("repo", "src"), "Storefront.sln");
+        SolutionPaths.CreateSln(CreateDir("repo", "bin"), "StaleBuildOutput.sln");
 
         var ex = Should.Throw<InvalidOperationException>(() => SolutionDiscovery.DiscoverSolution(workingDirectory: root));
 
@@ -235,7 +208,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
 
         message.ShouldContain(Path.Combine("src", "App5.sln"));
         message.ShouldNotContain("App6.sln");
-        message.ShouldContain("... and 2 more");
+        message.ShouldContain("... and 2 more.");
     }
 
     [Fact]
@@ -244,7 +217,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // A real directory with a solution, and a symlink pointing at it. Discovery through the link
         // must return the canonical (symlink-free) path, so the workspace agrees with git's toplevel.
         string realDir = CreateDir("real");
-        string slnPath = CreateSln(realDir, "Linked.slnx");
+        string slnPath = SolutionPaths.CreateSln(realDir, "Linked.slnx");
         string link = _temp.PathOf("link");
         SymlinkSupport.CreateDirectorySymlink(link, realDir);
 
@@ -257,13 +230,13 @@ public sealed class SolutionDiscoveryTests : IDisposable
     public void DiscoverSolution_SlnxAndSlnfExtensions_AreMatched()
     {
         string slnxDir = CreateDir("slnx-only");
-        string slnxPath = CreateSln(slnxDir, "Modern.slnx");
+        string slnxPath = SolutionPaths.CreateSln(slnxDir, "Modern.slnx");
         SolutionDiscovery.DiscoverSolution(workingDirectory: slnxDir)
             .ShouldBe(slnxPath);
 
         // Alone in its directory, so nothing demotes it: a filter is still a solution the walk-up can land on.
         string slnfDir = CreateDir("slnf-only");
-        string slnfPath = CreateSln(slnfDir, "Filtered.slnf");
+        string slnfPath = SolutionPaths.CreateSln(slnfDir, "Filtered.slnf");
         SolutionDiscovery.DiscoverSolution(workingDirectory: slnfDir)
             .ShouldBe(slnfPath);
     }

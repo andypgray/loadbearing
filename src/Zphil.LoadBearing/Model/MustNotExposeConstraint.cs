@@ -10,18 +10,10 @@ namespace Zphil.LoadBearing.Model;
 ///     <see cref="MustNotConstructConstraint" /> — so the generic operand/prose/foreign-Arch walks reach
 ///     it with no special-casing.
 /// </summary>
-internal sealed class MustNotExposeConstraint : Constraint
+internal sealed class MustNotExposeConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    internal MustNotExposeConstraint(Selection subject, IReadOnlyList<Selection> targets)
-        : base(subject)
-    {
-        Targets = targets;
-    }
-
     /// <summary>The forbidden exposure targets.</summary>
-    internal IReadOnlyList<Selection> Targets { get; }
-
-    internal override IReadOnlyList<Selection> Operands => Targets;
+    internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not expose " + SentenceRenderer.TargetList(Targets);
 }

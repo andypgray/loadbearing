@@ -164,7 +164,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.InjectionPairs()
             .ShouldBe(["App.OrdinarySingleton -> App.IScopedDep"]);
     }
@@ -203,7 +203,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("resolve scoped work through IServiceScopeFactory"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.InjectionPairs()
             .ShouldBe(["App.Svc -> App.IScopedB"]);
         result.ShouldHaveGrandfathered(1);

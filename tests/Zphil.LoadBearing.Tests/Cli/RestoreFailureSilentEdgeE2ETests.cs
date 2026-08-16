@@ -101,6 +101,15 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         </configuration>
         """;
 
+    // The spec assembly, compiled once for the whole class: every arm passes the same --spec, and the
+    // compilation drags in the full platform-assembly closure. Each arm still writes the bytes into its own
+    // workspace, because --spec takes a path.
+    private static readonly Lazy<byte[]> SpecImage = new(() => SpecAssemblyCompiler.EmitImage(SpecSource, "FieldMiniSpec"));
+
+    // The stub package, assembled once for the same reason — one nuspec and one compiled assembly, neither of
+    // which varies by arm.
+    private static readonly Lazy<byte[]> PackageImage = new(BuildStubPackage);
+
     [Fact]
     public void Check_SameTreeRestoredThenBroken_RedsThenRefusesAndNeverPasses()
     {
@@ -113,7 +122,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", packagesRoot);
 
         WriteStubPackage(workspace.PathOf("feed"));
-        string specDll = CompileSpec(workspace);
+        string specDll = WriteSpec(workspace);
 
         // ── the good arm: the feed is reachable, so the package edge is in the model and the rule reds ──
         RestoreFromCold(workspace, packagesRoot)
@@ -121,9 +130,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
 
         CliResult restored = Check(workspace, specDll);
 
-        restored.Exit.ShouldBe(1, restored.Err);
-        restored.Out.ShouldContain($"FAIL {RuleId}");
-        restored.Out.ShouldContain("JsonUser.cs");
+        restored.ShouldReportViolations($"FAIL {RuleId}", "JsonUser.cs");
 
         // ── the broken arm: the same tree, the same spec, no rebuild — only the feed moves ──
         File.WriteAllText(workspace.PathOf("NuGet.config"), BrokenNuGetConfig);
@@ -137,10 +144,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         // itself inert — its target selection matched no types — because the edge it rests on was never
         // extracted, and a green run said so to CI.
         broken.Exit.ShouldNotBe(0, Transcript(broken));
-        broken.Exit.ShouldBe(2, Transcript(broken));
-        broken.Err.ShouldContain(
-            "NuGet packages did not resolve for 1 project", customMessage: Transcript(broken));
-        broken.Err.ShouldContain("dotnet restore", customMessage: Transcript(broken));
+        broken.ShouldRefuseWith("NuGet packages did not resolve for 1 project", "dotnet restore");
     }
 
     [Fact]
@@ -159,13 +163,10 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         File.Exists(workspace.PathOf("FieldMini.Core", "obj", "project.assets.json"))
             .ShouldBeFalse();
 
-        CliResult never = Check(workspace, CompileSpec(workspace));
+        CliResult never = Check(workspace, WriteSpec(workspace));
 
-        never.Exit.ShouldBe(2, Transcript(never));
-        never.Err.ShouldContain(
-            "NuGet packages did not resolve for 1 project", customMessage: Transcript(never));
-        never.Err.ShouldContain("FieldMini.Core.csproj", customMessage: Transcript(never));
-        never.Err.ShouldContain("dotnet restore", customMessage: Transcript(never));
+        never.ShouldRefuseWith(
+            "NuGet packages did not resolve for 1 project", "FieldMini.Core.csproj", "dotnet restore");
         // No restore ran, so there are no NuGet logs for the SDK to replay and no warnings to point at. The
         // refusal has to be honest about that rather than sending the reader up the terminal.
         never.Err.ShouldNotContain("See the warnings above", customMessage: Transcript(never));
@@ -181,18 +182,16 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(
             "RestoreFailureSolutions/FieldMini", "FieldMini.sln", false);
 
-        CliResult never = Check(workspace, CompileSpec(workspace), "--json");
+        CliResult never = Check(workspace, WriteSpec(workspace), "--json");
 
-        never.Exit.ShouldBe(2, Transcript(never));
+        never.ShouldRefuseWith();
         using JsonDocument document = JsonDocument.Parse(never.Out);
         document.RootElement.GetProperty("modelIncomplete")
             .GetBoolean()
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(Transcript(never));
-        document.RootElement.GetProperty("restoreFailedProjects")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? "")
+        CheckJson.Strings(document, "restoreFailedProjects")
             .ShouldBe(["FieldMini.Core/FieldMini.Core.csproj"]);
     }
 
@@ -209,7 +208,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", packagesRoot);
 
         WriteStubPackage(workspace.PathOf("feed"));
-        string specDll = CompileSpec(workspace);
+        string specDll = WriteSpec(workspace);
         File.WriteAllText(workspace.PathOf("NuGet.config"), BrokenNuGetConfig);
 
         RestoreFromCold(workspace, packagesRoot)
@@ -217,16 +216,14 @@ public sealed class RestoreFailureSilentEdgeE2ETests
 
         CliResult broken = Check(workspace, specDll, "--json");
 
-        broken.Exit.ShouldBe(2, Transcript(broken));
+        broken.ShouldRefuseWith();
         using JsonDocument document = JsonDocument.Parse(broken.Out);
         document.RootElement.GetProperty("modelIncomplete")
             .GetBoolean()
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(Transcript(broken));
-        document.RootElement.GetProperty("restoreFailedProjects")
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? "")
+        CheckJson.Strings(document, "restoreFailedProjects")
             .ShouldBe(["FieldMini.Core/FieldMini.Core.csproj"]);
     }
 
@@ -260,30 +257,38 @@ public sealed class RestoreFailureSilentEdgeE2ETests
             .GetResult();
     }
 
-    private static string CompileSpec(TempFixtureWorkspace workspace)
+    // The spec this arm passes as --spec, written into its own workspace out of the one compilation.
+    private static string WriteSpec(TempFixtureWorkspace workspace)
     {
         string specDirectory = workspace.PathOf("spec");
         Directory.CreateDirectory(specDirectory);
         string specDll = Path.Combine(specDirectory, "FieldMiniSpec.dll");
-        SpecAssemblyCompiler.EmitSpecDll(SpecSource, specDll, "FieldMiniSpec");
+        File.WriteAllBytes(specDll, SpecImage.Value);
         return specDll;
     }
 
-    // A folder feed with one package in it, assembled here rather than through `dotnet pack`: a pack would
-    // need its own project, its own restore and its own feed to restore from, all to produce a zip holding
-    // one nuspec and one assembly.
+    // A folder feed with one package in it, out of the same one image every arm restores from.
     private static void WriteStubPackage(string feedDirectory)
     {
         Directory.CreateDirectory(feedDirectory);
+        File.WriteAllBytes(Path.Combine(feedDirectory, $"{PackageId}.{PackageVersion}.nupkg"), PackageImage.Value);
+    }
+
+    // Assembled here rather than through `dotnet pack`: a pack would need its own project, its own restore
+    // and its own feed to restore from, all to produce a zip holding one nuspec and one assembly.
+    private static byte[] BuildStubPackage()
+    {
         byte[] assembly = SpecAssemblyCompiler.EmitImage(
             PackageSource, PackageId, SpecAssemblyCompiler.PlatformReferences);
 
-        string packagePath = Path.Combine(feedDirectory, $"{PackageId}.{PackageVersion}.nupkg");
-        using FileStream file = File.Create(packagePath);
-        using var package = new ZipArchive(file, ZipArchiveMode.Create);
+        using var buffer = new MemoryStream();
+        using (var package = new ZipArchive(buffer, ZipArchiveMode.Create, true))
+        {
+            Write(package, $"{PackageId}.nuspec", Encoding.UTF8.GetBytes(Nuspec));
+            Write(package, $"lib/net10.0/{PackageId}.dll", assembly);
+        }
 
-        Write(package, $"{PackageId}.nuspec", Encoding.UTF8.GetBytes(Nuspec));
-        Write(package, $"lib/net10.0/{PackageId}.dll", assembly);
+        return buffer.ToArray();
     }
 
     private static void Write(ZipArchive package, string entryName, byte[] content)

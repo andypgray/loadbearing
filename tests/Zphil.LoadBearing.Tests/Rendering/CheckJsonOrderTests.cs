@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
@@ -37,10 +38,9 @@ public sealed class CheckJsonOrderTests
         specAssembly: "Spec.dll",
         diffBase: null,
         workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
-        modelIncomplete: true,
-        failedProjects: ["App.Web/App.Web.csproj"],
-        uncheckedProjects: ["App.Reports/App.Reports.csproj"],
-        restoreFailedProjects: ["App.Data/App.Data.csproj"],
+        diagnostics: new WorkspaceDiagnostics(
+            [], [], ["App.Web/App.Web.csproj"], ["App.Reports/App.Reports.csproj"],
+            ["App.Data/App.Data.csproj"]),
         rulesFilter: ["layer/*"],
         grain: DocumentGrain.Full);
 

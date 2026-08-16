@@ -45,8 +45,8 @@ public sealed class SessionFragmentStoreTests
         store.FullWalkCount.ShouldBe(1);
 
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap1.Solution, ct: Ct);
-        ModelDump.Render(FragmentMerger.Merge(first.Fragments))
-            .ShouldBe(ModelDump.Render(coldModel));
+        FragmentMerger.Merge(first.Fragments)
+            .ShouldModelTheSameAs(coldModel);
 
         // Act 2 — a second call with disk untouched must reuse everything.
         WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
@@ -56,8 +56,8 @@ public sealed class SessionFragmentStoreTests
         second.ReExtractedProjects.ShouldBeEmpty();
         store.LastReExtractedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
-        ModelDump.Render(FragmentMerger.Merge(second.Fragments))
-            .ShouldBe(ModelDump.Render(coldModel));
+        FragmentMerger.Merge(second.Fragments)
+            .ShouldModelTheSameAs(coldModel);
     }
 
     [Fact]
@@ -87,8 +87,7 @@ public sealed class SessionFragmentStoreTests
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
         ModelDump.Render(storeModel)
             .ShouldContain("MyApp.Web.WebIncrementalProbe");
-        ModelDump.Render(storeModel)
-            .ShouldBe(ModelDump.Render(coldModel));
+        storeModel.ShouldModelTheSameAs(coldModel);
     }
 
     [Fact]
@@ -134,8 +133,7 @@ public sealed class SessionFragmentStoreTests
 
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
-        ModelDump.Render(mergedExcluded)
-            .ShouldBe(ModelDump.Render(coldExcluded));
+        mergedExcluded.ShouldModelTheSameAs(coldExcluded);
     }
 
     [Fact]

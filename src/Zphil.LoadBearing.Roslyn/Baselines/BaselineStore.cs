@@ -116,9 +116,7 @@ internal static class BaselineStore
     /// <summary>Resolves a model baseline path (forward-slash, usually relative) against the solution directory.</summary>
     public static string ResolvePath(string baselinePath, string solutionDirectory)
     {
-        return Path.IsPathRooted(baselinePath)
-            ? Path.GetFullPath(baselinePath)
-            : Path.GetFullPath(Path.Combine(solutionDirectory, baselinePath));
+        return Path.GetFullPath(baselinePath, solutionDirectory);
     }
 
     private static Dictionary<string, IReadOnlyList<BaselineEntry>> ReadSections(string path, JsonElement root)
@@ -149,12 +147,47 @@ internal static class BaselineStore
     {
         if (entry.ValueKind != JsonValueKind.Object) throw Malformed(path, $"rule '{ruleId}' has a non-object entry.");
 
-        var names = new List<string>();
-        foreach (JsonProperty property in entry.EnumerateObject())
-            names.Add(property.Name);
+        // One pass over the properties answers the whole four-way shape question — {subject}, {subject,
+        // because}, {source, target}, {source, target, because} — and this runs per entry, per baseline file,
+        // on every check and status: materializing the names and set-comparing them four times was work
+        // proportional to a team's whole debt ledger for a fixed question about four words.
+        var hasSubject = false;
+        var hasSource = false;
+        var hasTarget = false;
+        var hasBecause = false;
+        var hasStranger = false;
+        var propertyCount = 0;
 
-        bool isSubject = NamesAreExactly(names, "subject") || NamesAreExactly(names, "subject", "because");
-        bool isEdge = NamesAreExactly(names, "source", "target") || NamesAreExactly(names, "source", "target", "because");
+        foreach (JsonProperty property in entry.EnumerateObject())
+        {
+            propertyCount++;
+            switch (property.Name)
+            {
+                case "subject":
+                    hasSubject = true;
+                    break;
+                case "source":
+                    hasSource = true;
+                    break;
+                case "target":
+                    hasTarget = true;
+                    break;
+                case "because":
+                    hasBecause = true;
+                    break;
+                default:
+                    hasStranger = true;
+                    break;
+            }
+        }
+
+        // Counting the distinct names back against the properties read is what rejects a repeated key: a
+        // second 'subject' is a hand edit whose second value would silently never be read.
+        int distinctNames = (hasSubject ? 1 : 0) + (hasSource ? 1 : 0) + (hasTarget ? 1 : 0) + (hasBecause ? 1 : 0);
+        bool exactlyNamed = !hasStranger && propertyCount == distinctNames;
+
+        bool isSubject = exactlyNamed && hasSubject && !hasSource && !hasTarget;
+        bool isEdge = exactlyNamed && hasSource && hasTarget && !hasSubject;
         if (!isSubject && !isEdge)
             throw Malformed(path, $"rule '{ruleId}' has an entry that is neither {{source, target}} nor {{subject}}.");
 
@@ -176,20 +209,6 @@ internal static class BaselineStore
         bool blankOrMultiline = string.IsNullOrWhiteSpace(text) || text.IndexOf('\r') >= 0 || text.IndexOf('\n') >= 0;
         if (blankOrMultiline) throw Malformed(path, $"rule '{ruleId}' has a blank or multi-line 'because'.");
         return text;
-    }
-
-    private static bool NamesAreExactly(IReadOnlyList<string> names, params string[] expected)
-    {
-        if (names.Count != expected.Length) return false;
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string name in names)
-        {
-            if (Array.IndexOf(expected, name) < 0) return false;
-            seen.Add(name);
-        }
-
-        return seen.Count == expected.Length;
     }
 
     private static int ReadSchemaVersion(string path, JsonElement root)

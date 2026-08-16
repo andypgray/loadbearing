@@ -38,7 +38,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ReferencePairs()
             .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
     }

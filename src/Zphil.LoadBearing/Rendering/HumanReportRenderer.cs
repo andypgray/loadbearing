@@ -106,7 +106,7 @@ public static class HumanReportRenderer
                 case ViolationKind.MemberShape:
                     MemberNode member = violation.SubjectMember!;
                     SourceLocation? at = member.DeclarationSites.FirstOrDefault();
-                    string memberLine = MemberText(((TypeNode)member.DeclaringType).FullName, member.Name, member.Kind);
+                    string memberLine = MemberText(member.DeclaringTypeFullName, member.Name, member.Kind);
                     if (at is not null)
                         located.Add((relativizer.Relative(at.FilePath), at.Line, memberLine));
                     else

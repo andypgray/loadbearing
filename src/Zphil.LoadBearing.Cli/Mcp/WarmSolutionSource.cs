@@ -5,11 +5,8 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 
 /// <summary>
 ///     The warm solution source: the host-managed counterpart to
-///     <see cref="ColdSolutionSource" />. Each <see cref="AcquireAsync" /> discovers the target solution
-///     exactly as the cold path does — <see cref="ModelPipeline.DiscoverSolution" /> first, so a discovery
-///     failure surfaces the byte-for-byte same <see cref="Roslyn.UserErrorException" /> a cold run raises —
-///     then serves the reconciled snapshot the shared <see cref="WorkspaceSession" /> keeps warm across tool
-///     calls.
+///     <see cref="ColdSolutionSource" />. Each <see cref="AcquireAsync" /> serves the reconciled snapshot
+///     the shared <see cref="WorkspaceSession" /> keeps warm across tool calls.
 /// </summary>
 /// <remarks>
 ///     The returned handle owns nothing (<c>owned: null</c>): the session outlives the call and keeps
@@ -28,15 +25,13 @@ internal sealed class WarmSolutionSource(WorkspaceSession session, SessionFragme
     : ISolutionSource
 {
     /// <inheritdoc />
-    public async Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
+    public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(solutionPath, ct);
         return new SolutionHandle(
-            snapshot.Solution, solutionPath, snapshot.Diagnostics, null,
+            snapshot.Solution, solutionPath, snapshot.LoadDiagnostics, null,
             (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
-            snapshot.TargetFrameworks, snapshot.FailedProjects, snapshot.UncheckedProjects,
-            snapshot.RestoreFailedProjects);
+            snapshot.TargetFrameworks);
     }
 
     /// <inheritdoc />

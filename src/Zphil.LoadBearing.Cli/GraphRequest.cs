@@ -37,4 +37,4 @@ internal sealed record GraphRequest(
     string? Binlog,
     bool AllowWorkspaceDiagnostics,
     DocumentGrain Grain,
-    string? Projects);
+    string? Projects) : IReplayableRequest;

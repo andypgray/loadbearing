@@ -81,6 +81,6 @@ internal static class ArchCheckSequence
 
         string filterName = Path.GetFileName(solutionPath);
         string reason = NarrowedUniverseNotice.RuleSkipReason(filterName, uncheckedProjects.Count);
-        return new NarrowedUniverse(filterName, uncheckedProjects.Count, reason);
+        return new NarrowedUniverse(reason);
     }
 }

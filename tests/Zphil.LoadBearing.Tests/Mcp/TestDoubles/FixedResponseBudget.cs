@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 
 namespace Zphil.LoadBearing.Tests.Mcp.TestDoubles;
@@ -14,6 +15,15 @@ namespace Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 /// </remarks>
 internal sealed class FixedResponseBudget(int maxChars) : IResponseBudget
 {
+    /// <summary>
+    ///     The MCP server's fitter at a budget named in characters — the form every ladder row reasons in,
+    ///     for the reason given above.
+    /// </summary>
+    internal static IResponseFitter Fitter(int maxChars)
+    {
+        return new BudgetedResponseFitter(new FixedResponseBudget(maxChars));
+    }
+
     public int MaxChars()
     {
         return maxChars;

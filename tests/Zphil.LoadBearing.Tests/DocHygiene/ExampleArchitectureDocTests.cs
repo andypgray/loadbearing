@@ -52,18 +52,18 @@ public sealed class ExampleArchitectureDocTests
         string relativePath, string solutionFileName, string specName)
     {
         // Arrange
-        string committed = File.ReadAllText(RepoRoot.Absolute(relativePath));
+        string committed = RepoRoot.ReadText(relativePath);
 
         // Act
         string? body = ManagedBlock.ExtractBody(committed);
 
         // Assert
-        Occurrences(committed, ManagedBlock.BeginMarker)
+        TextNormalization.Occurrences(committed, ManagedBlock.BeginMarker)
             .ShouldBe(1, $"{relativePath} must carry exactly one managed block.");
-        Occurrences(committed, ManagedBlock.EndMarker)
+        TextNormalization.Occurrences(committed, ManagedBlock.EndMarker)
             .ShouldBe(1, $"{relativePath} must carry exactly one managed block.");
         body.ShouldNotBeNull($"{relativePath} carries no managed block.");
-        Occurrences(body, "```mermaid")
+        TextNormalization.Occurrences(body, "```mermaid")
             .ShouldBe(2, $"{relativePath} must carry both drawings.");
         body.ShouldContain(
             $"accTitle: Codebase survey: {solutionFileName}",
@@ -155,16 +155,5 @@ public sealed class ExampleArchitectureDocTests
         return committed.Replace(body, string.Empty, StringComparison.Ordinal)
             .Replace(ManagedBlock.BeginMarker, string.Empty, StringComparison.Ordinal)
             .Replace(ManagedBlock.EndMarker, string.Empty, StringComparison.Ordinal);
-    }
-
-    private static int Occurrences(string haystack, string needle)
-    {
-        var count = 0;
-        for (int index = haystack.IndexOf(needle, StringComparison.Ordinal);
-             index >= 0;
-             index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal))
-            count++;
-
-        return count;
     }
 }

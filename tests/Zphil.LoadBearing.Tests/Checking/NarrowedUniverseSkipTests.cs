@@ -116,21 +116,20 @@ public sealed class NarrowedUniverseSkipTests
     {
         // The other never-baselinable violation, and the one kind deliberately outside the skip: a rule that
         // could not be evaluated is broken whatever the universe, and a filter must not quieten it.
-        RuleResult result = Checker.Run(Sources.Hierarchy, BaselineIndex.Empty, Narrowed(), arch =>
+        RuleResult result = Checker.Run(Sources.HierarchyModel, BaselineIndex.Empty, Narrowed(), arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Types.MustNotReference(typeof(IHandler<Order>)))
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.ShouldHaveSingleItem()
             .Kind.ShouldBe(ViolationKind.RuleError);
     }
 
-    // The narrowing a filtered run hands the checker: the two facts, plus the one line a rule it emptied
-    // reports.
+    // The narrowing a filtered run hands the checker: the one line a rule it emptied reports.
     private static NarrowedUniverse Narrowed()
     {
-        return new NarrowedUniverse("Leaf.slnf", 2, SkipReason);
+        return new NarrowedUniverse(SkipReason);
     }
 }

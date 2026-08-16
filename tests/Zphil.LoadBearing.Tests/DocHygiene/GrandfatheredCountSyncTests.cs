@@ -245,7 +245,7 @@ public sealed class GrandfatheredCountSyncTests
         List<string> unregistered = new();
 
         // Act
-        foreach (string path in TrackedMarkdown())
+        foreach (string path in TrackedFiles.Markdown)
         {
             if (registered.Contains(path)) continue;
 
@@ -295,7 +295,7 @@ public sealed class GrandfatheredCountSyncTests
         List<string> uncovered = new();
 
         // Act
-        foreach (string path in TrackedMarkdown())
+        foreach (string path in TrackedFiles.Markdown)
         {
             var claimed = ClaimedLines(path);
             foreach (GrandfatheredCounts.ProseMention mention in SweepDoc(path))
@@ -315,7 +315,7 @@ public sealed class GrandfatheredCountSyncTests
     public void SweepExemptions_StillMatchASweptMention()
     {
         // Arrange
-        var swept = TrackedMarkdown()
+        var swept = TrackedFiles.Markdown
             .SelectMany(SweepDoc)
             .ToArray();
         List<string> dead = new();
@@ -361,31 +361,19 @@ public sealed class GrandfatheredCountSyncTests
             $"Draft-era counts no longer diverge from the baselines they precede:\n{string.Join("\n", failures)}");
     }
 
-    private static IReadOnlyList<string> TrackedMarkdown()
-    {
-        return TrackedFiles.All
-            .Where(static path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-    }
-
     private static IReadOnlyList<GrandfatheredCount> ExtractDoc(string doc)
     {
-        return GrandfatheredCounts.Extract(doc, ReadDoc(doc));
+        return GrandfatheredCounts.Extract(doc, RepoRoot.ReadText(doc));
     }
 
     private static IReadOnlyList<GrandfatheredCounts.ProseMention> SweepDoc(string doc)
     {
-        return GrandfatheredCounts.ProseMentions(doc, ReadDoc(doc));
+        return GrandfatheredCounts.ProseMentions(doc, RepoRoot.ReadText(doc));
     }
 
     private static GrandfatheredCounts.CollapsedText CollapsedDoc(string doc)
     {
-        return GrandfatheredCounts.Collapse(ReadDoc(doc));
-    }
-
-    private static string ReadDoc(string doc)
-    {
-        return File.ReadAllText(RepoRoot.Absolute(doc));
+        return GrandfatheredCounts.Collapse(RepoRoot.ReadText(doc));
     }
 
     private static int? Expected(string exampleRoot, string ruleId)

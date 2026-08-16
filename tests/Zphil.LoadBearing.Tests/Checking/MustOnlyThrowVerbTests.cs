@@ -103,7 +103,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["App.Service -> System.InvalidOperationException"]);
     }
@@ -146,7 +146,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["App.Service -> Errors.MyError"]);
     }
@@ -164,7 +164,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.Violations.ShouldNotBeEmpty();
         result.Warnings.ShouldBeEmpty();
     }
@@ -215,7 +215,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("throw only the sanctioned exceptions"))
             .Single();
 
-        result.Status.ShouldBe(RuleStatus.Failed);
+        result.ShouldHaveFailed();
         result.ThrowPairs()
             .ShouldBe(["N.Worker -> N.Beta"]);
         result.ShouldHaveGrandfathered(1);
