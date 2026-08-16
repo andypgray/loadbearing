@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Validation;
 using Code = Zphil.LoadBearing.Validation.SpecValidationErrorCode;
 

@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Caching;

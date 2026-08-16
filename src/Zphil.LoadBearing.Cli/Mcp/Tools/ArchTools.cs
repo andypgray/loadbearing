@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Cli.Verbs;
 
 namespace Zphil.LoadBearing.Cli.Mcp.Tools;
 

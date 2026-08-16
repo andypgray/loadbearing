@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Fluent;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary>Trailer stage for an <c>Enforce</c> rule. Each trailer appends so repeats are detectable (§8 item 6).</summary>

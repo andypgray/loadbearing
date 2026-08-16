@@ -1,7 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 

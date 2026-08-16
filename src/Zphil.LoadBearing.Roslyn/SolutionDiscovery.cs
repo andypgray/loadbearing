@@ -1,3 +1,7 @@
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Hosting;
+using Zphil.LoadBearing.Roslyn.Solutions;
+
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>

@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 

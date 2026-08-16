@@ -44,8 +44,10 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
 ///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
 ///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
-///         prefix and a suffix, which say it more exactly. <c>Must</c>, the predicate escape hatch,
-///         idles because nothing here defeats the vocabulary. The unused sugar overloads and the unused
+///         prefix and a suffix, which say it more exactly. The predicate escape hatch is the one entry
+///         that came off this list: the three <c>api/*-front-door</c> rules use it because a curated set
+///         of names is the thing the vocabulary genuinely cannot say — no prefix, suffix or pattern picks
+///         out "the types an author spells". The unused sugar overloads and the unused
 ///         <c>.Baseline(path)</c>, <c>.WhileYoureThere</c> and <c>.DragonsDoc</c> surfaces are the same
 ///         story: their defaults are the intent here, and exercising an API for its own sake is not
 ///         dogfood.
@@ -110,6 +112,72 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "VsWhereLocator"
     ];
 
+    /// <summary>
+    ///     The curated root namespace of the contract package — what a spec author gets from
+    ///     <c>using Zphil.LoadBearing;</c> and a dot. Three groups: the entry point and the spec interface,
+    ///     the nouns and enums an author writes as arguments, and the five static classes holding the
+    ///     extension methods that are the verbs themselves. <c>IRuleBuilder</c>, <c>IScopeBuilder</c> and
+    ///     <c>Member</c> are here because authors do name them — the validation corpus spells all three in
+    ///     type position — even though a chain never has to.
+    /// </summary>
+    private static readonly HashSet<string> CoreFrontDoor =
+    [
+        "Accessibility",
+        "Arch",
+        "Constraint",
+        "IArchitectureSpec",
+        "IAttributeInfo",
+        "IMemberInfo",
+        "IParameterInfo",
+        "IRuleBuilder",
+        "IScopeBuilder",
+        "ITypeInfo",
+        "Layer",
+        "Lifetime",
+        "Member",
+        "MemberSelectionAdjectives",
+        "MemberSelectionConstraints",
+        "MethodSelectionConstraints",
+        "MigrationPolicy",
+        "Posture",
+        "QuarantineRole",
+        "Selection",
+        "SelectionAdjectives",
+        "SelectionConstraints",
+        "TypeKind"
+    ];
+
+    /// <summary>
+    ///     The extraction host's seam: what the CLI and the xUnit adapter call to get a workspace, a
+    ///     codebase model, or a refusal out of it. Everything else the project declares is machinery behind
+    ///     this list and lives in one of its family namespaces.
+    /// </summary>
+    private static readonly HashSet<string> ExtractionFrontDoor =
+    [
+        "CodebaseExtractor",
+        "LoadedSolution",
+        "PathCanonicalizer",
+        "SolutionDiscovery",
+        "UserErrorException",
+        "WorkspaceLoader",
+        "WorkspaceSession",
+        "WorkspaceSnapshot"
+    ];
+
+    /// <summary>
+    ///     The tool's entry path: arguments to a command, a command to a runner, and an exception to an
+    ///     exit code. <c>Program</c> is not listed because top-level statements synthesize it into the
+    ///     global namespace, which this rule's subject does not reach; the self-spec's authored-types pin
+    ///     is what holds it.
+    /// </summary>
+    private static readonly HashSet<string> HostFrontDoor =
+    [
+        "CliEntry",
+        "CliErrorMapper",
+        "CommandEntryPoint",
+        "CommandFactory"
+    ];
+
     /// <inheritdoc />
     public void Define(Arch arch)
     {
@@ -125,6 +193,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             "Zphil.LoadBearing.Checking.*",
             "Zphil.LoadBearing.Codebase.*",
             "Zphil.LoadBearing.Discovery.*",
+            "Zphil.LoadBearing.Fluent.*",
+            "Zphil.LoadBearing.Hosting.*",
             "Zphil.LoadBearing.Internal.*",
             "Zphil.LoadBearing.Model.*",
             "Zphil.LoadBearing.Prose.*",
@@ -354,6 +424,46 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "stays in the root namespace with the rest of the authoring surface.")
             .Fix("Put the new constraint node in Zphil.LoadBearing.Model beside its siblings, and handle it " +
                  "in ConstraintEvaluator and SentenceRenderer.");
+
+        arch.Rule("api/core-front-door")
+            .Enforce(arch.Types.InNamespace("Zphil.LoadBearing")
+                .Must(type => CoreFrontDoor.Contains(type.Name),
+                    description: "be a type a spec author names"))
+            .Because("The root namespace is the authoring surface. Someone writes `using Zphil.LoadBearing;` " +
+                     "and what completion offers from there is, in practice, the whole language they believe " +
+                     "exists — so a type that lands in it uninvited is one more thing to read past before " +
+                     "finding the verb they wanted, and that cost falls in the first hour with the product. " +
+                     "Hiding the rest is free: member resolution on a return type ignores using directives, " +
+                     "so a chain keeps flowing through types nobody imports.")
+            .Fix("Put the type where it belongs — Fluent for an intermediate a chain only passes through, " +
+                 "Hosting for a node of the built model, Model/Checking/Rendering/Validation for the " +
+                 "machinery behind them. If it really is a type an author spells, add its name to " +
+                 "CoreFrontDoor in this spec and say in review what an author writes it for.");
+
+        arch.Rule("api/extraction-front-door")
+            .Enforce(arch.Types.InNamespace("Zphil.LoadBearing.Roslyn")
+                .Must(type => ExtractionFrontDoor.Contains(type.Name),
+                    description: "be a type the host calls across the extraction seam"))
+            .Because("This package ships saying it is not for direct reference, which makes its root the " +
+                     "seam the CLI and the adapter call and everything behind it free to be rearranged. A " +
+                     "type left sitting in the root reads as callable, and the first caller that reaches " +
+                     "past the seam converts the next refactor of the internals into a breaking change " +
+                     "nobody signed up for.")
+            .Fix("Put the type in Extraction, Diagnostics, Solutions, Hosting or Checking beside its " +
+                 "siblings. If it genuinely belongs on the seam, add its name to ExtractionFrontDoor in " +
+                 "this spec.");
+
+        arch.Rule("api/host-front-door")
+            .Enforce(arch.Types.InNamespace("Zphil.LoadBearing.Cli")
+                .Must(type => HostFrontDoor.Contains(type.Name),
+                    description: "be a type on the entry path"))
+            .Because("Namespaces are not API here — this project ships as a tool — so the only thing the " +
+                     "root namespace buys is legibility, and that is worth holding. The entry path is the " +
+                     "first thing anyone reads to learn how the tool starts, and a root that also holds the " +
+                     "verb requests, runners and pipeline stages it dispatches to hides that path among the " +
+                     "thirty types it calls.")
+            .Fix("Put the type in Verbs, Pipeline, SpecLoading or Rendering beside its siblings. If it is " +
+                 "really part of the entry path, add its name to HostFrontDoor in this spec.");
 
         arch.Rule("mcp/env-through-seam")
             .Migrate(

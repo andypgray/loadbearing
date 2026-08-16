@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Fluent;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary><c>.Methods.MustBeStatic()</c> → "must be static" (GRAMMAR §5.7).</summary>

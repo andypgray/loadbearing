@@ -3,7 +3,7 @@ using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 

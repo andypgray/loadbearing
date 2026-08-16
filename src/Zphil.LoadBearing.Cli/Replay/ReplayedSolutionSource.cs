@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Replay;
 

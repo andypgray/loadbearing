@@ -4,7 +4,8 @@ using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Hosting;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests.Rendering;

@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fits — byte-identical to what that grain's own flag writes, so a reader can trust the `grain` stamp
   rather than diffing two reports. `arch_graph` has degraded this way since 0.4.0; check is the tool
   agents are told to call before finishing work and its bulk driver is an uncapped per-site dump, so it
-  is the response most likely to overrun on a legacy migration — and a report cut mid-array is corrupt
+  is the response most likely to overrun on a large migration — and a report cut mid-array is corrupt
   JSON that costs a client the whole tool surface, not merely some detail. What survives every rung is
   chosen rather than incidental: rule prose scales with the rule count, which is authored and small,
   while sites scale with the codebase, which is what actually overruns a channel — so the coarsest
@@ -67,6 +67,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   .NET guidance with nothing to draw and the list under the fence is the law.
 
 ### Changed
+
+- **Breaking: each project's root namespace now holds only the types callers name.** A spec author writes
+  `using Zphil.LoadBearing;` and dots, and what came back was everything the assembly happened to declare —
+  the model the host builds from a spec, and the intermediates a fluent chain only passes through — none of
+  which an author ever spells. The root now holds the authoring surface and nothing else: the entry point and
+  the spec interface, the nouns and enums written as arguments, the five static classes carrying the verbs,
+  and `IRuleBuilder`, `IScopeBuilder`, `Member` and `Selection`, which authors do write in type position.
+  Everything else moved to `Zphil.LoadBearing.Fluent` (`IEnforceRule`, `IMigrateRule`, `IQuarantinedScope`,
+  `MemberSelection`, `MethodSelection`, `NamespacePattern`, `TypeNamePattern`) or `Zphil.LoadBearing.Hosting`
+  (`ArchRule`, `ArchitectureModel`, `ArchModelBuilder`, `LayerDefinition`, `MigrateData`, `QuarantineData`).
+  **Most specs compile unchanged**: member resolution on a return type ignores using directives, so a chain
+  keeps flowing through types nobody imports, and the extension-method holders stayed in the root precisely
+  because extension lookup is the one thing that does need the declaring namespace in scope. A spec that
+  names a moved type in a helper signature adds one using. `Zphil.LoadBearing.Roslyn` and
+  `Zphil.LoadBearing.Cli` got the same treatment — neither is a referenced surface, so the move costs nothing
+  at the boundary and buys a project root that shows the seam instead of hiding it among the machinery behind
+  it. Three new self-enforced rules hold all three roots to their lists, so the next arrival reds where it is
+  made rather than accumulating quietly.
+
+- **Breaking: a spec assembly built against 0.4.0 or earlier must be rebuilt against this version.** A
+  compiled spec emits a type reference per chain, and `IEnforceRule`, `IMigrateRule` and `IQuarantinedScope`
+  are the return types of `.Enforce`, `.Migrate` and `.Quarantine` — so every posture chain in an older spec
+  DLL now names a type that is no longer where the reference says it is, and resolution fails when the host
+  loads it. The pinned `AssemblyVersion` is what lets a spec built against one release run on another; it
+  cannot carry a type across a namespace. Rebuilding the spec project is the entire fix, and the failure the
+  host reports already names the member that could not be found and what to do about it.
 
 - **The check report now leads with its verdict.** `check --json` and `arch_check` serialize `summary` and
   every trust stamp — `modelIncomplete`, `failedProjects`, `restoreFailedProjects`, `uncheckedProjects` —

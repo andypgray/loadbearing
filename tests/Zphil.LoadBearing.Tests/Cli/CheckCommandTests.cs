@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 

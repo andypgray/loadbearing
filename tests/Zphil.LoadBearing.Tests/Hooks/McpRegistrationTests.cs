@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Hooks;

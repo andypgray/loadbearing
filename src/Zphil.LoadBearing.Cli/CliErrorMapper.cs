@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Validation;
 
 namespace Zphil.LoadBearing.Cli;

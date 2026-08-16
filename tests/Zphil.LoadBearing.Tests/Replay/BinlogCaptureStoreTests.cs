@@ -5,6 +5,7 @@ using Xunit;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Roslyn.Replay;
+using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Replay;

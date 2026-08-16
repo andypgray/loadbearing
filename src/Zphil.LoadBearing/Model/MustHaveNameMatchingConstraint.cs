@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Model;

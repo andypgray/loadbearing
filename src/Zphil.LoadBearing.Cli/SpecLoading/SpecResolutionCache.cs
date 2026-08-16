@@ -33,7 +33,7 @@ internal readonly record struct SessionSpecResolution(
 ///         None of it can change without a full reload, which bumps the generation; and the solution file
 ///         itself is one of the structural fingerprints the session's reconcile sweep stats, so a project
 ///         added to or removed from it arrives here as a miss. It is the same grain
-///         <see cref="Roslyn.SessionFragmentStore" /> already flushes on, for the same reason.
+///         <see cref="Roslyn.Extraction.SessionFragmentStore" /> already flushes on, for the same reason.
 ///     </para>
 ///     <para>
 ///         <b>Only the candidate half is cached; the built output is resolved live on every call.</b> A hit

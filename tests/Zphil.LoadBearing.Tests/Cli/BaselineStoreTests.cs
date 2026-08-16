@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Baselines;

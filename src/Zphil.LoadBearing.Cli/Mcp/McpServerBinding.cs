@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Cli.Verbs;
 
 namespace Zphil.LoadBearing.Cli.Mcp;
 

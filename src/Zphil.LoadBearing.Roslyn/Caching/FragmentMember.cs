@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Roslyn.Extraction;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 

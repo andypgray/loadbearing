@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Reflection;
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;

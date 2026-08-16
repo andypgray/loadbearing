@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 

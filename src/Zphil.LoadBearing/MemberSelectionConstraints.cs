@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Model;
 using static Zphil.LoadBearing.Internal.Guard;
 

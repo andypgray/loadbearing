@@ -1,5 +1,5 @@
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 

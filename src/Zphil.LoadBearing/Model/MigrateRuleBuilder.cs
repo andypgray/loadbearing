@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Fluent;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary>Trailer/option stage for a <c>Migrate</c> rule. Each appends so repeats are detectable (§8 item 6).</summary>

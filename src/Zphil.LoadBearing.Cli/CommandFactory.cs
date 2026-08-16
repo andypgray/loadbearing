@@ -1,7 +1,9 @@
 using System.CommandLine;
 using Zphil.LoadBearing.Cli.Mcp;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Cli.Verbs;
 
 namespace Zphil.LoadBearing.Cli;
 

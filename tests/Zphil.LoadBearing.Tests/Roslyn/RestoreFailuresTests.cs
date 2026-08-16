@@ -2,7 +2,8 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;

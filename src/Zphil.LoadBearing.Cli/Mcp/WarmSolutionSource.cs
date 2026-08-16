@@ -1,5 +1,8 @@
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.SpecLoading;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
 
 namespace Zphil.LoadBearing.Cli.Mcp;
 

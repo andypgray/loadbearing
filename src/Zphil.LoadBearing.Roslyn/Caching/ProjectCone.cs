@@ -1,5 +1,6 @@
 using System.IO.Enumeration;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 

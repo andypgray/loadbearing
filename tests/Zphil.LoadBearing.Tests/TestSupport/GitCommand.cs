@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 

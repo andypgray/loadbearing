@@ -1,6 +1,7 @@
 using System.Data;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Checking;
 

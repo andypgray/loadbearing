@@ -1,7 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Rendering;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Tests.Rendering;

@@ -3,7 +3,7 @@ using Serilog.Events;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Tests.Mcp.Infrastructure;
 

@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Fluent;
 
 namespace Zphil.LoadBearing.Tests;
 

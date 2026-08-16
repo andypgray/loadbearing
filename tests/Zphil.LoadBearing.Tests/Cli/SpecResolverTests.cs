@@ -1,7 +1,8 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;

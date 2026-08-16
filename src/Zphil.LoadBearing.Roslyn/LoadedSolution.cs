@@ -1,5 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Extraction;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn;
 

@@ -5,6 +5,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Discovery;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Cli;

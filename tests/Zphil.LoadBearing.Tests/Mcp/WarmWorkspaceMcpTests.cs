@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 

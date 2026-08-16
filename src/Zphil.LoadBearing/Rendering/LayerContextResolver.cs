@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 

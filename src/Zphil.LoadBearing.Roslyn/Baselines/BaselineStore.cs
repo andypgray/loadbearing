@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Zphil.LoadBearing.Baselines;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
 

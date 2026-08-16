@@ -44,8 +44,17 @@ internal static class SkewedContract
                                   using System;
                                   using System.Reflection;
                                   using System.Runtime.CompilerServices;
+                                  using Zphil.LoadBearing.Fluent;
 
                                   [assembly: AssemblyVersion("{VERSION}")]
+
+                                  namespace Zphil.LoadBearing.Fluent
+                                  {
+                                      public interface IEnforceRule
+                                      {
+                                          IEnforceRule Because(string because);
+                                      }
+                                  }
 
                                   namespace Zphil.LoadBearing
                                   {
@@ -60,11 +69,6 @@ internal static class SkewedContract
                                       public interface IArchitectureSpec
                                       {
                                           void Define(Arch arch);
-                                      }
-
-                                      public interface IEnforceRule
-                                      {
-                                          IEnforceRule Because(string because);
                                       }
 
                                       public interface IRuleBuilder

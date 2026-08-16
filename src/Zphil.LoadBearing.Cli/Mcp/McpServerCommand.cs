@@ -6,8 +6,11 @@ using ModelContextProtocol.Protocol;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Mcp.Prompts;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Cli.Mcp;

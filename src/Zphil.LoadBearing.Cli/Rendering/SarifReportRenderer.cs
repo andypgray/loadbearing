@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
-using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 

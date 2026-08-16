@@ -3,7 +3,7 @@ using Xunit;
 using Xunit.Sdk;
 using Zphil.LoadBearing.ArchSpec;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 using Zphil.LoadBearing.Xunit;
@@ -61,6 +61,9 @@ public sealed class AdapterTests
                 "packs/depends-on-core-only",
                 "naming/interfaces",
                 "model/constraint-nodes",
+                "api/core-front-door",
+                "api/extraction-front-door",
+                "api/host-front-door",
                 "mcp/env-through-seam",
                 "roslyn/msbuild-bootstrap/containment",
                 "roslyn/msbuild-bootstrap/tripwire"

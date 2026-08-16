@@ -3,6 +3,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Discovery;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests;

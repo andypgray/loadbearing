@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Fluent;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary><c>.Methods.MustBeAbstract()</c> → "must be abstract" (GRAMMAR §5.7).</summary>

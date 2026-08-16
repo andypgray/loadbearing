@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Roslyn.Replay;
 
 namespace Zphil.LoadBearing.Cli.Replay;

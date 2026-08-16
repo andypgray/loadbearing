@@ -1,8 +1,8 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 
 namespace Zphil.LoadBearing.Tests.Mcp;

@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Roslyn.Extraction;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn;
 

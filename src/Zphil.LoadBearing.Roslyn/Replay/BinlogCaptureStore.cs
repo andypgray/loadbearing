@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Replay;
 

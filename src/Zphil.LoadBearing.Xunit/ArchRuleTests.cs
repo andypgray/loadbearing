@@ -2,9 +2,14 @@ using System.Runtime.CompilerServices;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Checking;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Extraction;
 using Zphil.LoadBearing.Roslyn.MsBuild;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Xunit;
 

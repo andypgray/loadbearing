@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Cli.Diff;
 

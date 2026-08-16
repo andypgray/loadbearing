@@ -1,9 +1,10 @@
 using System.Diagnostics;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Replay;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
 

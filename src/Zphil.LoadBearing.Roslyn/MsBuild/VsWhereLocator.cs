@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Roslyn.MsBuild;
 

@@ -2,8 +2,8 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp;
+using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Tests.Mcp;
 using Zphil.LoadBearing.Tests.TestSupport;
 

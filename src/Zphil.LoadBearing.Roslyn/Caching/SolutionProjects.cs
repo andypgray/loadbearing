@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
 

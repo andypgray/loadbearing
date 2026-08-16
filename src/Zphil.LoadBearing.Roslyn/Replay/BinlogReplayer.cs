@@ -1,5 +1,7 @@
 using Basic.CompilerLog.Util;
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Replay;
 

@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
+using Zphil.LoadBearing.Cli.Pipeline;
 
 namespace Zphil.LoadBearing.Cli;
 

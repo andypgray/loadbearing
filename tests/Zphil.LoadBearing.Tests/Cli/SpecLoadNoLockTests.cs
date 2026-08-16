@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;

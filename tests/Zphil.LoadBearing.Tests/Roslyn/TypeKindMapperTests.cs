@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 

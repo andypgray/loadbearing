@@ -1,4 +1,5 @@
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 

@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Mcp.Tools;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.TestSupport;

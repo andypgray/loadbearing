@@ -1,6 +1,6 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;

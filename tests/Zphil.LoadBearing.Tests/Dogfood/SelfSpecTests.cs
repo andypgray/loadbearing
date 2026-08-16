@@ -5,10 +5,13 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.ArchSpec;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -449,7 +452,7 @@ public sealed class SelfSpecTests
         // The type the generator completed rather than emitted. Its own declaration is hand-written, the
         // attribute landed on the method, and the two parts merge onto one symbol — so it must survive the
         // narrowing, and an equality above is what proves it was not quietly taken along.
-        authored.ShouldContain("Zphil.LoadBearing.Roslyn.NuGetAuditDiagnostics");
+        authored.ShouldContain("Zphil.LoadBearing.Roslyn.Diagnostics.NuGetAuditDiagnostics");
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Model;
 
 namespace Zphil.LoadBearing.Tests.Checking;

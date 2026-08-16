@@ -1,7 +1,7 @@
 using System.Reflection;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Discovery;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Tests.TestSupport;

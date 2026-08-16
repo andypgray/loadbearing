@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.TestSupport;

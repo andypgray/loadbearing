@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Cli.Pipeline;
+
 namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 
 /// <summary>

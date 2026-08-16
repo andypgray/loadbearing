@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Stubs;

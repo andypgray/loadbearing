@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Extraction;
 

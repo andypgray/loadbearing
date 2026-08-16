@@ -3,6 +3,7 @@ using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
 using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Rendering;

@@ -4,6 +4,7 @@ using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Replay;
+using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.Extraction;
 using Zphil.LoadBearing.Tests.TestSupport;
 

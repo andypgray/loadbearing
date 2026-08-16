@@ -1,4 +1,5 @@
 using Microsoft.Build.Locator;
+using Zphil.LoadBearing.Roslyn.Hosting;
 
 namespace Zphil.LoadBearing.Roslyn.MsBuild;
 

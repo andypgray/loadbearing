@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Cli;
+using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 

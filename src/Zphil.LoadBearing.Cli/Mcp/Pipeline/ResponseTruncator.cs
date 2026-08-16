@@ -50,7 +50,7 @@ internal static class ResponseTruncator
 
     /// <summary>
     ///     Resolves the character cap from the MCP client's
-    ///     <see cref="Zphil.LoadBearing.Roslyn.LoadBearingEnvVars.MaxMcpOutputTokens" /> budget
+    ///     <see cref="Zphil.LoadBearing.Roslyn.Hosting.LoadBearingEnvVars.MaxMcpOutputTokens" /> budget
     ///     (× 2.5 chars/token), falling back to 62,500 — the same multiple of a 25,000-token default — when
     ///     the value is unset, blank, or non-positive.
     /// </summary>

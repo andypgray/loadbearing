@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Prose;

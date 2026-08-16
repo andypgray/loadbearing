@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
 using Zphil.LoadBearing.Tests.Extraction;
 using CoreAccessibility = Zphil.LoadBearing.Accessibility;
 using RoslynAccessibility = Microsoft.CodeAnalysis.Accessibility;
