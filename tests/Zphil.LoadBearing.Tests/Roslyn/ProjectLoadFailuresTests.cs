@@ -35,7 +35,8 @@ public sealed class ProjectLoadFailuresTests
         // analyzer counts — which is exactly why those counts are not the predicate: two healthy projects
         // measured had zero analyzer references, and one had four metadata references.
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("P", @"C:\repo\P\P.csproj"));
+        string csproj = ProjectPath("P", "P.csproj");
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("P", csproj));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveLoadedEverything();
@@ -48,10 +49,11 @@ public sealed class ProjectLoadFailuresTests
         // csproj XML is malformed. Both loaded as a Project with no documents, no analyzers and both paths
         // null, so the model is missing that project entirely while the load still "succeeded".
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("P", @"C:\repo\P\P.csproj"));
+        string csproj = ProjectPath("P", "P.csproj");
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("P", csproj));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldHaveFailed(@"C:\repo\P\P.csproj");
+            .ShouldHaveFailed(csproj);
     }
 
     [Fact]
@@ -61,9 +63,11 @@ public sealed class ProjectLoadFailuresTests
         // the very defect this predicate replaces — needs two independent Roslyn facts to go missing at once.
         // This is the direction that separates the two spellings: under `||` it would red.
         using var workspace = new AdhocWorkspace();
+        string csproj = ProjectPath("A", "A.csproj");
+        string outputPath = ProjectPath("A", "bin", "A.dll");
         Solution solution = AdhocSolution.Of(
             workspace,
-            AdhocSolution.Empty("HasOutput", @"C:\repo\A\A.csproj").WithOutputFilePath(@"C:\repo\A\bin\A.dll"));
+            AdhocSolution.Empty("HasOutput", csproj).WithOutputFilePath(outputPath));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveLoadedEverything();
@@ -75,13 +79,14 @@ public sealed class ProjectLoadFailuresTests
         // One csproj behind several Projects: the reader has one file to go and fix, so the answer names it
         // once rather than once per framework.
         using var workspace = new AdhocWorkspace();
+        string csproj = ProjectPath("P", "P.csproj");
         Solution solution = AdhocSolution.Of(
             workspace,
-            AdhocSolution.Empty("P(net10.0)", @"C:\repo\P\P.csproj"),
-            AdhocSolution.Empty("P(netstandard2.0)", @"C:\repo\P\P.csproj"));
+            AdhocSolution.Empty("P(net10.0)", csproj),
+            AdhocSolution.Empty("P(netstandard2.0)", csproj));
 
         ProjectLoadFailures.Detect(solution, null)
-            .ShouldHaveFailed(@"C:\repo\P\P.csproj");
+            .ShouldHaveFailed(csproj);
     }
 
     [Fact]
@@ -234,5 +239,16 @@ public sealed class ProjectLoadFailuresTests
             $"{{\"solution\":{{\"path\":\"Solution.sln\",\"projects\":[{string.Join(",", entries)}]}}}}");
 
         return filterPath;
+    }
+
+    // A fabricated path, rooted for the OS running the test. Detect reports every path through
+    // Path.GetFullPath, and a drive-letter literal is not rooted on a POSIX filesystem — the backslash is an
+    // ordinary filename character there, so the whole literal would resolve against the working directory and
+    // the path reported back would not be the one named here.
+    private static string ProjectPath(params string[] segments)
+    {
+        string root = OperatingSystem.IsWindows() ? @"C:\repo" : "/repo";
+
+        return Path.Combine([root, .. segments]);
     }
 }
