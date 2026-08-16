@@ -36,14 +36,16 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         + "'System.Security.Cryptography.Xml' 4.7.0 has a known moderate severity vulnerability, "
         + "https://github.com/advisories/GHSA-vh55-786g-wjwj";
 
+    // The project the gate is told failed to load. Injected separately from the diagnostic above, because
+    // the product now separates them: the diagnostic renders and the project decides.
+    private const string BrokenProject = "C:/repo/MyApp.Broken/MyApp.Broken.csproj";
+
     private const string GateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so no "
-        + "baseline was written: a baseline captured from a partial model signs off debt that was never measured. "
-        + "Pass --allow-workspace-diagnostics to baseline against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so no baseline was written: a baseline "
+        + "captured from a partial model signs off debt that was never measured:";
 
     private const string CheckGateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
-        + "cannot pass. Pass --allow-workspace-diagnostics to check against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
 
     private static readonly string[] ConventionalBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
 
@@ -57,14 +59,13 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         string baselineFile = workspace.PathOf(ConventionalBaselineFile);
         File.Delete(baselineFile); // uncaptured, so a run that reached the write would create it
 
-        CliResult check = await RunCheckAsync(workspace, [LoadDiagnostic], false);
-        check.ShouldRefuseWith(CheckGateLine);
+        CliResult check = await RunCheckAsync(workspace, [LoadDiagnostic], false, [BrokenProject]);
+        check.ShouldRefuseWith(CheckGateLine, BrokenProject);
 
-        CliResult init = await RunBaselineAsync(workspace, [LoadDiagnostic], InitRequest, false);
+        CliResult init = await RunBaselineAsync(workspace, [LoadDiagnostic], InitRequest, false, [BrokenProject]);
 
-        init.ShouldRefuseWith();
+        init.ShouldRefuseWith(GateLine, BrokenProject);
         init.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
-        init.Err.ShouldContain(GateLine);
         init.Out.ShouldBeEmpty(); // it refused before the ratchet survey, so it reported no per-rule outcome
         File.Exists(baselineFile)
             .ShouldBeFalse(); // and above all, wrote nothing
@@ -100,10 +101,10 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         string baselineFile = workspace.PathOf(ConventionalBaselineFile);
         byte[] before = File.ReadAllBytes(baselineFile);
 
-        CliResult accept = await RunBaselineAsync(workspace, [LoadDiagnostic], AcceptReductionsRequest, false);
+        CliResult accept = await RunBaselineAsync(
+            workspace, [LoadDiagnostic], AcceptReductionsRequest, false, [BrokenProject]);
 
-        accept.ShouldRefuseWith();
-        accept.Err.ShouldContain(GateLine);
+        accept.ShouldRefuseWith(GateLine, BrokenProject);
         File.ReadAllBytes(baselineFile)
             .ShouldBe(before);
     }
@@ -118,10 +119,9 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         string baselineFile = workspace.PathOf(ConventionalBaselineFile);
         byte[] before = File.ReadAllBytes(baselineFile);
 
-        CliResult add = await RunBaselineAsync(workspace, [LoadDiagnostic], AddRequest, false);
+        CliResult add = await RunBaselineAsync(workspace, [LoadDiagnostic], AddRequest, false, [BrokenProject]);
 
-        add.ShouldRefuseWith();
-        add.Err.ShouldContain(GateLine);
+        add.ShouldRefuseWith(GateLine, BrokenProject);
         File.ReadAllBytes(baselineFile)
             .ShouldBe(before);
     }
@@ -153,10 +153,10 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         string baselineFile = workspace.PathOf(ConventionalBaselineFile);
         File.Delete(baselineFile);
 
-        CliResult init = await RunBaselineAsync(workspace, [AuditDiagnostic, LoadDiagnostic], InitRequest, false);
+        CliResult init = await RunBaselineAsync(
+            workspace, [AuditDiagnostic, LoadDiagnostic], InitRequest, false, [BrokenProject]);
 
-        init.ShouldRefuseWith();
-        init.Err.ShouldContain(GateLine);
+        init.ShouldRefuseWith(GateLine, BrokenProject);
         init.Err.ShouldContain($"warning: {AuditDiagnostic}");
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");
         File.Exists(baselineFile)
@@ -200,11 +200,13 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         TempFixtureWorkspace workspace,
         IReadOnlyList<string> diagnostics,
         Func<string, bool, BaselineRequest> request,
-        bool allowWorkspaceDiagnostics)
+        bool allowWorkspaceDiagnostics,
+        IReadOnlyList<string>? failedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var runner = new BaselineRunner(output, error, new DiagnosticInjectingSolutionSource(diagnostics));
+        var runner = new BaselineRunner(
+            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects));
 
         int exit = await runner.RunAsync(request(workspace.SolutionPath, allowWorkspaceDiagnostics), Ct);
 
@@ -212,12 +214,13 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
     }
 
     private static async Task<CliResult> RunCheckAsync(
-        TempFixtureWorkspace workspace, IReadOnlyList<string> diagnostics, bool allowWorkspaceDiagnostics)
+        TempFixtureWorkspace workspace, IReadOnlyList<string> diagnostics, bool allowWorkspaceDiagnostics,
+        IReadOnlyList<string>? failedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         var runner = new CheckRunner(
-            output, error, new DiagnosticInjectingSolutionSource(diagnostics), new FakeEnvironment());
+            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects), new FakeEnvironment());
 
         int exit = await runner.RunAsync(
             new CheckRequest(

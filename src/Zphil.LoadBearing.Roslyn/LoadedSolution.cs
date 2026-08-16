@@ -16,11 +16,13 @@ public sealed class LoadedSolution : IDisposable
 
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
-        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null)
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        IReadOnlyList<string>? failedProjects = null)
     {
         Workspace = workspace;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
+        FailedProjects = failedProjects ?? [];
     }
 
     /// <summary>The MSBuild workspace that produced <see cref="Solution" />.</summary>
@@ -36,6 +38,13 @@ public sealed class LoadedSolution : IDisposable
     ///     solution whose projects each target one framework.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted — what the
+    ///     fail-closed gate keys on, computed at this boundary by
+    ///     <see cref="ProjectLoadFailures.Detect" />. Empty for a solution that loaded completely.
+    /// </summary>
+    public IReadOnlyList<string> FailedProjects { get; }
 
     /// <summary>Disposes the underlying workspace.</summary>
     public void Dispose()

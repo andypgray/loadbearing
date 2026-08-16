@@ -27,6 +27,9 @@ public sealed class SpecResolverTests
         "Package 'Contoso.Widgets' 1.2.3 has a known high severity vulnerability, "
         + "https://github.com/advisories/GHSA-aaaa-bbbb-cccc";
 
+    // A project that failed to load, in the form the gate carries them: an absolute .csproj path.
+    private const string BrokenProject = "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj";
+
     [Fact]
     public void ResolveConventionProject_UniqueReferencingProject_IsChosen()
     {
@@ -183,12 +186,33 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_WorkspaceCarriedLoadFailures_NamesTheLoadFailureNotTheSpecRemedy()
+    public void ResolveConventionProject_ProjectsFailedToLoad_NamesThemRatherThanTheSpecRemedy()
     {
-        // The measured misdirection: a broken --locked-mode restore leaves the spec project's package
-        // reference unresolved, so the convention finds zero candidates and reported *its own* failure. The
-        // reader is sent to write an argument that cannot help, when the fix is to repair the restore.
-        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], []);
+        // The strongest arm: the project that would have matched may be one of the ones that failed, and no
+        // --spec argument repairs a load. The projects are the evidence, because that is what the gate
+        // itself now keys on — a set of paths rather than a set of sentences.
+        var diagnostics = new WorkspaceDiagnostics([], [], [BrokenProject]);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldContain("one or more projects failed to load");
+        error.Message.ShouldContain(BrokenProject);
+        error.Message.ShouldContain("Restore and build the solution first");
+        error.Message.ShouldNotContain("Pass --spec");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_StillBlamesTheLoad()
+    {
+        // The measured locked-mode shape, which survives the move off message-matching: a broken restore
+        // leaves the spec project's package reference unresolved while the project itself still loads
+        // completely, so nothing fails and the convention finds zero candidates. Keying this arm on the
+        // diagnostics is legitimate exactly because it gates nothing — it chooses between two spellings of
+        // one refusal, and the reader is sent to repair the restore rather than to write an argument that
+        // cannot help.
+        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -203,10 +227,10 @@ public sealed class SpecResolverTests
     [Fact]
     public void ResolveConventionProject_OnlyNuGetAuditAdvisories_KeepsTheCleanLoadMessage()
     {
-        // The audit carve-out reaches this refusal through IsIncomplete, and has to: an advisory's
-        // publication date says nothing about whether the workspace loaded, so a solution that genuinely has
-        // no spec project must not be told to go and fix its restore.
-        var diagnostics = new WorkspaceDiagnostics([Advisory], []);
+        // An advisory's publication date says nothing about whether this solution's references resolved, so
+        // a solution that genuinely has no spec project must not be told to go and fix its restore. This is
+        // the one job the audit classifier still has, and it decides no verdict: nothing here gates.
+        var diagnostics = new WorkspaceDiagnostics([Advisory], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -240,7 +264,7 @@ public sealed class SpecResolverTests
         // A workspace that fails to load rarely fails once. Quoting all of them buries the remedy under a
         // wall nobody reads to the end of, so the quote is bounded and says how much it left out.
         var diagnostics = new WorkspaceDiagnostics(
-            ["failure one", "failure two", "failure three", "failure four", "failure five"], []);
+            ["failure one", "failure two", "failure three", "failure four", "failure five"], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -253,12 +277,30 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_AuditAdvisoriesBesideARealFailure_QuotesTheRealFailure()
+    public void ResolveConventionProject_ManyFailedProjects_QuotesABoundedNumberAndCountsTheRest()
     {
-        // What forces the quote to read IncompleteReasons rather than the raw load failures: three freshly
-        // published advisories arriving first would fill a bounded quote and push the one actionable failure
-        // out of it — the same defect this refusal exists to remove, wearing a new costume.
-        var diagnostics = new WorkspaceDiagnostics([Advisory, Advisory, Advisory, LockFileFailure], []);
+        // The same bound over the stronger evidence: a solution rarely loses one project either, and the
+        // remedy has to survive to the end of the message.
+        var diagnostics = new WorkspaceDiagnostics(
+            [], [], ["C:/repo/one.csproj", "C:/repo/two.csproj", "C:/repo/three.csproj", "C:/repo/four.csproj"]);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldContain("  C:/repo/one.csproj");
+        error.Message.ShouldContain("  C:/repo/three.csproj");
+        error.Message.ShouldNotContain("four.csproj");
+        error.Message.ShouldContain("... and 1 more.");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_AuditAdvisoriesBesideARealDiagnostic_QuotesTheRealOne()
+    {
+        // What forces the quote to skip the advisories: three freshly published ones arriving first would
+        // fill a bounded quote and push the one actionable line out of it — the same defect this refusal
+        // exists to remove, wearing a new costume.
+        var diagnostics = new WorkspaceDiagnostics([Advisory, Advisory, Advisory, LockFileFailure], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject(
@@ -267,6 +309,21 @@ public sealed class SpecResolverTests
         error.Message.ShouldContain("NU1004");
         error.Message.ShouldNotContain("GHSA");
         error.Message.ShouldNotContain("more.");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_FailedProjectsBesideDiagnostics_PrefersTheProjects()
+    {
+        // Both arms have evidence; the projects win, because they are what the reader can act on and what
+        // the gate itself decided on. The diagnostics still render on whatever channel the surface has.
+        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [BrokenProject]);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldContain(BrokenProject);
+        error.Message.ShouldNotContain("NU1004");
     }
 
     [Fact]

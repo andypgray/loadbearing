@@ -109,7 +109,12 @@ internal static class BinlogReplayer
                     $"Replay stripped {analyzerCount} unresolved analyzer and {metadataCount} unresolved "
                     + "metadata reference(s); a build artifact recorded in the binlog was missing from disk.");
 
-            return new ReplayedSolution(workspace, reader, stripped, targetFrameworks);
+            // No solution file to read declared membership from, so only the loaded-but-empty arm can fire —
+            // and it cannot, because every replayed project came from a compiler invocation that ran. Asked
+            // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
+            var failedProjects = ProjectLoadFailures.Detect(stripped, null);
+
+            return new ReplayedSolution(workspace, reader, stripped, targetFrameworks, failedProjects);
         }
         catch
         {

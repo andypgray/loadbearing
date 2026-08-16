@@ -2,7 +2,6 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli;
-using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -11,31 +10,41 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>The workspace-diagnostics contract on <c>check</c>.</summary>
 /// <remarks>
-///     Three parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>):
+///     <para>
+///         Four parts, all against the real MyApp fixture (each opens a workspace, hence <c>Serial</c>).
+///         Driven through <see cref="CheckRunner" /> with an injected source that wraps the real cold load
+///         and adds synthetic diagnostics and/or synthetic failed projects — the one way to exercise the
+///         gate without a genuinely broken project, and the one way to put the two inputs in front of it
+///         <em>separately</em>, which is the whole subject of the last part below.
+///     </para>
 ///     <list type="bullet">
 ///         <item>
-///             <b>Fail closed.</b> A workspace-load failure means the model is incomplete, so
+///             <b>Fail closed.</b> A project that failed to load means the model is incomplete, so
 ///             <c>check</c> exits 2 by default (overriding the clean 0 and the violated 1) rather than read
 ///             green on a partial model; <c>--allow-workspace-diagnostics</c> restores the prior 0/1 exit
-///             with the load failures printed as warnings. Driven through <see cref="CheckRunner" /> with an
-///             injected source that wraps the real cold load and adds synthetic load diagnostics — the one
-///             way to exercise the gate without a genuinely broken project. <c>--json</c> stdout stays pure,
-///             and a <c>--sarif</c> report written before the gate returns records the unsuccessful
-///             invocation with the load diagnostics as notifications.
+///             with the load failures printed as warnings. <c>--json</c> stdout stays pure, and a
+///             <c>--sarif</c> report written before the gate returns records the unsuccessful invocation
+///             with the load diagnostics as notifications.
 ///         </item>
 ///         <item>
 ///             <b>Merge notes never gate.</b> A real same-FQN cross-project conflation (Shared.Widget
 ///             declared by two projects that do not reference each other) renders on the same diagnostics
 ///             stream — <c>warning:</c> on stderr, the <c>workspaceDiagnostics</c> array in JSON — while the
-///             exit stays 0: the advisory notes are kept out of the fail-closed gate by construction.
+///             exit stays 0: the advisory notes ride a separate slot by construction.
 ///         </item>
 ///         <item>
 ///             <b>NuGetAudit advisories never gate.</b> An injected advisory in the codeless shape Roslyn
 ///             delivers — external publication timing, not a broken model — renders on the same stream (the
-///             <c>warning:</c> line, the
-///             <c>workspaceDiagnostics</c> array, a SARIF notification) while the exit stays 0/1:
-///             <see cref="NuGetAuditDiagnostics" /> carves the family out of the gate input, yet a genuine
-///             load failure riding alongside it still fails closed.
+///             <c>warning:</c> line, the <c>workspaceDiagnostics</c> array, a SARIF notification) while the
+///             exit stays 0/1, and a genuine load failure riding alongside it still fails closed.
+///         </item>
+///         <item>
+///             <b>No message gates, in any language.</b> The measured field defects, replayed verbatim: a
+///             NuGet pruning advisory (<c>NU1510</c>) that refused a solution whose only rule passed, and an
+///             audit-fetch failure (<c>NU1900</c>) in German that refused where the identical English run
+///             exits 0. Both now render and exit 0, because a diagnostic is no longer an input to the
+///             decision — which is what makes the fix language-independent rather than one more phrase in a
+///             matcher.
 ///         </item>
 ///     </list>
 /// </remarks>
@@ -43,6 +52,33 @@ namespace Zphil.LoadBearing.Tests.Cli;
 public sealed class WorkspaceDiagnosticsGateE2ETests
 {
     private const string LoadDiagnostic = "Project 'MyApp.Broken' failed to load: simulated workspace-load failure.";
+
+    // The project the gate is told failed to load, and the only thing that makes it fire. Injected apart
+    // from the diagnostic above because the product separates them: the diagnostic renders, this decides.
+    private const string BrokenProject = "C:/repo/MyApp.Broken/MyApp.Broken.csproj";
+
+    // The NU1510 pruning advisory, captured verbatim from a restore of a net10.0 project referencing a
+    // package the shared framework now carries. It is an ordinary restore warning, it says nothing about
+    // whether the model built, and it refused a solution whose one rule passed — the defect this class's
+    // fourth part exists to keep closed. .NET 10 emits it for a large and growing set of packages.
+    private const string PruningAdvisory =
+        "Msbuild failed when processing the file '/src/App/App.csproj' with message: PackageReference "
+        + "System.Text.Encodings.Web will not be pruned. Consider removing this package from your "
+        + "dependencies, as it is likely unnecessary.";
+
+    // The same NU1510, in German. Nothing in the product reads either spelling.
+    private const string GermanPruningAdvisory =
+        "Msbuild failed when processing the file '/src/App/App.csproj' with message: PackageReference "
+        + "System.Text.Encodings.Web wird nicht gekürzt. Erwägen Sie, dieses Paket aus Ihren Abhängigkeiten "
+        + "zu entfernen, da es wahrscheinlich nicht erforderlich ist.";
+
+    // The NU1900 audit-fetch failure in German, captured verbatim from a restore against an unreachable feed
+    // under DOTNET_CLI_UI_LANGUAGE=de. The hardest case in the family and the reason a text matcher could
+    // never be finished: no GHSA URL, no NU1900 token, and neither English phrase the old matcher keyed on.
+    private const string GermanAuditFetchFailure =
+        "Msbuild failed when processing the file '/src/App/App.csproj' with message: Fehler beim Abrufen von "
+        + "Paketsicherheitsrisikodaten: Der Dienstindex für die Quelle "
+        + "\"https://nuget.fieldtest.invalid/v3/index.json\" konnte nicht geladen werden.";
 
     // A NuGetAudit advisory in the shape MSBuildWorkspace actually delivers one, captured from a run over a
     // solution referencing System.Security.Cryptography.Xml 4.7.0: Roslyn's project-load frame, package +
@@ -58,8 +94,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "https://github.com/advisories/GHSA-vh55-786g-wjwj";
 
     private const string GateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
-        + "cannot pass. Pass --allow-workspace-diagnostics to check against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -71,9 +106,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The clean spec would exit 0, but a project failed to load — the gate overrides that verdict.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
 
-        result.ShouldRefuseWith();
+        result.ShouldRefuseWith(GateLine, BrokenProject); // and the refusal names what failed
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
-        result.Err.ShouldContain(GateLine);
     }
 
     [Fact]
@@ -93,7 +127,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The violated spec would exit 1; the incomplete-model gate takes precedence and exits 2.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.ViolatedSpecDll, false, false);
 
-        result.ShouldRefuseWith(GateLine);
+        result.ShouldRefuseWith(GateLine, BrokenProject);
     }
 
     [Fact]
@@ -254,9 +288,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // An advisory riding alongside a genuine load failure: the load failure still gates, and both render.
         CliResult result = await RunWithInjectedDiagnosticAsync(
-            [AuditDiagnostic, LoadDiagnostic], CliRunner.CleanSpecDll, false, false);
+            [AuditDiagnostic, LoadDiagnostic], CliRunner.CleanSpecDll, false, false, null, [BrokenProject]);
 
-        result.ShouldRefuseWith(GateLine);
+        result.ShouldRefuseWith(GateLine, BrokenProject);
         result.Err.ShouldContain($"warning: {AuditDiagnostic}"); // the advisory renders
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and so does the load failure — no over-filtering
     }
@@ -292,6 +326,69 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         sarif.ShouldContain(AuditDiagnostic);
     }
 
+    // ── no message gates, in any language ─────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(PruningAdvisory)]
+    [InlineData(GermanPruningAdvisory)]
+    [InlineData(GermanAuditFetchFailure)]
+    public async Task Check_RestoreWarningWithNoFailedProject_RendersItAndExitsClean(string diagnostic)
+    {
+        // The two measured field refusals, in three spellings, all of which used to reach a decision. None of
+        // them says a project failed to build — they are restore warnings about packages and feeds — and
+        // nothing loads them into the gate any more, so the clean spec exits 0 and the warning still prints.
+        // The German pair is the point of the theory: recognition cannot depend on a phrase, because NuGet
+        // ships its wording in many languages and none of it is a contract.
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [diagnostic], CliRunner.CleanSpecDll, false, false);
+
+        result.ShouldSucceed();
+        result.Err.ShouldContain($"warning: {diagnostic}");
+        result.Err.ShouldNotContain("error: the model is incomplete");
+    }
+
+    [Fact]
+    public async Task Check_RestoreWarningWithNoFailedProjectJson_StampsNeitherIncompleteNorFailedProjects()
+    {
+        // The document half. A restore warning is data worth carrying, but it is not a verdict: an
+        // arch_check client reading modelIncomplete must not be told the answer is untrustworthy because a
+        // package could stand to be removed from a csproj.
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [PruningAdvisory], CliRunner.CleanSpecDll, false, true);
+
+        result.ShouldSucceed();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("modelIncomplete", out _)
+            .ShouldBeFalse();
+        document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse();
+        result.Out.ShouldContain("will not be pruned"); // it still rides workspaceDiagnostics
+    }
+
+    [Fact]
+    public async Task Check_WorkspaceLoadDiagnosticJson_CarriesTheFailedProjectsBesideTheVerdict()
+    {
+        // What modelIncomplete cannot say on its own: which projects are missing. The diagnostics array
+        // cannot be read for it — MSBuild's words about a fatal failure and about a restore warning arrive
+        // in the same shape — so the evidence needs its own slot, and it is the only channel an MCP client
+        // has for it.
+        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
+
+        result.ShouldRefuseWith();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.GetProperty("modelIncomplete")
+            .GetBoolean()
+            .ShouldBeTrue();
+        // Solution-relative and forward-slashed, like every other path in the document, so no machine path
+        // ever lands in one a golden pins.
+        var failedProjects = document.RootElement.GetProperty("failedProjects")
+            .EnumerateArray()
+            .Select(element => element.GetString() ?? "")
+            .ToList();
+        failedProjects.ShouldHaveSingleItem()
+            .ShouldEndWith("MyApp.Broken/MyApp.Broken.csproj");
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     private static string[] WorkspaceDiagnosticsOf(JsonDocument document)
@@ -302,19 +399,23 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ToArray();
     }
 
+    // The load-failure shape: the diagnostic renders, and the project beside it is what gates.
     private static Task<CliResult> RunWithInjectedDiagnosticAsync(
         string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
     {
-        return RunWithInjectedDiagnosticAsync([LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif);
+        return RunWithInjectedDiagnosticAsync(
+            [LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif, [BrokenProject]);
     }
 
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
-        IReadOnlyList<string> diagnostics, string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
+        IReadOnlyList<string> diagnostics, string spec, bool allowWorkspaceDiagnostics, bool json,
+        string? sarif = null, IReadOnlyList<string>? failedProjects = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
         string solution = CliRunner.MyAppSolution;
-        var runner = new CheckRunner(output, error, new DiagnosticInjectingSolutionSource(diagnostics), new FakeEnvironment());
+        var runner = new CheckRunner(
+            output, error, new DiagnosticInjectingSolutionSource(diagnostics, failedProjects), new FakeEnvironment());
 
         int exit = await runner.RunAsync(
             new CheckRequest(

@@ -13,72 +13,112 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         surface that consumes the model either fails closed on <c>check</c>'s terms — exit 2 / MCP error
 ///         / a named failing test, opt-out <c>--allow-workspace-diagnostics</c>
 ///         (<c>AllowWorkspaceDiagnostics</c> in the adapter) — or carries the diagnostics visibly on its own
-///         answering channel. NuGet-audit advisories never gate. Where a surface refuses <em>before</em>
-///         producing its answer, the refusal is the error channel (CLI stderr + exit 2, MCP <c>IsError</c>,
-///         the adapter's <c>Workspace_LoadedCompletely</c> failure with every rule case skipped); where it
-///         answers anyway, the diagnostics ride the answer (the JSON documents'
-///         <c>workspaceDiagnostics</c> + <c>modelIncomplete</c>, <c>explain</c>'s stderr warnings,
+///         answering channel. Where a surface refuses <em>before</em> producing its answer, the refusal is
+///         the error channel (CLI stderr + exit 2, MCP <c>IsError</c>, the adapter's
+///         <c>Workspace_LoadedCompletely</c> failure with every rule case skipped); where it answers anyway,
+///         the diagnostics ride the answer (the JSON documents' <c>workspaceDiagnostics</c> +
+///         <c>modelIncomplete</c> + <c>failedProjects</c>, <c>explain</c>'s stderr warnings,
 ///         <c>context</c>'s leading caveat block).
 ///     </para>
 ///     <para>
-///         <b>What gates.</b> Strictly the workspace-load failures
-///         (<see cref="WorkspaceDiagnostics.LoadFailures" />), never the advisory merge notes
-///         (<see cref="WorkspaceDiagnostics.MergeNotes" />, which ride a separate slot by construction) and
-///         never the NuGetAudit advisories (NU19xx) that do share the load-failure stream — an advisory's
-///         publication timing is an external, time-varying input, not a statement that the model failed to
-///         build, so <see cref="NuGetAuditDiagnostics" /> carves the family out of the gate input while it
-///         still renders everywhere. The decision itself lives on
-///         <see cref="WorkspaceDiagnostics.Gates" />, where the two streams cannot be swapped; what stays
-///         here is the wording each surface uses once it has fired.
+///         <b>What gates.</b> Strictly the projects that failed to load
+///         (<see cref="WorkspaceDiagnostics.FailedProjects" />), read off the loaded solution's structure by
+///         <see cref="ProjectLoadFailures" />. Never the diagnostics: MSBuild severity does not survive
+///         Roslyn's project-load reporting, so <see cref="WorkspaceDiagnostics.LoadFailures" /> carries fatal
+///         evaluation errors and ordinary restore warnings in one indistinguishable stream, and a gate that
+///         read it refused solutions whose rules all passed — and refused in German what it let through in
+///         English. The decision itself lives on <see cref="WorkspaceDiagnostics.Gates" />, where the
+///         gating and the rendered streams cannot be swapped; what stays here is the wording each surface
+///         uses once it has fired.
 ///     </para>
 ///     <para>
-///         <b>Why per-surface constants rather than one parameterized string.</b> The messages share a
-///         shape, not a template: each names what <em>that</em> surface cannot do and what is at stake if it
-///         did it anyway. Keeping them as separate literals is also what freezes <see cref="CheckMessage" />'s
-///         bytes, which the check gate's pinned tests duplicate verbatim.
+///         <b>Every message names the projects.</b> The gate's evidence is inherently a set of paths rather
+///         than a set of sentences, so each refusal lists them — which is also the one thing a reader can act
+///         on directly. The diagnostics that explain <em>why</em> each failed still render on whatever
+///         channels that surface has; the four CLI verbs below print them immediately above their refusal,
+///         which is why those four point at the warnings rather than repeating them.
+///     </para>
+///     <para>
+///         <b>Why per-surface messages rather than one parameterized string.</b> They share a shape, not a
+///         template: each names what <em>that</em> surface cannot do and what is at stake if it did it
+///         anyway. Only the assembly of the evidence block is shared, and that was never the part that
+///         varied.
 ///     </para>
 /// </remarks>
 internal static class IncompleteModelGate
 {
     /// <summary>
-    ///     The stderr line <c>check</c> emits before exit 2. Kept as one line, printed after the per-project
-    ///     load warnings it refers to, and naming the opt-out flag.
+    ///     The per-rule skip reason when the gate fires: short and constant, because the failed projects
+    ///     themselves ride <c>Workspace_LoadedCompletely</c>'s failure — one place to read them, not one copy
+    ///     per rule.
     /// </summary>
-    internal const string CheckMessage =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
-        + "cannot pass. Pass --allow-workspace-diagnostics to check against the partial model anyway.";
+    internal const string AdapterSkipReason =
+        "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely for "
+        + "the projects that failed to load.";
 
     /// <summary>
-    ///     The stderr line <c>baseline</c> emits before exit 2, having written nothing. A baseline is the
+    ///     The stderr lines <c>check</c> emits before exit 2, printed after the per-project load warnings
+    ///     they refer to, and naming the opt-out flag.
+    /// </summary>
+    internal static string CheckMessage(WorkspaceDiagnostics diagnostics)
+    {
+        return Block(
+            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so check cannot pass:",
+            diagnostics,
+            false,
+            "See the warnings above for why, then restore and build the solution (dotnet build). To check "
+            + "against the partial model anyway, pass --allow-workspace-diagnostics.");
+    }
+
+    /// <summary>
+    ///     The stderr lines <c>baseline</c> emits before exit 2, having written nothing. A baseline is the
     ///     team's signature on its debt: captured from a partial model it grandfathers "zero debt" for rules
     ///     that were never measured, and <c>--accept-reductions</c> deletes real entries as "no longer
     ///     occurring" when the only thing that changed is that a project stopped loading.
     /// </summary>
-    internal const string BaselineMessage =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so no "
-        + "baseline was written: a baseline captured from a partial model signs off debt that was never measured. "
-        + "Pass --allow-workspace-diagnostics to baseline against the partial model anyway.";
+    internal static string BaselineMessage(WorkspaceDiagnostics diagnostics)
+    {
+        return Block(
+            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so no baseline was "
+            + "written: a baseline captured from a partial model signs off debt that was never measured:",
+            diagnostics,
+            false,
+            "See the warnings above for why, then restore and build the solution (dotnet build). To baseline "
+            + "against the partial model anyway, pass --allow-workspace-diagnostics.");
+    }
 
     /// <summary>
-    ///     The stderr line <c>status</c> emits before exit 2, after rendering the burndown it does have.
+    ///     The stderr lines <c>status</c> emits before exit 2, after rendering the burndown it does have.
     ///     Unloaded projects declare no types, so every count in that burndown reads low.
     /// </summary>
-    internal const string StatusMessage =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so status "
-        + "cannot report the burndown: unloaded projects contribute no violations, so every count reads low. "
-        + "Pass --allow-workspace-diagnostics to report against the partial model anyway.";
+    internal static string StatusMessage(WorkspaceDiagnostics diagnostics)
+    {
+        return Block(
+            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so status cannot report "
+            + "the burndown: unloaded projects contribute no violations, so every count reads low:",
+            diagnostics,
+            false,
+            "See the warnings above for why, then restore and build the solution (dotnet build). To report "
+            + "against the partial model anyway, pass --allow-workspace-diagnostics.");
+    }
 
     /// <summary>
-    ///     The stderr line <c>render</c> emits before exit 2, having written nothing. Rendered files are
+    ///     The stderr lines <c>render</c> emits before exit 2, having written nothing. Rendered files are
     ///     committed context: a card whose project failed to load resolves no directory and is silently
     ///     dropped rather than written wrong, and <c>--diagram</c> draws the very survey <c>graph</c>
     ///     refuses to print from a partial model.
     /// </summary>
-    internal const string RenderMessage =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so nothing "
-        + "was rendered: a card whose project failed to load cannot be placed and would be dropped from the "
-        + "committed files, and --diagram would draw a survey missing whole projects. "
-        + "Pass --allow-workspace-diagnostics to render from the partial model anyway.";
+    internal static string RenderMessage(WorkspaceDiagnostics diagnostics)
+    {
+        return Block(
+            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing was rendered: "
+            + "a card whose project failed to load cannot be placed and would be dropped from the committed "
+            + "files, and --diagram would draw a survey missing whole projects:",
+            diagnostics,
+            false,
+            "See the warnings above for why, then restore and build the solution (dotnet build). To render "
+            + "from the partial model anyway, pass --allow-workspace-diagnostics.");
+    }
 
     /// <summary>
     ///     The <c>graph</c> refusal, thrown as a <see cref="UserErrorException" /> before extraction
@@ -87,16 +127,17 @@ internal static class IncompleteModelGate
     ///     <c>GlobalCallToolFilter</c>).
     /// </summary>
     /// <remarks>
-    ///     It carries the diagnostics inline rather than pointing at warnings printed above, because on the
-    ///     MCP surface there is nothing above: <c>arch_graph</c> discards its error writer, so a refusal that
-    ///     said "see the warnings" would name evidence the caller cannot reach. <c>graph</c> is also the
+    ///     It carries the failed projects inline rather than pointing at warnings printed above, because on
+    ///     the MCP surface there is nothing above: <c>arch_graph</c> discards its error writer, so a refusal
+    ///     that said "see the warnings" would name evidence the caller cannot reach. <c>graph</c> is also the
     ///     entry point that needs no spec — a stranger's first command on an unfamiliar codebase — so the
     ///     refusal names the fix in both dialects rather than assuming which surface asked.
     /// </remarks>
     internal static string GraphRefusal(WorkspaceDiagnostics diagnostics)
     {
         return Block(
-            "the model is incomplete — one or more projects failed to load, so graph cannot survey the codebase:",
+            $"the model is incomplete — {Failed(diagnostics)} failed to load, so graph cannot survey the "
+            + "codebase:",
             diagnostics,
             true,
             "Restore and build the solution first (dotnet build), then retry. To survey the partial model as it "
@@ -109,14 +150,14 @@ internal static class IncompleteModelGate
     ///     partial load is exactly the state in which "no architecture scope covers this path" can be a
     ///     false all-clear: a card whose project failed to load resolves no directory and places nowhere.
     ///     Stdout is context's only channel (no CLI twin, no <c>--json</c>), so the caveat rides the body,
-    ///     diagnostics inline, ahead of whatever answer the partial model still supports.
+    ///     the failed projects inline, ahead of whatever answer the partial model still supports.
     /// </summary>
     internal static string ContextCaveat(WorkspaceDiagnostics diagnostics)
     {
         return Block(
-            "caveat: the model is incomplete — one or more projects failed to load, so scope cards from the "
-            + "unloaded projects cannot be placed and \"no architecture scope covers\" cannot be trusted for "
-            + "paths under them:",
+            $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so scope cards from "
+            + "them cannot be placed and \"no architecture scope covers\" cannot be trusted for paths under "
+            + "them:",
             diagnostics,
             true,
             "Restore and build the solution first (dotnet build), then retry for a whole answer.");
@@ -125,13 +166,13 @@ internal static class IncompleteModelGate
     /// <summary>
     ///     The <c>Workspace_LoadedCompletely</c> failure body — the CLI gate transposed to a test report:
     ///     <c>check</c> gates and emits no verdict, so the adapter emits no rule verdicts. It carries the
-    ///     diagnostics inline for <see cref="GraphRefusal" />'s exact reason: in a test report there is
+    ///     failed projects inline for <see cref="GraphRefusal" />'s exact reason: in a test report there is
     ///     nothing above to point at.
     /// </summary>
     internal static string AdapterRefusal(WorkspaceDiagnostics diagnostics)
     {
         return Block(
-            "the model is incomplete — one or more projects failed to load, so every rule test was skipped:",
+            $"the model is incomplete — {Failed(diagnostics)} failed to load, so every rule test was skipped:",
             diagnostics,
             true,
             "A rule whose subject lives in an unloaded project selects nothing, and an empty subject passes — a "
@@ -143,36 +184,37 @@ internal static class IncompleteModelGate
     /// <summary>
     ///     The <c>Workspace_LoadedCompletely</c> skip reason under <c>AllowWorkspaceDiagnostics</c>: the rule
     ///     verdicts are live again, but a test by that name cannot pass while the load failures it is named
-    ///     for are real — so it skips, and the diagnostics ride the skip reason.
+    ///     for are real — so it skips, and the failed projects ride the skip reason.
     /// </summary>
     internal static string AdapterOptedIn(WorkspaceDiagnostics diagnostics)
     {
         return Block(
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite:",
+            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+            + $"{Failed(diagnostics)} failing to load:",
             diagnostics,
             false,
             null);
     }
 
-    // How a diagnostics block is assembled, stated once: the lede, then every diagnostic two-space-indented,
-    // then — inside the indented run, never after the tail — the MSBuild selection note, then the tail. Only
-    // the literals differ between the four messages, and the class's remarks defend those as separate
-    // messages; the assembly was never the part that varied.
-    private static string Block(string lede, WorkspaceDiagnostics diagnostics, bool withSelectionNote, string? tail)
+    // The count, as a noun phrase every lede can take: "1 project" / "3 projects". A gate that knows exactly
+    // which projects failed has no business saying "one or more".
+    private static string Failed(WorkspaceDiagnostics diagnostics)
+    {
+        int count = diagnostics.FailedProjects.Count;
+        return count == 1 ? "1 project" : $"{count} projects";
+    }
+
+    // How a block is assembled, stated once: the lede, then every failed project two-space-indented, then —
+    // inside the indented run, never after the tail — the MSBuild selection note, then the tail. Only the
+    // literals differ between the messages, and the class's remarks defend those as separate messages; the
+    // assembly was never the part that varied.
+    private static string Block(
+        string lede, WorkspaceDiagnostics diagnostics, bool withSelectionNote, string? tail)
     {
         var lines = new List<string> { lede };
-        lines.AddRange(diagnostics.LoadFailures.Select(diagnostic => "  " + diagnostic));
+        lines.AddRange(diagnostics.FailedProjects.Select(project => "  " + project));
         if (withSelectionNote) lines.Add("  " + MsBuildBootstrap.SelectionNote());
         if (tail is not null) lines.Add(tail);
         return string.Join("\n", lines);
     }
-
-    /// <summary>
-    ///     The per-rule skip reason when the gate fires: short and constant, because the diagnostics
-    ///     themselves ride <c>Workspace_LoadedCompletely</c>'s failure — one place to read them, not one copy
-    ///     per rule.
-    /// </summary>
-    internal const string AdapterSkipReason =
-        "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely for "
-        + "the load failures.";
 }

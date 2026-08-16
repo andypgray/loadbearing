@@ -8,9 +8,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
-// without a member-target or member-subject rule. The `modelIncomplete` and `rulesFilter` slots are additive
-// the same way: null (omitted) on every run whose workspace loaded and that checked the whole spec, so a
-// clean document is unchanged.
+// without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects` and `rulesFilter`
+// slots are additive the same way: null (omitted) on every run whose workspace loaded and that checked the
+// whole spec, so a clean document is unchanged.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
 /// <param name="RulesFilter">
@@ -24,6 +24,13 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     not <c>--allow-workspace-diagnostics</c> opted out of failing closed, which is what lets
 ///     <c>arch_check</c> tell a client the answer is untrustworthy on a surface that has no exit code.
 /// </param>
+/// <param name="FailedProjects">
+///     Which projects failed to load — solution-relative, forward-slashed <c>.csproj</c> paths — or null
+///     (omitted) when none did. The evidence behind <see cref="ModelIncomplete" />, and the reason it needs
+///     its own slot: <c>workspaceDiagnostics</c> carries MSBuild's words about the load, which name a
+///     failure and an ordinary restore warning in exactly the same shape, so a client cannot recover this
+///     from them. Absent on a clean run, so a clean document is unchanged.
+/// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
@@ -33,6 +40,7 @@ internal sealed record CheckJson(
     IReadOnlyList<RuleJson> Rules,
     IReadOnlyList<string> WorkspaceDiagnostics,
     bool? ModelIncomplete,
+    IReadOnlyList<string>? FailedProjects,
     SummaryJson Summary);
 
 /// <summary>

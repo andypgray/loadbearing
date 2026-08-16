@@ -21,9 +21,12 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     <para>
 ///         The narrowing rows extend the same contract to the knobs — each tool argument produces exactly
 ///         what its CLI option produces — and the budget row covers the one behaviour with no CLI spelling:
-///         over the client's declared response budget, <c>arch_graph</c> re-renders at overview grain, and
-///         what it returns is byte-identical to <c>graph --overview --json</c>. That identity is the whole
-///         claim, because it is what makes a degraded answer a complete document rather than a cut one.
+///         over the client's declared response budget, <c>arch_graph</c> re-renders one rung coarser, and
+///         what it returns is byte-identical to what that grain's own flag writes. It walks the ladder, not
+///         one step of it: a budget between the full and overview documents returns
+///         <c>graph --overview --json</c>, one between overview and skeleton returns
+///         <c>graph --skeleton --json</c>. That identity is the whole claim, because it is what makes a
+///         degraded answer a complete document rather than a cut one.
 ///     </para>
 /// </summary>
 /// <remarks>
@@ -62,16 +65,19 @@ public sealed class CliMcpParityTests
     // asserts on the resulting cap are what keep this honest if the multiple ever moves.
     private const double CharsPerToken = 2.5;
 
-    // The two cold graph documents this suite measures against, each produced once. Three rows want one or
-    // both of them, and the solution behind them is never mutated here — the diff-base row edits its own
-    // TempGitRepo copy — so the same document answers every row. Memoizing the task does not warm anything:
-    // the run underneath is still CliRunner.InvokeColdAsync, freshly loaded, which is what the remarks above
-    // require; it is awaited more than once instead of re-run.
+    // The three cold graph documents this suite measures against — one per rung of the grain ladder — each
+    // produced once. Several rows want more than one of them, and the solution behind them is never mutated
+    // here — the diff-base row edits its own TempGitRepo copy — so the same document answers every row.
+    // Memoizing the task does not warm anything: the run underneath is still CliRunner.InvokeColdAsync,
+    // freshly loaded, which is what the remarks above require; it is awaited more than once instead of re-run.
     private static readonly Lazy<Task<CliResult>> ColdGraph =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json"));
 
     private static readonly Lazy<Task<CliResult>> ColdGraphOverview =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--overview"));
+
+    private static readonly Lazy<Task<CliResult>> ColdGraphSkeleton =
+        new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--skeleton"));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -229,6 +235,14 @@ public sealed class CliMcpParityTests
             .NormalizedTrimmed()
             .ShouldBe(cliOverview.Out.NormalizedTrimmed());
 
+        // arch_graph skeleton ≡ graph --skeleton --json: the structural spine, external rows as a count.
+        CliResult cliSkeleton = await ColdGraphSkeleton.Value;
+        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["skeleton"] = true }, cancellationToken: Ct);
+        mcpSkeleton.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+
         // arch_graph projects ≡ graph --projects --json: the same survey over fewer projects.
         CliResult cliScoped = await CliRunner.InvokeColdAsync(
             "graph", CliRunner.MyAppSolution, "--json", "--projects", "MyApp.Web");
@@ -252,19 +266,23 @@ public sealed class CliMcpParityTests
     }
 
     [Fact]
-    public async Task HarnessG_GraphOverTheResponseBudget_ReturnsExactlyTheCliOverviewDocument()
+    public async Task HarnessG_GraphOverTheResponseBudget_ReturnsExactlyTheCliDocumentForTheGrainItLandsOn()
     {
-        // Arrange — the budget is derived from the two CLI documents rather than guessed, so this row proves
-        // the degrade instead of assuming a fixture size: it must sit at or above the overview document (which
-        // therefore survives the truncator whole) and below the full one (which therefore overruns).
+        // Arrange — each budget is derived from the CLI documents either side of the rung under test rather
+        // than guessed, so this row proves the degrade instead of assuming a fixture size: it must sit at or
+        // above the document that should survive the truncator whole, and below the one that should overrun.
         CliResult cliFull = await ColdGraph.Value;
         CliResult cliOverview = await ColdGraphOverview.Value;
+        CliResult cliSkeleton = await ColdGraphSkeleton.Value;
         cliFull.ShouldSucceed();
         cliOverview.ShouldSucceed();
+        cliSkeleton.ShouldSucceed();
 
         int fullChars = cliFull.Out.TrimEnd('\r', '\n')
             .Length;
         int overviewChars = cliOverview.Out.TrimEnd('\r', '\n')
+            .Length;
+        int skeletonChars = cliSkeleton.Out.TrimEnd('\r', '\n')
             .Length;
         var tokens = (int)Math.Ceiling((fullChars + overviewChars) / 2.0 / CharsPerToken);
         int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
@@ -277,7 +295,7 @@ public sealed class CliMcpParityTests
         harness.Environment.SetVariable(
             LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
 
-        // Act — the plain call, with no overview argument: the degrade is the server's own decision.
+        // Act — the plain call, with no grain argument: the degrade is the server's own decision.
         CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
 
         // Assert — a complete document at coarser grain, byte-identical to what --overview writes. Nothing was
@@ -286,6 +304,24 @@ public sealed class CliMcpParityTests
         text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
         text.NormalizedTrimmed()
             .ShouldBe(cliOverview.Out.NormalizedTrimmed());
+
+        // The rung below, on the same harness — the tool re-reads the budget per call, so a tighter one takes
+        // effect without a second server. The claim is ladder-wide, not overview-shaped: what comes back is
+        // whatever grain the response landed on, spelled exactly as that grain's own flag spells it.
+        var skeletonTokens = (int)Math.Ceiling((overviewChars + skeletonChars) / 2.0 / CharsPerToken);
+        int skeletonBudget = ResponseTruncator.ComputeMaxChars(skeletonTokens.ToString(CultureInfo.InvariantCulture));
+
+        skeletonBudget.ShouldBeGreaterThanOrEqualTo(skeletonChars + Environment.NewLine.Length);
+        skeletonBudget.ShouldBeLessThan(overviewChars);
+
+        harness.Environment.SetVariable(
+            LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
+        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
+
+        string skeletonText = mcpSkeleton.ShouldHaveTextContent();
+        skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+        skeletonText.NormalizedTrimmed()
+            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
     }
 
     private static McpServerBinding Binding(string? solution, string? spec)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -32,9 +33,11 @@ internal static class GraphJsonRenderer
     /// </summary>
     public static string Document(
         GraphSummary summary,
+        string solutionDirectory,
         string solutionName,
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
+        IReadOnlyList<string> failedProjects,
         GraphGrain grain,
         IReadOnlyList<string> projectsScope)
     {
@@ -52,7 +55,8 @@ internal static class GraphJsonRenderer
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
             elideExternalEdges ? summary.ExternalEdges.Count : null,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
-            modelIncomplete ? true : null);
+            modelIncomplete ? true : null,
+            JsonReportRenderer.RelativeProjects(failedProjects, new PathFormat.Relativizer(solutionDirectory)));
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
     }

@@ -5,8 +5,9 @@ namespace Zphil.LoadBearing.Cli;
 
 /// <summary>
 ///     What an <see cref="ISolutionSource" /> hands back: the loaded, unresolved-reference-stripped
-///     <see cref="Solution" />, the discovered solution path, and the workspace-load diagnostics — plus
-///     an optional <see cref="IDisposable" /> the handle owns (see <see cref="Dispose" />).
+///     <see cref="Solution" />, the discovered solution path, the workspace-load diagnostics and the
+///     projects that failed to load — plus an optional <see cref="IDisposable" /> the handle owns (see
+///     <see cref="Dispose" />).
 /// </summary>
 /// <remarks>
 ///     A <see cref="Solution" /> stays usable after its workspace is disposed, so a handle read in flight is
@@ -18,7 +19,8 @@ internal sealed class SolutionHandle(
     IReadOnlyList<string> diagnostics,
     IDisposable? owned,
     Func<IReadOnlyCollection<string>, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
-    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : IDisposable
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+    IReadOnlyList<string>? failedProjects = null) : IDisposable
 {
     private static readonly IReadOnlyDictionary<ProjectId, string> NoTargetFrameworks =
         new Dictionary<ProjectId, string>();
@@ -38,6 +40,12 @@ internal sealed class SolutionHandle(
 
     /// <summary>Workspace-load failure diagnostics, surfaced to stderr / the JSON document by the caller.</summary>
     public IReadOnlyList<string> Diagnostics { get; } = diagnostics;
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load — the fail-closed gate's
+    ///     whole input, where <see cref="Diagnostics" /> is only what gets rendered beside it.
+    /// </summary>
+    public IReadOnlyList<string> FailedProjects { get; } = failedProjects ?? [];
 
     /// <summary>
     ///     The warm path's incremental codebase producer, or null on the cold/one-shot path. When present

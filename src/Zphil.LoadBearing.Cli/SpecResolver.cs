@@ -57,8 +57,8 @@ internal static class SpecResolver
 {
     private const string CoreAssemblyFile = "Zphil.LoadBearing.dll";
 
-    // How many load failures a refusal quotes before it counts the rest. A refusal nobody reads to the end
-    // names nothing; three is enough to see whether the failures share a cause.
+    // How many entries a refusal quotes before it counts the rest. A refusal nobody reads to the end names
+    // nothing; three is enough to see whether the failures share a cause.
     private const int MaxQuotedDiagnostics = 3;
 
     /// <summary>
@@ -231,8 +231,9 @@ internal static class SpecResolver
     /// </summary>
     /// <remarks>
     ///     Zero candidates is reported against <paramref name="diagnostics" />, because a workspace that did
-    ///     not load cleanly produces exactly the same zero: an unresolved package reference means the spec
-    ///     project's reference to the contract library is simply not there to match.
+    ///     not load cleanly produces exactly the same zero: a project that failed to load declares no
+    ///     reference to match, and an unresolved package reference means the spec project's reference to the
+    ///     contract library is simply not there to match either.
     /// </remarks>
     internal static SpecProjectCandidate ResolveConventionProject(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
@@ -259,43 +260,64 @@ internal static class SpecResolver
         return matches[0];
     }
 
-    // Zero candidates has two causes whose remedies do not overlap, and reporting only the first sent readers
-    // to write an argument that could not help them. A clean load means the solution really has no spec
-    // project: the sentence stays byte-identical (the derive_spec prompt quotes it), plus how many projects
-    // were considered, which is what tells a reader whether the workspace held what they expected. A load
-    // that failed means the reference that would have matched may simply not have resolved — so that arm
-    // names the failures and points at the restore, and deliberately does not mention --spec.
+    // Zero candidates has causes whose remedies do not overlap, and reporting only the first sent readers to
+    // write an argument that could not help them. Three arms, strongest evidence first:
+    //
+    //  1. Projects failed to load. The one that would have matched may be among them, and no --spec argument
+    //     repairs a load — so this arm names them and points at the build.
+    //  2. Nothing failed to load, but the load reported problems about this solution. That is the measured
+    //     locked-mode shape: a broken restore leaves the spec project's package reference unresolved while
+    //     the project itself still loads, so the convention finds nothing and the reader must repair the
+    //     restore rather than name a project. It says "may", because that is all it knows.
+    //  3. A clean load means the solution really has no spec project. The sentence stays byte-identical (the
+    //     derive_spec prompt quotes it), plus how many projects were considered, which is what tells a reader
+    //     whether the workspace held what they expected.
+    //
+    // NuGetAudit advisories are excluded from arm 2's input, and only from arm 2's: an advisory's publication
+    // date says nothing about whether this solution's references resolved, so a solution that genuinely has
+    // no spec project must not be sent to go and fix its restore. Nothing here gates — arms 1 and 2 are the
+    // same refusal with different evidence — so no exit code turns on that distinction.
     private static UserErrorException NoSpecProjectFound(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
-        if (!diagnostics.IsIncomplete)
+        var lines = new List<string>();
+        if (diagnostics.IsIncomplete)
+        {
+            lines.Add(
+                "No spec project found: one or more projects failed to load, so a project that references "
+                + "Zphil.LoadBearing.dll may be among them:");
+            lines.AddRange(Quoted(diagnostics.FailedProjects));
+        }
+        else if (diagnostics.ActionableDiagnostics.Count > 0)
+        {
+            lines.Add(
+                "No spec project found: the workspace did not load cleanly, so a project that references "
+                + "Zphil.LoadBearing.dll may have failed to resolve it:");
+            lines.AddRange(Quoted(diagnostics.ActionableDiagnostics));
+        }
+        else
+        {
             return new UserErrorException(
                 "No spec project found: no solution project references Zphil.LoadBearing.dll. Pass --spec to name one.\n"
                 + $"Considered {candidates.Count} C# project(s) in the workspace.");
+        }
 
-        var lines = new List<string>
-        {
-            "No spec project found: the workspace did not load cleanly, so a project that references "
-            + "Zphil.LoadBearing.dll may have failed to resolve it:"
-        };
-        lines.AddRange(QuotedReasons(diagnostics.IncompleteReasons));
         lines.Add("Restore and build the solution first (dotnet restore, dotnet build), then retry.");
 
-        // The refusal is thrown before a CodebaseSource exists, so no runner renders the diagnostics beside
-        // it — the message has to carry them itself. CliErrorMapper.Write splits on \n and writes a line
-        // apiece, so this reads the same on stderr and in an MCP error result.
+        // The refusal is thrown before a CodebaseSource exists, so no runner renders the evidence beside it —
+        // the message has to carry it itself. CliErrorMapper.Write splits on \n and writes a line apiece, so
+        // this reads the same on stderr and in an MCP error result.
         return new UserErrorException(string.Join("\n", lines));
     }
 
-    // Up to MaxQuotedDiagnostics reasons, two-space indented as every other diagnostics block renders them,
-    // then a count of the rest. Reading IncompleteReasons rather than LoadFailures is load-bearing: three
-    // freshly published advisories would otherwise fill the quote and hide the one failure worth acting on.
-    private static IEnumerable<string> QuotedReasons(IReadOnlyList<string> reasons)
+    // Up to MaxQuotedDiagnostics entries, two-space indented as every other evidence block renders them, then
+    // a count of the rest.
+    private static IEnumerable<string> Quoted(IReadOnlyList<string> evidence)
     {
-        foreach (string reason in reasons.Take(MaxQuotedDiagnostics)) yield return "  " + reason;
+        foreach (string entry in evidence.Take(MaxQuotedDiagnostics)) yield return "  " + entry;
 
-        if (reasons.Count > MaxQuotedDiagnostics)
-            yield return $"  ... and {reasons.Count - MaxQuotedDiagnostics} more.";
+        if (evidence.Count > MaxQuotedDiagnostics)
+            yield return $"  ... and {evidence.Count - MaxQuotedDiagnostics} more.";
     }
 
     // One csproj that yields several Roslyn Projects (multi-TFM) is ONE candidate, not many. Group on

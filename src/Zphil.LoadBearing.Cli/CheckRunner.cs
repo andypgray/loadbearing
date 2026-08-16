@@ -70,13 +70,17 @@ internal sealed class CheckRunner(
 
         Render(
             request, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
-            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete, ruleGlobs);
+            Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, !gated, modelIncomplete,
+            diagnostics.FailedProjects, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
         if (gated)
         {
-            error.WriteLine(IncompleteModelGate.CheckMessage);
+            // WriteLine per LF-split line, as CliErrorMapper does, so the block adopts the writer's own
+            // newline rather than carrying embedded LFs onto a CRLF console.
+            foreach (string line in IncompleteModelGate.CheckMessage(diagnostics).Split('\n'))
+                error.WriteLine(line);
             return 2;
         }
 
@@ -100,7 +104,7 @@ internal sealed class CheckRunner(
     private void Render(
         CheckRequest request, CheckReport report, string solutionDirectory, string solutionName, string specAssembly,
         IReadOnlyList<string> diagnostics, bool executionSuccessful, bool modelIncomplete,
-        IReadOnlyList<string> ruleGlobs)
+        IReadOnlyList<string> failedProjects, IReadOnlyList<string> ruleGlobs)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
@@ -109,7 +113,7 @@ internal sealed class CheckRunner(
         if (request.Json)
             JsonReportRenderer.Render(
                 output, report, solutionDirectory, solutionName, specAssembly, request.DiffBase, diagnostics,
-                modelIncomplete, ruleGlobs);
+                modelIncomplete, failedProjects, ruleGlobs);
         else
             HumanReportRenderer.Render(output, report, solutionDirectory);
 

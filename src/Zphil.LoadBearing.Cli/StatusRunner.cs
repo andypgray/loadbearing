@@ -54,15 +54,17 @@ internal sealed class StatusRunner(
 
         if (request.Json)
             StatusJsonRenderer.Render(
-                output, report, Path.GetFileName(source.SolutionPath), Path.GetFileName(source.Resolution.DllPath),
-                renderedDiagnostics, modelIncomplete);
+                output, report, source.SolutionDirectory, Path.GetFileName(source.SolutionPath),
+                Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, modelIncomplete,
+                diagnostics.FailedProjects);
         else
             foreach (string line in StatusFormatter.Lines(report))
                 output.WriteLine(line);
 
         if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
-            error.WriteLine(IncompleteModelGate.StatusMessage);
+            foreach (string line in IncompleteModelGate.StatusMessage(diagnostics).Split('\n'))
+                error.WriteLine(line);
             return 2;
         }
 

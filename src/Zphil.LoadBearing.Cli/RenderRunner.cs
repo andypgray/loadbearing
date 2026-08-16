@@ -45,7 +45,8 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
         // is dropped, and --diagram draws the very survey graph refuses to print.
         if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
-            error.WriteLine(IncompleteModelGate.RenderMessage);
+            foreach (string line in IncompleteModelGate.RenderMessage(diagnostics).Split('\n'))
+                error.WriteLine(line);
             return 2;
         }
 

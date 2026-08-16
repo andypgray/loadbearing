@@ -38,7 +38,8 @@ public static class WorkspaceLoader
     /// <param name="diagnosticLog">
     ///     Optional sink for workspace-failure diagnostics. Failures are surfaced but never abort the
     ///     load: MSBuildWorkspace reports partial-load problems as diagnostics, and a partial load
-    ///     still yields a usable model.
+    ///     still yields a usable model. These render; they do not decide anything — whether the model is
+    ///     incomplete is <see cref="LoadedSolution.FailedProjects" />'s answer.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <remarks>
@@ -63,6 +64,10 @@ public static class WorkspaceLoader
         (Solution normalized, var targetFrameworks) =
             stripped.NormalizeProjectNames();
 
-        return new LoadedSolution(workspace, normalized, targetFrameworks);
+        // Which projects failed is read off the loaded structure here, at the boundary, so every consumer
+        // downstream is handed the same answer rather than re-deriving one from the diagnostic text.
+        var failedProjects = ProjectLoadFailures.Detect(normalized, solutionPath);
+
+        return new LoadedSolution(workspace, normalized, targetFrameworks, failedProjects);
     }
 }

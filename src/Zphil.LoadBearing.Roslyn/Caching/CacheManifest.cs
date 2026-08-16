@@ -21,6 +21,16 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         file degrades to a miss rather than an error — see <see cref="ExtractionCacheStore" />.
 ///     </para>
 /// </remarks>
+/// <param name="Diagnostics">
+///     The workspace-load diagnostics the recorded run collected, replayed verbatim on a hit so cached and
+///     cold output are byte-identical on a diagnostic-bearing solution.
+/// </param>
+/// <param name="FailedProjects">
+///     The absolute <c>.csproj</c> paths of the projects that failed to load on the recorded run — the
+///     fail-closed gate's input. Persisted rather than recomputed because a hit owns no workspace to read the
+///     loaded structure from, and a hit that answered green where the cold run refuses would be the one thing
+///     this cache promises it cannot do.
+/// </param>
 internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,
@@ -28,6 +38,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<ProjectCacheEntry> Projects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
+    IReadOnlyList<string> FailedProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>

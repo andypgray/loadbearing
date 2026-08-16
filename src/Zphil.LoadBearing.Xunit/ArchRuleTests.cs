@@ -153,10 +153,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     The named answer to a partially-loaded workspace: fails with the load diagnostics inline when a
-    ///     project failed to load (the rule cases then skip — no verdict is reached against a partial model),
-    ///     skips with the diagnostics when <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes
-    ///     silently on a complete load.
+    ///     The named answer to a partially-loaded workspace: fails naming the projects that failed to load
+    ///     (the rule cases then skip — no verdict is reached against a partial model), skips naming them when
+    ///     <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes silently on a complete load.
     /// </summary>
     [Fact]
     public async Task Workspace_LoadedCompletely()
@@ -217,8 +216,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
             var byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
             // No merge notes: the adapter has no channel that renders them, so its diagnostics are the load
-            // failures alone — which is also the only stream the gate below may ever see.
-            return new ArchCheckRun(byId, solutionDirectory, new WorkspaceDiagnostics(diagnostics, []));
+            // failures alone. The failed projects come off the load itself — null only where no load happened,
+            // which is also the case where there is nothing to have failed.
+            return new ArchCheckRun(
+                byId, solutionDirectory,
+                new WorkspaceDiagnostics(diagnostics, [], opened?.FailedProjects ?? []));
         }
         finally
         {

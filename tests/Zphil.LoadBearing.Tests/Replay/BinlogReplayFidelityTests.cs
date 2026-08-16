@@ -46,6 +46,20 @@ public sealed class BinlogReplayFidelityTests
     }
 
     [Fact]
+    public void Replay_ReportsNoFailedProjects_BecauseEveryReplayedProjectWasReallyBuilt()
+    {
+        // The gate's input on this path, pinned empty rather than assumed empty. A replayed project comes
+        // from a compiler invocation a real build actually made, so it carries an output path and cannot
+        // present the failed shape; and a binlog records what was built rather than what a .sln declares, so
+        // the declared-but-absent arm has nothing to compare against. The value is still computed by the one
+        // routine the MSBuild path uses — a replay that started answering "incomplete" would be a real
+        // regression, and hardcoding empty here would hide it.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+
+        replayed.FailedProjects.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Replay_ConstructorEdges_MatchTheMsBuildWorkspace()
     {
         // The construction channel (GRAMMAR §4.5) survives the binlog-replay path — an explicit assertion

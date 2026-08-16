@@ -20,13 +20,15 @@ internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
     string solutionPath,
     IReadOnlyList<string> diagnostics,
-    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : ISolutionSource
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+    IReadOnlyList<string>? failedProjects = null) : ISolutionSource
 {
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string? solution, string workingDirectory, CancellationToken ct)
     {
         ModelPipeline.DiscoverSolution(solution, workingDirectory);
         return Task.FromResult(new SolutionHandle(
-            replayedSolution, solutionPath, diagnostics, null, targetFrameworks: targetFrameworks));
+            replayedSolution, solutionPath, diagnostics, null, targetFrameworks: targetFrameworks,
+            failedProjects: failedProjects));
     }
 }

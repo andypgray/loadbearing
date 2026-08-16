@@ -3,20 +3,28 @@ using System.Text.RegularExpressions;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     Recognises the NuGet audit diagnostic family (NU19xx) so the <c>check</c> fail-closed gate can carve
-///     it out.
+///     Recognises the NuGet audit diagnostic family (NU19xx) among the workspace-load diagnostics, so a
+///     message that offers the load as an explanation for something can lead with a diagnostic that is
+///     actually about this solution.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         NuGetAudit re-raises NVD/GHSA advisories as restore warnings, which are replayed on every
-///         later build from the assets file and which MSBuildWorkspace then surfaces as workspace diagnostics —
-///         but an advisory's publication and the audit fetch's network reachability are external, time-varying
-///         inputs, not a statement that the model failed to build. Letting them reach a deterministic gate means
-///         a freshly published advisory (or an offline run) flips the exit code with no source change, and
-///         vulnerability response already has owned lanes (Dependabot, NuGetAudit itself,
-///         <c>dotnet list package --vulnerable</c>). So the family is filtered out of the gate input only: the
-///         messages still render everywhere (stderr warnings, the JSON <c>workspaceDiagnostics</c> array, SARIF
-///         notifications) — render-but-don't-gate.
+///         <b>What this decides: nothing.</b> It used to be the <c>check</c> fail-closed gate's carve-out —
+///         the family was filtered out of the gate input while still rendering everywhere. That boundary is
+///         gone, because the gate no longer reads diagnostics at all:
+///         <see cref="ProjectLoadFailures" /> reads which projects failed to load off the loaded solution's
+///         own structure, and <see cref="WorkspaceDiagnostics.FailedProjects" /> is the whole gate input. So
+///         an advisory cannot flip an exit code whether this recognises it or not, and neither can any other
+///         message.
+///     </para>
+///     <para>
+///         <b>Why it still exists.</b> Two refusals have nothing but text to offer — <c>SpecResolver</c>'s
+///         "no spec project found" chooses between blaming the load and blaming the spec, and its quote is
+///         bounded. An advisory's publication date and an audit fetch's network reachability are external,
+///         time-varying inputs that say nothing about how this codebase is built, so a run whose only
+///         diagnostics are advisories must not be sent to go and repair its restore, and three freshly
+///         published advisories must not fill a three-line quote and push the one actionable line out of it.
+///         That is the whole remaining job: ordering and wording, never a verdict.
 ///     </para>
 ///     <para>
 ///         <b>The code is not in the text, so the text is what this matches.</b> Roslyn's
@@ -24,23 +32,19 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <c>NU1902</c> is structurally absent from every diagnostic that reaches a host. What arrives is
 ///         NuGet's own words inside Roslyn's project-load frame, and nothing else:
 ///         <c>Package 'X' 1.0.0 has a known moderate severity vulnerability, https://…/advisories/GHSA-…</c>.
-///         A code-only matcher therefore never fired on a real advisory, and every solution carrying one
-///         vulnerable transitive package failed <c>check</c> closed with a complete, correct model
-///         (issue #19). The code match is kept for the paths that do carry one; the advisory match is what
-///         does the work.
+///         A code-only matcher therefore never fired on a real advisory, and while this family was a gate
+///         input, every solution carrying one vulnerable transitive package failed <c>check</c> closed with a
+///         complete, correct model (issue #19). The code match is kept for the paths that do carry one; the
+///         advisory match is what does the work.
 ///     </para>
 ///     <para>
-///         <b>Severity, not the gate, is what an advisory arrives as.</b> These are MSBuild <em>warnings</em>
-///         — Roslyn reports project-load log items as
-///         <see cref="Microsoft.CodeAnalysis.WorkspaceDiagnosticKind.Failure" />
-///         regardless — so carving them out does not un-gate a project that genuinely failed to load. A
-///         real load failure riding alongside an advisory still fails closed, which
-///         <c>WorkspaceDiagnosticsGateE2ETests</c> pins.
-///     </para>
-///     <para>
-///         <b>Known limit: localisation.</b> NuGet's advisory text is localised, so a non-English toolchain
-///         can still red the gate. The GHSA URL alternative covers the common case regardless of language;
-///         a full fix needs a code, which Roslyn does not give us.
+///         <b>Localisation is no longer a limit, because it is no longer load-bearing.</b> NuGet ships its
+///         wording in many languages, and matching text could never be finished: the measured German
+///         <c>NU1900</c> carries no GHSA URL, no <c>NU1900</c> token, and neither English phrase below, so it
+///         refused where the identical English run passed. Nothing about that refusal was this matcher's to
+///         fix — the defect was that a message reached a decision. It no longer can, in any language. What a
+///         miss here costs now is that a German advisory sorts as though it were actionable inside one
+///         bounded quote, which changes no exit code and no document.
 ///     </para>
 /// </remarks>
 internal static partial class NuGetAuditDiagnostics
@@ -49,8 +53,9 @@ internal static partial class NuGetAuditDiagnostics
     ///     Whether <paramref name="diagnostic" /> is a NuGet audit advisory — NU1900 (the audit fetch itself
     ///     failed), NU1901–1904 (low/moderate/high/critical severity advisories), NU1905, and any future
     ///     NU19xx code — recognised by the advisory text NuGet emits, or by the code on the paths that keep
-    ///     one. The false-positive direction here would un-gate a genuine load failure, so both patterns stay
-    ///     deliberately narrow: phrases NuGet owns, and a URL prefix nothing else emits.
+    ///     one. Both patterns stay deliberately narrow — phrases NuGet owns, and a URL prefix nothing else
+    ///     emits — so that a false positive cannot demote a genuine load diagnostic in the one bounded quote
+    ///     that reads this.
     /// </summary>
     internal static bool IsAudit(string diagnostic)
     {

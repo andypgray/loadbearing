@@ -75,7 +75,9 @@ internal sealed class GraphRunner(
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
         if (request.Json)
-            WriteJson(request, scoped, solutionName, renderedDiagnostics, modelIncomplete, projectGlobs);
+            WriteJson(
+                request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, modelIncomplete,
+                diagnostics.FailedProjects, projectGlobs);
         else
             WriteHuman(request, summary, scoped, solutionName, projectGlobs);
 
@@ -94,8 +96,9 @@ internal sealed class GraphRunner(
     // exists to avoid producing — a survey cut mid-array, unparseable, which is worse for a reader than a
     // whole answer in less detail. The loop cannot spin: every rung is strictly coarser and Skeleton is last.
     private void WriteJson(
-        GraphRequest request, GraphSummary scoped, string solutionName,
-        IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> projectGlobs)
+        GraphRequest request, GraphSummary scoped, string solutionDirectory, string solutionName,
+        IReadOnlyList<string> renderedDiagnostics, bool modelIncomplete, IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> projectGlobs)
     {
         GraphGrain grain = request.Grain;
         string document = Compose(grain);
@@ -112,7 +115,8 @@ internal sealed class GraphRunner(
         string Compose(GraphGrain at)
         {
             return GraphJsonRenderer.Document(
-                scoped, solutionName, renderedDiagnostics, modelIncomplete, at, projectGlobs);
+                scoped, solutionDirectory, solutionName, renderedDiagnostics, modelIncomplete, failedProjects,
+                at, projectGlobs);
         }
     }
 

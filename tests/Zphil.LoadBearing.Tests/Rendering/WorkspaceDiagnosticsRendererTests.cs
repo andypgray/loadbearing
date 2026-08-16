@@ -21,7 +21,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
     {
         // The negative control, and the reason the note is acceptable at all: it is diagnostic context, not
         // a banner. A clean run must say nothing about MSBuild on any surface, including the document.
-        var composed = new WorkspaceDiagnostics([], []).Rendered;
+        var composed = new WorkspaceDiagnostics([], [], []).Rendered;
 
         composed.ShouldBeEmpty();
     }
@@ -29,7 +29,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
     [Fact]
     public void Rendered_NonEmptyDiagnostics_KeepsThemInOrderAndAppendsTheNoteLast()
     {
-        var composed = new WorkspaceDiagnostics(["first failure", "second failure"], []).Rendered;
+        var composed = new WorkspaceDiagnostics(["first failure", "second failure"], [], []).Rendered;
 
         composed.Count.ShouldBe(3);
         composed[0]
@@ -46,7 +46,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
         // The asymmetry, stated as a test: only check renders merge notes, and it asks for them by name.
         // Rendered is what the other five write, so a merge note must not reach it — and a run with nothing
         // but merge notes says nothing at all on those surfaces.
-        var composed = new WorkspaceDiagnostics([], ["a conflation advisory"]).Rendered;
+        var composed = new WorkspaceDiagnostics([], ["a conflation advisory"], []).Rendered;
 
         composed.ShouldBeEmpty();
     }
@@ -54,7 +54,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
     [Fact]
     public void RenderedWithMergeNotes_LoadFailuresFirstThenNotesThenTheNote()
     {
-        var composed = new WorkspaceDiagnostics(["a load failure"], ["a conflation advisory"])
+        var composed = new WorkspaceDiagnostics(["a load failure"], ["a conflation advisory"], [])
             .RenderedWithMergeNotes;
 
         composed.Count.ShouldBe(3);

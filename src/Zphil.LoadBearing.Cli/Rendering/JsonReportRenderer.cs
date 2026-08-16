@@ -26,6 +26,7 @@ internal static class JsonReportRenderer
         string? diffBase,
         IReadOnlyList<string> workspaceDiagnostics,
         bool modelIncomplete,
+        IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> rulesFilter)
     {
         // One relativizer for the whole document: the base directory is the same string for every site,
@@ -41,6 +42,7 @@ internal static class JsonReportRenderer
             report.Results.Select(r => ToRule(r, relativizer)).ToList(),
             workspaceDiagnostics,
             modelIncomplete ? true : null,
+            RelativeProjects(failedProjects, relativizer),
             new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
@@ -50,6 +52,20 @@ internal static class JsonReportRenderer
                 report.WarningCount));
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson));
+    }
+
+    /// <summary>
+    ///     The failed projects as the document carries them — solution-relative and forward-slashed, like
+    ///     every other path in it, so a machine path never lands in a document a golden pins — or null when
+    ///     nothing failed, which omits the key entirely.
+    /// </summary>
+    internal static IReadOnlyList<string>? RelativeProjects(
+        IReadOnlyList<string> failedProjects, PathFormat.Relativizer relativizer)
+    {
+        return failedProjects.Count == 0
+            ? null
+            : failedProjects.Select(relativizer.Relative)
+                .ToList();
     }
 
     private static RuleJson ToRule(RuleResult result, PathFormat.Relativizer relativizer)

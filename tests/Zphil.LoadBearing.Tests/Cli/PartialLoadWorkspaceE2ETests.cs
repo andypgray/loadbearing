@@ -32,25 +32,28 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class PartialLoadWorkspaceE2ETests
 {
+    // The lede of each verb's refusal. The evidence — one indented line per failed project — and the shared
+    // tail follow it, and BrokenApp.Contracts.csproj is asserted separately wherever the evidence is the
+    // subject: a refusal that could not name what failed is the defect these four exist to prevent.
     private const string CheckGateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so check "
-        + "cannot pass. Pass --allow-workspace-diagnostics to check against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
 
     private const string StatusGateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so status "
-        + "cannot report the burndown: unloaded projects contribute no violations, so every count reads low. "
-        + "Pass --allow-workspace-diagnostics to report against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so status cannot report the burndown: "
+        + "unloaded projects contribute no violations, so every count reads low:";
 
     private const string BaselineGateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so no "
-        + "baseline was written: a baseline captured from a partial model signs off debt that was never measured. "
-        + "Pass --allow-workspace-diagnostics to baseline against the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so no baseline was written: a baseline "
+        + "captured from a partial model signs off debt that was never measured:";
 
     private const string RenderGateLine =
-        "error: the model is incomplete — one or more projects failed to load (see the warnings above), so nothing "
-        + "was rendered: a card whose project failed to load cannot be placed and would be dropped from the "
-        + "committed files, and --diagram would draw a survey missing whole projects. "
-        + "Pass --allow-workspace-diagnostics to render from the partial model anyway.";
+        "error: the model is incomplete — 1 project failed to load, so nothing was rendered: a card whose "
+        + "project failed to load cannot be placed and would be dropped from the committed files, and "
+        + "--diagram would draw a survey missing whole projects:";
+
+    // The project BrokenApp declares and the tree does not contain — the whole reason this fixture exists,
+    // and now the thing every refusal in this class names.
+    private const string MissingProject = "BrokenApp.Contracts.csproj";
 
     // The message shape of the crash this whole change exists to remove. Asserted absent, never present:
     // a refusal that names a symbol the caller never wrote is the failure, not the fix.
@@ -73,7 +76,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         graph.Err.ShouldContain("graph cannot survey the codebase");
         // It names what failed, inline — the MCP surface discards the error writer, so a refusal that
         // pointed at "the warnings above" would name evidence half its callers cannot reach.
-        graph.Err.ShouldContain("BrokenApp.Contracts.csproj");
+        graph.Err.ShouldContain(MissingProject);
         // ... says which MSBuild opened them, which is nearly always the next question ...
         graph.Err.ShouldContain("MSBuild for this run:");
         // ... and says what to do about it, in both dialects.
@@ -110,7 +113,8 @@ public sealed class PartialLoadWorkspaceE2ETests
         using JsonDocument _ = json.ShouldHaveJsonStdout();
         // The survey is a partial map, and says so in the document — the only channel an MCP client has.
         json.Out.ShouldContain("\"workspaceDiagnostics\"");
-        json.Out.ShouldContain("BrokenApp.Contracts.csproj");
+        json.Out.ShouldContain(MissingProject);
+        json.Out.ShouldContain("\"failedProjects\"");
         json.Out.ShouldContain("\"modelIncomplete\": true");
     }
 
@@ -124,8 +128,7 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult check = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
-        check.ShouldRefuseWith();
-        check.Err.ShouldContain(CheckGateLine);
+        check.ShouldRefuseWith(CheckGateLine, MissingProject);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
         CliResult checkAllowed = await CliRunner.InvokeColdAsync(
@@ -136,8 +139,7 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult status = await CliRunner.InvokeColdAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
-        status.ShouldRefuseWith();
-        status.Err.ShouldContain(StatusGateLine);
+        status.ShouldRefuseWith(StatusGateLine, MissingProject);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
         CliResult statusAllowed = await CliRunner.InvokeColdAsync(
@@ -146,6 +148,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         statusAllowed.ShouldSucceed();
         statusAllowed.Out.ShouldContain("\"workspaceDiagnostics\"");
         statusAllowed.Out.ShouldContain("\"modelIncomplete\": true");
+        statusAllowed.Out.ShouldContain(MissingProject); // and the document names it, not only the exit code
     }
 
     [Fact]
@@ -153,14 +156,15 @@ public sealed class PartialLoadWorkspaceE2ETests
     {
         // Spec resolution runs before the incomplete-model gate can fire, so on a tree like this the reader
         // met the convention's own failure first: "no solution project references Zphil.LoadBearing.dll —
-        // pass --spec to name one". Both halves of that were misdirection. The reference may well exist and
-        // simply not have resolved, and no --spec argument repairs a load. So the refusal names the load.
+        // pass --spec to name one". Both halves of that were misdirection. The project that would have
+        // matched may be one of the ones that failed, and no --spec argument repairs a load. So the refusal
+        // names them.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult check = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");
 
-        check.ShouldRefuseWith("did not load cleanly");
-        check.Err.ShouldContain("BrokenApp.Contracts.csproj"); // the evidence, inline
+        check.ShouldRefuseWith("one or more projects failed to load");
+        check.Err.ShouldContain(MissingProject); // the evidence, inline
         check.Err.ShouldContain("Restore and build the solution first");
         check.Err.ShouldNotContain("Pass --spec to name one");
         check.Err.ShouldNotContain(InvariantViolationFragment);
@@ -176,8 +180,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult baseline = await CliRunner.InvokeColdAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--init");
 
-        baseline.ShouldRefuseWith();
-        baseline.Err.ShouldContain(BaselineGateLine);
+        baseline.ShouldRefuseWith(BaselineGateLine, MissingProject);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         FilesUnder(workspace)
             .ShouldBe(before);
@@ -195,8 +198,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult render = await CliRunner.InvokeColdAsync(
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
-        render.ShouldRefuseWith();
-        render.Err.ShouldContain(RenderGateLine);
+        render.ShouldRefuseWith(RenderGateLine, MissingProject);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
         FilesUnder(workspace)
@@ -242,7 +244,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         exit.ShouldBe(0); // a lookup, never a gate
         var answer = output.ToString();
         answer.ShouldStartWith("caveat: the model is incomplete"); // the caveat opens the body, above the answer
-        answer.ShouldContain("BrokenApp.Contracts.csproj"); // naming what failed, inline: there is no stderr here
+        answer.ShouldContain(MissingProject); // naming what failed, inline: there is no stderr here
         answer.ShouldContain("MSBuild for this run:");
         answer.ShouldContain("Restore and build the solution first (dotnet build), then retry for a whole answer.");
         answer.ShouldNotContain(InvariantViolationFragment);
@@ -271,7 +273,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         refused.IsError.ShouldBe(true);
         string refusal = refused.ShouldHaveTextContent();
         refusal.ShouldContain("the model is incomplete");
-        refusal.ShouldContain("BrokenApp.Contracts.csproj"); // the evidence, inline: there is no stderr here
+        refusal.ShouldContain(MissingProject); // the evidence, inline: there is no stderr here
         refusal.ShouldContain("Restore and build the solution first");
         refusal.ShouldContain("allowWorkspaceDiagnostics");
         refusal.ShouldNotContain(InvariantViolationFragment);

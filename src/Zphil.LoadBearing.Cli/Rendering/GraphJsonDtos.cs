@@ -3,7 +3,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
-// The four optional slots below — grain, projectsScope, and the two workspace ones — are additive and null
+// The five optional slots below — grain, projectsScope, and the three workspace ones — are additive and null
 // (omitted) on a full, unscoped survey whose workspace loaded, so the schema stays version 1 and the
 // default document is byte-identical to the one before they existed. A run whose workspace did not load
 // reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses before
@@ -28,6 +28,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     <see langword="true" /> when a project failed to load, so the survey below covers only what did load
 ///     — projects, types, and edges are all missing, not merely fewer; null (omitted) otherwise.
 /// </param>
+/// <param name="FailedProjects">
+///     Which projects are missing from the survey — solution-relative, forward-slashed <c>.csproj</c> paths
+///     — or null (omitted) when none are. On a survey this is the most useful slot of the three: it names
+///     precisely what a reader would otherwise have to notice was absent.
+/// </param>
 /// <param name="ExternalEdges">
 ///     The external-reference rows, or null (omitted) at skeleton grain — the one thing that grain elides
 ///     beyond overview's. Null here is "not rendered at this grain", never "none found": a solution with no
@@ -48,7 +53,8 @@ internal sealed record GraphJson(
     IReadOnlyList<GraphExternalEdgeJson>? ExternalEdges,
     int? ExternalEdgeCount,
     IReadOnlyList<string>? WorkspaceDiagnostics,
-    bool? ModelIncomplete);
+    bool? ModelIncomplete,
+    IReadOnlyList<string>? FailedProjects);
 
 /// <summary>
 ///     One project: its declared references, solution-declared type count, and namespace inventory — the

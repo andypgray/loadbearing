@@ -28,12 +28,14 @@ internal sealed class ReplayedSolution : IDisposable
 
     internal ReplayedSolution(
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
-        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null)
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+        IReadOnlyList<string>? failedProjects = null)
     {
         Workspace = workspace;
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? NoTargetFrameworks;
+        FailedProjects = failedProjects ?? [];
     }
 
     /// <summary>The in-memory workspace the replayed solution was added to.</summary>
@@ -49,6 +51,19 @@ internal sealed class ReplayedSolution : IDisposable
     ///     any project that suppresses the framework segment of its output path.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load — the same fact
+    ///     <see cref="LoadedSolution.FailedProjects" /> carries, so the gate reads one thing on both paths.
+    /// </summary>
+    /// <remarks>
+    ///     Empty by construction on this path, and pinned so: a replayed project comes from a compiler
+    ///     invocation a real build actually made, so it carries an output path and cannot present the empty
+    ///     shape. There is also no solution file here to read declared membership from — a binlog records
+    ///     what was built, not what a <c>.sln</c> declares — so the declared-but-absent arm has nothing to
+    ///     compare against and is skipped.
+    /// </remarks>
+    public IReadOnlyList<string> FailedProjects { get; }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
     public void Dispose()

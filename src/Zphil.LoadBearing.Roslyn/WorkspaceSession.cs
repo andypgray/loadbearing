@@ -93,6 +93,10 @@ public sealed class WorkspaceSession : IAsyncDisposable
     // reuses its work. Starts at 0; the first load makes it 1, so a never-loaded generation never aliases one.
     private long generation;
 
+    // The projects that failed to load in the current generation, carried onto every snapshot it produces.
+    // Beside loadDiagnostics rather than derived from them: the diagnostics render, this decides.
+    private IReadOnlyList<string> failedProjects = [];
+
     // Workspace-load diagnostics of the current generation, carried onto every snapshot it produces.
     private IReadOnlyList<string> loadDiagnostics = [];
 
@@ -217,6 +221,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         loadedSolutionPath = null;
         snapshot = null;
         loadDiagnostics = [];
+        failedProjects = [];
         targetFrameworks = NoTargetFrameworks;
         documentFingerprints.Clear();
         documentIds.Clear();
@@ -237,6 +242,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
         current = materialized;
         loadedSolutionPath = solutionPath;
         loadDiagnostics = collected;
+        failedProjects = freshlyLoaded.FailedProjects;
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         generation++;
         SeedEditVersions(materialized);
@@ -382,14 +388,16 @@ public sealed class WorkspaceSession : IAsyncDisposable
 
     /// <summary>
     ///     Mints a snapshot of the current solution stamped with this generation, the load's per-project
-    ///     target frameworks, and an immutable copy of the per-project edit-version map, so a consumer
-    ///     holding the snapshot keeps a frozen view even as later sweeps keep bumping the live map.
+    ///     target frameworks and failed projects, and an immutable copy of the per-project edit-version map,
+    ///     so a consumer holding the snapshot keeps a frozen view even as later sweeps keep bumping the live
+    ///     map.
     /// </summary>
     private WorkspaceSnapshot MintSnapshot()
     {
         return new WorkspaceSnapshot(current!, loadDiagnostics)
         {
             Generation = generation,
+            FailedProjects = failedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };

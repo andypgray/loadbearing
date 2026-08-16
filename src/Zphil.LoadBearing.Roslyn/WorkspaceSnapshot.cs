@@ -60,4 +60,15 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     so the map a load produced stays valid across every in-place content edit folded into it.
     /// </remarks>
     internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = NoTargetFrameworks;
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, from the load that produced
+    ///     this snapshot — what the fail-closed gate keys on, where <see cref="Diagnostics" /> only renders.
+    /// </summary>
+    /// <remarks>
+    ///     Refreshed wholesale on each full (re)load and stable across the in-place content edits folded into
+    ///     one generation, exactly as <see cref="Diagnostics" /> is: whether a project loaded is a property of
+    ///     the load, and an edit that a sweep folds in never adds or removes a project.
+    /// </remarks>
+    internal IReadOnlyList<string> FailedProjects { get; init; } = [];
 }

@@ -146,7 +146,7 @@ internal static class Checker
     {
         var writer = new StringWriter();
         JsonReportRenderer.Render(
-            writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, []);
+            writer, report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], false, [], []);
         return writer.ToString();
     }
 

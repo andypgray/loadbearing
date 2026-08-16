@@ -32,38 +32,44 @@ internal enum CacheOutcome
 ///     Carries everything a caller needs to finish a run without re-reading the cache.
 /// </summary>
 /// <remarks>
-///     The recorded spec resolutions and workspace diagnostics are replayed on a hit, so cached and cold
-///     output are byte-identical on diagnostic-bearing solutions.
+///     The recorded spec resolutions, workspace diagnostics and failed projects are replayed on a hit, so
+///     cached and cold output — and the fail-closed verdict — are identical on a solution that does not load
+///     completely.
 /// </remarks>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
     IReadOnlyList<CodebaseFragment> ReusableFragments,
     IReadOnlySet<string> DirtyProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
-    IReadOnlyList<string> Diagnostics)
+    IReadOnlyList<string> Diagnostics,
+    IReadOnlyList<string> FailedProjects)
 {
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
 
     internal static CacheReadResult Miss()
     {
-        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], []);
+        return new CacheReadResult(CacheOutcome.Miss, [], EmptySet, [], [], []);
     }
 
     internal static CacheReadResult Hit(
         IReadOnlyList<CodebaseFragment> fragments,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
-        IReadOnlyList<string> diagnostics)
+        IReadOnlyList<string> diagnostics,
+        IReadOnlyList<string> failedProjects)
     {
-        return new CacheReadResult(CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics);
+        return new CacheReadResult(
+            CacheOutcome.Hit, fragments, EmptySet, specResolutions, diagnostics, failedProjects);
     }
 
     internal static CacheReadResult Partial(
         IReadOnlyList<CodebaseFragment> reusableFragments,
         IReadOnlySet<string> dirtyProjects,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
-        IReadOnlyList<string> diagnostics)
+        IReadOnlyList<string> diagnostics,
+        IReadOnlyList<string> failedProjects)
     {
-        return new CacheReadResult(CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics);
+        return new CacheReadResult(
+            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, diagnostics, failedProjects);
     }
 }
 
@@ -97,7 +103,8 @@ internal sealed record CacheFingerprint(
 internal sealed record ExtractionResult(
     IReadOnlyList<CodebaseFragment> Fragments,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
-    IReadOnlyList<string> Diagnostics);
+    IReadOnlyList<string> Diagnostics,
+    IReadOnlyList<string> FailedProjects);
 
 /// <summary>
 ///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
@@ -135,7 +142,7 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
     // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 16;
+    private const int CurrentSchemaVersion = 17;
 
     /// <summary>
     ///     The <see cref="JsonSerializerOptions" /> the cache serializes with — compact, with enums written as
@@ -255,6 +262,7 @@ internal sealed class ExtractionCacheStore
             fingerprint.Projects,
             extraction.SpecResolutions,
             extraction.Diagnostics,
+            extraction.FailedProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -329,11 +337,13 @@ internal sealed class ExtractionCacheStore
         if (dirtyProjects.Count == 0)
         {
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects);
-            return CacheReadResult.Hit(manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics);
+            return CacheReadResult.Hit(
+                manifest.Fragments, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects);
         }
 
         var reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
-        return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics);
+        return CacheReadResult.Partial(
+            reusable, dirtyProjects, manifest.SpecResolutions, manifest.Diagnostics, manifest.FailedProjects);
     }
 
     // ── structural + document checks ────────────────────────────────────────────────────────────────────

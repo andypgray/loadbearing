@@ -57,7 +57,8 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         // for NuGetAudit advisories exactly as check filters them.
         if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
         {
-            error.WriteLine(IncompleteModelGate.BaselineMessage);
+            foreach (string line in IncompleteModelGate.BaselineMessage(diagnostics).Split('\n'))
+                error.WriteLine(line);
             return 2;
         }
 

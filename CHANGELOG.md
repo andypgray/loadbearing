@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A NuGet restore warning no longer refuses a solution whose rules all pass — in any language.** The
+  fail-closed gate decided "did the model fail to build" by matching the text of MSBuild's project-load
+  messages, and that was never something text could answer: Roslyn reports every project-load log item as a
+  failure with the code stripped, so a fatal evaluation error and an ordinary restore warning arrive
+  indistinguishable. Two measurements made it concrete. `NU1510` — NuGet's advice that a package the shared
+  framework now carries could be dropped from a csproj, which .NET 10 emits for a large and growing set —
+  exited 2 in the same run that evaluated the solution's one rule and passed it. And the same audit-fetch
+  failure that exits 0 in English exited 2 under a German toolchain, carrying no advisory URL, no code, and
+  none of the phrases the matcher knew. The gate now reads which projects failed to load off the loaded
+  solution's own structure: a `.csproj` the solution declares that produced no project, or a project whose
+  evaluation produced neither an output path nor an intermediate assembly path. No message is an input to it,
+  so no wording and no locale can move it, and the two shapes above render as the warnings they are and exit
+  0. Every refusal now names the projects rather than pointing at a wall of diagnostics, and `check`,
+  `status` and `graph` carry them as `failedProjects` beside `modelIncomplete` — the evidence an MCP client
+  had no way to recover from the diagnostics array. What this deliberately does not change: a solution that
+  was never restored still loads completely and is still not detected, exactly as before — measured, not
+  assumed; a solution filter's dropped members are not treated as failures; and a real load failure riding
+  alongside an advisory still fails closed.
 - **A workspace that failed to load no longer reports itself as a missing spec project.** A broken
   `--locked-mode` restore leaves the spec project's reference to the contract library unresolved, so
   convention discovery matched nothing and reported that in its own terms — "no solution project references
@@ -16,10 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   help, because an unresolved reference stays unresolved whichever project you name. Zero candidates now
   splits on how the workspace loaded. A clean load keeps that sentence byte for byte and adds how many C#
   projects were considered, since a count far short of the solution's is the real finding. A load that failed
-  says so instead, quotes up to three of the failures that made the model incomplete, and points at repairing
-  the restore and the build. The quote deliberately reads those failures rather than the raw diagnostic
-  stream: three freshly published NuGet advisories would otherwise fill it and push the one actionable
-  failure past its end.
+  says so instead and points at repairing the restore and the build, quoting up to three projects that failed
+  to load, or — when nothing failed but the load still reported problems, which is exactly the locked-mode
+  shape — up to three of those diagnostics. The diagnostic arm deliberately skips NuGet advisories: three
+  freshly published ones would otherwise fill the quote and push the one actionable line past its end.
 - **`check` finds the spec assembly under any output layout the SDK produces, including two that refused a
   fully built solution.** A parent `Directory.Build.props` carrying
   `<OutputPath>bin\$(Configuration)\</OutputPath>` is imported before the SDK defaults `Configuration`, so the

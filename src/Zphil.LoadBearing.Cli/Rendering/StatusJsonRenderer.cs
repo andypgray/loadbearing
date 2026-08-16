@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -17,10 +18,12 @@ internal static class StatusJsonRenderer
     public static void Render(
         TextWriter output,
         CheckReport report,
+        string solutionDirectory,
         string solutionName,
         string specAssembly,
         IReadOnlyList<string> workspaceDiagnostics,
-        bool modelIncomplete)
+        bool modelIncomplete,
+        IReadOnlyList<string> failedProjects)
     {
         var document = new StatusJson(
             2,
@@ -29,6 +32,7 @@ internal static class StatusJsonRenderer
             report.Results.Select(ToRule).ToList(),
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             modelIncomplete ? true : null,
+            JsonReportRenderer.RelativeProjects(failedProjects, new PathFormat.Relativizer(solutionDirectory)),
             new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,

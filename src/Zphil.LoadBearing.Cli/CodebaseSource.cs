@@ -77,6 +77,7 @@ internal enum CodebaseSourceOutcome
 internal sealed class CodebaseSource : IDisposable
 {
     private readonly CacheReadResult cacheRead;
+    private readonly IReadOnlyList<string> failedProjects;
     private readonly SolutionHandle? handle;
     private readonly IReadOnlyList<string> loadFailures;
     private readonly ArchitectureModel? model;
@@ -95,6 +96,7 @@ internal sealed class CodebaseSource : IDisposable
         CodebaseSourceOutcome outcome,
         string solutionPath,
         IReadOnlyList<string> diagnostics,
+        IReadOnlyList<string> failedProjects,
         ArchitectureModel? model,
         SpecResolution? resolution,
         SolutionHandle? handle,
@@ -105,6 +107,7 @@ internal sealed class CodebaseSource : IDisposable
         Outcome = outcome;
         SolutionPath = solutionPath;
         loadFailures = diagnostics;
+        this.failedProjects = failedProjects;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -125,12 +128,13 @@ internal sealed class CodebaseSource : IDisposable
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
     /// <summary>
-    ///     How well the workspace loaded: the load failures — freshly collected on a cold run, replayed from
-    ///     the cache on a hit — and the merge notes the last <see cref="ExtractAsync" /> produced (empty
-    ///     before it runs). Read per call rather than captured, so a verb that renders after extracting sees
-    ///     the notes and one that gates before it sees the load failures alone.
+    ///     How well the workspace loaded: the projects that failed to load and the load-failure diagnostics —
+    ///     both freshly collected on a cold run and replayed from the cache on a hit — plus the merge notes
+    ///     the last <see cref="ExtractAsync" /> produced (empty before it runs). Read per call rather than
+    ///     captured, so a verb that renders after extracting sees the notes and one that gates before it does
+    ///     not have to wait for them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes);
+    public WorkspaceDiagnostics Diagnostics => new(loadFailures, mergeNotes, failedProjects);
 
     /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>.</summary>
     public string SolutionPath { get; }
@@ -180,8 +184,8 @@ internal sealed class CodebaseSource : IDisposable
         {
             ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
             return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, hitModel, hitResolution,
-                null, store, read, normalized);
+                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects, hitModel,
+                hitResolution, null, store, read, normalized);
         }
 
         // A miss, a partial, or a hit whose spec was not recorded: acquire the workspace and resolve cold.
@@ -234,7 +238,7 @@ internal sealed class CodebaseSource : IDisposable
         CacheReadResult read = store.ReadAndValidate(ct);
         if (read.Outcome == CacheOutcome.Hit)
             return new CodebaseSource(
-                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, null, null,
+                CodebaseSourceOutcome.Hit, solutionPath, read.Diagnostics, read.FailedProjects, null, null,
                 null, store, read, "");
 
         CodebaseSourceOutcome coldOutcome =
@@ -330,12 +334,13 @@ internal sealed class CodebaseSource : IDisposable
         try
         {
             // Merge notes are empty by construction here: extraction has not run, and only extraction
-            // produces them. What spec resolution needs from this value is the load failures.
-            var diagnostics = new WorkspaceDiagnostics(handle.Diagnostics, []);
+            // produces them. What spec resolution needs from this value is the load's own verdict.
+            var diagnostics = new WorkspaceDiagnostics(handle.Diagnostics, [], handle.FailedProjects);
             SpecResolution resolution = SpecResolver.Resolve(handle.Solution, solutionPath, spec, diagnostics);
             ArchitectureModel model = source.LoadSpecModel(resolution.DllPath);
             return new CodebaseSource(
-                outcome, solutionPath, handle.Diagnostics, model, resolution, handle, store, cacheRead, normalizedSpec);
+                outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, model, resolution, handle,
+                store, cacheRead, normalizedSpec);
         }
         catch
         {
@@ -350,8 +355,8 @@ internal sealed class CodebaseSource : IDisposable
     {
         SolutionHandle handle = await AcquireAsync(source, solutionPath, ct);
         return new CodebaseSource(
-            outcome, solutionPath, handle.Diagnostics, null, null, handle, store, cacheRead,
-            "");
+            outcome, solutionPath, handle.Diagnostics, handle.FailedProjects, null, null, handle, store,
+            cacheRead, "");
     }
 
     // The solution is already discovered, so hand the acquired path straight to the source: discovery over an
@@ -408,7 +413,8 @@ internal sealed class CodebaseSource : IDisposable
         try
         {
             var records = BuildWriteSpecRecords(solution);
-            store!.Write(fingerprint, new ExtractionResult(allFragments, records, loadFailures), ct);
+            store!.Write(
+                fingerprint, new ExtractionResult(allFragments, records, loadFailures, failedProjects), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
