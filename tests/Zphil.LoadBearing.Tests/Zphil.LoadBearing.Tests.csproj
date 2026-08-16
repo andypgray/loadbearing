@@ -24,6 +24,13 @@
         <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     </PropertyGroup>
 
+    <!-- Analyzer severities from the repo-root analyzers.globalconfig, named here for the same reason the
+         lock policy above is inline: this project alone, never the fixture solutions below it.
+         src/Directory.Build.props names the same file for the shipping projects. -->
+    <ItemGroup>
+        <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../../analyzers.globalconfig" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="coverlet.collector" Version="10.0.1" />
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)

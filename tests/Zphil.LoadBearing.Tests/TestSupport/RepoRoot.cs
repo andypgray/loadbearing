@@ -30,19 +30,6 @@ internal static class RepoRoot
     /// <summary>The absolute path to the committed root <c>ARCHITECTURE.md</c> (the rendered diagram).</summary>
     public static string ArchitectureMd => Path.Combine(Directory, "ARCHITECTURE.md");
 
-    /// <summary>
-    ///     The absolute path to the solution-level ReSharper settings file — the solution path plus the
-    ///     <c>.DotSettings</c> suffix, which is how ReSharper itself derives it.
-    /// </summary>
-    public static string SolutionDotSettings => Solution + ".DotSettings";
-
-    /// <summary>
-    ///     The absolute path to the test project's ReSharper settings layer — a project layer's file is
-    ///     the csproj path plus the <c>.DotSettings</c> suffix, and jb mounts it above the solution layer.
-    /// </summary>
-    public static string TestProjectDotSettings =>
-        Absolute("tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj.DotSettings");
-
     /// <summary>The absolute native path for a forward-slash repo-relative one.</summary>
     public static string Absolute(string repoRelativePath)
     {

@@ -1,0 +1,39 @@
+# Roslyn analyzer severities for the code this repo ships and tests. Severities only: house style is
+# declared in Zphil.LoadBearing.slnx.DotSettings, and the one formatting knob .DotSettings cannot carry
+# lives in .editorconfig.
+#
+# The name matters. Roslyn's common targets auto-discover files named exactly `.globalconfig` from every
+# directory above every compiled file (Microsoft.Managed.Core.targets, DiscoverGlobalAnalyzerConfigFiles),
+# so a repo-root file under that name would reach the fixture solutions staged inside the tree — and,
+# being auto-discovered on top of the explicit references below, would set each key twice, which the
+# compiler resolves by unsetting it. That failure is silent apart from one MultipleGlobalAnalyzerKeys
+# warning: the promotion stops applying while the file still looks in force. Under this name the file is
+# inert until named, so it reaches exactly the two places that name it — src/Directory.Build.props (the
+# four shipping projects plus the rule pack) and the tests csproj — for the same reason the lock-file and
+# determinism policies are scoped below the root rather than at it.
+
+is_global = true
+
+# The two halves of one invariant: a type that creates a disposable and keeps it as an instance member
+# owns it, so it must itself be disposable (CA1001) and must actually cascade the call (CA2213). Both are
+# off in the .NET 10 SDK's default analysis mode. Promoted after LazyCaptureReplaySource was found
+# publishing its replayed solution for the gate to reach in and dispose — an inversion that compiles,
+# reads as deliberate, and stays invisible until someone traces the lifetime by hand.
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA2213.severity = warning
+
+# A P/Invoke that states no search path hands DLL resolution to the loader's legacy probe order, which
+# reaches directories a caller can sometimes write to. Off in the .NET 10 SDK's default analysis mode.
+# Promoted after the server's parent-process watcher was found importing ntdll bare: every import in the
+# tree today names a Windows system DLL that can resolve nowhere else, so saying so costs nothing — and
+# the next one, which may name a DLL the system does not own, then arrives with its search path a decision
+# someone made rather than one the loader made for them.
+dotnet_diagnostic.CA5392.severity = warning
+
+# StartsWith(string), IndexOf(string) and Compare read the current culture by default, so text matched
+# with them can mean something different on a machine far from CI — silently, and only there. Off in the
+# .NET 10 SDK's default analysis mode. Promoted after a solution-file reducer was found matching
+# "Project(" culture-sensitively: a tool that compares identifiers, namespaces and paths is reading format
+# rather than prose, and Ordinal is what says so. CA1307, the same argument about calls that are already
+# ordinal, stays off — that one is ceremony, and this file promotes correctness.
+dotnet_diagnostic.CA1310.severity = warning

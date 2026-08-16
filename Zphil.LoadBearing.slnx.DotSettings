@@ -54,8 +54,7 @@
 	     Bare `jb cleanupcode` never reads this key: jb always defaults to Full Cleanup, so a direct
 	     CLI run must still pass the profile by name. jb's switch for that is not spelled literally
 	     here: XML forbids adjacent hyphens inside a comment, and one such spelling once left this
-	     file unreadable to every conformant XML parser while jb itself carried on regardless.
-	     DotSettingsCleanupProfileTests pins the file well-formed. -->
+	     file unreadable to every conformant XML parser while jb itself carried on regardless. -->
 	<s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">LoadBearing: Full Cleanup (keep named arguments)</s:String>
 
 	<!-- 'var' only where the initializer makes the type evident; explicit type everywhere else.
@@ -69,9 +68,7 @@
 	     var even where nothing on the line names the type (var selected = SelectRules(...)).
 	     Pinning all three here makes the policy the repo's own on any machine and closes the
 	     ForOtherTypes gap. Cleanup enforces it through the profile's ArrangeVarStyle task, in
-	     both directions, on every file it touches.
-
-	     DotSettingsCleanupProfileTests pins the three entries present and UseVarWhenEvident. -->
+	     both directions, on every file it touches. -->
 	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForBuiltInTypes/@EntryValue">UseVarWhenEvident</s:String>
 	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForSimpleTypes/@EntryValue">UseVarWhenEvident</s:String>
 	<s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForOtherTypes/@EntryValue">UseVarWhenEvident</s:String>
@@ -91,9 +88,7 @@
 	     DeconstructionDeclarations is promoted alongside the other three even though no
 	     ForDeconstructionDeclarations style key sits above it — the declarations in the tree are
 	     already explicit and inspect reports none, so the promotion holds the line where it is.
-	     Should that ever red, pin the missing style key rather than demoting this one.
-
-	     DotSettingsCleanupProfileTests pins all four at WARNING. -->
+	     Should that ever red, pin the missing style key rather than demoting this one. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_BuiltInTypes/@EntryIndexedValue">WARNING</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_SimpleTypes/@EntryIndexedValue">WARNING</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_Elsewhere/@EntryIndexedValue">WARNING</s:String>
@@ -112,9 +107,7 @@
 	     putting it in the project layer rather than weakening this entry.
 
 	     Inspect-only, like every other severity in this file: cleanup overrides the severity of
-	     each rule its enabled modules need, so nothing set here reaches a cleanup task.
-
-	     DotSettingsCleanupProfileTests pins this at WARNING and the layer file at DO_NOT_SHOW. -->
+	     each rule its enabled modules need, so nothing set here reaches a cleanup task. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MethodHasAsyncOverload/@EntryIndexedValue">WARNING</s:String>
 
 	<!-- Findings this solution can decide for itself, promoted so they stay decided.
@@ -135,9 +128,7 @@
 	     four sites are all regex patterns, where the verbatim prefix is the convention that keeps the
 	     next added backslash from silently meaning something else. And FieldCanBeMadeReadOnly.Global,
 	     which would tax every deliberately mutable public field with a disable comment and buy little
-	     for it.
-
-	     DotSettingsCleanupProfileTests pins all seven at WARNING. -->
+	     for it. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=RedundantTypeArgumentsInsideNameof/@EntryIndexedValue">WARNING</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract/@EntryIndexedValue">WARNING</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=CanSimplifyDictionaryTryGetValueWithGetValueOrDefault/@EntryIndexedValue">WARNING</s:String>
@@ -169,9 +160,7 @@
 
 	     A dot inside a rule ID escapes as _002E, which is why these keys read oddly. A literal dot
 	     produces a key ReSharper never reads: no error, no effect, and a false conclusion that the
-	     entry did not work.
-
-	     DotSettingsCleanupProfileTests pins all seven present and at SUGGESTION. -->
+	     entry did not work. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MemberCanBePrivate_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedType_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedMember_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
@@ -199,9 +188,7 @@
 	     UseObjectOrCollectionInitializer — folding the first Add into an initializer while later ones
 	     stay behind reads worse than leaving all of them alone.
 	     RedundantVerbatimStringPrefix — all four are regex patterns, where the prefix is the
-	     convention that stops the next added backslash meaning something else.
-
-	     DotSettingsCleanupProfileTests pins all eight present and at SUGGESTION. -->
+	     convention that stops the next added backslash meaning something else. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ForCanBeConvertedToForeach/@EntryIndexedValue">SUGGESTION</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConvertToLocalFunction/@EntryIndexedValue">SUGGESTION</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConvertToPrimaryConstructor/@EntryIndexedValue">SUGGESTION</s:String>
@@ -230,10 +217,7 @@
 	     cleanup of any file, silently. Margin wrapping is the same hazard from the other side: it
 	     fully chops any chain that already carries one break. Wrapping off is what keeps "any file
 	     can be passed to cleanup" true. Shape new chains by hand in their register; cleanup will
-	     keep them.
-
-	     DotSettingsCleanupProfileTests pins both halves: this entry present and False, and no entry
-	     anywhere in the file whose key names chained method calls. -->
+	     keep them. -->
 	<s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpFormat/WRAP_LINES/@EntryValue">False</s:Boolean>
 	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpKeepExistingMigration/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpPlaceEmbeddedOnSameLineMigration/@EntryIndexedValue">True</s:Boolean>

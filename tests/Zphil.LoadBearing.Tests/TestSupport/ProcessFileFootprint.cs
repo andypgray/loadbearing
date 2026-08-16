@@ -3,6 +3,12 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
+// Every P/Invoke in this assembly is one of the imports below, and each names a Windows system DLL that
+// can resolve nowhere but System32 — so the search path is stated once for the assembly rather than
+// twelve times over one file. An import that ever names a DLL the system does not own has to override
+// this per method — which is exactly the conversation stating it here is meant to force.
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>Which of the two scans observed a retained path.</summary>

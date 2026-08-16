@@ -34,7 +34,7 @@ public sealed class SessionFragmentStoreTests
         // Arrange
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        var store = new SessionFragmentStore();
+        using var store = new SessionFragmentStore();
 
         // Act 1 — the first call has nothing cached, so it flushes and walks every C# project.
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
@@ -67,7 +67,7 @@ public sealed class SessionFragmentStoreTests
         // Arrange — populate the store from the clean tree.
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        var store = new SessionFragmentStore();
+        using var store = new SessionFragmentStore();
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
 
@@ -97,7 +97,7 @@ public sealed class SessionFragmentStoreTests
         // Arrange
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        var store = new SessionFragmentStore();
+        using var store = new SessionFragmentStore();
         WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
         long walksBefore = store.FullWalkCount;
@@ -120,7 +120,7 @@ public sealed class SessionFragmentStoreTests
         // at merge time. This pins that the merge-time drop is byte-identical to never extracting the project.
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        var store = new SessionFragmentStore();
+        using var store = new SessionFragmentStore();
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet all = await store.GetFragmentsAsync(snapshot, null, Ct);
 
@@ -146,7 +146,7 @@ public sealed class SessionFragmentStoreTests
         // filter re-extraction passes — so a project spelled two ways anywhere would strand a stale fragment.
         using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
         await using var session = new WorkspaceSession();
-        var store = new SessionFragmentStore();
+        using var store = new SessionFragmentStore();
         WorkspaceSnapshot clean = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet first = await store.GetFragmentsAsync(clean, null, Ct);
 

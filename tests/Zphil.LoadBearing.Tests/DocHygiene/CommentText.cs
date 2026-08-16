@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -8,7 +9,8 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     Reduces C# source to the prose a maintainer wrote in it: every character outside comment trivia
 ///     is replaced with a blank, and comment text is left exactly where it sat. The result is the same
 ///     length as its input with newlines in their original positions, so a checker run over it reports
-///     source line numbers without any offset arithmetic.
+///     source line numbers without any offset arithmetic. A second reduction takes the directives back
+///     out of that text, for a gate that wants the prose alone.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -37,6 +39,11 @@ internal static class CommentText
     /// <summary>The inert character every non-comment position is replaced with.</summary>
     internal const char Blank = '\0';
 
+    // Both directive forms sit on one line, and neither alternative can cross one, so a replacement
+    // never swallows a newline and never shifts the lines beneath it.
+    private static readonly Regex Directives =
+        new(@"//\s*ReSharper\s+(?:disable|restore)\b[^\n\r]*|@formatter:(?:off|on)");
+
     /// <summary>
     ///     Returns <paramref name="source" /> with everything outside comment trivia replaced by
     ///     <see cref="Blank" />, preserving length, and preserving <c>'\n'</c> and <c>'\r'</c> wherever
@@ -63,6 +70,22 @@ internal static class CommentText
         }
 
         return new string(masked);
+    }
+
+    /// <summary>
+    ///     Returns <paramref name="masked" /> with every suppression and formatter directive replaced by
+    ///     <see cref="Blank" />, preserving length and newline positions exactly as <see cref="Mask" />
+    ///     does.
+    /// </summary>
+    /// <remarks>
+    ///     A directive is comment syntax addressed to a tool rather than prose a person wrote for a
+    ///     reader: it names a rule id and says nothing else. Blanking the matched run in place — never
+    ///     dropping the line — is what keeps every later line number true, which is the property
+    ///     <see cref="Mask" /> exists to hold.
+    /// </remarks>
+    public static string WithoutSuppressionDirectives(string masked)
+    {
+        return Directives.Replace(masked, static match => new string(Blank, match.Length));
     }
 
     private static bool IsComment(SyntaxTrivia trivia)

@@ -118,6 +118,23 @@ public sealed class DocHygieneTests
         new(@"@gmail\.com", RegexOptions.IgnoreCase)
     ];
 
+    /// <summary>
+    ///     Prose about running the development tooling: the local workflow one maintainer follows,
+    ///     which documents a machine's habits to strangers and dates the day the tool changes.
+    /// </summary>
+    /// <remarks>
+    ///     One pattern rather than a list, spelled the way the publication review spells it, so the gate
+    ///     and the review can never disagree about what counts. Case-insensitive because every token is
+    ///     a product or command name that prose capitalises however it likes. What it does not cover is
+    ///     the ordinary .NET suppression a source file carries above a deliberate site: that is source
+    ///     rather than narration, and the source arm blanks those before it reads.
+    /// </remarks>
+    internal static readonly Regex[] DevToolingPatterns =
+    [
+        new(@"resharper|jetbrains|inspectcode|cleanupcode|\bjb\b|cleanup profile|dotsettings",
+            RegexOptions.IgnoreCase)
+    ];
+
     /// <summary>Off-voice descriptions of a codebase that the reader-facing docs never use.</summary>
     internal static readonly Regex[] HouseVoicePatterns =
     [

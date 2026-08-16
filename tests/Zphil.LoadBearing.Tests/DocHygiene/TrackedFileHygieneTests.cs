@@ -10,14 +10,25 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     files. Two arms, split by where prose can hide: a C# source is read through the comment mask,
 ///     because only its comments carry prose a person wrote; every other text file is read whole,
 ///     because a settings file, a workflow or an ignore rule has no construct that separates prose
-///     from data. Each arm runs both catalogs — the internal working references, and the shapes of a
-///     private development environment.
+///     from data. Both arms run the internal working references and the shapes of a private
+///     development environment; the source arm runs a third catalog over a text with the suppression
+///     directives blanked out, for prose that narrates the development tooling to a stranger.
 /// </summary>
 /// <remarks>
-///     Three facts guard the enumerator itself. An enumerator that degraded to an empty result would
-///     turn every arm green over nothing, and a gate that passes because it read no files is worse
-///     than no gate — so the inventory is required to reach each source root, its paths are pinned to
-///     the character set that needs no quoting, and every exemption is required to still match a hit.
+///     <para>
+///         Several facts guard the enumerator itself. An enumerator that degraded to an empty result
+///         would turn every arm green over nothing, and a gate that passes because it read no files is
+///         worse than no gate — so the inventory is required to reach each source root, its paths are
+///         pinned to the character set that needs no quoting, and every exemption is required to still
+///         match a hit.
+///     </para>
+///     <para>
+///         The third catalog runs over sources only, and the limit is worth stating rather than
+///         papering over. A settings file has to describe itself — which entry it carries, and why that
+///         value rather than another — so sweeping the catalog across the non-source set would red
+///         exactly the prose that makes those files readable. Narration growing inside one of them is
+///         caught at review rather than here.
+///     </para>
 /// </remarks>
 public sealed class TrackedFileHygieneTests
 {
@@ -38,6 +49,25 @@ public sealed class TrackedFileHygieneTests
         ("src/Zphil.LoadBearing.Cli/Mcp/Prompts/derive-spec.md", "docs/")
     ];
 
+    /// <summary>
+    ///     The tooling mentions the source arm forgives, on the same (path, token) granularity as the
+    ///     pairs above.
+    /// </summary>
+    /// <remarks>
+    ///     All three are one category: an instruction protecting the file it sits in from a reformatting
+    ///     or member-moving pass, addressed to whoever edits that file next. The sample spec explains the
+    ///     marker that holds the formatter off itself; the assertion shadows explain why their qualified
+    ///     static calls have to survive one; the validation fixtures warn that their line numbers are
+    ///     quoted verbatim elsewhere. None of them narrates a workflow to a stranger — each is the reason
+    ///     its own file still reads the way it does.
+    /// </remarks>
+    private static readonly (string Path, string Token)[] SourceExemptions =
+    [
+        ("tests/Zphil.LoadBearing.Tests/CanonicalSampleSpec.cs", "ReSharper"),
+        ("tests/Zphil.LoadBearing.Tests/ShouldlyExtensions.cs", "ReSharper"),
+        ("tests/Zphil.LoadBearing.Tests/SpecValidationSpecs.cs", "cleanup profile")
+    ];
+
     private static readonly Regex[] EnvironmentPatterns =
         [..DocHygieneTests.PrivateEnvironmentPatterns, ..LocalPrivatePatterns.Patterns];
 
@@ -50,6 +80,16 @@ public sealed class TrackedFileHygieneTests
     // twice running.
     private static readonly Lazy<(string Path, string Text)[]> LazyMaskedSources =
         new(() => ReadAll(TrackedFiles.CSharp, CommentText.Mask));
+
+    // The suppression directives are the one comment form that names a tool by design, and the tree
+    // carries some forty of them. Blanking them out of the already-masked text is what lets the third
+    // catalog read prose alone — and deriving a second set here, rather than changing the mask, keeps
+    // the two arms above reading exactly the text they read before. The regex pass is cheap next to the
+    // parse that produced the text.
+    private static readonly Lazy<(string Path, string Text)[]> LazyDirectiveFreeSources =
+        new(() => LazyMaskedSources.Value
+            .Select(static entry => (entry.Path, Text: CommentText.WithoutSuppressionDirectives(entry.Text)))
+            .ToArray());
 
     private static readonly Lazy<(string Path, string Text)[]> LazyNonSourceTexts =
         new(() => ReadAll(TrackedFiles.NonSourceText, static text => text));
@@ -74,6 +114,17 @@ public sealed class TrackedFileHygieneTests
         // Assert
         findings.ShouldBeEmpty(
             $"Comments name a private development environment:\n{string.Join("\n", findings)}");
+    }
+
+    [Fact]
+    public void TrackedSource_CommentsNarrateNoDevTooling()
+    {
+        // Act
+        List<string> findings = ScanSourcesWithoutDirectives(DocHygieneTests.DevToolingPatterns);
+
+        // Assert
+        findings.ShouldBeEmpty(
+            $"Comments narrate the development tooling:\n{string.Join("\n", findings)}");
     }
 
     [Fact]
@@ -154,6 +205,33 @@ public sealed class TrackedFileHygieneTests
         dead.ShouldBeEmpty($"These exemptions no longer match anything and should be removed:\n{string.Join("\n", dead)}");
     }
 
+    [Fact]
+    public void SourceExemptions_AllStillMatchAHit()
+    {
+        // Arrange: read from the very text the arm scans rather than from the file on disk, so an
+        // exemption whose token survives only in code or in a string literal counts as dead.
+        Dictionary<string, string> byPath = LazyDirectiveFreeSources.Value
+            .ToDictionary(static entry => entry.Path, static entry => entry.Text, StringComparer.Ordinal);
+        List<string> dead = new();
+
+        // Act
+        foreach ((string path, string token) in SourceExemptions)
+        {
+            if (!byPath.TryGetValue(path, out string? text))
+            {
+                dead.Add($"{path} is no longer a tracked source.");
+                continue;
+            }
+
+            IReadOnlyList<string> hits = DocProse.FindForbidden(text, DocHygieneTests.DevToolingPatterns);
+            if (!hits.Any(hit => IsToken(hit, token))) dead.Add($"{path} no longer carries '{token}'.");
+        }
+
+        // Assert: same reason as the arm above — a stale exemption forgives nothing and hides the
+        // next mention to land in that file.
+        dead.ShouldBeEmpty($"These exemptions no longer match anything and should be removed:\n{string.Join("\n", dead)}");
+    }
+
     private static (string Path, string Text)[] ReadAll(
         IEnumerable<string> paths, Func<string, string> prepare)
     {
@@ -164,30 +242,38 @@ public sealed class TrackedFileHygieneTests
             .ToArray();
     }
 
+    // Comments as the mask leaves them, and nothing forgiven: a token either reference catalog finds
+    // in a comment has no benign reading, so there is no exemption to pass.
     private static List<string> ScanSources(Regex[] patterns)
     {
-        List<string> findings = new();
-        foreach ((string path, string masked) in LazyMaskedSources.Value)
-        foreach (string hit in DocProse.FindForbidden(masked, patterns))
-            findings.Add($"{path}:{hit}");
+        return Scan(LazyMaskedSources.Value, patterns, []);
+    }
 
-        return findings;
+    private static List<string> ScanSourcesWithoutDirectives(Regex[] patterns)
+    {
+        return Scan(LazyDirectiveFreeSources.Value, patterns, SourceExemptions);
     }
 
     private static List<string> ScanNonSource(Regex[] patterns)
     {
+        return Scan(LazyNonSourceTexts.Value, patterns, NonSourceExemptions);
+    }
+
+    private static List<string> Scan(
+        (string Path, string Text)[] texts, Regex[] patterns, (string Path, string Token)[] exemptions)
+    {
         List<string> findings = new();
-        foreach ((string path, string text) in LazyNonSourceTexts.Value)
+        foreach ((string path, string text) in texts)
         foreach (string hit in DocProse.FindForbidden(text, patterns))
-            if (!IsExempt(path, hit))
+            if (!IsExempt(exemptions, path, hit))
                 findings.Add($"{path}:{hit}");
 
         return findings;
     }
 
-    private static bool IsExempt(string path, string hit)
+    private static bool IsExempt((string Path, string Token)[] exemptions, string path, string hit)
     {
-        return NonSourceExemptions.Any(exemption => exemption.Path == path && IsToken(hit, exemption.Token));
+        return exemptions.Any(exemption => exemption.Path == path && IsToken(hit, exemption.Token));
     }
 
     // FindForbidden formats a hit as "{line}: {matchedText}", so the matched token is what follows

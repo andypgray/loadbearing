@@ -81,7 +81,7 @@ internal readonly record struct SessionCodebase(
 ///         summarizer — reads.
 ///     </para>
 /// </remarks>
-internal sealed class SessionFragmentStore
+internal sealed class SessionFragmentStore : IDisposable
 {
     private static readonly IReadOnlySet<string> NoProjects = new HashSet<string>(StringComparer.Ordinal);
 
@@ -135,6 +135,16 @@ internal sealed class SessionFragmentStore
     ///     change (structural reload). Internal test observable; never printed.
     /// </summary>
     internal long FullWalkCount { get; private set; }
+
+    /// <summary>
+    ///     Releases the extraction gate. The store is a session-lifetime singleton, so this runs when the
+    ///     server's provider is disposed rather than at any call boundary — the fragments and merged models it
+    ///     holds are plain managed state with nothing of their own to release.
+    /// </summary>
+    public void Dispose()
+    {
+        gate.Dispose();
+    }
 
     /// <summary>
     ///     Returns the full fragment set for <paramref name="snapshot" />, reusing everything it can. A new

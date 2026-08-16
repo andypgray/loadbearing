@@ -8,18 +8,27 @@ namespace Zphil.LoadBearing.Cli.Replay;
 ///     replay-free and sub-second and byte-identical to a plain cached run.
 /// </summary>
 /// <remarks>
-///     Replays the capture's binlog copy on the one <see cref="AcquireAsync" /> call the runner makes.
-///     The produced <see cref="ReplayedSolution" /> is exposed on <see cref="Replayed" /> for the gate
-///     to dispose (the handle itself is non-owning, <c>owned: null</c>); a runtime replay failure of a copy
-///     the store validated as usable is not fatal — it raises <see cref="CaptureReplayFailedException" /> so
-///     the gate can notice-and-fall-back to a design-time build rather than break the run. No MSBuildWorkspace
-///     and no design-time build on the success path (the gate registers MSBuildLocator up front, which is what
-///     lets the binlog parser resolve its MSBuild assemblies).
+///     Replays the capture's binlog copy on the one <see cref="AcquireAsync" /> call the runner makes, and
+///     owns the <see cref="ReplayedSolution" /> that produces: the handle it hands back is non-owning
+///     (<c>owned: null</c>) because the replay's reader backs the solution's lazy per-document text loaders,
+///     so releasing it at handle scope would come too early — <see cref="Dispose" /> releases it at run scope
+///     instead. A runtime replay failure of a copy the store validated as usable is not fatal — it raises
+///     <see cref="CaptureReplayFailedException" /> so the gate can notice-and-fall-back to a design-time build
+///     rather than break the run. No MSBuildWorkspace and no design-time build on the success path (the gate
+///     registers MSBuildLocator up front, which is what lets the binlog parser resolve its MSBuild assemblies).
 /// </remarks>
-internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolutionSource
+internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolutionSource, IDisposable
 {
-    /// <summary>The replayed solution once <see cref="AcquireAsync" /> has run, else null. The gate disposes it.</summary>
-    public ReplayedSolution? Replayed { get; private set; }
+    private ReplayedSolution? _replayed;
+
+    /// <summary>
+    ///     Releases the replayed solution — its workspace and binlog reader — once the run that acquired it is
+    ///     done. A run that never acquired, and one whose replay failed, materialised nothing to release.
+    /// </summary>
+    public void Dispose()
+    {
+        _replayed?.Dispose();
+    }
 
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
@@ -41,7 +50,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
             throw new CaptureReplayFailedException(BinlogReplayMessages.CaptureReplayFailedNotice(ex.Message), ex);
         }
 
-        Replayed = replayed;
+        _replayed = replayed;
         return Task.FromResult(new SolutionHandle(
             replayed.Solution, solutionPath, replayed.LoadDiagnosticsWith(diagnostics), null,
             targetFrameworks: replayed.TargetFrameworks));

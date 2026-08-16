@@ -32,4 +32,12 @@
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
+    <!-- Analyzer severities, from the repo-root analyzers.globalconfig (which explains what it promotes,
+         why, and why it is not named .globalconfig). Naming it here is what scopes it to src/, the way
+         the policies above are scoped: nothing auto-discovers it, so the fixture copies staged under
+         bin/ never inherit it. The tests csproj names the same file for itself. -->
+    <ItemGroup>
+        <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../analyzers.globalconfig" />
+    </ItemGroup>
+
 </Project>

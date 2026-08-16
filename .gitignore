@@ -29,6 +29,7 @@ Thumbs.db
 .claude/
 .mcp.json
 CLAUDE.md
+tests/Zphil.LoadBearing.Tests/Local/
 
 ## Internal design docs — kept locally, not published (GRAMMAR.md is tracked at the repo root)
 docs/

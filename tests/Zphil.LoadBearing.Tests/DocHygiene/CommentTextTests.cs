@@ -6,9 +6,10 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 
 /// <summary>
 ///     Unit and negative tests for <see cref="CommentText" />. They pin what the mask keeps, prove that
-///     a forbidden token written as a string literal survives no mask — which is what lets the source
-///     gate run with no exemption for C# at all — and pin the two properties the gate's line numbers
-///     and its blank character rest on.
+///     a forbidden token written as a string literal survives no mask — which is what spares the
+///     reference gates any C# exemption at all — pin the two properties the gate's line numbers and its
+///     blank character rest on, and pin the second reduction that takes the directives back out without
+///     moving a single line.
 /// </summary>
 public sealed class CommentTextTests
 {
@@ -165,5 +166,91 @@ public sealed class CommentTextTests
         // Assert
         masked.ShouldStartWith("// a note");
         masked.Length.ShouldBe(source.Length);
+    }
+
+    [Fact]
+    public void WithoutSuppressionDirectives_SuppressionComment_IsBlankedToEndOfLine()
+    {
+        // Arrange
+        var source = "// ReSharper disable once UseCollectionExpression\nvar x = 1;";
+
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(CommentText.Mask(source));
+
+        // Assert
+        string blankedDirective =
+            new(CommentText.Blank, "// ReSharper disable once UseCollectionExpression".Length);
+        string blankedCode = new(CommentText.Blank, "var x = 1;".Length);
+        stripped.ShouldBe(blankedDirective + "\n" + blankedCode);
+    }
+
+    [Theory]
+    [InlineData("// ReSharper disable once UseCollectionExpression", "ReSharper")]
+    [InlineData("// ReSharper disable All", "ReSharper")]
+    [InlineData("    // ReSharper restore StaticMemberInGenericType", "ReSharper")]
+    [InlineData("// @formatter:off", "@formatter")]
+    [InlineData("// @formatter:on", "@formatter")]
+    public void WithoutSuppressionDirectives_EveryDirectiveForm_LosesItsToken(string directive, string token)
+    {
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(CommentText.Mask(directive));
+
+        // Assert
+        stripped.ShouldNotContain(token);
+        stripped.Length.ShouldBe(directive.Length);
+    }
+
+    [Fact]
+    public void WithoutSuppressionDirectives_ProseThatMerelyNamesTheTool_Survives()
+    {
+        // Arrange: the shape the source gate's exemption list exists for — a doc comment saying why
+        // the suppression under it is load-bearing, which is prose rather than a directive.
+        var source = "/// <summary>The disables below hold against ReSharper.</summary>\npublic sealed class C;";
+
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(CommentText.Mask(source));
+
+        // Assert
+        stripped.ShouldContain("hold against ReSharper");
+    }
+
+    [Fact]
+    public void WithoutSuppressionDirectives_HitBelowADirective_KeepsItsSourceLine()
+    {
+        // Arrange: blanking in place rather than dropping the line is the whole property — a line
+        // removed here would report every later hit one line early.
+        string[] lines =
+        [
+            "// ReSharper disable once UnusedMember.Local",
+            "internal static void M() { }",
+            "",
+            "// Written in Phase 9 of the build."
+        ];
+        string source = string.Join("\n", lines);
+
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(CommentText.Mask(source));
+
+        // Assert
+        DocProse.FindForbidden(stripped, [PhaseLabel])
+            .ShouldHaveSingleItem()
+            .ShouldBe("4: Phase 9");
+    }
+
+    [Fact]
+    public void WithoutSuppressionDirectives_AnySource_PreservesLengthAndNewlinePositions()
+    {
+        // Arrange
+        var source = "// ReSharper disable once Foo\r\nvar a = 1;\n// @formatter:off\r\nvar b = 2;\n";
+
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(CommentText.Mask(source));
+
+        // Assert
+        stripped.Length.ShouldBe(source.Length);
+        for (var index = 0; index < source.Length; index++)
+            if (source[index] is '\n' or '\r')
+                stripped[index]
+                    .ShouldBe(source[index]);
     }
 }

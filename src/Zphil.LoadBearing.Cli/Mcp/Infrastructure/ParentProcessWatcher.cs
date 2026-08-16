@@ -136,6 +136,7 @@ internal static class ParentProcessWatcher
     }
 
     [DllImport("ntdll.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern int NtQueryInformationProcess(
         IntPtr processHandle,
         int processInformationClass,

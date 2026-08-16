@@ -212,7 +212,7 @@ internal static class MsBuildGate
     {
         LastAcquisition = GateAcquisition.CaptureReplay;
 
-        var source = new LazyCaptureReplaySource(binlogCopyPath);
+        using var source = new LazyCaptureReplaySource(binlogCopyPath);
         try
         {
             return await invokeRunner(solutionPath, source);
@@ -222,10 +222,6 @@ internal static class MsBuildGate
             await error.WriteLineAsync($"warning: {ex.Message}");
             LastAcquisition = GateAcquisition.CaptureReplayFellBackToCold;
             return await invokeRunner(solutionPath, SourceOrCold(hostSource));
-        }
-        finally
-        {
-            source.Replayed?.Dispose();
         }
     }
 

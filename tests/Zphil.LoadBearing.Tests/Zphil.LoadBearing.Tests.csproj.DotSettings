@@ -10,25 +10,11 @@
 	     thread, saves no blocking, and puts await noise through arrange blocks that read as data.
 
 	     Off here rather than demoted in the solution file, because demoting it there would give up
-	     the guard everywhere. jb mounts project layers by default — the switch that suppresses
-	     them names ProjectShared among the layers it turns off, and is not spelled literally in
-	     this comment for the reason below — so the explicit WARNING beside them still reaches
-	     every other project.
+	     the guard everywhere. Project layers are mounted by default, so the explicit WARNING in
+	     the solution file still reaches every other project.
 
-	     Three traps, each of which cost a probe here before this file worked:
-
-	     1. XML forbids adjacent hyphens inside a comment. Spelling a jb switch literally makes
-	        this file unparseable, and jb then ignores the whole layer SILENTLY: no error, no
-	        warning, findings simply keep their solution-level severity. It reads exactly like the
-	        mechanism not working.
-	     2. A dot inside a rule ID escapes as _002E in these keys. This rule has none; one that
-	        does needs the escape, and a literal dot produces a key ReSharper never reads.
-	     3. Naming the solution settings file explicitly on the command line DEFEATS this layer.
-	        jb mounts an explicitly-named settings file as a custom layer that sits above the
-	        project layers, so the scope below is ignored and the solution-level WARNING applies
-	        here after all. jb finds this file on its own; the run that proves the baseline is the
-	        one that passes no settings path at all. Measured: 0 findings without, 83 with.
-
-	     DotSettingsCleanupProfileTests pins this file present, well-formed, and DO_NOT_SHOW. -->
+	     Editing this file: XML forbids adjacent hyphens inside a comment, and a layer that stops
+	     parsing is mounted by nobody and reported by nothing — every inspection it scopes SILENTLY
+	     keeps its solution-level severity, which reads exactly like the mechanism not working. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MethodHasAsyncOverload/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 </wpf:ResourceDictionary>

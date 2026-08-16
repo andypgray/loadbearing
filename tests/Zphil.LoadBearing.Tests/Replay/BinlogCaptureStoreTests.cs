@@ -493,7 +493,7 @@ public sealed class BinlogCaptureStoreTests : IDisposable
         List<string> lines = File.ReadAllLines(Fixture.SolutionPath)
             .ToList();
         int webLine = lines.FindIndex(l => l.TrimStart()
-            .StartsWith("Project(") && l.Contains("\"MyApp.Web\""));
+            .StartsWith("Project(", StringComparison.Ordinal) && l.Contains("\"MyApp.Web\""));
         lines.RemoveAt(webLine + 1); // the following EndProject
         lines.RemoveAt(webLine); // the Project(...) line itself
 
