@@ -151,8 +151,7 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Projects.Count(p => p.Name == "P")
-            .ShouldBe(1);
+        model.Projects.ShouldContain(p => p.Name == "P", expectedCount: 1);
         model.Projects.Single(p => p.Name == "P")
             .ProjectReferences.ShouldBe(["Legacy", "Modern"]);
     }
@@ -172,8 +171,7 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Types.Count(t => t.FullName == "System.Exception")
-            .ShouldBe(1);
+        model.Types.ShouldContain(t => t.FullName == "System.Exception", expectedCount: 1);
         TypeNode shared = model.Type("System.Exception");
         shared.IsExternal.ShouldBeTrue();
         model.Edge("N.CA", "System.Exception")
@@ -221,10 +219,10 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.ConstructorEdges.Count(e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A")
-            .ShouldBe(1);
+        model.ConstructorEdges.ShouldContain(
+            e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A", expectedCount: 1);
         model.ConstructorEdge("P.B", "P.A")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     // ── Injection edges / registration facts (GRAMMAR §4.7) ───────────────────────────────────────────
@@ -268,10 +266,10 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.InjectionEdges.Count(e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep")
-            .ShouldBe(1);
+        model.InjectionEdges.ShouldContain(
+            e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep", expectedCount: 1);
         model.InjectionEdge("P.Svc", "P.IDep")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -296,10 +294,9 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.ServiceRegistrations.Count(r => r.ServiceFullName == "P.IFoo")
-            .ShouldBe(1);
+        model.ServiceRegistrations.ShouldContain(r => r.ServiceFullName == "P.IFoo", expectedCount: 1);
         model.Registration(Lifetime.Singleton, "P.IFoo", "P.Foo")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     // ── Same-FQN cross-project conflation notes ───────────────────────────────────────────────────────
@@ -388,8 +385,7 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, loserFirst, loserSecond]);
 
-        model.MergeNotes.Count.ShouldBe(1);
-        model.MergeNotes[0]
+        model.MergeNotes.ShouldHaveSingleItem()
             .ShouldContain("declared by projects 'Aproj' and 'Bproj'");
     }
 
@@ -494,8 +490,7 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
 
-        model.MergeNotes.Count.ShouldBe(1);
-        model.MergeNotes[0]
+        model.MergeNotes.ShouldHaveSingleItem()
             .ShouldContain("Project 'P' targets 'net10.0' and 'netstandard2.0'");
     }
 

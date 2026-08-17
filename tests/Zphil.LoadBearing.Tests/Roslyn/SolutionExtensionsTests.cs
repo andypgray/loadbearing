@@ -31,6 +31,8 @@ public sealed class SolutionExtensionsTests
         // Assert — the unresolved analyzer is gone, counted once; nothing to strip on the metadata side.
         analyzerCount.ShouldBe(1);
         metadataCount.ShouldBe(0);
-        stripped.GetProject(project.Id)!.AnalyzerReferences.ShouldBeEmpty();
+        stripped.GetProject(project.Id)
+            .ShouldNotBeNull()
+            .AnalyzerReferences.ShouldBeEmpty();
     }
 }

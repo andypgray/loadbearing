@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -94,9 +93,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Broad -> System.Exception"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
     }
 
     [Fact]
@@ -112,9 +109,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["N.Worker -> N.AppError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
     }
 
     [Fact]
@@ -174,9 +169,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("catch specific exceptions"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Handler -> Errors.BErr"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.BErr"]);
         result.ShouldHaveGrandfathered(1);
     }
 

@@ -126,11 +126,9 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ReferencePairs()
-            .ShouldContain("App.Client.User -> App.Legacy.Internal");
-        result.ReferencePairs()
-            .ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
+        // Exhaustive, which is what carries the green half too: the facade edge is absent from a set that
+        // names every inbound reference the containment formula reports.
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Client.User -> App.Legacy.Internal"]);
     }
 
     [Fact]
@@ -142,6 +140,9 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
+        // Reads the projection in its own right rather than stating the set through ShouldHaveFailedWithEdges,
+        // whose comparison is deliberately unordered: report order is this row's whole subject, and Apple and
+        // Zebra exist to bracket it.
         result.ReferencePairs()
             .ShouldBe([
                 "App.Domain.Apple -> App.Web.Controller",

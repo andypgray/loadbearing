@@ -46,10 +46,17 @@ public sealed class WarmWorkspaceMcpTests
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
 
+    // The Web layer's broad catcher, and the rule that reds it — the two values the pair of catch cases
+    // below name over and over, which is what earns them a const each where a rule id used twice stays a
+    // literal at its call site.
+    private const string ReportEndpoint = "MyApp.Web.ReportEndpoint";
+    private const string CatchRule = "exceptions/no-general-catch";
+
     private const string SaveMemberId = "M:MyApp.Web.HomeController.Save";
     private const string LoadMemberId = "M:MyApp.Web.HomeController.Load";
     private const string DeleteMemberId = "M:MyApp.Web.HomeController.Delete";
     private const string SaveAsyncMemberId = "M:MyApp.Web.HomeController.SaveAsync";
+    private const string NowMemberId = "P:System.DateTime.Now";
 
     // A one-rule spec (member-subject MustAcceptParameter): Web Task-returning methods must accept a
     // CancellationToken. Compiled to a throwaway DLL by SpecAssemblyCompiler because no committed fixture
@@ -140,10 +147,8 @@ public sealed class WarmWorkspaceMcpTests
 
         // Assert — the warm re-check reflects the new member-use site (the Now violation's site set grows from one
         // to two), the payload changed, and it is byte-identical to the cold run on the edited tree.
-        NowSiteCount(before)
-            .ShouldBe(1);
-        NowSiteCount(after)
-            .ShouldBe(2);
+        before.ShouldHaveViolationAtSites("time/inject-clock", ("targetMember", NowMemberId), 1);
+        after.ShouldHaveViolationAtSites("time/inject-clock", ("targetMember", NowMemberId), 2);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -182,10 +187,9 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the warm re-check reflects the new member-shape red (the async-suffix subject set grows from
         // {Save, Load} to {Save, Load, Delete}, the new one keying its own M: DocId), the payload changed, and
         // it is byte-identical to the cold run on the edited tree.
-        SubjectMembersOf(before, "naming/async-suffix")
-            .ShouldBe([SaveMemberId, LoadMemberId], true);
-        SubjectMembersOf(after, "naming/async-suffix")
-            .ShouldBe([SaveMemberId, LoadMemberId, DeleteMemberId], true);
+        before.ShouldHaveFailedWith("naming/async-suffix", "subjectMember", [SaveMemberId, LoadMemberId]);
+        after.ShouldHaveFailedWith(
+            "naming/async-suffix", "subjectMember", [SaveMemberId, LoadMemberId, DeleteMemberId]);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -228,10 +232,10 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — Save's member-shape red clears (Save now accepts the token, so the accept-cancellation
         // subject set shrinks from {Save, Load, SaveAsync} to {Load, SaveAsync}), the payload changed, and
         // the warm result is byte-identical to the cold run on the edited tree.
-        SubjectMembersOf(before, "async/accept-cancellation")
-            .ShouldBe([SaveMemberId, LoadMemberId, SaveAsyncMemberId], true);
-        SubjectMembersOf(after, "async/accept-cancellation")
-            .ShouldBe([LoadMemberId, SaveAsyncMemberId], true);
+        before.ShouldHaveFailedWith(
+            "async/accept-cancellation", "subjectMember", [SaveMemberId, LoadMemberId, SaveAsyncMemberId]);
+        after.ShouldHaveFailedWith(
+            "async/accept-cancellation", "subjectMember", [LoadMemberId, SaveAsyncMemberId]);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -267,10 +271,9 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the warm re-check reflects the flipped lifetime (the captive set shrinks from
         // {IOrderFeed, IOrderFormatter} to just {IOrderFormatter}), the payload changed, and it is
         // byte-identical to the cold run on the edited tree — the registration pass re-ran for Web.
-        CaptiveInjectedTargets(before)
-            .ShouldBe(["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"], true);
-        CaptiveInjectedTargets(after)
-            .ShouldBe(["MyApp.Web.IOrderFormatter"], true);
+        before.ShouldHaveFailedWith(
+            "di/no-captive-dependencies", "target", ["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"]);
+        after.ShouldHaveFailedWith("di/no-captive-dependencies", "target", ["MyApp.Web.IOrderFormatter"]);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -311,14 +314,8 @@ public sealed class WarmWorkspaceMcpTests
         // Assert — the violation identity is unchanged (still ONE catch violation for the (ReportEndpoint,
         // Exception) pair), its site set grows from one to two, the payload changed, and it is byte-identical
         // to the cold run on the edited tree.
-        CatchViolationCount(before)
-            .ShouldBe(1);
-        CatchViolationCount(after)
-            .ShouldBe(1);
-        CatchSiteCount(before)
-            .ShouldBe(1);
-        CatchSiteCount(after)
-            .ShouldBe(2);
+        before.ShouldHaveViolationAtSites(CatchRule, ("source", ReportEndpoint), 1);
+        after.ShouldHaveViolationAtSites(CatchRule, ("source", ReportEndpoint), 2);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -358,16 +355,11 @@ public sealed class WarmWorkspaceMcpTests
         // while the plain catch ban keeps ReportEndpoint red at the very same single site, because a `when`
         // filter never suppresses the catch edge — it only changes which of the edge's sites are recorded
         // unfiltered (GRAMMAR §4.8). And the warm answer is byte-identical to the cold one.
-        UnfilteredCatchSources(before)
-            .ShouldBe(["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"], true);
-        UnfilteredCatchSources(after)
-            .ShouldBe(["MyApp.Web.ReportPublisher"], true);
-        RuleStatusOf(before, "exceptions/no-general-catch")
-            .ShouldBe("failed");
-        RuleStatusOf(after, "exceptions/no-general-catch")
-            .ShouldBe("failed");
-        CatchSiteCount(after)
-            .ShouldBe(1);
+        before.ShouldHaveFailedWith(
+            "exceptions/no-unfiltered-catch", "source", [ReportEndpoint, "MyApp.Web.ReportPublisher"]);
+        after.ShouldHaveFailedWith("exceptions/no-unfiltered-catch", "source", ["MyApp.Web.ReportPublisher"]);
+        before.ShouldHaveViolationAtSites(CatchRule, ("source", ReportEndpoint), 1);
+        after.ShouldHaveViolationAtSites(CatchRule, ("source", ReportEndpoint), 1);
         after.NormalizedTrimmed()
             .ShouldNotBe(before.NormalizedTrimmed());
         after.NormalizedTrimmed()
@@ -521,8 +513,7 @@ public sealed class WarmWorkspaceMcpTests
         // Act/Assert — the first call pays the walk once.
         string first = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
         resolutions.FullResolveCount.ShouldBe(1);
-        RuleStatusOf(first, LayoutAppFixture.RuleId)
-            .ShouldBe("passed");
+        first.ShouldHavePassed(LayoutAppFixture.RuleId);
 
         // …a second call with disk untouched replays it rather than walking again, and answers identically.
         string second = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
@@ -543,8 +534,7 @@ public sealed class WarmWorkspaceMcpTests
             "check", workspace.SolutionPath, "--spec", specCsproj, "--no-cache", "--json");
 
         resolutions.FullResolveCount.ShouldBe(1);
-        RuleStatusOf(edited, LayoutAppFixture.RuleId)
-            .ShouldBe("failed");
+        edited.ShouldHaveFailed(LayoutAppFixture.RuleId);
         edited.NormalizedTrimmed()
             .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
@@ -650,70 +640,5 @@ public sealed class WarmWorkspaceMcpTests
         return source.Replace(
             "catch (System.Exception)",
             "catch (System.Exception) when (reportId > 0)");
-    }
-
-    // The member subjects (subjectMember DocIds) a member-subject rule reports red, keyed by rule id.
-    private static IReadOnlyList<string> SubjectMembersOf(string checkJson, string ruleId)
-    {
-        return CheckJson.Violations(checkJson, ruleId)
-            .Select(violation => violation.GetProperty("subjectMember")
-                .GetString()!)
-            .ToList();
-    }
-
-    // The injected-type targets reported red under the injection rule di/no-captive-dependencies (GRAMMAR §4.7).
-    private static IReadOnlyList<string> CaptiveInjectedTargets(string checkJson)
-    {
-        return CheckJson.Violations(checkJson, "di/no-captive-dependencies")
-            .Select(violation => violation.GetProperty("target")
-                .GetString()!)
-            .ToList();
-    }
-
-    // The number of member-use sites reported for the banned DateTime.Now read under time/inject-clock.
-    private static int NowSiteCount(string checkJson)
-    {
-        return CheckJson.Violations(checkJson, "time/inject-clock")
-            .Single(violation => violation.GetProperty("targetMember")
-                .GetString() == "P:System.DateTime.Now")
-            .GetProperty("sites")
-            .GetArrayLength();
-    }
-
-    // The number of distinct catch violations ReportEndpoint contributes (one per (source, caught) type pair)
-    // under exceptions/no-general-catch. Scoped to that source because the Web layer carries a second broad
-    // catcher, ReportPublisher, whose rethrowing clause the plain catch ban reds too.
-    private static int CatchViolationCount(string checkJson)
-    {
-        return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
-            .Count(violation => violation.GetProperty("source")
-                .GetString() == "MyApp.Web.ReportEndpoint");
-    }
-
-    // The number of catch sites reported for the (ReportEndpoint, System.Exception) swallow under exceptions/no-general-catch.
-    private static int CatchSiteCount(string checkJson)
-    {
-        return CheckJson.Violations(checkJson, "exceptions/no-general-catch")
-            .Single(violation => violation.GetProperty("source")
-                .GetString() == "MyApp.Web.ReportEndpoint")
-            .GetProperty("sites")
-            .GetArrayLength();
-    }
-
-    // A named rule's reported status — "passed", "failed" or "skipped".
-    private static string RuleStatusOf(string checkJson, string ruleId)
-    {
-        return CheckJson.Rule(checkJson, ruleId)
-            .GetProperty("status")
-            .GetString()!;
-    }
-
-    // The catching types exceptions/no-unfiltered-catch reports, one per (source, caught) type pair.
-    private static IReadOnlyList<string> UnfilteredCatchSources(string checkJson)
-    {
-        return CheckJson.Violations(checkJson, "exceptions/no-unfiltered-catch")
-            .Select(violation => violation.GetProperty("source")
-                .GetString()!)
-            .ToList();
     }
 }

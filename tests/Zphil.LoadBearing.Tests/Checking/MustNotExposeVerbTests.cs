@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -106,9 +105,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ExposurePairs()
-            .ShouldBe(["App.Wide -> System.Exception"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Expose, ["App.Wide -> System.Exception"]);
     }
 
     [Fact]
@@ -136,9 +133,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ExposurePairs()
-            .ShouldBe(["N.Gateway -> N.AppError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Expose, ["N.Gateway -> N.AppError"]);
     }
 
     [Fact]
@@ -210,9 +205,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("keep the internal types off the public API"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ExposurePairs()
-            .ShouldBe(["App.Facade -> Secrets.B"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Expose, ["App.Facade -> Secrets.B"]);
         result.ShouldHaveGrandfathered(1);
     }
 

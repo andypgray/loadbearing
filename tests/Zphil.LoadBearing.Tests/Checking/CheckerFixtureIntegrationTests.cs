@@ -22,11 +22,10 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
                     .Fix("Define an abstraction in Domain and implement it in Web."))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ReferencePairs()
-            .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.HomeController");
-        result.ReferencePairs()
-            .ShouldContain("MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions");
+        result.ShouldHaveFailedWithEdgesIncluding(
+            ViolationKind.Reference,
+            "MyApp.Domain.OrderService -> MyApp.Web.HomeController",
+            "MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions");
 
         Violation homeController = result.Violations.Single(v =>
             v.Source!.FullName == "MyApp.Domain.OrderService" && v.Target!.FullName == "MyApp.Web.HomeController");

@@ -101,12 +101,12 @@ public class ModelReificationTests
     {
         ArchRule rule = Rule("data-access/no-inline-sql");
 
-        rule.Migrate.ShouldNotBeNull();
-        rule.Migrate!.From.ShouldBe("Controllers open SqlConnection directly (legacy Active Record style).");
-        rule.Migrate.ToSentence.ShouldBe("Types in the Web layer named `*Controller` must not reference `SqlConnection`.");
-        rule.Migrate.ToSentence.ShouldBe(rule.Sentence);
-        rule.Migrate.BaselinePath.ShouldBe("arch/baseline.json");
-        rule.Migrate.Policy.ShouldBe(MigrationPolicy.MigrateIfSmall);
+        MigrateData migrate = rule.Migrate.ShouldNotBeNull();
+        migrate.From.ShouldBe("Controllers open SqlConnection directly (legacy Active Record style).");
+        migrate.ToSentence.ShouldBe("Types in the Web layer named `*Controller` must not reference `SqlConnection`.");
+        migrate.ToSentence.ShouldBe(rule.Sentence);
+        migrate.BaselinePath.ShouldBe("arch/baseline.json");
+        migrate.Policy.ShouldBe(MigrationPolicy.MigrateIfSmall);
     }
 
     [Fact]
@@ -125,10 +125,10 @@ public class ModelReificationTests
             .Rules.Single();
 
         rule.Posture.ShouldBe(Posture.Migrate);
-        rule.Migrate.ShouldNotBeNull();
+        MigrateData migrate = rule.Migrate.ShouldNotBeNull();
         // .Baseline omitted ⇒ conventional default derived from the rule ID (GRAMMAR §4.4).
-        rule.Migrate!.BaselinePath.ShouldBe("arch/baselines/data-access/no-inline-sql.json");
-        rule.Migrate.Policy.ShouldBe(MigrationPolicy.MigrateIfSmall);
+        migrate.BaselinePath.ShouldBe("arch/baselines/data-access/no-inline-sql.json");
+        migrate.Policy.ShouldBe(MigrationPolicy.MigrateIfSmall);
     }
 
     [Fact]
@@ -136,17 +136,17 @@ public class ModelReificationTests
     {
         ArchRule containment = Rule("legacy/billing/containment");
 
-        containment.Quarantine.ShouldNotBeNull();
-        containment.Quarantine!.Role.ShouldBe(QuarantineRole.Containment);
-        containment.Quarantine.Boundary.ShouldBe([typeof(IBillingFacade), typeof(BillingFacade)]);
-        containment.Quarantine.BaselinePath.ShouldBe("arch/baseline.json");
-        containment.Quarantine.Dragons.ShouldBe(DragonsProse);
-        containment.Quarantine.ScopeId.ShouldBe("legacy/billing");
+        QuarantineData quarantine = containment.Quarantine.ShouldNotBeNull();
+        quarantine.Role.ShouldBe(QuarantineRole.Containment);
+        quarantine.Boundary.ShouldBe([typeof(IBillingFacade), typeof(BillingFacade)]);
+        quarantine.BaselinePath.ShouldBe("arch/baseline.json");
+        quarantine.Dragons.ShouldBe(DragonsProse);
+        quarantine.ScopeId.ShouldBe("legacy/billing");
         containment.Constraint.ShouldNotBeNull();
         // Auto-derived fix from the first BoundaryOnlyVia type (GRAMMAR §5.5).
         containment.Fix.ShouldBe("use `IBillingFacade`");
         // The raw quarantined selection rides on the containment child so the renderer can place it.
-        containment.Quarantine.Quarantined.ShouldNotBeNull();
+        quarantine.Quarantined.ShouldNotBeNull();
     }
 
     [Fact]
@@ -154,15 +154,15 @@ public class ModelReificationTests
     {
         ArchRule tripwire = Rule("legacy/billing/tripwire");
 
-        tripwire.Quarantine.ShouldNotBeNull();
-        tripwire.Quarantine!.Role.ShouldBe(QuarantineRole.Tripwire);
-        tripwire.Quarantine.Dragons.ShouldBe(DragonsProse);
-        tripwire.Quarantine.ScopeId.ShouldBe("legacy/billing");
+        QuarantineData quarantine = tripwire.Quarantine.ShouldNotBeNull();
+        quarantine.Role.ShouldBe(QuarantineRole.Tripwire);
+        quarantine.Dragons.ShouldBe(DragonsProse);
+        quarantine.ScopeId.ShouldBe("legacy/billing");
         // Boundary and baseline are containment concerns; the tripwire has no closed-vocabulary law yet.
-        tripwire.Quarantine.Boundary.ShouldBeEmpty();
-        tripwire.Quarantine.BaselinePath.ShouldBeNull();
+        quarantine.Boundary.ShouldBeEmpty();
+        quarantine.BaselinePath.ShouldBeNull();
         // The quarantined selection rides on the tripwire too so its diff-touch can map changed files.
-        tripwire.Quarantine.Quarantined.ShouldNotBeNull();
+        quarantine.Quarantined.ShouldNotBeNull();
         tripwire.Constraint.ShouldBeNull();
         tripwire.Sentence.ShouldBe(string.Empty);
     }
@@ -183,12 +183,12 @@ public class ModelReificationTests
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
         QuarantineData containment = model.Rule("legacy/billing/containment")
-            .Quarantine!;
+            .Quarantine.ShouldNotBeNull();
         containment.DragonsDoc.ShouldBe("arch/billing-dragons.md");
         containment.Dragons.ShouldBeNull();
         model.Rule("legacy/billing/tripwire")
-            .Quarantine!.DragonsDoc
-            .ShouldBe("arch/billing-dragons.md");
+            .Quarantine.ShouldNotBeNull()
+            .DragonsDoc.ShouldBe("arch/billing-dragons.md");
     }
 
     [Fact]
@@ -198,12 +198,13 @@ public class ModelReificationTests
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
         QuarantineData containment = model.Rule("legacy/billing/containment")
-            .Quarantine!;
+            .Quarantine.ShouldNotBeNull();
         // .Baseline omitted ⇒ conventional default derived from the containment rule ID (GRAMMAR §4.4/§7).
         containment.BaselinePath.ShouldBe("arch/baselines/legacy/billing/containment.json");
         // The tripwire's baseline stays null — grandfathering is a containment concern.
         model.Rule("legacy/billing/tripwire")
-            .Quarantine!.BaselinePath.ShouldBeNull();
+            .Quarantine.ShouldNotBeNull()
+            .BaselinePath.ShouldBeNull();
     }
 
     [Fact]
@@ -247,7 +248,7 @@ public class ModelReificationTests
         var constraint = rule.Constraint.ShouldBeOfType<MustNotConstructConstraint>();
 
         // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.Count.ShouldBe(1);
+        constraint.Targets.ShouldHaveSingleItem();
         constraint.Operands.ShouldBe(constraint.Targets);
         // Subject selection intact — the bare Types noun, no adjectives.
         constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
@@ -259,11 +260,13 @@ public class ModelReificationTests
     {
         // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
         Rule("layering/domain-independent")
-            .Constraint!.MemberOperands.ShouldBeEmpty();
+            .Constraint.ShouldNotBeNull()
+            .MemberOperands.ShouldBeEmpty();
         // MustNotConstruct is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty too.
         ArchModelBuilder.Build(CtorRuleSpec)
             .Rules.Single()
-            .Constraint!.MemberOperands.ShouldBeEmpty();
+            .Constraint.ShouldNotBeNull()
+            .MemberOperands.ShouldBeEmpty();
     }
 
     [Fact]
@@ -353,7 +356,7 @@ public class ModelReificationTests
                 .Because("Swallowing invalid-operation signals hides real defects."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustNotCatchConstraint>(rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotCatchConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -367,8 +370,7 @@ public class ModelReificationTests
                 .Because("A broad catch names what it expects in a `when` filter."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustNotCatchUnfilteredConstraint>(
-            rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotCatchUnfilteredConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -382,7 +384,7 @@ public class ModelReificationTests
                 .Because("A handler that holds a failure and continues hides it."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustNotSwallowConstraint>(rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotSwallowConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -394,7 +396,7 @@ public class ModelReificationTests
                 .Because("Bare BCL exception types carry no meaning a caller can dispatch on."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustNotThrowConstraint>(rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotThrowConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -406,7 +408,7 @@ public class ModelReificationTests
                 .Because("Domain code must surface only sanctioned exception types."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustOnlyThrowConstraint>(rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustOnlyThrowConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -473,7 +475,7 @@ public class ModelReificationTests
                 .Because("Public signatures must not leak infrastructure types."))
             .Rules.Single();
 
-        ShouldReifyToWalkableDependencyConstraint<MustNotExposeConstraint>(rule, constraint => constraint.Targets);
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotExposeConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -528,8 +530,7 @@ public class ModelReificationTests
             .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(2);
-        union.Adjectives.Count.ShouldBe(1);
-        union.Adjectives[0]
+        union.Adjectives.ShouldHaveSingleItem()
             .ShouldBeOfType<ExceptAdjective>();
     }
 
@@ -543,8 +544,7 @@ public class ModelReificationTests
             .ShouldBeOfType<UnionSelection>();
 
         union.Parts.Count.ShouldBe(2);
-        union.Adjectives.Count.ShouldBe(1);
-        union.Adjectives[0]
+        union.Adjectives.ShouldHaveSingleItem()
             .ShouldBeOfType<AuthoredAdjective>();
     }
 
@@ -557,36 +557,8 @@ public class ModelReificationTests
         var union = arch.AnyOf(arch.Project("A"))
             .ShouldBeOfType<UnionSelection>();
 
-        union.Parts.Count.ShouldBe(1);
+        union.Parts.ShouldHaveSingleItem();
         union.Adjectives.ShouldBeEmpty();
-    }
-
-    /// <summary>
-    ///     Asserts <paramref name="rule" /> reified to the walkable shape every dependency-shape verb shares:
-    ///     an Enforce <typeparamref name="TConstraint" /> carrying one target, with the generic walk reaching
-    ///     that target through <c>Operands</c>, an empty member hook, and the subject selection intact.
-    /// </summary>
-    /// <remarks>
-    ///     <paramref name="targets" /> is a parameter because each verb declares its own <c>Targets</c> rather
-    ///     than inheriting one from <see cref="OperandConstraint" /> — reading it through the concrete type is
-    ///     what keeps every row pinning the property its own verb publishes.
-    /// </remarks>
-    private static void ShouldReifyToWalkableDependencyConstraint<TConstraint>(
-        ArchRule rule, Func<TConstraint, IReadOnlyList<Selection>> targets)
-        where TConstraint : OperandConstraint
-    {
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<TConstraint>();
-        IReadOnlyList<Selection> declared = targets(constraint);
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        declared.Count.ShouldBe(1);
-        constraint.Operands.ShouldBe(declared);
-        // A dependency-shape verb overrides Operands, not MemberOperands — its member hook is empty.
-        constraint.MemberOperands.ShouldBeEmpty();
-        // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
     }
 
     /// <summary>
@@ -618,8 +590,7 @@ public class ModelReificationTests
         IReadOnlyList<Selection> sugaredTargets = targets(sugared);
         IReadOnlyList<Selection> handWrittenTargets = targets(handWritten);
 
-        sugaredTargets.Count.ShouldBe(1);
-        Type sugarType = sugaredTargets[0]
+        Type sugarType = sugaredTargets.ShouldHaveSingleItem()
             .Noun.ShouldBeOfType<TypeNoun>()
             .Type;
         Type wrappedType = handWrittenTargets[0]
@@ -629,5 +600,60 @@ public class ModelReificationTests
         wrappedType.ShouldBe(sugarType);
         sugaredTargets[0]
             .Adjectives.ShouldBeEmpty();
+    }
+}
+
+/// <summary>
+///     The shared claim the dependency-verb rows above make about a reified <see cref="ArchRule" />, as an
+///     extension so the rule each row already arranged reads as the sentence's subject.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <c>file</c>-scoped because it encodes one suite's claim about the dependency-verb walk hook rather
+///         than reusable vocabulary — a top-level class would put it in every test file's extension lookup for
+///         a helper only these rows want.
+///     </para>
+///     <para>
+///         Deliberately <em>not</em> attributed <c>[ShouldlyMethods]</c>, for the reason given on
+///         <see cref="Zphil.LoadBearing.Tests.Checking.RuleResultAssertions" />.
+///     </para>
+/// </remarks>
+file static class ArchRuleReificationAssertions
+{
+    /// <summary>
+    ///     Asserts <paramref name="rule" /> reified to the walkable shape every dependency-shape verb shares:
+    ///     an Enforce <typeparamref name="TConstraint" /> carrying one target, with the generic walk reaching
+    ///     that target through <c>Operands</c>, an empty member hook, and the subject selection intact.
+    /// </summary>
+    /// <remarks>
+    ///     <paramref name="targets" /> is a parameter because each verb declares its own <c>Targets</c> rather
+    ///     than inheriting one from <see cref="OperandConstraint" /> — reading it through the concrete type is
+    ///     what keeps every row pinning the property its own verb publishes.
+    /// </remarks>
+    internal static void ShouldReifyToWalkableDependencyConstraint<TConstraint>(
+        this ArchRule rule, Func<TConstraint, IReadOnlyList<Selection>> targets)
+        where TConstraint : OperandConstraint
+    {
+        string report = Describe(rule);
+        rule.Posture.ShouldBe(Posture.Enforce, report);
+        var constraint = rule.Constraint.ShouldBeOfType<TConstraint>(report);
+        IReadOnlyList<Selection> declared = targets(constraint);
+
+        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        declared.ShouldHaveSingleItem(report);
+        constraint.Operands.ShouldBe(declared, report);
+        // A dependency-shape verb overrides Operands, not MemberOperands — its member hook is empty.
+        constraint.MemberOperands.ShouldBeEmpty(report);
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>(report);
+        constraint.Subject.Adjectives.ShouldBeEmpty(report);
+    }
+
+    /// <summary>The rule's identity, posture and the constraint type it actually reified to.</summary>
+    private static string Describe(ArchRule rule)
+    {
+        string reified = rule.Constraint?.GetType()
+            .Name ?? "(no constraint)";
+        return $"Rule '{rule.Id}' ({rule.Posture}) reified {reified}.";
     }
 }

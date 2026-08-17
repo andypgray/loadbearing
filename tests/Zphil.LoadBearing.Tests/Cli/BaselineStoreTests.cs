@@ -226,9 +226,10 @@ public sealed class BaselineStoreTests : IDisposable
             ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]),
             ("legacy/billing/containment", [BaselineEntry.ForSubject("T:App.Legacy.Thing")]));
 
-        BaselineDocument? document = BaselineStore.TryReadDocument(path);
+        BaselineDocument document = BaselineStore.TryReadDocument(path)
+            .ShouldNotBeNull();
 
-        document!.Sections.Keys.OrderBy(k => k, StringComparer.Ordinal)
+        document.Sections.Keys.OrderBy(k => k, StringComparer.Ordinal)
             .ShouldBe(["data/x", "legacy/billing/containment"]);
     }
 
@@ -277,7 +278,8 @@ public sealed class BaselineStoreTests : IDisposable
 
         index.TryGet("data/x", out RuleBaseline? section)
             .ShouldBeTrue();
-        section!.Count.ShouldBe(1);
+        section.ShouldNotBeNull()
+            .Entries.ShouldHaveSingleItem();
     }
 
     [Fact]

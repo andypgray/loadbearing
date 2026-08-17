@@ -265,6 +265,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         loadBearing.ShouldBe(archUnit, true);
     }
 
+    // The four readers below stay raw rather than stating their sets through the RuleResult outcome verbs:
+    // each projects a slot of its own choosing — a source rather than an edge, a declaring type rather than the
+    // member — and the value has to survive as a set for AssertOracleAgreement to compare it three ways.
     private IReadOnlySet<string> LoadBearingReferenceViolators(Action<Arch> define)
     {
         return Checker.Run(workspace.Model, define)

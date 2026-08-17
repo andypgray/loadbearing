@@ -124,8 +124,8 @@ public sealed class McpUnboundServerTests : IDisposable
         response.ShouldNotBeNull($"the arch_graph response never arrived.\nstderr:\n{conversation.Diagnostics}");
 
         return new Conversation(
-            McpChildHarness.ShouldHaveInstructions(conversation.Handshake),
-            McpChildHarness.ShouldHaveToolText(response, "arch_graph"),
+            conversation.Handshake.ShouldHaveInstructions(),
+            response.ShouldHaveToolText("arch_graph"),
             McpChildHarness.IsToolError(response));
     }
 

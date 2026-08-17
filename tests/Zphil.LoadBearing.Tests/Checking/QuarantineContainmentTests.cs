@@ -62,11 +62,9 @@ public sealed class QuarantineContainmentTests
     {
         RuleResult containment = Containment(BaselineIndex.Empty, BoundaryScope);
 
-        containment.ShouldHaveFailed();
-        containment.ReferencePairs()
-            .ShouldContain("App.Client.User -> App.Legacy.Internal");
-        containment.ReferencePairs()
-            .ShouldNotContain("App.Client.User -> App.Legacy.IFacade");
+        // Exhaustive, which is what carries the facade's greenness too: it is absent from a set that names
+        // every inbound reference the boundary scope reports.
+        containment.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Client.User -> App.Legacy.Internal"]);
         containment.BaselineCaptured.ShouldBeFalse();
     }
 
@@ -92,9 +90,7 @@ public sealed class QuarantineContainmentTests
 
         RuleResult containment = Containment(baselines, HermeticScope);
 
-        containment.ShouldHaveFailed();
-        containment.ReferencePairs()
-            .ShouldBe(["App.Client.User -> App.Legacy.IFacade"]);
+        containment.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Client.User -> App.Legacy.IFacade"]);
         containment.ShouldHaveGrandfathered(1);
     }
 
@@ -119,9 +115,8 @@ public sealed class QuarantineContainmentTests
     {
         RuleResult containment = Containment(BaselineIndex.Empty, HermeticScope);
 
-        containment.ShouldHaveFailed();
-        containment.ReferencePairs()
-            .ShouldBe(
+        containment.ShouldHaveFailedWithEdges(
+            ViolationKind.Reference,
             [
                 "App.Client.User -> App.Legacy.IFacade",
                 "App.Client.User -> App.Legacy.Internal"

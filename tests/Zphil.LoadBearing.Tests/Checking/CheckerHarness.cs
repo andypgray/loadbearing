@@ -105,10 +105,18 @@ internal static class Checker
     ///     order — for the rows whose whole question is which types a selection reaches.
     /// </summary>
     /// <remarks>
-    ///     Read back through a probe rule nothing can satisfy: no fixture type is named <c>ZZZ*</c>, so every
-    ///     selected type lands as a shape violation and the violation list IS the selected set. The verb is
-    ///     incidental — only the selection is under test — which is why it is spelled once here rather than
-    ///     scaffolded at each site, and explained once rather than in a comment per site.
+    ///     <para>
+    ///         Read back through a probe rule nothing can satisfy: no fixture type is named <c>ZZZ*</c>, so
+    ///         every selected type lands as a shape violation and the violation list IS the selected set. The
+    ///         verb is incidental — only the selection is under test — which is why it is spelled once here
+    ///         rather than scaffolded at each site, and explained once rather than in a comment per site.
+    ///     </para>
+    ///     <para>
+    ///         Its callers therefore keep this raw list rather than stating
+    ///         <c>ShouldHaveFailedWithSubjects</c>: they hold no <see cref="RuleResult" />, and the probe
+    ///         rule's redness is precisely the incidental fact above — a row that asserted it would be
+    ///         claiming the scaffolding.
+    ///     </para>
     /// </remarks>
     public static IReadOnlyList<string> Selects(CodebaseModel codebase, Func<Arch, Selection> select)
     {
@@ -144,6 +152,21 @@ internal static class Checker
     ///     The violations of one <paramref name="kind" />, each rendered by <paramref name="identify" />, in
     ///     report order — the one walk every violation-listing assertion below is a naming of.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         These readers stay here rather than moving beside
+    ///         <see cref="RuleResultAssertions" />, which now states the same claims as outcome verbs. The
+    ///         split is by subject, not by verb shape: this type runs and reads a check, that one claims
+    ///         things about one <see cref="RuleResult" />. Both share this namespace, so a move would buy no
+    ///         call site anything, and <see cref="Selects" /> reads <see cref="ShapeSubjects" /> internally —
+    ///         moving it would make the harness depend on the assertions rather than the other way round.
+    ///     </para>
+    ///     <para>
+    ///         What survives here after the sweep is the deliberate remainder: the rows whose subject is the
+    ///         projection itself — report order, an arbitrary slot no named reader offers, or two reads
+    ///         cross-compared. No row calls both a reader and an outcome verb.
+    ///     </para>
+    /// </remarks>
     public static IReadOnlyList<string> Violators(
         this RuleResult result, ViolationKind kind, Func<Violation, string> identify)
     {

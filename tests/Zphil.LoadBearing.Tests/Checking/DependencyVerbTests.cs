@@ -33,9 +33,7 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
         result.Violations.First(v => v.Source!.FullName == "App.Domain.Service" && v.Target!.FullName == "App.Web.Controller")
             .Sites.ShouldNotBeEmpty();
     }
@@ -62,9 +60,7 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> System.Text.StringBuilder");
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Domain.Service -> System.Text.StringBuilder"]);
     }
 
     [Fact]
@@ -76,10 +72,8 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
         // Source is the referencing Domain type (where the edit happens); Target is the referenced Web type.
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
         result.Violations.ShouldAllBe(v => v.Target!.Namespace == "App.Web");
     }
 
@@ -93,12 +87,14 @@ public sealed class DependencyVerbTests
             .Single();
 
         result.ShouldHaveFailed();
-        // The BCL reference (StringBuilder) is exempt; the same-layer reference (Model) is allowed.
+        // The BCL reference (StringBuilder) is exempt; the same-layer reference (Model) is allowed. Stated as
+        // one edge in and one edge out rather than as the whole set: exhaustively, this rule's violations are
+        // the four-edge literal ViolationOrder_IsOrdinalBySourceThenTarget pins, and a second copy of it here
+        // would couple this row to types that exist for that pin.
         result.Violations.ShouldAllBe(v => !v.Target!.IsExternal);
-        result.ReferencePairs()
-            .ShouldNotContain("App.Domain.Service -> App.Domain.Model");
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> App.Web.Controller");
+        IReadOnlyList<string> referenced = result.ReferencePairs();
+        referenced.ShouldNotContain("App.Domain.Service -> App.Domain.Model");
+        referenced.ShouldContain("App.Domain.Service -> App.Web.Controller");
     }
 
     [Fact]
@@ -110,10 +106,8 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
         // Allowed = Web only; the Domain→Domain edge (Service→Model) is not implicitly self-allowed.
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> App.Domain.Model");
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Domain.Service -> App.Domain.Model"]);
     }
 
     [Fact]
@@ -125,10 +119,8 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
         // Web may be referenced only by Web; the inbound Domain→Web edge is a violation.
-        result.ReferencePairs()
-            .ShouldContain("App.Domain.Service -> App.Web.Controller");
+        result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
     }
 
     [Fact]
@@ -162,9 +154,7 @@ public sealed class DependencyVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ConstructionPairs()
-            .ShouldBe(["App.Web.Maker -> App.Data.Db"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Construction, ["App.Web.Maker -> App.Data.Db"]);
     }
 
     [Fact]

@@ -300,10 +300,8 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new ThreeBadPatternsSpec());
 
         // Two dead subtree globs (the subject noun and the verb) plus one blank affix, reported together.
-        ex.Errors.Count(e => e.Code == Code.UnanchoredSubtreePattern)
-            .ShouldBe(2);
-        ex.Errors.Count(e => e.Code == Code.BlankPattern)
-            .ShouldBe(1);
+        ex.Errors.ShouldContain(e => e.Code == Code.UnanchoredSubtreePattern, expectedCount: 2);
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 1);
     }
 
     [Fact]
@@ -430,8 +428,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new MultiplePoisonedMembersSpec());
 
         // Two poisoned member anchors on one rule → two errors in one pass (the §8 all-at-once contract).
-        ex.Errors.Count(e => e.Code == Code.MemberExpressionUnresolvable)
-            .ShouldBe(2);
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable, expectedCount: 2);
     }
 
     [Fact]
@@ -510,8 +507,7 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new VerbMultiplePoisonedMembersSpec());
 
         // Two poisoned verb-position anchors on one rule → two errors in one pass (the §8 all-at-once contract).
-        ex.Errors.Count(e => e.Code == Code.MemberExpressionUnresolvable)
-            .ShouldBe(2);
+        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable, expectedCount: 2);
     }
 
     [Fact]
@@ -541,11 +537,11 @@ public class SpecValidationTests
         SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
         SpecValidationError error = ex.ShouldHaveError(Code.MissingBecause);
 
-        error.Location.ShouldNotBeNull();
+        SpecSourceLocation location = error.Location.ShouldNotBeNull();
         // File name only — never the machine-specific directory — so goldens stay byte-identical across build
         // machines; the line is the captured 1-based anchor line.
-        error.Location!.File.ShouldBe("SpecValidationSpecs.cs");
-        error.Location.Line.ShouldBeGreaterThan(0);
+        location.File.ShouldBe("SpecValidationSpecs.cs");
+        location.Line.ShouldBeGreaterThan(0);
         error.Message.ShouldStartWith("SpecValidationSpecs.cs:");
     }
 
@@ -570,12 +566,12 @@ public class SpecValidationTests
         SpecValidationError ruleError = ex.ShouldHaveError(Code.MissingBecause);
         SpecValidationError memberError = ex.ShouldHaveError(Code.MemberExpressionUnresolvable);
 
-        ruleError.Location.ShouldNotBeNull();
-        memberError.Location.ShouldNotBeNull();
+        SpecSourceLocation ruleAnchor = ruleError.Location.ShouldNotBeNull();
+        SpecSourceLocation memberAnchor = memberError.Location.ShouldNotBeNull();
         // The member poison steers to its own arch.Member(...) lambda line — below the arch.Rule(...) anchor
         // the rule-level MissingBecause renders at — proving item-18 steers point at the offending construct,
         // not the consuming rule (GRAMMAR §8).
-        memberError.Location!.Line.ShouldBeGreaterThan(ruleError.Location!.Line);
+        memberAnchor.Line.ShouldBeGreaterThan(ruleAnchor.Line);
     }
 
     // GRAMMAR §8 item 19: an undefined Lifetime value on an arch.Registered noun used by a rule. The check rides the shared
@@ -721,8 +717,7 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new BlankAttributeAllAtOnceSpec());
 
-        ex.Errors.Count(e => e.Code == Code.BlankPattern)
-            .ShouldBe(2);
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 2);
         ex.ShouldHaveError(Code.MissingBecause, "area/rule");
     }
 
@@ -777,8 +772,7 @@ public class SpecValidationTests
         // list — all three reported together under the shared "attribute name" label.
         SpecValidationException ex = BuildExpectingFailure(new BlankMemberAttributeNameSpec());
 
-        ex.Errors.Count(e => e.Code == Code.BlankPattern)
-            .ShouldBe(3);
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 3);
         ex.ShouldHaveError(Code.BlankPattern)
             .Message
             .ShouldBe("SpecValidationSpecs.cs:830: Blank attribute name on 'member/adjective'.");
@@ -799,10 +793,8 @@ public class SpecValidationTests
         List<SpecValidationError> blanks = ex.Errors.Where(e => e.Code == Code.BlankPattern)
             .ToList();
         blanks.Count.ShouldBe(6);
-        blanks.Count(e => e.Message.Contains("Blank interface name"))
-            .ShouldBe(3);
-        blanks.Count(e => e.Message.Contains("Blank base type name"))
-            .ShouldBe(3);
+        blanks.ShouldContain(e => e.Message.Contains("Blank interface name"), expectedCount: 3);
+        blanks.ShouldContain(e => e.Message.Contains("Blank base type name"), expectedCount: 3);
         blanks[0]
             .Message.ShouldBe("SpecValidationSpecs.cs:840: Blank interface name on 'hierarchy/implementing'.");
     }

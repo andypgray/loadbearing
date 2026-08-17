@@ -108,8 +108,8 @@ public sealed class McpChildServerRepoHandleTests
         foreach (string name in ReadToolCalls.Select(call => call.Name))
         {
             string? answer = conversation.Answers.GetValueOrDefault(name);
-            answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{conversation.Diagnostics}");
-            McpChildHarness.ShouldHaveToolText(answer, name)
+            answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{conversation.Diagnostics}")
+                .ShouldHaveToolText(name)
                 .ShouldNotBeNullOrEmpty($"{name} answered with an empty payload.");
         }
 
@@ -118,7 +118,8 @@ public sealed class McpChildServerRepoHandleTests
 
         // arch_check must have genuinely run the whole diff path, spec load included — otherwise a server
         // that answered five errors would hold nothing and pass.
-        McpChildHarness.ShouldHaveToolText(conversation.Answers["arch_check"]!, "arch_check")
+        conversation.Answers["arch_check"]!
+            .ShouldHaveToolText("arch_check")
             .ShouldContain("quarantinedScopeTouched");
     }
 

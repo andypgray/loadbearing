@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
@@ -124,12 +123,10 @@ public sealed class BaselineAddE2ETests
             .Except(LineSet(afterText))
             .ToList();
         added.Count.ShouldBe(2);
-        added.Count(line => line.Contains("\"digest\""))
-            .ShouldBe(1);
-        added.Count(line => line.Contains(HomeId) && line.Contains("\"because\": \"INC-1234\""))
-            .ShouldBe(1);
-        removed.Count.ShouldBe(1);
-        removed.Single()
+        added.ShouldContain(line => line.Contains("\"digest\""), expectedCount: 1);
+        added.ShouldContain(
+            line => line.Contains(HomeId) && line.Contains("\"because\": \"INC-1234\""), expectedCount: 1);
+        removed.ShouldHaveSingleItem()
             .ShouldContain("\"digest\"");
 
         // The bystanders are untouched: the same-rule DataSet red and the other-rule uncaptured containment
@@ -175,10 +172,7 @@ public sealed class BaselineAddE2ETests
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
-        JsonElement containment = CheckJson.Rule(check.Out, ContainmentRule);
-        containment.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
+        check.Out.ShouldHavePassed(ContainmentRule);
     }
 
     [Fact]
@@ -190,7 +184,7 @@ public sealed class BaselineAddE2ETests
         // reads (GRAMMAR §4.5) are current memberUse violations.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveFailedWith(red, ClockRule, "targetMember", [NowMemberId, UtcNowMemberId]);
+        red.Out.ShouldHaveFailedWith(ClockRule, "targetMember", [NowMemberId, UtcNowMemberId]);
 
         // Capture: --init grandfathers both member identities (T: source x P: member DocId entries), and the
         // re-check sees the rule green with both reads riding the baseline.
@@ -200,7 +194,7 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveCaptured(captured, ClockRule, 2);
+        captured.Out.ShouldHaveCaptured(ClockRule, 2);
 
         // Un-capture the pair (composer as arrangement, the Migrate fact's idiom): a digest-valid EMPTY
         // section turns both reads red again on a captured rule — the state the valve exists for.
@@ -228,30 +222,15 @@ public sealed class BaselineAddE2ETests
                 ])));
         afterText.ShouldNotBe(beforeText);
         LineSet(afterText)
-            .Count(line => line.Contains("\"source\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER clock read (UtcNow) is still red; only Now is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement clockRule = CheckJson.Rule(check.Out, ClockRule);
-        clockRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        clockRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        List<JsonElement> bystanders = clockRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList();
-        JsonElement bystander = bystanders.ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("memberUse");
-        bystander.GetProperty("targetMember")
-            .GetString()
-            .ShouldBe(UtcNowMemberId);
+        check.Out
+            .ShouldHaveGrandfathered(ClockRule, 1)
+            .ShouldHaveSingleViolationOnMember(
+                ClockRule, kind: "memberUse", slot: "targetMember", member: UtcNowMemberId);
 
         // The attribution round-trips: --accept-reductions keeps the still-observed Now entry (refusing the
         // UtcNow growth) and a second --init leaves the captured section be — byte-identical both ways.
@@ -268,7 +247,7 @@ public sealed class BaselineAddE2ETests
         // memberShape violations, each keyed by the member's own DocId in the subjectMember field.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveFailedWith(red, AsyncRule, "subjectMember", [SaveMemberId, LoadMemberId]);
+        red.Out.ShouldHaveFailedWith(AsyncRule, "subjectMember", [SaveMemberId, LoadMemberId]);
 
         // Capture: --init grandfathers both member identities (M: member DocId, ForSubject entries), and the
         // re-check sees the rule green with both methods riding the baseline.
@@ -278,7 +257,7 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveCaptured(captured, AsyncRule, 2);
+        captured.Out.ShouldHaveCaptured(AsyncRule, 2);
 
         // Un-capture the pair (composer as arrangement, the Migrate/clock fact's idiom): a digest-valid EMPTY
         // section turns both methods red again on a captured rule — the state the valve exists for.
@@ -305,30 +284,15 @@ public sealed class BaselineAddE2ETests
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(asyncPath))
-            .Count(line => line.Contains("\"subject\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"subject\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER Task method (Load) is still red; only Save is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        JsonElement asyncRule = CheckJson.Rule(check.Out, AsyncRule);
-        asyncRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        asyncRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        JsonElement bystander = asyncRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("memberShape");
-        bystander.GetProperty("subjectMember")
-            .GetString()
-            .ShouldBe(LoadMemberId);
+        check.Out
+            .ShouldHaveGrandfathered(AsyncRule, 1)
+            .ShouldHaveSingleViolationOnMember(
+                AsyncRule, kind: "memberShape", slot: "subjectMember", member: LoadMemberId);
 
         // The attribution round-trips: --accept-reductions keeps the still-observed Save entry (refusing the
         // Load growth) and a second --init leaves the captured section be — byte-identical both ways.
@@ -372,34 +336,17 @@ public sealed class BaselineAddE2ETests
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(diPath))
-            .Count(line => line.Contains("\"source\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER construction (HomeController) is still red; only InvoiceService is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
-        JsonElement diRule = CheckJson.Rule(check.Out, ConstructionRule);
-        diRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        diRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        JsonElement bystander = diRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("construction");
-        bystander.GetProperty("source")
-            .GetString()
-            .ShouldBe("MyApp.Web.HomeController");
-        bystander.GetProperty("target")
-            .GetString()
-            .ShouldBe("MyApp.Web.InvoiceCreatedHandler");
+        check.Out
+            .ShouldHaveGrandfathered(ConstructionRule, 1)
+            .ShouldHaveSingleViolationOnEdge(
+                ConstructionRule, kind: "construction",
+                source: "MyApp.Web.HomeController", target: "MyApp.Web.InvoiceCreatedHandler");
     }
 
     [Fact]
@@ -412,7 +359,7 @@ public sealed class BaselineAddE2ETests
         // IOrderFeed and a transient IOrderFormatter, each keyed by the (source, injected) type pair.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveFailedWith(red, CaptiveRule, "target", ["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"]);
+        red.Out.ShouldHaveFailedWith(CaptiveRule, "target", ["MyApp.Web.IOrderFeed", "MyApp.Web.IOrderFormatter"]);
 
         // Capture: --init grandfathers both injection identities (T: source × T: injected ForEdge entries), and
         // the re-check sees the rule green with both captive edges riding the baseline.
@@ -422,7 +369,7 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveCaptured(captured, CaptiveRule, 2);
+        captured.Out.ShouldHaveCaptured(CaptiveRule, 2);
 
         // Un-capture the pair (composer as arrangement, the member/construction facts' idiom): a digest-valid
         // EMPTY section turns both captive edges red again on a captured rule — the state the valve exists for.
@@ -449,34 +396,17 @@ public sealed class BaselineAddE2ETests
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(captivePath))
-            .Count(line => line.Contains("\"source\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER captive edge (IOrderFormatter) is still red; only IOrderFeed is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
-        JsonElement captiveRule = CheckJson.Rule(check.Out, CaptiveRule);
-        captiveRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        captiveRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        JsonElement bystander = captiveRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("injection");
-        bystander.GetProperty("source")
-            .GetString()
-            .ShouldBe("MyApp.Web.ReportScheduler");
-        bystander.GetProperty("target")
-            .GetString()
-            .ShouldBe("MyApp.Web.IOrderFormatter");
+        check.Out
+            .ShouldHaveGrandfathered(CaptiveRule, 1)
+            .ShouldHaveSingleViolationOnEdge(
+                CaptiveRule, kind: "injection",
+                source: "MyApp.Web.ReportScheduler", target: "MyApp.Web.IOrderFormatter");
 
         // The attribution round-trips: --accept-reductions keeps the still-observed IOrderFeed entry (refusing
         // the IOrderFormatter growth) and a second --init leaves the captured section be — byte-identical both ways.
@@ -494,7 +424,7 @@ public sealed class BaselineAddE2ETests
         // distinguish between.
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveFailedWith(red, CatchRule, "source", ["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"]);
+        red.Out.ShouldHaveFailedWith(CatchRule, "source", ["MyApp.Web.ReportEndpoint", "MyApp.Web.ReportPublisher"]);
 
         // Capture: --init grandfathers both catch identities (T: source × T: caught ForEdge entries, minting the
         // arch/baselines/exceptions/ directory), and the re-check sees the rule green with both baselined.
@@ -504,7 +434,7 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveCaptured(captured, CatchRule, 2);
+        captured.Out.ShouldHaveCaptured(CatchRule, 2);
 
         // Un-capture (composer as arrangement, the member/construction/injection facts' idiom): a digest-valid
         // EMPTY section turns both catches red again on a captured rule — the state the valve exists for.
@@ -532,8 +462,7 @@ public sealed class BaselineAddE2ETests
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(catchPath))
-            .Count(line => line.Contains("\"source\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The added swallow now passes, and two bystanders stay red: the in-rule one — ReportPublisher's catch of
         // the very same System.Exception, a distinct (source, caught) identity — and the cross-rule one, the
@@ -541,44 +470,15 @@ public sealed class BaselineAddE2ETests
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
-        JsonElement catchRule = CheckJson.Rule(check.Out, CatchRule);
-        catchRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        catchRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        JsonElement inRuleBystander = catchRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        inRuleBystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("catch");
-        inRuleBystander.GetProperty("source")
-            .GetString()
-            .ShouldBe("MyApp.Web.ReportPublisher");
-        inRuleBystander.GetProperty("target")
-            .GetString()
-            .ShouldBe("System.Exception");
-        JsonElement throwRule = CheckJson.Rule(check.Out, ThrowRule);
-        throwRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        JsonElement bystander = throwRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("throw");
-        bystander.GetProperty("source")
-            .GetString()
-            .ShouldBe("MyApp.Domain.OrderApproval");
-        bystander.GetProperty("target")
-            .GetString()
-            .ShouldBe("System.InvalidOperationException");
+        check.Out
+            .ShouldHaveGrandfathered(CatchRule, 1)
+            .ShouldHaveSingleViolationOnEdge(
+                CatchRule, kind: "catch",
+                source: "MyApp.Web.ReportPublisher", target: "System.Exception")
+            // The Enforce rule carries no baseline, so there is no grandfathered count to read beside it.
+            .ShouldHaveSingleViolationOnEdge(
+                ThrowRule, kind: "throw",
+                source: "MyApp.Domain.OrderApproval", target: "System.InvalidOperationException");
 
         // The attribution round-trips: --accept-reductions keeps the still-observed swallow entry (refusing the
         // ReportPublisher growth) and a second --init leaves the captured section be — byte-identical both ways.
@@ -597,7 +497,7 @@ public sealed class BaselineAddE2ETests
         // path (BaselineAddMatcher matches ViolationKind.Expose on both type endpoints, exactly as it does Catch).
         CliResult red = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveFailedWith(red, ExposeRule, "source", ["MyApp.Web.HomeController", "MyApp.Web.InvoiceController"]);
+        red.Out.ShouldHaveFailedWith(ExposeRule, "source", ["MyApp.Web.HomeController", "MyApp.Web.InvoiceController"]);
 
         // Capture: --init grandfathers both exposure identities (T: source × T: exposed ForEdge entries, minting
         // the arch/baselines/api/ directory), and the re-check sees the rule green with both surfaces baselined.
@@ -607,7 +507,7 @@ public sealed class BaselineAddE2ETests
 
         CliResult captured = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        ShouldHaveCaptured(captured, ExposeRule, 2);
+        captured.Out.ShouldHaveCaptured(ExposeRule, 2);
 
         // Un-capture the pair (composer as arrangement, the catch/injection facts' idiom): a digest-valid EMPTY
         // section turns both surfaces red again on a captured rule — the state the valve exists for.
@@ -634,35 +534,18 @@ public sealed class BaselineAddE2ETests
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(exposePath))
-            .Count(line => line.Contains("\"source\":"))
-            .ShouldBe(1);
+            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER surfaced DataTable (InvoiceController) is still red; only HomeController is
         // grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
-        JsonElement exposeRule = CheckJson.Rule(check.Out, ExposeRule);
-        exposeRule.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        exposeRule.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(1);
-        JsonElement bystander = exposeRule.GetProperty("violations")
-            .EnumerateArray()
-            .ToList()
-            .ShouldHaveSingleItem();
-        bystander.GetProperty("kind")
-            .GetString()
-            .ShouldBe("expose");
-        bystander.GetProperty("source")
-            .GetString()
-            .ShouldBe("MyApp.Web.InvoiceController");
-        bystander.GetProperty("target")
-            .GetString()
-            .ShouldBe("System.Data.DataTable");
+        check.Out
+            .ShouldHaveGrandfathered(ExposeRule, 1)
+            .ShouldHaveSingleViolationOnEdge(
+                ExposeRule, kind: "expose",
+                source: "MyApp.Web.InvoiceController", target: "System.Data.DataTable");
 
         // The attribution round-trips: --accept-reductions keeps the still-observed HomeController entry (refusing
         // the InvoiceController growth) and a second --init leaves the captured section be — byte-identical both ways.
@@ -785,42 +668,6 @@ public sealed class BaselineAddE2ETests
         checkJson.Err.ShouldNotContain("--add");
         status.Out.ShouldNotContain("--add");
         status.Err.ShouldNotContain("--add");
-    }
-
-    /// <summary>
-    ///     Asserts <paramref name="rule" /> is red in <paramref name="check" />'s JSON document with exactly
-    ///     the violations <paramref name="expected" /> names — each read off the violation's
-    ///     <paramref name="endpoint" /> field, which is the kind's own identity (the caught, injected or
-    ///     exposed type; the member DocId a member rule keys on). The "red first" state every valve fact
-    ///     starts from, in any order.
-    /// </summary>
-    private static void ShouldHaveFailedWith(CliResult check, string rule, string endpoint, string[] expected)
-    {
-        JsonElement red = CheckJson.Rule(check.Out, rule);
-        red.GetProperty("status")
-            .GetString()
-            .ShouldBe("failed");
-        red.GetProperty("violations")
-            .EnumerateArray()
-            .Select(violation => violation.GetProperty(endpoint)
-                .GetString())
-            .ShouldBe(expected, true);
-    }
-
-    /// <summary>
-    ///     Asserts <paramref name="rule" /> is green in <paramref name="check" />'s JSON document on
-    ///     <paramref name="count" /> grandfathered violations — captured, not fixed.
-    /// </summary>
-    private static void ShouldHaveCaptured(CliResult check, string rule, int count)
-    {
-        JsonElement captured = CheckJson.Rule(check.Out, rule);
-        captured.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed");
-        captured.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(count);
     }
 
     /// <summary>

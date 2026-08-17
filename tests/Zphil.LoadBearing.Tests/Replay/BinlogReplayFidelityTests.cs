@@ -163,15 +163,15 @@ public sealed class BinlogReplayFidelityTests
 
         foreach (Project project in replayed.Solution.Projects)
         {
-            project.FilePath.ShouldNotBeNull();
-            project.FilePath!.ShouldEndWith(".csproj");
-            File.Exists(project.FilePath)
-                .ShouldBeTrue($"csproj should exist on disk: {project.FilePath}");
+            string projectPath = project.FilePath.ShouldNotBeNull();
+            projectPath.ShouldEndWith(".csproj");
+            File.Exists(projectPath)
+                .ShouldBeTrue($"csproj should exist on disk: {projectPath}");
 
-            project.OutputFilePath.ShouldNotBeNull();
-            File.Exists(project.OutputFilePath!)
+            string outputPath = project.OutputFilePath.ShouldNotBeNull();
+            File.Exists(outputPath)
                 .ShouldBeTrue(
-                    $"built output assembly should exist on disk: {project.OutputFilePath}");
+                    $"built output assembly should exist on disk: {outputPath}");
         }
     }
 }

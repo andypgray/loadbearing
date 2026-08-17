@@ -75,7 +75,7 @@ public sealed class McpStdioChildServerTests
             + "pipe wedges at startup and the call cannot complete — the failure no in-process MCP test can "
             + $"see.\nstderr:\n{conversation.Diagnostics}");
 
-        string text = McpChildHarness.ShouldHaveToolText(response, "arch_check");
+        string text = response.ShouldHaveToolText("arch_check");
         McpChildHarness.IsToolError(response)
             .ShouldBeFalse($"arch_check reported a tool error: {text}");
 

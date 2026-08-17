@@ -88,12 +88,9 @@ public sealed class MustNotCatchUnfilteredVerbTests
                     .Because("b"))
             .Single();
 
+        // The subject covers FilteredHandler too, and the single-item claim below is the verb's whole point:
+        // its identical catch of the identical type is absent from the report.
         result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
-
-        // The subject covers FilteredHandler too, and its identical catch of the identical type is absent from the
-        // report — the verb's whole point, stated as a complete list.
-        result.CatchPairs()
-            .ShouldBe(["App.DataHandler -> Errors.DbError"]);
 
         string block = result.HumanBlock();
         block.ShouldContain("App.DataHandler catches Errors.DbError");
@@ -156,9 +153,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Broad -> System.Exception"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
     }
 
     [Fact]
@@ -174,9 +169,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["N.Worker -> N.AppError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
     }
 
     [Fact]
@@ -239,9 +232,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
                     .Because("name what a broad catch expects"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Handler -> Errors.BErr"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.BErr"]);
         result.ShouldHaveGrandfathered(1);
     }
 

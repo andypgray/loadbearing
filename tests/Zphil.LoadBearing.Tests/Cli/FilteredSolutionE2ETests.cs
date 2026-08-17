@@ -168,14 +168,7 @@ public sealed class FilteredSolutionE2ETests
             "check", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json");
 
         result.ShouldSucceed();
-        using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement rule = CheckJson.Rule(document, "data-access/no-inline-sql");
-        rule.GetProperty("status")
-            .GetString()
-            .ShouldBe("skipped");
-        rule.GetProperty("skipReason")
-            .GetString()
-            .ShouldBe(RuleSkipReason);
+        result.Out.ShouldHaveSkipped("data-access/no-inline-sql", RuleSkipReason);
     }
 
     [Fact]

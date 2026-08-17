@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -160,9 +159,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.InjectionPairs()
-            .ShouldBe(["App.OrdinarySingleton -> App.IScopedDep"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.OrdinarySingleton -> App.IScopedDep"]);
     }
 
     [Fact]
@@ -199,9 +196,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("resolve scoped work through IServiceScopeFactory"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.InjectionPairs()
-            .ShouldBe(["App.Svc -> App.IScopedB"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.Svc -> App.IScopedB"]);
         result.ShouldHaveGrandfathered(1);
     }
 

@@ -52,9 +52,7 @@ public class PackCompositionTests
     {
         var exception = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(new PackCallSpec(), new LocalCollidingSpec()));
 
-        exception.Errors
-            .Count(error => error.Code == SpecValidationErrorCode.DuplicateId)
-            .ShouldBe(1);
+        exception.Errors.ShouldContain(error => error.Code == SpecValidationErrorCode.DuplicateId, expectedCount: 1);
     }
 
     private static SpecValidationError DuplicateIdError(params IArchitectureSpec[] specs)

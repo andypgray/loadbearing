@@ -508,7 +508,7 @@ public sealed class CodebaseExtractorRegistrationTests
 
         model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
             .ShouldBeTrue();
-        model.ServiceRegistrations.Count.ShouldBe(1); // only the inner real call; AddMyServices is not recognized
+        model.ServiceRegistrations.ShouldHaveSingleItem(); // only the inner real call; AddMyServices is not recognized
     }
 
     // ── Honesty boundary ──────────────────────────────────────────────────────────────────────────────────

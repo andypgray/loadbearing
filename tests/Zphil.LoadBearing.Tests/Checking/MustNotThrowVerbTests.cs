@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -114,9 +113,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ThrowPairs()
-            .ShouldBe(["App.Broad -> System.Exception"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["App.Broad -> System.Exception"]);
     }
 
     [Fact]
@@ -147,9 +144,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ThrowPairs()
-            .ShouldBe(["N.Worker -> N.AppError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["N.Worker -> N.AppError"]);
     }
 
     [Fact]
@@ -225,9 +220,7 @@ public sealed class MustNotThrowVerbTests
                     .Because("throw types a caller can dispatch on"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ThrowPairs()
-            .ShouldBe(["N.Worker -> N.Beta"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["N.Worker -> N.Beta"]);
         result.ShouldHaveGrandfathered(1);
     }
 

@@ -247,7 +247,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         model.ConstructorEdge("N.Maker", "N.Thing")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     [Fact]

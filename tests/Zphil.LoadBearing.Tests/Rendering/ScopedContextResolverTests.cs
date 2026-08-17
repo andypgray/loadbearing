@@ -37,15 +37,11 @@ public class ScopedContextResolverTests
 
         IReadOnlyList<ScopePlacement> placements = ScopedContextResolver.Resolve(Model(), codebase);
 
-        placements.Count.ShouldBe(1);
-        placements[0]
-            .ScopeId.ShouldBe("legacy/billing");
-        placements[0]
-            .ContainmentRule.Id.ShouldBe("legacy/billing/containment");
-        placements[0]
-            .DirectoryPath.ShouldBe("MyApp.Legacy.Billing");
-        placements[0]
-            .SkipReason.ShouldBeNull();
+        ScopePlacement placement = placements.ShouldHaveSingleItem();
+        placement.ScopeId.ShouldBe("legacy/billing");
+        placement.ContainmentRule.Id.ShouldBe("legacy/billing/containment");
+        placement.DirectoryPath.ShouldBe("MyApp.Legacy.Billing");
+        placement.SkipReason.ShouldBeNull();
     }
 
     [Fact]

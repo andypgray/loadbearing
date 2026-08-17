@@ -49,7 +49,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
             .Lines()
             .ShouldBe([8]);
         model.CatchEdges("N.Worker")
-            .Count.ShouldBe(1);
+            .ShouldHaveSingleItem();
         model.HasEdge("N.Worker", "N.MyError")
             .ShouldBeTrue();
         model.Edge("N.Worker", "N.MyError")

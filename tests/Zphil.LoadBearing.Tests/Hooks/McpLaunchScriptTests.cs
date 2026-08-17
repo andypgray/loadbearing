@@ -75,11 +75,10 @@ public sealed class McpLaunchScriptTests
         result.ExitCode.ShouldBe(0);
         lab.ExecutedArguments()[1]
             .ShouldBe(first);
-        lab.StagedDirectories()
-            .Length.ShouldBe(
-                1, "a second session on one build must share the first session's copy, not mint its own.");
-        File.Exists(Path.Combine(lab.StagedDirectories()
-                .Single(), StagedMarker))
+        string staged = lab.StagedDirectories()
+            .ShouldHaveSingleItem(
+                "a second session on one build must share the first session's copy, not mint its own.");
+        File.Exists(Path.Combine(staged, StagedMarker))
             .ShouldBeTrue("the copy was re-staged over a build that had not changed.");
     }
 

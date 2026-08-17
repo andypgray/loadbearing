@@ -68,17 +68,13 @@ public class ContextFileComposerTests
             ArchModelBuilder.Build(WebLayerSpec), null, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
-        composition.Files.Count.ShouldBe(1);
-        composition.Files[0]
-            .Path.ShouldBe(Path.Combine("/sln", "AGENTS.md"));
+        ContextFile file = composition.Files.ShouldHaveSingleItem();
+        file.Path.ShouldBe(Path.Combine("/sln", "AGENTS.md"));
         // The root block still carries the module map (`### Layers`, a function of the spec); what the
         // missing codebase costs is the per-directory card, whose heading is `## Layer <name>`.
-        composition.Files[0]
-            .Body.ShouldContain("## Architecture (LoadBearing)");
-        composition.Files[0]
-            .Body.ShouldContain("### Layers");
-        composition.Files[0]
-            .Body.ShouldNotContain("## Layer `Web`");
+        file.Body.ShouldContain("## Architecture (LoadBearing)");
+        file.Body.ShouldContain("### Layers");
+        file.Body.ShouldNotContain("## Layer `Web`");
     }
 
     [Fact]
@@ -138,7 +134,7 @@ public class ContextFileComposerTests
             ArchModelBuilder.Build(BillingLayerSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["layer 'Billing' matched no types; no scoped context emitted"]);
-        composition.Files.Count.ShouldBe(1); // the root file only
+        composition.Files.ShouldHaveSingleItem(); // the root file only
     }
 
     [Fact]
@@ -151,6 +147,6 @@ public class ContextFileComposerTests
             ArchModelBuilder.Build(AbsentScopeSpec), codebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["scope 'legacy/billing' matched no types; no scoped context emitted"]);
-        composition.Files.Count.ShouldBe(1);
+        composition.Files.ShouldHaveSingleItem();
     }
 }

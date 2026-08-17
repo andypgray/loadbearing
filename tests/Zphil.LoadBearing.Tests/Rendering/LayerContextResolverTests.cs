@@ -87,16 +87,12 @@ public class LayerContextResolverTests
 
         IReadOnlyList<LayerPlacement> placements = LayerContextResolver.Resolve(ArchModelBuilder.Build(WebLayerSpec), codebase);
 
-        placements.Count.ShouldBe(1);
-        placements[0]
-            .LayerName.ShouldBe("Web");
-        placements[0]
-            .Rules.Select(rule => rule.Id)
+        LayerPlacement placement = placements.ShouldHaveSingleItem();
+        placement.LayerName.ShouldBe("Web");
+        placement.Rules.Select(rule => rule.Id)
             .ShouldBe(["layering/web-not-billing"]);
-        placements[0]
-            .DirectoryPath.ShouldBe("src/MyApp.Web");
-        placements[0]
-            .SkipReason.ShouldBeNull();
+        placement.DirectoryPath.ShouldBe("src/MyApp.Web");
+        placement.SkipReason.ShouldBeNull();
     }
 
     [Fact]

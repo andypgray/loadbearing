@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using Shouldly;
 using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -183,24 +182,6 @@ internal static class McpChildHarness
         return new ChildConversation(handshake, answers, stillAlive, diagnostics);
     }
 
-    /// <summary>
-    ///     The text payload of a <c>tools/call</c> response. A JSON-RPC error always fails — the tool never
-    ///     ran — but a tool-level <c>isError</c> does not, because for some callers a refusal <em>is</em> the
-    ///     subject and for others a rule the fixture spec cannot answer is legitimate. Read that flag
-    ///     separately with <see cref="IsToolError" />.
-    /// </summary>
-    internal static string ShouldHaveToolText(string frame, string toolName)
-    {
-        using JsonDocument document = JsonDocument.Parse(frame);
-        document.RootElement.TryGetProperty("error", out JsonElement error)
-            .ShouldBeFalse($"{toolName} returned a JSON-RPC error rather than a tool result: {error}");
-
-        return document.RootElement.GetProperty("result")
-            .GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
-    }
-
     /// <summary>Whether a <c>tools/call</c> response carries a tool-level <c>isError</c>.</summary>
     internal static bool IsToolError(string frame)
     {
@@ -208,21 +189,6 @@ internal static class McpChildHarness
         return document.RootElement.GetProperty("result")
                    .TryGetProperty("isError", out JsonElement flag)
                && flag.ValueKind == JsonValueKind.True;
-    }
-
-    /// <summary>
-    ///     The <c>instructions</c> an <c>initialize</c> response carries — one of the two in-band channels a
-    ///     client actually reads, the other being a tool call's error result.
-    /// </summary>
-    internal static string ShouldHaveInstructions(string handshake)
-    {
-        using JsonDocument document = JsonDocument.Parse(handshake);
-        document.RootElement.TryGetProperty("error", out JsonElement error)
-            .ShouldBeFalse($"the server returned a JSON-RPC error to initialize: {error}");
-
-        return document.RootElement.GetProperty("result")
-            .GetProperty("instructions")
-            .GetString() ?? string.Empty;
     }
 
     /// <summary>Writes one newline-delimited frame to the child's stdin and flushes, leaving the pipe open.</summary>

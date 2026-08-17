@@ -89,11 +89,6 @@ public sealed class PartialLoadWorkspaceE2ETests
     // a refusal that names a symbol the caller never wrote is the failure, not the fix.
     private const string InvariantViolationFragment = "has no C# declaration meaning";
 
-    // The two projects that do load, out of a tree that was never restored. They carry the second cause, so
-    // this fixture is also the only bed where both blocks are composed on a real tree — which is what the
-    // ordering assertions below are for.
-    private static readonly string[] UnrestoredProjects = ["BrokenApp.Core.csproj", "BrokenApp.Web.csproj"];
-
     [Fact]
     public async Task Graph_PartiallyLoadedWorkspace_RefusesNamingTheFailuresRatherThanCrashing()
     {
@@ -118,8 +113,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         graph.Err.ShouldContain("allowWorkspaceDiagnostics");
         // ... and the second cause, which on a survey is the sharper of the two: these projects are all
         // present with all their types, so a reader has nothing to notice as absent.
-        ShouldTellBothCausesLoadFirst(
-            graph,
+        graph.ShouldTellBothCausesLoadFirst(
             "the model is incomplete — 1 project failed to load, so graph cannot survey the codebase:",
             "the model is incomplete — NuGet packages did not resolve for 2 projects, so graph cannot survey "
             + "the codebase: the external references a survey exists to show are exactly what did not resolve:");
@@ -169,7 +163,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult check = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         check.ShouldRefuseWith(CheckGateLine, MissingProject);
-        ShouldTellBothCausesLoadFirst(check, CheckGateLine, CheckRestoreGateLine);
+        check.ShouldTellBothCausesLoadFirst(CheckGateLine, CheckRestoreGateLine);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
         CliResult checkAllowed = await CliRunner.InvokeColdAsync(
@@ -181,7 +175,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult status = await CliRunner.InvokeColdAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         status.ShouldRefuseWith(StatusGateLine, MissingProject);
-        ShouldTellBothCausesLoadFirst(status, StatusGateLine, StatusRestoreGateLine);
+        status.ShouldTellBothCausesLoadFirst(StatusGateLine, StatusRestoreGateLine);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
         CliResult statusAllowed = await CliRunner.InvokeColdAsync(
@@ -223,7 +217,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "baseline", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--init");
 
         baseline.ShouldRefuseWith(BaselineGateLine, MissingProject);
-        ShouldTellBothCausesLoadFirst(baseline, BaselineGateLine, BaselineRestoreGateLine);
+        baseline.ShouldTellBothCausesLoadFirst(BaselineGateLine, BaselineRestoreGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         FilesUnder(workspace)
             .ShouldBe(before);
@@ -242,7 +236,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         render.ShouldRefuseWith(RenderGateLine, MissingProject);
-        ShouldTellBothCausesLoadFirst(render, RenderGateLine, RenderRestoreGateLine);
+        render.ShouldTellBothCausesLoadFirst(RenderGateLine, RenderRestoreGateLine);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
         FilesUnder(workspace)
@@ -329,7 +323,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         // The second cause reaches the agent too, and inline for the same reason as the first: this surface
         // has no stderr, so a block that pointed at warnings above would name nothing reachable.
         refusal.ShouldContain("NuGet packages did not resolve for 2 projects");
-        foreach (string project in UnrestoredProjects) refusal.ShouldContain(project);
+        foreach (string project in PartialLoadRefusalAssertions.UnrestoredProjects) refusal.ShouldContain(project);
         refusal.ShouldNotContain(InvariantViolationFragment);
         // A UserErrorException is expected input, not a bug, so the server logs nothing about it.
         harness.Logs.Warnings.ShouldBeEmpty();
@@ -365,6 +359,42 @@ public sealed class PartialLoadWorkspaceE2ETests
         return workspace;
     }
 
+    // Every file under the solution root, ordered, excluding build output — the "wrote nothing" oracle.
+    private static string[] FilesUnder(TempFixtureWorkspace workspace)
+    {
+        string root = Path.GetDirectoryName(workspace.SolutionPath)!;
+        return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                           && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+}
+
+/// <summary>
+///     The composed-refusal claim this suite makes about a <see cref="CliResult" />, as an extension so the
+///     run under test reads as the subject beside the exit-contract assertions it sits with.
+/// </summary>
+/// <remarks>
+///     <para>
+///         <c>file</c>-scoped rather than added to <see cref="CliResultAssertions" />: it carries this
+///         fixture's own project list, which is evidence about BrokenApp rather than vocabulary about the CLI.
+///         It graduates to the shared file the day a second suite wants it.
+///     </para>
+///     <para>
+///         Deliberately <em>not</em> attributed <c>[ShouldlyMethods]</c>, for the reason given on
+///         <see cref="Zphil.LoadBearing.Tests.Checking.RuleResultAssertions" />.
+///     </para>
+/// </remarks>
+file static class PartialLoadRefusalAssertions
+{
+    /// <summary>
+    ///     The two projects that do load, out of a tree that was never restored. They carry the second cause,
+    ///     so this fixture is also the only bed where both blocks are composed on a real tree — which is what
+    ///     the ordering assertion below is for.
+    /// </summary>
+    internal static readonly string[] UnrestoredProjects = ["BrokenApp.Core.csproj", "BrokenApp.Web.csproj"];
+
     /// <summary>
     ///     Asserts one refusal carries <em>both</em> causes, each naming its own projects, with the load block
     ///     above the restore block.
@@ -375,27 +405,28 @@ public sealed class PartialLoadWorkspaceE2ETests
     ///     the suite composes both blocks over a real tree — the cheaper beds inject one list or the other —
     ///     so this is where the composition is measured rather than assembled.
     /// </remarks>
-    private static void ShouldTellBothCausesLoadFirst(CliResult result, string loadLede, string restoreLede)
+    internal static void ShouldTellBothCausesLoadFirst(
+        this CliResult result, string loadLede, string restoreLede)
     {
         string channel = result.Err;
-        channel.ShouldContain(loadLede);
-        channel.ShouldContain(restoreLede);
-        foreach (string project in UnrestoredProjects) channel.ShouldContain(project);
+        string report = Describe(result);
+
+        channel.ShouldContain(loadLede, report);
+        channel.ShouldContain(restoreLede, report);
+        foreach (string project in UnrestoredProjects) channel.ShouldContain(project, report);
 
         channel.IndexOf(loadLede, StringComparison.Ordinal)
             .ShouldBeLessThan(
                 channel.IndexOf(restoreLede, StringComparison.Ordinal),
-                $"The restore block should follow the load block.{Environment.NewLine}{channel}");
+                $"The restore block should follow the load block.{Environment.NewLine}{report}");
     }
 
-    // Every file under the solution root, ordered, excluding build output — the "wrote nothing" oracle.
-    private static string[] FilesUnder(TempFixtureWorkspace workspace)
+    /// <summary>
+    ///     The exit code and stderr — the channel this assertion reads, and the whole of what the refusal said.
+    /// </summary>
+    private static string Describe(CliResult result)
     {
-        string root = Path.GetDirectoryName(workspace.SolutionPath)!;
-        return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                           && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+        return $"The CLI exited {result.Exit}.{Environment.NewLine}"
+               + $"stderr:{Environment.NewLine}{result.Err.TrimEnd()}";
     }
 }

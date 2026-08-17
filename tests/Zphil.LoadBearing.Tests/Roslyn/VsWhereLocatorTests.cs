@@ -71,8 +71,7 @@ public sealed class VsWhereLocatorTests
 
         IReadOnlyList<VsInstance> instances = VsWhereLocator.ParseInstances(json);
 
-        instances.Count.ShouldBe(1);
-        instances[0]
+        instances.ShouldHaveSingleItem()
             .InstallationPath.ShouldBe(@"C:\VS\Good");
     }
 

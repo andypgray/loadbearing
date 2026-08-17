@@ -108,12 +108,9 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
+        // The subject covers all four handlers, and the single-item claim below is the verb's whole point:
+        // only the handler that holds the failure is in the report.
         result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.Swallower", "Errors.DbError");
-
-        // The subject covers all four handlers, and only the one that holds the failure is in the report — the
-        // verb's whole point, stated as a complete list.
-        result.CatchPairs()
-            .ShouldBe(["App.Swallower -> Errors.DbError"]);
 
         string block = result.HumanBlock();
         block.ShouldContain("App.Swallower catches Errors.DbError");
@@ -133,8 +130,9 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
-        unfiltered.CatchPairs()
-            .ShouldBe([
+        unfiltered.ShouldHaveFailedWithEdges(
+            ViolationKind.Catch,
+            [
                 "App.Rethrower -> Errors.DbError",
                 "App.Swallower -> Errors.DbError",
                 "App.Translator -> Errors.DbError"
@@ -146,8 +144,7 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
-        swallow.CatchPairs()
-            .ShouldBe(["App.Swallower -> Errors.DbError"]);
+        swallow.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Swallower -> Errors.DbError"]);
     }
 
     [Fact]
@@ -244,9 +241,7 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.NotLast -> Errors.DbError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.NotLast -> Errors.DbError"]);
     }
 
     [Fact]
@@ -261,9 +256,7 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Broad -> System.Exception"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
     }
 
     [Fact]
@@ -279,9 +272,7 @@ public sealed class MustNotSwallowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["N.Worker -> N.AppError"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
     }
 
     [Fact]
@@ -344,9 +335,7 @@ public sealed class MustNotSwallowVerbTests
                     .Because("a handler that holds a failure and continues hides it"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.CatchPairs()
-            .ShouldBe(["App.Handler -> Errors.BErr"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.BErr"]);
         result.ShouldHaveGrandfathered(1);
     }
 

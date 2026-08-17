@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
@@ -46,10 +45,10 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.InjectionPairs()
-            .ShouldBe(
-                ["App.Consumer -> App.IBar", "App.Consumer -> App.Bar"], true);
+        // Spelled interface-then-implementation, which is how the registration reads rather than how the
+        // report orders it — the comparison is unordered, so the literal is free to stay legible.
+        result.ShouldHaveFailedWithEdges(
+            ViolationKind.Injection, ["App.Consumer -> App.IBar", "App.Consumer -> App.Bar"]);
     }
 
     [Fact]
@@ -87,11 +86,10 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.InjectionPairs()
-            .ShouldBe(
-                ["App.Consumer -> App.ISingletonDep", "App.Consumer -> App.IScopedDep", "App.Consumer -> App.ITransientDep"],
-                true);
+        // Spelled in the canonical lifetime order the rule is about, not in report order; unordered comparison.
+        result.ShouldHaveFailedWithEdges(
+            ViolationKind.Injection,
+            ["App.Consumer -> App.ISingletonDep", "App.Consumer -> App.IScopedDep", "App.Consumer -> App.ITransientDep"]);
     }
 
     [Fact]
@@ -123,9 +121,7 @@ public sealed class RegisteredNounMembershipTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.InjectionPairs()
-            .ShouldBe(["App.Consumer -> System.IDisposable"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.Consumer -> System.IDisposable"]);
     }
 
     [Fact]

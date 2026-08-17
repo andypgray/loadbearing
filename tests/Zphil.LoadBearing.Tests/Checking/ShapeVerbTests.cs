@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
@@ -46,8 +45,7 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects()
-            .ShouldBe(["App.Naming.Bar"]);
+        result.ShouldHaveFailedWithSubjects(["App.Naming.Bar"]);
     }
 
     [Fact]
@@ -59,8 +57,7 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects()
-            .ShouldBe(["App.Naming.OrderController"]);
+        result.ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -88,8 +85,7 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects()
-            .ShouldBe(["App.Bad.Widget2"]);
+        result.ShouldHaveFailedWithSubjects(["App.Bad.Widget2"]);
     }
 
     [Fact]
@@ -109,8 +105,7 @@ public sealed class ShapeVerbTests
                         .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Naming.OrderController"]);
+            .ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -124,8 +119,7 @@ public sealed class ShapeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShapeSubjects()
-            .ShouldBe(["App.Naming.OrderController"]);
+        result.ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
 
     [Fact]
@@ -169,8 +163,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Open").MustBeSealed())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.OpenThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.OpenThing"]);
     }
 
     [Fact]
@@ -188,8 +181,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Open").MustBeStatic())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.OpenThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.OpenThing"]);
     }
 
     [Fact]
@@ -207,8 +199,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Sealed").MustBeAbstract())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.SealedThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.SealedThing"]);
     }
 
     [Fact]
@@ -226,8 +217,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Internal").MustBePublic())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.InternalThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.InternalThing"]);
     }
 
     [Fact]
@@ -245,8 +235,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Public").MustBeInternal())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.PublicThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.PublicThing"]);
     }
 
     [Fact]
@@ -259,16 +248,14 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.WithPrefix("Static").MustBeSealed())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.StaticThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.StaticThing"]);
 
         Checker.Run(Shape, arch =>
                 arch.Rule("shape/abstract")
                     .Enforce(arch.Types.WithPrefix("Static").MustBeAbstract())
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Shape.StaticThing"]);
+            .ShouldHaveFailedWithSubjects(["App.Shape.StaticThing"]);
     }
 
     [Fact]
@@ -287,8 +274,7 @@ public sealed class ShapeVerbTests
                     .Enforce(arch.Types.InNamespace("App.Events.*").Must(t => t.IsRecord, "be a record"))
                     .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["App.Events.OrderHandler"]);
+            .ShouldHaveFailedWithSubjects(["App.Events.OrderHandler"]);
     }
 
     [Fact]

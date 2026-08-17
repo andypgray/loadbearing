@@ -180,7 +180,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         ReferenceEdge edge = model.Edge("N.User", "N.Config");
-        edge.Sites.Count.ShouldBe(1);
+        edge.Sites.ShouldHaveSingleItem();
         edge.Lines()
             .ShouldBe([3]);
     }
@@ -371,7 +371,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.C", "N.Dep")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -429,12 +429,10 @@ public sealed class CodebaseExtractorEdgeTests
 
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
 
-        model.Edges.Count(e => e.Source.FullName == "P.B" && e.Target.FullName == "P.A")
-            .ShouldBe(1);
-        model.Types.Count(t => t.FullName == "P.A")
-            .ShouldBe(1);
+        model.Edges.ShouldContain(e => e.Source.FullName == "P.B" && e.Target.FullName == "P.A", expectedCount: 1);
+        model.Types.ShouldContain(t => t.FullName == "P.A", expectedCount: 1);
         model.Edge("P.B", "P.A")
-            .Sites.Count.ShouldBe(1);
+            .Sites.ShouldHaveSingleItem();
     }
 
     [Fact]

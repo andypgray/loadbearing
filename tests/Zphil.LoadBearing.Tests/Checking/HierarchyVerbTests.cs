@@ -74,8 +74,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement(typeof(IThing)))
                 .Because("b"))
             .Single();
-        failing.ShapeSubjects()
-            .ShouldBe([$"{T}Gizmo"]);
+        failing.ShouldHaveFailedWithSubjects([$"{T}Gizmo"]);
     }
 
     [Fact]
@@ -91,8 +90,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom(typeof(ThingBase)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}FreeType"]);
+            .ShouldHaveFailedWithSubjects([$"{T}FreeType"]);
     }
 
     [Fact]
@@ -108,8 +106,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith(typeof(MarkAttribute)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Plain"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Plain"]);
     }
 
     // ── negative twins: red where the positive matches an anchor, green on the inverse (GRAMMAR §5.3) ──
@@ -121,8 +118,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement(typeof(IThing)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Widget"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement(typeof(IThing)))
@@ -138,8 +134,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom(typeof(ThingBase)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}SubType"]);
+            .ShouldHaveFailedWithSubjects([$"{T}SubType"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom(typeof(ThingBase)))
@@ -155,8 +150,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith(typeof(MarkAttribute)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Tagged"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Tagged"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith(typeof(MarkAttribute)))
@@ -175,8 +169,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<Order>)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}OrderHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<Order>)))
@@ -193,15 +186,13 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<>)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}OrderHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<>)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}TextHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}TextHandler"]);
     }
 
     // ── matcher parity over the transitive/substitution/declared-only fixture (GRAMMAR §5.2, negated) ──
@@ -215,8 +206,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement(typeof(IThing)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}WidgetChild"]);
+            .ShouldHaveFailedWithSubjects([$"{T}WidgetChild"]);
     }
 
     [Fact]
@@ -228,8 +218,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement(typeof(IHandler<Order>)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}SubstHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}SubstHandler"]);
     }
 
     [Fact]
@@ -241,8 +230,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("AttrBase").MustNotBeAttributedWith(typeof(MarkAttribute)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}AttrBase"]);
+            .ShouldHaveFailedWithSubjects([$"{T}AttrBase"]);
 
         Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("AttrDerived").MustNotBeAttributedWith(typeof(MarkAttribute)))
@@ -277,8 +265,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith($"{T}MarkAttribute"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Plain"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Plain"]);
     }
 
     [Fact]
@@ -288,8 +275,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith($"{T}MarkAttribute"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Tagged"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Tagged"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith($"{T}MarkAttribute"))
@@ -331,8 +317,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<T>"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}TaggedInt"]);
+            .ShouldHaveFailedWithSubjects([$"{T}TaggedInt"]);
 
         Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<System.Int32>"))
@@ -351,8 +336,7 @@ public sealed class HierarchyVerbTests
                     .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}TaggedPlain"]);
+            .ShouldHaveFailedWithSubjects([$"{T}TaggedPlain"]);
 
         Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Untagged")
@@ -412,8 +396,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement($"{T}IThing"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Gizmo"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Gizmo"]);
     }
 
     [Fact]
@@ -423,8 +406,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement($"{T}IThing"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Widget"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing"))
@@ -446,8 +428,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom($"{T}ThingBase"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}FreeType"]);
+            .ShouldHaveFailedWithSubjects([$"{T}FreeType"]);
     }
 
     [Fact]
@@ -457,8 +438,7 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom($"{T}ThingBase"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}SubType"]);
+            .ShouldHaveFailedWithSubjects([$"{T}SubType"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom($"{T}ThingBase"))
@@ -476,15 +456,13 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}Widget"]);
+            .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}OrderHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
         Checker.Run(Model, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
@@ -504,15 +482,13 @@ public sealed class HierarchyVerbTests
                 .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement($"{T}IThing"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}WidgetChild"]);
+            .ShouldHaveFailedWithSubjects([$"{T}WidgetChild"]);
 
         Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
                 .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement($"{T}IHandler<T>"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe([$"{T}SubstHandler"]);
+            .ShouldHaveFailedWithSubjects([$"{T}SubstHandler"]);
     }
 
     // ── external anchors (GRAMMAR §5.2): the shallow hierarchy external types carry is a fact about the
@@ -537,6 +513,8 @@ public sealed class HierarchyVerbTests
                 .Because("b");
         });
 
+        // Both arms read raw rather than stated through ShouldHaveFailedWithSubjects: the claim below is that
+        // two selections agree, and only a value the row holds can be compared against another one.
         IReadOnlyList<string> typed = report.ForRule("h/typed")
             .ShapeSubjects();
         IReadOnlyList<string> stringed = report.ForRule("h/string")

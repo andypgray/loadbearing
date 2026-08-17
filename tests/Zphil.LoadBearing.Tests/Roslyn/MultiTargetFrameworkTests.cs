@@ -120,8 +120,8 @@ public sealed class MultiTargetFrameworkTests
                     .Enforce(arch.Project(Core).MustHavePrefix("Zzz"))
                     .Because("b"))
             .Single();
-        failing.ShapeSubjects()
-            .ShouldContain(Widget);
+        // Exhaustive, which is what proves the project rule reaches the framework-exclusive type too.
+        failing.ShouldHaveFailedWithSubjects(["MultiTfm.Core.ModernOnly", Widget]);
 
         // And a rule that must hold, over the same subject: the selection is non-empty and behaves.
         Checker.Run(model, arch =>

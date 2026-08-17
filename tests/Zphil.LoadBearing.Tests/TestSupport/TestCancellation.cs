@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// <remarks>
 ///     Imported project-wide by <c>GlobalUsings.cs</c>, so <c>Ct</c> resolves bare in every test file and
 ///     this type's name is spelled exactly once. It holds one member for that reason: a
-///     <c>using static</c> imports everything a type exposes, so anything added beside <see cref="Ct" />
+///     <c>using static</c> imports everything a type exposes, so anything added beside <c>Ct</c>
 ///     would arrive unannounced in all of them.
 /// </remarks>
 internal static class TestCancellation

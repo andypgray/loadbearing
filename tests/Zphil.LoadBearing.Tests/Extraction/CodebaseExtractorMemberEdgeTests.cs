@@ -45,7 +45,7 @@ public sealed class CodebaseExtractorMemberEdgeTests
 
         // The read and the write fold to the SAME property symbol — one P: edge, never M:get_P/M:set_P.
         model.MemberEdges("N.User")
-            .Count.ShouldBe(1);
+            .ShouldHaveSingleItem();
         MemberEdge edge = model.MemberEdge("N.User", "P:N.Model.P");
         edge.Member.Kind.ShouldBe(MemberKind.Property);
         edge.Lines()

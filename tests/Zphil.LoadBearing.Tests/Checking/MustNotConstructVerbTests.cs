@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -121,9 +120,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ConstructionPairs()
-            .ShouldBe(["App.WidgetFactory -> Widgets.Widget"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Construction, ["App.WidgetFactory -> Widgets.Widget"]);
     }
 
     [Fact]
@@ -152,9 +149,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("resolve via DI"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ConstructionPairs()
-            .ShouldBe(["App.WidgetFactory -> Widgets.Gadget"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Construction, ["App.WidgetFactory -> Widgets.Gadget"]);
         result.ShouldHaveGrandfathered(1);
     }
 

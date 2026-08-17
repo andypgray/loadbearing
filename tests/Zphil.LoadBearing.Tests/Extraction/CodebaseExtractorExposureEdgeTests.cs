@@ -390,7 +390,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // The two parts each contribute one exposing member, unioned under the one (source, exposed) edge with
         // two deduped sites.
         model.ExposureEdges("N.C")
-            .Count.ShouldBe(1);
+            .ShouldHaveSingleItem();
         model.ExposureEdge("N.C", "N.Gadget")
             .Sites.Count.ShouldBe(2);
     }

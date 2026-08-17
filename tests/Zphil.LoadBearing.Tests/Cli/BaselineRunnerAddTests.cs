@@ -163,8 +163,8 @@ public sealed class BaselineRunnerAddTests : IDisposable
         CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);
         CheckReport report = ArchChecker.Check(model, codebase, BaselineIndex.Empty);
         report.Single()
-            .CatchPairs()
-            .ShouldBe(["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"], true);
+            .ShouldHaveFailedWithEdges(
+                ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"]);
         string path = Path.Combine(_temp.Path, "catch.json");
         File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
 
@@ -194,9 +194,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         // added edge and leaves ImportHandler's identical-looking catch — a distinct identity — red.
         RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path))
             .Single();
-        ratcheted.ShouldHaveFailed();
-        ratcheted.CatchPairs()
-            .ShouldBe(["App.ImportHandler -> Errors.DbError"]);
+        ratcheted.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError"]);
         ratcheted.ShouldHaveGrandfathered(1);
     }
 }

@@ -143,9 +143,9 @@ public sealed class RuleQuotesTests
         IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.IndexBullets([card]);
 
         // Assert: the trailing help bullet carries no id and contributes nothing.
-        bullets.Count.ShouldBe(1);
-        bullets["layering/domain-independent"]
-            .ShouldHaveSingleItem()
+        KeyValuePair<string, IReadOnlyList<string>> bullet = bullets.ShouldHaveSingleItem();
+        bullet.Key.ShouldBe("layering/domain-independent");
+        bullet.Value.ShouldHaveSingleItem()
             .ShouldStartWith("The Domain layer must not reference the Web layer.");
     }
 

@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -24,8 +23,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
                 .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotImplement("MyApp.Web.IHandler<T>"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["MyApp.Web.InvoiceCreatedHandler"]);
+            .ShouldHaveFailedWithSubjects(["MyApp.Web.InvoiceCreatedHandler"]);
 
         // HomeController does not implement IHandler — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
@@ -43,8 +41,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
                 .Enforce(arch.Types.WithPrefix("OrderRuleViolation").MustNotDeriveFrom(typeof(Exception)))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["MyApp.Domain.OrderRuleViolation"]);
+            .ShouldHaveFailedWithSubjects(["MyApp.Domain.OrderRuleViolation"]);
 
         // OrderApproval derives from no BCL exception — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
@@ -62,8 +59,7 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
                 .Enforce(arch.Types.WithPrefix("HomeController").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
                 .Because("b"))
             .Single()
-            .ShapeSubjects()
-            .ShouldBe(["MyApp.Web.HomeController"]);
+            .ShouldHaveFailedWithSubjects(["MyApp.Web.HomeController"]);
 
         // InvoiceCreatedHandler carries no attribute — the ban silently passes.
         Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")

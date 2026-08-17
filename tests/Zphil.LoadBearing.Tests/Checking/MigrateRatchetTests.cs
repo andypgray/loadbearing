@@ -57,7 +57,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.ShouldHaveFailed();
-        result.Violations.Count.ShouldBe(1);
+        result.Violations.ShouldHaveSingleItem();
         result.Grandfathered.ShouldBeEmpty();
         result.BaselineCaptured.ShouldBeTrue();
     }
@@ -82,9 +82,7 @@ public sealed class MigrateRatchetTests
         RuleResult result = Checker.Run(source, index, NoDataAccess)
             .Single();
 
-        result.ShouldHaveFailed();
-        result.ReferencePairs()
-            .ShouldBe(["App.Web.OldController -> App.Data.Cache"]);
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Web.OldController -> App.Data.Cache"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -152,7 +150,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.ShouldHaveFailed();
-        result.Violations.Count.ShouldBe(1);
+        result.Violations.ShouldHaveSingleItem();
         result.BaselineCaptured.ShouldBeFalse();
     }
 
