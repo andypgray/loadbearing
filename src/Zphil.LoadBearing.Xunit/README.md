@@ -64,7 +64,7 @@ A `.slnf` solution path checks the projects the filter selects plus everything t
 which can be fewer than the solution declares. Rule cases still report: a narrowed universe is
 a smaller true answer, and every verdict reached is real. What cannot pass is the completeness
 claim: `Workspace_LoadedCompletely` reports as skipped, naming the declared projects the run
-never checked, rather than pass under a name the filtered run cannot vouch for. Point
+never checked, rather than let a subset speak for the whole solution. Point
 `SolutionPath` at the solution the filter references to get the whole answer. A filter whose
 selection pulls in every declared project narrows nothing, and the run is indistinguishable
 from one over the solution.

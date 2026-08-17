@@ -16,7 +16,7 @@
              clarity; version + shared metadata come from the repo-root Directory.Build.props. -->
         <PackageId>Zphil.LoadBearing</PackageId>
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <Description>The LoadBearing spec contract: a fluent C# builder and reified rule model for describing .NET architecture — layers, scopes, and rules, each with a posture (Enforce for the law, Migrate for ratcheted tech debt, Quarantine for contained legacy). Architecture spec projects reference this package; checking and rendering come from the loadbearing tool (Zphil.LoadBearing.Cli) or the xUnit adapter (Zphil.LoadBearing.Xunit). netstandard2.0 with zero dependencies, so a spec project can target anything from net48 up.</Description>
+        <Description>The LoadBearing spec contract: a fluent C# builder and reified rule model for describing .NET architecture — layers, scopes, and rules, each with a posture (Enforce for the law, Migrate for ratcheted debt with a grandfathered baseline, Quarantine for code contained rather than touched). Architecture spec projects reference this package; checking and rendering come from the loadbearing tool (Zphil.LoadBearing.Cli) or the xUnit adapter (Zphil.LoadBearing.Xunit). netstandard2.0 with zero dependencies, so a spec project can target anything from net48 up.</Description>
         <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;tech-debt;legacy;csharp;dotnet</PackageTags>
     </PropertyGroup>
 

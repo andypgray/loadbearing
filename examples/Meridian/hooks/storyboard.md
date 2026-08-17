@@ -1,13 +1,12 @@
 # Agent-loop storyboard: the rule that corrects the agent
 
-This is the script for the hero demo behind LoadBearing's thesis: a coding agent, working a
-routine task, writes the pattern Meridian is retiring, and the architecture rule reaches it at
-the moment of creation, so the agent self-corrects before the change ever lands.
+A coding agent, working a routine task, writes the pattern Meridian is retiring, and the
+architecture rule reaches it at the moment of creation, so the agent self-corrects before the
+change ever lands. This page walks that loop beat by beat.
 
 Every fenced block below is real captured output from the wrapper in this directory, run against
-Meridian. Nothing here is mocked. A screencast of this scenario is planned but not yet recorded
-(examples open question (c)); until then this page is its shooting script, and the reproduction
-steps make the loop runnable today at the command line.
+Meridian. Nothing here is mocked, and [Reproduce it](#reproduce-it) walks the same loop by hand
+at the command line.
 
 ## The files in this directory
 
@@ -184,16 +183,3 @@ wrapper the way the hook does, install the [global tool](../README.md#run-it-you
 `loadbearing` resolves, then run `sh hooks/arch-hook.sh` (or `arch-hook.ps1`): it runs that same
 check, prints the report and exits 2 on a red rule, and prints nothing and exits 0 once you switch
 to the Beat 4 version. Revert `BookingsController` when you are done so the example tree stays clean.
-
-## For the screencast (when it is recorded)
-
-The scenario above is the storyboard for the deferred screencast. Recording notes, following the
-publicity storyboard convention:
-
-- Three beats on screen: the task, the red block, the green re-check. Let the red report sit long
-  enough to read the four components.
-- Capture a neutral pane. No home-directory path, employer or client name, or notification toast in
-  any frame; the file paths on screen are Meridian's (`src/Meridian.Web/...`), nothing above the
-  repository root. Scrub the last frame too, since a loop returns to it.
-- Keep the tool output verbatim. The value of the demo is that the block is real, so it is captured,
-  not typeset.

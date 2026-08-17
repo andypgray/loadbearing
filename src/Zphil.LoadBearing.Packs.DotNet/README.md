@@ -1,8 +1,8 @@
 # Zphil.LoadBearing.Packs.DotNet
 
-A rule pack: nine canonical .NET rules as an ordinary class library, so a spec that wants them
-does not write them again. There is no plugin host, no manifest, and no discovery. You reference
-it and call the methods you want.
+`Zphil.LoadBearing.Packs.DotNet` is a rule pack: nine canonical .NET rules as an ordinary class
+library, so a spec that wants them does not write them again. There is no plugin host, no
+manifest, and no discovery. You reference the project and call the methods you want.
 
 This project is not published. It ships inside this repository as a working example and as the
 pack three of the repository's own specs consume.
@@ -59,18 +59,18 @@ posture, string? fix = null)`; three of them take one extra `Selection` naming a
 
 ## What the pack owns, and what you own
 
-**The pack owns `Because`.** The reason to reuse an `HttpClient` is the same in every codebase, so
+The pack owns `Because`. The reason to reuse an `HttpClient` is the same in every codebase, so
 it ships with the rule, citation URL and all, and you cannot override it. If a rule's rationale is
 genuinely different for you, that is a signal the rule is yours to write rather than take.
 
-**You own the posture.** `PackPosture.Enforce` for law, `PackPosture.Migrate("<what the code does
+You own the posture. `PackPosture.Enforce` for law, `PackPosture.Migrate("<what the code does
 today>")` for a ratchet against a baseline. The same rule is `Enforce` in a codebase that already
 keeps it and `Migrate` in one working it off; the pack has never seen your code and does not
 guess. Baseline paths stay conventional, so the pack never names a path.
 
-**You own the selections.** Which types the rule governs, and which seam is exempt.
+You own the selections: which types the rule governs, and which seam is exempt.
 
-**You may override `Fix`.** Remediation names local types, and the pack's generic hint cannot.
+You may override `Fix`. Remediation names local types, and the pack's generic hint cannot.
 Pass it as the last argument, not as a `.Fix(...)` trailer: pack methods return `void`, so exactly
 one `Because` and one `Fix` reach the rule and a second trailer will not compile.
 

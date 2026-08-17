@@ -1,10 +1,9 @@
 # The agent loop, closed by a hook
 
-This directory exists for [storyboard.md](storyboard.md): the script for the demo behind
-LoadBearing's thesis, in which a coding agent working a routine task writes the pattern
-Meridian is retiring, and the architecture rule reaches it at the moment of creation. The
-storyboard walks that loop beat by beat with real captured output, from the task brief to
-the red check to the self-correction that lands instead.
+This directory exists for [storyboard.md](storyboard.md): a coding agent working a routine
+task writes the pattern Meridian is retiring, and the architecture rule reaches it at the
+moment of creation. The storyboard walks that loop beat by beat with real captured output,
+from the task brief to the red check to the self-correction that lands instead.
 
 Around it sit the pieces that make the loop run: two wrapper scripts, one PowerShell and
 one POSIX, that map a red check to the exit code a Claude Code hook treats as blocking, and

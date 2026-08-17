@@ -4,7 +4,7 @@ Nine rules hold a four-layer clean architecture, every one `Enforce`, zero basel
 
 ## The subsystem
 
-Four layers run one direction. `Domain` holds the quote and rate-card model; `Application` holds the use cases and the ports they depend on; `Infrastructure` implements those ports; `Api` is the composition root and the HTTP surface. Nine rules hold that shape, every one `Enforce`, zero baselines: the subsystem was born conforming.
+Four layers run one direction. `Domain` holds the quote and rate-card model; `Application` holds the use cases and the ports they depend on; `Infrastructure` implements those ports; `Api` is the composition root and the HTTP surface. The rules hold that shape; the subsystem was born conforming, so there is nothing to ratchet.
 
 Writes go through a command bus that opens a unit of work only around a handler marked `[Transactional]`. `RequestQuoteHandler` writes twice: it reserves a quote number, then persists the quote. An unmarked command handler would commit each write on its own, so a failure between the two burns a quote number with no quote to show for it.
 
