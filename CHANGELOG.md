@@ -94,6 +94,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot carry a type across a namespace. Rebuilding the spec project is the entire fix, and the failure the
   host reports already names the member that could not be found and what to do about it.
 
+- **Breaking: `RuleBaseline.Contains` is gone — `TryMatch` answers the same question and hands back the
+  entry.** Membership was answerable two ways, and only one of them could return what it had matched. The
+  shorter probe gave a bare yes, and with it went the `because` a baseline stores beside a grandfathered
+  entry — the attribution a report carries so that a ratcheted violation says why it is being carried.
+  Nothing at the call site looked lossy, which is what makes this worth removing rather than documenting:
+  the cheaper-looking of two spellings was the one that dropped evidence. `TryMatch(entry, out _)` is what
+  `Contains(entry)` was, so a caller that genuinely wanted the boolean changes one word. This is public
+  surface on the contract package every spec project references, which is why it is called out as a break
+  at all; it is not front-door surface, and a spec author never had reason to name it — a baseline is read
+  by the host, not written into the sentences an author writes.
+
 - **The check report now leads with its verdict.** `check --json` and `arch_check` serialize `summary` and
   every trust stamp — `modelIncomplete`, `failedProjects`, `restoreFailedProjects`, `uncheckedProjects` —
   above `rules`, which used to carry all of them below it. A reader with a response budget cuts at the last

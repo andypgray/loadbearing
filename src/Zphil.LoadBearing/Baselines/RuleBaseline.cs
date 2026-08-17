@@ -37,12 +37,6 @@ public sealed class RuleBaseline
     /// <summary>The number of grandfathered entries in this section.</summary>
     public int Count => Entries.Count;
 
-    /// <summary>Whether <paramref name="entry" /> is grandfathered by this section.</summary>
-    public bool Contains(BaselineEntry entry)
-    {
-        return _lookup.ContainsKey(Guard.NotNull(entry, nameof(entry)));
-    }
-
     /// <summary>
     ///     Looks up the <em>stored</em> entry whose identity equals <paramref name="identity" />,
     ///     recovering its <see cref="BaselineEntry.Because" /> attribution (which identity equality
