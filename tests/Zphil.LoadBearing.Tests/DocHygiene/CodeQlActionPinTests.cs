@@ -59,9 +59,9 @@ public sealed class CodeQlActionPinTests
             .ToList();
 
         // Assert
-        split.ShouldBeEmpty(
+        split.ShouldReportNothing(
             "Workflow(s) pin github/codeql-action steps to more than one revision, which fails the "
-            + $"analysis outright:\n{string.Join("\n", split)}");
+            + "analysis outright");
     }
 
     [Fact]

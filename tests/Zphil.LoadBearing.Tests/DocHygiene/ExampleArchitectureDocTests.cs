@@ -108,9 +108,9 @@ public sealed class ExampleArchitectureDocTests
             "Zphil.LoadBearing",
             $"{relativePath} draws this repository's own projects, which {solutionFileName} does not "
             + "declare; the survey fence's declared-members default has regressed.");
-        missing.ShouldBeEmpty(
+        missing.ShouldReportNothing(
             $"{relativePath} omits project(s) {solutionFileName} declares, so the survey fence narrowed "
-            + $"further than declared membership (spec {specName}):\n{string.Join("\n", missing)}");
+            + $"further than declared membership (spec {specName})");
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public sealed class ExampleArchitectureDocTests
             .ToList();
 
         // Assert
-        uncovered.ShouldBeEmpty($"Example drawing(s) outside the pinned set:\n{string.Join("\n", uncovered)}");
+        uncovered.ShouldReportNothing("Example drawing(s) outside the pinned set");
     }
 
     // The project names an .slnx declares, by csproj basename, which is what the survey labels a node

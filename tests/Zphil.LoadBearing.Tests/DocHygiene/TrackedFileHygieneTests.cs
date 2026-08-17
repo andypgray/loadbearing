@@ -69,7 +69,7 @@ public sealed class TrackedFileHygieneTests
     ];
 
     private static readonly Regex[] EnvironmentPatterns =
-        [..DocHygieneTests.PrivateEnvironmentPatterns, ..LocalPrivatePatterns.Patterns];
+        [.. DocHygieneTests.PrivateEnvironmentPatterns, .. LocalPrivatePatterns.Patterns];
 
     private static readonly Regex PlainPath = new("^[A-Za-z0-9._/-]+$");
 
@@ -101,8 +101,7 @@ public sealed class TrackedFileHygieneTests
         List<string> findings = ScanSources(DocHygieneTests.InternalReferencePatterns);
 
         // Assert
-        findings.ShouldBeEmpty(
-            $"Comments name internal working references:\n{string.Join("\n", findings)}");
+        findings.ShouldReportNothing("Comments name internal working references");
     }
 
     [Fact]
@@ -112,8 +111,7 @@ public sealed class TrackedFileHygieneTests
         List<string> findings = ScanSources(EnvironmentPatterns);
 
         // Assert
-        findings.ShouldBeEmpty(
-            $"Comments name a private development environment:\n{string.Join("\n", findings)}");
+        findings.ShouldReportNothing("Comments name a private development environment");
     }
 
     [Fact]
@@ -123,8 +121,7 @@ public sealed class TrackedFileHygieneTests
         List<string> findings = ScanSourcesWithoutDirectives(DocHygieneTests.DevToolingPatterns);
 
         // Assert
-        findings.ShouldBeEmpty(
-            $"Comments narrate the development tooling:\n{string.Join("\n", findings)}");
+        findings.ShouldReportNothing("Comments narrate the development tooling");
     }
 
     [Fact]
@@ -134,8 +131,7 @@ public sealed class TrackedFileHygieneTests
         List<string> findings = ScanNonSource(DocHygieneTests.InternalReferencePatterns);
 
         // Assert
-        findings.ShouldBeEmpty(
-            $"Published text names internal working references:\n{string.Join("\n", findings)}");
+        findings.ShouldReportNothing("Published text names internal working references");
     }
 
     [Fact]
@@ -145,8 +141,7 @@ public sealed class TrackedFileHygieneTests
         List<string> findings = ScanNonSource(EnvironmentPatterns);
 
         // Assert
-        findings.ShouldBeEmpty(
-            $"Published text names a private development environment:\n{string.Join("\n", findings)}");
+        findings.ShouldReportNothing("Published text names a private development environment");
     }
 
     [Fact]
@@ -176,15 +171,14 @@ public sealed class TrackedFileHygieneTests
         // Assert: the inventory is read from line-oriented output, so a path git would quote or one
         // holding a newline would come back mangled. Pinning the character set means the day such a
         // path appears the gate says so, rather than silently dropping the file.
-        quoted.ShouldBeEmpty(
-            $"Tracked path(s) need quoting, so the inventory cannot be read line by line:\n{string.Join("\n", quoted)}");
+        quoted.ShouldReportNothing("Tracked path(s) need quoting, so the inventory cannot be read line by line");
     }
 
     [Fact]
     public void NonSourceExemptions_AllStillMatchAHit()
     {
         // Arrange
-        Regex[] everyPattern = [..DocHygieneTests.InternalReferencePatterns, ..EnvironmentPatterns];
+        Regex[] everyPattern = [.. DocHygieneTests.InternalReferencePatterns, .. EnvironmentPatterns];
         List<string> dead = new();
 
         // Act
@@ -202,7 +196,7 @@ public sealed class TrackedFileHygieneTests
         }
 
         // Assert: an exemption whose hit has gone forgives nothing and hides the next one.
-        dead.ShouldBeEmpty($"These exemptions no longer match anything and should be removed:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These exemptions no longer match anything and should be removed");
     }
 
     [Fact]
@@ -229,7 +223,7 @@ public sealed class TrackedFileHygieneTests
 
         // Assert: same reason as the arm above — a stale exemption forgives nothing and hides the
         // next mention to land in that file.
-        dead.ShouldBeEmpty($"These exemptions no longer match anything and should be removed:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These exemptions no longer match anything and should be removed");
     }
 
     private static (string Path, string Text)[] ReadAll(

@@ -48,9 +48,9 @@ public sealed class CheckoutCredentialPersistenceTests
             .ToList();
 
         // Assert
-        persisting.ShouldBeEmpty(
+        persisting.ShouldReportNothing(
             "actions/checkout step(s) omit 'persist-credentials: false', leaving the job's GITHUB_TOKEN "
-            + $"in .git/config for every step that follows:\n{string.Join("\n", persisting)}");
+            + "in .git/config for every step that follows");
     }
 
     [Fact]

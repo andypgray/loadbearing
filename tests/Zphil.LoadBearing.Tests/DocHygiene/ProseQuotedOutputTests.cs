@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -81,8 +80,7 @@ public sealed class ProseQuotedOutputTests
                 drift.Add($"{doc} no longer quotes '{summary}'.");
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"These registered inline summaries have been reworded:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("These registered inline summaries have been reworded");
     }
 
     [Fact]
@@ -99,8 +97,7 @@ public sealed class ProseQuotedOutputTests
                 fenced.Add($"{doc} now quotes '{summary}' inside a fence; remove the exemption and let the fenced gates hold it.");
 
         // Assert
-        fenced.ShouldBeEmpty(
-            $"These inline summaries are no longer inline:\n{string.Join("\n", fenced)}");
+        fenced.ShouldReportNothing("These inline summaries are no longer inline");
     }
 
     [Fact]
@@ -121,8 +118,7 @@ public sealed class ProseQuotedOutputTests
         }
 
         // Assert
-        unregistered.ShouldBeEmpty(
-            $"These tracked docs quote a check summary where no fence scanner can see it:\n{string.Join("\n", unregistered)}");
+        unregistered.ShouldReportNothing("These tracked docs quote a check summary where no fence scanner can see it");
     }
 
     [Fact]
@@ -145,8 +141,7 @@ public sealed class ProseQuotedOutputTests
         }
 
         // Assert
-        wrong.ShouldBeEmpty(
-            $"These quoted check summaries do not add up:\n{string.Join("\n", wrong)}");
+        wrong.ShouldReportNothing("These quoted check summaries do not add up");
     }
 
     [Fact]
@@ -175,8 +170,7 @@ public sealed class ProseQuotedOutputTests
         }
 
         // Assert
-        dead.ShouldBeEmpty(
-            $"These permanently-exempt captures no longer match what the exemption describes:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These permanently-exempt captures no longer match what the exemption describes");
     }
 
     private static IEnumerable<(string Text, int Number)> Lines(string doc)

@@ -171,6 +171,19 @@ public sealed class QuoteSyncTests
             "examples/Meridian/arch/Meridian.ArchSpec/Meridian.ArchSpec.csproj")
     ];
 
+    /// <summary>
+    ///     The registered docs and their fences. Unlike its siblings this gate scans fences rather than a
+    ///     quote type — its unit of registration is a marker inside a doc, not the doc — so it takes the
+    ///     harness for the emptiness guard and the one scan per doc, and states no registry sweep.
+    /// </summary>
+    private static readonly DocGate<IReadOnlyList<string>> Gate = new(
+        Excerpts.Select(static excerpt => excerpt.Doc)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray(),
+        static doc => SourceAnchors.Fences(RepoRoot.ReadText(doc)),
+        quotes: "fenced code blocks",
+        scanner: "fence scanner");
+
     [Fact]
     public void ExcerptRegistry_IsNotEmpty()
     {
@@ -188,9 +201,9 @@ public sealed class QuoteSyncTests
         // Act: every excerpt's marker — including the demonstration-exempt one — must pick out exactly one
         // fence of its own doc; zero means the excerpt was dropped or reworded, more than one means it is
         // no longer distinctive.
-        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(excerpt => excerpt.Doc))
+        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(static excerpt => excerpt.Doc))
         {
-            IReadOnlyList<IReadOnlyList<string>> fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
+            IReadOnlyList<IReadOnlyList<string>> fences = Gate.Scan(group.Key);
             foreach (Excerpt excerpt in group)
             {
                 int matches = fences.Count(fence => ContainsMarker(fence, excerpt.Marker));
@@ -199,8 +212,7 @@ public sealed class QuoteSyncTests
         }
 
         // Assert
-        failures.ShouldBeEmpty(
-            $"Registered excerpt markers no longer pick out exactly one fence each:\n{string.Join("\n", failures)}");
+        failures.ShouldReportNothing("Registered excerpt markers no longer pick out exactly one fence each");
     }
 
     [Fact]
@@ -212,9 +224,9 @@ public sealed class QuoteSyncTests
 
         // Act: every non-blank line of a synced excerpt's fence must appear, in order, as a verbatim
         // substring of its source's lines; a miss means the quote has drifted from the committed file.
-        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(excerpt => excerpt.Doc))
+        foreach (IGrouping<string, Excerpt> group in Excerpts.GroupBy(static excerpt => excerpt.Doc))
         {
-            IReadOnlyList<IReadOnlyList<string>> fences = SourceAnchors.Fences(RepoRoot.ReadText(group.Key));
+            IReadOnlyList<IReadOnlyList<string>> fences = Gate.Scan(group.Key);
             foreach (Excerpt excerpt in group)
             {
                 if (excerpt.Source is null) continue;
@@ -234,27 +246,16 @@ public sealed class QuoteSyncTests
         }
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"Quoted excerpts no longer match their committed sources:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("Quoted excerpts no longer match their committed sources");
     }
 
     [Fact]
     public void EveryRegisteredDoc_YieldsAtLeastOneFence()
     {
-        // Arrange
-        List<string> empty = new();
-
-        // Act: guard against the fence scanner silently matching nothing if a doc's quoting style changes
-        // out from under this gate. Every registered doc is reported, not just the first to come up empty.
-        foreach (string doc in Excerpts.Select(excerpt => excerpt.Doc)
-                     .Distinct())
-            if (SourceAnchors.Fences(RepoRoot.ReadText(doc))
-                    .Count == 0)
-                empty.Add(doc);
-
-        // Assert
-        empty.ShouldBeEmpty(
-            $"These docs yielded no fenced code blocks; the fence scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
+        // Act & Assert: guard against the fence scanner silently matching nothing if a doc's quoting style
+        // changes out from under this gate. Every registered doc is reported, not just the first to come
+        // up empty.
+        Gate.ShouldYieldFromEveryRegisteredDoc();
     }
 
     private static bool ContainsMarker(IReadOnlyList<string> fence, string marker)

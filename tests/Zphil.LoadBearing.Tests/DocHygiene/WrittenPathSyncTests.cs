@@ -33,6 +33,12 @@ public sealed class WrittenPathSyncTests
         ("examples/Meridian.Operations/README.md", "examples/Meridian.Operations")
     ];
 
+    private static readonly DocGate<WrittenPath> Gate = new(
+        WriteDocs.Select(static entry => entry.Doc)
+            .ToArray(),
+        ExtractDoc,
+        quotes: "write reports");
+
     [Fact]
     public void QuotedWritePaths_NameTrackedFiles()
     {
@@ -42,32 +48,21 @@ public sealed class WrittenPathSyncTests
 
         // Act: every quoted path, resolved against its own example root, must be a file git tracks.
         foreach ((string doc, string exampleRoot) in WriteDocs)
-        foreach (WrittenPath written in ExtractDoc(doc))
+        foreach (WrittenPath written in Gate.Scan(doc))
         {
             WrittenPaths.PathResult result = WrittenPaths.Classify(written, exampleRoot, tracked);
             if (result.Bucket != WrittenPaths.PathBucket.Matched) stranded.Add(result.Failure!);
         }
 
         // Assert
-        stranded.ShouldBeEmpty(
-            $"Quoted write reports name files this repository no longer publishes:\n{string.Join("\n", stranded)}");
+        stranded.ShouldReportNothing("Quoted write reports name files this repository no longer publishes");
     }
 
     [Fact]
     public void EveryWritePathDoc_YieldsAtLeastOnePath()
     {
-        // Arrange
-        List<string> empty = new();
-
-        // Act: guard against the scanner silently matching nothing if a doc's quoting style changes.
-        foreach ((string doc, string _) in WriteDocs)
-            if (ExtractDoc(doc)
-                    .Count == 0)
-                empty.Add(doc);
-
-        // Assert
-        empty.ShouldBeEmpty(
-            $"These docs yielded no write reports; the scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
+        // Act & Assert: guard against the scanner silently matching nothing if a doc's quoting style changes.
+        Gate.ShouldYieldFromEveryRegisteredDoc();
     }
 
     [Fact]
@@ -76,8 +71,8 @@ public sealed class WrittenPathSyncTests
         // Arrange & Act: the corpus must keep exercising both alternatives, or half the pattern is dead
         // and nobody finds out until the day a doc quotes the other one.
         HashSet<string> labels = WriteDocs
-            .SelectMany(entry => ExtractDoc(entry.Doc))
-            .Select(written => written.Label)
+            .SelectMany(entry => Gate.Scan(entry.Doc))
+            .Select(static written => written.Label)
             .ToHashSet(StringComparer.Ordinal);
 
         // Assert
@@ -87,27 +82,12 @@ public sealed class WrittenPathSyncTests
     [Fact]
     public void EveryTrackedDocQuotingWritePaths_IsRegistered()
     {
-        // Arrange: the registry above is hand-written, so the failure it cannot see is a doc that quotes
-        // a write report and was never added to it — a whole walkthrough silently outside the gate. Git
-        // decides the scope, as it does for every hygiene gate here.
-        HashSet<string> registered = WriteDocs
-            .Select(entry => entry.Doc)
-            .ToHashSet(StringComparer.Ordinal);
-        List<string> unregistered = new();
-
-        // Act
-        foreach (string path in TrackedFiles.Markdown)
-        {
-            if (registered.Contains(path)) continue;
-
-            int written = ExtractDoc(path)
-                .Count;
-            if (written > 0) unregistered.Add($"{path} quotes {written} write report line(s) but is not registered.");
-        }
-
-        // Assert
-        unregistered.ShouldBeEmpty(
-            $"These tracked docs quote write reports that nothing holds to the tracked file set:\n{string.Join("\n", unregistered)}");
+        // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
+        // quotes a write report and was never added to it — a whole walkthrough silently outside the gate.
+        Gate.ShouldFindNothingOutsideTheRegistry(
+            counted: "write report line(s)",
+            swept: "write reports",
+            authority: "the tracked file set");
     }
 
     private static IReadOnlyList<WrittenPath> ExtractDoc(string doc)

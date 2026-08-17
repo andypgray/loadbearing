@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -62,6 +61,12 @@ public sealed class GrandfatheredCountSyncTests
         // this repository's own baselines.
         (RootReadme, SelfRoot)
     ];
+
+    private static readonly DocGate<GrandfatheredCount> Gate = new(
+        CountDocs.Select(static entry => entry.Doc)
+            .ToArray(),
+        ExtractDoc,
+        quotes: "grandfathered counts");
 
     /// <summary>
     ///     The prose recaps of those counts. A sentence is registered as the fragment it is written in
@@ -204,7 +209,7 @@ public sealed class GrandfatheredCountSyncTests
         // Act: every fenced count, resolved against its own root's baselines, must equal the entries the
         // run it was captured from would have matched.
         foreach ((string doc, string exampleRoot) in CountDocs)
-        foreach (GrandfatheredCount count in ExtractDoc(doc))
+        foreach (GrandfatheredCount count in Gate.Scan(doc))
         {
             GrandfatheredCounts.CountResult result =
                 GrandfatheredCounts.Classify(count, exampleRoot, TrackedFiles.All, read);
@@ -212,51 +217,25 @@ public sealed class GrandfatheredCountSyncTests
         }
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"Quoted grandfathered counts no longer match the baselines they came from:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("Quoted grandfathered counts no longer match the baselines they came from");
     }
 
     [Fact]
     public void EveryCountDoc_YieldsAtLeastOneCount()
     {
-        // Arrange
-        List<string> empty = new();
-
-        // Act: guard against the scanner silently matching nothing if a doc's quoting style changes.
-        foreach ((string doc, string _) in CountDocs)
-            if (ExtractDoc(doc)
-                    .Count == 0)
-                empty.Add(doc);
-
-        // Assert
-        empty.ShouldBeEmpty(
-            $"These docs yielded no grandfathered counts; the scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
+        // Act & Assert: guard against the scanner silently matching nothing if a doc's quoting style changes.
+        Gate.ShouldYieldFromEveryRegisteredDoc();
     }
 
     [Fact]
     public void EveryTrackedDocQuotingFencedCounts_IsRegistered()
     {
-        // Arrange: the registry above is hand-written, so the failure it cannot see is a doc that quotes
-        // a count and was never added to it — a whole walkthrough silently outside the gate. Git decides
-        // the scope, as it does for every hygiene gate here.
-        HashSet<string> registered = CountDocs
-            .Select(entry => entry.Doc)
-            .ToHashSet(StringComparer.Ordinal);
-        List<string> unregistered = new();
-
-        // Act
-        foreach (string path in TrackedFiles.Markdown)
-        {
-            if (registered.Contains(path)) continue;
-
-            int counts = ExtractDoc(path)
-                .Count;
-            if (counts > 0) unregistered.Add($"{path} quotes {counts} grandfathered count(s) but is not registered.");
-        }
-
-        // Assert
-        unregistered.ShouldBeEmpty(
-            $"These tracked docs quote grandfathered counts that nothing holds to a baseline:\n{string.Join("\n", unregistered)}");
+        // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
+        // quotes a count and was never added to it — a whole walkthrough silently outside the gate.
+        Gate.ShouldFindNothingOutsideTheRegistry(
+            counted: "grandfathered count(s)",
+            swept: "grandfathered counts",
+            authority: "a baseline");
     }
 
     [Fact]
@@ -282,8 +261,7 @@ public sealed class GrandfatheredCountSyncTests
         }
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"Prose recaps of grandfathered counts no longer match the baselines they came from:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("Prose recaps of grandfathered counts no longer match the baselines they came from");
     }
 
     [Fact]
@@ -307,8 +285,7 @@ public sealed class GrandfatheredCountSyncTests
         }
 
         // Assert
-        uncovered.ShouldBeEmpty(
-            $"These prose sites state a grandfathered count that nothing holds to a baseline:\n{string.Join("\n", uncovered)}");
+        uncovered.ShouldReportNothing("These prose sites state a grandfathered count that nothing holds to a baseline");
     }
 
     [Fact]
@@ -327,7 +304,7 @@ public sealed class GrandfatheredCountSyncTests
                 dead.Add($"exemption {doc} -> '{marker}' matches no swept line.");
 
         // Assert
-        dead.ShouldBeEmpty($"These sweep exemptions no longer correspond to any prose and should be removed:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These sweep exemptions no longer correspond to any prose and should be removed");
     }
 
     [Fact]
@@ -357,8 +334,7 @@ public sealed class GrandfatheredCountSyncTests
         }
 
         // Assert
-        failures.ShouldBeEmpty(
-            $"Draft-era counts no longer diverge from the baselines they precede:\n{string.Join("\n", failures)}");
+        failures.ShouldReportNothing("Draft-era counts no longer diverge from the baselines they precede");
     }
 
     private static IReadOnlyList<GrandfatheredCount> ExtractDoc(string doc)

@@ -55,6 +55,13 @@ public sealed class ReadmeAnchorGateTests
         (RootReadme, SelfRoot)
     ];
 
+    private static readonly DocGate<SourceAnchor> Gate = new(
+        AnchorDocs.Select(static entry => entry.Doc)
+            .ToArray(),
+        ExtractDoc,
+        quotes: "anchors",
+        docs: "anchor docs");
+
     /// <summary>
     ///     Landmark pins for anchors the content bucket cannot verify: the reported line holds no copy of
     ///     the derived token, so the committed line the anchor is keyed to is pinned directly. Each entry
@@ -152,7 +159,7 @@ public sealed class ReadmeAnchorGateTests
 
         // Act: every anchor that is not a documented demonstration must resolve against committed source.
         foreach ((string doc, string exampleRoot) in AnchorDocs)
-        foreach (SourceAnchor anchor in ExtractDoc(doc))
+        foreach (SourceAnchor anchor in Gate.Scan(doc))
         {
             if (DemonstrationAnchors.Contains((doc, anchor.File, anchor.Line))) continue;
 
@@ -161,8 +168,7 @@ public sealed class ReadmeAnchorGateTests
         }
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"Quoted source anchors no longer match their committed source:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("Quoted source anchors no longer match their committed source");
     }
 
     [Fact]
@@ -175,7 +181,7 @@ public sealed class ReadmeAnchorGateTests
         // Act: a demonstration anchor quotes a hypothetical edit's output, so it must not match committed
         // source; if one starts matching, that code has landed and the anchor should become a real one.
         foreach ((string doc, string exampleRoot) in AnchorDocs)
-        foreach (SourceAnchor anchor in ExtractDoc(doc))
+        foreach (SourceAnchor anchor in Gate.Scan(doc))
         {
             if (!DemonstrationAnchors.Contains((doc, anchor.File, anchor.Line))) continue;
 
@@ -184,25 +190,26 @@ public sealed class ReadmeAnchorGateTests
         }
 
         // Assert
-        promoted.ShouldBeEmpty(
-            $"Demonstration anchors now match committed source:\n{string.Join("\n", promoted)}");
+        promoted.ShouldReportNothing("Demonstration anchors now match committed source");
     }
 
     [Fact]
     public void EachAnchorDoc_YieldsAtLeastOneAnchor()
     {
-        // Arrange
-        List<string> empty = new();
+        // Act & Assert: guard against the scanner silently matching nothing if a doc's quoting style changes.
+        Gate.ShouldYieldFromEveryRegisteredDoc();
+    }
 
-        // Act: guard against the scanner silently matching nothing if a doc's quoting style changes.
-        foreach ((string doc, string _) in AnchorDocs)
-            if (ExtractDoc(doc)
-                    .Count == 0)
-                empty.Add(doc);
-
-        // Assert
-        empty.ShouldBeEmpty(
-            $"These anchor docs yielded no anchors; the scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
+    [Fact]
+    public void EveryTrackedDocQuotingAnchors_IsRegistered()
+    {
+        // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
+        // quotes anchors and was never added to it — a whole walkthrough silently outside the gate, which
+        // is the one fact this gate shipped without while its three siblings all stated it.
+        Gate.ShouldFindNothingOutsideTheRegistry(
+            counted: "source anchor(s)",
+            swept: "source anchors",
+            authority: "their committed source");
     }
 
     [Fact]
@@ -212,7 +219,7 @@ public sealed class ReadmeAnchorGateTests
         HashSet<(string ExampleRoot, string File, int Line)> byKey = new();
         HashSet<(string Doc, string File, int Line)> byDoc = new();
         foreach ((string doc, string exampleRoot) in AnchorDocs)
-        foreach (SourceAnchor anchor in ExtractDoc(doc))
+        foreach (SourceAnchor anchor in Gate.Scan(doc))
         {
             byKey.Add((exampleRoot, anchor.File, anchor.Line));
             byDoc.Add((doc, anchor.File, anchor.Line));
@@ -229,7 +236,7 @@ public sealed class ReadmeAnchorGateTests
                 dead.Add($"demonstration {demonstration.Doc} -> {demonstration.File}:{demonstration.Line} matches no extracted anchor.");
 
         // Assert
-        dead.ShouldBeEmpty($"These pin entries no longer correspond to any anchor and should be removed:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These pin entries no longer correspond to any anchor and should be removed");
     }
 
     [Fact]

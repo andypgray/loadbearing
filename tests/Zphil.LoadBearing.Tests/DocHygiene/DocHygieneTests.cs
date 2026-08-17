@@ -58,7 +58,7 @@ public sealed class DocHygieneTests
 
     private static readonly string[] VoiceDocs =
     [
-        ..BudgetDocs,
+        .. BudgetDocs,
         "GRAMMAR.md",
         "CHANGELOG.md",
         "AGENTS.md"
@@ -160,7 +160,7 @@ public sealed class DocHygieneTests
         IReadOnlyList<string> hits = DocProse.FindForbidden(content, InternalReferencePatterns);
 
         // Assert
-        hits.ShouldBeEmpty($"{relativePath} names internal working references:\n{string.Join("\n", hits)}");
+        hits.ShouldReportNothing($"{relativePath} names internal working references");
     }
 
     [Theory]
@@ -174,7 +174,7 @@ public sealed class DocHygieneTests
         IReadOnlyList<string> hits = DocProse.FindForbidden(content, HouseVoicePatterns);
 
         // Assert
-        hits.ShouldBeEmpty($"{relativePath} uses off-voice wording:\n{string.Join("\n", hits)}");
+        hits.ShouldReportNothing($"{relativePath} uses off-voice wording");
     }
 
     [Theory]
@@ -224,8 +224,7 @@ public sealed class DocHygieneTests
         }
 
         // Assert
-        uncovered.ShouldBeEmpty(
-            $"Reader doc(s) under examples/ or src/ are outside the budgeted set:\n{string.Join("\n", uncovered)}");
+        uncovered.ShouldReportNothing("Reader doc(s) under examples/ or src/ are outside the budgeted set");
     }
 
     [Fact]
@@ -240,8 +239,7 @@ public sealed class DocHygieneTests
             .ToList();
 
         // Assert
-        uncovered.ShouldBeEmpty(
-            $"Tracked reader doc(s) are outside the budgeted set:\n{string.Join("\n", uncovered)}");
+        uncovered.ShouldReportNothing("Tracked reader doc(s) are outside the budgeted set");
     }
 
     private static TheoryData<string> ToTheoryData(string[] docs)

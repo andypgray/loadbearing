@@ -1,4 +1,3 @@
-using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -73,6 +72,12 @@ public sealed class RuleQuoteSyncTests
             "Types in `Classic.*` must not reference types in `System.Data.*`.")
     ];
 
+    private static readonly DocGate<RuleQuote> Gate = new(
+        QuoteDocs.Select(static entry => entry.Doc)
+            .ToArray(),
+        ExtractDoc,
+        quotes: "rule quotes");
+
     [Fact]
     public void QuotedRuleSentences_MatchTheirRenderedBullet()
     {
@@ -84,7 +89,7 @@ public sealed class RuleQuoteSyncTests
         foreach ((string doc, string exampleRoot) in QuoteDocs)
         {
             IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = BulletsFor(exampleRoot);
-            foreach (RuleQuote quote in ExtractDoc(doc))
+            foreach (RuleQuote quote in Gate.Scan(doc))
             {
                 if (IsNarrative(quote)) continue;
 
@@ -94,8 +99,7 @@ public sealed class RuleQuoteSyncTests
         }
 
         // Assert
-        drift.ShouldBeEmpty(
-            $"Quoted rule sentences no longer match what the spec renders:\n{string.Join("\n", drift)}");
+        drift.ShouldReportNothing("Quoted rule sentences no longer match what the spec renders");
     }
 
     [Fact]
@@ -109,7 +113,7 @@ public sealed class RuleQuoteSyncTests
         foreach ((string doc, string exampleRoot) in QuoteDocs)
         {
             IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = BulletsFor(exampleRoot);
-            foreach (RuleQuote quote in ExtractDoc(doc))
+            foreach (RuleQuote quote in Gate.Scan(doc))
             {
                 if (!IsNarrative(quote)) continue;
 
@@ -119,25 +123,14 @@ public sealed class RuleQuoteSyncTests
         }
 
         // Assert
-        promoted.ShouldBeEmpty(
-            $"Narrative rule quotes now match what the spec renders:\n{string.Join("\n", promoted)}");
+        promoted.ShouldReportNothing("Narrative rule quotes now match what the spec renders");
     }
 
     [Fact]
     public void EveryRuleQuoteDoc_YieldsAtLeastOneQuote()
     {
-        // Arrange
-        List<string> empty = new();
-
-        // Act: guard against the scanner silently matching nothing if a doc's quoting style changes.
-        foreach ((string doc, string _) in QuoteDocs)
-            if (ExtractDoc(doc)
-                    .Count == 0)
-                empty.Add(doc);
-
-        // Assert
-        empty.ShouldBeEmpty(
-            $"These docs yielded no rule quotes; the scanner may be silently matching nothing:\n{string.Join("\n", empty)}");
+        // Act & Assert: guard against the scanner silently matching nothing if a doc's quoting style changes.
+        Gate.ShouldYieldFromEveryRegisteredDoc();
     }
 
     [Fact]
@@ -146,7 +139,7 @@ public sealed class RuleQuoteSyncTests
         // Arrange
         HashSet<(string Doc, string RuleId, string Sentence)> extracted = new();
         foreach ((string doc, string _) in QuoteDocs)
-        foreach (RuleQuote quote in ExtractDoc(doc))
+        foreach (RuleQuote quote in Gate.Scan(doc))
             extracted.Add((quote.Doc, quote.RuleId, quote.Sentence));
 
         // Act
@@ -156,35 +149,18 @@ public sealed class RuleQuoteSyncTests
                 dead.Add($"narrative {narrative.Doc} -> {narrative.RuleId} ('{narrative.Sentence}') matches no extracted quote.");
 
         // Assert
-        dead.ShouldBeEmpty($"These narrative entries no longer correspond to any quote and should be removed:\n{string.Join("\n", dead)}");
+        dead.ShouldReportNothing("These narrative entries no longer correspond to any quote and should be removed");
     }
 
     [Fact]
     public void EveryTrackedDocQuotingRules_IsRegistered()
     {
-        // Arrange: the registry above is hand-written, so the failure it cannot see is a doc that quotes
-        // rules and was never added to it — a whole example silently outside the gate. Git decides the
-        // scope, as it does for every hygiene gate here, and the sweep runs over every tracked markdown
-        // file rather than only the ones under examples/: the root README is already registered, so
-        // restricting it to examples/ would leave that doc's siblings unguarded for no reason.
-        HashSet<string> registered = QuoteDocs
-            .Select(entry => entry.Doc)
-            .ToHashSet(StringComparer.Ordinal);
-        List<string> unregistered = new();
-
-        // Act
-        foreach (string path in TrackedFiles.Markdown)
-        {
-            if (registered.Contains(path)) continue;
-
-            int quotes = ExtractDoc(path)
-                .Count;
-            if (quotes > 0) unregistered.Add($"{path} quotes {quotes} rule sentence(s) but is not registered.");
-        }
-
-        // Assert
-        unregistered.ShouldBeEmpty(
-            $"These tracked docs quote rule sentences that nothing holds to the spec:\n{string.Join("\n", unregistered)}");
+        // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
+        // quotes rules and was never added to it — a whole example silently outside the gate.
+        Gate.ShouldFindNothingOutsideTheRegistry(
+            counted: "rule sentence(s)",
+            swept: "rule sentences",
+            authority: "the spec");
     }
 
     private static bool IsNarrative(RuleQuote quote)

@@ -64,10 +64,8 @@ public sealed class DependabotCoverageTests
             .ToList();
 
         // Assert
-        unlisted.ShouldBeEmpty(
-            $"Project(s) carry a committed {LockFileName} that {DependabotConfig} does not update:\n{string.Join("\n", unlisted)}");
-        unlocked.ShouldBeEmpty(
-            $"{DependabotConfig} updates director(ies) with no committed {LockFileName}:\n{string.Join("\n", unlocked)}");
+        unlisted.ShouldReportNothing($"Project(s) carry a committed {LockFileName} that {DependabotConfig} does not update");
+        unlocked.ShouldReportNothing($"{DependabotConfig} updates director(ies) with no committed {LockFileName}");
     }
 
     [Fact]
