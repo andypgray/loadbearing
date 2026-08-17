@@ -24,8 +24,6 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 [Collection("Serial")]
 public sealed class GlobalCallToolFilterTests
 {
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task CallTool_UserError_ReturnsErrorResultAndLogsNothing()
     {

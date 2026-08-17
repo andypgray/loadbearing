@@ -27,8 +27,6 @@ public sealed class CheckCacheE2ETests
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     // ── fragment cache: hit / disabled / partial / shared store ───────────────────────────────────────────
 
     [Fact]

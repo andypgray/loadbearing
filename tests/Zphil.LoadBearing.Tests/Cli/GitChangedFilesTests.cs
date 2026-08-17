@@ -61,6 +61,6 @@ public sealed class GitChangedFilesTests
     {
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
 
-        await Should.ThrowAsync<UserErrorException>(() => GitChangedFiles.ResolveAsync("HEAD", temp.Path, TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<UserErrorException>(() => GitChangedFiles.ResolveAsync("HEAD", temp.Path, Ct));
     }
 }

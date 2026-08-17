@@ -123,8 +123,6 @@ public sealed class FilteredSolutionE2ETests
     private static string FilterDirectory =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilteredSolutions");
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Check_NarrowingFilter_StampsTheNarrowingAboveTheVerdict()
     {

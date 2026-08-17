@@ -89,8 +89,6 @@ public sealed class GraphCommandTests
           MyApp.Web -> System.Threading: 2
         """;
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Graph_MyAppFixture_PrintsSurveyAndExitsZero()
     {

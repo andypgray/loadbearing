@@ -76,8 +76,6 @@ public sealed class WarmWorkspaceMcpTests
                                                         }
                                                         """;
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task ArchCheck_SourceFileEditedOnDisk_ReflectsEditAndMatchesColdCli()
     {

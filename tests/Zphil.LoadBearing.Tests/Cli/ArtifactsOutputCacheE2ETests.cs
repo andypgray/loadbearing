@@ -43,8 +43,6 @@ public sealed class ArtifactsOutputCacheE2ETests
 {
     private const string Web = "MyApp.Web";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task ArtifactsLayout_AssetsFileChangedBetweenRuns_IsSeen()
     {

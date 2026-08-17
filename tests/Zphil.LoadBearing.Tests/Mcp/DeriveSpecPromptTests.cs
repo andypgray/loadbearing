@@ -19,8 +19,6 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// </summary>
 public sealed class DeriveSpecPromptTests
 {
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
     private static McpServerBinding Binding => new(null, null, Directory.GetCurrentDirectory());

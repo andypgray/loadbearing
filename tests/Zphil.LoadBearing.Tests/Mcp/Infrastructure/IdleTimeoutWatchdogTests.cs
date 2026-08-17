@@ -183,7 +183,7 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
         // poll-loop test. A tighter budget flakes under coverage instrumentation / a
         // saturated thread pool, where the Task.Run + PeriodicTimer first tick can be
         // delayed seconds past the 50 ms timeout; the loop still fires, just not within 2 s.
-        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)
+        exited.Wait(TimeSpan.FromSeconds(10), Ct)
             .ShouldBeTrue();
     }
 }

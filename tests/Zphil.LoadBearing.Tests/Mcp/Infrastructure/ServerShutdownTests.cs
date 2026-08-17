@@ -225,7 +225,7 @@ public sealed class ServerShutdownTests : IDisposable
         exited.Wait(TimeSpan.FromSeconds(5))
             .ShouldBeTrue();
         disposerRan.ShouldBeTrue();
-        await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(5), Ct);
     }
 
     [Fact]

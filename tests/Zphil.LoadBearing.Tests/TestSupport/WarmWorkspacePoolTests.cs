@@ -32,8 +32,6 @@ public sealed class WarmWorkspacePoolTests
 
     private const string AddedType = "WarmPoolProbeType";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task LeaseReset_AfterASessionFoldedASameLengthEdit_ServesPristineWithoutReloading()
     {

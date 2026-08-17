@@ -125,8 +125,6 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "package references that resolved to nothing produce no edges, so a rule about a package is "
         + "measured against a model that never saw it:";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     // ── Workspace-load diagnostics fail check closed ──────────────────────────────────────────────────
 
     [Fact]

@@ -30,8 +30,6 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
 {
     private const string LoadDiagnostic = "Project 'MyApp.Broken' failed to load: simulated workspace-load failure.";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Explain_WorkspacePathWithLoadFailure_RendersTheDiagnosticsAndStillAnswers()
     {

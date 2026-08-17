@@ -58,8 +58,6 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
     private static readonly string[] ConventionalBaselineFile = ["arch", "baselines", "data-access", "no-inline-sql.json"];
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task CheckThenBaselineInit_WorkspaceLoadDiagnostic_BothFailClosedAndNothingIsWritten()
     {

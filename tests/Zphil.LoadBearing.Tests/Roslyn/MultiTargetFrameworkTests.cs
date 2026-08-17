@@ -40,8 +40,6 @@ public sealed class MultiTargetFrameworkTests
     /// </summary>
     private static readonly Lazy<Task<CodebaseModel>> MultiTfmCodebase = new(ExtractAsync);
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task OpenSolutionAsync_MultiTargetedProject_YieldsRoslynTfmDiscriminatedNames()
     {

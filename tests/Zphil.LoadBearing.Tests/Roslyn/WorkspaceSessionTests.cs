@@ -33,18 +33,17 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_DocumentEditedOnDisk_ReturnsRefreshedSnapshotWithEdit()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, Ct);
         string moneyFile = shared.PathOf("MyApp.Domain", "Money.cs");
 
         // Act — edit the file on disk, then re-acquire.
         FixtureEdits.EditOnDisk(moneyFile, content => content + "\n// external-edit-marker\n");
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — a fresh snapshot whose document reflects the edit.
         after.ShouldNotBeSameAs(before);
-        string text = await DocumentTextAsync(after, moneyFile, ct);
+        string text = await DocumentTextAsync(after, moneyFile);
         text.ShouldContain("external-edit-marker");
 
         // …folded in place, not reloaded: the generation holds, and only the edited file's project bumps —
@@ -63,19 +62,18 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     {
         // Arrange — load, then promote every document past the racy window with one warmup sweep, so the
         // measured sweep is a pure O(stat) no-op (the steady-state case).
-        CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        WorkspaceSnapshot loaded = await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        WorkspaceSnapshot loaded = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         // Best-effort: a file that cannot be re-stamped stays racy and simply re-reads, which the warmup
         // below absorbs into the baseline.
         FixtureEdits.BackdateAllDocuments(loaded);
-        await session.GetCurrentAsync(fixture.SolutionPath, ct); // warmup: content-verifies + promotes
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct); // warmup: content-verifies + promotes
         long readsAfterWarmup = session.SweepContentReads;
 
         // Act — sweep twice more with disk untouched.
-        WorkspaceSnapshot again = await session.GetCurrentAsync(fixture.SolutionPath, ct);
-        WorkspaceSnapshot againTwice = await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        WorkspaceSnapshot again = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot againTwice = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Assert — same snapshot instance throughout, and zero additional content reads.
         again.ShouldBeSameAs(loaded);
@@ -92,14 +90,13 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_MtimeBumpedIdenticalContent_ReturnsSameSnapshot()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, Ct);
         string moneyFile = shared.PathOf("MyApp.Domain", "Money.cs");
 
         // Act — bump the mtime without changing the bytes (an IDE-style touch).
         File.SetLastWriteTimeUtc(moneyFile, DateTime.UtcNow.AddSeconds(2));
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — content-verified equal, so no new snapshot is minted.
         after.ShouldBeSameAs(before);
@@ -109,15 +106,14 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_KnownDocumentDeleted_TriggersSingleFullReload()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
         string deleted = shared.PathOf("MyApp.Domain", "PricingStrategy.cs");
 
         // Act
         File.Delete(deleted);
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — exactly one reload, and the deleted document is gone from the fresh solution.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
@@ -130,19 +126,18 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     {
         // Arrange — the cone-scan case that exceeds a pure mtime sweep: an SDK-glob add touches no
         // MSBuild file, so only a directory scan can see it.
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
         string newFile = shared.PathOf("MyApp.Domain", "NewlyAddedType.cs");
 
         // Act
-        await File.WriteAllTextAsync(newFile, "namespace MyApp.Domain;\npublic class NewlyAddedType { }\n", ct);
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await File.WriteAllTextAsync(newFile, "namespace MyApp.Domain;\npublic class NewlyAddedType { }\n", Ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — one reload, and the new type is present in the extracted model.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
-        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: ct);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: Ct);
         model.Types.ShouldContain(t => t.FullName == "MyApp.Domain.NewlyAddedType");
     }
 
@@ -152,21 +147,20 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
         // disk but is never compiled. Before the fix the cone scan compared the disk against the COMPILED
         // document set, so this stray read as a perpetual add and forced a full reload on every single call.
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
         File.Exists(shared.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"))
             .ShouldBeTrue();
 
         // Act — two more reconcile sweeps with disk untouched.
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — the stray is recorded cone membership, so it never trips the scan (zero reloads) and never
         // enters the extracted model — the two halves of "a removed file is not a compiled document".
         (session.FullReloadCount - reloadsBefore).ShouldBe(0);
-        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: ct);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: Ct);
         model.Types.ShouldNotContain(t => t.FullName == "MyApp.Domain.Snippets.ExcludedScratchTypeMustNeverAppearInTheModel");
     }
 
@@ -174,14 +168,13 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_CsprojTouched_TriggersReload()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
 
         // Act — a structural touch on a project file.
         File.SetLastWriteTimeUtc(shared.PathOf("MyApp.Domain", "MyApp.Domain.csproj"), DateTime.UtcNow.AddSeconds(2));
-        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, ct);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — a structural reload, which bumps the generation so the store flushes and re-walks all.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
@@ -192,15 +185,14 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_ProjectAssetsTouched_TriggersReload()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
 
         // Act — a restore signal: obj/project.assets.json changes.
         File.SetLastWriteTimeUtc(
             shared.PathOf("MyApp.Domain", "obj", "project.assets.json"), DateTime.UtcNow.AddSeconds(2));
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
@@ -214,9 +206,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // existence-flip rule by ExtractionCacheStoreTests.ReadAndValidate_NewStructuralProbeFileAppearsInAncestor_ReturnsMiss.
 
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         WorkspaceSession session = shared.Session;
-        await session.GetCurrentAsync(shared.SolutionPath, ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
         string propsFile = Path.Combine(Path.GetDirectoryName(shared.SolutionPath)!, "Directory.Build.props");
 
@@ -224,8 +215,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         {
             // Act — a props file that did not exist at load appears in the solution directory (a probe-chain
             // ancestor recorded as absent).
-            await File.WriteAllTextAsync(propsFile, "<Project />\n", ct);
-            await session.GetCurrentAsync(shared.SolutionPath, ct);
+            await File.WriteAllTextAsync(propsFile, "<Project />\n", Ct);
+            await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
             // Assert
             (session.FullReloadCount - reloadsBefore).ShouldBe(1);
@@ -242,13 +233,12 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_TenConcurrentCallers_AllSucceedWithSingleLoad()
     {
         // Arrange — fire the very first (loading) call ten times at once.
-        CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
 
         // Act
         Task<WorkspaceSnapshot>[] calls = Enumerable.Range(0, 10)
-            .Select(_ => session.GetCurrentAsync(fixture.SolutionPath, ct))
+            .Select(_ => session.GetCurrentAsync(fixture.SolutionPath, Ct))
             .ToArray();
         WorkspaceSnapshot[] snapshots = await Task.WhenAll(calls);
 
@@ -261,24 +251,22 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task DisposeAsync_CalledTwice_IsIdempotent()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();
         var session = new WorkspaceSession();
-        await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Act
         await session.DisposeAsync();
 
         // Assert — a second dispose is a no-op, and post-dispose access is a clean ObjectDisposedException.
         await Should.NotThrowAsync(async () => await session.DisposeAsync());
-        await Should.ThrowAsync<ObjectDisposedException>(async () => await session.GetCurrentAsync(fixture.SolutionPath, ct));
+        await Should.ThrowAsync<ObjectDisposedException>(async () => await session.GetCurrentAsync(fixture.SolutionPath, Ct));
     }
 
     [Fact]
     public async Task GetCurrentAsync_FailedLoadThenGoodPath_RecoversAndSucceeds()
     {
         // Arrange
-        CancellationToken ct = TestContext.Current.CancellationToken;
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
         string bogusSolution = Path.Combine(Path.GetDirectoryName(fixture.SolutionPath)!, "DoesNotExist.sln");
@@ -287,14 +275,14 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         var threw = false;
         try
         {
-            await session.GetCurrentAsync(bogusSolution, ct);
+            await session.GetCurrentAsync(bogusSolution, Ct);
         }
         catch
         {
             threw = true;
         }
 
-        WorkspaceSnapshot recovered = await session.GetCurrentAsync(fixture.SolutionPath, ct);
+        WorkspaceSnapshot recovered = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Assert
         threw.ShouldBeTrue();
@@ -303,11 +291,11 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<string> DocumentTextAsync(WorkspaceSnapshot snapshot, string path, CancellationToken ct)
+    private static async Task<string> DocumentTextAsync(WorkspaceSnapshot snapshot, string path)
     {
         DocumentId documentId = snapshot.Solution.GetDocumentIdsWithFilePath(Path.GetFullPath(path))
             .First();
-        SourceText text = await snapshot.Solution.GetDocument(documentId)!.GetTextAsync(ct);
+        SourceText text = await snapshot.Solution.GetDocument(documentId)!.GetTextAsync(Ct);
         return text.ToString();
     }
 }

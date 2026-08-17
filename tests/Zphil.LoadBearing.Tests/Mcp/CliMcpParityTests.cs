@@ -93,8 +93,6 @@ public sealed class CliMcpParityTests
         new(() => CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton"));
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task HarnessA_ViolatedSpec_CheckStatusExplain_MatchCli()
     {

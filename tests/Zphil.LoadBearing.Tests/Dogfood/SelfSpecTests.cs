@@ -214,14 +214,12 @@ public sealed class SelfSpecTests
         // Through the warm pool, sharing ArchitectureMd_IsCurrent's load. Unlike that test, the extraction
         // excludes what `render` excludes — the spec project and the plumbing only it references — because
         // here the extraction decides card placement, and a card must land where the command puts it.
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(RepoRoot.Solution, Ct);
         IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution);
         SpecResolution resolution = SpecResolver.Resolve(
             snapshot.Solution, declaredMembers, RepoRoot.ArchSpecCsproj, WorkspaceDiagnostics.None);
         CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks, null,
-            TestContext.Current.CancellationToken);
+            snapshot.Solution, resolution.ExcludeProjectNames, snapshot.TargetFrameworks, null, Ct);
 
         ContextComposition composition = ContextFileComposer.Compose(SelfModel, codebase, RepoRoot.Directory, SpecName);
 
@@ -467,8 +465,7 @@ public sealed class SelfSpecTests
     [Fact]
     public async Task CompilationOutputInfo_CarriesARootedIntermediateAssemblyForEveryCSharpProject()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(
-            RepoRoot.Solution, TestContext.Current.CancellationToken);
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(RepoRoot.Solution, Ct);
 
         List<Project> cSharpProjects = snapshot.Solution.Projects
             .Where(project => project.Language == LanguageNames.CSharp)

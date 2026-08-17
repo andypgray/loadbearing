@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -144,7 +143,7 @@ internal static class McpChildHarness
                                 ?? throw new InvalidOperationException("Failed to start the MCP server child."))
         {
             // Drained from the start so a chatty child cannot fill its stderr pipe and stall.
-            Task<string> errorDrain = server.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+            Task<string> errorDrain = server.StandardError.ReadToEndAsync(Ct);
             try
             {
                 await SendAsync(server, InitializeRequest);
@@ -230,7 +229,7 @@ internal static class McpChildHarness
     internal static async Task SendAsync(Process server, string frame)
     {
         await server.StandardInput.WriteAsync(frame + "\n");
-        await server.StandardInput.FlushAsync(TestContext.Current.CancellationToken);
+        await server.StandardInput.FlushAsync(Ct);
     }
 
     /// <summary>
@@ -278,7 +277,7 @@ internal static class McpChildHarness
     {
         try
         {
-            Task first = await Task.WhenAny(drain, Task.Delay(DrainBudget, TestContext.Current.CancellationToken));
+            Task first = await Task.WhenAny(drain, Task.Delay(DrainBudget, Ct));
             return first == drain ? await drain : "(stderr did not drain)";
         }
         catch (Exception ex)
@@ -295,7 +294,7 @@ internal static class McpChildHarness
     internal static async Task<string?> ReadLineWithinAsync(StreamReader stdout, TimeSpan budget)
     {
         Task<string?> pending = stdout.ReadLineAsync();
-        Task first = await Task.WhenAny(pending, Task.Delay(budget, TestContext.Current.CancellationToken));
+        Task first = await Task.WhenAny(pending, Task.Delay(budget, Ct));
         return first == pending ? await pending : null;
     }
 

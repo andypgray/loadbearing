@@ -34,8 +34,6 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class CheckCommandTests
 {
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Check_JsonDocumentOverTheBudget_DegradesOneRungAtATime()
     {

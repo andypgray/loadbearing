@@ -52,7 +52,7 @@ public sealed class ParentProcessWatcherTests
             false);
 
         // Assert — synchronous: should already be set, but allow tiny slack.
-        exited.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken)
+        exited.Wait(TimeSpan.FromSeconds(2), Ct)
             .ShouldBeTrue();
     }
 
@@ -73,7 +73,7 @@ public sealed class ParentProcessWatcherTests
             false);
 
         // Assert — the helper exits quickly; allow generous slack for CI/scheduler.
-        exited.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)
+        exited.Wait(TimeSpan.FromSeconds(10), Ct)
             .ShouldBeTrue();
     }
 

@@ -67,8 +67,6 @@ public sealed class NarrowingGateOrderE2ETests
     private static readonly string[] ConventionalBaselineFile =
         ["arch", "baselines", "data-access", "no-inline-sql.json"];
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task BaselineInit_BrokenAndNarrowed_RefusesOnTheGateAndNeverMentionsTheNarrowing()
     {

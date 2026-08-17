@@ -27,8 +27,6 @@ public sealed class SessionFragmentStoreTests
     private const string MultiTfmCore = "MultiTfm.Core";
     private const string MultiTfmWeb = "MultiTfm.Web";
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task GetFragmentsAsync_FirstCallThenSteadyState_ExtractsAllThenReusesAll()
     {

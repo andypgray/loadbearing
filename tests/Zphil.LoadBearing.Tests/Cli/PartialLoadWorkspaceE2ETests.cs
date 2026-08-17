@@ -94,8 +94,6 @@ public sealed class PartialLoadWorkspaceE2ETests
     // ordering assertions below are for.
     private static readonly string[] UnrestoredProjects = ["BrokenApp.Core.csproj", "BrokenApp.Web.csproj"];
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Graph_PartiallyLoadedWorkspace_RefusesNamingTheFailuresRatherThanCrashing()
     {
