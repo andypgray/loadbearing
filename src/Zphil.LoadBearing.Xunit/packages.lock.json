@@ -307,7 +307,7 @@
           "Microsoft.CodeAnalysis": "[5.6.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.6.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.6.0, )",
-          "Zphil.LoadBearing": "[0.4.0, )"
+          "Zphil.LoadBearing": "[0.5.0, )"
         }
       }
     }

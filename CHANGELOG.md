@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-17
+
 ### Added
 
 - **`graph` now says which of the projects it surveys the solution actually declares.** A workspace
@@ -909,7 +911,8 @@ deterministic enforcement and generated AI-agent context.
 - xUnit adapter (`Zphil.LoadBearing.Xunit`): every rule in the spec as an individually named
   xUnit test, failure text identical to the CLI.
 
-[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/andypgray/loadbearing/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/andypgray/loadbearing/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/andypgray/loadbearing/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
 [0.3.0]: https://github.com/andypgray/loadbearing/compare/v0.2.0...v0.3.1
