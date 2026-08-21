@@ -60,6 +60,30 @@ internal static class CheckJsonAssertions
     }
 
     /// <summary>
+    ///     Asserts <paramref name="ruleId" /> reports <paramref name="count" /> in its
+    ///     <c>violationCount</c> — the key a consumer scripts against, present at every grain, so the claim
+    ///     reads the same off a full, overview or skeleton document. Says nothing about status: zero on a
+    ///     passing rule is as much the contract as a red's tally.
+    /// </summary>
+    /// <remarks>
+    ///     Presence is asserted through <c>TryGetProperty</c> rather than read bare, because the key going
+    ///     absent is the exact regression this verb guards — a <see cref="KeyNotFoundException" /> would
+    ///     report it as an error naming neither the rule nor what it did carry.
+    /// </remarks>
+    internal static string ShouldReportViolationCount(this string checkJson, string ruleId, int count)
+    {
+        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        string report = Describe(rule);
+
+        rule.TryGetProperty("violationCount", out JsonElement violationCount)
+            .ShouldBeTrue(report);
+        violationCount.GetInt32()
+            .ShouldBe(count, report);
+
+        return checkJson;
+    }
+
+    /// <summary>
     ///     Asserts the run reached no verdict for <paramref name="ruleId" /> and said why: status
     ///     <c>skipped</c> carrying <paramref name="reason" /> (GRAMMAR §4.1).
     /// </summary>

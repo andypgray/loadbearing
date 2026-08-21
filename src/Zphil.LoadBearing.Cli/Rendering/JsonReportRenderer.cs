@@ -99,10 +99,10 @@ internal static class JsonReportRenderer
             // is narrowed to authored types.
             result.SubjectGeneratedTypes > 0 ? result.SubjectTypes : null,
             result.SubjectGeneratedTypes > 0 ? result.SubjectGeneratedTypes : null,
+            result.Violations.Count,
             elideViolations
                 ? null
                 : result.Violations.Select(v => ToViolation(v, relativizer, grain)).ToList(),
-            elideViolations ? result.Violations.Count : null,
             result.Warnings.Select(w => new WarningJson(w.Kind, w.Message)).ToList());
     }
 
@@ -136,9 +136,9 @@ internal static class JsonReportRenderer
             violation.Subject?.FullName,
             violation.SubjectMember?.SymbolId,
             violation.Detail,
+            violation.Sites.Count,
             elideSites
                 ? null
-                : violation.Sites.Select(s => new SiteJson(relativizer.Relative(s.FilePath), s.Line)).ToList(),
-            elideSites ? violation.Sites.Count : null);
+                : violation.Sites.Select(s => new SiteJson(relativizer.Relative(s.FilePath), s.Line)).ToList());
     }
 }

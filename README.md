@@ -177,6 +177,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, w
     "grandfathered": 2,
     "stale": 0
   },
+  "violationCount": 0,
   "violations": [],
   "warnings": []
 }

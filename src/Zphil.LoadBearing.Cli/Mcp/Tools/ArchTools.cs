@@ -117,12 +117,12 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "and summary cover that subset alone. Matching no rule is an error listing the available IDs.")]
         string? rules = null,
         [Description(
-            "Elide each violation's sites, keeping every rule and every violation and reporting the sites "
-            + "as siteCount. Coarser grain, never a narrower subject.")]
+            "Elide each violation's sites, keeping every rule and every violation; siteCount (always "
+            + "present) still says how many. Coarser grain, never a narrower subject.")]
         bool overview = false,
         [Description(
             "Elide the violations too, keeping every rule with its verdict, prose, baseline and warnings; "
-            + "the elided violations are reported as violationCount. Coarser than overview, still not a "
+            + "violationCount (always present) still says how many. Coarser than overview, still not a "
             + "narrower subject.")]
         bool skeleton = false,
         CancellationToken cancellationToken = default)

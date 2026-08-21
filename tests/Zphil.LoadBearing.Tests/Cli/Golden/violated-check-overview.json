@@ -19,6 +19,7 @@
       "sentence": "The Domain layer must not reference the Web layer.",
       "because": "Domain is UI-agnostic; transaction boundaries live in services.",
       "fix": "Define an abstraction in Domain and implement it in Web.",
+      "violationCount": 2,
       "violations": [
         {
           "kind": "reference",
@@ -41,6 +42,7 @@
       "status": "passed",
       "sentence": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`.",
       "because": "Billing must not reach up into the web layer.",
+      "violationCount": 0,
       "violations": [],
       "warnings": []
     },
@@ -56,6 +58,7 @@
         "grandfathered": 1,
         "stale": 0
       },
+      "violationCount": 1,
       "violations": [
         {
           "kind": "reference",
@@ -78,6 +81,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "memberUse",
@@ -106,6 +110,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "memberShape",
@@ -132,6 +137,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 1,
       "violations": [
         {
           "kind": "construction",
@@ -154,6 +160,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "injection",
@@ -176,6 +183,7 @@
       "status": "passed",
       "sentence": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`.",
       "because": "Nothing should reference the (nonexistent) ghost layer.",
+      "violationCount": 0,
       "violations": [],
       "warnings": [
         {
@@ -190,6 +198,7 @@
       "status": "failed",
       "sentence": "Types in `MyApp.Nowhere.*` must be named `*Service`.",
       "because": "A subject that matches nothing must fail loudly.",
+      "violationCount": 1,
       "violations": [
         {
           "kind": "emptySubject",
@@ -211,6 +220,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "reference",
@@ -234,6 +244,7 @@
       "sentence": "",
       "because": "Replacement scheduled; not worth stabilizing.",
       "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.",
+      "violationCount": 0,
       "violations": [],
       "warnings": []
     },
@@ -249,6 +260,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "catch",
@@ -272,6 +284,7 @@
       "sentence": "The Domain layer must throw only `OrderRuleViolation`.",
       "because": "Domain code signals rule failures with the domain's own exception, not a generic BCL type.",
       "fix": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.",
+      "violationCount": 1,
       "violations": [
         {
           "kind": "throw",
@@ -289,6 +302,7 @@
       "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.",
       "because": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.",
       "fix": "Add a CancellationToken parameter and flow it to the calls you await.",
+      "violationCount": 3,
       "violations": [
         {
           "kind": "memberShape",
@@ -320,6 +334,7 @@
         "grandfathered": 0,
         "stale": 0
       },
+      "violationCount": 2,
       "violations": [
         {
           "kind": "expose",
@@ -343,6 +358,7 @@
       "sentence": "The Web or Domain layers must not catch `Exception` without a `when` filter.",
       "because": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.",
       "fix": "Add a `when` filter naming the exceptions you can handle, or catch those types directly.",
+      "violationCount": 2,
       "violations": [
         {
           "kind": "catch",
@@ -366,6 +382,7 @@
       "sentence": "The Web or Domain layers must not swallow `Exception`.",
       "because": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling.",
       "fix": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle.",
+      "violationCount": 1,
       "violations": [
         {
           "kind": "catch",
@@ -383,6 +400,7 @@
       "sentence": "The Domain layer must not throw `InvalidOperationException`.",
       "because": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
       "fix": "Throw OrderRuleViolation instead of System.InvalidOperationException.",
+      "violationCount": 1,
       "violations": [
         {
           "kind": "throw",

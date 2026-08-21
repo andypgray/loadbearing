@@ -22,8 +22,9 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         <em>subject</em> (which rules are evaluated at all), while <c>--overview</c> and
 ///         <c>--skeleton</c> coarsen the <em>grain</em> (how much of each evaluated rule is written). Every
 ///         rung is a whole verdict over the same rules — which is what makes an over-budget MCP call safe to
-///         degrade automatically — and full grain stamps nothing, so the document a consumer read before the
-///         ladder existed is byte-identical to the one it reads now.
+///         degrade automatically — full grain stamps no <c>grain</c> key, and the per-rule
+///         <c>violationCount</c> and per-violation <c>siteCount</c> ride every rung, so the keys a consumer
+///         scripts against never depend on the grain the report landed on.
 ///     </para>
 /// </summary>
 [Collection("Serial")]
@@ -226,8 +227,8 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_ViolatedSpecJson_StampsNoGrain()
     {
-        // The negative control that keeps the ladder additive: a full report says nothing about grain, so a
-        // consumer reading the document before the ladder existed reads the same bytes after it.
+        // The negative control that keeps the grain stamp meaningful: a full report says nothing about
+        // grain, so a document that names one is always a coarsened one, never the complete report.
         CliResult result = await ViolatedJson.Value;
 
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -243,8 +244,8 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--overview");
 
         // Assert — the whole report at coarser grain: every rule and every violation still here with its
-        // prose and its edge, each violation's sites replaced by their count, and the grain stamped so a
-        // reader knows which document this is.
+        // prose and its edge, each violation's sites elided down to the siteCount that rides every grain,
+        // and the grain stamped so a reader knows which document this is.
         result.ShouldReportViolations();
         result.Out.ShouldMatchGolden("violated-check-overview.json");
     }
@@ -257,8 +258,8 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton");
 
         // Assert — the verdict alone: every rule with its prose, status, baseline and warnings, its
-        // violations replaced by their count. Still a verdict, which is what distinguishes it from status's
-        // burndown over the same rules.
+        // violations elided down to the violationCount that rides every grain. Still a verdict, which is
+        // what distinguishes it from status's burndown over the same rules.
         result.ShouldReportViolations();
         result.Out.ShouldMatchGolden("violated-check-skeleton.json");
     }
@@ -299,6 +300,109 @@ public sealed class CheckCommandE2ETests
         passing.GetProperty("violationCount")
             .GetInt32()
             .ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Check_FullJson_EveryRuleAndEveryViolationCarryTheCountBesideItsExpansion()
+    {
+        // The count is the key a consumer scripts against, so rendering the expansion must never displace
+        // it: at full grain both sit side by side and the count is the array's length — which also keeps
+        // grandfathered violations out of the count exactly as they stay out of the array. Swept over every
+        // rule and every violation so a future grain change cannot drop either count from any of them.
+        CliResult result = await ViolatedJson.Value;
+
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        foreach (JsonElement rule in document.RootElement.GetProperty("rules")
+                     .EnumerateArray())
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            List<string> keys = rule.EnumerateObject()
+                .Select(field => field.Name)
+                .ToList();
+            keys.ShouldContain("violationCount", id);
+            keys.ShouldContain("violations", id);
+            rule.GetProperty("violationCount")
+                .GetInt32()
+                .ShouldBe(rule.GetProperty("violations")
+                    .GetArrayLength(), id);
+
+            foreach (JsonElement violation in rule.GetProperty("violations")
+                         .EnumerateArray())
+            {
+                List<string> violationKeys = violation.EnumerateObject()
+                    .Select(field => field.Name)
+                    .ToList();
+                violationKeys.ShouldContain("siteCount", id);
+                violationKeys.ShouldContain("sites", id);
+                violation.GetProperty("siteCount")
+                    .GetInt32()
+                    .ShouldBe(violation.GetProperty("sites")
+                        .GetArrayLength(), id);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Check_SkeletonJson_EveryRuleKeepsTheCountWhenTheElisionDropsTheArray()
+    {
+        // The same sweep at the coarse grain: the elision drops the array and only the array. Together with
+        // the full-grain sweep above this pins the per-rule key set at both ends of the ladder, so no
+        // future grain change can drop the count silently from either.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton");
+
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        foreach (JsonElement rule in document.RootElement.GetProperty("rules")
+                     .EnumerateArray())
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            List<string> keys = rule.EnumerateObject()
+                .Select(field => field.Name)
+                .ToList();
+            keys.ShouldContain("violationCount", id);
+            keys.ShouldNotContain("violations", id);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("--overview")]
+    [InlineData("--skeleton")]
+    public async Task Check_JsonAtEveryGrain_ADefensiveReadOfAFailedRulesCountNeverAnswersZero(string? grainFlag)
+    {
+        // The field-test repro: a consumer scripting the Python idiom rule.get('violationCount', 0) over a
+        // fine-grain report read 0 for rules that had failed, because the count key used to substitute for
+        // the rendered array. Absent-means-zero is the ordinary defensive read, so the count must be present
+        // and non-zero for every failed rule at every grain — that is what makes the read safe.
+        string[] arguments = grainFlag is null
+            ? ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"]
+            : ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", grainFlag];
+
+        CliResult result = await CliRunner.InvokeAsync(arguments);
+
+        result.ShouldReportViolations();
+        result.Out.ShouldReportViolationCount("layering/domain-independent", 2);
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        List<JsonElement> failed = document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .Where(rule => rule.GetProperty("status")
+                .GetString() == "failed")
+            .ToList();
+
+        failed.ShouldNotBeEmpty();
+        foreach (JsonElement rule in failed)
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            rule.TryGetProperty("violationCount", out JsonElement count)
+                .ShouldBeTrue(id);
+            count.GetInt32()
+                .ShouldBeGreaterThan(0, id);
+        }
     }
 
     [Fact]

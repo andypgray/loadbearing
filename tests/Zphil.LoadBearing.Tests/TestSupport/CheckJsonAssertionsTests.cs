@@ -22,6 +22,7 @@ public sealed class CheckJsonAssertionsTests
             {
               "id": "ex/one-catch",
               "status": "failed",
+              "violationCount": 1,
               "violations": [
                 {
                   "kind": "catch",
@@ -70,6 +71,21 @@ public sealed class CheckJsonAssertionsTests
         var sharedSource = ("source", "App.Handler");
 
         Should.Throw<ShouldAssertException>(() => Report.ShouldHaveViolationAtSites("ex/two-catches", sharedSource, 1));
+    }
+
+    [Fact]
+    public void ShouldReportViolationCount_CountMismatch_Reds()
+    {
+        Should.Throw<ShouldAssertException>(() => Report.ShouldReportViolationCount("ex/one-catch", 2));
+    }
+
+    [Fact]
+    public void ShouldReportViolationCount_KeyAbsent_Reds()
+    {
+        // The second rule carries no violationCount at all — the exact regression the verb exists to catch,
+        // and the reason it reads the key with TryGetProperty: a KeyNotFoundException would surface as an
+        // error naming no rule rather than as this red.
+        Should.Throw<ShouldAssertException>(() => Report.ShouldReportViolationCount("ex/two-catches", 2));
     }
 
     [Fact]

@@ -169,6 +169,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluation still resolves selections by single attribution, so a rule anchored on a project that
   loses the attribution is unaffected by this change.
 
+- **A check rule now states its violation count at every grain, and a violation its site count.** A
+  per-rule entry in `check --json` carried either `violationCount` or `violations[]`, never both —
+  the count only where the grain had elided the array — and a violation the same for `siteCount`
+  and `sites[]`. Nothing said the keys stood in for each other, so the ordinary defensive read,
+  `rule.get('violationCount', 0)`, answered 0 for a rule whose status is `failed`:
+  absent-means-zero, silently wrong in the unsafe direction, against the very key the derive
+  recipe tells a consumer to script on. Both counts are now written unconditionally, each ahead of
+  the array it summarizes, so a document a reader truncates inside the bulk has already delivered
+  the number. `schemaVersion` holds at 3 — a key addition, not a change in what any verdict means —
+  and a skeleton report is byte-identical to before; full and overview reports grow by the counts.
+
 ## [0.5.0] - 2026-08-17
 
 ### Added

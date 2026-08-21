@@ -14,10 +14,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // `rulesFilter` slots are additive the same way: null (omitted) on every run whose workspace loaded, whose
 // NuGet packages resolved, that no solution filter narrowed, whose solution is all C# and single-framework,
 // and that checked the whole spec — so a clean document is unchanged.
-// The grain slots — `grain`, `violationCount`, `siteCount` — are additive in the same sense and absent from
-// every full-grain report, which is every report the CLI writes unless asked otherwise. They hold the schema
-// at version 3, as the survey's own ladder held it at 1: a consumer reading a full document cannot tell
-// these exist.
+// The `grain` slot is additive in the same sense and absent from every full-grain report, which is every
+// report the CLI writes unless asked otherwise; it holds the schema at version 3, as the survey's own ladder
+// held it at 1 — a consumer reading a full document cannot tell it exists. The per-rule `violationCount` and
+// per-violation `siteCount` are unconditional at every grain: while each stood in for its elided array, a
+// defensive absent-means-zero read answered 0 wherever the array was rendered instead — silently wrong
+// precisely for a failed rule — so each is always written, ahead of the array it summarizes.
 // CheckJson's slot order is the verdict first, and deliberately: the request echo, then the trust stamps,
 // then `summary`, then `rules`, with `workspaceDiagnostics` last. System.Text.Json writes a record's
 // declaration order verbatim, so this list is the wire order. Below the ladder's coarsest rung a reader with
@@ -122,16 +124,18 @@ internal sealed record CheckJson(
 ///     camelCase wire spelling is <see cref="LoadBearingJson.Options" />'s to apply, so a renderer cannot
 ///     write a value no member names.
 /// </summary>
-/// <param name="Violations">
-///     This rule's violations, or null (omitted) at skeleton grain — the one thing that grain elides beyond
-///     overview's. Null here is "not rendered at this grain", never "none found": a passing rule renders an
-///     empty array, and <see cref="ViolationCount" /> tells the two apart.
-/// </param>
 /// <param name="ViolationCount">
-///     How many violations the elision dropped, present only when <see cref="Violations" /> is elided.
-///     Rendered even when zero, because that is precisely the case a reader must not confuse with a rule
-///     whose violations were merely not written here — a skeleton report is still a verdict, and a count of
-///     0 beside <c>status: passed</c> is what makes it one.
+///     How many violations the rule found, at every grain. The count is the stable key a consumer scripts
+///     against, so it never substitutes for <see cref="Violations" /> or yields to it — while it stood in
+///     for the elided array alone, a defensive absent-means-zero read answered 0 exactly when the rule had
+///     failed. Declared ahead of the array it summarizes, so a downstream truncator that cuts inside the
+///     bulk has already written the number. Zero means "none found": beside <c>status: passed</c> it is
+///     what makes a skeleton report a verdict.
+/// </param>
+/// <param name="Violations">
+///     This rule's violations — <see cref="ViolationCount" />'s expansion — or null (omitted) at skeleton
+///     grain, the one thing that grain elides beyond overview's. Null here is "not rendered at this grain",
+///     never "none found": a passing rule renders an empty array, and the count tells the two apart.
 /// </param>
 /// <param name="SubjectTypes">
 ///     How many types the rule's subject materialized to, present only alongside
@@ -156,23 +160,25 @@ internal sealed record RuleJson(
     BaselineJson? Baseline,
     int? SubjectTypes,
     int? SubjectGeneratedTypes,
+    int ViolationCount,
     IReadOnlyList<ViolationJson>? Violations,
-    int? ViolationCount,
     IReadOnlyList<WarningJson> Warnings);
 
 /// <summary>A ratcheted rule's state: its baseline path and the grandfathered/stale counts.</summary>
 internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 
 /// <summary>One violation; the null slots are omitted per kind.</summary>
-/// <param name="Sites">
-///     Where the violation occurs, or null (omitted) from overview grain down — the first thing the ladder
-///     elides, because sites scale with the codebase while everything above them scales with the spec. Null
-///     is "not rendered at this grain", never "none found"; <see cref="SiteCount" /> carries the number.
-/// </param>
 /// <param name="SiteCount">
-///     How many sites the elision dropped, present only when <see cref="Sites" /> is elided — so a coarser
+///     How many sites the violation occurs at, at every grain — <see cref="Sites" /> is its expansion, not
+///     its replacement, on the same reasoning as <see cref="RuleJson" />'s violation count. A coarser
 ///     report still says how much work each violation is, which is the one thing a reader would otherwise
 ///     have to re-run the check at full grain to learn.
+/// </param>
+/// <param name="Sites">
+///     Where the violation occurs — <see cref="SiteCount" />'s expansion — or null (omitted) from overview
+///     grain down: the first thing the ladder elides, because sites scale with the codebase while
+///     everything above them scales with the spec. Null is "not rendered at this grain", never "none
+///     found"; the count carries the number.
 /// </param>
 internal sealed record ViolationJson(
     ViolationKind Kind,
@@ -182,8 +188,8 @@ internal sealed record ViolationJson(
     string? Subject,
     string? SubjectMember,
     string? Detail,
-    IReadOnlyList<SiteJson>? Sites,
-    int? SiteCount);
+    int SiteCount,
+    IReadOnlyList<SiteJson>? Sites);
 
 /// <summary>A single reference or declaration site (relative, forward-slash path).</summary>
 internal sealed record SiteJson(string File, int Line);
