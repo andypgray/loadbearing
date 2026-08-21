@@ -82,6 +82,11 @@ public sealed class SdkStyleProjectTests
         // *.csproj, and RestoreFailures now skips a project in another language before it ever asks this
         // predicate — so a row for one would describe a path that cannot be reached.
         "PolyglotApp.Core.csproj: SDK-style, assets file present",
+        // The Razor bed. RazorApp.Web is the corpus's only Microsoft.NET.Sdk.Web project, which is the point
+        // of it elsewhere and makes no difference here — the discriminator reads the root element's Sdk
+        // attribute, and every SDK names one.
+        "RazorApp.Core.csproj: SDK-style, assets file present",
+        "RazorApp.Web.csproj: SDK-style, assets file present",
         "ShadowedApp.Product.Tests.csproj: SDK-style, assets file present",
         "ShadowedApp.Product.csproj: SDK-style, assets file present",
         "SlnxApp.Core.csproj: SDK-style, assets file present",

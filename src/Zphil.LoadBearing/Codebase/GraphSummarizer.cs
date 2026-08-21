@@ -197,11 +197,15 @@ public static class GraphSummarizer
         List<NamespaceCount> namespaces = declaredTypes
             .GroupBy(type => type.Namespace)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
-            .Select(group => new NamespaceCount(DisplayNamespace(group.Key), group.Count()))
+            .Select(group => new NamespaceCount(
+                DisplayNamespace(group.Key), group.Count(), group.Count(type => type.IsGenerated)))
             .ToList();
 
+        int generated = declaredTypes.Count(type => type.IsGenerated);
+
         return new ProjectSummary(
-            project.Name, project.ProjectReferences, declaredTypes.Count, namespaces, project.SolutionMember);
+            project.Name, project.ProjectReferences, declaredTypes.Count, generated, namespaces,
+            project.SolutionMember);
     }
 
     // The external-reference bucket: the first two dot-segments of the target's namespace (one segment →

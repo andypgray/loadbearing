@@ -119,17 +119,38 @@ internal static class CompilationFactory
     ///     As <see cref="ExtractConsoleApp" />, but the sources are first run through
     ///     <paramref name="generator" /> and the model is extracted from the <em>updated</em> compilation — so
     ///     generator-emitted types enter extraction exactly as they do in a real build (GRAMMAR §4.1), beside
-    ///     the synthesized <c>Program</c> the console output kind brings.
+    ///     the synthesized <c>Program</c> the console output kind brings. The driver's own generated trees ride
+    ///     through as the run's provenance, the way a workspace load reports its source-generated documents.
     /// </summary>
     public static CodebaseModel ExtractConsoleAppWithGenerator(
         IIncrementalGenerator generator, params (string Path, string Source)[] files)
     {
+        return ExtractConsoleAppWithGenerator(generator, true, files);
+    }
+
+    /// <summary>
+    ///     The same run with <paramref name="reportProvenance" /> deciding whether the driver's generated
+    ///     trees reach extraction at all. Passing <see langword="false" /> models every host that cannot say
+    ///     which trees a generator produced — a hand-built compilation, a replayed build log — and so leaves
+    ///     the banner as the only signal. Running one generator both ways is what separates the two arms:
+    ///     whatever changes verdict between them moved on provenance alone.
+    /// </summary>
+    public static CodebaseModel ExtractConsoleAppWithGenerator(
+        IIncrementalGenerator generator, bool reportProvenance, params (string Path, string Source)[] files)
+    {
         CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-        driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out _);
+        // The driver is the return value, not the receiver: RunGeneratorsAndUpdateCompilation leaves the
+        // ORIGINAL driver empty, so discarding this hands GetRunResult an empty tree list.
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator)
+            .RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out _);
 
-        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(generated, "TestProject", [])]);
+        IReadOnlySet<SyntaxTree>? generatedTrees = reportProvenance
+            ? driver.GetRunResult().GeneratedTrees.ToHashSet()
+            : null;
+
+        return CodebaseExtractor.ExtractFromCompilations(
+            [new CompilationInput(generated, "TestProject", [], GeneratedTrees: generatedTrees)]);
     }
 
     /// <summary>Multi-file convenience: extract a model from several files in one project.</summary>

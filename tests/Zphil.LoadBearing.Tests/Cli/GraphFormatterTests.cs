@@ -61,6 +61,56 @@ public sealed class GraphFormatterTests
             .ShouldBe(["  Acme.Signals/Acme.Signals.fsproj — not a C# project"]);
     }
 
+    [Fact]
+    public void Lines_GeneratedTypes_QualifyTheProjectCountAndEachNamespace()
+    {
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            GeneratedTypeSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        // Assert — three namespace shapes in one inventory. A wholly generated namespace reads "all
+        // generated" rather than repeating the count it just gave, because that is the shape a reader must
+        // catch: it is the one namespace here that must never become a layer glob. A namespace with none
+        // says nothing at all, so the qualifier's presence is itself the signal.
+        Roster(lines)
+            .ShouldBe(["  Acme.Web — 5 types (3 generated); references: (none)"]);
+        Section(lines, "Namespaces:")
+            .ShouldBe(["  Acme.Web: Acme.Views (2, all generated), Acme.Web (2, 1 generated), Acme.Plain (1)"]);
+    }
+
+    [Fact]
+    public void Lines_NoGeneratedTypes_LeaveEveryLineExactlyAsItWas()
+    {
+        // The negative that keeps every existing golden byte-identical: a solution with no generator output
+        // must render the survey it rendered before the qualifier existed.
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        Roster(lines)
+            .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
+        Section(lines, "Namespaces:")
+            .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
+    }
+
+    // Hand-built rather than extracted: the subject here is the LINE, and the three namespace shapes it has
+    // to spell are easier to read as literals than as the generator run that would produce them.
+    // GraphSummarizerTests covers the counting itself, over a real generator.
+    private static GraphSummary GeneratedTypeSummary()
+    {
+        ProjectSummary web = new(
+            "Acme.Web",
+            [],
+            5,
+            3,
+            [
+                new NamespaceCount("Acme.Views", 2, 2),
+                new NamespaceCount("Acme.Web", 2, 1),
+                new NamespaceCount("Acme.Plain", 1, 0)
+            ]);
+
+        return new GraphSummary([web], [], [], [], []);
+    }
+
     // One section: the lines between its heading and the blank line closing it.
     private static IReadOnlyList<string> Section(IReadOnlyList<string> lines, string heading)
     {

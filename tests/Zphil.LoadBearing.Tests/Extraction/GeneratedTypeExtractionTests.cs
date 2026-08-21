@@ -9,11 +9,19 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 /// <summary>
 ///     Source-generator output on the extraction fast path: the ratified §4.1 boundary (a project noun
 ///     names what the assembly declares, generated types included) and the <c>IsGenerated</c> fact
-///     <c>.Authored()</c> filters on (GRAMMAR §5.2). Detection is
-///     <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> on the type or on any type containing it —
-///     nothing else — so the two halves pinned here are the containing-type walk and the partial case,
-///     where the attribute sits on the generated <em>method</em> and the author's own class stays authored.
+///     <c>.Authored()</c> filters on (GRAMMAR §5.2). Detection reads three signals —
+///     <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> on the type or on any type containing it, the
+///     tree's provenance as a source-generated document, and the auto-generated banner comment — with the
+///     two file signals lifting to a type only when they hold of <em>every</em> declaring file.
 /// </summary>
+/// <remarks>
+///     Four halves are pinned here: the containing-type walk; the partial case where the attribute sits on
+///     the generated <em>method</em> and the author's own class stays authored; each file signal on its own,
+///     separated by running one generator twice through <c>CompilationFactory</c>'s provenance-reporting
+///     overload, once with provenance and once without; and the guard that keeps metadata types — which
+///     declare no syntax at all, so an all-parts test over an empty sequence would answer
+///     <see langword="true" /> — authored.
+/// </remarks>
 public sealed class GeneratedTypeExtractionTests
 {
     // Authored sources: top-level statements (so a synthesized Program rides along), one ordinary type, and
@@ -40,6 +48,12 @@ public sealed class GeneratedTypeExtractionTests
                            }
                        }
                        """));
+
+    // The file-signal fixture, run twice over one generator. The generator emits three trees carrying no
+    // attribute anywhere: one led by a banner, one marked nothing at all, and two halves of a partial type.
+    // With provenance reported every one of them is generator output; withheld, only the banner speaks.
+    private static readonly CodebaseModel ProvenanceModel = FileSignalModel(true);
+    private static readonly CodebaseModel BannerOnlyModel = FileSignalModel(false);
 
     [Fact]
     public void GeneratorOutput_DeclaredType_IsInventoriedWithProjectNameAndNotExternal()
@@ -125,6 +139,62 @@ public sealed class GeneratedTypeExtractionTests
         holder.IsGenerated.ShouldBeFalse();
     }
 
+    [Fact]
+    public void ExtractFacts_ExternalMetadataTypes_StayAuthored()
+    {
+        // Arrange — the guard that makes the all-parts rule safe. A metadata symbol has no declaring syntax
+        // at all, and "every declaring file is generated" over an empty sequence is vacuously true, so
+        // without the length check the entire referenced world reports generated.
+        IReadOnlyList<TypeNode> externals = Model.Types
+            .Where(type => type.IsExternal)
+            .ToList();
+
+        // Act / Assert — asserted over every external rather than a named one, because the failure this
+        // guards against is indiscriminate: it takes all of them at once or none.
+        externals.ShouldNotBeEmpty();
+        externals.ShouldAllBe(type => !type.IsGenerated);
+    }
+
+    [Fact]
+    public void ExtractFacts_BannerWithoutAttributeOrProvenance_IsGenerated()
+    {
+        // Arrange / Act / Assert — the banner alone, with nothing else to go on. This is the Razor shape:
+        // a compiled view carries a banner, no [GeneratedCode] and no [CompilerGenerated], so the attribute
+        // arm cannot see it and a whole view tier would read as hand-written code.
+        BannerOnlyModel.Type("Gen.Bannered")
+            .IsGenerated.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ExtractFacts_ProvenanceWithoutAttributeOrBanner_IsGenerated()
+    {
+        // Arrange / Act / Assert — neither marker in the source; the workspace reporting the tree as
+        // generator output is the whole signal.
+        ProvenanceModel.Type("Gen.Unmarked")
+            .IsGenerated.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ExtractFacts_SameUnmarkedSourceWithoutProvenance_IsAuthored()
+    {
+        // Arrange / Act / Assert — the same generator, the same source, provenance withheld. Reading true
+        // above and false here is what proves the provenance arm moved it and no other signal did.
+        BannerOnlyModel.Type("Gen.Unmarked")
+            .IsGenerated.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFacts_PartialTypeWithEveryPartGenerated_IsGenerated()
+    {
+        // Arrange / Act
+        TypeNode split = ProvenanceModel.Type("Gen.Split");
+
+        // Assert — the other side of App.Holder. Both parts are generator output, so the file signal holds
+        // of every file declaring the type and lifts to the type; nobody can act on a violation here.
+        split.FilePaths.Count.ShouldBe(2);
+        split.IsGenerated.ShouldBeTrue();
+    }
+
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
     {
         return types.Select(type => type.FullName)
@@ -161,6 +231,87 @@ public sealed class GeneratedTypeExtractionTests
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             context.RegisterPostInitializationOutput(ctx => ctx.AddSource("Emitted.g.cs", EmittedSource));
+        }
+    }
+
+    // One authored file beside the file-signal generator's four, so each model still has an authored
+    // population to read the generated one against.
+    private static CodebaseModel FileSignalModel(bool reportProvenance)
+    {
+        return CompilationFactory.ExtractConsoleAppWithGenerator(
+            new FileSignalGenerator(),
+            reportProvenance,
+            ("Program.cs", """
+                           using App;
+
+                           Gauge.Read();
+
+                           namespace App
+                           {
+                               public static class Gauge
+                               {
+                                   public static void Read()
+                                   {
+                                   }
+                               }
+                           }
+                           """));
+    }
+
+    // Four trees carrying no attribute anywhere, so every verdict they earn comes from a FILE signal. One is
+    // led by a banner the way a compiled Razor view is; the rest are marked nothing at all, which is the
+    // shape only provenance can see. The last two are halves of one partial type — the case the all-parts
+    // rule must answer generated, as against App.Holder above, whose author wrote one of its halves.
+    private sealed class FileSignalGenerator : IIncrementalGenerator
+    {
+        private const string BanneredSource = """
+                                              // <auto-generated/>
+                                              namespace Gen
+                                              {
+                                                  public sealed class Bannered
+                                                  {
+                                                  }
+                                              }
+                                              """;
+
+        private const string UnmarkedSource = """
+                                              namespace Gen
+                                              {
+                                                  public sealed class Unmarked
+                                                  {
+                                                  }
+                                              }
+                                              """;
+
+        private const string FirstSplitPart = """
+                                              namespace Gen
+                                              {
+                                                  public sealed partial class Split
+                                                  {
+                                                      public int First { get; set; }
+                                                  }
+                                              }
+                                              """;
+
+        private const string SecondSplitPart = """
+                                               namespace Gen
+                                               {
+                                                   public sealed partial class Split
+                                                   {
+                                                       public int Second { get; set; }
+                                                   }
+                                               }
+                                               """;
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterPostInitializationOutput(ctx =>
+            {
+                ctx.AddSource("Bannered.g.cs", BanneredSource);
+                ctx.AddSource("Unmarked.g.cs", UnmarkedSource);
+                ctx.AddSource("Split.First.g.cs", FirstSplitPart);
+                ctx.AddSource("Split.Second.g.cs", SecondSplitPart);
+            });
         }
     }
 }

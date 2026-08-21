@@ -127,24 +127,40 @@ internal sealed record GraphJson(
 
 /// <summary>
 ///     One project: whether the solution declares it, its declared references, solution-declared type count,
-///     and namespace inventory — the last of which is null (omitted) at overview grain, being the one thing
-///     that grain elides.
+///     how many of those a generator emitted, and its namespace inventory — the last of which is null
+///     (omitted) at overview grain, being the one thing that grain elides.
 /// </summary>
 /// <remarks>
-///     <c>solutionMember</c> follows the document-wide optional-field convention, and here it carries real
-///     weight: absent means membership was never read, so a reader must not take a missing key for
-///     <c>false</c>. An explicit <c>false</c> is a project the workspace loaded through a
-///     <c>ProjectReference</c> that the solution file does not declare.
+///     <para>
+///         <c>solutionMember</c> follows the document-wide optional-field convention, and here it carries
+///         real weight: absent means membership was never read, so a reader must not take a missing key for
+///         <c>false</c>. An explicit <c>false</c> is a project the workspace loaded through a
+///         <c>ProjectReference</c> that the solution file does not declare.
+///     </para>
+///     <para>
+///         <c>generated</c> is deliberately <em>not</em> a top-level coverage statement, which is what the
+///         other survey-level omissions above are. A coverage statement says what the survey does not
+///         cover, and every one of them names something with no home in the rows above it — but a generated
+///         type has a home: it is already inside this project's <c>types</c>, and inside its namespace's.
+///         A top-level array would leave the larger number standing as if it were the whole story and
+///         correct it in a footnote, and a count key beside it would count rows rather than types. So the
+///         qualifier sits on the number it qualifies, in both places that number appears.
+///     </para>
 /// </remarks>
 internal sealed record GraphProjectJson(
     string Name,
     bool? SolutionMember,
     IReadOnlyList<string> ProjectReferences,
     int Types,
+    int? Generated,
     IReadOnlyList<GraphNamespaceJson>? Namespaces);
 
-/// <summary>A namespace and the count of the project's declared types in it.</summary>
-internal sealed record GraphNamespaceJson(string Namespace, int Types);
+/// <summary>
+///     A namespace and the count of the project's declared types in it, with how many of those a generator
+///     emitted. <c>generated</c> is omitted at zero — most namespaces have none, and every survey of a
+///     solution with no generators at all is byte-identical to the one before the key existed.
+/// </summary>
+internal sealed record GraphNamespaceJson(string Namespace, int Types, int? Generated);
 
 /// <summary>An observed cross-project reference edge with its distinct type-pair count.</summary>
 internal sealed record GraphProjectEdgeJson(string Source, string Target, int References);

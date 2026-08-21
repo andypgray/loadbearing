@@ -62,16 +62,26 @@ public interface ITypeInfo
     bool IsRecord { get; }
 
     /// <summary>
-    ///     Whether a source generator emitted the type — the fact <c>.Authored()</c> filters on
-    ///     (GRAMMAR §5.2, §5.6). True when <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> sits on
-    ///     the type or on any type containing it, so the nested types a generator emits inside an
-    ///     attributed container ride along without carrying their own attribute.
+    ///     Whether a generator emitted the type — the fact <c>.Authored()</c> filters on (GRAMMAR §5.2,
+    ///     §5.6). True when <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> sits on the type or on any
+    ///     type containing it — so the nested types a generator emits inside an attributed container ride
+    ///     along without carrying their own attribute — or when every file declaring it is generator
+    ///     output, which is either a source-generated document or a file led by an auto-generated banner
+    ///     comment.
     /// </summary>
     /// <remarks>
-    ///     The attribute is the whole boundary: a generator that emits no <c>[GeneratedCode]</c> is
-    ///     invisible here, and a hand-written type that carries it is reported generated. Nothing is
-    ///     inferred from a file path, an <c>obj/</c> directory, or a naming convention — those vary per
-    ///     generator and per build.
+    ///     <para>
+    ///         <em>Every</em> declaring file, not any: the attribute is a claim about a type and the file
+    ///         signals are claims about a file, so a file signal lifts to a type only when it holds of every
+    ///         file declaring it. A partial type whose author writes one part and whose generator writes the
+    ///         other is therefore authored — someone can act on a violation reported against it.
+    ///     </para>
+    ///     <para>
+    ///         Nothing is inferred from a file path, an <c>obj/</c> directory, or a naming convention: those
+    ///         vary per generator and per build, and they answer the question 'may a tool edit this file'
+    ///         rather than this one. A hand-written type that carries the attribute is still reported
+    ///         generated — the signals are read, never second-guessed.
+    ///     </para>
     /// </remarks>
     bool IsGenerated { get; }
 

@@ -291,9 +291,14 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
-    ///     The whole result as failure text: what the rule reported, every violation and warning in
-    ///     report order, and the ratchet counts.
+    ///     The whole result as failure text: what the rule reported, the subject it swept, every violation
+    ///     and warning in report order, and the ratchet counts.
     /// </summary>
+    /// <remarks>
+    ///     The subject line is carried unconditionally, including its zero — unlike the report, which stays
+    ///     silent when nothing is generated. A red raises the question "what was this rule even looking at",
+    ///     and "0 types" is the answer that ends the search fastest.
+    /// </remarks>
     private static string Describe(RuleResult result)
     {
         var lines = new List<string> { $"Rule '{result.Rule.Id}' ({result.Rule.Posture}) reported {result.Status}." };
@@ -301,6 +306,7 @@ internal static class RuleResultAssertions
         if (result.SkipReason is not null)
             lines.Add($"  skipped: {result.SkipReason}");
 
+        lines.Add($"  subject: {result.SubjectTypes} types, {result.SubjectGeneratedTypes} generated");
         lines.Add($"  violations ({result.Violations.Count}):");
         lines.AddRange(result.Violations.Select(Describe));
         lines.Add($"  warnings ({result.Warnings.Count}):");

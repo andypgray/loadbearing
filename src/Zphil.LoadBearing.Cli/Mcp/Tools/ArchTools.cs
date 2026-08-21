@@ -36,6 +36,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "only those. " +
         "Narrow with overview or skeleton (coarser grain) or rules (fewer rules); an over-budget report " +
         "coarsens its own grain, as far as skeleton, rather than being cut. " +
+        "subjectTypes/subjectGeneratedTypes appear together on a rule whose subject contained generator " +
+        "output, pass or fail: how many types it swept and how many nobody wrote. Both absent means none " +
+        "were. Narrowing the rule with .Authored() removes them. " +
         "If projects fail to load, or their NuGet packages did not resolve, the report still " +
         "returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — a verdict reached " +
         "against a partial model; report that, never plain green. " +
@@ -78,6 +81,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "absent when the solution has none). shadowedTypes[] is the other coverage key: a full name a project " +
         "declares that a referenced assembly also supplies means two types, so a rule naming it reaches both " +
         "while arch.Project() over the declaring project reaches only the declaration. " +
+        "generated qualifies the types count on a project and on each namespace (absent when zero): how many " +
+        "of them a generator emitted, which is what arch.Project() would sweep and .Authored() would drop. A " +
+        "namespace whose two counts are equal is wholly generator output — never make it a layer glob. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +

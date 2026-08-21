@@ -154,9 +154,11 @@ internal sealed class ExtractionCacheStore
 {
     // The on-disk schema of this per-solution cache file. A record written under any other version degrades to
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
-    // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
-    // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 22;
+    // error. Bump this whenever a fragment gains a fact, OR changes how one is computed: a widened fact keeps
+    // its name and its type while taking a different value for identical inputs, so a hit would replay the old
+    // answer forever with nothing to distinguish it. The suite cannot catch a missed bump — every run gets a
+    // fresh cache directory — so the discipline is the only guard.
+    private const int CurrentSchemaVersion = 23;
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;

@@ -94,6 +94,51 @@ internal static class CheckJsonAssertions
     }
 
     /// <summary>
+    ///     Asserts <paramref name="ruleId" />'s subject swept <paramref name="types" /> types, of which
+    ///     <paramref name="generated" /> were generator output (GRAMMAR §5.2). Says nothing about status: a
+    ///     rule aimed at generated code is as often green as red, which is the reason the pair is reported
+    ///     for both.
+    /// </summary>
+    internal static string ShouldHaveSubjectCoverage(
+        this string checkJson, string ruleId, int types, int generated)
+    {
+        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        string report = Describe(rule);
+
+        rule.GetProperty("subjectTypes")
+            .GetInt32()
+            .ShouldBe(types, report);
+        rule.GetProperty("subjectGeneratedTypes")
+            .GetInt32()
+            .ShouldBe(generated, report);
+
+        return checkJson;
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="ruleId" /> states nothing about its subject — both keys absent, which is
+    ///     what a rule whose subject holds no generator output reports.
+    /// </summary>
+    /// <remarks>
+    ///     Its own verb rather than <see cref="ShouldHaveSubjectCoverage" /> with a zero: the pair is written
+    ///     only when something was generated, so there would be no denominator to pass and the argument would
+    ///     read as a claim while asserting nothing. Both absences are checked, because half a pair is a
+    ///     defect in its own right — a denominator with no numerator is a fact about nothing.
+    /// </remarks>
+    internal static string ShouldReportNoSubjectCoverage(this string checkJson, string ruleId)
+    {
+        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        string report = Describe(rule);
+
+        rule.TryGetProperty("subjectTypes", out _)
+            .ShouldBeFalse(report);
+        rule.TryGetProperty("subjectGeneratedTypes", out _)
+            .ShouldBeFalse(report);
+
+        return checkJson;
+    }
+
+    /// <summary>
     ///     Asserts <paramref name="ruleId" /> is red in <paramref name="checkJson" /> with exactly the
     ///     violations <paramref name="expected" /> names — each read off the violation's
     ///     <paramref name="endpoint" /> field, which is the kind's own identity (the caught, injected or

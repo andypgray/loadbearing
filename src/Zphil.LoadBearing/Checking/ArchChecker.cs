@@ -163,7 +163,8 @@ public static class ArchChecker
 
         try
         {
-            (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = evaluator.Evaluate(rule.Constraint!);
+            (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
+                evaluator.Evaluate(rule.Constraint!);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
             // view at all — is asked of the raw violations and is the same one for both branches.
             if (narrowing is not null && SelectedNothing(violations))
@@ -173,8 +174,8 @@ public static class ArchChecker
             // MustOnlyBeReferencedBy constraint and so evaluates exactly like Enforce) — partitions
             // against its baseline; everything else is plain Enforce law (GRAMMAR §7).
             return rule.BaselinePath is not null
-                ? Ratchet(rule, violations, warnings, baselines)
-                : Enforce(rule, violations, warnings);
+                ? Ratchet(rule, violations, warnings, coverage, baselines)
+                : Enforce(rule, violations, warnings, coverage);
         }
         catch (RuleEvaluationException ex)
         {
@@ -191,11 +192,13 @@ public static class ArchChecker
         }
     }
 
-    private static RuleResult Enforce(ArchRule rule, IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings)
+    private static RuleResult Enforce(
+        ArchRule rule, IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage)
     {
         IReadOnlyList<Violation> ordered = Order(violations);
         RuleStatus status = ordered.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
-        return new RuleResult(rule, status, ordered, warnings);
+        return new RuleResult(
+            rule, status, ordered, warnings, subjectTypes: coverage.Types, subjectGeneratedTypes: coverage.Generated);
     }
 
     // The ratchet, shared by Migrate and Quarantine containment: a violation whose identity
@@ -203,7 +206,8 @@ public static class ArchChecker
     // forbidden target from a grandfathered source (pair identity, GRAMMAR §4.3) and every
     // EmptySubject/RuleError (never baselinable) — is red.
     private static RuleResult Ratchet(
-        ArchRule rule, IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, BaselineIndex baselines)
+        ArchRule rule, IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings,
+        SubjectCoverage coverage, BaselineIndex baselines)
     {
         bool captured = baselines.TryGet(rule.Id, out RuleBaseline? section);
         var red = new List<Violation>();
@@ -243,7 +247,8 @@ public static class ArchChecker
         int stale = section is null ? 0 : section.Count - matched.Count;
         RuleStatus status = orderedRed.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
         return new RuleResult(
-            rule, status, orderedRed, warnings, null, grandfathered, stale, captured, grandfatheredEntries);
+            rule, status, orderedRed, warnings, null, grandfathered, stale, captured, grandfatheredEntries,
+            coverage.Types, coverage.Generated);
     }
 
     // The Quarantine tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per

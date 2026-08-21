@@ -19,7 +19,9 @@ public sealed class RuleResult
         IReadOnlyList<Violation>? grandfathered = null,
         int staleBaselineEntries = 0,
         bool baselineCaptured = false,
-        IReadOnlyList<BaselineEntry>? grandfatheredEntries = null)
+        IReadOnlyList<BaselineEntry>? grandfatheredEntries = null,
+        int subjectTypes = 0,
+        int subjectGeneratedTypes = 0)
     {
         Rule = rule;
         Status = status;
@@ -30,6 +32,8 @@ public sealed class RuleResult
         StaleBaselineEntries = staleBaselineEntries;
         BaselineCaptured = baselineCaptured;
         GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
+        SubjectTypes = subjectTypes;
+        SubjectGeneratedTypes = subjectGeneratedTypes;
     }
 
     /// <summary>The rule that was evaluated.</summary>
@@ -73,6 +77,27 @@ public sealed class RuleResult
     ///     non-ratcheted rule and whenever <see cref="Grandfathered" /> is empty.
     /// </summary>
     public IReadOnlyList<BaselineEntry> GrandfatheredEntries { get; }
+
+    /// <summary>
+    ///     How many types the rule's subject actually materialized to — a member-subject rule reports the
+    ///     members' declaring types, so this and <see cref="SubjectGeneratedTypes" /> share a unit. Zero for
+    ///     a rule that reached no subject at all: errored, skipped, tripwire, or empty-subject.
+    /// </summary>
+    public int SubjectTypes { get; }
+
+    /// <summary>
+    ///     How many of <see cref="SubjectTypes" /> a generator emitted
+    ///     (<see cref="ITypeInfo.IsGenerated" />) — the rule's own answer to whether it is aimed at code
+    ///     anyone can act on.
+    /// </summary>
+    /// <remarks>
+    ///     Reported for passing and failing rules alike, because a green rule aimed mostly at generator
+    ///     output is exactly as misaimed as a red one and has less to draw attention to it. It carries no
+    ///     advice: <c>.Authored()</c> is often the right narrowing and often not — a rule forbidding a
+    ///     generated JSON context from writing to stdout means what it says — so this states a fact about
+    ///     the subject and leaves the judgement where it belongs.
+    /// </remarks>
+    public int SubjectGeneratedTypes { get; }
 
     /// <summary>
     ///     Whether the Migrate ratchet has burned to zero on a rule this run actually measured, so the

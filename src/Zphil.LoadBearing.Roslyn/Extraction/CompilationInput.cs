@@ -21,10 +21,19 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///         and is <see langword="null" /> wherever nothing was read to answer with, which is every
 ///         hand-built input and any run whose solution file would not parse.
 ///     </para>
+///     <para>
+///         <see cref="GeneratedTrees" /> is the provenance half of the generated-code signal (GRAMMAR §5.2):
+///         which of <see cref="Compilation" />'s trees the workspace produced from a source generator. It
+///         holds <em>trees</em> rather than paths because a generator's pseudo-path moves the moment a build
+///         sets <c>EmitCompilerGeneratedFiles</c>, and it is data rather than a predicate because every other
+///         member here is. <see langword="null" /> wherever nothing was loaded to answer with, which leaves
+///         the banner as the only signal.
+///     </para>
 /// </remarks>
 public sealed record CompilationInput(
     Compilation Compilation,
     string ProjectName,
     IReadOnlyList<string> ProjectReferences,
     string? TargetFramework = null,
-    bool? SolutionMember = null);
+    bool? SolutionMember = null,
+    IReadOnlySet<SyntaxTree>? GeneratedTrees = null);

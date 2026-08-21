@@ -49,7 +49,7 @@ internal static class FragmentExtractor
 
     public static CodebaseFragment Extract(CompilationInput input)
     {
-        return new ExtractState(input.Compilation).Run(input);
+        return new ExtractState(input.Compilation, input.GeneratedTrees).Run(input);
     }
 
     /// <summary>
@@ -360,6 +360,14 @@ internal static class FragmentExtractor
         // not referenced at all — in which case nothing can wear it and every type is authored. Resolved once
         // so the generated screen is a symbol compare per attribute rather than a full display walk.
         private readonly INamedTypeSymbol? _generatedCodeAttribute;
+
+        // Which of this compilation's trees the workspace reported as generator output, and the memo over
+        // the whole per-tree verdict (provenance or banner). The verdict is asked once per declaring part of
+        // every declared type and again for every external the reference passes resolve, while a tree
+        // typically declares many types — so the memo turns a per-type root walk into a per-file one. Both
+        // hold trees, so both are scoped to the state that dies with the compilation.
+        private readonly IReadOnlySet<SyntaxTree>? _generatorOutputTrees;
+        private readonly Dictionary<SyntaxTree, bool> _generatedTreeVerdicts = new();
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
@@ -372,11 +380,12 @@ internal static class FragmentExtractor
         private readonly Dictionary<SyntaxTree, SemanticModel> _semanticModels = new();
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
-        public ExtractState(Compilation compilation)
+        public ExtractState(Compilation compilation, IReadOnlySet<SyntaxTree>? generatorOutputTrees)
         {
             _compilation = compilation;
             _bareCatchType = ReferenceWalker.BareCatchTypeOf(compilation);
             _generatedCodeAttribute = compilation.GetTypeByMetadataName(GeneratedCodeAttributeFullName);
+            _generatorOutputTrees = generatorOutputTrees;
         }
 
         public CodebaseFragment Run(CompilationInput input)
@@ -723,13 +732,34 @@ internal static class FragmentExtractor
                 IsGeneratedType(definition));
         }
 
-        // The generated fact `.Authored()` filters on (GRAMMAR §5.2). A type is generated when
-        // [System.CodeDom.Compiler.GeneratedCode] sits on it or on any type containing it, so the nested types a
-        // generator emits inside an attributed container ride along without carrying their own attribute. The
-        // attribute is the whole boundary — nothing is inferred from a file path, an obj/ directory, or a naming
-        // convention. Reading the merged symbol is what decides the partial case: [GeneratedRegex] puts its
-        // attribute on the generated METHOD, so the author's own partial class stays authored.
+        // The generated fact `.Authored()` filters on (GRAMMAR §5.2), from two independent signals. A type is
+        // generated when [System.CodeDom.Compiler.GeneratedCode] sits on it or on any type containing it — so the
+        // nested types a generator emits inside an attributed container ride along without carrying their own
+        // attribute — OR when every file declaring it is generator output (GeneratedSourceSignals). The second
+        // signal is what reaches the generators that emit no attribute at all: a compiled Razor view carries
+        // [RazorCompiledItemMetadata] and a banner and nothing else, so under the attribute alone a whole web
+        // tier's worth of views read as hand-written code a rule could hold its author to.
+        //
+        // ALL declaring files, never any: the attribute is a claim about a type, the file signals are claims
+        // about a file, and a file fact lifts to a type only when it holds of every file declaring it. The
+        // generator that completes an author's partial class writes ONE of its files — [GeneratedRegex] emits
+        // the author's own class beside wholly generated ones in a single banner-carrying tree — and any-part
+        // would hand the author's class to the generated side.
+        //
+        // The Length check is the load-bearing guard, not a defensive one: ExtractFacts also runs from
+        // ResolveName over metadata symbols, which declare no syntax at all, and All() over an empty sequence
+        // is true. Without it every external type in the model reports generated.
         private bool IsGeneratedType(INamedTypeSymbol definition)
+        {
+            if (HasGeneratedCodeAttribute(definition)) return true;
+
+            ImmutableArray<SyntaxReference> declarations = definition.DeclaringSyntaxReferences;
+            return declarations.Length > 0 && declarations.All(d => IsGeneratedTree(d.SyntaxTree));
+        }
+
+        // Reading the merged symbol is what decides the partial case for this arm: [GeneratedRegex] puts its
+        // attribute on the generated METHOD, so the author's own partial class stays authored.
+        private bool HasGeneratedCodeAttribute(INamedTypeSymbol definition)
         {
             if (_generatedCodeAttribute is null) return false; // unreferenced — nothing in this compilation wears it
 
@@ -738,6 +768,15 @@ internal static class FragmentExtractor
                     return true;
 
             return false;
+        }
+
+        private bool IsGeneratedTree(SyntaxTree tree)
+        {
+            if (_generatedTreeVerdicts.TryGetValue(tree, out bool memoized)) return memoized;
+
+            bool verdict = GeneratedSourceSignals.IsGeneratedTree(tree, _generatorOutputTrees);
+            _generatedTreeVerdicts[tree] = verdict;
+            return verdict;
         }
 
         private bool IsGeneratedCodeAttribute(AttributeData attribute)

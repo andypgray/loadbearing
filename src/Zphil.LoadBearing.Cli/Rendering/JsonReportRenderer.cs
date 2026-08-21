@@ -93,6 +93,11 @@ internal static class JsonReportRenderer
             result.Rule.Fix,
             result.SkipReason,
             ToBaseline(result),
+            // Both or neither: the denominator alone says nothing worth a key, and the numerator alone is
+            // unreadable. Non-zero is the whole gate, which is what makes the pair vanish the moment a rule
+            // is narrowed to authored types.
+            result.SubjectGeneratedTypes > 0 ? result.SubjectTypes : null,
+            result.SubjectGeneratedTypes > 0 ? result.SubjectGeneratedTypes : null,
             elideViolations
                 ? null
                 : result.Violations.Select(v => ToViolation(v, relativizer, grain)).ToList(),

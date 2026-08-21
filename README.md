@@ -81,11 +81,12 @@ Suppose an agent adds a progress printer to the CLI so a slow solution load stop
 FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
+  subject: 154 types, 1 generated
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:10 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:15 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the twenty-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
+That stanza is one rule's worth of the twenty-rule board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope rather than a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
 
 ## In xUnit
 
@@ -188,12 +189,12 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, w
 ```text
   Zphil.LoadBearing — 192 types; references: (none)
   Zphil.LoadBearing.ArchSpec — 1 type; references: Zphil.LoadBearing, Zphil.LoadBearing.Packs.DotNet, Zphil.LoadBearing.Roslyn
-  Zphil.LoadBearing.Cli — 120 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
-  Zphil.LoadBearing.Roslyn — 78 types; references: Zphil.LoadBearing
+  Zphil.LoadBearing.Cli — 120 types (1 generated); references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
+  Zphil.LoadBearing.Roslyn — 78 types (8 generated); references: Zphil.LoadBearing
   Zphil.LoadBearing.Xunit — 2 types; references: Zphil.LoadBearing, Zphil.LoadBearing.Roslyn
 ```
 
-The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The lines not shown here are the test project, the rule pack, and the fixture projects the tests check against.
+The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side: the rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it, and the survey shows it reaching for no other project in the solution. The `(8 generated)` is the count you check before writing a rule on a project: `arch.Project` names everything the assembly declares, so on a web tier where compiled views outnumber the code around them, that number is the difference between a law people can follow and one aimed at nobody. The lines not shown here are the test project, the rule pack, and the fixture projects the tests check against.
 
 `render --diagram <path>` draws that same survey as a Mermaid diagram inside a committed file's managed block. Pointed at this repository and scoped to its six shipping projects, it writes [`ARCHITECTURE.md`](https://github.com/andypgray/loadbearing/blob/main/ARCHITECTURE.md):
 

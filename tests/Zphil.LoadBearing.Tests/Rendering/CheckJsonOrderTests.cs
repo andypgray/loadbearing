@@ -12,13 +12,17 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     <c>arch_check</c>'s too): the roll-up and every trust stamp serialize ahead of <c>rules</c> — the
 ///     bulk a truncating reader's cut lands in — and the stamps serialize ahead of the <c>summary</c> they
 ///     invalidate. The goldens cannot pin this: a stamp is omitted from every clean run, so five of the six
-///     keys here appear in no golden at all. The one document under test carries all of them at once.
+///     keys here appear in no golden at all. The one document under test carries all of them at once —
+///     including the per-rule subject-coverage pair, which the same reasoning applies to one level down.
 /// </summary>
 public sealed class CheckJsonOrderTests
 {
-    // One controller opening the data layer directly, so the rule fails and the roll-up counts are real.
+    // One controller opening the data layer directly, so the rule fails and the roll-up counts are real,
+    // plus an attributed type inside the subject namespace so the rule's subject-coverage pair is populated
+    // too — this document's job is to carry every optional slot at once, and those two are optional.
     private const string OneController = """
                                          namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
+                                         namespace App.Web { [System.CodeDom.Compiler.GeneratedCode("Test", "1.0")] public class Emitted {} }
                                          namespace App.Data { public class Db {} }
                                          """;
 
@@ -70,6 +74,26 @@ public sealed class CheckJsonOrderTests
         ShouldSerializeBefore(StampedDocument, key, "summary");
     }
 
+    [Theory]
+    [InlineData("subjectTypes")]
+    [InlineData("subjectGeneratedTypes")]
+    public void Document_SubjectCoverage_SerializesAheadOfTheRulesViolations(string key)
+    {
+        // Inside a rule rather than at document level: the pair qualifies THIS rule's subject, so it sits
+        // with the rule's own framing — id, verdict, prose, baseline — above the violation list that scales
+        // with the codebase and is the first thing a truncating reader loses. Scoped to the rules block,
+        // because `violations` also names a roll-up count in the summary above it.
+        ShouldSerializeBefore(RulesBlock(StampedDocument), key, "violations");
+    }
+
+    [Fact]
+    public void Document_SubjectCoverage_KeepsTheDenominatorAheadOfTheNumerator()
+    {
+        // "2 types, 1 generated" reads in that order for the same reason it is written in that order: the
+        // count comes before the qualifier that narrows it.
+        ShouldSerializeBefore(RulesBlock(StampedDocument), "subjectTypes", "subjectGeneratedTypes");
+    }
+
     [Fact]
     public void Document_WorkspaceDiagnostics_StaysBelowTheRules()
     {
@@ -77,6 +101,15 @@ public sealed class CheckJsonOrderTests
         // of them is already hoisted into failedProjects and restoreFailedProjects — so this is the one slot
         // deliberately left where a cut can reach it.
         ShouldSerializeBefore(StampedDocument, "rules", "workspaceDiagnostics");
+    }
+
+    // The document from `rules` onward. Several key names appear both in the roll-up summary and inside a
+    // rule, and ShouldHaveKeyAt reads the first occurrence — so an ordering claim about two keys of one rule
+    // has to be made where only the rules are.
+    private static string RulesBlock(string document)
+    {
+        int at = ShouldHaveKeyAt(document, "rules");
+        return document.Substring(at);
     }
 
     private static void ShouldSerializeBefore(string document, string earlier, string later)

@@ -117,6 +117,18 @@ internal sealed record CheckJson(
 ///     whose violations were merely not written here — a skeleton report is still a verdict, and a count of
 ///     0 beside <c>status: passed</c> is what makes it one.
 /// </param>
+/// <param name="SubjectTypes">
+///     How many types the rule's subject materialized to, present only alongside
+///     <see cref="SubjectGeneratedTypes" />. It is the denominator that makes that number readable — "803
+///     of 804" and "803 of 90,000" are different findings — and it appears nowhere else in the document.
+/// </param>
+/// <param name="SubjectGeneratedTypes">
+///     How many of <see cref="SubjectTypes" /> a generator emitted, or null (omitted) when none were. The
+///     pair is populated together and only when the count is non-zero, so it is self-extinguishing:
+///     narrowing the rule with <c>.Authored()</c> empties it and both keys go away. Rendered at every
+///     grain — it is two integers, and the coarser the report the more a reader needs to know the verdict
+///     is partly about code nobody wrote.
+/// </param>
 internal sealed record RuleJson(
     string Id,
     Posture Posture,
@@ -126,6 +138,8 @@ internal sealed record RuleJson(
     string? Fix,
     string? SkipReason,
     BaselineJson? Baseline,
+    int? SubjectTypes,
+    int? SubjectGeneratedTypes,
     IReadOnlyList<ViolationJson>? Violations,
     int? ViolationCount,
     IReadOnlyList<WarningJson> Warnings);

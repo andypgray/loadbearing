@@ -80,8 +80,17 @@ internal static class GraphJsonRenderer
             project.SolutionMember,
             project.ProjectReferences,
             project.Types,
+            project.Generated > 0 ? project.Generated : null,
             grain >= DocumentGrain.Overview
                 ? null
-                : project.Namespaces.Select(n => new GraphNamespaceJson(n.Namespace, n.Types)).ToList());
+                : project.Namespaces.Select(ToNamespace).ToList());
+    }
+
+    // Omitted at zero on both keys, which is what keeps the survey of a solution with no generators exactly
+    // the document it was before the key existed — and keeps the skeleton grain inside its token budget.
+    private static GraphNamespaceJson ToNamespace(NamespaceCount @namespace)
+    {
+        return new GraphNamespaceJson(
+            @namespace.Namespace, @namespace.Types, @namespace.Generated > 0 ? @namespace.Generated : null);
     }
 }

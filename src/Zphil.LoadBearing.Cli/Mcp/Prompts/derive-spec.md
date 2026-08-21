@@ -62,6 +62,13 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
   the solution file does not declare — a passenger, not part of the estate you are writing law
   for, so keep it out of your layer globs. An absent key means membership could not be read.
+  `generated` qualifies a type count — on the project, and on each namespace — with how many of
+  those types a generator emitted; it is absent when none were. **A namespace whose `generated`
+  equals its `types` is wholly generator output: never make it a layer glob and never anchor a
+  rule on it.** A compiled view tier collects hundreds of such types under one namespace nobody
+  typed, and naming it would aim your law at code no one can fix. Where a project's `generated`
+  is a large share of its `types`, prefer namespace subjects over `arch.Project(...)`, or narrow
+  the project noun with `.Authored()`.
 - `projectEdges[]` — **observed** project→project references (distinct type pairs), and only
   references the code declares: a project reaching a type it compiles itself is not an edge,
   however extraction attributed that type (see `multiplyDeclaredTypes[]` below). Compare
@@ -95,7 +102,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]              { name, solutionMember?, projectReferences[], types, namespaces[]{ namespace, types } }
+projects[]              { name, solutionMember?, projectReferences[], types, generated?, namespaces[]{ namespace, types, generated? } }
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
@@ -110,9 +117,12 @@ external row survives. At skeleton grain — `skeleton: true`, or the server's s
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
 and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
 `externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
-edges stay. `unsupportedProjects[]` survives every rung whole, having no count key at all. Read
-the stamp: a survey with no `grain` is the complete one. An absent coverage key with no count
-beside it means the solution has none; the count key is what tells elision from absence.
+edges stay. `unsupportedProjects[]` survives every rung whole, having no count key at all. A
+project's own `generated` survives every rung too, riding its row; only the per-namespace one
+goes, with the inventory that carries it — so at any grain you can still see which projects are
+mostly generator output, and drop to full grain to see which namespaces. Read the stamp: a
+survey with no `grain` is the complete one. An absent coverage key with no count beside it means
+the solution has none; the count key is what tells elision from absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project

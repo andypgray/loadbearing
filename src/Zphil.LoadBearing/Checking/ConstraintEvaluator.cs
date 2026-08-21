@@ -6,6 +6,27 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
+///     How much of a rule's materialized subject set a generator emitted: <see cref="Types" /> is the whole
+///     set, <see cref="Generated" /> the part of it no author wrote. A struct so that
+///     <see langword="default" /> is the zero pair — what a rule that never reached a subject at all
+///     (errored, skipped, empty) reports, with no null to thread through the checker.
+/// </summary>
+internal readonly struct SubjectCoverage
+{
+    public SubjectCoverage(int types, int generated)
+    {
+        Types = types;
+        Generated = generated;
+    }
+
+    /// <summary>The size of the materialized subject set.</summary>
+    public int Types { get; }
+
+    /// <summary>How many of <see cref="Types" /> a generator emitted.</summary>
+    public int Generated { get; }
+}
+
+/// <summary>
 ///     Evaluates one <see cref="Constraint" /> against the codebase, per-verb (GRAMMAR §4.1, §4.3,
 ///     §4.5, §4.7, §4.8, §4.9, §5.3): each dependency verb walks the <see cref="CodebaseModel" /> edge
 ///     list its family is extracted into, and each shape verb tests every subject directly.
@@ -65,14 +86,15 @@ internal sealed class ConstraintEvaluator
         return $"The subject selection operand \"{operandReference}\" matched no solution-declared types.";
     }
 
-    internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) Evaluate(Constraint constraint)
+    internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
+        Evaluate(Constraint constraint)
     {
         // Loud per-operand emptiness for a union subject (GRAMMAR §9), ahead of the member dispatch because
         // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
         // member-subject paths alike. The gate hands back the operand sets it evaluated, so the union
         // subject is folded from them rather than evaluated a second time.
         (IReadOnlyList<Violation> emptyOperands, IReadOnlyList<HashSet<TypeNode>>? unionOperands) = EmptySubjectOperands(constraint.Subject);
-        if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings);
+        if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings, default);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
         // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
@@ -80,8 +102,36 @@ internal sealed class ConstraintEvaluator
         if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, unionOperands);
 
         HashSet<TypeNode> subjects = Subjects(constraint.Subject, unionOperands);
-        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings);
+        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings, default);
 
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = Dispatch(constraint, subjects);
+        return (violations, warnings, CoverageOf(subjects));
+    }
+
+    // The subject-coverage pair the report states (GRAMMAR §5.2): how big the materialized subject set is
+    // and how much of it a generator emitted. Measured HERE, on the set the verbs actually range over,
+    // rather than on the selection that produced it — which is what makes the statement self-extinguishing:
+    // adding .Authored() leaves nothing generated, and the statement disappears with no separate rule about
+    // when to suppress it. Both numbers, because "803 of 804" and "803 of 90,000" are different findings and
+    // the denominator appears nowhere else in the document.
+    private static SubjectCoverage CoverageOf(IReadOnlyCollection<TypeNode> subjects)
+    {
+        return new SubjectCoverage(subjects.Count, subjects.Count(type => type.IsGenerated));
+    }
+
+    // A member subject's coverage is reported in DECLARING TYPES, not members: the pair has to keep one unit
+    // for "n of m" to mean anything, and the generated-ness fact is a type fact — a member of a generated
+    // type is generated code whether or not it is counted as one.
+    private static SubjectCoverage MemberCoverageOf(IReadOnlyList<MemberNode> members)
+    {
+        var declaringTypes = new HashSet<ITypeInfo>(members.Select(member => member.DeclaringType));
+        return new SubjectCoverage(declaringTypes.Count, declaringTypes.Count(type => type.IsGenerated));
+    }
+
+    // The verb dispatch, lifted out of Evaluate unchanged so the coverage pair can ride beside the pair every
+    // arm returns. No arm knows about coverage — the subject set it is measured from is already resolved.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Dispatch(Constraint constraint, HashSet<TypeNode> subjects)
+    {
         switch (constraint)
         {
             case MustNotReferenceConstraint c:
@@ -495,15 +545,23 @@ internal sealed class ConstraintEvaluator
     // violation at its own declaration sites, identity keyed on its DocId (§4.6). An empty member subject
     // fails with the member-flavored message (the analog of the empty type subject). Resolution can throw
     // RuleEvaluationException (a closed-generic .Returning anchor); ArchChecker turns that into a RuleError.
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EvaluateMember(
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateMember(
         MemberConstraint constraint, IReadOnlyList<HashSet<TypeNode>>? unionOperands)
     {
         // MemberConstraint.Subject IS MemberSubject.Source, so the union gate's operand sets are this
         // member selection's source types — resolved from them rather than evaluated a second time.
         HashSet<TypeNode> sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
         IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
-        if (members.Count == 0) return ([Violation.EmptySubject(EmptyMemberSubjectMessage)], NoWarnings);
+        if (members.Count == 0) return ([Violation.EmptySubject(EmptyMemberSubjectMessage)], NoWarnings, default);
 
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchMember(constraint, members);
+        return (violations, warnings, MemberCoverageOf(members));
+    }
+
+    // The member-verb dispatch, lifted out of EvaluateMember unchanged for the same reason Dispatch was.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchMember(
+        MemberConstraint constraint, IReadOnlyList<MemberNode> members)
+    {
         switch (constraint)
         {
             case MemberMustHaveSuffixConstraint c:

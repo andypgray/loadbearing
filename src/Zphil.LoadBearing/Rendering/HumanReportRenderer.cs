@@ -60,12 +60,31 @@ public static class HumanReportRenderer
         {
             output.WriteLine($"  because: {result.Rule.Because}");
             if (result.Rule.Fix is { } fix) output.WriteLine($"  fix: {fix}");
-            foreach (string line in ViolationLines(result, relativizer)) output.WriteLine($"  {line}");
         }
+
+        RenderSubjectLine(output, result);
+
+        // Split from the because/fix block above rather than joined to it: the subject line renders for a
+        // passing rule too, and it belongs with the rule's own framing rather than after its site list.
+        if (result.Status == RuleStatus.Failed)
+            foreach (string line in ViolationLines(result, relativizer))
+                output.WriteLine($"  {line}");
 
         if (result.Rule.BaselinePath is not null) RenderRatchetLines(output, result);
 
         foreach (CheckWarning warning in result.Warnings) output.WriteLine($"  warning: {warning.Message}");
+    }
+
+    // What the rule's subject actually swept, stated only when some of it is generator output — so a rule
+    // aimed squarely at code someone wrote says nothing, and the line's presence is itself the finding.
+    // It is a fact, never advice: .Authored() is the cure often enough to name in the docs and wrong often
+    // enough that a nag here would be noise on every green run.
+    private static void RenderSubjectLine(TextWriter output, RuleResult result)
+    {
+        if (result.SubjectGeneratedTypes == 0) return;
+
+        string types = Plurals.Noun(result.SubjectTypes, "type");
+        output.WriteLine($"  subject: {result.SubjectTypes} {types}, {result.SubjectGeneratedTypes} generated");
     }
 
     // The ratchet's human lines (Migrate and Quarantine containment). Baselined violations pass, so they

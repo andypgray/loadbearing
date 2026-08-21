@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RazorApp.Core/RazorApp.Core.csproj" />
+  <Project Path="RazorApp.Web/RazorApp.Web.csproj" />
+</Solution>

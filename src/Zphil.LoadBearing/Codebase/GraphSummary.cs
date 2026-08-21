@@ -55,9 +55,9 @@ public sealed class GraphSummary
 /// <summary>
 ///     One project in the survey: its name, whether the solution declares it, its declared forward project
 ///     references (verbatim from the <see cref="ProjectNode" />), the count of its solution-declared types,
-///     and its namespace inventory. Comparing <see cref="ProjectReferences" /> against the
-///     <see cref="GraphSummary.ProjectEdges" /> surfaces declared-but-unobserved references (the
-///     dead-reference signal).
+///     how many of those a generator emitted, and its namespace inventory. Comparing
+///     <see cref="ProjectReferences" /> against the <see cref="GraphSummary.ProjectEdges" /> surfaces
+///     declared-but-unobserved references (the dead-reference signal).
 /// </summary>
 public sealed class ProjectSummary
 {
@@ -65,12 +65,14 @@ public sealed class ProjectSummary
         string name,
         IReadOnlyList<string> projectReferences,
         int types,
+        int generated,
         IReadOnlyList<NamespaceCount> namespaces,
         bool? solutionMember = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
         Types = types;
+        Generated = generated;
         Namespaces = namespaces;
         SolutionMember = solutionMember;
     }
@@ -83,6 +85,15 @@ public sealed class ProjectSummary
 
     /// <summary>The count of this project's solution-declared (non-external) types.</summary>
     public int Types { get; }
+
+    /// <summary>
+    ///     How many of <see cref="Types" /> a generator emitted (<see cref="ITypeInfo.IsGenerated" />) — a
+    ///     subset of that count, never a separate population. It is the survey's answer to what a
+    ///     project-anchored subject would sweep before a rule is written: a project whose two counts are
+    ///     close is one where <c>arch.Project(…)</c> aims most of a rule at code nobody can fix, and
+    ///     <c>.Authored()</c> is the narrowing that says so.
+    /// </summary>
+    public int Generated { get; }
 
     /// <summary>The distinct namespaces of this project's declared types with per-namespace counts, ordinal by namespace.</summary>
     public IReadOnlyList<NamespaceCount> Namespaces { get; }
@@ -99,10 +110,11 @@ public sealed class ProjectSummary
 /// <summary>A namespace and the number of a project's solution-declared types that reside in it.</summary>
 public sealed class NamespaceCount
 {
-    internal NamespaceCount(string @namespace, int types)
+    internal NamespaceCount(string @namespace, int types, int generated)
     {
         Namespace = @namespace;
         Types = types;
+        Generated = generated;
     }
 
     /// <summary>The namespace; the empty/global namespace renders as <c>(global)</c>.</summary>
@@ -110,6 +122,13 @@ public sealed class NamespaceCount
 
     /// <summary>The count of the project's declared types in this namespace.</summary>
     public int Types { get; }
+
+    /// <summary>
+    ///     How many of <see cref="Types" /> a generator emitted — a subset of that count. A namespace where
+    ///     the two are equal is wholly generator output, which is the shape that must never become a layer
+    ///     glob: a compiled view tier collects under one namespace nobody typed.
+    /// </summary>
+    public int Generated { get; }
 }
 
 /// <summary>

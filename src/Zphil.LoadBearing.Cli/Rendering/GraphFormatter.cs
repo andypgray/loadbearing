@@ -109,16 +109,28 @@ internal static class GraphFormatter
     {
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
         string membership = project.SolutionMember == false ? " (not a solution member)" : "";
-        return $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}; "
+        string generated = project.Generated > 0 ? $" ({project.Generated} generated)" : "";
+        return $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}{generated}; "
                + $"references: {references}";
     }
 
     private static string NamespaceLine(ProjectSummary project)
     {
         string inventory = project.Namespaces.Count > 0
-            ? string.Join(", ", project.Namespaces.Select(n => $"{n.Namespace} ({n.Types})"))
+            ? string.Join(", ", project.Namespaces.Select(NamespaceEntry))
             : "(none)";
         return $"  {project.Name}: {inventory}";
+    }
+
+    // A wholly generated namespace reads "all generated" rather than repeating the count it just gave. That
+    // is the shape a reader most needs to catch — a compiled view tier collects under one namespace nobody
+    // typed, and it is the one namespace here that must never become a layer glob.
+    private static string NamespaceEntry(NamespaceCount @namespace)
+    {
+        if (@namespace.Generated == 0) return $"{@namespace.Namespace} ({@namespace.Types})";
+
+        string qualifier = @namespace.Generated == @namespace.Types ? "all generated" : $"{@namespace.Generated} generated";
+        return $"{@namespace.Namespace} ({@namespace.Types}, {qualifier})";
     }
 
     private static IEnumerable<string> ProjectEdgeLines(GraphSummary summary)

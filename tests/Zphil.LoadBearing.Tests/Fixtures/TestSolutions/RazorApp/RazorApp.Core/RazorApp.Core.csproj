@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The contrast arm. A plain SDK project with no generator of any kind, so every type it declares is
+         authored - which is what lets one document show both sides of the boundary at once, rather than
+         asserting a presence here and an absence in a second fixture nothing ties to this one. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- Pin the declared project-reference chain graph, not the SDK's transitive closure. -->
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    </PropertyGroup>
+</Project>

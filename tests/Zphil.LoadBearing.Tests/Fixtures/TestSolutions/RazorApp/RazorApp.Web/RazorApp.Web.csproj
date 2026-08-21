@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <!-- The Web SDK is the point of this project: it runs the Razor source generator over the .cshtml files
+         below, which emits one AspNetCoreGeneratedDocument type per view carrying a banner and NO
+         [GeneratedCode] attribute. That shape - real generator output that the attribute alone cannot see -
+         is what this fixture exists to hold, and it is why the regression pin uses a compiled view rather
+         than a hand-written type named to look generated. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- Pin the declared project-reference chain graph, not the SDK's transitive closure. -->
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+        <!-- An explicit Main rather than top-level statements. The Web SDK's PublicProgramSourceGenerator
+             emits a banner-carrying `partial class Program` beside a top-level-statements entry point, which
+             would put a SECOND generator's output in this project and make the counts below read as though
+             the Razor generator had emitted it. -->
+        <OutputType>Exe</OutputType>
+        <!-- The Web SDK brings PackageReferences with it, which would otherwise turn on .NET's NuGet
+             vulnerability audit. The audit fetches advisory data from every configured feed, and an
+             unreachable private feed emits NU1900 warnings that MSBuildWorkspace surfaces as workspace
+             diagnostics - tripping check's fail-closed gate. A throwaway test fixture needs no audit, and
+             disabling it keeps the fixture's workspace load clean and offline-deterministic. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\RazorApp.Core\RazorApp.Core.csproj" />
+    </ItemGroup>
+</Project>

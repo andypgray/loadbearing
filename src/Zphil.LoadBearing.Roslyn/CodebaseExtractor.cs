@@ -123,6 +123,15 @@ public static class CodebaseExtractor
         IEnumerable<Task<Compilation?>> compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
         Compilation?[] compilations = await Task.WhenAll(compilationTasks);
 
+        // The provenance half of the generated-code signal (GRAMMAR §5.2), read once per project. It runs
+        // AFTER the compilation batch rather than beside it because binding is what executes the generators:
+        // by here every generated document is realized, so this batch is a cache read rather than a second
+        // round of generator work. This single fill covers the CLI, the warm MCP session, the xUnit adapter
+        // and binlog replay, because every one of them funnels through this method.
+        IEnumerable<Task<IReadOnlySet<SyntaxTree>>> generatedTreeTasks =
+            projects.Select(project => GeneratedTreesOfAsync(project, ct));
+        IReadOnlySet<SyntaxTree>[] generatedTrees = await Task.WhenAll(generatedTreeTasks);
+
         // One canonicalizer for the whole enumeration: every project's membership is tested against a
         // canonicalized path, and the projects of one solution share nearly all of their ancestors.
         var canonicalProjectFiles = new ProjectFileCanonicalizer();
@@ -143,10 +152,26 @@ public static class CodebaseExtractor
             inputs.Add(new CompilationInput(
                 compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project),
                 SpecExclusion.SolutionMembershipOf(
-                    declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath))));
+                    declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath)),
+                generatedTrees[i]));
         }
 
         return inputs;
+    }
+
+    // The trees one project's source generators produced, by reference — the identity the extractor tests
+    // each declaring tree against. Holding trees rather than the documents' paths is what survives a build
+    // that sets EmitCompilerGeneratedFiles, which moves every generated document off its pseudo-path.
+    private static async Task<IReadOnlySet<SyntaxTree>> GeneratedTreesOfAsync(Project project, CancellationToken ct)
+    {
+        IEnumerable<SourceGeneratedDocument> documents = await project.GetSourceGeneratedDocumentsAsync(ct);
+
+        var trees = new HashSet<SyntaxTree>();
+        foreach (SourceGeneratedDocument document in documents)
+            if (await document.GetSyntaxTreeAsync(ct) is { } tree)
+                trees.Add(tree);
+
+        return trees;
     }
 
     private static string? TargetFrameworkOf(IReadOnlyDictionary<ProjectId, string>? targetFrameworks, Project project)
