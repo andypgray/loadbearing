@@ -114,15 +114,8 @@ internal sealed record DeclaredProjects(
 ///         disk-independent for its <see cref="ParseDeclaredProjects" /> core.
 ///     </para>
 /// </remarks>
-internal static class SolutionProjectFileParser
+internal static partial class SolutionProjectFileParser
 {
-    // A classic-.sln project line: Project("{TypeGuid}") = "Name", "Relative\Path.csproj", "{ProjectGuid}".
-    // The second quoted field (named group "path") is the project path; solution folders put a folder name
-    // there instead, filtered out later by the .csproj extension test.
-    private static readonly Regex SlnProjectLine = new(
-        "Project\\(\"\\{[^}]*\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"(?<path>[^\"]*)\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     /// <summary>
     ///     Whether this parser owns <paramref name="solutionPath" />'s format — the two full-solution formats
     ///     and the solution filter that points at one. A caller that subtracts declared membership must ask
@@ -367,7 +360,7 @@ internal static class SolutionProjectFileParser
 
     private static IEnumerable<string> ParseSln(string solutionText)
     {
-        foreach (Match match in SlnProjectLine.Matches(solutionText))
+        foreach (Match match in SlnProjectLine().Matches(solutionText))
             yield return match.Groups["path"].Value;
     }
 
@@ -381,4 +374,15 @@ internal static class SolutionProjectFileParser
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(path => path!);
     }
+
+    /// <summary>
+    ///     A classic-<c>.sln</c> project line:
+    ///     <c>Project("{TypeGuid}") = "Name", "Relative\Path.csproj", "{ProjectGuid}"</c>. The second quoted
+    ///     field (named group <c>path</c>) is the project path; solution folders put a folder name there
+    ///     instead, filtered out later by the <c>.csproj</c> extension test.
+    /// </summary>
+    [GeneratedRegex(
+        "Project\\(\"\\{[^}]*\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"(?<path>[^\"]*)\"",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex SlnProjectLine();
 }

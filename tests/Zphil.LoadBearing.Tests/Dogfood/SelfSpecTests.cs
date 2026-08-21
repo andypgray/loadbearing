@@ -413,8 +413,11 @@ public sealed class SelfSpecTests
     ///     stays authored while the three types each regex emits, plus the single <c>Utilities</c> class they
     ///     share, do not. Two of every three are nested and carry no attribute of their own, which is what
     ///     makes the containing-type walk load-bearing rather than defensive; the <c>_N</c> suffix is the
-    ///     generator's declaration index within the file, so reordering the partial methods renumbers them and
-    ///     moves this pin with them. Beside them sits the attribute-on-the-generated-<em>class</em> shape:
+    ///     generator's declaration index across the whole <em>compilation</em>, not within one file, so a
+    ///     <c>[GeneratedRegex]</c> added in an earlier-sorting file renumbers every one after it and moves this
+    ///     pin for an edit the test never names. <c>SlnProjectLine_2</c>, which lives in
+    ///     <c>SolutionProjectFileParser</c> rather than beside <c>AuditText_0</c>/<c>AuditCode_1</c>, is the
+    ///     standing proof. Beside them sits the attribute-on-the-generated-<em>class</em> shape:
     ///     <c>ManifestJsonContext</c>, whose declaration is hand-written and whose partial halves merge onto
     ///     one symbol, lands on the generated side exactly as the CLI's <c>LoadBearingJsonContext</c> does
     ///     (<see cref="CliProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes" />). Both live here rather
@@ -443,6 +446,9 @@ public sealed class SelfSpecTests
                 "System.Text.RegularExpressions.Generated.AuditText_0",
                 "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory",
                 "System.Text.RegularExpressions.Generated.AuditText_0.RunnerFactory.Runner",
+                "System.Text.RegularExpressions.Generated.SlnProjectLine_2",
+                "System.Text.RegularExpressions.Generated.SlnProjectLine_2.RunnerFactory",
+                "System.Text.RegularExpressions.Generated.SlnProjectLine_2.RunnerFactory.Runner",
                 "System.Text.RegularExpressions.Generated.Utilities",
                 "Zphil.LoadBearing.Roslyn.Caching.ManifestJsonContext"
             ], ignoreOrder: true);
