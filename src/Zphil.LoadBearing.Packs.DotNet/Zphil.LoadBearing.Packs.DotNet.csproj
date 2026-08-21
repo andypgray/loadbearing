@@ -24,8 +24,8 @@
              itself. HttpClient, Task, CancellationToken, and the [Table]/[ComplexType] attributes all
              resolve from the shared framework, so there is nothing else to reference. Pinned at the
              newest in-repo version; the example spec projects sit at 10.0.9 and unify upward. -->
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
     </ItemGroup>
 
 </Project>
