@@ -274,6 +274,140 @@ public sealed class GraphSummarizerTests
         scoped.ExternalEdges.ShouldBeEmpty();
     }
 
+    // ── Multiply-declared source ──────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Summarize_ReferenceIntoATypeTheSourceProjectAlsoDeclares_RendersNoProjectEdge()
+    {
+        // Arrange — Shared.Widget is compiled into BOTH projects (a <Compile Include> link in the real
+        // shape). Facts follow Lib, the first declarer, so App's reference to its OWN copy resolves to a
+        // node stamped 'Lib' — and used to render as App -> Lib, an edge no project file declares.
+        GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
+
+        // Assert — App declares no ProjectReference to Lib and the survey must not invent one.
+        summary.ProjectEdges.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Summarize_GenuineEdgeBetweenTheSamePair_SurvivesWithItsOwnCountAlone()
+    {
+        // Arrange — App both compiles its own copy of Shared.Widget and genuinely references Lib.Service,
+        // which only Lib declares. Suppressing on the project pair rather than on the type pair would drop
+        // the real edge with the phantom; keeping the phantom would inflate the count to 2.
+        CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
+                                                                            namespace Shared { public class Widget {} }
+                                                                            namespace Lib { public class Service {} }
+                                                                            """));
+        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib", ("App.cs", """
+                                                                                                               namespace Shared { public class Widget {} }
+                                                                                                               namespace App
+                                                                                                               {
+                                                                                                                   public class Own { public Shared.Widget W; }
+                                                                                                                   public class Client { public Lib.Service S; }
+                                                                                                               }
+                                                                                                               """));
+
+        // Act
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert — one edge, one type pair: App.Client -> Lib.Service.
+        summary.ProjectEdges.Select(e => (e.Source, e.Target, e.References))
+            .ShouldBe([("App", "Lib", 1)]);
+    }
+
+    [Fact]
+    public void Summarize_MultiplyDeclaredTypes_NameEveryDeclarerAndTheOneWhoseFactsWon()
+    {
+        // Arrange — the fact the suppressed edge would otherwise have been the only sign of: without it, a
+        // reader cannot see that arch.Project("App") will miss Shared.Widget.
+        GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
+
+        // Assert — declaredBy carries the winner too, so the entry reads whole, and it is ordinal rather
+        // than declarer-order: the roster is a set of names, not a history of which arrived first.
+        MultiplyDeclaredTypeSummary widget = summary.MultiplyDeclaredTypes.ShouldHaveSingleItem();
+        widget.Type.ShouldBe("Shared.Widget");
+        widget.DeclaredBy.ShouldBe(["App", "Lib"]);
+        widget.FactsFollow.ShouldBe("Lib");
+    }
+
+    [Fact]
+    public void Summarize_SeveralMultiplyDeclaredTypes_OrdersThemOrdinalByFullName()
+    {
+        // Arrange — declared out of order in both files, so nothing but the sort can produce the order.
+        CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
+                                                                            namespace Shared { public class Zebra {} public class Aardvark {} }
+                                                                            """));
+        CompilationInput app = CompilationFactory.Compile("App", ("App.cs", """
+                                                                            namespace Shared { public class Zebra {} public class Aardvark {} }
+                                                                            """));
+
+        // Act
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert
+        summary.MultiplyDeclaredTypes.Select(t => t.Type)
+            .ShouldBe(["Shared.Aardvark", "Shared.Zebra"]);
+    }
+
+    [Fact]
+    public void Summarize_SolutionWithNoLinkedSource_SaysNothingAboutMultiplyDeclaredTypes()
+    {
+        // The common case, and the one the survey's optional key rests on: nothing to say, so the list is
+        // empty and every existing document is byte-identical.
+        GraphSummary summary = ThreeProjectSummary();
+
+        summary.MultiplyDeclaredTypes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Scope_MultiplyDeclaredType_SurvivesWhenAnyOfItsDeclarersIsInScope()
+    {
+        // Arrange — Shared.Widget's facts follow Lib; the scope names App, the loser.
+        GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
+
+        // Act
+        GraphSummary scoped = GraphSummarizer.Scope(summary, ["App"]);
+
+        // Assert — any-declarer, mirroring the either-endpoint rule the project edges take. Keying on the
+        // winner alone would drop the entry from precisely the scope whose author needs it: the reason to
+        // read it is that a subject anchored on App will miss this type.
+        scoped.MultiplyDeclaredTypes.Select(t => t.Type)
+            .ShouldBe(["Shared.Widget"]);
+    }
+
+    [Fact]
+    public void Scope_MultiplyDeclaredTypeWithNoDeclarerInScope_IsNarrowedOut()
+    {
+        // Arrange
+        GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
+
+        // Act — a project that declares nothing shared.
+        GraphSummary scoped = GraphSummarizer.Scope(summary, ["Other"]);
+
+        // Assert — a complete survey of a smaller subject, so an entry no scoped project declares goes.
+        scoped.MultiplyDeclaredTypes.ShouldBeEmpty();
+    }
+
+    // Two projects compiling one shared type, which is what a <Compile Include> link produces: App declares
+    // Shared.Widget itself and references it, and declares NO ProjectReference to Lib. The first declarer in
+    // input order wins the facts — this path takes its inputs as given, where the workspace path hands them
+    // over ordinal by project name — so App's reference to its own copy resolves to a node stamped 'Lib'.
+    private static CodebaseModel LinkedSourceModel()
+    {
+        CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
+                                                                            namespace Shared;
+                                                                            public class Widget {}
+                                                                            """));
+        CompilationInput app = CompilationFactory.Compile("App", ("App.cs", """
+                                                                            namespace Shared { public class Widget {} }
+                                                                            namespace App { public class Own { public Shared.Widget W; } }
+                                                                            """));
+
+        return CodebaseExtractor.ExtractFromCompilations([lib, app]);
+    }
+
     // Three projects in a chain — Contoso.Web -> Acme.App -> Acme.Lib — with one external edge, out of
     // Acme.App only (System.Exception as a base type), so every scoping row below is hand-verifiable.
     private static GraphSummary ThreeProjectSummary()

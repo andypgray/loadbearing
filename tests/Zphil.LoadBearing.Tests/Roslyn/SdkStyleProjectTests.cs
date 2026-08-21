@@ -70,6 +70,9 @@ public sealed class SdkStyleProjectTests
         "LayoutApp.Spec.csproj: SDK-style, no assets file",
         // The restored fixture solutions: SDK-style, and the assets file the classification predicts is
         // there. This is the pairing — the predicate earns the right to gate here, not in the XML.
+        "LinkedApp.Client.csproj: SDK-style, assets file present",
+        "LinkedApp.Core.csproj: SDK-style, assets file present",
+        "LinkedApp.Tool.csproj: SDK-style, assets file present",
         "MultiTfm.Core.csproj: SDK-style, assets file present",
         "MultiTfm.Web.csproj: SDK-style, assets file present",
         "MyApp.Domain.csproj: SDK-style, assets file present",

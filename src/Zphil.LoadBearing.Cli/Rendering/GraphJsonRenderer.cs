@@ -34,6 +34,12 @@ internal static class GraphJsonRenderer
         IReadOnlyList<string> projectsScope)
     {
         bool elideExternalEdges = grain >= DocumentGrain.Skeleton;
+
+        // The coverage statement rides the same rung as the external rows, and for the same reason: its
+        // length scales with the codebase. Where it parts company is the empty case — absent rather than an
+        // empty array or a zero count — so a solution with nothing to say carries neither of its two keys at
+        // any grain, and its survey is byte-identical to the one before the statement existed.
+        bool anyMultiplyDeclaredTypes = summary.MultiplyDeclaredTypes.Count > 0;
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
@@ -48,6 +54,10 @@ internal static class GraphJsonRenderer
                 ? null
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
             elideExternalEdges ? summary.ExternalEdges.Count : null,
+            anyMultiplyDeclaredTypes && !elideExternalEdges
+                ? summary.MultiplyDeclaredTypes.Select(t => new GraphMultiplyDeclaredTypeJson(t.Type, t.DeclaredBy, t.FactsFollow)).ToList()
+                : null,
+            anyMultiplyDeclaredTypes && elideExternalEdges ? summary.MultiplyDeclaredTypes.Count : null,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             trust.ModelIncomplete,
             trust.FailedProjects,

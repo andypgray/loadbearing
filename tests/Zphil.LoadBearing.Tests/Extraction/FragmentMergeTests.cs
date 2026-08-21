@@ -421,6 +421,60 @@ public sealed class FragmentMergeTests
         ]);
     }
 
+    [Fact]
+    public void ExtractFromCompilations_ConflatedType_CarriesEveryLosingProjectOnTheWinningNode()
+    {
+        // The same conflation as the note above, kept as a fact rather than only as a sentence: the survey
+        // has to suppress an edge on it, and no consumer can act on prose. Losers only — ProjectName is the
+        // winner, so repeating it here would make the node say the same thing twice.
+        CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """
+                                                                                 namespace N;
+                                                                                 public class Dup {}
+                                                                                 """));
+        CompilationInput stubB = CompilationFactory.Compile("Spec.B", ("B.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+        CompilationInput stubA = CompilationFactory.Compile("Spec.A", ("A.cs", """
+                                                                               namespace N;
+                                                                               public class Dup {}
+                                                                               """));
+
+        // Losers arrive out of order; the list orders them ordinal like the note that reads the same table.
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, stubB, stubA]);
+
+        TypeNode dup = model.Type("N.Dup");
+        dup.ProjectName.ShouldBe("App.Web");
+        dup.AlsoDeclaredBy.ShouldBe(["Spec.A", "Spec.B"]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_TypesNoOtherProjectDeclares_CarryNoOtherDeclarers()
+    {
+        // The overwhelming common case, and what keeps the survey's coverage statement absent rather than
+        // empty: an ordinary type says nothing, and so does one whose own project declared it twice under
+        // two target frameworks — one project is never a conflation.
+        var file = ("P.cs", """
+                            namespace P;
+                            public class A {}
+                            """);
+        var modern = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "net10.0");
+        var legacy = new CompilationInput(CompilationFactory.Compile("P", file)
+            .Compilation, "P", [], "netstandard2.0");
+        CompilationInput other = CompilationFactory.Compile("Q", ("Q.cs", """
+                                                                          namespace Q;
+                                                                          public class B {}
+                                                                          """));
+
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy, other]);
+
+        model.Type("P.A")
+            .AlsoDeclaredBy.ShouldBeEmpty();
+        model.Type("Q.B")
+            .AlsoDeclaredBy.ShouldBeEmpty();
+    }
+
     // ── Multi-target-framework collapse notes ─────────────────────────────────────────────────────────
 
     [Fact]

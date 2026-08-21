@@ -67,6 +67,11 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "namespace root. " +
         "Every project the workspace loaded is here, which is wider than the solution: solutionMember false " +
         "marks a passenger a ProjectReference dragged in, and an absent key means membership was unreadable. " +
+        "projectEdges[] carry only references the code declares: where one source file is compiled into " +
+        "several projects, a project referencing its own compiled-in copy is not an edge to the declarer the " +
+        "type was attributed to, and multiplyDeclaredTypes[] names those types with every declaring project " +
+        "and the one whose facts won — arch.Project() on any other declarer will not select them (the key is " +
+        "absent when the solution has none). " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +
@@ -189,9 +194,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "grain, never a narrower subject.")]
         bool overview = false,
         [Description(
-            "Elide the namespace inventories and the external-reference rows, keeping every project, its "
-            + "declared references and type count, and the observed project edges; the elided rows are "
-            + "reported as a count. Coarser than overview, still not a narrower subject.")]
+            "Elide the namespace inventories, the external-reference rows and the multiply-declared types, "
+            + "keeping every project, its declared references and type count, and the observed project "
+            + "edges; each elided section is reported as a count. Coarser than overview, still not a "
+            + "narrower subject.")]
         bool skeleton = false,
         [Description(
             "Project-name globs, semicolon-separated ('*' allowed). References in both directions are "

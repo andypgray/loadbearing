@@ -3,11 +3,16 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
-// The seven optional slots below — grain, projectsScope, and the five workspace ones — are additive and null
-// (omitted) on a full, unscoped survey whose workspace loaded, whose NuGet packages resolved and that no
-// solution filter narrowed, so the schema stays version 1 and the default document is byte-identical to the
-// one before they existed. A run whose model is incomplete reaches this document only under
-// --allow-workspace-diagnostics, since graph otherwise refuses before extraction.
+// The eight optional slots below — grain, projectsScope, multiplyDeclaredTypes, and the five workspace ones
+// — are additive and null (omitted) on a full, unscoped survey of a healthy solution whose workspace
+// loaded, whose NuGet packages resolved and that no solution filter narrowed, so the schema stays version 1
+// and the default document is byte-identical to the one before they existed. A run whose model is
+// incomplete reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses
+// before extraction.
+//
+// multiplyDeclaredTypes is the survey's first COVERAGE STATEMENT — a flat, optional, top-level key saying
+// what the survey above does not cover, absent when there is nothing to say, and elided to a count at
+// skeleton grain because its content scales with the codebase rather than with the schema.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
 /// <param name="Grain">
@@ -60,6 +65,19 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     is elided. Rendered so a coarser survey still says what is missing and how much of it there was,
 ///     rather than reading like a codebase with no external dependencies.
 /// </param>
+/// <param name="MultiplyDeclaredTypes">
+///     The types more than one project declares — one source file compiled into several of them — each with
+///     every declaring project and the one whose facts and project attribution the type follows. Null
+///     (omitted) when the solution has none, which is the overwhelming common case, and null at skeleton
+///     grain too, where <see cref="MultiplyDeclaredTypeCount" /> stands in for it. The fact a rule author
+///     needs before anchoring a subject on a project: <c>arch.Project</c> named on any declarer but
+///     <c>factsFollow</c> will not select the type.
+/// </param>
+/// <param name="MultiplyDeclaredTypeCount">
+///     How many multiply-declared entries the elision dropped, present only when
+///     <see cref="MultiplyDeclaredTypes" /> is elided at skeleton grain — never rendered as a bare
+///     <c>0</c>, so a healthy solution's document is untouched.
+/// </param>
 internal sealed record GraphJson(
     int SchemaVersion,
     string Solution,
@@ -69,6 +87,8 @@ internal sealed record GraphJson(
     IReadOnlyList<GraphProjectEdgeJson> ProjectEdges,
     IReadOnlyList<GraphExternalEdgeJson>? ExternalEdges,
     int? ExternalEdgeCount,
+    IReadOnlyList<GraphMultiplyDeclaredTypeJson>? MultiplyDeclaredTypes,
+    int? MultiplyDeclaredTypeCount,
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
@@ -101,3 +121,13 @@ internal sealed record GraphProjectEdgeJson(string Source, string Target, int Re
 
 /// <summary>An external reference grouped by target namespace root, with its distinct type-pair count.</summary>
 internal sealed record GraphExternalEdgeJson(string Source, string TargetNamespaceRoot, int References);
+
+/// <summary>
+///     One type several projects declare: its full name, every declaring project, and the declarer whose
+///     facts won. <c>declaredBy</c> carries the winner too, so the entry reads whole rather than as a losers
+///     list a reader has to add <c>factsFollow</c> back into.
+/// </summary>
+internal sealed record GraphMultiplyDeclaredTypeJson(
+    string Type,
+    IReadOnlyList<string> DeclaredBy,
+    string FactsFollow);

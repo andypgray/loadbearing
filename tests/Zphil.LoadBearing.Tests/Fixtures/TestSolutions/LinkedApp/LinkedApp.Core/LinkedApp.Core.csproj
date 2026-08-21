@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The linked-source fixture's home project: it declares Shared/Widget.cs natively, and
+         LinkedApp.Tool compiles that very file a second time through a <Compile Include> link. Extraction
+         attributes a multiply-declared type to its FIRST declarer in ordinal project order, and this project
+         is that declarer by name — 'LinkedApp.Client' sorts first overall but declares nothing shared — so
+         the winner is decided by the sort rather than by an accident of enumeration.
+         Package-free like the other TestSolutions beds: the whole restore resolves from the SDK, so the
+         startup sweep costs no network. Restored UNLOCKED — the lock-file policy lives only in the tests
+         project, never here. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+    </PropertyGroup>
+</Project>

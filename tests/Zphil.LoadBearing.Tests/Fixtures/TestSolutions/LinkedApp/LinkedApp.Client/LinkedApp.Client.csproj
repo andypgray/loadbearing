@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The control. A real ProjectReference to Core and a reference to a type only Core declares, so the
+         genuine LinkedApp.Client -> LinkedApp.Core edge must survive the suppression that removes Tool's
+         phantom one. Without it the fix would be indistinguishable from dropping every edge into a project
+         that happens to declare a shared type. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\LinkedApp.Core\LinkedApp.Core.csproj" />
+    </ItemGroup>
+</Project>

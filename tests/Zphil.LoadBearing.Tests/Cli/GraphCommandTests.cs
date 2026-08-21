@@ -47,6 +47,9 @@ public sealed class GraphCommandTests
           MyApp.Domain -> MyApp.Web: 2
           MyApp.Web -> MyApp.Legacy.Billing: 3
 
+        Types declared by more than one project:
+          (none)
+
         Namespaces:
           MyApp.Domain: MyApp.Domain (8)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
@@ -77,6 +80,9 @@ public sealed class GraphCommandTests
         Observed project references (distinct type pairs):
           MyApp.Domain -> MyApp.Web: 2
           MyApp.Web -> MyApp.Legacy.Billing: 3
+
+        Types declared by more than one project:
+          (none)
 
         Namespaces:
           (elided at overview grain — rerun without --overview for the per-project namespace inventory)

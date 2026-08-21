@@ -113,7 +113,9 @@ public sealed class CodebaseModel
     ///         projects declare one fully-qualified type name; the first declarer wins the node's facts and
     ///         <see cref="TypeNode.ProjectName" />, so every later declarer's copy is invisible to
     ///         <c>arch.Project</c> selections. One note per conflated type names all of them, so a type
-    ///         several projects shadow costs one line.
+    ///         several projects shadow costs one line. The same fact rides the node itself as
+    ///         <see cref="TypeNode.AlsoDeclaredBy" />, for a consumer that must act on it rather than
+    ///         report it.
     ///     </para>
     ///     <para>
     ///         <b>Per-project — a multi-target-framework collapse.</b> One project file's several target

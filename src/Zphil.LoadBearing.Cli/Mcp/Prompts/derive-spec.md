@@ -62,20 +62,30 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
   the solution file does not declare — a passenger, not part of the estate you are writing law
   for, so keep it out of your layer globs. An absent key means membership could not be read.
-- `projectEdges[]` — **observed** project→project references (distinct type pairs). Compare
+- `projectEdges[]` — **observed** project→project references (distinct type pairs), and only
+  references the code declares: a project reaching a type it compiles itself is not an edge,
+  however extraction attributed that type (see `multiplyDeclaredTypes[]` below). Compare
   against the declared references: a declared reference with no observed edge is a dead
   reference (note it for the human; it is cleanup evidence, not a rule). An observed edge you
   did not expect is the interesting kind.
 - `externalEdges[]` — external references grouped by namespace root. Scan for the classic
   dangerous externals: `System.Data` (inline SQL), `System.Web` (HttpContext-era coupling),
   direct driver namespaces, and anything the team says it is migrating away from.
+- `multiplyDeclaredTypes[]` — the types more than one project declares, because one source file
+  is compiled into several of them (a `<Compile Include>` link, shared source, a polyfill).
+  Each entry names the type, every project declaring it, and the one whose facts and project
+  attribution it follows. Read this **before** anchoring a subject on a project:
+  `arch.Project(...)` naming any other declarer will not select the type, so a rule written on
+  it is quietly narrower than it reads. The key is absent when the solution has none, which is
+  the common case.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]      { name, solutionMember?, projectReferences[], types, namespaces[]{ namespace, types } }
-projectEdges[]  { source, target, references }
-externalEdges[] { source, targetNamespaceRoot, references }
+projects[]              { name, solutionMember?, projectReferences[], types, namespaces[]{ namespace, types } }
+projectEdges[]          { source, target, references }
+externalEdges[]         { source, targetNamespaceRoot, references }
+multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
 ```
 
 Grain is a ladder, and an over-budget survey walks down it by itself rather than coming back
@@ -83,12 +93,16 @@ cut. At overview grain — `overview: true`, or the server's own first step — 
 stamps `"grain": "overview"` and elides each project's `namespaces`; every project, edge and
 external row survives. At skeleton grain — `skeleton: true`, or the server's second step when
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
-too, reporting how many rows went as `externalEdgeCount`; the projects and their edges stay.
-Read the stamp: a survey with no `grain` is the complete one.
+and `multiplyDeclaredTypes[]` too, reporting how many rows went as `externalEdgeCount` and
+`multiplyDeclaredTypeCount`; the projects and their edges stay. Read the stamp: a survey with
+no `grain` is the complete one. An absent `multiplyDeclaredTypes` with no
+`multiplyDeclaredTypeCount` beside it means the solution has none; the count key is what tells
+elision from absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
-outside the roster. On a solution too big to survey whole even at skeleton grain, scope is
+outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of its declarers is
+in scope. On a solution too big to survey whole even at skeleton grain, scope is
 the knob left — grain has nowhere further to go.
 
 From the survey, write down **hypotheses, not conclusions**:

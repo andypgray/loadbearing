@@ -7,21 +7,24 @@ namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
 ///     The extracted codebase, summarized for onboarding: its projects with their namespace inventories,
-///     the observed cross-project reference edges, and the external references grouped by namespace root
-///     — the deterministic pre-spec survey the derive flow orients on. Produced by
-///     <see cref="GraphSummarizer" /> over a <see cref="CodebaseModel" />. Grouped counts only, never
-///     per-site dumps (the minimal-token posture; sites arrive later from <c>check</c> on drafted rules).
+///     the observed cross-project reference edges, the external references grouped by namespace root, and
+///     the types more than one project declares — the deterministic pre-spec survey the derive flow orients
+///     on. Produced by <see cref="GraphSummarizer" /> over a <see cref="CodebaseModel" />. Grouped counts
+///     only, never per-site dumps (the minimal-token posture; sites arrive later from <c>check</c> on
+///     drafted rules).
 /// </summary>
 public sealed class GraphSummary
 {
     internal GraphSummary(
         IReadOnlyList<ProjectSummary> projects,
         IReadOnlyList<ProjectEdgeSummary> projectEdges,
-        IReadOnlyList<ExternalEdgeSummary> externalEdges)
+        IReadOnlyList<ExternalEdgeSummary> externalEdges,
+        IReadOnlyList<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes)
     {
         Projects = projects;
         ProjectEdges = projectEdges;
         ExternalEdges = externalEdges;
+        MultiplyDeclaredTypes = multiplyDeclaredTypes;
     }
 
     /// <summary>The projects, ordered by name (ordinal) — the <see cref="CodebaseModel.Projects" /> order.</summary>
@@ -32,6 +35,12 @@ public sealed class GraphSummary
 
     /// <summary>The external references grouped by namespace root, ordered by (source, root) (ordinal).</summary>
     public IReadOnlyList<ExternalEdgeSummary> ExternalEdges { get; }
+
+    /// <summary>
+    ///     The types more than one project declares, ordered by full name (ordinal), and empty for the
+    ///     overwhelming common case — the survey's coverage statement about its own project attribution.
+    /// </summary>
+    public IReadOnlyList<MultiplyDeclaredTypeSummary> MultiplyDeclaredTypes { get; }
 }
 
 /// <summary>
@@ -117,6 +126,37 @@ public sealed class ProjectEdgeSummary
 
     /// <summary>The number of distinct type-pairs observed from <see cref="Source" /> into <see cref="Target" />.</summary>
     public int References { get; }
+}
+
+/// <summary>
+///     One type that several projects declare — a single source file compiled into more than one of them
+///     (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill). Extraction attributes its
+///     facts to the first declarer, so this is what a rule author needs <em>before</em> anchoring a subject
+///     on a project: <c>arch.Project</c> named on any of the other declarers will not select this type.
+/// </summary>
+public sealed class MultiplyDeclaredTypeSummary
+{
+    internal MultiplyDeclaredTypeSummary(string type, IReadOnlyList<string> declaredBy, string factsFollow)
+    {
+        Type = type;
+        DeclaredBy = declaredBy;
+        FactsFollow = factsFollow;
+    }
+
+    /// <summary>The type's fully-qualified name.</summary>
+    public string Type { get; }
+
+    /// <summary>
+    ///     Every project that declares it, ordinal-ordered — <see cref="FactsFollow" /> among them, so the
+    ///     entry reads as the whole roster rather than as the losers alone.
+    /// </summary>
+    public IReadOnlyList<string> DeclaredBy { get; }
+
+    /// <summary>
+    ///     The declarer whose facts and project attribution the type carries (the first declarer). Every
+    ///     other name in <see cref="DeclaredBy" /> is a project whose <c>arch.Project</c> selection misses it.
+    /// </summary>
+    public string FactsFollow { get; }
 }
 
 /// <summary>

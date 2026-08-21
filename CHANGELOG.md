@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The survey now names the types that more than one project declares, and which project's facts
+  they follow.** `multiplyDeclaredTypes` carries the type, every project declaring it, and the one
+  whose facts and project attribution it follows, so a rule author can see before writing a subject
+  that `arch.Project` named on any other declarer will not select that type. `check` has reported the
+  same fact as a per-type advisory note since the merge notes shipped; this is the same content in
+  the document where subjects are actually planned, and that note is unchanged. The key is absent
+  when a solution has none, so `schemaVersion` stays 1 and a healthy solution's survey is
+  byte-identical to the one it was before. At skeleton grain it elides to
+  `multiplyDeclaredTypeCount` the way the external-reference rows elide, because its length scales
+  with the codebase rather than the schema.
+  The human survey gains a section beside the observed references, reading `(none)` when there is
+  nothing to report and one line per type when there is.
+
+### Fixed
+
+- **The survey no longer reports a project as referencing another when it compiles that project's
+  source itself.** Where one file is compiled into several projects (a linked `<Compile Include>`,
+  shared source, a polyfill), extraction attributes its types to the first declaring project, and
+  everything downstream reads that single attribution as the truth. A project reaching its own
+  compiled-in copy therefore resolved to a node stamped with another project's name, so `graph`,
+  `graph --json`, `arch_graph` and `render --diagram` all drew an edge no project file declares.
+  Measured on Math.NET Numerics, whose native-provider loader is linked into all three provider
+  projects: two invented edges, and a spec drafted from that survey carried three `.Except` clauses
+  whose only job was to work around them. A reference into a type the referencing project declares
+  itself is now dropped, and only that. The survey groups one entry per type pair, so a genuine
+  reference between the same two projects survives with its count untouched, and the attribution
+  behind the suppression is stated rather than left silent (see `multiplyDeclaredTypes` above). Rule
+  evaluation still resolves selections by single attribution, so a rule anchored on a project that
+  loses the attribution is unaffected by this change.
+
 ## [0.5.0] - 2026-08-17
 
 ### Added

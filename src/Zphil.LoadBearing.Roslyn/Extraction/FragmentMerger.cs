@@ -27,10 +27,11 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///     </para>
 ///     <para>
 ///         A later declarer under a <em>different</em> project name is same-FQN cross-project conflation.
-///         Facts still follow the first declarer, and an advisory
-///         <see cref="CodebaseModel.MergeNotes">merge note</see> records it — one note per conflated FQN
-///         naming every losing project, so a type several projects shadow costs one line rather than one
-///         per shadow.
+///         Facts still follow the first declarer, and it is recorded twice over: as an advisory
+///         <see cref="CodebaseModel.MergeNotes">merge note</see> — one per conflated FQN naming every
+///         losing project, so a type several projects shadow costs one line rather than one per shadow —
+///         and as <see cref="TypeNode.AlsoDeclaredBy" /> on the winning node, which is the queryable form
+///         a consumer that must act on the conflation reads instead of the prose.
 ///     </para>
 ///     <para>
 ///         A later declarer under the <em>same</em> project name is one project file's several target
@@ -417,6 +418,12 @@ internal static class FragmentMerger
                 node.DeclarationSites = FragmentSiteSets.Locations(sites);
                 node.FilePaths = FragmentSiteSets.FilePaths(sites);
             }
+
+            // The conflation kept as a fact rather than only as the sentence ConflationNote composes from the
+            // same table. A consumer that has to ACT on it — the survey, which must not render a project's
+            // reference to its own compiled-in copy as an edge to the declarer that won — cannot read prose.
+            foreach ((string fqn, SortedSet<string> losers) in _conflatedLosers)
+                _nodes[fqn].AlsoDeclaredBy = losers.ToList();
 
             List<TypeNode> types = _nodes.Values
                 .OrderBy(n => n.FullName, StringComparer.Ordinal)

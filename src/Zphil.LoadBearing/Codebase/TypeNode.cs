@@ -35,6 +35,7 @@ public sealed class TypeNode : ITypeInfo
         IsExternal = isExternal;
         DeclarationSites = Array.Empty<SourceLocation>();
         FilePaths = Array.Empty<string>();
+        AlsoDeclaredBy = Array.Empty<string>();
         Interfaces = Array.Empty<ITypeInfo>();
         Attributes = Array.Empty<ITypeInfo>();
         AllInterfaces = Array.Empty<TypeConstruction>();
@@ -71,6 +72,16 @@ public sealed class TypeNode : ITypeInfo
     ///     for external types.
     /// </summary>
     public IReadOnlyList<SourceLocation> DeclarationSites { get; internal set; }
+
+    /// <summary>
+    ///     The <em>other</em> projects declaring this same fully-qualified name — one source file compiled
+    ///     into several projects (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill) —
+    ///     ordered ordinal, and empty for every ordinary type. <see cref="ProjectName" /> is the first
+    ///     declarer, whose facts this node carries; these are the projects an <c>arch.Project</c> selection
+    ///     over them will therefore not reach, and each one compiles this type itself rather than
+    ///     referencing the declarer that won.
+    /// </summary>
+    public IReadOnlyList<string> AlsoDeclaredBy { get; internal set; }
 
     /// <summary>
     ///     The full transitive, substituted interface closure (<c>symbol.AllInterfaces</c>

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="LinkedApp.Client/LinkedApp.Client.csproj" />
+  <Project Path="LinkedApp.Core/LinkedApp.Core.csproj" />
+  <Project Path="LinkedApp.Tool/LinkedApp.Tool.csproj" />
+</Solution>

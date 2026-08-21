@@ -5,8 +5,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
 ///     Formats a <see cref="GraphSummary" /> as the human <c>graph</c> survey — a project roster with
-///     declared references and type counts, the observed cross-project reference edges, the namespace
-///     inventory, and external references grouped by namespace root.
+///     declared references and type counts, the observed cross-project reference edges, the types more than
+///     one project declares, the namespace inventory, and external references grouped by namespace root.
 /// </summary>
 /// <remarks>
 ///     Pure over the summary, so the line shapes are unit-pinned. Mirrors
@@ -23,10 +23,15 @@ internal static class GraphFormatter
     private const string SkeletonElisionLine =
         "  (elided at skeleton grain — rerun without --skeleton for the external references)";
 
+    private const string SkeletonMultiplyDeclaredElisionLine =
+        "  (elided at skeleton grain — rerun without --skeleton for the multiply-declared types)";
+
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them: the namespace inventory becomes one elision line at overview grain, the external references
-    ///     become one more at skeleton grain, and no section ever disappears.
+    ///     and the multiply-declared types become elision lines at skeleton grain, and no section ever
+    ///     disappears. A section with nothing to elide keeps its <c>(none)</c> instead, which is why a
+    ///     healthy solution's skeleton still says outright that no type is declared twice.
     /// </summary>
     public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName, DocumentGrain grain)
     {
@@ -38,6 +43,10 @@ internal static class GraphFormatter
 
         lines.Add("Observed project references (distinct type pairs):");
         lines.AddRange(ProjectEdgeLines(summary));
+        lines.Add("");
+
+        lines.Add("Types declared by more than one project:");
+        lines.AddRange(MultiplyDeclaredTypeLines(summary, grain));
         lines.Add("");
 
         lines.Add("Namespaces:");
@@ -79,6 +88,26 @@ internal static class GraphFormatter
         return summary.ProjectEdges.Count > 0
             ? summary.ProjectEdges.Select(e => $"  {e.Source} -> {e.Target}: {e.References}")
             : ["  (none)"];
+    }
+
+    // The survey's coverage statement, sited straight after the edges it explains: one reason a project
+    // pair is absent from the block above is that one of them compiles the other's type itself. It reads
+    // "(none)" on a healthy solution rather than vanishing, for the same reason every other section does —
+    // a section that only appears when it has content is one a reader never learns to look for.
+    private static IEnumerable<string> MultiplyDeclaredTypeLines(GraphSummary summary, DocumentGrain grain)
+    {
+        if (grain >= DocumentGrain.Skeleton && summary.MultiplyDeclaredTypes.Count > 0)
+            return [SkeletonMultiplyDeclaredElisionLine];
+
+        return summary.MultiplyDeclaredTypes.Count > 0
+            ? summary.MultiplyDeclaredTypes.Select(MultiplyDeclaredTypeLine)
+            : ["  (none)"];
+    }
+
+    private static string MultiplyDeclaredTypeLine(MultiplyDeclaredTypeSummary type)
+    {
+        return $"  {type.Type} — declared by {string.Join(", ", type.DeclaredBy)}; "
+               + $"facts follow {type.FactsFollow}";
     }
 
     private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, DocumentGrain grain)

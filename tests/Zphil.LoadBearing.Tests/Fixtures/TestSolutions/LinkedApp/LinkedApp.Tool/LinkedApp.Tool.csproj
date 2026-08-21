@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The defect's whole shape in one project file: it compiles LinkedApp.Core's Shared/Widget.cs as its
+         own source and declares NO ProjectReference to Core. Its one type therefore references its own
+         compiled-in copy of the type, which extraction has attributed to Core — so the survey used to render
+         a LinkedApp.Tool -> LinkedApp.Core edge that neither csproj declares.
+         The absence of the ProjectReference is what makes the assertion "no Tool -> Core edge at all"
+         rather than a count, so no ordering accident can satisfy it. Do not add one. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="..\LinkedApp.Core\Shared\Widget.cs" Link="Widget.cs" />
+    </ItemGroup>
+</Project>

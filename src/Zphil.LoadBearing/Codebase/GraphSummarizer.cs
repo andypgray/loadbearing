@@ -12,6 +12,12 @@ public static class GraphSummarizer
     private const string GlobalNamespaceLabel = "(global)";
 
     /// <summary>Builds the survey from an extracted model.</summary>
+    /// <remarks>
+    ///     The project edges are the edges the code actually declares: a reference into a type the
+    ///     referencing project compiles itself is not one, however extraction attributed that type, and
+    ///     <see cref="GraphSummary.MultiplyDeclaredTypes" /> states the attribution that suppression rests on
+    ///     rather than leaving it silent.
+    /// </remarks>
     /// <param name="model">The extracted codebase to summarize.</param>
     /// <returns>The survey over every project in <paramref name="model" />.</returns>
     public static GraphSummary Summarize(CodebaseModel model)
@@ -30,7 +36,9 @@ public static class GraphSummarizer
         // Cross-project edges only: a same-project reference is never a cross-boundary rule candidate, so
         // it is excluded from the survey (the survey exists to seed layering/boundary rules).
         List<ProjectEdgeSummary> projectEdges = model.Edges
-            .Where(edge => !edge.Target.IsExternal && edge.Source.ProjectName != edge.Target.ProjectName)
+            .Where(edge => !edge.Target.IsExternal
+                           && edge.Source.ProjectName != edge.Target.ProjectName
+                           && !SourceAlsoDeclaresTarget(edge))
             .GroupBy(edge => (Source: edge.Source.ProjectName, Target: edge.Target.ProjectName))
             .Select(group => new ProjectEdgeSummary(group.Key.Source, group.Key.Target, group.Count()))
             .OrderBy(edge => edge.Source, StringComparer.Ordinal)
@@ -45,7 +53,37 @@ public static class GraphSummarizer
             .ThenBy(edge => edge.TargetNamespaceRoot, StringComparer.Ordinal)
             .ToList();
 
-        return new GraphSummary(projects, projectEdges, externalEdges);
+        // The coverage statement behind the suppression above, and the fact a rule author needs before
+        // anchoring a subject on a project. Types are already ordinal by full name; the sort is spelled
+        // anyway so this list's stated order does not depend on the model's.
+        List<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes = model.Types
+            .Where(type => type.AlsoDeclaredBy.Count > 0)
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => new MultiplyDeclaredTypeSummary(type.FullName, DeclarersOf(type), type.ProjectName))
+            .ToList();
+
+        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes);
+    }
+
+    // A reference from a project into a type that project declares itself. Extraction attributes a
+    // multiply-declared type to its first declarer alone, so a project compiling its own linked-in copy
+    // reaches a node stamped with somebody else's name — and rendering that as a cross-project edge invents
+    // a dependency no project file declares. Because model.Edges is one entry per type PAIR, dropping it
+    // here removes exactly those pairs and leaves every genuine pair between the same two projects, and its
+    // count, untouched.
+    private static bool SourceAlsoDeclaresTarget(ReferenceEdge edge)
+    {
+        return edge.Target.AlsoDeclaredBy.Contains(edge.Source.ProjectName, StringComparer.Ordinal);
+    }
+
+    // Every declarer of a conflated type: the winner and the losers as one ordinal roster, which is what
+    // makes an entry readable on its own — "these projects declare it, that one's facts won" — rather than
+    // a losers list a reader has to add the winner back into.
+    private static IReadOnlyList<string> DeclarersOf(TypeNode type)
+    {
+        var declarers = new List<string>(type.AlsoDeclaredBy) { type.ProjectName };
+        declarers.Sort(StringComparer.Ordinal);
+        return declarers;
     }
 
     /// <summary>
@@ -67,6 +105,12 @@ public static class GraphSummarizer
     ///         Each surviving <see cref="ProjectSummary" /> is carried through verbatim, declared
     ///         <see cref="ProjectSummary.ProjectReferences" /> included: a declared reference to a project
     ///         outside the scope is exactly the divergence signal, and filtering it would erase it.
+    ///     </para>
+    ///     <para>
+    ///         A <see cref="GraphSummary.MultiplyDeclaredTypes" /> entry survives when <em>any</em> of its
+    ///         declaring projects is in scope, the same either-endpoint rule the project edges take: the
+    ///         reason to read the entry is that a subject anchored inside the scope will miss the type, and
+    ///         a declarer outside it is the half that explains why.
     ///     </para>
     /// </remarks>
     /// <param name="summary">The survey to narrow.</param>
@@ -91,7 +135,11 @@ public static class GraphSummarizer
             .Where(edge => Matches(projectGlobs, edge.Source))
             .ToList();
 
-        return new GraphSummary(projects, projectEdges, externalEdges);
+        List<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes = summary.MultiplyDeclaredTypes
+            .Where(type => type.DeclaredBy.Any(project => Matches(projectGlobs, project)))
+            .ToList();
+
+        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes);
     }
 
     private static bool Matches(IReadOnlyList<string> globs, string projectName)
