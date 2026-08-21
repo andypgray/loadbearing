@@ -29,7 +29,13 @@ public sealed class ServerInstructionsTests
     ///     it is a direct deduction from how much of <see cref="ServerInstructions.Text" /> an unbound
     ///     server's client ever sees.
     /// </summary>
-    private const int BannerBudget = 400;
+    /// <remarks>
+    ///     Raised from 400 when the banner took on <see cref="ServerInstructions.UnboundCallCoda" />: an
+    ///     unbound client buys a recovery it can act on with roughly 240 more characters of the file's tail,
+    ///     which is the trade the file's ordering was designed to make payable. This is also the coda's only
+    ///     budget — it is inside the banner, so bounding the banner bounds it.
+    /// </remarks>
+    private const int BannerBudget = 650;
 
     [Fact]
     public void Text_FitsUnderTheClientTruncationCliff()
@@ -68,6 +74,59 @@ public sealed class ServerInstructionsTests
 
         instructions.ShouldContain("`args`");
         instructions.ShouldContain("LOADBEARING_SOLUTION_PATH");
+    }
+
+    [Fact]
+    public void For_UnboundServer_PutsTheInSessionRecoveryBeforeTheConfigRemedies()
+    {
+        // The whole point of the change: a reader who stops early must meet the thing they can do, not the
+        // two things they cannot. "x" keeps the discovery text out of it, so neither index can match inside
+        // the quoted failure; Text carries neither marker, so neither can match below the banner either.
+        string instructions = ServerInstructions.For("x");
+
+        int recovery = instructions.IndexOf(ServerInstructions.UnboundCallCoda, StringComparison.Ordinal);
+        int configRemedies = instructions.IndexOf("`args`", StringComparison.Ordinal);
+
+        recovery.ShouldBeGreaterThanOrEqualTo(0);
+        configRemedies.ShouldBeGreaterThan(recovery);
+    }
+
+    [Fact]
+    public void For_UnboundServer_EmbedsTheCallCodaVerbatim()
+    {
+        // Verbatim, not merely equivalent: the banner and every tool-call error carry the same constant, so
+        // the handshake channel and the per-call channel cannot drift into describing different recoveries.
+        ServerInstructions.For("x")
+            .ShouldContain(ServerInstructions.UnboundCallCoda);
+    }
+
+    [Fact]
+    public void UnboundCallCoda_NamesARecoveryTheSessionCanPerform()
+    {
+        // Lowercase `loadbearing` is the command, not the product name Text spells LoadBearing — the
+        // suite's case-sensitive ShouldContain is what keeps those two apart.
+        ServerInstructions.UnboundCallCoda.ShouldContain("loadbearing graph <solution>");
+        ServerInstructions.UnboundCallCoda.ShouldContain("loadbearing check <solution>");
+
+        // And the negative half, which is the actual finding: a remedy an in-session reader cannot take
+        // belongs below the one they can, never inside it. Both of these are client-config edits.
+        ServerInstructions.UnboundCallCoda.ShouldNotContain("`args`");
+        ServerInstructions.UnboundCallCoda.ShouldNotContain("LOADBEARING_SOLUTION_PATH");
+    }
+
+    [Fact]
+    public void For_UnboundServer_KeepsTheRecoveryAboveTheTruncationCliff()
+    {
+        // A generous real failure: the multi-solution refusal on a big repository names candidate paths, so
+        // it is the longest thing that can sit between the header and the recovery. Even at 600 characters
+        // the recovery ends well clear of the cut, which is what "above the fold" has to mean here.
+        string failure = new('x', 600);
+
+        string instructions = ServerInstructions.For(failure);
+
+        int recoveryEnd = instructions.IndexOf(ServerInstructions.UnboundCallCoda, StringComparison.Ordinal)
+                          + ServerInstructions.UnboundCallCoda.Length;
+        recoveryEnd.ShouldBeLessThanOrEqualTo(ClientTruncationCliff);
     }
 
     [Fact]

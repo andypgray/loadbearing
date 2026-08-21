@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Mcp;
@@ -18,7 +19,9 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         stderr, which for the MCP surface is discarded by construction. What the client saw was a server
 ///         that failed to start, and nothing else. So the server now starts unbound and says why through
 ///         the two in-band channels a client does read — the <c>initialize</c> instructions, and every
-///         tool call's error result, which re-runs the identical discovery.
+///         tool call's error result, which re-runs the identical discovery. Both then close with the one
+///         recovery the session can act on itself, because the config edits that rebind the server are not
+///         available to whoever is reading.
 ///     </para>
 ///     <para>
 ///         <b>Why a real child.</b> The no-argument path no longer fails fast, so an in-process invocation
@@ -79,6 +82,10 @@ public sealed class McpUnboundServerTests : IDisposable
         conversation.ToolIsError.ShouldBeTrue(conversation.ToolText);
         conversation.ToolText.ShouldContain("Multiple solution files found");
         conversation.ToolText.ShouldContain("Alpha.sln");
+        // The reply a session actually reads carries the recovery too, not just the refusal. The banner
+        // above went by once, at a handshake no agent re-reads; this is the channel that repeats. It is also
+        // uncuttable — error results bypass the response truncator, so no budget can trim the advice off.
+        conversation.ToolText.ShouldContain(ServerInstructions.UnboundCallCoda);
     }
 
     [Fact]
@@ -101,6 +108,10 @@ public sealed class McpUnboundServerTests : IDisposable
         conversation.ToolIsError.ShouldBeTrue(conversation.ToolText);
         conversation.ToolText.ShouldContain("No .sln, .slnf or .slnx file found");
         conversation.ToolText.ShouldContain(Path.Combine("src", "Storefront.sln"));
+        // Spelled out rather than compared against the constant: what has to survive is a runnable command
+        // in front of a reader, and this shape reds if the coda ever stops being one. Lowercase is the
+        // command; the suite's case-sensitive ShouldContain keeps it distinct from the product name.
+        conversation.ToolText.ShouldContain("loadbearing graph <solution>");
     }
 
     /// <summary>

@@ -90,7 +90,19 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
     ///     <c>WithPrompts</c> + <c>WithGlobalCallToolFilter</c> composition, swapping the stdio transport for
     ///     a stream transport over in-memory pipes.
     /// </summary>
-    public static async Task<McpPipelineHarness> StartAsync(McpServerBinding binding, CancellationToken cancellationToken)
+    /// <param name="binding">The solution + spec the composed server answers for.</param>
+    /// <param name="cancellationToken">Cancels host start and the client handshake.</param>
+    /// <param name="bindingFailure">
+    ///     A discovery refusal to compose the filter as though the server never bound, for the tests that
+    ///     drive the unbound coda. Defaults to null — bound — because every other test here wants a server
+    ///     that works, and the real unbound launch cannot be driven in-process at all (it needs a child;
+    ///     see <c>McpUnboundServerTests</c>). Flagging a harness over a solution that does resolve is
+    ///     therefore deliberate: the filter's contract is the nullness of this value, nothing else.
+    /// </param>
+    public static async Task<McpPipelineHarness> StartAsync(
+        McpServerBinding binding,
+        CancellationToken cancellationToken,
+        string? bindingFailure = null)
     {
         FakeEnvironment environment = new();
         CapturingLoggerProvider logs = new();
@@ -128,7 +140,7 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
             })
             .WithCoercingTools()
             .WithPrompts<ArchPrompts>()
-            .WithGlobalCallToolFilter()
+            .WithGlobalCallToolFilter(bindingFailure)
             .WithStreamServerTransport(clientToServer.Reader.AsStream(), serverToClient.Writer.AsStream());
 
         IHost host = builder.Build();

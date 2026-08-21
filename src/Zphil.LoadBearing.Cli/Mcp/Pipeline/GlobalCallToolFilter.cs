@@ -31,9 +31,20 @@ internal static class GlobalCallToolFilter
     ///     Successful text passes through <see cref="ResponseTruncator" />. Before dispatch the filter runs
     ///     <see cref="UnknownParameterGuard" /> so a hallucinated argument key becomes an actionable error
     ///     rather than a silently-dropped argument, and the whole body is bracketed by
-    ///     <see cref="IdleTimeoutWatchdog.EnterCall" />/<see cref="IdleTimeoutWatchdog.ExitCall" />.
+    ///     <see cref="IdleTimeoutWatchdog.EnterCall" />/<see cref="IdleTimeoutWatchdog.ExitCall" />. On an
+    ///     unbound server every error also carries <see cref="ServerInstructions.UnboundCallCoda" />, because
+    ///     the banner that named a recovery was delivered once, at the handshake, and a reader arriving at a
+    ///     failed tool call may never have seen it.
     /// </remarks>
-    public static IMcpServerBuilder WithGlobalCallToolFilter(this IMcpServerBuilder builder)
+    /// <param name="builder">The server builder being composed.</param>
+    /// <param name="bindingFailure">
+    ///     The discovery refusal, or <see langword="null" /> when the server bound. Only its nullness is
+    ///     read; it takes the same shape as <see cref="ServerInstructions.For" />'s parameter so one call
+    ///     site passes one value to both and the handshake and the per-call replies cannot disagree about
+    ///     whether this server is bound. Required rather than optional: a forgotten coda would be a silent
+    ///     hole in the only channel an unbound session still reads.
+    /// </param>
+    public static IMcpServerBuilder WithGlobalCallToolFilter(this IMcpServerBuilder builder, string? bindingFailure)
     {
         return builder.WithRequestFilters(filters =>
         {
@@ -58,13 +69,13 @@ internal static class GlobalCallToolFilter
                         // tampered baseline) — possibly wrapped in JsonException(s) by the SDK's argument
                         // binder. Walk the chain: the first UserFacingMessage surfaces silently, exactly as
                         // a directly-thrown one would. Anything else is a bug: log one warning, then surface.
-                        if (FindUserFacingMessage(ex) is { } message) return ErrorResult(message);
+                        if (FindUserFacingMessage(ex) is { } message) return ErrorResult(message, bindingFailure);
 
                         context.Server.Services?.GetService<ILoggerFactory>()
                             ?.CreateLogger(typeof(GlobalCallToolFilter))
                             .LogWarning(ex, "Tool '{ToolName}' failed", context.Params.Name);
 
-                        return ErrorResult(ex.Message);
+                        return ErrorResult(ex.Message, bindingFailure);
                     }
 
                     if (result.IsError is not true)
@@ -94,11 +105,27 @@ internal static class GlobalCallToolFilter
         });
     }
 
-    private static CallToolResult ErrorResult(string message)
+    /// <summary>
+    ///     The error result for <paramref name="message" />, with the session's recovery appended when the
+    ///     server never bound to a solution.
+    /// </summary>
+    /// <remarks>
+    ///     The coda rides every error while unbound, not just the discovery refusal. While unbound every
+    ///     dispatched call ends in that refusal anyway, and the calls that fail earlier — the unknown-key
+    ///     guard, a coercer — would only reach it once the argument was fixed, so the advice is true of all
+    ///     of them. Scoping it to the refusal's own text would instead couple this filter to prose that is
+    ///     pinned verbatim elsewhere. Errors bypass the truncator, so the coda can never be the part that
+    ///     gets cut.
+    /// </remarks>
+    private static CallToolResult ErrorResult(string message, string? bindingFailure)
     {
+        string text = bindingFailure is null
+            ? message
+            : message + "\n\n" + ServerInstructions.UnboundCallCoda;
+
         return new CallToolResult
         {
-            Content = [new TextContentBlock { Text = message }],
+            Content = [new TextContentBlock { Text = text }],
             IsError = true
         };
     }

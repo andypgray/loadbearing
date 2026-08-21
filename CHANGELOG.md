@@ -75,6 +75,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An unbound MCP server now leads with a recovery the reader can actually perform.** A server that
+  cannot resolve a solution starts anyway and says why, and the two remedies it named (put the
+  solution in the client config's `args`, or set `LOADBEARING_SOLUTION_PATH` in its `env`) are both
+  edits an agent inside that session cannot make. The one it can make, the CLI with the solution
+  named, appeared only inside the quoted discovery error. On a multi-solution repository wired from
+  the registry manifest that is exactly how a session reads it: the agent drove the CLI throughout
+  and called none of the five advertised tools. The banner now names the CLI first and the config
+  edits after it, as the fix for the next session rather than this one, and every tool call's error
+  result carries the same sentence, because the banner is delivered once at a handshake nothing
+  re-reads. Errors bypass the response truncator, so no budget can trim the advice away. The tools
+  still take no solution argument and the server is still bound at start: what changed is which
+  recovery is legible from inside a session that cannot rebind it.
+- **The registry manifest and the README now say where a registry-wired repository binds its
+  solution.** A config generated from `.mcp/server.json` passes no solution argument, so a
+  repository the walk-up cannot resolve gets an unbound server and a session that works from the
+  CLI, and nothing in either document said so: the README's existing routing to the installed tool
+  keys on a repository's SDK pin, which is a different condition. Both now state that such a
+  repository is bound at install time, in the config's `args` or through
+  `LOADBEARING_SOLUTION_PATH`. The manifest still serves the repositories that can use it and the
+  prose still carries the boundary; the boundary is now written where an installer meets it.
 - **The derive recipe now expects `dotnet sln add` to rewrite more of a solution than the one project
   it adds.** The CLI unions its default platforms into a `.sln`'s configuration list and writes the
   project-configuration table out complete, so adding one spec project to a dozen-project solution

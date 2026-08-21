@@ -24,8 +24,9 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///     MCP client over piped stdio gets the file logger, the orphan-server watchdogs, MSBuild
 ///     registration (JIT-quarantined behind <see cref="EnsureMsBuildRegistered" />), and the host.
 ///     A launch whose optional solution argument was omitted and whose walk-up then found nothing still
-///     starts — unbound, announcing the reason in its <c>initialize</c> instructions and returning it from
-///     every tool call (<see cref="ResolveBoundSolution" />).
+///     starts — unbound, announcing the reason, and the recovery the session can still take, in its
+///     <c>initialize</c> instructions and in every tool call's error result
+///     (<see cref="ResolveBoundSolution" />).
 /// </remarks>
 internal static class McpServerCommand
 {
@@ -90,7 +91,7 @@ internal static class McpServerCommand
             .WithStdioServerTransport()
             .WithCoercingTools()
             .WithPrompts<ArchPrompts>()
-            .WithGlobalCallToolFilter();
+            .WithGlobalCallToolFilter(bindingFailure);
 
         await builder.Build().RunAsync(ct);
         return 0;
@@ -180,7 +181,10 @@ internal static class McpServerCommand
     ///     client as "the server failed to start" and no reason at all, since the process is gone before
     ///     <c>initialize</c> can answer. The server starts unbound instead and says why through
     ///     <see cref="ServerInstructions.For" /> and through every tool call, which re-runs the identical
-    ///     discovery and gets the identical message.
+    ///     discovery and gets the identical message, followed by the CLI recovery
+    ///     <see cref="GlobalCallToolFilter.WithGlobalCallToolFilter" /> appends whenever this value is
+    ///     non-null. One returned value feeds both channels, which is why it is held in a local rather than
+    ///     recomputed per consumer: the handshake and the tool replies cannot then disagree about the bind.
     ///     Whitespace splits with null because <see cref="ModelPipeline.DiscoverSolution" /> already treats
     ///     the two alike: what makes an argument fatal is discovery actually honouring it.
     ///     NoInlining keeps it consistent with the quarantine style below; SolutionDiscovery is pure file I/O

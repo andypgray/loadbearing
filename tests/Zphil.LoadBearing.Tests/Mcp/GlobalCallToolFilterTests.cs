@@ -2,6 +2,7 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Tests.Cli;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -39,8 +40,62 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — surfaced as an error result with the exact message, and the filter stayed silent.
         result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent()
-            .ShouldStartWith("Unknown rule ID 'nope/nope'.");
+        string text = result.ShouldHaveTextContent();
+        text.ShouldStartWith("Unknown rule ID 'nope/nope'.");
+        // A bound server pays nothing for the unbound path: no recovery advice, because there is nothing
+        // here to recover from.
+        text.ShouldNotContain(ServerInstructions.UnboundCallCoda);
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_UserErrorWhileUnbound_AppendsTheSessionRecovery()
+    {
+        // Arrange — a harness flagged unbound over a solution that does resolve. Deliberate, and exactly the
+        // filter's contract: it reads the nullness of the binding failure and nothing else, and the real
+        // unbound launch cannot run in-process at all (McpUnboundServerTests drives that in a child).
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll),
+            Ct,
+            bindingFailure: "No .sln, .slnf or .slnx file found.");
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync(
+            "arch_explain",
+            new Dictionary<string, object?> { ["ruleId"] = "nope/nope" },
+            cancellationToken: Ct);
+
+        // Assert — the error still leads with what went wrong, and closes with what the reader can do about
+        // it. ShouldEndWith is the placement pin: appended, never interleaved, never ahead of the reason.
+        result.IsError.ShouldBe(true);
+        string text = result.ShouldHaveTextContent();
+        text.ShouldStartWith("Unknown rule ID 'nope/nope'.");
+        text.ShouldEndWith(ServerInstructions.UnboundCallCoda);
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_UnknownParameterWhileUnbound_AlsoCarriesTheRecovery()
+    {
+        // Arrange — the pre-dispatch guard, which fails before discovery is ever reached. Pinning the coda
+        // here is what makes the blanket semantics deliberate rather than incidental: fixing the argument
+        // key would only surface the discovery refusal next, so the advice is true of this call too.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll),
+            Ct,
+            bindingFailure: "No .sln, .slnf or .slnx file found.");
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync(
+            "arch_explain",
+            new Dictionary<string, object?> { ["rule"] = "layering/domain-independent" },
+            cancellationToken: Ct);
+
+        // Assert
+        result.IsError.ShouldBe(true);
+        string text = result.ShouldHaveTextContent();
+        text.ShouldContain("\"rule\"");
+        text.ShouldEndWith(ServerInstructions.UnboundCallCoda);
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 
