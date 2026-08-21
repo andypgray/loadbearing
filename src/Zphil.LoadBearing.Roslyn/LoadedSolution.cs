@@ -91,14 +91,15 @@ public sealed class LoadedSolution : IDisposable
     /// <summary>
     ///     This load's verdict as the one value every surface reads — the four project lists above beside
     ///     the failure messages the load reported, which only the caller has: the loader writes them to a
-    ///     sink it was handed, so they never land on this type. Merge notes are empty by construction, since
-    ///     only extraction produces them and none has run at load time.
+    ///     sink it was handed, so they never land on this type. The merge's two facts — its notes and the
+    ///     multi-targeted projects — are empty by construction, since only extraction produces them and none
+    ///     has run at load time.
     /// </summary>
     /// <param name="loadFailures">The workspace-load failure messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
         return new WorkspaceDiagnostics(
-            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects);
+            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
     }
 
     /// <summary>Disposes the underlying workspace.</summary>

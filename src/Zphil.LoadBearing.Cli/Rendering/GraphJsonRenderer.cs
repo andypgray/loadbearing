@@ -73,11 +73,17 @@ internal static class GraphJsonRenderer
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
     }
 
+    // The framework pair takes no grain argument, deliberately: it rides the project row like solutionMember
+    // and the project's own generated count, so it survives every rung the roster does. Omitted when empty,
+    // which is every single-framework project — the rule that keeps an ordinary solution's survey the
+    // document it was before the keys existed.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
         return new GraphProjectJson(
             project.Name,
             project.SolutionMember,
+            project.TargetFrameworks.Count > 0 ? project.TargetFrameworks : null,
+            project.FactsFollow,
             project.ProjectReferences,
             project.Types,
             project.Generated > 0 ? project.Generated : null,

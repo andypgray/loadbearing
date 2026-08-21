@@ -103,13 +103,13 @@ internal sealed class ReplayedSolution : IDisposable
     ///     This replay's verdict as the one value every surface reads — the three project lists above beside
     ///     the replay messages the caller's own sink collected, which never land on this type. Unchecked
     ///     projects are empty: a binlog records what was built, not what a solution declares, so there is
-    ///     nothing to have left out. Merge notes are empty by construction, as on the MSBuild path.
+    ///     nothing to have left out. The merge's two facts are empty by construction, as on the MSBuild path.
     /// </summary>
     /// <param name="loadFailures">The replay messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
         return new WorkspaceDiagnostics(
-            loadFailures, [], FailedProjects, [], RestoreFailedProjects, UnsupportedProjects);
+            loadFailures, [], FailedProjects, [], RestoreFailedProjects, UnsupportedProjects, []);
     }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>

@@ -110,9 +110,10 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
 
     /// <summary>
     ///     This snapshot's load verdict as the one value every surface reads: the diagnostics and the four
-    ///     project lists above, bundled so no consumer re-pairs them. Merge notes are empty by construction —
-    ///     only extraction produces them, and a snapshot describes a load.
+    ///     project lists above, bundled so no consumer re-pairs them. The merge's two facts — its notes and
+    ///     its multi-targeted projects — are empty by construction: only extraction produces them, and a
+    ///     snapshot describes a load.
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnostics =>
-        new(Diagnostics, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects);
+        new(Diagnostics, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
 }

@@ -102,6 +102,10 @@ internal sealed class CodebaseSource : IDisposable
     // Empty until ExtractAsync runs, which is why Diagnostics is composed per read rather than captured.
     private IReadOnlyList<string> mergeNotes = [];
 
+    // The other half of the same read: which projects arrived as several compilations. Captured beside the
+    // notes because it comes off the same merged model and must not be able to disagree with them.
+    private IReadOnlyList<MultiTargetedProject> multiTargetedProjects = [];
+
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
     // A null declaredMembers mints the unforced reader; the cold spec path passes the one it already forced.
@@ -146,11 +150,13 @@ internal sealed class CodebaseSource : IDisposable
     /// <summary>
     ///     How well the workspace loaded: the projects that failed to load, the ones whose NuGet packages are
     ///     not in the model, and the load-failure diagnostics — all freshly collected on a cold run and
-    ///     replayed from the cache on a hit — plus the merge notes the last <see cref="ExtractAsync" />
-    ///     produced (empty before it runs). Read per call rather than captured, so a verb that renders after
-    ///     extracting sees the notes and one that gates before it does not have to wait for them.
+    ///     replayed from the cache on a hit — plus the two facts the last <see cref="ExtractAsync" /> produced,
+    ///     its merge notes and its multi-targeted projects (both empty before it runs). Read per call rather
+    ///     than captured, so a verb that renders after extracting sees them and one that gates before it does
+    ///     not have to wait for them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics => loadDiagnostics with { MergeNotes = mergeNotes };
+    public WorkspaceDiagnostics Diagnostics =>
+        loadDiagnostics with { MergeNotes = mergeNotes, MultiTargetedProjects = multiTargetedProjects };
 
     /// <summary>
     ///     Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.
@@ -301,7 +307,20 @@ internal sealed class CodebaseSource : IDisposable
         // regenerates them through FragmentMerger — the cache stores fragments, never notes. Captured here,
         // off the one exit, so Diagnostics can surface them beside the workspace-load failures.
         mergeNotes = codebase.MergeNotes;
+        multiTargetedProjects = MultiTargetedProjectsOf(codebase);
         return codebase;
+    }
+
+    // The projects that arrived as several compilations, read off the same model the notes came from. Wider
+    // than the notes by design: a note is raised only where two frameworks declared the same type, so a
+    // project whose frameworks share nothing has no note and is still checked against one of them.
+    private static IReadOnlyList<MultiTargetedProject> MultiTargetedProjectsOf(CodebaseModel codebase)
+    {
+        return codebase.Projects
+            .Where(project => project.TargetFrameworks.Count > 0)
+            .Select(project => new MultiTargetedProject(
+                project.Name, project.TargetFrameworks, project.FactsFollow))
+            .ToList();
     }
 
     private async Task<CodebaseModel> ExtractCoreAsync(

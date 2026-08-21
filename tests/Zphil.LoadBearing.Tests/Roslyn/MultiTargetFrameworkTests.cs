@@ -17,7 +17,8 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///     and references it). These pin that a multi-framework project has exactly one name everywhere it is
 ///     read — the model's <see cref="TypeNode.ProjectName" />, the project list, a project reference, and an
 ///     <c>arch.Project</c> selection — and that the one thing normalization does <em>not</em> cure, the
-///     shared types taking one framework's facts, is disclosed rather than silent.
+///     shared types taking one framework's facts, is disclosed rather than silent: as an advisory note, and
+///     as the two facts the project node carries for every document that has to render it.
 /// </summary>
 /// <remarks>
 ///     In the <see cref="SerialCollection">Serial</see> collection: every test here loads an MSBuild
@@ -34,7 +35,7 @@ public sealed class MultiTargetFrameworkTests
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
 
     /// <summary>
-    ///     The fixture's codebase, extracted once for the five gates below that read it. The model is
+    ///     The fixture's codebase, extracted once for the seven gates below that read it. The model is
     ///     immutable and the snapshot behind it is pooled for the whole class, so the extraction itself is
     ///     the only part that was being repeated.
     /// </summary>
@@ -157,6 +158,32 @@ public sealed class MultiTargetFrameworkTests
             + "their facts from 'net10.0' (the first extracted), so a rule about them is checked against "
             + "that framework alone."
         ]);
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_MultiTargetedProject_StatesItsFrameworksAndTheWinningOneOnTheProject()
+    {
+        CodebaseModel model = await MultiTfmCodebase.Value;
+
+        // The merge note above says this in prose on one channel; the project node is the queryable form,
+        // and it is what the survey renders. The order is extraction's own (ordinal), not the csproj's —
+        // which declares netstandard2.0 first — so the first entry is always the one a shared type falls to.
+        ProjectNode core = model.Projects.Single(project => project.Name == Core);
+        core.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
+        core.FactsFollow.ShouldBe("net10.0");
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_SingleTargetedProject_StatesNeitherFrameworkFact()
+    {
+        CodebaseModel model = await MultiTfmCodebase.Value;
+
+        // The contrast project inside the same model: one compilation, so its name already says which one
+        // every fact came from and there is nothing to qualify. This is the shape every project of an
+        // ordinary solution has, and the reason its documents are the ones they were before the pair existed.
+        ProjectNode web = model.Projects.Single(project => project.Name == Web);
+        web.TargetFrameworks.ShouldBeEmpty();
+        web.FactsFollow.ShouldBeNull();
     }
 
     [Fact]

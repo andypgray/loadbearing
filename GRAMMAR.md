@@ -270,6 +270,19 @@ lands only where the whole list is static and one form:
   several projects still means one node (§4.1 subjects, `arch.Project` misses the other
   declarers), and a name no project declares is one node as before. `check` reports the split
   as an advisory note, and the codebase survey states it as a coverage key.
+- **One project file can mean several compilations.** A multi-targeting project compiles once
+  per framework; extraction walks them all, and the model unions them under the one project
+  name. The union is lossless — types, references and solution membership all survive — except
+  for the facts of a type more than one framework declares: its edges, member inventory and
+  hierarchy come from the first framework extracted, and extraction consumes frameworks in
+  ordinal order of the framework name, never the csproj's declaration order. So on
+  `net48;net6.0;net8.0;netstandard2.0` every shared type's facts come from `net48`, and anything
+  another framework's `#if` guards is not in the model at all: a rule about such a type is
+  checked against the winning framework's compilation alone. A framework-exclusive type (one
+  only a single framework declares) keeps that framework's facts. The codebase survey lists
+  each multi-targeted project's frameworks in extraction order and names the one its shared
+  types follow, and `check` stamps the same pair per project beside an advisory note wherever
+  two frameworks actually collapsed a type.
 - **`MustOnly*` complement universe = solution-declared types — for the *reference* verbs.**
   BCL/NuGet references are
   exempt, and the fragment states it: *"must reference only {list} (external packages are not

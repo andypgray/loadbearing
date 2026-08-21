@@ -711,7 +711,11 @@ internal static class FragmentMerger
                 (src, symbolId, sites) => new MemberEdge(_nodes[src], MemberReferenceFor(symbolId), FragmentSiteSets.Locations(sites)));
         }
 
-        private static List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
+        // An instance method rather than a static one because a project node now states two facts the merge
+        // already computed: every framework its fragments carried, and — where they shared a type — the one
+        // whose facts those types took. This is the only ProjectNode construction site in the tree, so the
+        // tables reach the model here or nowhere.
+        private List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
             Dictionary<string, bool?> memberByProject = new(StringComparer.Ordinal);
@@ -731,8 +735,20 @@ internal static class FragmentMerger
 
             return refsByProject
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => new ProjectNode(kv.Key, kv.Value.ToList(), memberByProject[kv.Key]))
+                .Select(kv => new ProjectNode(
+                    kv.Key, kv.Value.ToList(), memberByProject[kv.Key], TargetFrameworksOf(kv.Key),
+                    _multiFrameworkWinners.GetValueOrDefault(kv.Key)))
                 .ToList();
+        }
+
+        // Stated only where there is more than one framework to state. A single-framework project — and every
+        // hand-built input, whose fragments carry no framework at all — has nothing a name does not already
+        // say, and an empty list is what keeps its rendered documents the ones they were before the fact
+        // existed.
+        private IReadOnlyList<string>? TargetFrameworksOf(string projectName)
+        {
+            SortedSet<string>? frameworks = _frameworksByProject.GetValueOrDefault(projectName);
+            return frameworks is { Count: > 1 } ? frameworks.ToList() : null;
         }
 
         // A multi-targeted project arrives as one fragment per framework under the one name the load boundary

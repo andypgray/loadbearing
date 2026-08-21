@@ -164,6 +164,73 @@ public sealed class GraphSummarizerTests
     }
 
     [Fact]
+    public void Summarize_MultiTargetedProject_CarriesItsFrameworksAndTheWinnerThrough()
+    {
+        // Arrange — one project name, two compilations, both declaring the same type: the collapse the pair
+        // exists to state. This path takes its inputs as given, so the winner is the first of them; it is
+        // the WORKSPACE path that hands frameworks over ordinal, and MultiTargetFrameworkTests pins that
+        // against the real two-framework fixture. The list is ordinal either way — the merge sorts it.
+        CompilationInput modern = Framework("net10.0");
+        CompilationInput legacy = Framework("netstandard2.0");
+
+        // Act
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert — both frameworks, and the one whose facts the shared Widget carries.
+        ProjectSummary shared = summary.Projects.Single();
+        shared.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
+        shared.FactsFollow.ShouldBe("net10.0");
+    }
+
+    [Fact]
+    public void Summarize_SingleTargetedProject_SaysNothingAboutFrameworks()
+    {
+        // Arrange — the case every project of an ordinary solution is in, and the one the omit-when-empty
+        // rendering rests on: one compilation, so the project name already says where every fact came from.
+        CodebaseModel model = CompilationFactory.Extract("Plain", ("Plain.cs", """
+                                                                               namespace Plain { public class Thing {} }
+                                                                               """));
+
+        // Act
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert
+        ProjectSummary plain = summary.Projects.Single();
+        plain.TargetFrameworks.ShouldBeEmpty();
+        plain.FactsFollow.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Summarize_MultiTargetedProjectWhoseFrameworksShareNoType_NamesThemAndNoWinner()
+    {
+        // Arrange — two frameworks of one project declaring disjoint types, the shape a #if-guarded class
+        // makes. Nothing collapsed, so nothing was displaced and there is no winner to name; the framework
+        // list alone still says the project compiles twice, which is the fact a rule author needs.
+        CompilationInput legacy = CompilationFactory.Compile("Shared", ("Legacy.cs", """
+                                                                                     namespace Shared { public class LegacyOnly {} }
+                                                                                     """)) with
+        {
+            TargetFramework = "netstandard2.0"
+        };
+        CompilationInput modern = CompilationFactory.Compile("Shared", ("Modern.cs", """
+                                                                                     namespace Shared { public class ModernOnly {} }
+                                                                                     """)) with
+        {
+            TargetFramework = "net10.0"
+        };
+
+        // Act
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern]);
+        GraphSummary summary = GraphSummarizer.Summarize(model);
+
+        // Assert
+        ProjectSummary shared = summary.Projects.Single();
+        shared.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
+        shared.FactsFollow.ShouldBeNull();
+    }
+
+    [Fact]
     public void Summarize_MixedSolutionMembership_CarriesEachProjectsLabelThrough()
     {
         // Arrange — App is declared, Lib is a passenger, and Loose was extracted with nothing read about it.
@@ -430,6 +497,17 @@ public sealed class GraphSummarizerTests
 
         // Assert — a complete survey of a smaller subject, so an entry no scoped project declares goes.
         scoped.MultiplyDeclaredTypes.ShouldBeEmpty();
+    }
+
+    // One framework's compilation of the one project, declaring the type both of them declare.
+    private static CompilationInput Framework(string targetFramework)
+    {
+        return CompilationFactory.Compile("Shared", ("Widget.cs", """
+                                                                  namespace Shared { public class Widget {} }
+                                                                  """)) with
+        {
+            TargetFramework = targetFramework
+        };
     }
 
     // Two projects compiling one shared type, which is what a <Compile Include> link produces: App declares

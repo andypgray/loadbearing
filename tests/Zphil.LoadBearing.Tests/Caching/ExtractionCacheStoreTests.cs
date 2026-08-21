@@ -374,7 +374,7 @@ public sealed class ExtractionCacheStoreTests
             specs,
             new WorkspaceDiagnostics(
                 ["load-diag-1", "load-diag-2"], [], ["/repo/Broken/Broken.csproj"], [],
-                ["/repo/Unrestored/Unrestored.csproj"], ["/repo/Fs/Fs.fsproj"]));
+                ["/repo/Unrestored/Unrestored.csproj"], ["/repo/Fs/Fs.fsproj"], []));
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -444,7 +444,7 @@ public sealed class ExtractionCacheStoreTests
         List<CodebaseFragment> fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], [], []));
+        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], [], [], []));
     }
 
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
@@ -452,7 +452,7 @@ public sealed class ExtractionCacheStoreTests
         List<CodebaseFragment> fragments = solution.Projects
             .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
             .ToList();
-        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics([diagnostic], [], [], [], [], []));
+        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics([diagnostic], [], [], [], [], [], []));
     }
 
     /// <summary>

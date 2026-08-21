@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     The check document's key order (<see cref="JsonReportRenderer.Document" />, and so
 ///     <c>arch_check</c>'s too): the roll-up and every trust stamp serialize ahead of <c>rules</c> — the
 ///     bulk a truncating reader's cut lands in — and the stamps serialize ahead of the <c>summary</c> they
-///     invalidate. The goldens cannot pin this: a stamp is omitted from every clean run, so five of the six
+///     invalidate. The goldens cannot pin this: a stamp is omitted from every clean run, so six of the seven
 ///     keys here appear in no golden at all. The one document under test carries all of them at once —
 ///     including the per-rule subject-coverage pair, which the same reasoning applies to one level down.
 /// </summary>
@@ -32,9 +32,9 @@ public sealed class CheckJsonOrderTests
             .Because("The web layer must not open the data layer directly."));
 
     // A run whose workspace loaded incompletely, whose packages did not restore, that a solution filter
-    // narrowed, whose solution declares a project in another language, and that a --rules glob narrowed
-    // further: every optional slot populated at once, which no real run needs to be for the order to
-    // matter and which no golden can be.
+    // narrowed, whose solution declares a project in another language and a project that compiles twice,
+    // and that a --rules glob narrowed further: every optional slot populated at once, which no real run
+    // needs to be for the order to matter and which no golden can be.
     private static readonly string StampedDocument = JsonReportRenderer.Document(
         report: WebOpensData,
         solutionDirectory: Directory.GetCurrentDirectory(),
@@ -44,7 +44,8 @@ public sealed class CheckJsonOrderTests
         workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
         diagnostics: new WorkspaceDiagnostics(
             [], [], ["App.Web/App.Web.csproj"], ["App.Reports/App.Reports.csproj"],
-            ["App.Data/App.Data.csproj"], ["App.Signals/App.Signals.fsproj"]),
+            ["App.Data/App.Data.csproj"], ["App.Signals/App.Signals.fsproj"],
+            [new MultiTargetedProject("App.Shared", ["net10.0", "netstandard2.0"], "net10.0")]),
         rulesFilter: ["layer/*"],
         grain: DocumentGrain.Full);
 
@@ -55,6 +56,7 @@ public sealed class CheckJsonOrderTests
     [InlineData("uncheckedProjects")]
     [InlineData("restoreFailedProjects")]
     [InlineData("unsupportedProjects")]
+    [InlineData("multiTargetedProjects")]
     public void Document_VerdictAndTrustStamps_SerializeAheadOfRules(string key)
     {
         // Below the grain ladder's coarsest rung a reader with a response budget cuts at the last newline
@@ -69,6 +71,7 @@ public sealed class CheckJsonOrderTests
     [InlineData("uncheckedProjects")]
     [InlineData("restoreFailedProjects")]
     [InlineData("unsupportedProjects")]
+    [InlineData("multiTargetedProjects")]
     public void Document_TrustStamps_SerializeAheadOfTheSummaryTheyInvalidate(string key)
     {
         ShouldSerializeBefore(StampedDocument, key, "summary");

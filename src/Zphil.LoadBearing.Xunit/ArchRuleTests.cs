@@ -249,14 +249,15 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                 null, CancellationToken.None);
 
             Dictionary<string, RuleResult> byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
-            // No merge notes: the adapter has no channel that renders them, so its diagnostics are the load
-            // failures alone. The project lists come off the load itself — null only where no load happened,
-            // which is also the case where there is nothing to have failed, skipped or been unable to read.
+            // Neither of the merge's two facts: the adapter has no channel that renders them, so its
+            // diagnostics are the load failures alone. The project lists come off the load itself — null only
+            // where no load happened, which is also the case where there is nothing to have failed, skipped
+            // or been unable to read.
             return new ArchCheckRun(
                 byId, solutionDirectory, fullSolutionPath,
                 new WorkspaceDiagnostics(
                     diagnostics, [], opened?.FailedProjects ?? [], opened?.UncheckedProjects ?? [],
-                    opened?.RestoreFailedProjects ?? [], opened?.UnsupportedProjects ?? []));
+                    opened?.RestoreFailedProjects ?? [], opened?.UnsupportedProjects ?? [], []));
         }
         finally
         {

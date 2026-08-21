@@ -105,13 +105,27 @@ internal static class GraphFormatter
     // Only the passenger is annotated. Membership is the unremarkable case — every project of a healthy
     // solution has it — so marking it would put a badge on every line and leave the one line worth reading
     // no easier to find. An unread membership says nothing at all, for the same reason it serializes absent.
+    // The framework clause follows that same rule: one project file, one compilation is the unremarkable
+    // case, so only the project that arrived as several says so.
     private static string ProjectLine(ProjectSummary project)
     {
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
         string membership = project.SolutionMember == false ? " (not a solution member)" : "";
         string generated = project.Generated > 0 ? $" ({project.Generated} generated)" : "";
         return $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}{generated}; "
-               + $"references: {references}";
+               + $"{FrameworksClause(project)}references: {references}";
+    }
+
+    // "targets net10.0, netstandard2.0 (shared types from net10.0); " — the frameworks in extraction order,
+    // and the winner only where the frameworks actually share a type. A multi-targeted project whose
+    // frameworks share nothing displaced no facts, so the parenthesis would be a claim about nothing; the
+    // list alone still says the project compiles more than once, which is the fact a rule author needs.
+    private static string FrameworksClause(ProjectSummary project)
+    {
+        if (project.TargetFrameworks.Count == 0) return "";
+
+        string shared = project.FactsFollow is { } winner ? $" (shared types from {winner})" : "";
+        return $"targets {string.Join(", ", project.TargetFrameworks)}{shared}; ";
     }
 
     private static string NamespaceLine(ProjectSummary project)

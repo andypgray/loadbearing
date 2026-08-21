@@ -3,11 +3,44 @@ using Zphil.LoadBearing.Roslyn.MsBuild;
 namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 
 /// <summary>
+///     One project file that arrived as several compilations: its name, every target framework it was
+///     extracted from, and the one whose facts the types those frameworks share ended up carrying.
+/// </summary>
+/// <remarks>
+///     <para>
+///         It lands here rather than beside the document DTOs because it is a fact about the extraction, and
+///         because a document that composed it for itself could disagree with the merge note stating the same
+///         thing in prose. Unlike the four project lists around it these are project <em>names</em>, never
+///         paths, so nothing relativizes them and the value reaches the wire as it is.
+///     </para>
+///     <para>
+///         <see cref="FactsFollow" /> is null when the frameworks share no type. That is the gate the merge's
+///         own note is under, and it is a correctness matter rather than a nicety: a project whose frameworks
+///         each declare their own types displaced nothing, and naming a winner would be false about all of
+///         them. The framework list alone still says the project compiled more than once.
+///     </para>
+/// </remarks>
+/// <param name="Project">The project (assembly) name — one name for however many compilations it produced.</param>
+/// <param name="TargetFrameworks">
+///     Every framework the project was extracted from, ordinal-ordered — which is also the order a workspace
+///     load hands them over in, so the first entry is the one a shared type's facts fall to.
+/// </param>
+/// <param name="FactsFollow">
+///     The framework whose facts the shared types carry, or <see langword="null" /> when the frameworks share
+///     no type.
+/// </param>
+internal sealed record MultiTargetedProject(
+    string Project,
+    IReadOnlyList<string> TargetFrameworks,
+    string? FactsFollow);
+
+/// <summary>
 ///     Everything a run knows about how well its workspace loaded, as one value: the
 ///     <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" /> that gate, the
 ///     <see cref="LoadFailures" /> and <see cref="MergeNotes" /> that never do, the
-///     <see cref="UncheckedProjects" /> and <see cref="UnsupportedProjects" /> that scope the verdict instead
-///     of deciding it, plus the rendering both surfaces read and the gate decision every verb makes.
+///     <see cref="UncheckedProjects" />, <see cref="UnsupportedProjects" /> and
+///     <see cref="MultiTargetedProjects" /> that scope the verdict instead of deciding it, plus the rendering
+///     both surfaces read and the gate decision every verb makes.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -86,16 +119,28 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     wrong, so it says what the run covers and decides nothing. Without it the run simply surveyed fewer
 ///     projects than the solution declares and said so nowhere.
 /// </param>
+/// <param name="MultiTargetedProjects">
+///     The projects one <c>.csproj</c> of which yielded several compilations, each with its frameworks and
+///     the one its shared types' facts came from. It is <see cref="MergeNotes" />' machine-readable half —
+///     both are filled from the same merge, on the same read, so the key and the prose cannot disagree about
+///     what compiled twice — and it takes <see cref="UnsupportedProjects" />' posture rather than
+///     <see cref="FailedProjects" />': the model is complete and every rule answered, over one framework's
+///     view of the projects named here. So it scopes the verdict, never invalidates it, and never reaches
+///     <see cref="Gates" />. Wider than the notes, deliberately: a note is raised only where two frameworks
+///     declared the same type, while a project whose frameworks share nothing is still a project that
+///     compiled more than once, and that is unsayable in prose the merge does not raise.
+/// </param>
 internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> LoadFailures,
     IReadOnlyList<string> MergeNotes,
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
-    IReadOnlyList<string> UnsupportedProjects)
+    IReadOnlyList<string> UnsupportedProjects,
+    IReadOnlyList<MultiTargetedProject> MultiTargetedProjects)
 {
     /// <summary>A run with nothing to report — nothing failed to load, and no diagnostics or merge notes.</summary>
-    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], []);
+    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], []);
 
     /// <summary>
     ///     The load failures with the MSBuild-selection note appended, or empty for a clean load. What five

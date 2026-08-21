@@ -205,7 +205,7 @@ public static class GraphSummarizer
 
         return new ProjectSummary(
             project.Name, project.ProjectReferences, declaredTypes.Count, generated, namespaces,
-            project.SolutionMember);
+            project.SolutionMember, project.TargetFrameworks, project.FactsFollow);
     }
 
     // The external-reference bucket: the first two dot-segments of the target's namespace (one segment →

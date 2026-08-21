@@ -46,7 +46,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "checked — a clean report then covers a subset; say so. " +
         "unsupportedProjects names the declared projects this product cannot read at all (C# only), each " +
         "with its reason — no rule can be violated in one, so a clean report over a polyglot solution is " +
-        "not a clean solution either.";
+        "not a clean solution either. " +
+        "multiTargetedProjects names the projects that compiled for several frameworks, each with the " +
+        "framework its shared types' facts follow — what another framework's #if guards was never in the " +
+        "model, so a clean report over such a project covers one framework's view of it.";
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
@@ -84,6 +87,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "generated qualifies the types count on a project and on each namespace (absent when zero): how many " +
         "of them a generator emitted, which is what arch.Project() would sweep and .Authored() would drop. A " +
         "namespace whose two counts are equal is wholly generator output — never make it a layer glob. " +
+        "targetFrameworks and factsFollow ride a multi-targeted project's row (both absent on a " +
+        "single-framework one): every framework it was extracted from, ordinal-ordered, and the one its " +
+        "shared types' facts came from — what another framework's #if guards is not in the model. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +

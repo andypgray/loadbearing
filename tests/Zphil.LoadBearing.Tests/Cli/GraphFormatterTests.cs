@@ -9,10 +9,12 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The human survey's project roster, over a universe the MyApp fixture cannot supply: one project the
-///     solution declares, one passenger a <c>ProjectReference</c> dragged in, and one nothing was read
-///     about. <see cref="GraphCommandTests" /> pins the whole document against the real fixture; this pins
-///     the one line shape that fixture has no example of, because all three of its projects are declared.
+///     The human survey's project roster, over universes the MyApp fixture cannot supply: one project the
+///     solution declares, one passenger a <c>ProjectReference</c> dragged in, one nothing was read about,
+///     and — separately — the three shapes a target-framework clause takes.
+///     <see cref="GraphCommandTests" /> pins the whole document against the real fixture; this pins the line
+///     shapes that fixture has no example of, because all three of its projects are declared and each
+///     targets one framework.
 /// </summary>
 public sealed class GraphFormatterTests
 {
@@ -90,6 +92,54 @@ public sealed class GraphFormatterTests
             .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
         Section(lines, "Namespaces:")
             .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lines_MultiTargetedProjects_AnnotateTheirFrameworksAndOnlyACollapseNamesAWinner()
+    {
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MultiTargetedSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        // Assert — the clause's two shapes in one roster, plus the single-framework project that says
+        // nothing. The parenthesis is what a rule author acts on: it names the one compilation a rule about
+        // a shared type is measured against. Acme.Split targets two frameworks that share no type, so
+        // nothing was displaced and there is no winner to name — the list alone still says it compiles twice.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Plain — 1 type; references: (none)",
+                "  Acme.Shared — 3 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
+                + "references: (none)",
+                "  Acme.Split — 2 types; targets net10.0, netstandard2.0; references: (none)"
+            ]);
+    }
+
+    [Fact]
+    public void Lines_SingleTargetedProjects_LeaveEveryLineExactlyAsItWas()
+    {
+        // The other half of the byte-identity claim: every project of an ordinary solution targets one
+        // framework, so its roster must be the one it was before the clause existed.
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        Roster(lines)
+            .ShouldAllBe(line => !line.Contains("targets", StringComparison.Ordinal));
+    }
+
+    // Hand-built for the reason GeneratedTypeSummary is: the subject is the LINE, and the three shapes it
+    // has to spell — collapsed, uncollapsed, single-framework — read better as literals than as the three
+    // extractions that would produce them. MultiTargetFrameworkTests covers the facts themselves, over the
+    // real two-framework fixture solution.
+    private static GraphSummary MultiTargetedSummary()
+    {
+        ProjectSummary plain = new("Acme.Plain", [], 1, 0, [], solutionMember: true);
+        ProjectSummary shared = new(
+            "Acme.Shared", [], 3, 0, [], solutionMember: true, targetFrameworks: ["net10.0", "netstandard2.0"],
+            factsFollow: "net10.0");
+        ProjectSummary split = new(
+            "Acme.Split", [], 2, 0, [], solutionMember: true, targetFrameworks: ["net10.0", "netstandard2.0"]);
+
+        return new GraphSummary([plain, shared, split], [], [], [], []);
     }
 
     // Hand-built rather than extracted: the subject here is the LINE, and the three namespace shapes it has

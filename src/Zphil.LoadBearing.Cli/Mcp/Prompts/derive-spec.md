@@ -62,6 +62,14 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
   the solution file does not declare — a passenger, not part of the estate you are writing law
   for, so keep it out of your layer globs. An absent key means membership could not be read.
+  `targetFrameworks` lists every framework a multi-targeting project was extracted from,
+  ordinal-ordered by framework name — extraction's own order, never the csproj's — and
+  `factsFollow` names the framework whose compilation supplied the facts for the types more
+  than one framework declares; it is absent when the frameworks share no type (every type then
+  keeps its own framework's facts), and both are absent when the project compiled once. Read
+  both before writing a rule whose subject is that project: the rule is checked against
+  `factsFollow`'s compilation alone, and a `#if`-divergent branch on a losing framework is
+  invisible to it.
   `generated` qualifies a type count — on the project, and on each namespace — with how many of
   those types a generator emitted; it is absent when none were. **A namespace whose `generated`
   equals its `types` is wholly generator output: never make it a layer glob and never anchor a
@@ -102,7 +110,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]              { name, solutionMember?, projectReferences[], types, generated?, namespaces[]{ namespace, types, generated? } }
+projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, projectReferences[], types, generated?, namespaces[]{ namespace, types, generated? } }
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
@@ -118,11 +126,12 @@ the overview is still too big — it stamps `"grain": "skeleton"` and drops `ext
 and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
 `externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
 edges stay. `unsupportedProjects[]` survives every rung whole, having no count key at all. A
-project's own `generated` survives every rung too, riding its row; only the per-namespace one
-goes, with the inventory that carries it — so at any grain you can still see which projects are
-mostly generator output, and drop to full grain to see which namespaces. Read the stamp: a
-survey with no `grain` is the complete one. An absent coverage key with no count beside it means
-the solution has none; the count key is what tells elision from absence.
+project's own `generated` survives every rung too, riding its row, and the framework pair
+(`targetFrameworks`, `factsFollow`) rides the row the same way; only the per-namespace
+`generated` goes, with the inventory that carries it — so at any grain you can still see which
+projects are mostly generator output, and drop to full grain to see which namespaces. Read the
+stamp: a survey with no `grain` is the complete one. An absent coverage key with no count beside
+it means the solution has none; the count key is what tells elision from absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project

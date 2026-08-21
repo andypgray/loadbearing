@@ -73,6 +73,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The human survey gains a section beside the observed references, reading `(none)` when there is
   nothing to report and one line per type when there is.
 
+- **Both documents now state a multi-targeting project's frameworks, and which one's facts its
+  shared types carry.** A multi-targeting `.csproj` compiles once per framework, and extraction
+  takes every compilation: types, references and solution membership union losslessly under the
+  one project name. The exception is a type more than one framework declares — it carries one
+  framework's edges, members and hierarchy: the first extracted, in ordinal order of the framework
+  name, never the csproj's declaration order, so anything a losing framework's `#if` guards is not
+  in the model and a rule about that type answers from the winning compilation alone. The survey's
+  project row gains `targetFrameworks`, every framework in that order, and `factsFollow`, the
+  winner — present only when the frameworks actually share a type, because a project whose
+  frameworks share nothing displaced nothing and every type keeps its own framework's facts. The
+  pair rides the row the way `generated` does, surviving every grain rung, and the human survey's
+  project line gains a `targets net10.0, netstandard2.0 (shared types from net10.0)` clause.
+  `check --json` gains the matching top-level stamp, `multiTargetedProjects`, beside
+  `unsupportedProjects` and with its posture: every rule still ran and answered, over one
+  framework's view, so it scopes the verdict and never touches `modelIncomplete`. It is the keyed
+  form of the advisory sentence `check` already prints; the sentence is unchanged, and the stamp
+  is wider, naming every project that compiled more than once rather than only those where two
+  frameworks collapsed a type. Both keys are absent for a single-framework project, so every
+  schema version is unchanged and a single-framework solution's documents are byte-identical to
+  the ones before.
+
 ### Fixed
 
 - **An unbound MCP server now leads with a recovery the reader can actually perform.** A server that

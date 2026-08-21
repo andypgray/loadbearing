@@ -55,7 +55,8 @@ public sealed class GraphSummary
 /// <summary>
 ///     One project in the survey: its name, whether the solution declares it, its declared forward project
 ///     references (verbatim from the <see cref="ProjectNode" />), the count of its solution-declared types,
-///     how many of those a generator emitted, and its namespace inventory. Comparing
+///     how many of those a generator emitted, its namespace inventory, and — for a multi-targeted project —
+///     the frameworks it was extracted from and the one its shared types' facts came from. Comparing
 ///     <see cref="ProjectReferences" /> against the <see cref="GraphSummary.ProjectEdges" /> surfaces
 ///     declared-but-unobserved references (the dead-reference signal).
 /// </summary>
@@ -67,7 +68,9 @@ public sealed class ProjectSummary
         int types,
         int generated,
         IReadOnlyList<NamespaceCount> namespaces,
-        bool? solutionMember = null)
+        bool? solutionMember = null,
+        IReadOnlyList<string>? targetFrameworks = null,
+        string? factsFollow = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
@@ -75,6 +78,8 @@ public sealed class ProjectSummary
         Generated = generated;
         Namespaces = namespaces;
         SolutionMember = solutionMember;
+        TargetFrameworks = targetFrameworks ?? [];
+        FactsFollow = factsFollow;
     }
 
     /// <summary>The project (assembly) name.</summary>
@@ -105,6 +110,21 @@ public sealed class ProjectSummary
     ///     reported here rather than filtered out.
     /// </summary>
     public bool? SolutionMember { get; }
+
+    /// <summary>
+    ///     <see cref="ProjectNode.TargetFrameworks" /> verbatim: every framework this project was extracted
+    ///     from, ordinal-ordered, and empty for the single-framework project — which is every project of most
+    ///     solutions, so most surveys say nothing here at all.
+    /// </summary>
+    public IReadOnlyList<string> TargetFrameworks { get; }
+
+    /// <summary>
+    ///     <see cref="ProjectNode.FactsFollow" /> verbatim: the framework whose facts this project's shared
+    ///     types carry, or <see langword="null" /> when its frameworks share no type. It is the survey's
+    ///     answer to what a rule anchored on this project is actually checked against — one compilation of
+    ///     several, with every other framework's conditional code outside the model.
+    /// </summary>
+    public string? FactsFollow { get; }
 }
 
 /// <summary>A namespace and the number of a project's solution-declared types that reside in it.</summary>

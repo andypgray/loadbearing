@@ -376,10 +376,12 @@ internal sealed class ExtractionCacheStore
         }
 
         // Re-paired once, here, from the flat lists the manifest persists — the only place the five become a
-        // verdict again, so no consumer can assemble them in a different order.
+        // verdict again, so no consumer can assemble them in a different order. The merge's own two facts —
+        // the notes and the multi-targeted projects — are empty here on purpose: nothing persists them
+        // because a hit re-merges the stored fragments and produces both afresh.
         var loadDiagnostics = new WorkspaceDiagnostics(
             manifest.Diagnostics, [], manifest.FailedProjects, manifest.UncheckedProjects,
-            manifest.RestoreFailedProjects, manifest.UnsupportedProjects);
+            manifest.RestoreFailedProjects, manifest.UnsupportedProjects, []);
 
         if (dirtyProjects.Count == 0)
         {

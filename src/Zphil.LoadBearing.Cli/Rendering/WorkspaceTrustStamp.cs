@@ -20,9 +20,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 internal sealed record UnsupportedProjectStamp(string Project, string Reason);
 
 /// <summary>
-///     The five facts every document stamps about how far its own contents can be trusted: whether the model
-///     is incomplete, and which projects failed to load, went unchecked, had no packages restored, or are
-///     written in a language this product cannot read.
+///     The six facts every document stamps about how far its own contents can be trusted: whether the model
+///     is incomplete, and which projects failed to load, went unchecked, had no packages restored, are
+///     written in a language this product cannot read, or were read from one of several compilations.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -64,12 +64,22 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason);
 ///     an all-C# solution. Unlike its three siblings this is not a verdict about the load — nothing here was
 ///     ever going to load — so it never reaches <see cref="ModelIncomplete" />.
 /// </param>
+/// <param name="MultiTargetedProjects">
+///     The projects one <c>.csproj</c> of which yielded several compilations, or <see langword="null" /> when
+///     every project targets one framework — which is every project of most solutions. It takes
+///     <see cref="UnsupportedProjects" />' posture rather than <see cref="FailedProjects" />': the model is
+///     whole and every rule answered, over one framework's view of these projects, so it never reaches
+///     <see cref="ModelIncomplete" /> either. Carried through unchanged rather than remade the way the four
+///     path lists are — these are project names, so there is nothing to relativize and no second shape for
+///     the wire to disagree with the merge about.
+/// </param>
 internal readonly record struct WorkspaceTrustStamp(
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
-    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects)
+    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
+    IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects)
 {
     /// <summary>
     ///     The reason every unsupported entry carries. One string for the whole set, deliberately — see
@@ -92,7 +102,8 @@ internal readonly record struct WorkspaceTrustStamp(
             Relative(diagnostics.FailedProjects, relativizer),
             Relative(diagnostics.UncheckedProjects, relativizer),
             Relative(diagnostics.RestoreFailedProjects, relativizer),
-            Unsupported(diagnostics.UnsupportedProjects, relativizer));
+            Unsupported(diagnostics.UnsupportedProjects, relativizer),
+            diagnostics.MultiTargetedProjects.Count == 0 ? null : diagnostics.MultiTargetedProjects);
     }
 
     private static IReadOnlyList<string>? Relative(

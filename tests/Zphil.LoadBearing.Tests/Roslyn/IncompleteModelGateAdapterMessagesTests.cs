@@ -96,6 +96,6 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     private static WorkspaceDiagnostics Diagnostics(
         IReadOnlyList<string>? failed = null, IReadOnlyList<string>? restoreFailed = null)
     {
-        return new WorkspaceDiagnostics([], [], failed ?? [], [], restoreFailed ?? [], []);
+        return new WorkspaceDiagnostics([], [], failed ?? [], [], restoreFailed ?? [], [], []);
     }
 }

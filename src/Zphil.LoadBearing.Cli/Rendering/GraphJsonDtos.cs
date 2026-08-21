@@ -126,7 +126,8 @@ internal sealed record GraphJson(
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects);
 
 /// <summary>
-///     One project: whether the solution declares it, its declared references, solution-declared type count,
+///     One project: whether the solution declares it, which target frameworks it was extracted from and
+///     which one its shared types' facts came from, its declared references, solution-declared type count,
 ///     how many of those a generator emitted, and its namespace inventory — the last of which is null
 ///     (omitted) at overview grain, being the one thing that grain elides.
 /// </summary>
@@ -136,6 +137,16 @@ internal sealed record GraphJson(
 ///         real weight: absent means membership was never read, so a reader must not take a missing key for
 ///         <c>false</c>. An explicit <c>false</c> is a project the workspace loaded through a
 ///         <c>ProjectReference</c> that the solution file does not declare.
+///     </para>
+///     <para>
+///         <c>targetFrameworks</c> and <c>factsFollow</c> ride the row for the reason <c>generated</c> does,
+///         and are absent for the same reason: a single-framework project has one compilation, so its name
+///         already says which one every fact came from and there is nothing to qualify. Where a project file
+///         yielded several, the array names them all and <c>factsFollow</c> names the one the types they
+///         share took their facts from — absent in its own right when the frameworks share no type, because
+///         nothing was then displaced and claiming a winner would be false about every type in the project.
+///         Riding the row is also what carries them down the grain ladder untouched: the pair scales with the
+///         solution's projects, which the coarsest survey still lists in full.
 ///     </para>
 ///     <para>
 ///         <c>generated</c> is deliberately <em>not</em> a top-level coverage statement, which is what the
@@ -150,6 +161,8 @@ internal sealed record GraphJson(
 internal sealed record GraphProjectJson(
     string Name,
     bool? SolutionMember,
+    IReadOnlyList<string>? TargetFrameworks,
+    string? FactsFollow,
     IReadOnlyList<string> ProjectReferences,
     int Types,
     int? Generated,

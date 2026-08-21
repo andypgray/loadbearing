@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -9,10 +10,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
 // without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects`,
-// `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects` and `rulesFilter` slots are additive
-// the same way: null (omitted) on every run whose workspace loaded, whose NuGet packages resolved, that no
-// solution filter narrowed, whose solution is all C#, and that checked the whole spec — so a clean document
-// is unchanged.
+// `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects`, `multiTargetedProjects` and
+// `rulesFilter` slots are additive the same way: null (omitted) on every run whose workspace loaded, whose
+// NuGet packages resolved, that no solution filter narrowed, whose solution is all C# and single-framework,
+// and that checked the whole spec — so a clean document is unchanged.
 // The grain slots — `grain`, `violationCount`, `siteCount` — are additive in the same sense and absent from
 // every full-grain report, which is every report the CLI writes unless asked otherwise. They hold the schema
 // at version 3, as the survey's own ladder held it at 1: a consumer reading a full document cannot tell
@@ -84,6 +85,20 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     verdict over a polyglot solution is the exact reading this slot qualifies — no rule can be violated
 ///     in a project the model does not contain, and the report had no way to say so.
 /// </param>
+/// <param name="MultiTargetedProjects">
+///     Which projects arrived as several compilations, because one <c>.csproj</c> targets several frameworks
+///     — each with every framework it was read from and, where its frameworks share a type, the one those
+///     types' facts came from — or null (omitted) when every project targets a single framework. Beside
+///     <see cref="UnsupportedProjects" /> and
+///     for its reason: it scopes the verdict rather than invalidating it, so it never reaches
+///     <see cref="ModelIncomplete" /> and every rule below ran and answered — against one framework's view of
+///     these projects. That is what the slot exists to say: a rule about a type both frameworks declare was
+///     checked against <c>factsFollow</c> alone, and whatever another framework's <c>#if</c> guards was never
+///     in the model to violate it. Never elided by grain, on the same reasoning as its neighbour: it is
+///     bounded by the solution rather than by the codebase, and a coarser report is where a reader most needs
+///     it. <c>workspaceDiagnostics</c> carries the same fact as an English sentence, and only for the
+///     projects whose frameworks actually collapsed a type; this is the keyed form, and it covers the rest.
+/// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
@@ -96,6 +111,7 @@ internal sealed record CheckJson(
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
+    IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
     SummaryJson Summary,
     IReadOnlyList<RuleJson> Rules,
     IReadOnlyList<string> WorkspaceDiagnostics);
