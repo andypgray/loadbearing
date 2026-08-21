@@ -74,11 +74,18 @@ jobs:
 
       # Restore/build/test the whole solution, not just the test project: the self-spec
       # tests open the real Zphil.LoadBearing.slnx through MSBuildWorkspace, so building the
-      # entire solution is what guarantees the workspace resolves at test time. CI=true (set
-      # by GitHub Actions) also puts NuGet restore in locked mode for the six lock-file
-      # projects, while the throwaway fixture projects restore unlocked by design.
+      # entire solution is what guarantees the workspace resolves at test time.
+      #
+      # --locked-mode is named on the line rather than left to CI=true. src/Directory.Build.props
+      # and the tests csproj already set RestoreLockedMode under $(CI), so this restore was locked
+      # either way — but only for as long as the runner keeps setting that variable, and the day it
+      # stops, the restore goes unlocked silently with nothing red. Spelled here it is unconditional.
+      # The flag applies to every project in the graph, which costs nothing: locked mode only bites
+      # where a lock file exists, so the six lock-file projects are held to their committed graph
+      # while the arch project and the throwaway fixtures, which carry no lock file by design,
+      # restore unlocked exactly as before.
       - name: Restore
-        run: dotnet restore Zphil.LoadBearing.slnx
+        run: dotnet restore Zphil.LoadBearing.slnx --locked-mode
 
       - name: Build
         run: dotnet build Zphil.LoadBearing.slnx --no-restore
