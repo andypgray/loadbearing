@@ -30,7 +30,7 @@ internal sealed class MilestoneStore
     /// <summary>Appends a milestone to the shipment's ordered list.</summary>
     public void Add(ShipmentMilestone milestone)
     {
-        if (!byShipment.TryGetValue(milestone.ShipmentId, out var milestones))
+        if (!byShipment.TryGetValue(milestone.ShipmentId, out List<ShipmentMilestone>? milestones))
         {
             milestones = [];
             byShipment[milestone.ShipmentId] = milestones;
@@ -42,6 +42,6 @@ internal sealed class MilestoneStore
     /// <summary>Returns the shipment's milestones, or an empty list if none are recorded.</summary>
     public IReadOnlyList<ShipmentMilestone> For(string shipmentId)
     {
-        return byShipment.TryGetValue(shipmentId, out var milestones) ? milestones : [];
+        return byShipment.TryGetValue(shipmentId, out List<ShipmentMilestone>? milestones) ? milestones : [];
     }
 }

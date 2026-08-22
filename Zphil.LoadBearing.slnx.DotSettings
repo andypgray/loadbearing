@@ -88,11 +88,22 @@
 	     DeconstructionDeclarations is promoted alongside the other three even though no
 	     ForDeconstructionDeclarations style key sits above it — the declarations in the tree are
 	     already explicit and inspect reports none, so the promotion holds the line where it is.
-	     Should that ever red, pin the missing style key rather than demoting this one. -->
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_BuiltInTypes/@EntryIndexedValue">WARNING</s:String>
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_SimpleTypes/@EntryIndexedValue">WARNING</s:String>
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_Elsewhere/@EntryIndexedValue">WARNING</s:String>
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_DeconstructionDeclarations/@EntryIndexedValue">WARNING</s:String>
+	     Should that ever red, pin the missing style key rather than demoting this one.
+
+	     The _005F in each key is the escape for the underscore in the rule id, and it is the whole
+	     entry: an underscore is how this format introduces an escape, so it cannot also stand for
+	     itself. These four carried the literal spelling from the day they were written until
+	     2026-08-20, and in that form they did nothing at all — the entry parses, the file loads, the
+	     rule keeps its default of hint, and a drifted declaration sits below the level the baseline
+	     reads, which is the exact state the entries were added to escape. Nothing reported it,
+	     because a no-op key and a working one are indistinguishable until a violation exists to
+	     report. What settled it: with the literal spelling the rule stayed at hint even when the
+	     value was raised to ERROR, while a control rule promoted from hint in the same file moved.
+	     Same trap as the _002E below, one character earlier. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FBuiltInTypes/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FSimpleTypes/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FElsewhere/@EntryIndexedValue">WARNING</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FDeconstructionDeclarations/@EntryIndexedValue">WARNING</s:String>
 
 	<!-- A sync call that blocks an async pipeline, made visible.
 

@@ -79,7 +79,7 @@ public sealed class InMemoryDatabase
     public void Restore(Snapshot snapshot)
     {
         quotes.Clear();
-        foreach (var entry in snapshot.Quotes) quotes[entry.Key] = entry.Value;
+        foreach (KeyValuePair<string, Quote> entry in snapshot.Quotes) quotes[entry.Key] = entry.Value;
 
         lastQuoteNumber = snapshot.LastQuoteNumber;
     }

@@ -1,5 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <!--
+        This project belongs to no solution, on purpose. It looks like an oversight and is not, so the
+        reasoning lives here rather than in anyone's memory.
+
+        What it demonstrates is the consumer that sits OUTSIDE the solution it checks. The adapter
+        finds its target by walking up from the test assembly for a named solution file, which is the
+        shape a team gets when its architecture tests live beside the code instead of inside the
+        solution under test. That walk is the whole point of the project, and its sixteen lines are
+        the whole demonstration; declaring it as a member dissolves the thing being shown.
+
+        Joining a solution would also break two working guarantees.
+
+        Spec discovery. The CLI picks a spec project by convention: the unique DECLARED solution
+        member that references the LoadBearing contract library. This project references the xUnit
+        adapter, which references that library, so as a declared member it becomes a second candidate
+        and the check verb stops with "Multiple spec projects found" and a non-zero exit. That would
+        fail the examples job, the packaged quickstart walk, and the published quickstart itself,
+        whose entire point is that it runs without being told where the spec lives.
+
+        The committed drawing. Its survey fence draws every project its solution declares, and a gate
+        holds it to exactly that set, while a second gate requires the LoadBearing projects to appear
+        nowhere in the body. A declared test project would demand a redrawn survey with a test node
+        in it, drawn from a spec that is not what the page is about.
+
+        None of this leaves the project uncovered. The examples workflow builds and runs it on every
+        push, in a step named for this adapter, which deliberately does not reuse an earlier build
+        because no solution above it produces one. Its nine rule tests run there.
+
+        What it genuinely lacks is solution-scoped static inspection, which cannot reach a project
+        that no solution declares. That is accepted rather than overlooked:
+        one file, one class, one overridden property.
+    -->
+
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>

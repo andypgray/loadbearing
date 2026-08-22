@@ -13,7 +13,7 @@ public sealed class DemurrageCalculator : IDemurrageCalculator
     /// <inheritdoc />
     public decimal CalculateCharge(string containerId, DateOnly dischargedAt, DateOnly gatedOutAt)
     {
-        var billableDays = calendar.BillableDays(dischargedAt, gatedOutAt);
+        IReadOnlyList<DateOnly> billableDays = calendar.BillableDays(dischargedAt, gatedOutAt);
 
         List<DemurrageCharge.Day> days = [];
         for (var i = 0; i < billableDays.Count; i++)

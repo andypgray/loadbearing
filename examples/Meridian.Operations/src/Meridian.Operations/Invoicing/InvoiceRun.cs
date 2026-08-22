@@ -27,7 +27,7 @@ internal sealed class InvoiceRun(
 
     public InvoiceView GenerateFor(string shipmentId)
     {
-        var milestones = tracking.MilestonesFor(shipmentId);
+        IReadOnlyList<ShipmentMilestone> milestones = tracking.MilestonesFor(shipmentId);
         string containerId = containersByShipment.GetValueOrDefault(shipmentId, shipmentId);
 
         var demurrageCharge = 0m;
@@ -43,7 +43,7 @@ internal sealed class InvoiceRun(
 
         Invoice invoice = assembler.Assemble(shipmentId, milestones, containerId, demurrageCharge);
 
-        var lines = invoice.Lines
+        List<string> lines = invoice.Lines
             .Select(line => $"{line.Description}: {line.Amount:0.00} USD")
             .ToList();
 

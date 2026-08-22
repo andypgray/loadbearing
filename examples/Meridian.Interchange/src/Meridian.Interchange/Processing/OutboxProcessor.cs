@@ -19,7 +19,7 @@ internal sealed class OutboxProcessor(
     public async Task ProcessPendingAsync(CancellationToken cancellationToken)
     {
         int maxAttempts = options.Value.MaxDeliveryAttempts;
-        var pending = await store.GetPendingAsync(cancellationToken);
+        IReadOnlyList<OutboxMessage> pending = await store.GetPendingAsync(cancellationToken);
 
         foreach (OutboxMessage message in pending)
         {
