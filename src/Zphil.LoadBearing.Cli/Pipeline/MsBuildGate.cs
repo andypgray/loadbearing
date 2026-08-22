@@ -28,7 +28,7 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 ///         source only ever replaces the <em>cold</em> branch it names.
 ///     </para>
 ///     <para>
-///         <b>The environment seam.</b> The three cache-fronted verbs also take an optional
+///         <b>The environment seam.</b> Every entry point also takes an optional
 ///         <see cref="IEnvironment" />, threaded from <see cref="CliEntry" /> so a host can supply the
 ///         cache-root override without touching real process state. <c>null</c> — what <c>Program</c> passes —
 ///         means <see cref="SystemEnvironment" />, so production reads the real variable exactly as before.
@@ -96,30 +96,39 @@ internal static class MsBuildGate
             ct);
     }
 
-    // ── explain / render / baseline: the plain cold path (no --binlog) ───────────────────────────────────
+    // ── explain / render / baseline: the plain path, cache-aware but never replay-aware ──────────────────
+    //
+    // These three front the persisted extraction cache, and so take the environment seam the cache root is
+    // read through, exactly as the three above do. What they do NOT take is the replay
+    // decision: none of them carries --binlog, so there is no capture to validate and nothing for
+    // SelectSourceAndRunAsync to choose between — a fragment-cache hit is decided down in CodebaseSource,
+    // where their --no-cache argument travels to.
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunExplainAsync(
-        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return InvokeExplainAsync(request, output, error, SourceOrCold(hostSource), ct);
+        return InvokeExplainAsync(request, output, error, SourceOrCold(hostSource), environment, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunRenderAsync(
-        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return InvokeRenderAsync(request, output, error, SourceOrCold(hostSource), ct);
+        return InvokeRenderAsync(request, output, error, SourceOrCold(hostSource), environment, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunBaselineAsync(
-        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource, CancellationToken ct)
+        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource? hostSource,
+        IEnvironment? environment, CancellationToken ct)
     {
         EnsureMsBuildRegistered();
-        return InvokeBaselineAsync(request, output, error, SourceOrCold(hostSource), ct);
+        return InvokeBaselineAsync(request, output, error, SourceOrCold(hostSource), environment, ct);
     }
 
     // ── the source-selection gate ────────────────────────────────────────────────────────────────────────
@@ -318,22 +327,25 @@ internal static class MsBuildGate
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeExplainAsync(
-        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        ExplainRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new ExplainRunner(output, error, source).RunAsync(request, ct);
+        return new ExplainRunner(output, error, source, environment).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeRenderAsync(
-        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        RenderRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new RenderRunner(output, error, source).RunAsync(request, ct);
+        return new RenderRunner(output, error, source, environment).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeBaselineAsync(
-        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource source, CancellationToken ct)
+        BaselineRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment? environment, CancellationToken ct)
     {
-        return new BaselineRunner(output, error, source).RunAsync(request, ct);
+        return new BaselineRunner(output, error, source, environment).RunAsync(request, ct);
     }
 }

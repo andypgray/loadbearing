@@ -33,8 +33,9 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
     [Fact]
     public async Task Explain_WorkspacePathWithLoadFailure_RendersTheDiagnosticsAndStillAnswers()
     {
+        // Cache-free: the subject is what a workspace load reports, and a hit answers with no workspace at all.
         CliResult result = await RunAsync(
-            new ExplainRequest("cli/no-stdout", RepoRoot.Solution, RepoRoot.ArchSpecCsproj, RepoRoot.Directory));
+            new ExplainRequest("cli/no-stdout", RepoRoot.Solution, RepoRoot.ArchSpecCsproj, RepoRoot.Directory, true));
 
         result.ShouldSucceed("cli/no-stdout"); // the answer still arrives — it was never at risk
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and the load failure is visible beside it
@@ -50,7 +51,7 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
         CliResult result = await RunAsync(
             new ExplainRequest(
                 "layering/domain-independent", CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll,
-                Path.GetDirectoryName(CliRunner.MyAppSolution)!));
+                Path.GetDirectoryName(CliRunner.MyAppSolution)!, true));
 
         result.ShouldSucceed("layering/domain-independent (enforce)");
         result.Err.ShouldBeEmpty();

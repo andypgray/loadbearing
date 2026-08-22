@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`render`, `explain` and `baseline --add` now answer from the extraction cache, and take
+  `--no-cache`.** Only `check`, `status` and `graph` could reach it before, so on a 35-project
+  solution the other verbs paid a full extraction every time — roughly 105 seconds where a cache hit
+  takes 5. The old rule sorted verbs by what they do with the model; the rule now is what they read
+  *absence* as. A verb that reads presence — a violation it saw, a rule it found, a card it can
+  place — is at worst wrong in a way the next run corrects. `baseline --init` and
+  `baseline --accept-reductions` read absence as evidence: they turn "not in the model" into "no
+  longer happening" and write that into a file that outlives the run. Those two modes therefore
+  extract cache-free whatever the flag says, which is the same reasoning that already makes them
+  refuse a partial load or a solution filter — a stale cache is a third route to the same
+  smaller-than-real model, and the only one of the three that raises nothing for those refusals to
+  fire on. `baseline --add` records one violation the run did see, so it rides the cache like the
+  rest. Output is unchanged on every path: a hit replays the recorded diagnostics and merges the
+  same fragments, so a cached run is byte-identical to a cold one.
+
 - **The survey now counts how much of a project a generator wrote.** `arch.Project("Nop.Web")` is
   the obvious way to name a web tier, and on a real one it takes 803 compiled Razor views into its
   subject beside a handful of hand-written types, so naming and suffix rules report against code

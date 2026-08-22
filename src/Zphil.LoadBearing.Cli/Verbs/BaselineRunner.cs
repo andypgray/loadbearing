@@ -1,5 +1,6 @@
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
@@ -41,18 +42,36 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///         Short of that the command reports rather than gates — a red rule is the state to capture, not a
 ///         failure, so it exits 0 on success.
 ///     </para>
+///     <para>
+///         <b>The persisted extraction cache is fronted by <c>--add</c> alone</b>, and the split falls out
+///         of the same sentence: a stale cache is a third route to the smaller-than-real model the two gates
+///         above refuse <c>--init</c> and <c>--accept-reductions</c> on — and the only one of the three that
+///         is silent, because a hit replays the recorded diagnostics and so neither gate can see it. Those
+///         two modes therefore extract cache-free whatever <c>--no-cache</c> says, while <c>--add</c> takes
+///         the operator's answer.
+///     </para>
 ///     <para>Output/error writers are injected so the e2e tests can capture them.</para>
 /// </remarks>
-internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
-    : WorkspaceRunner(source)
+internal sealed class BaselineRunner(
+    TextWriter output,
+    TextWriter error,
+    ISolutionSource? source = null,
+    IEnvironment? environment = null)
+    : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(BaselineRequest request, CancellationToken ct)
     {
         // Mode validation FIRST — before discovering a solution or loading a workspace.
         ValidateMode(request);
 
+        // --init and --accept-reductions read absence as evidence, so they extract cache-free: a stale hit is
+        // a smaller-than-real model, and unlike a failed load or a solution filter it raises no diagnostic the
+        // two gates below could refuse on. --add records one violation the run did see, so it may front the
+        // cache and the operator's --no-cache is the whole policy there.
+        bool readsAbsenceAsEvidence = request.Init || request.AcceptReductions;
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,
+            readsAbsenceAsEvidence || request.NoCache, ct);
 
         // Composed for the render, so the MSBuild-selection note goes out with the load failures.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
@@ -76,6 +95,7 @@ internal sealed class BaselineRunner(TextWriter output, TextWriter error, ISolut
         }
 
         CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
+        RecordCacheOutcome(source);
 
         // Evaluate against an empty baseline so every current violation surfaces as the state to capture.
         // No narrowing goes down: this report is a capture survey rather than a verdict, the two modes that

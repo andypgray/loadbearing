@@ -77,11 +77,15 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
             ReportPartialModels);
     }
 
-    /// <summary>The <c>arch_explain</c> run — a spec lookup, so none of the four policy legs applies.</summary>
+    /// <summary>
+    ///     The <c>arch_explain</c> run. A spec lookup, so the document, replay and partial-model legs do not
+    ///     apply — but the persisted-cache leg does, exactly as it does for the three above: a tool call
+    ///     leaves <c>cache.json</c> alone whatever the CLI verb would do with it.
+    /// </summary>
     /// <param name="ruleId">The post-desugar rule ID to explain.</param>
     internal ExplainRequest ExplainRequest(string ruleId)
     {
-        return new ExplainRequest(ruleId, Solution, Spec, WorkingDirectory);
+        return new ExplainRequest(ruleId, Solution, Spec, WorkingDirectory, BypassPersistedCache);
     }
 
     /// <summary>The <c>arch_context</c> run — a card lookup, so none of the four policy legs applies.</summary>

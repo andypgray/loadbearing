@@ -4,6 +4,11 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 /// <param name="Solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>
 /// <param name="Spec">The <c>--spec</c> value (a built DLL or a solution-member csproj), or null for convention.</param>
 /// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
+/// <param name="NoCache">
+///     Whether to bypass the persisted extraction cache entirely (no read, no write). Render fronts it
+///     because its output is additive and reviewed: a stale card is corrected by the next run and never
+///     removes anything, unlike the two <c>baseline</c> modes that read absence as evidence.
+/// </param>
 /// <param name="AllowWorkspaceDiagnostics">
 ///     Whether to render from the partial model when a project fails to load. Default (<c>false</c>): any
 ///     workspace-load failure refuses the whole command with exit 2 and writes nothing, because the files
@@ -18,6 +23,7 @@ internal sealed record RenderRequest(
     string? Solution,
     string? Spec,
     string WorkingDirectory,
+    bool NoCache,
     bool AllowWorkspaceDiagnostics,
     string? Diagram = null,
     string? DiagramOnly = null,

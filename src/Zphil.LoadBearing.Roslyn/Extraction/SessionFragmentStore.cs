@@ -201,7 +201,7 @@ internal sealed class SessionFragmentStore : IDisposable
 
     private CodebaseModel Merge(SessionFragmentSet set, IReadOnlyCollection<string> excludeProjectNames)
     {
-        string key = ExclusionKey(excludeProjectNames);
+        string key = FragmentMerger.ExclusionKey(excludeProjectNames);
         lock (mergedGate)
         {
             if (mergedVersion != set.Version)
@@ -218,15 +218,6 @@ internal sealed class SessionFragmentStore : IDisposable
             merged[key] = model;
             return model;
         }
-    }
-
-    // The exclusion set as one ordinal-stable string. Two callers excluding the same projects in a different
-    // order are the same merge, so the key sorts; '\n' cannot occur in a project name.
-    private static string ExclusionKey(IReadOnlyCollection<string> excludeProjectNames)
-    {
-        if (excludeProjectNames.Count == 0) return "";
-
-        return string.Join("\n", excludeProjectNames.OrderBy(name => name, StringComparer.Ordinal));
     }
 
     private async Task<SessionFragmentSet> FullWalkAsync(

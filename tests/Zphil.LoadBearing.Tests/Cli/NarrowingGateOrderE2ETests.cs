@@ -167,7 +167,7 @@ public sealed class NarrowingGateOrderE2ETests
             [], [BrokenProject], [SkippedProject(workspace)], [UnrestoredProject]);
         var request = new RenderRequest(
             workspace.SolutionPath, CliRunner.CleanSpecDll,
-            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), false);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, false);
 
         CliResult render = await CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
 
@@ -179,6 +179,9 @@ public sealed class NarrowingGateOrderE2ETests
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
+
+    // Every request below is cache-free. The subject here is the order two gates speak in over an injected
+    // set of load diagnostics, and a cache hit replays a real run's diagnostics instead of the injected ones.
 
     // Injected under the solution directory so the notice relativizes it to a path this class can pin; an
     // unchecked project spelled anywhere else would render as a machine-specific climb out of a temp root.
@@ -194,7 +197,7 @@ public sealed class NarrowingGateOrderE2ETests
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
         var request = new BaselineRequest(
             workspace.SolutionPath, CliRunner.ViolatedSpecDll, true, false, false, null, null, null, null, null,
-            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), allowWorkspaceDiagnostics);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, allowWorkspaceDiagnostics);
 
         return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source).RunAsync(request, Ct));
     }
@@ -205,7 +208,7 @@ public sealed class NarrowingGateOrderE2ETests
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
         var request = new RenderRequest(
             workspace.SolutionPath, CliRunner.CleanSpecDll,
-            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), allowWorkspaceDiagnostics);
+            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, allowWorkspaceDiagnostics);
 
         return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
     }

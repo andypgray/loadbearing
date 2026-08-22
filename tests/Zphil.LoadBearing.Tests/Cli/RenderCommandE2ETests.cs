@@ -1,6 +1,11 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Hosting;
+using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -317,6 +322,134 @@ public sealed class RenderCommandE2ETests
         ManagedBlock.ExtractBody(File.ReadAllText(Architecture))
             .ShouldBe(ScopedDiagramBody);
     }
+
+    // ── the persisted extraction cache ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Render_ColdThenCached_IsByteIdenticalAndTheSecondRunOpensNoWorkspace()
+    {
+        using var cache = new TempCacheRoot("render-cache");
+        Delete(RootAgents, ScopeAgents);
+
+        // Prime the target files under --no-cache, so the slot stays empty and both runs below report
+        // `unchanged`. What is compared is then a cold render against a cached one, rather than a first
+        // render against a second.
+        await RenderAsync(cache.Root, "--no-cache");
+
+        (CliResult cold, long coldLoads) = await RenderAsync(cache.Root);
+        (CliResult cached, long cachedLoads) = await RenderAsync(cache.Root);
+
+        // The cold run does the design-time build and writes the slot; the second answers from it, and
+        // "answers from it" means no MSBuild at all — the whole of what render pays on a large solution.
+        coldLoads.ShouldBe(1);
+        cachedLoads.ShouldBe(0);
+
+        // Byte-identical on every channel: a cached render is not a cheaper answer, it is the same answer.
+        cached.Out.ShouldBe(cold.Out);
+        cached.Err.ShouldBe(cold.Err);
+        cached.Exit.ShouldBe(cold.Exit);
+        cold.ShouldSucceed();
+    }
+
+    [Fact]
+    public async Task Render_NoCache_KeepsBothRunsColdAndWritesNothingBack()
+    {
+        using var cache = new TempCacheRoot("render-cache");
+        Delete(RootAgents, ScopeAgents);
+
+        (CliResult first, long firstLoads) = await RenderAsync(cache.Root, "--no-cache");
+        (CliResult second, long secondLoads) = await RenderAsync(cache.Root, "--no-cache");
+
+        firstLoads.ShouldBe(1);
+        secondLoads.ShouldBe(1); // no read — and the flag is what makes render behave as it always did
+        cache.HasCacheFile()
+            .ShouldBeFalse(); // and no write: nothing under the root to go stale
+        first.ShouldSucceed();
+        second.ShouldSucceed();
+    }
+
+    // ── one walk per run, whatever exclusion sets it asks for ────────────────────────────────────────────
+
+    [Fact]
+    public async Task RenderDiagram_ColdWithScopedCards_WalksTheSolutionOnceForBothExclusionSets()
+    {
+        using var cache = new TempCacheRoot("render-cache");
+        Delete(RootAgents, ScopeAgents, Architecture);
+
+        RenderRun cold = await RenderRunAsync(cache.Root, noCache: true, Architecture);
+
+        // This run asks its source for two models — the cards respect the spec's exclusions, the survey fence
+        // draws every declared project — and it used to pay a full walk of the solution for each. One walk
+        // now serves both: the second model is a merge over fragments already in hand.
+        cold.ExtractionCount.ShouldBe(1);
+        cold.AcquireCount.ShouldBe(1);
+        cold.Exit.ShouldBe(0);
+        cold.Out.NormalizedTrimmed()
+            .ShouldBe("wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote ARCHITECTURE.md");
+    }
+
+    [Fact]
+    public async Task RenderDiagram_OverAnEmptySlot_FillsItOnceAndTheNextRunWalksNothing()
+    {
+        using var cache = new TempCacheRoot("render-cache");
+        Delete(RootAgents, ScopeAgents, Architecture);
+
+        RenderRun cold = await RenderRunAsync(cache.Root, false, Architecture);
+        RenderRun cached = await RenderRunAsync(cache.Root, false, Architecture);
+
+        // The fingerprint and the write-back live on the one-walk path, so the walk count is what says the
+        // slot was filled once: a second walk would have re-fingerprinted and re-written it.
+        cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
+        cold.ExtractionCount.ShouldBe(1);
+        cache.HasCacheFile()
+            .ShouldBeTrue();
+
+        cached.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
+        cached.ExtractionCount.ShouldBe(0); // a hit takes the stored fragments whole and walks nothing
+        cached.AcquireCount.ShouldBe(0);
+        cached.Out.NormalizedTrimmed()
+            .ShouldBe("unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\nunchanged ARCHITECTURE.md");
+    }
+
+    // Renders cold — every invocation opens (or declines to open) its own workspace, which is what makes the
+    // load-count delta mean "did this run reach MSBuild" — with the persisted cache isolated at a private root.
+    private static async Task<(CliResult Result, long Loads)> RenderAsync(string cacheRoot, params string[] extra)
+    {
+        FakeEnvironment environment = new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheRoot);
+        string[] args =
+            ["render", CliRunner.MyAppSolution, "--spec", CliRunner.RenderSpecDll, .. extra];
+
+        long before = WorkspaceLoader.LoadCount;
+        CliResult result = await CliRunner.InvokeColdAsync(environment, args);
+        return (result, WorkspaceLoader.LoadCount - before);
+    }
+
+    // The runner directly rather than the command tree, because the walk count is a runner observable the
+    // command line has no way to surface — output is byte-identical whichever path a run takes, which is the
+    // whole claim.
+    private static async Task<RenderRun> RenderRunAsync(string cacheRoot, bool noCache, string? diagram = null)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var counting = new CountingSolutionSource();
+        FakeEnvironment environment = new FakeEnvironment().SetVariable(LoadBearingEnvVars.CacheDirectory, cacheRoot);
+        var runner = new RenderRunner(output, error, counting, environment);
+
+        int exit = await runner.RunAsync(
+            new RenderRequest(
+                CliRunner.MyAppSolution, CliRunner.RenderSpecDll, SolutionDirectory, noCache, false, diagram),
+            Ct);
+
+        return new RenderRun(
+            exit, output.ToString(), runner.LastOutcome, runner.LastExtractionCount, counting.AcquireCount);
+    }
+
+    private sealed record RenderRun(
+        int Exit,
+        string Out,
+        CodebaseSourceOutcome? Outcome,
+        int ExtractionCount,
+        int AcquireCount);
 
     [Fact]
     public async Task Render_DiagramScopeWithoutATarget_IsAUserError()

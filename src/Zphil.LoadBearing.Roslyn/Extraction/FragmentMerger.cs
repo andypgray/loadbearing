@@ -97,6 +97,23 @@ internal static class FragmentMerger
         return fragments.Where(f => !excluded.Contains(f.ProjectName)).ToList();
     }
 
+    /// <summary>
+    ///     <paramref name="excludeProjectNames" /> as one ordinal-stable string, for a caller memoizing the
+    ///     models it merges from one fragment set. Two callers excluding the same projects in a different
+    ///     order are the same merge, so the key sorts; <c>'\n'</c> cannot occur in a project name.
+    /// </summary>
+    /// <remarks>
+    ///     It lives beside <see cref="Retain" /> because the two have to agree: the key identifies a merge
+    ///     exactly as far as <c>Retain</c> distinguishes one, and both memos in the product — the warm
+    ///     session store's and the per-run source's — would strand a wrong model if they diverged.
+    /// </remarks>
+    internal static string ExclusionKey(IReadOnlyCollection<string> excludeProjectNames)
+    {
+        if (excludeProjectNames.Count == 0) return "";
+
+        return string.Join("\n", excludeProjectNames.OrderBy(name => name, StringComparer.Ordinal));
+    }
+
     private sealed class MergeState
     {
         // The supplier map every fragment shares when nothing is shadowed. NodeKeyFor asks the shadow table

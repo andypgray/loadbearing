@@ -22,8 +22,8 @@ internal static class CommandFactory
     /// </param>
     /// <param name="environment">
     ///     The environment seam the cache-root override is read through, or <c>null</c> (the real entry point)
-    ///     for real process state. Carried only into the three cache-fronted commands — <c>check</c>,
-    ///     <c>status</c>, <c>graph</c> — because they are the only ones that read a variable at all.
+    ///     for real process state. Carried into every command that consumes a model, since all six front the
+    ///     persisted extraction cache, and so all six resolve a cache root.
     /// </param>
     public static RootCommand BuildRootCommand(
         ISolutionSource? hostSource = null, IEnvironment? environment = null)
@@ -31,9 +31,9 @@ internal static class CommandFactory
         return new RootCommand("LoadBearing — a fluent architecture spec with deterministic enforcement.")
         {
             BuildCheckCommand(hostSource, environment),
-            BuildExplainCommand(hostSource),
-            BuildRenderCommand(hostSource),
-            BuildBaselineCommand(hostSource),
+            BuildExplainCommand(hostSource, environment),
+            BuildRenderCommand(hostSource, environment),
+            BuildBaselineCommand(hostSource, environment),
             BuildStatusCommand(hostSource, environment),
             BuildGraphCommand(hostSource, environment),
             BuildMcpCommand()
@@ -122,7 +122,7 @@ internal static class CommandFactory
         return check;
     }
 
-    private static Command BuildExplainCommand(ISolutionSource? hostSource)
+    private static Command BuildExplainCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         Argument<string> ruleId = new("rule-id")
         {
@@ -130,12 +130,14 @@ internal static class CommandFactory
         };
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
+        Option<bool> noCache = NoCacheOption();
 
         Command explain = new("explain", "Print a rule's because, fix, posture payload, and linked prose.")
         {
             ruleId,
             solution,
-            spec
+            spec,
+            noCache
         };
 
         SetRequestAction(
@@ -144,13 +146,15 @@ internal static class CommandFactory
                 parseResult.GetValue(ruleId)!,
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
-                Directory.GetCurrentDirectory()),
-            (request, output, error, ct) => MsBuildGate.RunExplainAsync(request, output, error, hostSource, ct));
+                Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache)),
+            (request, output, error, ct) =>
+                MsBuildGate.RunExplainAsync(request, output, error, hostSource, environment, ct));
 
         return explain;
     }
 
-    private static Command BuildRenderCommand(ISolutionSource? hostSource)
+    private static Command BuildRenderCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -180,6 +184,7 @@ internal static class CommandFactory
                 + "for legibility on a large solution, not to keep a foreign project out. "
                 + "Scopes the codebase survey fence only, never the law fence. With --diagram."
         };
+        Option<bool> noCache = NoCacheOption();
 
         Command render = new(
             "render",
@@ -192,7 +197,8 @@ internal static class CommandFactory
             allowWorkspaceDiagnostics,
             diagram,
             diagramOnly,
-            diagramExclude
+            diagramExclude,
+            noCache
         };
 
         SetRequestAction(
@@ -201,16 +207,18 @@ internal static class CommandFactory
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(diagram),
                 parseResult.GetValue(diagramOnly),
                 parseResult.GetValue(diagramExclude)),
-            (request, output, error, ct) => MsBuildGate.RunRenderAsync(request, output, error, hostSource, ct));
+            (request, output, error, ct) =>
+                MsBuildGate.RunRenderAsync(request, output, error, hostSource, environment, ct));
 
         return render;
     }
 
-    private static Command BuildBaselineCommand(ISolutionSource? hostSource)
+    private static Command BuildBaselineCommand(ISolutionSource? hostSource, IEnvironment? environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -251,6 +259,10 @@ internal static class CommandFactory
         Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Write baselines from the partial model even when some projects fail to load or to restore, instead of "
             + "refusing the command with exit 2.");
+        // Offered on the whole verb but load-bearing for --add alone: --init and --accept-reductions extract
+        // cache-free whatever it says, because both read absence as evidence. One flag name
+        // across every verb is what an operator learns; a mode where it changes nothing is not worth a second.
+        Option<bool> noCache = NoCacheOption();
 
         Command baseline = new(
             "baseline",
@@ -268,7 +280,8 @@ internal static class CommandFactory
             source,
             target,
             subject,
-            allowWorkspaceDiagnostics
+            allowWorkspaceDiagnostics,
+            noCache
         };
 
         SetRequestAction(
@@ -285,8 +298,10 @@ internal static class CommandFactory
                 parseResult.GetValue(target),
                 parseResult.GetValue(subject),
                 Directory.GetCurrentDirectory(),
+                parseResult.GetValue(noCache),
                 parseResult.GetValue(allowWorkspaceDiagnostics)),
-            (request, output, error, ct) => MsBuildGate.RunBaselineAsync(request, output, error, hostSource, ct));
+            (request, output, error, ct) =>
+                MsBuildGate.RunBaselineAsync(request, output, error, hostSource, environment, ct));
 
         return baseline;
     }

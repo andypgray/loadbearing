@@ -30,8 +30,13 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
 {
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
+        // Cache-free, and the one verb whose policy is not about what it reads absence as: arch_context has
+        // no CLI verb at all (MCP-only), and the warm tool path deliberately leaves cache.json untouched so
+        // the file and the warm WorkspaceSession keep independent lifetimes and never race on it. There is
+        // no environment to read a cache root from for the same reason.
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+            SolutionSource, environment: null, request.Solution, request.Spec, request.WorkingDirectory,
+            noCache: true, ct);
 
         // Ahead of every exit below, because each of them can be the false all-clear: the body is context's
         // only channel, so the load failures ride it or reach nobody.

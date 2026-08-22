@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Cli.SpecLoading;
@@ -14,13 +15,26 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     reaches here — System.CommandLine rejects it as a parse error, remapped to exit 2.
 /// </summary>
 /// <remarks>
-///     <b>Never a gate.</b> A workspace opened for resolution can fail partially; explain renders the
-///     composed diagnostics to stderr and still answers, because the model it dumps comes from the spec, not
-///     the codebase — a load failure cannot make the answer wrong. The DLL fast path never opens a
-///     workspace, so it stays silent by construction.
+///     <para>
+///         <b>Never a gate.</b> A workspace opened for resolution can fail partially; explain renders the
+///         composed diagnostics to stderr and still answers, because the model it dumps comes from the spec,
+///         not the codebase — a load failure cannot make the answer wrong. The DLL fast path never opens a
+///         workspace, so it stays silent by construction.
+///     </para>
+///     <para>
+///         <b>It fronts the persisted extraction cache</b> (<c>--no-cache</c> opts out), and this is the
+///         verb the cache does the most for: it never extracts at all, so on a hit the recorded resolution
+///         replays and the run opens <em>no workspace</em> — the whole of what a convention or csproj
+///         <c>--spec</c> costs. Nothing here reads absence as evidence: an unknown rule ID is a refusal
+///         against the spec's own rule list, which no cache state can shorten.
+///     </para>
 /// </remarks>
-internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
-    : WorkspaceRunner(source)
+internal sealed class ExplainRunner(
+    TextWriter output,
+    TextWriter error,
+    ISolutionSource? source = null,
+    IEnvironment? environment = null)
+    : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(ExplainRequest request, CancellationToken ct)
     {
@@ -42,9 +56,12 @@ internal sealed class ExplainRunner(TextWriter output, TextWriter error, ISoluti
 
         // Convention or csproj --spec: load the workspace for resolution only; never extract. The acquisition
         // seam is the shared one, so explain's model is the model every other verb would have loaded — its
-        // lazy ExtractAsync is simply never called.
+        // lazy ExtractAsync is simply never called. On a cache hit the recorded resolution replays and no
+        // workspace opens either, which is this verb's entire cost.
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,
+            request.NoCache, ct);
+        RecordCacheOutcome(source);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
         // Nothing gates on them here: the rule being dumped is the spec's, so a project that failed to load

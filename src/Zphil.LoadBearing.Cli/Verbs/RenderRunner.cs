@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
@@ -30,16 +31,29 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     (<see cref="NarrowedUniverseNotice.RenderRefusal" />), with no opt-out: the fix is to run against the
 ///     solution the filter references. On a complete model it exits 0 on success; expected
 ///     failures surface as <see cref="UserErrorException" /> (exit 2). Render never exits 1.
+///     <para>
+///         <b>It fronts the persisted extraction cache</b> (<c>--no-cache</c> opts out), which is what the
+///         refusals above make safe to say: render reads <em>presence</em> — a card it can place — and its
+///         output is idempotent, additive and reviewed as a diff, so a stale card is corrected by the next
+///         run and never removes anything. The one conclusion it draws from absence, "this project's card
+///         cannot be placed", it refuses on rather than writes, and it refuses on a diagnostic a cache hit
+///         replays.
+///     </para>
 /// </remarks>
-internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutionSource? source = null)
-    : WorkspaceRunner(source)
+internal sealed class RenderRunner(
+    TextWriter output,
+    TextWriter error,
+    ISolutionSource? source = null,
+    IEnvironment? environment = null)
+    : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(RenderRequest request, CancellationToken ct)
     {
         ValidateDiagramOptions(request);
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, request.Solution, request.Spec, request.WorkingDirectory, ct);
+            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,
+            request.NoCache, ct);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
@@ -80,6 +94,10 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
 
         if (request.Diagram is { } diagramPath) await WriteDiagramAsync(request, source, specName, diagramPath, ct);
 
+        // After the last extraction, not after the first: --diagram extracts a second time, and the
+        // re-extraction set is only final once every ExtractAsync this run makes has run.
+        RecordCacheOutcome(source);
+
         return 0;
     }
 
@@ -92,15 +110,16 @@ internal sealed class RenderRunner(TextWriter output, TextWriter error, ISolutio
             throw new UserErrorException("--diagram-only and --diagram-exclude apply only with --diagram <path>.");
     }
 
-    // The diagram target. It runs its own extraction, with no project exclusions, which is the same call
+    // The diagram target. It asks for its own model, with no project exclusions, which is the same call
     // `graph` makes: the scoped-card extraction above passes the spec resolution's excluded projects (the
-    // spec project plus the private plumbing only it references), and reusing it would extract a different
-    // universe than the survey does. The surviving invariant is one summarizer and one summary shape. What
-    // the two now differ on is the view: the survey fence draws only declared solution members, while
-    // `graph` reports every project it loaded and labels which is which — so a project missing from the
-    // drawing is a question `graph` answers rather than the two disagreeing. The second extraction is the
-    // cost, and only when --diagram and scoped cards coincide. The law fence beside it costs nothing extra
-    // — it is pure over the model already in hand.
+    // spec project plus the private plumbing only it references), and reusing that model would draw a
+    // different universe than the survey does. The surviving invariant is one summarizer and one summary
+    // shape. What the two now differ on is the view: the survey fence draws only declared solution members,
+    // while `graph` reports every project it loaded and labels which is which — so a project missing from
+    // the drawing is a question `graph` answers rather than the two disagreeing. The two exclusion sets cost
+    // one walk between them, not two: CodebaseSource walks once per source and memoizes the merge per
+    // exclusion, so what this second call pays is a merge over fragments already in hand. The law fence
+    // beside it costs nothing extra — it is pure over the model already in hand.
     private async Task WriteDiagramAsync(
         RenderRequest request, CodebaseSource source, string specName, string diagramPath, CancellationToken ct)
     {

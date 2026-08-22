@@ -54,8 +54,8 @@ internal sealed class SolutionHandle(
     ///     model — memoized, so a call that re-walked nothing re-merges nothing either. It takes the caller's
     ///     excluded project names because the exclusion is applied at merge time, which is what lets one
     ///     store serve every tool whatever each drops, and the caller's declared solution membership because
-    ///     the read belongs to the one seam that already knows the solution path. Null falls straight through
-    ///     to today's full <c>ExtractFromSolutionAsync</c>, so the CLI path is unchanged.
+    ///     the read belongs to the one seam that already knows the solution path. Null falls through to the
+    ///     CLI's own one-walk-per-run path, which memoizes the same two tiers over the fragments it walked.
     /// </summary>
     public Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
         WarmCodebase { get; } = warmCodebase;

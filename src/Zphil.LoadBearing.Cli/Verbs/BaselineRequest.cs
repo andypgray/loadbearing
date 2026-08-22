@@ -36,6 +36,12 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     The offending type or member — a full name or symbol ID — for the shape form of <c>--add</c>.
 /// </param>
 /// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
+/// <param name="NoCache">
+///     Whether to bypass the persisted extraction cache entirely (no read, no write). It is the operator's
+///     half of the policy only for <see cref="Add" />, which records one violation the run did see;
+///     <see cref="Init" /> and <see cref="AcceptReductions" /> read absence as evidence and force a
+///     cache-free extraction whatever this says.
+/// </param>
 /// <param name="AllowWorkspaceDiagnostics">
 ///     Whether to write baselines from the partial model when a project fails to load. Default
 ///     (<c>false</c>): any workspace-load failure refuses the whole command with exit 2 and writes nothing,
@@ -54,4 +60,5 @@ internal sealed record BaselineRequest(
     string? Target,
     string? Subject,
     string WorkingDirectory,
+    bool NoCache,
     bool AllowWorkspaceDiagnostics);

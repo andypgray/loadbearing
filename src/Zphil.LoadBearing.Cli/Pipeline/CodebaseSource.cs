@@ -57,6 +57,15 @@ internal enum CodebaseSourceOutcome
 ///         spec with no matching record falls back to the cold path.
 ///     </para>
 ///     <para>
+///         <b>One walk per source, however many models a run asks for.</b> The fragments are walked at most
+///         once for the source's lifetime and the merged models are memoized against them, keyed by
+///         exclusion — the same two tiers <see cref="SessionFragmentStore" /> holds for the warm path, and
+///         through its key, so the two cannot disagree about when a merge repeats. The split matters because
+///         the costs are three orders of magnitude apart: <c>render --diagram</c> asks for the spec's
+///         exclusions to place its cards and then for none at all to draw the survey, which before this was
+///         two full walks of the solution for one run.
+///     </para>
+///     <para>
 ///         <b>The warm MCP path leaves the persisted cache untouched.</b> Tool calls pass <c>--no-cache</c>
 ///         (a <see cref="CodebaseSourceOutcome.Disabled" /> run), so <c>cache.json</c> and the warm
 ///         <see cref="WorkspaceSession" /> keep independent lifetimes and never race on the file. That
@@ -67,16 +76,19 @@ internal enum CodebaseSourceOutcome
 ///     </para>
 ///     <para>
 ///         <b>
-///             Which verbs front the persisted cache is a policy, not an accident of which ladder they were
-///             written on.
+///             Which verbs front the persisted cache is a policy, and it sorts them by what they read
+///             absence as.
 ///         </b>
-///         <c>check</c>, <c>status</c> and <c>graph</c> do
-///         (<see cref="CreateWithSpecAsync(ISolutionSource,IEnvironment,string,string,string,bool,CancellationToken)" />
-///         and <see cref="CreateSpeclessAsync" /> take the caller's <c>--no-cache</c>); <c>render</c>,
-///         <c>baseline</c>, <c>explain</c> and the <c>arch_context</c> tool do not
-///         (<see cref="CreateWithSpecAsync(ISolutionSource,string,string,string,CancellationToken)" />).
-///         They all acquire here either way, so the warm path, the merge notes and the incomplete-model
-///         diagnostics are one thing taught once rather than a policy each ladder learns separately.
+///         A verb that reads <em>presence</em> — a violation it saw, a rule it found, a card it can place —
+///         may front it, and <c>check</c>, <c>status</c>, <c>graph</c>, <c>render</c>, <c>explain</c> and
+///         <c>baseline --add</c> all do. <c>baseline --init</c> and <c>baseline --accept-reductions</c> read
+///         <em>absence as evidence</em> — "not in the model" becomes "no longer happening", written into a
+///         file that outlives the run — so they force a cache-free extraction: a stale hit is a third route
+///         to the smaller-than-real model the incomplete-model and narrowing gates already refuse those two
+///         modes on, and the only one of the three that raises no diagnostic either gate can see. There is
+///         one spec-ful entry point rather than a cache-free overload beside it, so every caller spells its
+///         policy as the <c>noCache</c> argument instead of inheriting one from the ladder it was written
+///         on.
 ///     </para>
 /// </remarks>
 internal sealed class CodebaseSource : IDisposable
@@ -92,10 +104,24 @@ internal sealed class CodebaseSource : IDisposable
 
     private readonly SolutionHandle? handle;
     private readonly WorkspaceDiagnostics loadDiagnostics;
+
+    // The models merged from that fragment set, keyed by exclusion. Two tiers because the two costs are
+    // three orders of magnitude apart: the walk above measured ~85 s on a 35-project solution, while a
+    // merge is CPU over fragments already in hand. `render --diagram` is the caller that
+    // proves the split — one walk for the whole run, then a second model over a different exclusion, because
+    // the survey fence draws every project while the cards respect the spec's exclusions. Plain, unlocked
+    // collections: a source belongs to one run and its ExtractAsync is never re-entered concurrently, unlike
+    // the session-lifetime store the warm path uses.
+    private readonly Dictionary<string, CodebaseModel> mergedByExclusion = new(StringComparer.Ordinal);
+
     private readonly ArchitectureModel? model;
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
     private readonly ExtractionCacheStore? store;
+
+    // The fragment set this source acquired, held for its lifetime — walked from the workspace, or taken
+    // whole from a cache hit. Null until the first ExtractAsync, and written exactly once after it.
+    private IReadOnlyList<CodebaseFragment>? fragments;
 
     // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
     // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
@@ -190,6 +216,13 @@ internal sealed class CodebaseSource : IDisposable
     /// </summary>
     internal IReadOnlySet<string> ReExtractedProjects => reExtractedProjects;
 
+    /// <summary>
+    ///     How many times this source walked the workspace for fragments — at most once for its whole
+    ///     lifetime, however many exclusion sets its callers ask for, and zero on a cache hit or the warm
+    ///     path (neither walks). Internal test observable; never printed.
+    /// </summary>
+    internal int ExtractionCount { get; private set; }
+
     /// <summary>Disposes the owned cold workspace; a no-op on a cache hit (which owns none).</summary>
     public void Dispose()
     {
@@ -197,14 +230,30 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     /// <summary>
-    ///     Discovers the solution and prepares a spec-ful source for <c>check</c>/<c>status</c>: on a cache
-    ///     hit the spec is replayed and the model loaded with no workspace; otherwise a workspace is acquired
-    ///     and the spec resolved against it. Discovery, spec-resolution, and spec-load failures surface
-    ///     exactly as a cold run raises them.
+    ///     Discovers the solution and prepares the spec-ful source every verb that consumes a spec acquires
+    ///     through: on a cache hit the spec is replayed and the model loaded with no workspace; otherwise a
+    ///     workspace is acquired and the spec resolved against it. Discovery, spec-resolution, and spec-load
+    ///     failures surface exactly as a cold run raises them.
     /// </summary>
+    /// <param name="source">The seam a run that needs a workspace acquires one through.</param>
+    /// <param name="environment">
+    ///     The seam the cache root is read through. Null means real process state, exactly as it does for the
+    ///     runners and the gate — and it is never read at all under <paramref name="noCache" />, which is what
+    ///     lets a caller whose policy is never to front the cache pass none.
+    /// </param>
+    /// <param name="solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>
+    /// <param name="spec">The <c>--spec</c> value, or null for the convention.</param>
+    /// <param name="workingDirectory">The directory solution discovery walks up from.</param>
+    /// <param name="noCache">
+    ///     This caller's cache policy, spelled here rather than inherited: <c>true</c> reads nothing from
+    ///     <c>cache.json</c> and writes nothing to it, so the run touches what a plain cold run touches. It
+    ///     still acquires through the same seam either way, so a host keeping a warm session serves it that
+    ///     session's model (<see cref="SolutionHandle.WarmCodebase" />) rather than a fresh walk per call.
+    /// </param>
+    /// <param name="ct">The run's cancellation token.</param>
     public static Task<CodebaseSource> CreateWithSpecAsync(
         ISolutionSource source,
-        IEnvironment environment,
+        IEnvironment? environment,
         string? solution,
         string? spec,
         string workingDirectory,
@@ -214,27 +263,6 @@ internal sealed class CodebaseSource : IDisposable
         string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
         ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
         return CreateWithSpecCoreAsync(source, solutionPath, spec, store, ct);
-    }
-
-    /// <summary>
-    ///     Discovers the solution and prepares a spec-ful source for the verbs that never front the persisted
-    ///     extraction cache — <c>render</c>, <c>baseline</c>, <c>explain</c> and the <c>arch_context</c> tool.
-    ///     Identical to the cache-aware overload with <c>noCache: true</c>: nothing is read from
-    ///     <c>cache.json</c> and nothing written to it, so what these runs touch on disk is what a plain cold
-    ///     run touches. They still acquire through the same seam, so a host that keeps a warm session serves
-    ///     them its model (<see cref="SolutionHandle.WarmCodebase" />) rather than a fresh walk per call.
-    /// </summary>
-    /// <remarks>
-    ///     The persisted cache is deliberately left to the three verbs that ratchet on it. These four either
-    ///     write files from the model (<c>render</c>, <c>baseline</c>) or answer a single lookup out of it
-    ///     (<c>explain</c>, <c>arch_context</c>), and none of them is the caller a cache-invalidation bug
-    ///     should first be discovered by.
-    /// </remarks>
-    public static Task<CodebaseSource> CreateWithSpecAsync(
-        ISolutionSource source, string? solution, string? spec, string workingDirectory, CancellationToken ct)
-    {
-        string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory);
-        return CreateWithSpecCoreAsync(source, solutionPath, spec, store: null, ct);
     }
 
     // The shared tail of both spec-ful entry points, from the point the cache store — the one thing they
@@ -300,6 +328,14 @@ internal sealed class CodebaseSource : IDisposable
     ///     ones reused on a partial), the subset is merged for the model, and the whole fragment set is
     ///     written back best-effort.
     /// </summary>
+    /// <remarks>
+    ///     Callable more than once per source, and cheap after the first: the walk (and, with a store, the
+    ///     fingerprint and the write-back) happen on the first call alone, and a repeat with an exclusion set
+    ///     already merged hands back that model rather than rebuilding it. A repeat with a <em>different</em>
+    ///     exclusion set still merges — it is a different model — but off the fragments already in hand.
+    ///     The two facts below are re-read per call regardless, because they legitimately differ per
+    ///     exclusion: which same-FQN types conflated, and which projects arrived multi-targeted.
+    /// </remarks>
     public async Task<CodebaseModel> ExtractAsync(IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
         CodebaseModel codebase = await ExtractCoreAsync(excludeProjectNames, ct);
@@ -317,39 +353,84 @@ internal sealed class CodebaseSource : IDisposable
     private async Task<CodebaseModel> ExtractCoreAsync(
         IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
-        if (Outcome == CodebaseSourceOutcome.Hit)
-            return FragmentMerger.Merge(FragmentMerger.Retain(cacheRead.ReusableFragments, excludeProjectNames));
-
-        Solution solution = handle!.Solution;
-
-        if (store is null) // Disabled: no persisted cache — either a pure cold walk or the warm incremental path.
+        if (WarmCodebaseProducer() is { } warmCodebase)
         {
-            if (handle.WarmCodebase is { } warmCodebase)
-            {
-                // The warm MCP path: the session-scoped store reuses clean projects' fragments, re-walks only
-                // the dirty ∪ dependent set, and terminates in the same FragmentMerger every path uses —
-                // memoized against the fragment set and this exclusion, so a call that re-walked nothing gets
-                // the model unchanged. Exclusion goes down as an argument because it is applied at merge
-                // time, so one store serves every tool whatever it drops; the store's re-extraction set
-                // becomes this source's observable so the runner counters keep meaning.
-                SessionCodebase warm = await warmCodebase(excludeProjectNames, declaredMembers.Value, ct);
-                reExtractedProjects = new HashSet<string>(warm.ReExtractedProjects, StringComparer.Ordinal);
-                return warm.Model;
-            }
-
-            return await CodebaseExtractor.ExtractFromSolutionAsync(
-                solution, excludeProjectNames, handle.TargetFrameworks, declaredMembers.Value, ct);
+            // The warm MCP path: the session-scoped store reuses clean projects' fragments, re-walks only
+            // the dirty ∪ dependent set, and terminates in the same FragmentMerger every path uses —
+            // memoized against the fragment set and this exclusion, so a call that re-walked nothing gets
+            // the model unchanged. Exclusion goes down as an argument because it is applied at merge
+            // time, so one store serves every tool whatever it drops; the store's re-extraction set
+            // becomes this source's observable so the runner counters keep meaning.
+            //
+            // It returns above this source's own memo rather than through it, deliberately: the store must
+            // be re-consulted per call so an edit between two calls is re-walked, and a memo here would
+            // answer the second call from the first call's model and strand the edit.
+            SessionCodebase warm = await warmCodebase(excludeProjectNames, declaredMembers.Value, ct);
+            reExtractedProjects = new HashSet<string>(warm.ReExtractedProjects, StringComparer.Ordinal);
+            return warm.Model;
         }
 
+        // One walk per source, then one merge per distinct exclusion set over the fragments it produced.
+        // `render --diagram` is why: it asks for the spec's exclusions to place the cards and then for none
+        // at all to draw the survey, and before this it paid the whole walk twice for the difference.
+        fragments ??= await WalkFragmentsAsync(ct);
+        return MergedFor(fragments, excludeProjectNames);
+    }
+
+    // The warm path's producer when this run takes it: a cold-loaded handle carrying a session codebase, and
+    // no persisted store to prefer over it. Null on a hit (which owns no handle) and whenever a store is
+    // live, since the store path serves every caller from the fragments it also writes back.
+    private Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
+        WarmCodebaseProducer()
+    {
+        if (Outcome == CodebaseSourceOutcome.Hit || store is not null) return null;
+
+        return handle!.WarmCodebase;
+    }
+
+    // The fragment set this source merges from, acquired once. A hit takes the cached set whole and walks
+    // nothing; every other path opens the workspace it already holds.
+    private async Task<IReadOnlyList<CodebaseFragment>> WalkFragmentsAsync(CancellationToken ct)
+    {
+        if (Outcome == CodebaseSourceOutcome.Hit) return cacheRead.ReusableFragments;
+
+        ExtractionCount++;
+        Solution solution = handle!.Solution;
+
+        if (store is null)
+            // Disabled and cold: walk every project and let the merge above drop what each caller excludes.
+            // That is byte-identical to excluding at collection — FragmentMerger.Retain is an order-preserving
+            // filter on ProjectName, over a list CollectInputsAsync has already ordered — and it is what lets
+            // one walk serve two exclusion sets. reExtractedProjects stays empty, as it always has on a
+            // disabled run: the field says which projects the *cache* made this run re-extract.
+            return await CodebaseExtractor.ExtractFragmentsAsync(
+                solution, null, handle.TargetFrameworks, declaredMembers.Value, ct);
+
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
+        // Both this and the write-back sit on the one-walk path, so a second ExtractAsync re-fingerprints
+        // nothing and re-writes nothing.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
         List<CodebaseFragment> allFragments = await ExtractAllFragmentsAsync(solution, ct);
-        CodebaseModel merged = FragmentMerger.Merge(FragmentMerger.Retain(allFragments, excludeProjectNames));
-
         if (fingerprint is not null)
             TryWrite(fingerprint, allFragments, ct);
 
+        return allFragments;
+    }
+
+    // The merged model for one exclusion set, memoized against the walked fragments. Keyed through the
+    // merger's own ExclusionKey, so this memo and the warm session store's cannot disagree about when two
+    // callers are asking for the same merge. Sharing the instance is safe for the reason it is there: a
+    // merged model is read-only once built, and every consumer — the checker, the renderers, the
+    // summarizer — reads.
+    private CodebaseModel MergedFor(
+        IReadOnlyList<CodebaseFragment> walked, IReadOnlyCollection<string> excludeProjectNames)
+    {
+        string key = FragmentMerger.ExclusionKey(excludeProjectNames);
+        if (mergedByExclusion.TryGetValue(key, out CodebaseModel? memoized)) return memoized;
+
+        CodebaseModel merged = FragmentMerger.Merge(FragmentMerger.Retain(walked, excludeProjectNames));
+        mergedByExclusion[key] = merged;
         return merged;
     }
 
@@ -540,11 +621,11 @@ internal sealed class CodebaseSource : IDisposable
         return string.IsNullOrWhiteSpace(spec) ? "" : Path.GetFullPath(spec);
     }
 
-    private static ExtractionCacheStore? TryCreateStore(string solutionPath, IEnvironment environment)
+    private static ExtractionCacheStore? TryCreateStore(string solutionPath, IEnvironment? environment)
     {
         try
         {
-            return new ExtractionCacheStore(solutionPath, environment.CacheRootOverride());
+            return new ExtractionCacheStore(solutionPath, (environment ?? new SystemEnvironment()).CacheRootOverride());
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

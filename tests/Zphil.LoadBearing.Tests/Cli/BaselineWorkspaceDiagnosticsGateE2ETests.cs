@@ -235,9 +235,11 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
     private static BaselineRequest Request(string solution, bool allowWorkspaceDiagnostics)
     {
+        // Cache-free: the subject is what an injected load failure does to the gate, and a cache hit would
+        // replay a real run's diagnostics over the injected ones.
         return new BaselineRequest(
             solution, CliRunner.ViolatedSpecDll, false, false, false, null, null, null, null, null,
-            Path.GetDirectoryName(Path.GetFullPath(solution))!, allowWorkspaceDiagnostics);
+            Path.GetDirectoryName(Path.GetFullPath(solution))!, true, allowWorkspaceDiagnostics);
     }
 
     private static Task<CliResult> RunBaselineAsync(

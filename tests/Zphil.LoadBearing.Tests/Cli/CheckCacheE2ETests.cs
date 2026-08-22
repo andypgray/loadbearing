@@ -302,18 +302,4 @@ public sealed class CheckCacheE2ETests
         CodebaseSourceOutcome? Outcome,
         IReadOnlySet<string> ReExtracted,
         int AcquireCount);
-
-    // Counts workspace acquisitions so a hit (zero acquisitions) is observable without any timing.
-    private sealed class CountingSolutionSource : ISolutionSource
-    {
-        private readonly ColdSolutionSource inner = new();
-
-        public int AcquireCount { get; private set; }
-
-        public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
-        {
-            AcquireCount++;
-            return inner.AcquireAsync(solutionPath, ct);
-        }
-    }
 }
