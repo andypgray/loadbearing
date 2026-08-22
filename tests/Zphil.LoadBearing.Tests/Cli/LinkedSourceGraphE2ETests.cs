@@ -18,8 +18,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         to its first declarer, so Tool's reference to its <em>own</em> compiled-in <c>Widget</c> resolves
 ///         to a node stamped <c>LinkedApp.Core</c> — which the survey used to render as
 ///         <c>LinkedApp.Tool -&gt; LinkedApp.Core</c>, an edge no project file declares — while saying
-///         nothing at all about the attribution that produced it, so a reader could not see that
-///         <c>arch.Project("LinkedApp.Tool")</c> will miss the type.
+///         nothing at all about the attribution that produced it, so a reader could not see whose facts a
+///         rule anchored on <c>LinkedApp.Tool</c> answers from.
 ///     </para>
 ///     <para>
 ///         <b>Why the absent edge is the assertion rather than a count.</b> Tool's only outward type
@@ -68,7 +68,7 @@ public sealed class LinkedSourceGraphE2ETests
 
         // Assert — the whole content of the check-side note, as data: the type, every project declaring it,
         // and which one's facts an arch.Project selection follows. A reader holding this document alone can
-        // tell that a subject anchored on LinkedApp.Tool will not select Widget.
+        // tell that a subject anchored on LinkedApp.Tool answers from Core's compilation of Widget.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement entry = document.RootElement.GetProperty("multiplyDeclaredTypes")

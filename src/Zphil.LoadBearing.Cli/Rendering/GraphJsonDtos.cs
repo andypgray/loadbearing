@@ -76,8 +76,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     every declaring project and the one whose facts and project attribution the type follows. Null
 ///     (omitted) when the solution has none, which is the overwhelming common case, and null at skeleton
 ///     grain too, where <see cref="MultiplyDeclaredTypeCount" /> stands in for it. The fact a rule author
-///     needs before anchoring a subject on a project: <c>arch.Project</c> named on any declarer but
-///     <c>factsFollow</c> will not select the type.
+///     needs before anchoring a subject on a project: <c>arch.Project</c> named on any declarer selects
+///     the type, and its facts answer from <c>factsFollow</c>'s compilation.
 /// </param>
 /// <param name="MultiplyDeclaredTypeCount">
 ///     How many multiply-declared entries the elision dropped, present only when

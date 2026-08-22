@@ -80,7 +80,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "projectEdges[] carry only references the code declares: where one source file is compiled into " +
         "several projects, a project referencing its own compiled-in copy is not an edge to the declarer the " +
         "type was attributed to, and multiplyDeclaredTypes[] names those types with every declaring project " +
-        "and the one whose facts won — arch.Project() on any other declarer will not select them (the key is " +
+        "and the one whose facts won — arch.Project() on any declarer selects them, with rule verdicts " +
+        "answering from the winner's facts (the key is " +
         "absent when the solution has none). shadowedTypes[] is the other coverage key: a full name a project " +
         "declares that a referenced assembly also supplies means two types, so a rule naming it reaches both " +
         "while arch.Project() over the declaring project reaches only the declaration. " +

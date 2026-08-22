@@ -304,8 +304,8 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_SameFqnDeclaredByTwoDifferentProjects_RecordsCrossProjectMergeNote()
     {
-        // Both Aproj and Bproj declare N.Dup. Aproj wins (input order), so Bproj's copy is invisible to
-        // arch.Project("Bproj") — the merge records one advisory note naming winner, loser, and consequence.
+        // Both Aproj and Bproj declare N.Dup. Aproj wins the facts (input order) while arch.Project("Bproj")
+        // still selects the type — the merge records one advisory note naming winner, loser, and consequence.
         CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", """
                                                                               namespace N;
                                                                               public class Dup {}
@@ -319,7 +319,8 @@ public sealed class FragmentMergeTests
 
         model.MergeNotes.ShouldBe([
             "Type 'N.Dup' is declared by projects 'Aproj' and 'Bproj'; its facts and project attribution "
-            + "follow 'Aproj' (the first declarer), so arch.Project('Bproj') selections will not include it."
+            + "follow 'Aproj' (the first declarer), but arch.Project('Bproj') selections include it too, "
+            + "and each declarer's reference to its own compiled-in copy counts against that declarer alone."
         ]);
     }
 
@@ -416,8 +417,9 @@ public sealed class FragmentMergeTests
 
         model.MergeNotes.ShouldBe([
             "Type 'N.Dup' is declared by projects 'App.Web', 'Spec.A' and 'Spec.B'; its facts and project "
-            + "attribution follow 'App.Web' (the first declarer), so arch.Project('Spec.A') and "
-            + "arch.Project('Spec.B') selections will not include it."
+            + "attribution follow 'App.Web' (the first declarer), but arch.Project('Spec.A') and "
+            + "arch.Project('Spec.B') selections include it too, and each declarer's reference to its own "
+            + "compiled-in copy counts against that declarer alone."
         ]);
     }
 

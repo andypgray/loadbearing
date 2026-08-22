@@ -267,9 +267,34 @@ lands only where the whole list is static and one form:
   naming the type reaches both; `arch.Project` is what tells them apart, because the external
   one carries the supplying **assembly**'s name, so a project selection over the declaring
   project reaches the declaration alone. Nothing else splits: one source file compiled into
-  several projects still means one node (§4.1 subjects, `arch.Project` misses the other
-  declarers), and a name no project declares is one node as before. `check` reports the split
+  several projects still means one node (the next bullet states its membership), and a name
+  no project declares is one node as before. `check` reports the split
   as an advisory note, and the codebase survey states it as a coverage key.
+- **One source file can be compiled into several projects.** A linked `<Compile Include>`,
+  shared source, a polyfill: N projects each compile the file as their own source, and the
+  model still carries **one node** for the type. Its facts — edges, member inventory,
+  hierarchy — follow the first declarer in ordinal project order. Membership is N-way:
+  `arch.Project` naming **any** declarer contains the type — as a subject, as a target
+  operand, in a member selection, inside a union. Edges add attribution on top. The projects
+  an edge *into* such a type counts against are the intersection of the two endpoints'
+  declarer sets when it is nonempty — the source compiled its own copy, so the edge is
+  intra-project — and the first declarer alone otherwise. A project-headed target operand
+  forbids (or, for `MustOnly*`, allows) the edge only when its project is among those, so a
+  declarer's reference to its own compiled-in copy never satisfies a ban aimed at another
+  declarer; a project-headed *subject* of `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy`
+  counts an edge by the same rule, because there the subject is the edge's target. The edge's
+  *source* belongs to every declarer — each one's compilation genuinely makes the reference —
+  so a source-side project operand reaches it from any of them. Selections not headed by a
+  project stay attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`,
+  `arch.Layer`, `arch.Registered`, and `MustNotUse`'s string-keyed member anchors, so
+  `MustNotReference(typeof(T))` reds even on a project's own copy. `MustOnly*` stays strict
+  (no implicit self-allowance, below): an intra-copy edge is satisfied only by an allow entry
+  naming the compiling project, or by a non-project entry containing the type. `Except`
+  subtracts by node identity: `arch.Project("A").Except(arch.Project("B"))` removes a
+  co-declared node from A's selection too. Where nothing is multiply declared this all
+  degenerates to the single-attribution reading, byte for byte. The attribution is disclosed
+  three ways: `check`'s advisory merge note, the survey's `multiplyDeclaredTypes` coverage
+  statement, and the winning node's `AlsoDeclaredBy` roster.
 - **One project file can mean several compilations.** A multi-targeting project compiles once
   per framework; extraction walks them all, and the model unions them under the one project
   name. The union is lossless — types, references and solution membership all survive — except
@@ -1280,6 +1305,9 @@ matches the anchor's definition FQN.
   **no** generic twin (decided against): a boundary is a variadic facade-plus-
   implementation list, which has no type-argument form; a single facade type is
   `BoundaryOnlyVia(typeof(IFacade))`.
+- A project-headed quarantined selection follows §4.1's several-projects rule: a type the
+  project co-declares is in the quarantine — for containment, for the tripwire's changed-file
+  mapping, and for scope-card placement alike.
 - Nested/overlapping quarantines compose as independent conjuncts; there is no scope precedence.
 - **Practical note** (also for the derive prompt): `BoundaryOnlyVia` usually needs
   the facade *implementation* type(s) listed alongside the interface, or the composition

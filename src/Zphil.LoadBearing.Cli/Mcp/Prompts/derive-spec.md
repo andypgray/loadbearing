@@ -90,8 +90,9 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   is compiled into several of them (a `<Compile Include>` link, shared source, a polyfill).
   Each entry names the type, every project declaring it, and the one whose facts and project
   attribution it follows. Read this **before** anchoring a subject on a project:
-  `arch.Project(...)` naming any other declarer will not select the type, so a rule written on
-  it is quietly narrower than it reads. The key is absent when the solution has none, which is
+  `arch.Project(...)` on any declarer selects the type, its facts answer from the declarer the
+  entry names, and a declarer's reference to its own compiled-in copy is intra-project rather
+  than an edge to that declarer. The key is absent when the solution has none, which is
   the common case.
 - `shadowedTypes[]` — the full names a project declares that a referenced assembly also supplies:
   a stand-in written under a package's own namespace, a polyfill under a BCL one. The name means

@@ -82,9 +82,10 @@ public sealed class TypeNode : ITypeInfo
     ///     The <em>other</em> projects declaring this same fully-qualified name — one source file compiled
     ///     into several projects (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill) —
     ///     ordered ordinal, and empty for every ordinary type. <see cref="ProjectName" /> is the first
-    ///     declarer, whose facts this node carries; these are the projects an <c>arch.Project</c> selection
-    ///     over them will therefore not reach, and each one compiles this type itself rather than
-    ///     referencing the declarer that won.
+    ///     declarer, whose facts this node carries; an <c>arch.Project</c> selection over any declarer in
+    ///     the roster reaches this node all the same (<see cref="IsDeclaredBy" />), because each one
+    ///     compiles this type itself rather than referencing the declarer that won — so a reference from
+    ///     a declarer into its own compiled-in copy counts against that declarer, not against the winner.
     /// </summary>
     public IReadOnlyList<string> AlsoDeclaredBy { get; internal set; }
 
@@ -165,4 +166,27 @@ public sealed class TypeNode : ITypeInfo
 
     /// <inheritdoc />
     public IReadOnlyList<ITypeInfo> Attributes { get; internal set; }
+
+    /// <summary>
+    ///     Whether <paramref name="projectName" /> declares this type — <see cref="ProjectName" /> or any
+    ///     entry of <see cref="AlsoDeclaredBy" />, compared ordinal. This is the membership predicate
+    ///     behind every <c>arch.Project</c> selection (GRAMMAR §4.1): one source file compiled into
+    ///     several projects is one node, and every project that compiles it names it.
+    /// </summary>
+    /// <remarks>
+    ///     Walked rather than cached, because <see cref="AlsoDeclaredBy" /> is stamped during model
+    ///     construction, after the node is minted — a roster built at mint time would be stale for every
+    ///     conflated type. The list is empty for every ordinary type, so the walk is one comparison.
+    /// </remarks>
+    public bool IsDeclaredBy(string projectName)
+    {
+        if (string.Equals(ProjectName, projectName, StringComparison.Ordinal)) return true;
+
+        IReadOnlyList<string> alsoDeclaredBy = AlsoDeclaredBy;
+        for (var i = 0; i < alsoDeclaredBy.Count; i++)
+            if (string.Equals(alsoDeclaredBy[i], projectName, StringComparison.Ordinal))
+                return true;
+
+        return false;
+    }
 }

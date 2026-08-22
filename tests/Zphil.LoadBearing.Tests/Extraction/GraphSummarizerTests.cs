@@ -431,7 +431,7 @@ public sealed class GraphSummarizerTests
     public void Summarize_MultiplyDeclaredTypes_NameEveryDeclarerAndTheOneWhoseFactsWon()
     {
         // Arrange — the fact the suppressed edge would otherwise have been the only sign of: without it, a
-        // reader cannot see that arch.Project("App") will miss Shared.Widget.
+        // reader cannot see that a rule anchored on App answers from Lib's facts for Shared.Widget.
         GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
 
         // Assert — declaredBy carries the winner too, so the entry reads whole, and it is ordinal rather
@@ -483,7 +483,7 @@ public sealed class GraphSummarizerTests
 
         // Assert — any-declarer, mirroring the either-endpoint rule the project edges take. Keying on the
         // winner alone would drop the entry from precisely the scope whose author needs it: the reason to
-        // read it is that a subject anchored on App will miss this type.
+        // read it is that a subject anchored on App answers from Lib's facts for this type.
         scoped.MultiplyDeclaredTypes.Select(t => t.Type)
             .ShouldBe(["Shared.Widget"]);
     }

@@ -84,7 +84,9 @@ public static class GraphSummarizer
     // reaches a node stamped with somebody else's name — and rendering that as a cross-project edge invents
     // a dependency no project file declares. Because model.Edges is one entry per type PAIR, dropping it
     // here removes exactly those pairs and leaves every genuine pair between the same two projects, and its
-    // count, untouched.
+    // count, untouched. Deliberately coarser than the checker's per-edge attribution, which intersects the
+    // two endpoints' declarer rosters: the survey's only question is whether the pair is one no project
+    // file declares.
     private static bool SourceAlsoDeclaresTarget(ReferenceEdge edge)
     {
         return edge.Target.AlsoDeclaredBy.Contains(edge.Source.ProjectName, StringComparer.Ordinal);
@@ -123,8 +125,8 @@ public static class GraphSummarizer
     ///     <para>
     ///         A <see cref="GraphSummary.MultiplyDeclaredTypes" /> entry survives when <em>any</em> of its
     ///         declaring projects is in scope, the same either-endpoint rule the project edges take: the
-    ///         reason to read the entry is that a subject anchored inside the scope will miss the type, and
-    ///         a declarer outside it is the half that explains why.
+    ///         reason to read the entry is that a subject anchored inside the scope answers from facts that
+    ///         may follow a declarer outside it, and that declarer is the half that explains why.
     ///     </para>
     ///     <para>
     ///         A <see cref="GraphSummary.ShadowedTypes" /> entry takes the same either-end rule across its two

@@ -91,20 +91,20 @@ internal sealed class ConstraintEvaluator
     {
         // Loud per-operand emptiness for a union subject (GRAMMAR §9), ahead of the member dispatch because
         // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
-        // member-subject paths alike. The gate hands back the operand sets it evaluated, so the union
-        // subject is folded from them rather than evaluated a second time.
-        (IReadOnlyList<Violation> emptyOperands, IReadOnlyList<HashSet<TypeNode>>? unionOperands) = EmptySubjectOperands(constraint.Subject);
-        if (emptyOperands.Count > 0) return (emptyOperands, NoWarnings, default);
+        // member-subject paths alike. The gate hands back the admission it folded the operands into, so
+        // the union subject is neither evaluated a second time nor attributed a second time.
+        (IReadOnlyList<Violation> emptyOperands, SelectionAdmission? resolved) = ResolveSubject(constraint.Subject);
+        if (resolved is not { } admission) return (emptyOperands, NoWarnings, default);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
         // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
         // types none of whose members survive the kind filter is the ordinary way to fail empty).
-        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, unionOperands);
+        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, admission.Members);
 
-        HashSet<TypeNode> subjects = Subjects(constraint.Subject, unionOperands);
+        HashSet<TypeNode> subjects = admission.Members;
         if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings, default);
 
-        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = Dispatch(constraint, subjects);
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = Dispatch(constraint, subjects, admission);
         return (violations, warnings, CoverageOf(subjects));
     }
 
@@ -130,18 +130,21 @@ internal sealed class ConstraintEvaluator
 
     // The verb dispatch, lifted out of Evaluate unchanged so the coverage pair can ride beside the pair every
     // arm returns. No arm knows about coverage — the subject set it is measured from is already resolved.
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Dispatch(Constraint constraint, HashSet<TypeNode> subjects)
+    // Only the two INVERSE verbs read the admission beside the set: there the subject sits at the edge's
+    // target end, where which project a reference is attributed to decides whether it counts (§4.1).
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Dispatch(
+        Constraint constraint, HashSet<TypeNode> subjects, SelectionAdmission admission)
     {
         switch (constraint)
         {
             case MustNotReferenceConstraint c:
-                return ForbiddenReference(subjects, c.Targets, false);
+                return ForbiddenReference(admission, c.Targets, inbound: false);
             case MustNotBeReferencedByConstraint c:
-                return ForbiddenReference(subjects, c.Sources, true);
+                return ForbiddenReference(admission, c.Sources, inbound: true);
             case MustOnlyReferenceConstraint c:
                 return OnlyReference(subjects, c.Targets);
             case MustOnlyBeReferencedByConstraint c:
-                return OnlyBeReferencedBy(subjects, c.Sources);
+                return OnlyBeReferencedBy(admission, c.Sources);
             case MustNotUseConstraint c:
                 return ForbiddenMemberUse(subjects, c.Members);
             case MustNotConstructConstraint c:
@@ -213,6 +216,14 @@ internal sealed class ConstraintEvaluator
     ///     the two catch subsets carry: an edge none of whose sites the ban forbids is green, and no
     ///     printed <c>file:line</c> is ever a site the ban permits.
     /// </summary>
+    /// <remarks>
+    ///     <paramref name="attributionSourceOf" /> names the endpoint whose compilation made the edge —
+    ///     the source, for every verb whose operand sits at the target end. It is what tells a
+    ///     project-headed operand a reference into a type that project compiles itself from a reference
+    ///     into another project's declaration of the same name (GRAMMAR §4.1). Null hands the test back to
+    ///     plain membership, which is what the inbound reference verb wants: there the operand IS the
+    ///     edge's source, and every project declaring it genuinely makes the reference.
+    /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenEdge<TEdge>(
         IEnumerable<TEdge> candidates,
         IReadOnlyList<Selection> operands,
@@ -220,14 +231,20 @@ internal sealed class ConstraintEvaluator
         Func<TEdge, IReadOnlyList<SourceLocation>> sitesOf,
         Func<TEdge, IReadOnlyList<SourceLocation>, Violation> toViolation,
         bool requireSites,
-        bool warnInert)
+        bool warnInert,
+        Func<TEdge, TypeNode>? attributionSourceOf)
     {
-        HashSet<TypeNode> operandSet = ResolveOperands(operands);
+        SelectionAdmission operandSet = ResolveOperands(operands);
         var violations = new List<Violation>();
 
         foreach (TEdge edge in candidates)
         {
-            if (!operandSet.Contains(operandOf(edge))) continue;
+            TypeNode operand = operandOf(edge);
+            bool forbidden = attributionSourceOf is null
+                ? operandSet.Contains(operand)
+                : operandSet.Admits(operand, attributionSourceOf(edge));
+
+            if (!forbidden) continue;
 
             IReadOnlyList<SourceLocation>? sites = sitesOf(edge);
             if (requireSites && sites.Count == 0) continue;
@@ -262,14 +279,27 @@ internal sealed class ConstraintEvaluator
     ///     Inbound (<c>MustNotBeReferencedBy</c>): edge operand→subject, so the walk keys on the target
     ///     while the violation still names <c>Source</c> — the referencing type, where the edit happens.
     /// </summary>
+    /// <remarks>
+    ///     The two directions carry the §4.1 attribution rule at opposite ends. Outbound it rides on the
+    ///     operand, which is the edge's target. Inbound the SUBJECT is the target, so it rides on the
+    ///     candidates instead: a project-headed subject counts an inbound reference only where the
+    ///     referencing compilation bound the copy that subject's project declares. Filtering candidates
+    ///     rather than violations is safe because walk order is unobservable (see <see cref="Keyed" />).
+    /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands, bool inbound)
+        SelectionAdmission subjects, IReadOnlyList<Selection> operands, bool inbound)
     {
         ILookup<TypeNode, ReferenceEdge> index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
+        IEnumerable<ReferenceEdge> candidates = Keyed(subjects.Members, index);
+        if (inbound) candidates = candidates.Where(edge => subjects.Admits(edge.Target, edge.Source));
+
         Func<ReferenceEdge, TypeNode> operandOf = inbound ? e => e.Source : e => e.Target;
+        Func<ReferenceEdge, TypeNode>? attributionSourceOf = inbound ? null : e => e.Source;
+
         return ForbiddenEdge(
-            Keyed(subjects, index), operands, operandOf, e => e.Sites,
-            (e, sites) => Violation.Reference(e.Source, e.Target, sites), requireSites: false, warnInert: true);
+            candidates, operands, operandOf, e => e.Sites,
+            (e, sites) => Violation.Reference(e.Source, e.Target, sites),
+            requireSites: false, warnInert: true, attributionSourceOf: attributionSourceOf);
     }
 
     // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
@@ -277,6 +307,9 @@ internal sealed class ConstraintEvaluator
     // overload. Per-overload edges yield per-overload MemberUse violations (the §4.3 identity substrate).
     // The banned set is resolved eagerly so a closed-generic member anchor is refused (RuleError) before
     // any edge is tested — mirroring the type-noun refusal in SelectionEvaluator.DefinitionFullName.
+    // Keyed on names rather than on nodes, the ban is attribution-insensitive by construction, which is
+    // the same answer a typeof operand gets from the §4.1 attribution rule: a member of a type several
+    // projects compile is banned in every one of them, its own compiled-in copy included.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenMemberUse(
         HashSet<TypeNode> subjects, IReadOnlyList<Member> members)
     {
@@ -311,7 +344,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _constructorEdgesBySource.Lookup), operands, e => e.Constructed, e => e.Sites,
-            (e, sites) => Violation.Construction(e.Source, e.Constructed, sites), requireSites: false, warnInert: true);
+            (e, sites) => Violation.Construction(e.Source, e.Constructed, sites),
+            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -330,7 +364,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _injectionEdgesBySource.Lookup), operands, e => e.Injected, e => e.Sites,
-            (e, sites) => Violation.Injection(e.Source, e.Injected, sites), requireSites: false, warnInert: false);
+            (e, sites) => Violation.Injection(e.Source, e.Injected, sites),
+            requireSites: false, warnInert: false, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -346,7 +381,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.Sites,
-            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: false, warnInert: true);
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
+            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -367,7 +403,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.UnfilteredSites,
-            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
+            requireSites: true, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -388,7 +425,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.SwallowingSites,
-            (e, sites) => Violation.Catch(e.Source, e.Caught, sites), requireSites: true, warnInert: true);
+            (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
+            requireSites: true, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -406,7 +444,8 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _throwEdgesBySource.Lookup), operands, e => e.Thrown, e => e.Sites,
-            (e, sites) => Violation.Throw(e.Source, e.Thrown, sites), requireSites: false, warnInert: true);
+            (e, sites) => Violation.Throw(e.Source, e.Thrown, sites),
+            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     /// <summary>
@@ -421,34 +460,41 @@ internal sealed class ConstraintEvaluator
     {
         return ForbiddenEdge(
             Keyed(subjects, _exposureEdgesBySource.Lookup), operands, e => e.Exposed, e => e.Sites,
-            (e, sites) => Violation.Expose(e.Source, e.Exposed, sites), requireSites: false, warnInert: true);
+            (e, sites) => Violation.Expose(e.Source, e.Exposed, sites),
+            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedTargets)
     {
-        HashSet<TypeNode> allowed = ResolveOperands(allowedTargets);
+        SelectionAdmission allowed = ResolveOperands(allowedTargets);
         var violations = new List<Violation>();
 
         // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
         // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
+        // Strictness survives §4.1 attribution: a reference into a type the referencing project compiles
+        // itself is allowed by an entry naming THAT project, or by an entry that is not a project at all —
+        // never by an entry naming some other declarer of the same source file.
         foreach (ReferenceEdge edge in Keyed(subjects, _edgesBySource.Lookup))
-            if (!edge.Target.IsExternal && !allowed.Contains(edge.Target))
+            if (!edge.Target.IsExternal && !allowed.Admits(edge.Target, edge.Source))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedSources)
+        SelectionAdmission subjects, IReadOnlyList<Selection> allowedSources)
     {
-        HashSet<TypeNode> allowed = ResolveOperands(allowedSources);
+        SelectionAdmission allowed = ResolveOperands(allowedSources);
         var violations = new List<Violation>();
 
         // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
-        // Edge sources are always solution-declared, so no external caveat is needed.
-        foreach (ReferenceEdge edge in Keyed(subjects, _edgesByTarget.Lookup))
-            if (!allowed.Contains(edge.Source))
+        // Edge sources are always solution-declared, so no external caveat is needed. The subject sits at
+        // the edge's target end, so it counts an edge only where the reference is attributed to it (§4.1),
+        // while the allow-set test stays plain membership — every declarer of an allowed source makes the
+        // reference itself.
+        foreach (ReferenceEdge edge in Keyed(subjects.Members, _edgesByTarget.Lookup))
+            if (subjects.Admits(edge.Target, edge.Source) && !allowed.Contains(edge.Source))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
@@ -460,53 +506,52 @@ internal sealed class ConstraintEvaluator
     // System.TimeoutException throw is red unless typeof(TimeoutException) is in the allow-set (a Type-sugar
     // operand resolves the external node by FQN, since the target universe includes externals). An allowed
     // type absent from the model resolves empty and harmlessly allows nothing. MustOnly* never warns — an
-    // empty allow-set is loud by itself (the point of departure from ForbiddenCatch).
+    // empty allow-set is loud by itself (the point of departure from ForbiddenCatch). The allow-set is a
+    // target position like any other, so §4.1 attribution decides membership here too: a project-headed
+    // entry allows a throw of a type several projects compile only where the throwing project is the one
+    // the edge is attributed to.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyThrow(
         HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedThrows)
     {
-        HashSet<TypeNode> allowed = ResolveOperands(allowedThrows);
+        SelectionAdmission allowed = ResolveOperands(allowedThrows);
         var violations = new List<Violation>();
 
         foreach (ThrowEdge edge in Keyed(subjects, _throwEdgesBySource.Lookup))
-            if (!allowed.Contains(edge.Thrown))
+            if (!allowed.Admits(edge.Thrown, edge.Source))
                 violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         return (violations, NoWarnings);
     }
 
-    // Every operand of a union subject must match at least one type (GRAMMAR §9): law must load
-    // predictably, so a typo'd project name inside a four-way union fails the rule in its own right
-    // instead of being silently absorbed by its siblings. One never-baselinable EmptySubject violation per
-    // empty operand, in operand order; a non-union subject has no operands and passes straight through
-    // (Operands null, so the caller evaluates the subject the ordinary way). Target position keeps the
-    // softer per-rule inert-target warning instead. The per-operand sets come back with the verdict: they
-    // ARE the union, so returning them is what keeps a union subject from being evaluated twice.
-    private (IReadOnlyList<Violation> Empty, IReadOnlyList<HashSet<TypeNode>>? Operands) EmptySubjectOperands(
-        Selection subject)
+    // The subject, resolved once: its membership, the heads that admitted each conflated node in it, and
+    // the §9 per-operand emptiness verdict a union subject carries. Law must load predictably, so a typo'd
+    // project name inside a four-way union fails the rule in its own right instead of being silently
+    // absorbed by its siblings — one never-baselinable EmptySubject violation per empty operand, in
+    // operand order, and no admission at all, because a rule that fails this gate never reaches a verb and
+    // must never have the union's own adjectives applied. Target position keeps the softer per-rule
+    // inert-target warning instead. A non-union subject has no operands and resolves straight through; a
+    // union's operands ARE the union, so collecting them here is what keeps it from being resolved twice.
+    private (IReadOnlyList<Violation> Empty, SelectionAdmission? Subject) ResolveSubject(Selection subject)
     {
-        if (subject is not UnionSelection union) return (Array.Empty<Violation>(), null);
+        if (subject is not UnionSelection union)
+        {
+            SelectionAdmission whole = SelectionAdmission.Collect(_selections, subject, SelectionPosition.Subject);
+            return (Array.Empty<Violation>(), whole);
+        }
 
-        var operands = new List<HashSet<TypeNode>>(union.Parts.Count);
+        var operands = new List<SelectionAdmission>(union.Parts.Count);
         var violations = new List<Violation>();
         foreach (Selection operand in union.Parts)
         {
-            HashSet<TypeNode> matched = _selections.Evaluate(operand, SelectionPosition.Subject);
+            SelectionAdmission matched = SelectionAdmission.Collect(_selections, operand, SelectionPosition.Subject);
             operands.Add(matched);
             if (matched.Count == 0)
                 violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
         }
 
-        return (violations, operands);
-    }
+        if (violations.Count > 0) return (violations, null);
 
-    // The subject set, folded from the operand sets the union gate already computed where there is one —
-    // union semantics are exactly "union the operands, then apply the union's own adjectives", and the
-    // operands were evaluated in this same (Subject) position.
-    private HashSet<TypeNode> Subjects(Selection subject, IReadOnlyList<HashSet<TypeNode>>? unionOperands)
-    {
-        return subject is UnionSelection union && unionOperands is not null
-            ? _selections.Unite(union, unionOperands)
-            : _selections.Evaluate(subject, SelectionPosition.Subject);
+        return (Array.Empty<Violation>(), SelectionAdmission.United(_selections, union, operands));
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
@@ -546,11 +591,11 @@ internal sealed class ConstraintEvaluator
     // fails with the member-flavored message (the analog of the empty type subject). Resolution can throw
     // RuleEvaluationException (a closed-generic .Returning anchor); ArchChecker turns that into a RuleError.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateMember(
-        MemberConstraint constraint, IReadOnlyList<HashSet<TypeNode>>? unionOperands)
+        MemberConstraint constraint, HashSet<TypeNode> sourceTypes)
     {
-        // MemberConstraint.Subject IS MemberSubject.Source, so the union gate's operand sets are this
-        // member selection's source types — resolved from them rather than evaluated a second time.
-        HashSet<TypeNode> sourceTypes = Subjects(constraint.MemberSubject.Source, unionOperands);
+        // MemberConstraint.Subject IS MemberSubject.Source, so the subject the gate already resolved IS
+        // this member selection's source types — read from there rather than evaluated a second time. The
+        // members themselves take the set alone: a member verb is shape-only, with no edge to attribute.
         IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
         if (members.Count == 0) return ([Violation.EmptySubject(EmptyMemberSubjectMessage)], NoWarnings, default);
 
@@ -633,12 +678,12 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings);
     }
 
-    private HashSet<TypeNode> ResolveOperands(IReadOnlyList<Selection> operands)
+    // A verb's forbidden set or allow-list: every operand resolved in target position and folded into one
+    // admission, which carries both the membership the non-edge tests read and the per-node attribution
+    // an edge test needs where several projects declare one type (GRAMMAR §4.1).
+    private SelectionAdmission ResolveOperands(IReadOnlyList<Selection> operands)
     {
-        var set = new HashSet<TypeNode>();
-        foreach (Selection operand in operands) set.UnionWith(_selections.Evaluate(operand, SelectionPosition.Target));
-
-        return set;
+        return SelectionAdmission.Operands(_selections, operands, SelectionPosition.Target);
     }
 
     // One edge kind's index, built on first use so a spec that never uses (say) a catch verb never pays

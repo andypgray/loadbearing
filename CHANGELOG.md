@@ -78,9 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The survey now names the types that more than one project declares, and which project's facts
   they follow.** `multiplyDeclaredTypes` carries the type, every project declaring it, and the one
   whose facts and project attribution it follows, so a rule author can see before writing a subject
-  that `arch.Project` named on any other declarer will not select that type. `check` has reported the
+  which project's compilation a rule over that type answers from. `check` has reported the
   same fact as a per-type advisory note since the merge notes shipped; this is the same content in
-  the document where subjects are actually planned, and that note is unchanged. The key is absent
+  the document where subjects are actually planned. The key is absent
   when a solution has none, so `schemaVersion` stays 1 and a healthy solution's survey is
   byte-identical to the one it was before. At skeleton grain it elides to
   `multiplyDeclaredTypeCount` the way the external-reference rows elide, because its length scales
@@ -110,6 +110,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ones before.
 
 ### Changed
+
+- **`arch.Project` now reaches every declarer of a type compiled into several projects, and an
+  edge into such a type counts against the project that compiled the copy.** Where one source
+  file is compiled into N projects — a `<Compile Include>` link, shared source, a polyfill — the
+  model keeps one node attributed to the first declarer, and rule evaluation used to read that
+  attribution as the whole truth: a subject anchored on any other declarer missed the type, and a
+  project referencing its own compiled-in copy read as a cross-project edge into the first
+  declarer. On the field test's MathNet leg that forced three `.Except` workarounds onto real
+  `MustNotReference` rules, excepting a namespace to silence edges no project file declares.
+  Membership is now N-way — `arch.Project` naming any declarer selects the type, as subject,
+  target, member subject, or union operand — and an edge into such a type counts against the
+  intersection of the two endpoints' declarer sets when it is nonempty (the source compiled its
+  own copy: intra-project), the first declarer otherwise. The same rule covers a project-headed
+  subject of `MustNotBeReferencedBy` and `MustOnlyBeReferencedBy`, and an edge's source counts
+  for every declarer. Non-project operands — `typeof`, `arch.Namespace`, `arch.Types`,
+  `arch.Layer`, `arch.Registered`, `MustNotUse`'s member anchors — stay attribution-insensitive,
+  so a `typeof` ban still reds on a project's own copy; `MustOnlyReference` stays strict, so an
+  intra-copy edge needs an allow entry naming the compiling project or a non-project entry
+  containing the type; `.Except` subtracts by node identity, removing a co-declared node from
+  every declarer's selection. The check report's per-type advisory note states the consequence
+  ("selections include it too, and each declarer's reference to its own compiled-in copy counts
+  against that declarer alone"). A solution with no linked source checks byte-identically — no
+  schema moves, and the extraction cache is untouched. A solution with linked source sees
+  verdicts move: baseline entries that covered phantom self-edges go stale (symbol IDs name a
+  name, not a node, so every other committed entry still resolves — the normal stale mechanism
+  prunes), previously-missed types come into view for project-anchored subjects, and
+  `MustNotBeReferencedBy` over a co-declaring project can newly red on the shared type's own
+  edges — fix or re-baseline as with any widened rule.
 
 - **A shared project is no longer reported as a language this product cannot read.**
   `unsupportedProjects` stamped one reason, `not a C# project`, onto every entry, while the two

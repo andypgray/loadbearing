@@ -178,9 +178,10 @@ public sealed class ProjectEdgeSummary
 
 /// <summary>
 ///     One type that several projects declare — a single source file compiled into more than one of them
-///     (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill). Extraction attributes its
-///     facts to the first declarer, so this is what a rule author needs <em>before</em> anchoring a subject
-///     on a project: <c>arch.Project</c> named on any of the other declarers will not select this type.
+///     (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill). <c>arch.Project</c> named on
+///     any declarer selects it, but extraction attributes its facts to the first declarer — so this is what
+///     a rule author needs <em>before</em> anchoring a subject on a project: whose compilation a rule over
+///     this type answers from.
 /// </summary>
 public sealed class MultiplyDeclaredTypeSummary
 {
@@ -202,7 +203,8 @@ public sealed class MultiplyDeclaredTypeSummary
 
     /// <summary>
     ///     The declarer whose facts and project attribution the type carries (the first declarer). Every
-    ///     other name in <see cref="DeclaredBy" /> is a project whose <c>arch.Project</c> selection misses it.
+    ///     name in <see cref="DeclaredBy" /> selects it; this is the one whose compilation its facts
+    ///     answer from.
     /// </summary>
     public string FactsFollow { get; }
 }

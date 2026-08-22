@@ -268,7 +268,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.ShouldSucceed(); // merge notes are advisory — the gate never fires on them
         result.Err.ShouldContain(
             "warning: Type 'Shared.Widget' is declared by projects 'MyApp.Domain' and 'MyApp.Legacy.Billing'");
-        result.Err.ShouldContain("arch.Project('MyApp.Legacy.Billing') selections will not include it.");
+        result.Err.ShouldContain(
+            "arch.Project('MyApp.Legacy.Billing') selections include it too, and each declarer's "
+            + "reference to its own compiled-in copy counts against that declarer alone.");
         result.Err.ShouldNotContain("error: the model is incomplete"); // the fail-closed gate did NOT fire
     }
 

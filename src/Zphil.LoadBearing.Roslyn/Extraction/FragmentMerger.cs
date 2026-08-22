@@ -53,7 +53,8 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///         <see cref="CodebaseModel.MergeNotes">merge note</see> — one per conflated FQN naming every
 ///         losing project, so a type several projects shadow costs one line rather than one per shadow —
 ///         and as <see cref="TypeNode.AlsoDeclaredBy" /> on the winning node, which is the queryable form
-///         a consumer that must act on the conflation reads instead of the prose.
+///         a consumer that must act on the conflation — the survey's edge suppression, the checker's
+///         N-way membership — reads instead of the prose.
 ///     </para>
 ///     <para>
 ///         A later declarer under the <em>same</em> project name is one project file's several target
@@ -337,9 +338,10 @@ internal static class FragmentMerger
 
         // A second (or later) declarer of an already-declared FQN. When its project name differs from the
         // winner's, this is same-FQN cross-project conflation: the facts and ProjectName keep following the
-        // first declarer, so the loser's copy is invisible to arch.Project selections — record the loser
-        // against the type. A matching project name is a project's own several target frameworks, which the
-        // sibling below answers for; the loser set collapses a multi-framework loser to one entry.
+        // first declarer, while selections and edge attribution reach every declarer through the recorded
+        // roster — record the loser against the type. A matching project name is a project's own several
+        // target frameworks, which the sibling below answers for; the loser set collapses a multi-framework
+        // loser to one entry.
         private void NoteConflationIfCrossProject(string fqn, string laterProjectName)
         {
             string winner = _nodes[NodeKey.Unshadowed(fqn)].ProjectName;
@@ -372,7 +374,7 @@ internal static class FragmentMerger
             _multiFrameworkWinners.TryAdd(laterProjectName, winningFramework);
         }
 
-        // One note per conflated type, naming every project that loses it. Grouping is what keeps a type
+        // One note per conflated type, naming every project that declares it. Grouping is what keeps a type
         // stubbed by several sibling projects from spending a line per stub — six types shadowed across six
         // projects cost six lines rather than sixteen, with nothing dropped. The list joiner degrades to
         // "'A' and 'B'" at two items, so a single loser reads as a plain sentence.
@@ -385,8 +387,9 @@ internal static class FragmentMerger
             string selections = JoinWithAnd([.. losers.Select(loser => $"arch.Project('{loser}')")]);
 
             return $"Type '{fqn}' is declared by projects {declarers}; its facts and "
-                   + $"project attribution follow '{winner}' (the first declarer), so {selections} "
-                   + "selections will not include it.";
+                   + $"project attribution follow '{winner}' (the first declarer), but {selections} "
+                   + "selections include it too, and each declarer's reference to its own compiled-in "
+                   + "copy counts against that declarer alone.";
         }
 
         // One note per multi-framework project whose frameworks share a type, naming every framework it
@@ -751,7 +754,7 @@ internal static class FragmentMerger
 
         // The split kept as a fact rather than only as the sentence ShadowedNamesNote composes from the same
         // tables, for the reason AlsoDeclaredBy exists beside ConflationNote: the consumers that must ACT on
-        // it — the survey's coverage statement, a rule author asking whom it costs — cannot read prose, and
+        // it — the survey's coverage statement, a rule author asking whose facts won — cannot read prose, and
         // the alternative they fell back on was rediscovering the split by grouping the type universe on name.
         //
         // The binder roster is indexed rather than looked up defensively: an entry in _shadowingAssemblies

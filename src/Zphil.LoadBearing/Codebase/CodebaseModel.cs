@@ -127,9 +127,10 @@ public sealed class CodebaseModel
     ///     <para>
     ///         <b>Per-type — same-FQN cross-project conflation.</b> Two or more <em>differently named</em>
     ///         projects declare one fully-qualified type name; the first declarer wins the node's facts and
-    ///         <see cref="TypeNode.ProjectName" />, so every later declarer's copy is invisible to
-    ///         <c>arch.Project</c> selections. One note per conflated type names all of them, so a type
-    ///         several projects shadow costs one line. The same fact rides the node itself as
+    ///         <see cref="TypeNode.ProjectName" />, while <c>arch.Project</c> selections reach every
+    ///         declarer and a declarer's reference to its own compiled-in copy counts against that declarer
+    ///         alone. One note per conflated type names all of them, so a type several projects shadow
+    ///         costs one line. The same fact rides the node itself as
     ///         <see cref="TypeNode.AlsoDeclaredBy" />, for a consumer that must act on it rather than
     ///         report it.
     ///     </para>

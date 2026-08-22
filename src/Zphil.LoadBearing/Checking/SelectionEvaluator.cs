@@ -28,7 +28,20 @@ internal sealed class SelectionEvaluator
     internal SelectionEvaluator(CodebaseModel model)
     {
         _model = model;
-        _solutionDeclared = model.Types.Where(t => !t.IsExternal).ToList();
+
+        // One pass over the type universe for two answers: the subject universe, and whether any type in
+        // the model is declared by more than one project. The second is what lets SelectionAdmission skip
+        // per-node attribution outright on a codebase where no source file compiles into two projects.
+        var solutionDeclared = new List<TypeNode>();
+        var multiplyDeclared = false;
+        foreach (TypeNode type in model.Types)
+        {
+            if (!type.IsExternal) solutionDeclared.Add(type);
+            if (type.AlsoDeclaredBy.Count > 0) multiplyDeclared = true;
+        }
+
+        _solutionDeclared = solutionDeclared;
+        AnyMultiplyDeclared = multiplyDeclared;
 
         // The FQN noun index, built once per evaluator and immutable afterwards: a typeof operand is
         // otherwise a full linear scan of the type universe — the largest list in the model — per operand
@@ -44,10 +57,30 @@ internal sealed class SelectionEvaluator
         _byFullName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
     }
 
-    // The project-name index, built on first use in the same shape ConstraintEvaluator's edge indexes take,
-    // so a spec with no project noun never pays the grouping pass. It preserves Types order within a key.
+    /// <summary>
+    ///     Whether any type in the model is declared by more than one project (GRAMMAR §4.1) — one source
+    ///     file compiled into several projects. False on an ordinary codebase, where it collapses every
+    ///     attribution question a target-position test would otherwise have to ask.
+    /// </summary>
+    internal bool AnyMultiplyDeclared { get; }
+
+    // The declarer index, built on first use in the same shape ConstraintEvaluator's edge indexes take, so
+    // a spec with no project noun never pays the grouping pass. Keyed on EVERY project that declares a
+    // type rather than only the one whose facts the node carries: one source file compiled into several
+    // projects is one node (GRAMMAR §4.1), and a project selection over any of those projects names it. A
+    // type is listed once per declarer and the declarers are distinct, so the lookup still preserves Types
+    // order within a key — a grouping keeps first-seen order, and the outer sequence is still Types.
     private ILookup<string, TypeNode> ByProjectName =>
-        _byProjectName ??= _model.Types.ToLookup(t => t.ProjectName, StringComparer.Ordinal);
+        _byProjectName ??= _model.Types
+            .SelectMany(DeclaredBy, (type, declarer) => (Declarer: declarer, Type: type))
+            .ToLookup(pair => pair.Declarer, pair => pair.Type, StringComparer.Ordinal);
+
+    // Every project declaring one type, the winner first: the roster an arch.Project selection tests
+    // against, and the same set TypeNode.IsDeclaredBy walks.
+    private static IReadOnlyList<string> DeclaredBy(TypeNode type)
+    {
+        return [type.ProjectName, .. type.AlsoDeclaredBy];
+    }
 
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
     internal static bool IsPatternSelection(Selection selection)
@@ -125,7 +158,7 @@ internal sealed class SelectionEvaluator
                     return universe.Where(t => pattern.Matches(t.Namespace));
                 });
             case ProjectNoun project:
-                // The ordinal ProjectName index, then the position filter — the same nodes in the same
+                // The ordinal declarer index, then the position filter — the same nodes in the same
                 // order the universe scan yielded, because a lookup grouping keeps Types order.
                 IEnumerable<TypeNode> declaring = ByProjectName[project.Name];
                 return subject ? declaring.Where(t => !t.IsExternal) : declaring;
