@@ -179,7 +179,8 @@ internal static class SarifReportRenderer
 
     // The counted head both incomplete-model notifications open with. Local to this file rather than taken
     // from the human stamp or the narrowing notice, per the convention that each renderer composes its own
-    // messages; the narrowing notification below inflects its own, because it carries a was/were clause too.
+    // messages; what every sentence here does borrow is the inflection, which is a rule about English rather
+    // than a sentence about this log.
     private static string ProjectSubject(IReadOnlyList<string> projects)
     {
         int count = projects.Count;
@@ -191,12 +192,13 @@ internal static class SarifReportRenderer
     // raised. Warning rather than error: the results are true, they are simply not the whole solution's.
     // Composed here rather than shared with the human stamp, per this file's convention that each renderer
     // formats independently; the paths arrive already solution-relative, like every other path in the log.
-    // The subject stays hand-inflected rather than taking Plurals: it carries a was/were clause too.
+    // The sentence is this file's; its noun and copula are the one inflection owner's, so the two numbers of
+    // it cannot be written by hand into disagreement.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
     {
-        string subject = uncheckedProjects.Count == 1
-            ? "1 project the solution declares was not checked"
-            : $"{uncheckedProjects.Count} projects the solution declares were not checked";
+        int count = uncheckedProjects.Count;
+        var subject =
+            $"{count} {Plurals.Noun(count, "project")} the solution declares {Plurals.PastVerb(count)} not checked";
 
         return new SarifNotification(
             new SarifMessage(
@@ -214,9 +216,9 @@ internal static class SarifReportRenderer
     // disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
-        string subject = unsupportedProjects.Count == 1
-            ? "1 project the solution declares was not surveyed"
-            : $"{unsupportedProjects.Count} projects the solution declares were not surveyed";
+        int count = unsupportedProjects.Count;
+        var subject =
+            $"{count} {Plurals.Noun(count, "project")} the solution declares {Plurals.PastVerb(count)} not surveyed";
         IEnumerable<string> entries = unsupportedProjects
             .Select(project => $"{project.Project} ({project.Reason})");
 

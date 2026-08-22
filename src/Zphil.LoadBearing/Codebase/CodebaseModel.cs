@@ -20,6 +20,7 @@ public sealed class CodebaseModel
         IReadOnlyList<ExposureEdge> exposureEdges,
         IReadOnlyList<ServiceRegistration> serviceRegistrations,
         IReadOnlyList<ProjectNode> projects,
+        IReadOnlyList<ShadowedName> shadowedNames,
         IReadOnlyList<string> mergeNotes)
     {
         Types = types;
@@ -32,6 +33,7 @@ public sealed class CodebaseModel
         ExposureEdges = exposureEdges;
         ServiceRegistrations = serviceRegistrations;
         Projects = projects;
+        ShadowedNames = shadowedNames;
         MergeNotes = mergeNotes;
     }
 
@@ -109,6 +111,14 @@ public sealed class CodebaseModel
     public IReadOnlyList<ProjectNode> Projects { get; }
 
     /// <summary>
+    ///     Every full name a project declares that a referenced assembly also supplies, ordered by that name
+    ///     (ordinal), and empty for the overwhelming common case — the one place a name in
+    ///     <see cref="Types" /> does not identify a type, stated as a fact rather than left to be rediscovered
+    ///     by grouping that list. The prose form is the third <see cref="MergeNotes">merge note</see> kind.
+    /// </summary>
+    public IReadOnlyList<ShadowedName> ShadowedNames { get; }
+
+    /// <summary>
     ///     Advisory notes the fragment merge raised while assembling this model: the two project-level kinds
     ///     first, each ordinal by project name, then the per-type kind, ordinal by fully-qualified name — so
     ///     the list is stable across runs and the coarser fact is read first.
@@ -140,8 +150,10 @@ public sealed class CodebaseModel
     ///         so a rule naming the type reaches both while an <c>arch.Project</c> selection over the
     ///         declaring project reaches only the declaration. One note per declaring project rather than per
     ///         name, on the same reasoning as the framework note above: the answer is the same for all of
-    ///         them, and a solution carrying a dozen shims would otherwise spend a dozen lines. The
-    ///         queryable form is the second node itself, and the survey states it as a coverage key.
+    ///         them, and a solution carrying a dozen shims would otherwise spend a dozen lines. The queryable
+    ///         form is the second node itself, and — for a consumer that needs the split named rather than
+    ///         inferred from two nodes wearing one name — <see cref="ShadowedNames" />, which is also what
+    ///         the survey's coverage key is a projection of.
     ///     </para>
     ///     <para>
     ///         All three kinds are purely informational — the model is complete and correct, just carrying an

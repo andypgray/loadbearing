@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
@@ -30,8 +29,7 @@ internal static class StatusJsonRenderer
         IReadOnlyList<string> workspaceDiagnostics,
         WorkspaceDiagnostics diagnostics)
     {
-        var relativizer = new PathFormat.Relativizer(solutionDirectory);
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, solutionDirectory);
 
         var document = new StatusJson(
             2,

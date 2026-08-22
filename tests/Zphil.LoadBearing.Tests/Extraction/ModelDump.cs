@@ -116,6 +116,20 @@ internal static class ModelDump
                 .Append(RenderSites(registration.Sites))
                 .AppendLine("]");
 
+        // The one model fact that is about a NAME rather than about a node, so nothing above renders it: two
+        // nodes wearing one name are each dumped, but which name the merge concluded was shadowed, and by
+        // whom, is only stated here. Empty for every bed but the shadowed-name ones.
+        builder.AppendLine("== SHADOWED NAMES ==");
+        foreach (ShadowedName shadowed in model.ShadowedNames)
+            builder.Append(shadowed.FullName)
+                .Append(" declared=")
+                .Append(shadowed.DeclaredBy)
+                .Append(" supplied=[")
+                .Append(string.Join(", ", shadowed.SuppliedBy))
+                .Append("] bound=[")
+                .Append(string.Join(", ", shadowed.BoundFromAssemblyBy))
+                .AppendLine("]");
+
         builder.AppendLine("== DECLARED MEMBERS ==");
         foreach (TypeNode type in model.Types)
         foreach (MemberNode member in type.Members)

@@ -34,4 +34,14 @@ internal static class Plurals
     {
         return count == 1 ? "is" : "are";
     }
+
+    /// <summary>
+    ///     The past copula agreeing with <paramref name="count" />: <c>was</c> for exactly one, <c>were</c>
+    ///     otherwise. <see cref="Verb" />'s rule in the tense the coverage sentences are written in — what a
+    ///     run could not check, read or survey is always something that already happened.
+    /// </summary>
+    internal static string PastVerb(int count)
+    {
+        return count == 1 ? "was" : "were";
+    }
 }

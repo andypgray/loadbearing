@@ -17,7 +17,17 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </remarks>
 /// <param name="Project">The project, solution-relative and forward-slashed like every other path.</param>
 /// <param name="Reason">Why the run could not read it.</param>
-internal sealed record UnsupportedProjectStamp(string Project, string Reason);
+internal sealed record UnsupportedProjectStamp(string Project, string Reason)
+{
+    /// <summary>
+    ///     The entry as a human line reads it: the project, then why. One owner, so the survey's own section
+    ///     and the stamp a verb writes above its answer cannot spell the same entry two ways.
+    /// </summary>
+    internal string Describe()
+    {
+        return $"{Project} — {Reason}";
+    }
+}
 
 /// <summary>
 ///     The six facts every document stamps about how far its own contents can be trusted: whether the model
@@ -104,6 +114,18 @@ internal readonly record struct WorkspaceTrustStamp(
             Relative(diagnostics.RestoreFailedProjects, relativizer),
             Unsupported(diagnostics.UnsupportedProjects, relativizer),
             diagnostics.MultiTargetedProjects.Count == 0 ? null : diagnostics.MultiTargetedProjects);
+    }
+
+    /// <summary>
+    ///     The same stamp for a caller whose only path work is this one: the relativizer every project path
+    ///     lands through is built from <paramref name="solutionDirectory" /> here rather than at the call site.
+    /// </summary>
+    /// <param name="diagnostics">The load's verdict, carrying the four project lists.</param>
+    /// <param name="solutionDirectory">The directory the paths are shown relative to.</param>
+    internal static WorkspaceTrustStamp From(WorkspaceDiagnostics diagnostics, string solutionDirectory)
+    {
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        return From(diagnostics, relativizer);
     }
 
     private static IReadOnlyList<string>? Relative(

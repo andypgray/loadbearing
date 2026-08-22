@@ -176,18 +176,6 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     Writes <paramref name="stamp" /> as <see cref="LineBlocks" /> writes every block, then the blank
-    ///     line that separates a stamp from the answer it scopes.
-    /// </summary>
-    /// <param name="output">The verb's stdout writer.</param>
-    /// <param name="stamp">One of the per-verb stamps.</param>
-    internal static void Write(TextWriter output, string stamp)
-    {
-        LineBlocks.Write(output, stamp);
-        output.WriteLine();
-    }
-
-    /// <summary>
     ///     The unchecked projects as a notice shows them — solution-relative and forward-slashed, like every
     ///     path in the documents beside them, so a machine path never lands in output a golden pins.
     /// </summary>
@@ -211,13 +199,13 @@ internal static class NarrowedUniverseNotice
 
     // The count as a clause every lede can take, in both numbers: a block that read "1 projects ... were not
     // checked" is the sentence a reader stops trusting. Taken as a count rather than the list, because the
-    // per-rule skip reason names the number without ever showing the paths. The noun comes from the one
-    // inflection owner; the copula stays here, since this is the only sentence in the codebase that needs
-    // was/were and a helper for one caller would be a rule with nowhere else to hold.
+    // per-rule skip reason names the number without ever showing the paths. Noun and copula both come from
+    // the one inflection owner — the same clause is written in three other places, and English agreeing with
+    // itself in one of them and not the next is precisely what a single owner exists to prevent.
     private static string Subject(int uncheckedProjectCount)
     {
         string noun = Plurals.Noun(uncheckedProjectCount, "project");
-        string copula = uncheckedProjectCount == 1 ? "was" : "were";
+        string copula = Plurals.PastVerb(uncheckedProjectCount);
 
         return $"{uncheckedProjectCount} {noun} the solution declares {copula} not checked";
     }

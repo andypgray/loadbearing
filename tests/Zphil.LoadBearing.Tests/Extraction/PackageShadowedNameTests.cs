@@ -22,7 +22,9 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     and this would be same-FQN cross-project conflation instead, which is a different rule with a
 ///     different note. The three surviving-edge rows are the point of the file as much as the suppressed
 ///     one: get the assembly comparison wrong in the other direction and every cross-project edge in the
-///     suite re-points.
+///     suite re-points. The catch row goes further than the reference ones, because that axis keys three
+///     tables on one endpoint pair: it pins that an edge's unfiltered and swallowing subsets land on the
+///     same node its edge did, which is the one thing about the split nothing else in the suite would red on.
 /// </remarks>
 public sealed class PackageShadowedNameTests
 {
@@ -107,6 +109,21 @@ public sealed class PackageShadowedNameTests
     }
 
     [Fact]
+    public void ExtractFromCompilations_AShadowedName_IsStampedOnTheModelAsAFact()
+    {
+        // The queryable half of the merge note above. A consumer that must act on the split — the survey's
+        // coverage statement, a rule author asking whom it costs — reads this rather than rediscovering it
+        // by grouping the type universe on name.
+        ShadowedName shadowed = Model.ShadowedNames.ShouldHaveSingleItem();
+
+        shadowed.ShouldSatisfyAllConditions(
+            () => shadowed.FullName.ShouldBe("Vendor.Widget"),
+            () => shadowed.DeclaredBy.ShouldBe("Product.Tests"),
+            () => shadowed.SuppliedBy.ShouldBe(["Vendor"]),
+            () => shadowed.BoundFromAssemblyBy.ShouldBe(["Product"]));
+    }
+
+    [Fact]
     public void ExtractFromCompilations_NoShadowedName_SaysNothingAndMintsOneNodePerName()
     {
         CompilationInput core = CompilationFactory.Compile("Product.Core", ("Thing.cs", """
@@ -122,6 +139,7 @@ public sealed class PackageShadowedNameTests
         CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([consumer, core]);
 
         model.MergeNotes.ShouldBeEmpty();
+        model.ShadowedNames.ShouldBeEmpty();
         model.Types
             .Select(type => type.FullName)
             .ShouldBeUnique();
@@ -142,8 +160,60 @@ public sealed class PackageShadowedNameTests
         CodebaseModel model = FragmentMerger.Merge(unnamed);
 
         model.MergeNotes.ShouldBeEmpty();
+        model.ShadowedNames.ShouldBeEmpty();
         Nodes(model, "Vendor.Widget")
             .Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Merge_ACatchOnAShadowedName_KeepsEachSidesUnfilteredAndSwallowingSitesOnItsOwnEdge()
+    {
+        // The catch axis carries two subset tables beside its edge table, and all three have to key on the
+        // same node pair: key the subsets on the NAME instead and the product's swallowed site is looked up
+        // under a key its edge never wrote — so the product edge reads "nothing unfiltered here" while the
+        // stand-in's edge reads a swallowing site at a line in a file it does not contain. Both are silent;
+        // typed keys are what makes the recomputation impossible to get wrong.
+        CodebaseModel model = ExtractCatchBed();
+
+        CatchEdge product = model.CatchEdge("Product.Service", "Vendor.Fault");
+        CatchEdge tests = model.CatchEdge("Product.Tests.FaultTests", "Vendor.Fault");
+
+        product.Caught.IsExternal.ShouldBeTrue();
+        product.Caught.ProjectName.ShouldBe("Vendor");
+        product.UnfilteredLines()
+            .ShouldBe([7]);
+        product.SwallowingLines()
+            .ShouldBe([7]);
+
+        tests.Caught.IsExternal.ShouldBeFalse();
+        tests.Caught.ProjectName.ShouldBe("Product.Tests");
+        tests.UnfilteredLines()
+            .ShouldBeEmpty();
+        tests.SwallowingLines()
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Merge_AProjectThatReachesAShadowOnlyByThrowing_StillBindsTheAssembly()
+    {
+        // The roster has to come from what each project BOUND, not from the reference edges into the
+        // assembly's node: the thrown expression's static type is never spelled here, so it mints no
+        // reference edge to mint the roster from, and an edge-derived answer reads "which nothing binds" —
+        // a sentence indistinguishable from a real one. The same hole swallows a bare `catch` and a name
+        // reached only as a member's parameter or return type, which mints no edge at all.
+        CodebaseModel model = ExtractThrowOnlyBed();
+
+        model.Edges.ShouldNotContain(edge => edge.Target.FullName == "Vendor.Fault");
+        model.ThrowEdge("Product.Service", "Vendor.Fault")
+            .Thrown.IsExternal.ShouldBeTrue();
+
+        ShadowedName shadowed = model.ShadowedNames.ShouldHaveSingleItem();
+        shadowed.BoundFromAssemblyBy.ShouldBe(["Product"]);
+
+        // And the same answer where a reader meets it, since the survey is now a projection of that fact.
+        GraphSummarizer.Summarize(model)
+            .ShadowedTypes.ShouldHaveSingleItem()
+            .BoundFromAssemblyBy.ShouldBe(["Product"]);
     }
 
     [Fact]
@@ -249,6 +319,90 @@ public sealed class PackageShadowedNameTests
             ["Product"]);
 
         return [product, core, tests];
+    }
+
+    // A bed of its own rather than another row on the shared one: the catch axis needs an exception type on
+    // both sides of the split, and adding one to Inputs() would move the merge-note and edge-roster pins the
+    // rest of the file is built on.
+    private static CodebaseModel ExtractCatchBed()
+    {
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public class Fault : System.Exception {}
+                                                                      """));
+
+        // Unfiltered and swallowing — no `when`, no rethrow — so both subsets carry the one site.
+        CompilationInput product = CompilationFactory.CompileAgainstPackages(
+            "Product", [vendor], ("Service.cs", """
+                                                namespace Product;
+                                                public class Service
+                                                {
+                                                    public void Run()
+                                                    {
+                                                        try { }
+                                                        catch (Vendor.Fault) { }
+                                                    }
+                                                }
+                                                """));
+
+        // The stand-in, declared and caught by the project that wrote it. Filtered AND rethrowing, so both of
+        // its subsets are empty and a site appearing on this edge could only have come from the other one.
+        CompilationInput tests = CompilationFactory.Compile(
+            "Product.Tests",
+            ("Mocks/Vendor.cs", """
+                                namespace Vendor;
+                                public class Fault : System.Exception {}
+                                """),
+            ("FaultTests.cs", """
+                              namespace Product.Tests;
+                              public class FaultTests
+                              {
+                                  public void Run()
+                                  {
+                                      try { }
+                                      catch (Vendor.Fault error) when (error.Message.Length > 0) { throw; }
+                                  }
+                              }
+                              """));
+
+        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
+    }
+
+    // The narrowest reach there is: the product names the factory, never the exception, so `Vendor.Fault`
+    // arrives in the fragment as a throw edge and an external record and by no other route.
+    private static CodebaseModel ExtractThrowOnlyBed()
+    {
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public class Fault : System.Exception {}
+                                                                      public static class Faults
+                                                                      {
+                                                                          public static Fault Create() { return new Fault(); }
+                                                                      }
+                                                                      """));
+
+        CompilationInput product = CompilationFactory.CompileAgainstPackages(
+            "Product", [vendor], ("Service.cs", """
+                                                namespace Product;
+                                                public class Service
+                                                {
+                                                    public void Run()
+                                                    {
+                                                        throw Vendor.Faults.Create();
+                                                    }
+                                                }
+                                                """));
+
+        // Declared and never used, which is all the shadow needs: the name the product binds from the package
+        // is one this project compiles itself.
+        CompilationInput tests = CompilationFactory.Compile("Product.Tests", ("Mocks/Vendor.cs", """
+                                                                                                 namespace Vendor;
+                                                                                                 public class Fault : System.Exception {}
+                                                                                                 """));
+
+        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
     }
 
     private static ReferenceEdge Edge(string source, string target)

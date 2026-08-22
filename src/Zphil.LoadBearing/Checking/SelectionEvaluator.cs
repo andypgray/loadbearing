@@ -35,10 +35,12 @@ internal sealed class SelectionEvaluator
         // per rule. It preserves Types order within a key, so the sets it feeds are populated in exactly
         // the order the equivalent Where scan populated them.
         //
-        // A lookup rather than a dictionary because a full name is not unique: where a project declares a
-        // name a referenced assembly also supplies, the model carries both (GRAMMAR §4.1). An indexer here
-        // would silently keep whichever came last in Types order and make the other invisible to every
-        // typeof operand — a ban that reaches only one of two types it names is worse than a slow scan.
+        // A lookup rather than a dictionary because a full name is not unique: CodebaseModel.ShadowedNames
+        // is the model's own roster of the names that are not (GRAMMAR §4.1). An indexer here would silently
+        // keep whichever came last in Types order and make the other invisible to every typeof operand — a
+        // ban that reaches only one of two types it names is worse than a slow scan. The lookup is built
+        // unconditionally rather than gated on that roster: it is one O(n) pass either way, and a name maps
+        // to its one node through the same call whether or not anything shadows it.
         _byFullName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
     }
 

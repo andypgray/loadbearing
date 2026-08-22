@@ -39,7 +39,7 @@ internal static class NarrowingNotices
         if (!source.Diagnostics.IsNarrowed) return;
 
         string stamp = Compose(source, factory);
-        NarrowedUniverseNotice.Write(output, stamp);
+        LineBlocks.WriteStamp(output, stamp);
     }
 
     /// <summary>

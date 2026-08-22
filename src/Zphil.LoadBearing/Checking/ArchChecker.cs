@@ -28,6 +28,9 @@ public static class ArchChecker
     internal const string TripwireSkipReason =
         "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.";
 
+    // Stateless, so one instance serves every rule of every run.
+    private static readonly IComparer<Violation> ReportOrder = new ReportOrderComparer();
+
     /// <summary>Checks every rule with no baselines, so every ratchet violation is red.</summary>
     /// <param name="model">The finalized model whose rules to evaluate.</param>
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
@@ -197,8 +200,7 @@ public static class ArchChecker
     {
         IReadOnlyList<Violation> ordered = Order(violations);
         RuleStatus status = ordered.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
-        return new RuleResult(
-            rule, status, ordered, warnings, subjectTypes: coverage.Types, subjectGeneratedTypes: coverage.Generated);
+        return new RuleResult(rule, status, ordered, warnings, coverage: coverage);
     }
 
     // The ratchet, shared by Migrate and Quarantine containment: a violation whose identity
@@ -247,8 +249,7 @@ public static class ArchChecker
         int stale = section is null ? 0 : section.Count - matched.Count;
         RuleStatus status = orderedRed.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
         return new RuleResult(
-            rule, status, orderedRed, warnings, null, grandfathered, stale, captured, grandfatheredEntries,
-            coverage.Types, coverage.Generated);
+            rule, status, orderedRed, warnings, null, grandfathered, stale, captured, grandfatheredEntries, coverage);
     }
 
     // The Quarantine tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
@@ -314,29 +315,50 @@ public static class ArchChecker
         return new RuleResult(rule, RuleStatus.Failed, [Violation.RuleError(detail)]);
     }
 
-    // Deterministic within-rule order: Violation.OrderKey, compared ordinal slot by slot (never as a
-    // tuple, whose default string comparison is culture-sensitive).
+    // Deterministic within-rule order, from the one comparer both lists take.
     private static IReadOnlyList<Violation> Order(IReadOnlyList<Violation> violations)
     {
         return violations
-            .OrderBy(v => v.OrderKey.Primary, StringComparer.Ordinal)
-            .ThenBy(v => v.OrderKey.Secondary, StringComparer.Ordinal)
-            .ThenBy(v => v.OrderKey.Tertiary, StringComparer.Ordinal)
-            .ThenBy(v => v.OrderKey.Quaternary, StringComparer.Ordinal)
+            .OrderBy(violation => violation, ReportOrder)
             .ToList();
     }
 
-    // The ratchet's grandfathered (violation, entry) pairs, ordered by the SAME keys as Order so the two
-    // split lists — Grandfathered and its index-aligned GrandfatheredEntries — share order (OrderBy is a
-    // stable sort, so this yields exactly the violation order Order would).
+    // The ratchet's grandfathered (violation, entry) pairs, ordered by that same comparer so the two split
+    // lists — Grandfathered and its index-aligned GrandfatheredEntries — share the order Order produces
+    // (OrderBy is a stable sort, so equal keys keep the order they arrived in on both sides).
     private static List<(Violation Violation, BaselineEntry Entry)> OrderPairs(
         List<(Violation Violation, BaselineEntry Entry)> pairs)
     {
         return pairs
-            .OrderBy(p => p.Violation.OrderKey.Primary, StringComparer.Ordinal)
-            .ThenBy(p => p.Violation.OrderKey.Secondary, StringComparer.Ordinal)
-            .ThenBy(p => p.Violation.OrderKey.Tertiary, StringComparer.Ordinal)
-            .ThenBy(p => p.Violation.OrderKey.Quaternary, StringComparer.Ordinal)
+            .OrderBy(pair => pair.Violation, ReportOrder)
             .ToList();
+    }
+
+    /// <summary>
+    ///     The report order every violation list takes: <see cref="Violation.OrderKey" />'s four slots,
+    ///     compared ordinal one slot at a time — never as a tuple, whose default string comparison is
+    ///     culture-sensitive. One comparer rather than a key chain per list, because the red violations and
+    ///     the grandfathered pairs have to come out in the same order and nothing else would hold them to it.
+    /// </summary>
+    private sealed class ReportOrderComparer : IComparer<Violation>
+    {
+        public int Compare(Violation? x, Violation? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return -1;
+            if (y is null) return 1;
+
+            (string Primary, string Secondary, string Tertiary, string Quaternary) left = x.OrderKey;
+            (string Primary, string Secondary, string Tertiary, string Quaternary) right = y.OrderKey;
+
+            int primary = StringComparer.Ordinal.Compare(left.Primary, right.Primary);
+            if (primary != 0) return primary;
+
+            int secondary = StringComparer.Ordinal.Compare(left.Secondary, right.Secondary);
+            if (secondary != 0) return secondary;
+
+            int tertiary = StringComparer.Ordinal.Compare(left.Tertiary, right.Tertiary);
+            return tertiary != 0 ? tertiary : StringComparer.Ordinal.Compare(left.Quaternary, right.Quaternary);
+        }
     }
 }

@@ -67,36 +67,15 @@ public static class GraphSummarizer
 
     // The second coverage statement, and the only place a name in this model does not identify a type: a
     // project declares a full name that a referenced assembly also supplies, so Types carries both nodes.
-    // Read straight off the type universe rather than from a field, because two nodes sharing a name IS the
-    // fact — nothing else in the merge produces one, so the grouping cannot report a false positive.
+    // A projection of the fact the merge stamped, the shape MultiplyDeclaredTypes above already takes — so
+    // the survey's two coverage statements read the same way, and neither rediscovers its subject by
+    // grouping the type universe on name. Reading the stamped fact is also the only way to state the binder
+    // roster truthfully: the edges see one name per edge minted, which is not every name a project binds.
     private static List<ShadowedTypeSummary> ShadowedTypes(CodebaseModel model)
     {
-        ILookup<string, TypeNode> byName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
-
-        // Which projects actually reach the assembly's half. A reader shown only the declarer cannot tell
-        // whether the split costs them anything; this is the half that says whom it costs.
-        ILookup<TypeNode, string> bindersOf = model.Edges
-            .Where(edge => edge.Target.IsExternal)
-            .ToLookup(edge => edge.Target, edge => edge.Source.ProjectName);
-
-        return byName
-            .Where(group => group.Count() > 1)
-            .OrderBy(group => group.Key, StringComparer.Ordinal)
-            .Select(group => new ShadowedTypeSummary(
-                group.Key,
-                group.First(node => !node.IsExternal)
-                    .ProjectName,
-                [
-                    .. group.Where(node => node.IsExternal)
-                        .Select(node => node.ProjectName)
-                        .OrderBy(name => name, StringComparer.Ordinal)
-                ],
-                [
-                    .. group.Where(node => node.IsExternal)
-                        .SelectMany(node => bindersOf[node])
-                        .Distinct(StringComparer.Ordinal)
-                        .OrderBy(name => name, StringComparer.Ordinal)
-                ]))
+        return model.ShadowedNames
+            .Select(shadowed => new ShadowedTypeSummary(
+                shadowed.FullName, shadowed.DeclaredBy, shadowed.SuppliedBy, shadowed.BoundFromAssemblyBy))
             .ToList();
     }
 

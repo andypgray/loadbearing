@@ -93,7 +93,7 @@ internal static class GraphFormatter
         IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
         return unsupportedProjects.Count > 0
-            ? unsupportedProjects.Select(project => $"  {project.Project} — {project.Reason}")
+            ? unsupportedProjects.Select(project => $"  {project.Describe()}")
             : ["  (none)"];
     }
 
@@ -160,12 +160,8 @@ internal static class GraphFormatter
     // a section that only appears when it has content is one a reader never learns to look for.
     private static IEnumerable<string> MultiplyDeclaredTypeLines(GraphSummary summary, DocumentGrain grain)
     {
-        if (grain >= DocumentGrain.Skeleton && summary.MultiplyDeclaredTypes.Count > 0)
-            return [SkeletonMultiplyDeclaredElisionLine];
-
-        return summary.MultiplyDeclaredTypes.Count > 0
-            ? summary.MultiplyDeclaredTypes.Select(MultiplyDeclaredTypeLine)
-            : ["  (none)"];
+        return CoverageSection(
+            summary.MultiplyDeclaredTypes, grain, SkeletonMultiplyDeclaredElisionLine, MultiplyDeclaredTypeLine);
     }
 
     private static string MultiplyDeclaredTypeLine(MultiplyDeclaredTypeSummary type)
@@ -179,22 +175,28 @@ internal static class GraphFormatter
     // name means two types, and the line names both halves plus who reaches the far one.
     private static IEnumerable<string> ShadowedTypeLines(GraphSummary summary, DocumentGrain grain)
     {
-        if (grain >= DocumentGrain.Skeleton && summary.ShadowedTypes.Count > 0)
-            return [SkeletonShadowedElisionLine];
-
-        return summary.ShadowedTypes.Count > 0
-            ? summary.ShadowedTypes.Select(ShadowedTypeLine)
-            : ["  (none)"];
+        return CoverageSection(summary.ShadowedTypes, grain, SkeletonShadowedElisionLine, ShadowedTypeLine);
     }
 
+    // No empty-roster arm: an entry exists only because some project's compilation bound the name from the
+    // assembly, and the merge records that project where it knows it rather than inferring it from the edges,
+    // so "which nothing binds" is a sentence this line can no longer be asked to write.
     private static string ShadowedTypeLine(ShadowedTypeSummary type)
     {
-        string bound = type.BoundFromAssemblyBy.Count > 0
-            ? string.Join(", ", type.BoundFromAssemblyBy)
-            : "nothing";
-
         return $"  {type.Type} — declared by {type.DeclaredBy}; also supplied by {string.Join(", ", type.SuppliedBy)}, "
-               + $"which {bound} binds";
+               + $"which {string.Join(", ", type.BoundFromAssemblyBy)} binds";
+    }
+
+    // The rule both coverage statements above take, and the one that sets them apart from the sections
+    // around them: an empty statement still reads "(none)" at every grain, because having nothing to report
+    // IS its finding, and only a non-empty one elides its rows at skeleton, where the list scales with the
+    // codebase and the fact that there is something there to read is what a coarse survey has room for.
+    private static IEnumerable<string> CoverageSection<T>(
+        IReadOnlyList<T> items, DocumentGrain grain, string elisionLine, Func<T, string> line)
+    {
+        if (items.Count == 0) return ["  (none)"];
+
+        return grain >= DocumentGrain.Skeleton ? [elisionLine] : items.Select(line);
     }
 
     private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, DocumentGrain grain)

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
@@ -33,16 +32,17 @@ internal static class GraphJsonRenderer
         DocumentGrain grain,
         IReadOnlyList<string> projectsScope)
     {
-        bool elideExternalEdges = grain >= DocumentGrain.Skeleton;
+        bool skeleton = grain >= DocumentGrain.Skeleton;
 
-        // The coverage statement rides the same rung as the external rows, and for the same reason: its
-        // length scales with the codebase. Where it parts company is the empty case — absent rather than an
-        // empty array or a zero count — so a solution with nothing to say carries neither of its two keys at
-        // any grain, and its survey is byte-identical to the one before the statement existed.
-        bool anyMultiplyDeclaredTypes = summary.MultiplyDeclaredTypes.Count > 0;
-        bool anyShadowedTypes = summary.ShadowedTypes.Count > 0;
-        var relativizer = new PathFormat.Relativizer(solutionDirectory);
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
+        (IReadOnlyList<GraphMultiplyDeclaredTypeJson>? multiplyDeclaredRows, int? multiplyDeclaredCount) =
+            CoverageRung(
+                summary.MultiplyDeclaredTypes, skeleton,
+                t => new GraphMultiplyDeclaredTypeJson(t.Type, t.DeclaredBy, t.FactsFollow));
+        (IReadOnlyList<GraphShadowedTypeJson>? shadowedRows, int? shadowedCount) =
+            CoverageRung(
+                summary.ShadowedTypes, skeleton,
+                t => new GraphShadowedTypeJson(t.Type, t.DeclaredBy, t.SuppliedBy, t.BoundFromAssemblyBy));
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, solutionDirectory);
 
         var document = new GraphJson(
             1,
@@ -51,18 +51,14 @@ internal static class GraphJsonRenderer
             projectsScope.Count > 0 ? projectsScope : null,
             summary.Projects.Select(project => ToProject(project, grain)).ToList(),
             summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
-            elideExternalEdges
+            skeleton
                 ? null
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
-            elideExternalEdges ? summary.ExternalEdges.Count : null,
-            anyMultiplyDeclaredTypes && !elideExternalEdges
-                ? summary.MultiplyDeclaredTypes.Select(t => new GraphMultiplyDeclaredTypeJson(t.Type, t.DeclaredBy, t.FactsFollow)).ToList()
-                : null,
-            anyMultiplyDeclaredTypes && elideExternalEdges ? summary.MultiplyDeclaredTypes.Count : null,
-            anyShadowedTypes && !elideExternalEdges
-                ? summary.ShadowedTypes.Select(t => new GraphShadowedTypeJson(t.Type, t.DeclaredBy, t.SuppliedBy, t.BoundFromAssemblyBy)).ToList()
-                : null,
-            anyShadowedTypes && elideExternalEdges ? summary.ShadowedTypes.Count : null,
+            skeleton ? summary.ExternalEdges.Count : null,
+            multiplyDeclaredRows,
+            multiplyDeclaredCount,
+            shadowedRows,
+            shadowedCount,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             trust.ModelIncomplete,
             trust.FailedProjects,
@@ -71,6 +67,22 @@ internal static class GraphJsonRenderer
             trust.UnsupportedProjects);
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
+    }
+
+    // A coverage statement's two keys, from the one rule both take. It rides the same rung as the external
+    // rows, and for the same reason: its length scales with the codebase, so a skeleton carries the count
+    // instead. Where it parts company is the empty case — absent rather than an empty array or a zero count
+    // — so a solution with nothing to say carries neither key at any grain, and its survey is byte-identical
+    // to the one before the statement existed.
+    private static (IReadOnlyList<TJson>? Rows, int? Count) CoverageRung<T, TJson>(
+        IReadOnlyList<T> items, bool skeleton, Func<T, TJson> map)
+    {
+        if (items.Count == 0) return (null, null);
+        if (skeleton) return (null, items.Count);
+
+        List<TJson> rows = items.Select(map)
+            .ToList();
+        return (rows, null);
     }
 
     // The framework pair takes no grain argument, deliberately: it rides the project row like solutionMember

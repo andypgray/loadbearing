@@ -1,5 +1,4 @@
 using Zphil.LoadBearing.Cli.Pipeline;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
@@ -38,15 +37,11 @@ internal static class UnsupportedProjectsNotices
     {
         if (source.Diagnostics.UnsupportedProjects.Count == 0) return;
 
-        var relativizer = new PathFormat.Relativizer(source.SolutionDirectory);
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source.Diagnostics, relativizer);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source.Diagnostics, source.SolutionDirectory);
         IReadOnlyList<string> entries = (trust.UnsupportedProjects ?? [])
-            .Select(project => $"{project.Project} — {project.Reason}")
+            .Select(project => project.Describe())
             .ToList();
 
-        // The block, then the blank line that separates a stamp from the answer it scopes — the shape every
-        // stamp takes, written out here rather than borrowed from the notice named after the other subject.
-        LineBlocks.Write(output, factory(entries));
-        output.WriteLine();
+        LineBlocks.WriteStamp(output, factory(entries));
     }
 }

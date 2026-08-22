@@ -2,7 +2,6 @@ using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
@@ -135,8 +134,7 @@ internal sealed class GraphRunner(
 
         // Read off the same stamp the --json document is composed from, so the terminal reader and the
         // document cannot disagree about which projects the survey could not read, or how they are spelled.
-        var relativizer = new PathFormat.Relativizer(solutionDirectory);
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, solutionDirectory);
 
         foreach (string line in GraphFormatter.Lines(
                      scoped, solutionName, request.Grain, trust.UnsupportedProjects ?? []))

@@ -221,6 +221,6 @@ internal static class ProjectLoadFailures
     // for an observed refusal — unlike RestoreFailures', which was measured falsely refusing.
     private static bool NotACsharpProject(Project project)
     {
-        return !string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal);
+        return !ProjectLanguages.IsCSharp(project);
     }
 }

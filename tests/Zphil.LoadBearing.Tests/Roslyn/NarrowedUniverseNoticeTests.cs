@@ -166,14 +166,14 @@ public sealed class NarrowedUniverseNoticeTests
     }
 
     [Fact]
-    public void Write_AStamp_SplitsOnLineFeedAndAdoptsTheWritersNewlineThenLeavesABlankLine()
+    public void WriteStamp_AStamp_SplitsOnLineFeedAndAdoptsTheWritersNewlineThenLeavesABlankLine()
     {
         // The stamps are assembled with LFs; a console writer's newline is CRLF. Writing the block whole
         // would put lone LFs into a CRLF stream, so it goes out one WriteLine per line, and the blank line
         // below it is what separates the stamp from the answer it scopes.
         var output = new StringWriter { NewLine = "\r\n" };
 
-        NarrowedUniverseNotice.Write(output, "lede:\n  evidence\ntail");
+        LineBlocks.WriteStamp(output, "lede:\n  evidence\ntail");
 
         output.ToString()
             .ShouldBe("lede:\r\n  evidence\r\ntail\r\n\r\n");

@@ -136,7 +136,7 @@ internal static class RestoreFailures
             // never included it. Blaming one refused a solution whose C# half was restored perfectly:
             // measured on that bed, exit 2 naming the .fsproj alone. Skipped before any file is read, so
             // this also spares the assets probe for every project the model does not contain.
-            if (!string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal)) continue;
+            if (!ProjectLanguages.IsCSharp(project)) continue;
 
             string fullPath = Path.GetFullPath(filePath);
             if (Path.GetDirectoryName(fullPath) is not { } projectDirectory) continue;

@@ -15,9 +15,10 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///     files. <see cref="For{TKey}" /> holds the single <c>new SortedSet&lt;FragmentSite&gt;()</c>, so the
 ///     default comparer — which <em>is</em> the pinned (file, line) site ordering, see
 ///     <see cref="FragmentSite.CompareTo" /> — cannot be spelled differently on one axis and quietly reorder
-///     that family's sites. <see cref="OrderedPairs{TValue,TOut}" /> and
-///     <see cref="OrderedRegistrations{TOut}" /> hold the ordinal sorts that make a serialized fragment and a
-///     merged model byte-stable however a dictionary happened to lay its entries out.
+///     that family's sites. <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> and
+///     <see cref="OrderedRegistrations{TOut}" /> hold the sorts that make a serialized fragment and a merged
+///     model byte-stable however a dictionary happened to lay its entries out — one sort for both ends of the
+///     pipeline, with each end naming the comparer its own key element is ordered by.
 ///     <see cref="FilePaths" /> holds the GRAMMAR §5.6 first-occurrence-order contract. Adding an edge axis
 ///     costs a table and a call, not a copy of any of those rules.
 /// </remarks>
@@ -36,19 +37,34 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
-    ///     Materializes a table keyed by an endpoint pair as a list ordered ordinal by the key's first element
-    ///     then its second, projecting each entry through <paramref name="make" />. The key's tuple element
-    ///     names are erased at runtime, so every axis — <c>(src, target)</c>, <c>(src, caught)</c>,
-    ///     <c>(src, member SymbolId)</c> — is the one shape here.
+    ///     Materializes a table keyed by an endpoint pair as a list ordered by the key's first element then its
+    ///     second, each through the comparer its element type is ordered by, projecting each entry through
+    ///     <paramref name="make" />. The key's tuple element names are erased at runtime, so every axis —
+    ///     <c>(src, target)</c>, <c>(src, caught)</c>, <c>(src, member SymbolId)</c> — is the one shape here,
+    ///     whether an endpoint is a name (extraction, one compilation's view) or a node key (the merge, where
+    ///     one name can denote two).
+    /// </summary>
+    internal static List<TOut> OrderedPairs<TFirst, TSecond, TValue, TOut>(
+        Dictionary<(TFirst, TSecond), TValue> map,
+        IComparer<TFirst> firstComparer,
+        IComparer<TSecond> secondComparer,
+        Func<TFirst, TSecond, TValue, TOut> make)
+    {
+        return map
+            .OrderBy(kv => kv.Key.Item1, firstComparer)
+            .ThenBy(kv => kv.Key.Item2, secondComparer)
+            .Select(kv => make(kv.Key.Item1, kv.Key.Item2, kv.Value))
+            .ToList();
+    }
+
+    /// <summary>
+    ///     The same over a name-keyed pair, the shape extraction's own tables take — ordinal on both elements,
+    ///     so an axis there names no comparer and the sort is still spelled exactly once.
     /// </summary>
     internal static List<TOut> OrderedPairs<TValue, TOut>(
         Dictionary<(string, string), TValue> map, Func<string, string, TValue, TOut> make)
     {
-        return map
-            .OrderBy(kv => kv.Key.Item1, StringComparer.Ordinal)
-            .ThenBy(kv => kv.Key.Item2, StringComparer.Ordinal)
-            .Select(kv => make(kv.Key.Item1, kv.Key.Item2, kv.Value))
-            .ToList();
+        return OrderedPairs(map, StringComparer.Ordinal, StringComparer.Ordinal, make);
     }
 
     /// <summary>
@@ -57,7 +73,7 @@ internal static class FragmentSiteSets
     ///     no-implementation form sorting as the empty string.
     /// </summary>
     /// <remarks>
-    ///     It sits beside <see cref="OrderedPairs{TValue,TOut}" /> for the same reason that one exists: both
+    ///     It sits beside <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> for the same reason that one exists: both
     ///     ends of the pipeline materialize this table, and a rule spelled twice is a rule that can come to
     ///     be spelled two ways.
     /// </remarks>

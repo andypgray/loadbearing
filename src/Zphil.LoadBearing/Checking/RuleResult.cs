@@ -10,6 +10,10 @@ namespace Zphil.LoadBearing.Checking;
 /// </remarks>
 public sealed class RuleResult
 {
+    // The subject coverage arrives whole rather than as a pair of ints, and that is a correctness matter
+    // rather than a tidiness one: it lands beside the ratchet's own count, and same-typed positionals in a
+    // row are a transposition no compiler can catch. The two properties below stay ints, because that is
+    // what every renderer reads.
     internal RuleResult(
         ArchRule rule,
         RuleStatus status,
@@ -20,8 +24,7 @@ public sealed class RuleResult
         int staleBaselineEntries = 0,
         bool baselineCaptured = false,
         IReadOnlyList<BaselineEntry>? grandfatheredEntries = null,
-        int subjectTypes = 0,
-        int subjectGeneratedTypes = 0)
+        SubjectCoverage coverage = default)
     {
         Rule = rule;
         Status = status;
@@ -32,8 +35,8 @@ public sealed class RuleResult
         StaleBaselineEntries = staleBaselineEntries;
         BaselineCaptured = baselineCaptured;
         GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
-        SubjectTypes = subjectTypes;
-        SubjectGeneratedTypes = subjectGeneratedTypes;
+        SubjectTypes = coverage.Types;
+        SubjectGeneratedTypes = coverage.Generated;
     }
 
     /// <summary>The rule that was evaluated.</summary>

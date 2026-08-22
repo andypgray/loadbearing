@@ -20,4 +20,20 @@ internal static class LineBlocks
     {
         foreach (string line in block.Split('\n')) writer.WriteLine(line);
     }
+
+    /// <summary>
+    ///     Writes <paramref name="stamp" /> as <see cref="Write" /> writes every block, then the blank line
+    ///     that separates a stamp from the answer it scopes.
+    /// </summary>
+    /// <remarks>
+    ///     The shape every stamp takes, whichever subject it is about — one owner, so a verb that scopes its
+    ///     answer with a stamp cannot be the one that forgets the separator.
+    /// </remarks>
+    /// <param name="writer">The verb's stdout writer — the stamp scopes what follows it there.</param>
+    /// <param name="stamp">One of the per-verb stamps.</param>
+    internal static void WriteStamp(TextWriter writer, string stamp)
+    {
+        Write(writer, stamp);
+        writer.WriteLine();
+    }
 }

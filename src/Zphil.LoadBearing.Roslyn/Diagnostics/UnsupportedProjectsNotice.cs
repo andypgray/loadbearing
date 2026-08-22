@@ -64,13 +64,13 @@ internal static class UnsupportedProjectsNotice
     }
 
     // The count as a clause both ledes can take, in both numbers — the sentence a reader stops trusting is
-    // "1 projects ... could not be read". The copula lives here for NarrowedUniverseNotice.Subject's reason:
-    // this is the only sentence that needs was/were, so a helper for one caller would be a rule with nowhere
-    // else to hold.
+    // "1 projects ... could not be read". Noun and copula both come from the one inflection owner, which is
+    // where NarrowedUniverseNotice.Subject takes the same two words from: the clause is this file's, the
+    // English is nobody's.
     private static string Subject(int unsupportedProjectCount)
     {
         string noun = Plurals.Noun(unsupportedProjectCount, "project");
-        string copula = unsupportedProjectCount == 1 ? "was" : "were";
+        string copula = Plurals.PastVerb(unsupportedProjectCount);
 
         return $"{unsupportedProjectCount} {noun} the solution declares {copula} not read — this product "
                + "surveys C# projects only";
