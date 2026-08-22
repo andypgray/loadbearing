@@ -191,6 +191,41 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
+    ///     The refusal spec resolution throws when the convention finds no spec project and the model is
+    ///     incomplete — the project that would have matched may be one the run could not see, and no
+    ///     <c>--spec</c> argument repairs either cause.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Like <see cref="ContextCaveat" /> it gates nothing: it is the same two causes with the same two
+    ///         remedies, said where spec resolution meets them. It belongs here rather than at the call site
+    ///         because spec resolution runs <em>before</em> any verb's gate can fire, so this is the message a
+    ///         reader on a broken tree actually meets — and a second, hand-rolled answer to one condition is
+    ///         exactly how the four verbs came to disagree in the first place. Hand-rolled, it quoted the load
+    ///         failures for either cause, so a run incomplete only because a restore failed promised a list of
+    ///         failed projects and printed none.
+    ///     </para>
+    ///     <para>
+    ///         It carries the blamed projects inline rather than pointing at warnings printed above, for
+    ///         <see cref="GraphRefusal" />'s reason and a stronger one of its own: this refusal is thrown
+    ///         before a runner exists to render any diagnostics beside it, so on <em>both</em> its surfaces
+    ///         there is nothing above to point at.
+    ///     </para>
+    /// </remarks>
+    internal static string SpecRefusal(WorkspaceDiagnostics diagnostics)
+    {
+        return Message(
+            diagnostics,
+            false,
+            $"No spec project found: {Failed(diagnostics)} failed to load, so a project that references "
+            + "Zphil.LoadBearing.dll may be among them:",
+            "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
+            $"No spec project found: NuGet packages did not resolve for {Unrestored(diagnostics)}, so a "
+            + "project that references Zphil.LoadBearing.dll may have failed to resolve it:",
+            "Restore the solution first (dotnet restore), then retry.");
+    }
+
+    /// <summary>
     ///     The caveat block <c>context</c> writes above its answer when the model is incomplete. Context
     ///     never gates — it is a lookup an agent runs mid-edit, and a partial answer beats none — but a
     ///     partial load is exactly the state in which "no architecture scope covers this path" can be a

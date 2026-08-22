@@ -350,38 +350,34 @@ internal static class SpecResolver
     }
 
     // Zero candidates has causes whose remedies do not overlap, and reporting only the first sent readers to
-    // write an argument that could not help them. Three arms, strongest evidence first:
+    // write an argument that could not help them. Four arms, strongest evidence first. The first two are the
+    // incomplete-model gate's own two causes, said in its words (IncompleteModelGate.SpecRefusal) and only
+    // reached from here — so they compose rather than exclude, one run being able to break both ways at once:
     //
     //  1. Projects failed to load. The one that would have matched may be among them, and no --spec argument
     //     repairs a load — so this arm names them and points at the build.
-    //  2. Nothing failed to load, but the load reported problems about this solution. That is the measured
-    //     locked-mode shape: a broken restore leaves the spec project's package reference unresolved while
-    //     the project itself still loads, so the convention finds nothing and the reader must repair the
-    //     restore rather than name a project. It says "may", because that is all it knows.
-    //  3. A clean load means the solution really has no spec project. The sentence stays byte-identical (the
+    //  2. A project's NuGet packages did not resolve. That is the measured locked-mode shape: a broken
+    //     restore leaves the spec project's reference to the contract library unresolved while the project
+    //     itself still loads completely, so the convention finds nothing and the reader must repair the
+    //     restore rather than name a project.
+    //  3. Nothing failed either way, but the load reported problems about this solution — diagnostics with no
+    //     project blamed. It says "may", because that is all it knows.
+    //  4. A clean load means the solution really has no spec project. The sentence stays byte-identical (the
     //     derive_spec prompt quotes it), plus how many projects were considered, which is what tells a reader
     //     whether the workspace held what they expected.
     //
-    // NuGetAudit advisories are excluded from arm 2's input, and only from arm 2's: an advisory's publication
+    // NuGetAudit advisories are excluded from arm 3's input, and only from arm 3's: an advisory's publication
     // date says nothing about whether this solution's references resolved, so a solution that genuinely has
-    // no spec project must not be sent to go and fix its restore. Nothing here gates — arms 1 and 2 are the
-    // same refusal with different evidence — so no exit code turns on that distinction.
+    // no spec project must not be sent to go and fix its restore. Nothing here gates — every arm is the same
+    // refusal with different evidence — so no exit code turns on that distinction.
     private static UserErrorException NoSpecProjectFound(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
         // The refusal is thrown before a CodebaseSource exists, so no runner renders the evidence beside it —
         // the message has to carry it itself, in the shape every other evidence block takes. CliErrorMapper
         // writes it a line apiece, so this reads the same on stderr and in an MCP error result.
-        const string tail = "Restore and build the solution first (dotnet restore, dotnet build), then retry.";
-
         if (diagnostics.IsIncomplete)
-            return new UserErrorException(
-                EvidenceBlock.Compose(
-                    "No spec project found: one or more projects failed to load, so a project that references "
-                    + "Zphil.LoadBearing.dll may be among them:",
-                    diagnostics.FailedProjects,
-                    tail,
-                    quoteCap: MaxQuotedDiagnostics));
+            return new UserErrorException(IncompleteModelGate.SpecRefusal(diagnostics));
 
         if (diagnostics.ActionableDiagnostics.Count > 0)
             return new UserErrorException(
@@ -389,7 +385,7 @@ internal static class SpecResolver
                     "No spec project found: the workspace did not load cleanly, so a project that references "
                     + "Zphil.LoadBearing.dll may have failed to resolve it:",
                     diagnostics.ActionableDiagnostics,
-                    tail,
+                    "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
                     quoteCap: MaxQuotedDiagnostics));
 
         return new UserErrorException(

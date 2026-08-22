@@ -15,6 +15,18 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///         reaches for the same shape a third time.
 ///     </para>
 ///     <para>
+///         <b>A colon promises a block, so composing one over nothing is refused here.</b> A lede ending in
+///         a colon and answered by the remedy line reads as truncated output — the reader is sent to look at
+///         evidence and finds the next sentence where it should have been. The rule was already written down
+///         at one call site: <see cref="SolutionDiscovery.NotFoundMessage" /> withholds its heading when the
+///         walk-up saw nothing one level down, because "a walk-up that saw nothing one level down must not
+///         announce a list it is about to leave empty". Enforcing it here is what makes it hold at all of
+///         them. A caller whose list can be empty therefore either guards the whole block on that list — as
+///         <see cref="IncompleteModelGate" /> does, once per cause — or ends its lede in a full stop, as
+///         <c>NotFoundMessage</c> does; that is the one call site that legitimately composes over nothing,
+///         and the guard is what keeps it the only one.
+///     </para>
+///     <para>
 ///         <b>The block is LF-joined, never platform-joined.</b> A composed block is one comparable value
 ///         whatever machine built it; <see cref="LineBlocks" /> is what turns it back into console lines.
 ///     </para>
@@ -26,7 +38,10 @@ internal static class EvidenceBlock
     ///     spaces (with the elision count when <paramref name="quoteCap" /> bites), then — inside that
     ///     indented run, never after the tail — the MSBuild selection note, then <paramref name="tail" />.
     /// </summary>
-    /// <param name="lede">The sentence the evidence hangs from, ending in a colon.</param>
+    /// <param name="lede">
+    ///     The sentence the evidence hangs from, ending in a colon — or in a full stop where
+    ///     <paramref name="evidence" /> can be empty, which is what the guard below holds callers to.
+    /// </param>
     /// <param name="evidence">The paths or diagnostics being named, one per line.</param>
     /// <param name="tail">
     ///     The closing sentence — the remedy, or the reading being denied. Omitted where the lede already
@@ -40,6 +55,10 @@ internal static class EvidenceBlock
     ///     How many entries to quote before counting the rest. A refusal nobody reads to the end names
     ///     nothing; omitted where the evidence is a project list the reader has to act on entry by entry.
     /// </param>
+    /// <exception cref="ArgumentException">
+    ///     <paramref name="lede" /> ends in a colon and <paramref name="evidence" /> is empty — the dangling
+    ///     colon this guard exists to make unreachable.
+    /// </exception>
     internal static string Compose(
         string lede,
         IReadOnlyList<string> evidence,
@@ -47,6 +66,12 @@ internal static class EvidenceBlock
         bool withSelectionNote = false,
         int? quoteCap = null)
     {
+        if (evidence.Count == 0 && lede.EndsWith(':'))
+            throw new ArgumentException(
+                $"A lede ending in a colon promises the block beneath it, and there is none: '{lede}'. "
+                + "Guard the whole block on the list, or end the lede in a full stop.",
+                nameof(evidence));
+
         int quoted = quoteCap ?? evidence.Count;
 
         var lines = new List<string> { lede };

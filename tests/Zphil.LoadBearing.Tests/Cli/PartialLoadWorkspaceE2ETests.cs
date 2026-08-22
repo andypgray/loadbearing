@@ -29,7 +29,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         references the deliberately-absent project — so its two SDK-style projects carry the restore cause
 ///         while the third carries the load cause. Every refusal below therefore writes two blocks, and the
 ///         order they come in is asserted rather than assumed: nothing else in the suite reaches the
-///         composition over a real tree, because the cheaper beds inject one list or the other.
+///         composition over a real tree, because the cheaper beds hand both lists in ready-made.
 ///     </para>
 ///     <para>
 ///         Cold invocations throughout (<see cref="CliRunner.InvokeColdAsync(string[])" />), never the warm pool: a
@@ -80,6 +80,18 @@ public sealed class PartialLoadWorkspaceE2ETests
         "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so nothing was "
         + "rendered: a card would be committed describing dependencies the model never resolved, and --diagram "
         + "would draw a survey with the external edges missing:";
+
+    // The spec refusal's two ledes. It is the seventh surface to compose this shape and the only one a
+    // reader can meet before any verb's gate has run, so its counts and its projects are the gate's — the
+    // hand-rolled version it replaced quoted the load failures for either cause and printed none for the
+    // second.
+    private const string SpecGateLine =
+        "No spec project found: 1 project failed to load, so a project that references Zphil.LoadBearing.dll "
+        + "may be among them:";
+
+    private const string SpecRestoreGateLine =
+        "No spec project found: NuGet packages did not resolve for 2 projects, so a project that references "
+        + "Zphil.LoadBearing.dll may have failed to resolve it:";
 
     // The project BrokenApp declares and the tree does not contain — the whole reason this fixture exists,
     // and now the thing every refusal in this class names.
@@ -188,20 +200,23 @@ public sealed class PartialLoadWorkspaceE2ETests
     }
 
     [Fact]
-    public async Task Check_PartiallyLoadedWorkspaceWithNoSpec_BlamesTheLoadRatherThanTheMissingSpec()
+    public async Task Check_PartiallyLoadedWorkspaceWithNoSpec_BlamesBothCausesRatherThanTheMissingSpec()
     {
         // Spec resolution runs before the incomplete-model gate can fire, so on a tree like this the reader
         // met the convention's own failure first: "no solution project references Zphil.LoadBearing.dll —
         // pass --spec to name one". Both halves of that were misdirection. The project that would have
-        // matched may be one of the ones that failed, and no --spec argument repairs a load. So the refusal
-        // names them.
+        // matched may be one the run could not see, and no --spec argument repairs either cause. So the
+        // refusal names them — and it names them both, which is what nothing measured while it composed its
+        // own block: told only about the load, a reader on a tree broken solely by its restore was told that
+        // projects had failed to load and shown none of them.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult check = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");
 
-        check.ShouldRefuseWith("one or more projects failed to load");
-        check.Err.ShouldContain(MissingProject); // the evidence, inline
+        check.ShouldRefuseWith(SpecGateLine, MissingProject); // the evidence, inline
+        check.ShouldTellBothCausesLoadFirst(SpecGateLine, SpecRestoreGateLine);
         check.Err.ShouldContain("Restore and build the solution first");
+        check.Err.ShouldContain("Restore the solution first (dotnet restore), then retry.");
         check.Err.ShouldNotContain("Pass --spec to name one");
         check.Err.ShouldNotContain(InvariantViolationFragment);
     }
@@ -402,7 +417,7 @@ file static class PartialLoadRefusalAssertions
     /// <remarks>
     ///     The ordering is a rule, not an accident: a project that never loaded is more fundamentally broken
     ///     than one that loaded without its packages, and the two ask for different repairs. Nothing else in
-    ///     the suite composes both blocks over a real tree — the cheaper beds inject one list or the other —
+    ///     the suite composes both blocks over a real tree — the cheaper beds hand both lists in ready-made —
     ///     so this is where the composition is measured rather than assembled.
     /// </remarks>
     internal static void ShouldTellBothCausesLoadFirst(

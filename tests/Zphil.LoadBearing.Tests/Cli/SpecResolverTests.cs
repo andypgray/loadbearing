@@ -198,21 +198,70 @@ public sealed class SpecResolverTests
             SpecResolver.ResolveConventionProject(
                 [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
 
-        error.Message.ShouldContain("one or more projects failed to load");
+        error.Message.ShouldContain("1 project failed to load");
         error.Message.ShouldContain(BrokenProject);
         error.Message.ShouldContain("Restore and build the solution first");
         error.Message.ShouldNotContain("Pass --spec");
     }
 
     [Fact]
+    public void ResolveConventionProject_PackagesDidNotResolve_BlamesTheRestoreAndNamesTheProject()
+    {
+        // The measured locked-mode shape, and the defect this pin exists to keep out of the field. A broken
+        // restore leaves the spec project's reference to the contract library unresolved while the project
+        // itself still loads completely, so the convention finds zero candidates and the model is incomplete
+        // for the second cause alone. The refusal used to quote the load failures whichever cause fired —
+        // and that list is empty here, so a colon promising the projects was answered by the remedy line.
+        // Hence the colon and its first line of evidence asserted together: an empty list reds here now,
+        // rather than on a bed.
+        var diagnostics = new WorkspaceDiagnostics([], [], [], [], [BrokenProject], [], []);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldContain("NuGet packages did not resolve for 1 project");
+        error.Message.ShouldContain("may have failed to resolve it:\n  " + BrokenProject);
+        error.Message.ShouldContain("Restore the solution first (dotnet restore), then retry.");
+        error.Message.ShouldNotContain("failed to load");
+        error.Message.ShouldNotContain("Pass --spec");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_BothCauses_TellsThemBothWithTheLoadFirst()
+    {
+        // One tree can be broken both ways at once, and the two ask for different repairs — so each block
+        // names its own project rather than one list standing in for both. The load block comes first: a
+        // project that never loaded is more fundamentally broken than one that loaded without its packages.
+        const string unrestoredProject = "C:/repo/src/MyApp.Web/MyApp.Web.csproj";
+        const string loadLede =
+            "No spec project found: 1 project failed to load, so a project that references "
+            + "Zphil.LoadBearing.dll may be among them:";
+        const string restoreLede =
+            "No spec project found: NuGet packages did not resolve for 1 project, so a project that "
+            + "references Zphil.LoadBearing.dll may have failed to resolve it:";
+        var diagnostics = new WorkspaceDiagnostics([], [], [BrokenProject], [], [unrestoredProject], [], []);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldContain(loadLede + "\n  " + BrokenProject);
+        error.Message.ShouldContain(restoreLede + "\n  " + unrestoredProject);
+        error.Message.IndexOf(loadLede, StringComparison.Ordinal)
+            .ShouldBeLessThan(error.Message.IndexOf(restoreLede, StringComparison.Ordinal), error.Message);
+    }
+
+    [Fact]
     public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_StillBlamesTheLoad()
     {
-        // The measured locked-mode shape, which survives the move off message-matching: a broken restore
-        // leaves the spec project's package reference unresolved while the project itself still loads
-        // completely, so nothing fails and the convention finds zero candidates. Keying this arm on the
-        // diagnostics is legitimate exactly because it gates nothing — it chooses between two spellings of
-        // one refusal, and the reader is sent to repair the restore rather than to write an argument that
-        // cannot help.
+        // The residual arm: the load reported a problem about this solution while blaming no project, so
+        // neither gate cause fired and there is nothing to name but the diagnostic itself. It is no longer
+        // the locked-mode shape — that lands on the restore block above, and this comment went on calling it
+        // the locked-mode shape for as long as the field message was broken, because the arm it guards is
+        // hand-built from lists a test can leave empty. Keying this arm on the diagnostics is legitimate
+        // exactly because it gates nothing — it chooses between two spellings of one refusal, and the reader
+        // is sent to repair the load rather than to write an argument that cannot help.
         var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>
@@ -279,10 +328,13 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_ManyFailedProjects_QuotesABoundedNumberAndCountsTheRest()
+    public void ResolveConventionProject_ManyFailedProjects_NamesEveryOne()
     {
-        // The same bound over the stronger evidence: a solution rarely loses one project either, and the
-        // remedy has to survive to the end of the message.
+        // The bound above does not carry over to the stronger evidence, and deliberately: a diagnostic is
+        // read to see whether the failures share a cause, so three of them is enough, while a project list
+        // is what the reader has to act on entry by entry — an "... and 1 more." there names a repair they
+        // cannot make. It is also what the six surfaces that already state this cause do, so a capped list
+        // here would have been the only place a reader met a partial one.
         var diagnostics = new WorkspaceDiagnostics(
             [], [], ["C:/repo/one.csproj", "C:/repo/two.csproj", "C:/repo/three.csproj", "C:/repo/four.csproj"],
             [], [], [], []);
@@ -291,10 +343,10 @@ public sealed class SpecResolverTests
             SpecResolver.ResolveConventionProject(
                 [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
 
+        error.Message.ShouldContain("4 projects failed to load");
         error.Message.ShouldContain("  C:/repo/one.csproj");
-        error.Message.ShouldContain("  C:/repo/three.csproj");
-        error.Message.ShouldNotContain("four.csproj");
-        error.Message.ShouldContain("... and 1 more.");
+        error.Message.ShouldContain("  C:/repo/four.csproj");
+        error.Message.ShouldNotContain("more.");
     }
 
     [Fact]
