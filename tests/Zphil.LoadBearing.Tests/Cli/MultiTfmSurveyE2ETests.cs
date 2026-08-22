@@ -17,6 +17,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     top-level array, so what is asserted is that they are on the right row, absent from the wrong one,
 ///     and still there at both coarser grains — every part of the claim, none of the document's spelling.
 /// </remarks>
+[Collection("Serial")]
 public sealed class MultiTfmSurveyE2ETests
 {
     private const string Core = "MultiTfm.Core";

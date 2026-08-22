@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Xunit;
 using Zphil.LoadBearing.Rendering;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
@@ -17,7 +18,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         class pays the copy and the <c>dotnet restore</c>; each later test in that class gets the same
 ///         directory with its tree reset to pristine. Every caller is in the
 ///         <see cref="SerialCollection">"Serial"</see> collection, so two tests can never hold one lease at
-///         once.
+///         once — <see cref="RequireSerialCollection(string?,string?)">enforced</see> at construction rather
+///         than merely stated here, because five classes had drifted out of it before anything checked.
 ///     </para>
 ///     <para>
 ///         <b>Why the path must be stable, not merely private.</b> A fresh directory per test cost far more
@@ -53,6 +55,11 @@ internal sealed class TempFixtureWorkspace : IDisposable
     private static readonly string[] RestoreRelevantExtensions =
         [".csproj", ".fsproj", ".vbproj", ".sln", ".slnx", ".slnf", ".props", ".targets"];
 
+    // The collection every caller has to be in, named by its definition type rather than by the string
+    // "Serial": the attribute and the definition move together under a rename, and the definition type is
+    // what the runner reports back for a member.
+    private static readonly string SerialCollectionName = typeof(SerialCollection).FullName!;
+
     private static readonly Lock LeaseGate = new();
 
     // Lease key -> the directory that key owns. Held for the process; reset, never deleted, between tests.
@@ -79,6 +86,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
         bool restore = true,
         [CallerFilePath] string callerFilePath = "")
     {
+        RequireSerialCollection();
+
         string source = SourceDirectory(fixtureDirectory);
         var key = $"{Path.GetFileNameWithoutExtension(callerFilePath)}-{fixtureDirectory.Replace('/', '-')}";
 
@@ -113,6 +122,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
     // leased constructor's (string, string, bool) call shape, which real call sites already use.
     private TempFixtureWorkspace(DirectoryInfo source, string solutionFileName, bool restore)
     {
+        RequireSerialCollection();
+
         _root = PrivateCopy(source.FullName);
         SolutionPath = Path.Combine(_root, solutionFileName);
         if (restore) FixtureRestorer.Restore(SolutionPath);
@@ -162,6 +173,44 @@ internal sealed class TempFixtureWorkspace : IDisposable
         var segments = new List<string> { _root };
         segments.AddRange(relativeSegments);
         return Path.Combine(segments.ToArray());
+    }
+
+    /// <summary>
+    ///     Refuses a construction from a test outside the <see cref="SerialCollection">"Serial"</see>
+    ///     collection, reading which collection that is from the ambient runner context.
+    /// </summary>
+    /// <remarks>
+    ///     Sited at the constructor because every path in reaches it — <see cref="TempGitRepo" /> and
+    ///     <see cref="BinlogFixtureWorkspace" /> both wrap one, so a wrapper added later is covered without
+    ///     being listed anywhere. A test that forgets the attribute fails on the line that builds the copy,
+    ///     under a filtered run of that test alone, rather than as a distant gate over the whole suite.
+    /// </remarks>
+    private static void RequireSerialCollection()
+    {
+        ITestContext current = TestContext.Current;
+        RequireSerialCollection(
+            current.TestCollection?.TestCollectionClassName, current.TestClass?.TestClassSimpleName);
+    }
+
+    /// <summary>
+    ///     The refusal itself, over the two facts read above. Split from the ambient read so both halves
+    ///     pin: what the runner reports for a member of the collection, and what this makes of it.
+    /// </summary>
+    /// <param name="collectionClassName">
+    ///     The definition type of the collection the calling test belongs to; <c>null</c> for the implicit
+    ///     per-class collection a test class gets when it carries no <c>[Collection]</c> attribute, which is
+    ///     the shape of the defect this exists to catch.
+    /// </param>
+    /// <param name="testClassName">The calling test's class, named in the refusal so it needs no lookup.</param>
+    internal static void RequireSerialCollection(string? collectionClassName, string? testClassName)
+    {
+        if (string.Equals(collectionClassName, SerialCollectionName, StringComparison.Ordinal)) return;
+
+        throw new InvalidOperationException(
+            $"{testClassName ?? "A test"} builds a fixture copy from outside the \"Serial\" collection. "
+            + "Add [Collection(\"Serial\")] to it: the copy shells dotnet restore with redirected output, "
+            + "and that child deadlocks against the Roslyn BuildHost a workspace-loading test spawns at the "
+            + "same moment.");
     }
 
     private static string SourceDirectory(string fixtureDirectory)

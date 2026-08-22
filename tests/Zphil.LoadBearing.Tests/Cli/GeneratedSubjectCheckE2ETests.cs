@@ -16,6 +16,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     specs below differ by exactly one call, so what changes between the two documents is attributable to
 ///     that call alone.
 /// </remarks>
+[Collection("Serial")]
 public sealed class GeneratedSubjectCheckE2ETests
 {
     private const string RuleId = "naming/web-types";

@@ -11,6 +11,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     pins the model and the summary; these pin the two documents a reader actually holds, because a key
 ///     that is computed correctly and rendered nowhere is not a statement.
 /// </summary>
+[Collection("Serial")]
 public sealed class ShadowedTypeGraphE2ETests
 {
     private const string ShadowedHeading = "Type names a referenced assembly also supplies:";

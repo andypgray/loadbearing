@@ -17,6 +17,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     the multi-targeted project is named with its frameworks and its winner, and a single-framework
 ///     solution's report carries no such key at all — which is what keeps every existing report byte-identical.
 /// </remarks>
+[Collection("Serial")]
 public sealed class MultiTfmCheckE2ETests
 {
     private const string Core = "MultiTfm.Core";

@@ -17,6 +17,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     that changed nothing this test is about. What is asserted is the namespace, the flag and the counts
 ///     — every part of the claim, none of the spelling.
 /// </remarks>
+[Collection("Serial")]
 public sealed class GeneratedTypeSurveyE2ETests
 {
     private const string Web = "RazorApp.Web";

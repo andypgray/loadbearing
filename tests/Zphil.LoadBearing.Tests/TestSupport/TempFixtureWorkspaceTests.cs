@@ -1,14 +1,15 @@
 using Shouldly;
 using Xunit;
+using Xunit.Sdk;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
-///     The pins under <see cref="TempFixtureWorkspace" />'s restore trigger. A leased tree is reset between
-///     tests and re-restored only when a project or solution file actually changed, so a solution format the
-///     reset does not recognise costs the next test a stale <c>project.assets.json</c> — and says nothing.
-///     Both halves are held: the accepted set directly, and the whole lease-reset-restore path over the one
-///     fixture solution written in the XML format.
+///     The pins under <see cref="TempFixtureWorkspace" />'s restore trigger and its serial-collection guard.
+///     A leased tree is reset between tests and re-restored only when a project or solution file actually
+///     changed, so a solution format the reset does not recognise costs the next test a stale
+///     <c>project.assets.json</c> — and says nothing. Both halves are held: the accepted set directly, and
+///     the whole lease-reset-restore path over the one fixture solution written in the XML format.
 /// </summary>
 [Collection("Serial")]
 public sealed class TempFixtureWorkspaceTests
@@ -74,6 +75,48 @@ public sealed class TempFixtureWorkspaceTests
         second.SolutionPath.ShouldBe(leasedSolution);
         File.Exists(AssetsFileIn(projectDirectory))
             .ShouldBeTrue($"the reset restored '{SlnxSolutionFileName}' to its fixture content without re-restoring the copy.");
+    }
+
+    /// <summary>
+    ///     The value the guard compares against, read from the runner rather than assumed. This class is a
+    ///     member of the collection, so a runner that reported the name some other way would make every
+    ///     construction in the suite refuse — and this is the one assertion that would say why.
+    /// </summary>
+    [Fact]
+    public void SerialMembership_IsReportedAsTheDefinitionTypesFullName()
+    {
+        ITestCollection? collection = TestContext.Current.TestCollection;
+
+        collection.ShouldNotBeNull("a running test always belongs to some collection.");
+        collection.TestCollectionClassName.ShouldBe(
+            typeof(SerialCollection).FullName,
+            "the guard recognises membership by this name, so nothing else can be in the \"Serial\" collection.");
+    }
+
+    /// <summary>
+    ///     <c>null</c> is the case that matters: it is what a test class with no <c>[Collection]</c>
+    ///     attribute reports, which is exactly the drift the guard exists to catch.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Zphil.LoadBearing.Tests.TestSupport.SomeOtherCollection")]
+    public void RequireSerialCollection_ACallerOutsideTheCollection_IsRefusedByName(string? collectionClassName)
+    {
+        Action construct = () => TempFixtureWorkspace.RequireSerialCollection(
+            collectionClassName, "SomeParallelE2ETests");
+
+        var refusal = construct.ShouldThrow<InvalidOperationException>();
+        refusal.Message.ShouldContain("SomeParallelE2ETests");
+        refusal.Message.ShouldContain("[Collection(\"Serial\")]");
+    }
+
+    [Fact]
+    public void RequireSerialCollection_ACallerInTheCollection_IsAllowed()
+    {
+        Action construct = () => TempFixtureWorkspace.RequireSerialCollection(
+            typeof(SerialCollection).FullName, nameof(TempFixtureWorkspaceTests));
+
+        construct.ShouldNotThrow();
     }
 
     private static string AssetsFileIn(string projectDirectory)
