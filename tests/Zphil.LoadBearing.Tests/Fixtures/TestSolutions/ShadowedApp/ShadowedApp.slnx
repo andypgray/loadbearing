@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ShadowedApp.Product/ShadowedApp.Product.csproj" />
+  <Project Path="ShadowedApp.Product.Tests/ShadowedApp.Product.Tests.csproj" />
+</Solution>

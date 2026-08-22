@@ -44,7 +44,12 @@ public sealed class TypeNode : ITypeInfo
         Members = Array.Empty<MemberNode>();
     }
 
-    /// <summary>The fully-qualified name; the model's identity key. See remarks for the exact form.</summary>
+    /// <summary>
+    ///     The fully-qualified name. See remarks for the exact form — and note it names a type rather than
+    ///     identifying one: where a project declares a name a referenced assembly also supplies, two nodes
+    ///     wear it, parted by <see cref="ProjectName" /> and <see cref="IsExternal" />. Node identity is the
+    ///     instance, which is why every set and lookup over nodes in this model uses reference equality.
+    /// </summary>
     public string FullName { get; }
 
     /// <summary>

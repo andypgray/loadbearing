@@ -586,8 +586,10 @@ internal sealed class ConstraintEvaluator
     // One edge kind's index, built on first use so a spec that never uses (say) a catch verb never pays
     // for a catch index. Keyed on the endpoint the SUBJECT set is tested against — Source for the
     // outbound verbs, Target for the two referenced-by verbs — with the default (reference) comparer,
-    // the same identity HashSet<TypeNode>.Contains used before them. Nodes are unique instances after
-    // the merge conflates same-FQN declarers, so a key is a node, not a name.
+    // the same identity HashSet<TypeNode>.Contains used before them. A key is a node, not a name, and the
+    // distinction is real rather than pedantic: a name a project declares and a referenced assembly also
+    // supplies denotes two nodes (GRAMMAR §4.1), and a reference into one of them must not index under the
+    // other. Reference identity is what keeps them apart — do not give TypeNode value equality on FullName.
     private sealed class EdgeIndex<TEdge>
     {
         private readonly IReadOnlyList<TEdge> _edges;

@@ -63,11 +63,20 @@ public sealed class Violation
 
     /// <summary>
     ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
-    ///     FullName, Member SymbolId), compared ordinal by the checker. A MemberUse mirrors Reference's
-    ///     (source, target) as (source FullName, member SymbolId); a MemberShape mirrors Shape's subject
-    ///     as (declaring-type FullName, member SymbolId).
+    ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
+    ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
+    ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId).
     /// </summary>
-    internal (string Primary, string Secondary, string Tertiary) OrderKey
+    /// <remarks>
+    ///     The fourth slot exists because the first three no longer separate every pair of violations: a full
+    ///     name a project declares and a referenced assembly also supplies denotes two nodes (GRAMMAR §4.1),
+    ///     and one source type can reach both where it is itself compiled into two projects. Without it the
+    ///     sort ties, and a stable sort then falls through to the order the subject set was walked in — a
+    ///     reference-keyed hash set, which is to say no order at all, differing run to run. Project name is
+    ///     the discriminator because it is exactly what parts the two: the external half carries the
+    ///     supplying assembly's name.
+    /// </remarks>
+    internal (string Primary, string Secondary, string Tertiary, string Quaternary) OrderKey
     {
         get
         {
@@ -77,7 +86,8 @@ public sealed class Violation
                              ?? (SubjectMember is { } member ? member.DeclaringTypeFullName : string.Empty);
             string secondary = Target?.FullName ?? string.Empty;
             string tertiary = Member?.SymbolId ?? SubjectMember?.SymbolId ?? string.Empty;
-            return (primary, secondary, tertiary);
+            string quaternary = (Target ?? Subject)?.ProjectName ?? string.Empty;
+            return (primary, secondary, tertiary, quaternary);
         }
     }
 

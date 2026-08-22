@@ -35,7 +35,13 @@ public sealed class CodebaseModel
         MergeNotes = mergeNotes;
     }
 
-    /// <summary>All types — solution-declared and shallow external nodes — ordered by FullName.</summary>
+    /// <summary>
+    ///     All types — solution-declared and shallow external nodes — ordered by FullName, then declarations
+    ///     before externals, then by <see cref="TypeNode.ProjectName" />. The tie-break is load-bearing rather
+    ///     than decorative: a name a project declares that a referenced assembly also supplies carries two
+    ///     nodes, so FullName alone is not a total order and every rendered document would lose its
+    ///     byte-stability to dictionary enumeration order without it.
+    /// </summary>
     public IReadOnlyList<TypeNode> Types { get; }
 
     /// <summary>All reference edges, ordered by (source FullName, target FullName).</summary>
@@ -103,9 +109,9 @@ public sealed class CodebaseModel
     public IReadOnlyList<ProjectNode> Projects { get; }
 
     /// <summary>
-    ///     Advisory notes the fragment merge raised while assembling this model: the project-level notes
-    ///     first, ordinal by project name, then the per-type notes, ordinal by fully-qualified name — so the
-    ///     list is stable across runs and the coarser fact is read first.
+    ///     Advisory notes the fragment merge raised while assembling this model: the two project-level kinds
+    ///     first, each ordinal by project name, then the per-type kind, ordinal by fully-qualified name — so
+    ///     the list is stable across runs and the coarser fact is read first.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -127,9 +133,20 @@ public sealed class CodebaseModel
     ///         nothing collapsed.
     ///     </para>
     ///     <para>
-    ///         Both kinds are purely informational — the model is complete and correct, just ambiguous in its
-    ///         attribution — so they never denote a failed load and never gate <c>check</c> (unlike
-    ///         workspace-load diagnostics). Empty for the overwhelming common case.
+    ///         <b>Per-project — a name a referenced assembly also supplies.</b> A project declares a
+    ///         fully-qualified name that an assembly no project of this solution produces supplies too — a
+    ///         stand-in under a package's own namespace, a polyfill under a BCL one. Both types are in
+    ///         <see cref="Types" />, and each reference reaches whichever the referencing compilation bound,
+    ///         so a rule naming the type reaches both while an <c>arch.Project</c> selection over the
+    ///         declaring project reaches only the declaration. One note per declaring project rather than per
+    ///         name, on the same reasoning as the framework note above: the answer is the same for all of
+    ///         them, and a solution carrying a dozen shims would otherwise spend a dozen lines. The
+    ///         queryable form is the second node itself, and the survey states it as a coverage key.
+    ///     </para>
+    ///     <para>
+    ///         All three kinds are purely informational — the model is complete and correct, just carrying an
+    ///         attribution a reader can be surprised by — so they never denote a failed load and never gate
+    ///         <c>check</c> (unlike workspace-load diagnostics). Empty for the overwhelming common case.
     ///     </para>
     /// </remarks>
     public IReadOnlyList<string> MergeNotes { get; }

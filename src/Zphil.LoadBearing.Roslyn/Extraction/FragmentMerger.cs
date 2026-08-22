@@ -23,7 +23,26 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///     <para>
 ///         Declaring the nodes fully precedes populating their hierarchy, and that ordering is
 ///         load-bearing: it is what makes a type any fragment declares beat every fragment's external view
-///         of it, so <c>ResolveNode</c> mints a shallow external only for an FQN no fragment declares at all.
+///         of it — with one qualification, which is the whole of the rule below. A fragment's external view
+///         is only <em>of</em> that declaration when the assembly it bound the name from is one the declaring
+///         fragments produce. Where it is not, the two are different types wearing one name.
+///     </para>
+///     <para>
+///         So a fully-qualified name can denote two nodes: the source declaration, and a shallow external
+///         attributed to the supplying assembly — the shape a test project's stand-in under a package's own
+///         namespace makes, where product code binds the package while the test project compiles its own.
+///         Each fragment's endpoints resolve to whichever its compilation actually bound, on every axis
+///         including the hierarchy, so product code never reads as depending on the test assembly and the
+///         stand-in stays a first-class declared type of the project that wrote it. The split is confined to
+///         that case: a name no fragment declares is one external node as before, and one source file
+///         compiled into several projects still conflates to a single node (the paragraph below). It is
+///         disclosed as an advisory <see cref="CodebaseModel.MergeNotes">merge note</see>, one per declaring
+///         project rather than per name, and again in the survey.
+///     </para>
+///     <para>
+///         Internally a node is keyed by that name, or by name and supplying assembly where it is the
+///         shadow; only the merge sees those keys, and every table pairing endpoints keys on them, so an
+///         edge into one of two same-named types cannot collapse onto the other.
 ///     </para>
 ///     <para>
 ///         A later declarer under a <em>different</em> project name is same-FQN cross-project conflation.
@@ -98,7 +117,16 @@ internal static class FragmentMerger
         // Project name → every target framework its fragments carried, ordinal-sorted. Built over all
         // fragments, not just the declaring ones, so a note can name the project's whole framework set.
         private readonly Dictionary<string, SortedSet<string>> _frameworksByProject = new(StringComparer.Ordinal);
+
+        // FQN → every assembly name a fragment declaring it was compiled into, and the index of the
+        // fragment whose declaration won its facts. The first is the declaration half of the shadow test —
+        // EVERY declarer, not just the winner, because a name one project wins on ordinal order can be
+        // bound from a sibling project that declares it too, and that is an ordinary intra-solution
+        // reference rather than a shadow. An unknown assembly name contributes nothing, so a set that
+        // stays empty answers "unknown" and the test fails open.
+        private readonly Dictionary<string, HashSet<string>> _declaringAssemblies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FragmentType> _hierarchy = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _hierarchyFragments = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), SortedSet<FragmentSite>> _memberEdgeSites = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
@@ -109,6 +137,13 @@ internal static class FragmentMerger
         private readonly Dictionary<string, string> _multiFrameworkWinners = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TypeNode> _nodes = new(StringComparer.Ordinal);
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
+
+        // Shadowed FQN → every assembly that supplied that name to a fragment which did NOT compile it and
+        // which none of its declarers produce, ordinal-sorted. One entry per type rather than per
+        // (type, assembly) pair, the grouping _conflatedLosers uses, so one line can name them all. This
+        // table is both the shadow node's gate and the merge note's content: a split the report does not
+        // disclose is untypeable.
+        private readonly Dictionary<string, SortedSet<string>> _shadowingAssemblies = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
         public CodebaseModel Run(IReadOnlyList<CodebaseFragment> fragments)
@@ -118,76 +153,106 @@ internal static class FragmentMerger
             foreach (CodebaseFragment fragment in fragments)
                 RecordTargetFramework(fragment);
 
-            // Declared nodes: first declarer (input order) wins facts/ProjectName; sites union.
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentType declared in fragment.DeclaredTypes)
-                DeclareMerged(declared, fragment.ProjectName, fragment.TargetFramework);
+            // Declared nodes: first declarer (input order) wins facts/ProjectName; sites union. The index
+            // rides along because the winner's own bindings are what its hierarchy is later resolved through.
+            for (var index = 0; index < fragments.Count; index++)
+            {
+                CodebaseFragment fragment = fragments[index];
+                foreach (FragmentType declared in fragment.DeclaredTypes)
+                    DeclareMerged(declared, fragment, index);
+            }
 
             // External facts table: the first fragment (input order) referencing a not-declared-anywhere
-            // FQN wins its facts. Built after declaration so an FQN some fragment declares never goes external.
+            // FQN wins its facts. Built after declaration so the pass below can ask "does anything declare
+            // this?" of _nodes alone, which is what splits an ordinary external from a shadowed name.
             foreach (CodebaseFragment fragment in fragments)
             foreach (FragmentExternal external in fragment.Externals)
                 RecordExternal(external);
 
-            // Hierarchy from the winning fragment only; every reference rewired to a merged node. Declared
-            // members (GRAMMAR §4.6) are winner-only in the same way — the winning fragment's inventory
-            // becomes the node's MemberNode list — so they are taken in the same pass: the inventory is a
-            // function of the fragment and the node alone, and nothing between here and the model reads or
-            // writes it. Externals keep their empty default; the member axis is solution-declared-only.
+            // Every shadow gets its node here rather than waiting to be resolved by an endpoint, so the
+            // report and the model cannot disagree: a name is noted as meaning two types exactly when Types
+            // carries two. Without this a name referenced only where extraction keeps its facts as strings —
+            // a member's parameter or return type (GRAMMAR §4.6) — would be noted and then not be there.
+            foreach ((string fqn, SortedSet<string> shadowing) in _shadowingAssemblies)
+            foreach (string assembly in shadowing)
+                ResolveNode(ShadowKey(fqn, assembly));
+
+            // Each fragment's own answer to "which assembly did I bind this name from", built once here and
+            // read by every pass below. It has to come after the two passes above, because a supplier is
+            // only interesting once the tables know which names are declared and which of those are shadowed.
+            List<Dictionary<string, string>> suppliers = fragments.Select(SuppliersOf)
+                .ToList();
+
+            // Hierarchy from the winning fragment only, resolved through THAT fragment's bindings — a
+            // declarer whose own compilation bound a shadowed name from an assembly reaches the assembly's
+            // node, exactly as its edges do. Declared members (GRAMMAR §4.6) are winner-only in the same way
+            // — the winning fragment's inventory becomes the node's MemberNode list — so they are taken in
+            // the same pass: the inventory is a function of the fragment and the node alone, and nothing
+            // between here and the model reads or writes it. Externals keep their empty default; the member
+            // axis is solution-declared-only.
             foreach ((string fqn, FragmentType declared) in _hierarchy)
             {
                 TypeNode node = _nodes[fqn];
-                PopulateHierarchy(node, declared);
+                PopulateHierarchy(node, declared, suppliers[_hierarchyFragments[fqn]]);
                 PopulateMembers(node, declared);
             }
 
-            // Edge site-sets union per (src, tgt).
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentEdge edge in fragment.Edges)
-                MergeSimpleEdge(edge.SourceFullName, edge.TargetFullName, _edgeSites, edge.Sites);
+            // Every edge family, one fragment at a time rather than one family at a time, so each family
+            // reads the supplier index of the fragment that observed it. Interleaving the families changes
+            // only the order the work runs in, and nothing here is order-sensitive: every site set is a
+            // SortedSet, every map keys on its endpoint pair, the external facts table was frozen in the
+            // pass above so ResolveNode mints the same facts whenever it first runs, _memberFacts is
+            // first-wins over facts that are a function of the SymbolId, and Materialize re-sorts the nodes.
+            for (var index = 0; index < fragments.Count; index++)
+            {
+                CodebaseFragment fragment = fragments[index];
+                Dictionary<string, string> fragmentSuppliers = suppliers[index];
 
-            // Member-use edges (GRAMMAR §4.5) key on (src, member SymbolId) rather than a type pair, and the
-            // self-drop is therefore a same-type guard; one shared MemberReference per distinct SymbolId.
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
-                MergeMemberEdge(memberEdge);
+                // Edge site-sets union per (src, tgt).
+                foreach (FragmentEdge edge in fragment.Edges)
+                    MergeSimpleEdge(fragmentSuppliers, edge.SourceFullName, edge.TargetFullName, _edgeSites, edge.Sites);
 
-            // Construction edges (GRAMMAR §4.5) key on (src, constructed).
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
-                MergeSimpleEdge(
-                    constructorEdge.SourceFullName, constructorEdge.ConstructedFullName, _constructorEdgeSites, constructorEdge.Sites);
+                // Member-use edges (GRAMMAR §4.5) key on (src, member SymbolId) rather than a type pair, and
+                // the self-drop is therefore a same-type guard; one shared MemberReference per distinct SymbolId.
+                foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
+                    MergeMemberEdge(fragmentSuppliers, memberEdge);
 
-            // Injection edges (GRAMMAR §4.7) key on (src, injected).
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
-                MergeSimpleEdge(
-                    injectionEdge.SourceFullName, injectionEdge.InjectedFullName, _injectionEdgeSites, injectionEdge.Sites);
+                // Construction edges (GRAMMAR §4.5) key on (src, constructed).
+                foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
+                    MergeSimpleEdge(
+                        fragmentSuppliers, constructorEdge.SourceFullName, constructorEdge.ConstructedFullName,
+                        _constructorEdgeSites, constructorEdge.Sites);
 
-            // Registration facts (GRAMMAR §4.7) are the one axis with no node resolution: they key on
-            // (lifetime, service, impl?) string-side, because registration is many-to-many and membership is
-            // resolved model-side at evaluation.
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentServiceRegistration registration in fragment.ServiceRegistrations)
-                MergeRegistration(registration);
+                // Injection edges (GRAMMAR §4.7) key on (src, injected).
+                foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
+                    MergeSimpleEdge(
+                        fragmentSuppliers, injectionEdge.SourceFullName, injectionEdge.InjectedFullName,
+                        _injectionEdgeSites, injectionEdge.Sites);
 
-            // Catch edges (GRAMMAR §4.8) key on (src, caught), and their unfiltered- and swallowing-site
-            // subsets union under that same key and guard — so a file:line any fragment reports unfiltered
-            // (or swallowing) keeps that standing in the merged edge.
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentCatchEdge catchEdge in fragment.CatchEdges)
-                MergeCatchEdge(catchEdge);
+                // Registration facts (GRAMMAR §4.7) are the one axis with no node resolution: they key on
+                // (lifetime, service, impl?) string-side, because registration is many-to-many and membership
+                // is resolved model-side at evaluation. That is also why a shadowed name needs nothing here —
+                // there is no attribution to get wrong, only a name, and both nodes wear it.
+                foreach (FragmentServiceRegistration registration in fragment.ServiceRegistrations)
+                    MergeRegistration(registration);
 
-            // Throw edges (GRAMMAR §4.8) key on (src, thrown).
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
-                MergeSimpleEdge(throwEdge.SourceFullName, throwEdge.ThrownFullName, _throwEdgeSites, throwEdge.Sites);
+                // Catch edges (GRAMMAR §4.8) key on (src, caught), and their unfiltered- and swallowing-site
+                // subsets union under that same key and guard — so a file:line any fragment reports unfiltered
+                // (or swallowing) keeps that standing in the merged edge.
+                foreach (FragmentCatchEdge catchEdge in fragment.CatchEdges)
+                    MergeCatchEdge(fragmentSuppliers, catchEdge);
 
-            // Exposure edges (GRAMMAR §4.9) key on (src, exposed).
-            foreach (CodebaseFragment fragment in fragments)
-            foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
-                MergeSimpleEdge(
-                    exposureEdge.SourceFullName, exposureEdge.ExposedFullName, _exposureEdgeSites, exposureEdge.Sites);
+                // Throw edges (GRAMMAR §4.8) key on (src, thrown).
+                foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
+                    MergeSimpleEdge(
+                        fragmentSuppliers, throwEdge.SourceFullName, throwEdge.ThrownFullName, _throwEdgeSites, throwEdge.Sites);
+
+                // Exposure edges (GRAMMAR §4.9) key on (src, exposed).
+                foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
+                    MergeSimpleEdge(
+                        fragmentSuppliers, exposureEdge.SourceFullName, exposureEdge.ExposedFullName,
+                        _exposureEdgeSites, exposureEdge.Sites);
+            }
 
             return Materialize(fragments);
         }
@@ -202,20 +267,29 @@ internal static class FragmentMerger
             frameworks.Add(targetFramework);
         }
 
-        private void DeclareMerged(FragmentType declared, string projectName, string? targetFramework)
+        private void DeclareMerged(FragmentType declared, CodebaseFragment fragment, int fragmentIndex)
         {
             string fqn = declared.Facts.FullName;
             if (!_nodes.ContainsKey(fqn))
             {
-                _nodes[fqn] = declared.Facts.ToTypeNode(projectName, isExternal: false);
+                _nodes[fqn] = declared.Facts.ToTypeNode(fragment.ProjectName, isExternal: false);
                 _hierarchy[fqn] = declared; // the winning (first) declarer supplies the hierarchy
-                _declaringFrameworks[fqn] = targetFramework;
+                _hierarchyFragments[fqn] = fragmentIndex;
+                _declaringFrameworks[fqn] = fragment.TargetFramework;
             }
             else
             {
-                NoteConflationIfCrossProject(fqn, projectName);
-                NoteFrameworkCollapseIfSameProject(fqn, projectName, targetFramework);
+                NoteConflationIfCrossProject(fqn, fragment.ProjectName);
+                NoteFrameworkCollapseIfSameProject(fqn, fragment.ProjectName, fragment.TargetFramework);
             }
+
+            // Recorded for EVERY declarer, winner or not: a name this fragment compiles is satisfied by
+            // this fragment's assembly, so a reference bound from it is an ordinary intra-solution
+            // reference however the attribution fell out. An unknown assembly name adds nothing, leaving
+            // the set empty and the shadow test with nothing to disagree with.
+            if (!_declaringAssemblies.TryGetValue(fqn, out HashSet<string>? assemblies))
+                _declaringAssemblies[fqn] = assemblies = new HashSet<string>(StringComparer.Ordinal);
+            if (fragment.AssemblyName is { Length: > 0 } assemblyName) assemblies.Add(assemblyName);
 
             SortedSet<FragmentSite> sites = FragmentSiteSets.For(_declarationSites, fqn);
             foreach (FragmentSite site in declared.DeclarationSites) sites.Add(site);
@@ -290,6 +364,45 @@ internal static class FragmentMerger
                    + "framework alone.";
         }
 
+        // The shadowed names regrouped under the project that declares each of them, with that project's
+        // supplying assemblies unioned. Grouping by PROJECT rather than by type is the FrameworkCollapseNote
+        // grain and is chosen for the same reason its comment gives: the answer is the same for all of them,
+        // and a solution carrying a dozen netstandard shims under BCL names would otherwise spend a dozen
+        // lines drowning the channel it is trying to be noticed in.
+        private Dictionary<string, (SortedSet<string> Types, SortedSet<string> Assemblies)> ShadowedNamesByProject()
+        {
+            Dictionary<string, (SortedSet<string> Types, SortedSet<string> Assemblies)> byProject = new(StringComparer.Ordinal);
+
+            foreach ((string fqn, SortedSet<string> assemblies) in _shadowingAssemblies)
+            {
+                string declaringProject = _nodes[fqn].ProjectName;
+                if (!byProject.TryGetValue(declaringProject, out (SortedSet<string> Types, SortedSet<string> Assemblies) entry))
+                    byProject[declaringProject] = entry = (new SortedSet<string>(StringComparer.Ordinal), new SortedSet<string>(StringComparer.Ordinal));
+
+                entry.Types.Add(fqn);
+                foreach (string assembly in assemblies) entry.Assemblies.Add(assembly);
+            }
+
+            return byProject;
+        }
+
+        // One note per project whose declarations share a full name with something a referenced assembly
+        // supplies. It states the split rather than a suppression, because nothing is suppressed: both types
+        // are in the model, and which one a reference reaches is decided by what that reference actually
+        // bound. The reader's question is the one the last clause answers — why a project selection over the
+        // declaring project does not reach every use of the name.
+        private static string ShadowedNamesNote(string projectName, (SortedSet<string> Types, SortedSet<string> Assemblies) shadowed)
+        {
+            string types = JoinWithAnd([.. shadowed.Types.Select(type => $"'{type}'")]);
+            string assemblies = JoinWithAnd([.. shadowed.Assemblies.Select(assembly => $"'{assembly}'")]);
+            string noun = shadowed.Assemblies.Count == 1 ? "assembly" : "assemblies";
+            string verb = shadowed.Assemblies.Count == 1 ? "supplies" : "supply";
+
+            return $"Project '{projectName}' declares {types}, which referenced {noun} {assemblies} also {verb}; "
+                   + "every reference resolves to whichever of the two the referencing compilation bound, so "
+                   + $"a selection over project '{projectName}' reaches the declared one alone.";
+        }
+
         // "A", "A and B", "A, B and C" — each caller formats its own items, so this only joins.
         private static string JoinWithAnd(IReadOnlyList<string> items)
         {
@@ -298,32 +411,98 @@ internal static class FragmentMerger
             return string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1];
         }
 
+        // Either nothing in the merge declares this FQN — an ordinary external, one node for it, facts from
+        // the first fragment that referenced it — or something does, and the question becomes whether the
+        // assembly this fragment bound the name FROM is one of the declaring assemblies. Where it is not,
+        // the name denotes two different types and the model carries both.
         private void RecordExternal(FragmentExternal external)
         {
             string fqn = external.Facts.FullName;
-            if (!_nodes.ContainsKey(fqn)) _externalFacts.TryAdd(fqn, external);
+            if (!_nodes.ContainsKey(fqn))
+            {
+                _externalFacts.TryAdd(fqn, external);
+                return;
+            }
+
+            NoteShadowIfForeign(fqn, external);
         }
 
-        private void PopulateHierarchy(TypeNode node, FragmentType declared)
+        // The shadow test, stated once. Four guards, and each is a fail-open rather than an optimisation:
+        //   • the supplying assembly unknown — an error symbol whose ContainingAssembly is null reaches
+        //     extraction as "" — so there is nothing to compare;
+        //   • no declaring assembly known at all (a hand-built fragment, a cache written before the
+        //     fragment carried the fact), so the same;
+        //   • the supplier IS one of the declaring assemblies, which is every ordinary reference into a
+        //     project of this solution, whichever project won the attribution.
+        // Only a KNOWN disagreement mints anything. Doubt never does.
+        private void NoteShadowIfForeign(string fqn, FragmentExternal external)
         {
-            if (declared.BaseTypeFullName is { } baseFqn) node.BaseType = ResolveNode(baseFqn);
+            string supplying = external.AssemblyName;
+            if (supplying.Length == 0) return;
+            if (!_declaringAssemblies.TryGetValue(fqn, out HashSet<string>? declaring)) return;
+            if (declaring.Count == 0 || declaring.Contains(supplying)) return;
+
+            if (!_shadowingAssemblies.TryGetValue(fqn, out SortedSet<string>? shadowing))
+                _shadowingAssemblies[fqn] = shadowing = new SortedSet<string>(StringComparer.Ordinal);
+
+            shadowing.Add(supplying);
+            _externalFacts.TryAdd(ShadowKey(fqn, supplying), external);
+        }
+
+        // A shadow's node key. The separator is the one character that cannot appear in a fully-qualified
+        // name and that sorts BEFORE every printable one, so the ordinal sorts everywhere else in this file
+        // keep working unchanged and put a name's declared node ahead of its shadows for free.
+        private static string ShadowKey(string fqn, string assemblyName)
+        {
+            return fqn + '\0' + assemblyName;
+        }
+
+        // FQN → the assembly THIS fragment bound it from, for every FQN it referenced but did not declare.
+        // The fragment's externals are exactly that answer: extraction mints one per referenced-not-declared
+        // FQN carrying the ContainingAssembly of the symbol it bound. A fragment that declared the FQN
+        // itself has no entry — which is what leaves a test project's reference to its OWN stand-in alone.
+        private static Dictionary<string, string> SuppliersOf(CodebaseFragment fragment)
+        {
+            var suppliers = new Dictionary<string, string>(fragment.Externals.Count, StringComparer.Ordinal);
+            foreach (FragmentExternal external in fragment.Externals) suppliers[external.Facts.FullName] = external.AssemblyName;
+
+            return suppliers;
+        }
+
+        // Which node one fragment's mention of an FQN denotes: its own declared-or-first-declarer node,
+        // unless this fragment bound the name from an assembly recorded as shadowing it.
+        private string NodeKeyFor(IReadOnlyDictionary<string, string> suppliers, string fqn)
+        {
+            if (!_shadowingAssemblies.TryGetValue(fqn, out SortedSet<string>? shadowing)) return fqn;
+            if (!suppliers.TryGetValue(fqn, out string? supplier)) return fqn;
+
+            return shadowing.Contains(supplier) ? ShadowKey(fqn, supplier) : fqn;
+        }
+
+        private void PopulateHierarchy(TypeNode node, FragmentType declared, IReadOnlyDictionary<string, string> suppliers)
+        {
+            if (declared.BaseTypeFullName is { } baseFqn) node.BaseType = ResolveNode(NodeKeyFor(suppliers, baseFqn));
 
             node.Interfaces = declared.Interfaces
-                .Select(f => (ITypeInfo)ResolveNode(f))
+                .Select(f => (ITypeInfo)ResolveNode(NodeKeyFor(suppliers, f)))
                 .ToList();
 
             node.Attributes = declared.Attributes
-                .Select(f => (ITypeInfo)ResolveNode(f))
+                .Select(f => (ITypeInfo)ResolveNode(NodeKeyFor(suppliers, f)))
                 .ToList();
 
-            node.AllInterfaces = declared.AllInterfaces.Select(ToConstruction).ToList();
-            node.BaseTypeChain = declared.BaseTypeChain.Select(ToConstruction).ToList();
-            node.AttributeConstructions = declared.AttributeConstructions.Select(ToConstruction).ToList();
+            node.AllInterfaces = declared.AllInterfaces.Select(c => ToConstruction(suppliers, c))
+                .ToList();
+            node.BaseTypeChain = declared.BaseTypeChain.Select(c => ToConstruction(suppliers, c))
+                .ToList();
+            node.AttributeConstructions = declared.AttributeConstructions.Select(c => ToConstruction(suppliers, c))
+                .ToList();
         }
 
-        private TypeConstruction ToConstruction(FragmentConstruction construction)
+        private TypeConstruction ToConstruction(IReadOnlyDictionary<string, string> suppliers, FragmentConstruction construction)
         {
-            return new TypeConstruction(ResolveNode(construction.DefinitionFullName), construction.ConstructedName);
+            return new TypeConstruction(
+                ResolveNode(NodeKeyFor(suppliers, construction.DefinitionFullName)), construction.ConstructedName);
         }
 
         private static void PopulateMembers(TypeNode node, FragmentType declared)
@@ -333,54 +512,73 @@ internal static class FragmentMerger
                 .ToList();
         }
 
-        // The one edge merge, stated once for every axis that keys on an endpoint pair: the ordinal self-edge
-        // guard (extraction already dropped these, so it is defensive), ResolveNode on BOTH endpoints — the
-        // rule that keeps an external endpoint one shared node however many fragments referenced it — and the
-        // site union. Returns false for the dropped self-edge, so an axis carrying parallel subsets (catch)
-        // gates them on the same guard rather than restating it.
+        // The one edge merge, stated once for every axis that keys on an endpoint pair: each endpoint mapped
+        // to the node THIS fragment's compilation bound it to, the ordinal self-edge guard (extraction
+        // already dropped these, so it is defensive), ResolveNode on BOTH endpoints — the rule that keeps an
+        // external endpoint one shared node however many fragments referenced it — and the site union.
+        // Returns false for the dropped self-edge, so an axis carrying parallel subsets (catch) gates them
+        // on the same guard rather than restating it.
+        //
+        // A source endpoint is always a type this fragment declared, so NodeKeyFor hands it straight back;
+        // mapping it anyway is what makes the self-edge guard compare nodes rather than names, which is the
+        // honest comparison once one name can denote two.
         private bool MergeSimpleEdge(
+            IReadOnlyDictionary<string, string> suppliers,
             string source,
             string target,
             Dictionary<(string, string), SortedSet<FragmentSite>> map,
             IReadOnlyList<FragmentSite> sites)
         {
-            if (string.Equals(source, target, StringComparison.Ordinal)) return false;
+            string sourceKey = NodeKeyFor(suppliers, source);
+            string targetKey = NodeKeyFor(suppliers, target);
+            if (string.Equals(sourceKey, targetKey, StringComparison.Ordinal)) return false;
 
-            ResolveNode(source);
-            ResolveNode(target);
-            SortedSet<FragmentSite> merged = FragmentSiteSets.For(map, (source, target));
+            ResolveNode(sourceKey);
+            ResolveNode(targetKey);
+            SortedSet<FragmentSite> merged = FragmentSiteSets.For(map, (sourceKey, targetKey));
             foreach (FragmentSite site in sites) merged.Add(site);
             return true;
         }
 
-        private void MergeMemberEdge(FragmentMemberEdge edge)
+        private void MergeMemberEdge(IReadOnlyDictionary<string, string> suppliers, FragmentMemberEdge edge)
         {
-            // Same-type guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
-            if (string.Equals(edge.SourceFullName, edge.TargetContainingTypeFullName, StringComparison.Ordinal)) return;
+            string sourceKey = NodeKeyFor(suppliers, edge.SourceFullName);
+            string containingKey = NodeKeyFor(suppliers, edge.TargetContainingTypeFullName);
 
-            ResolveNode(edge.SourceFullName);
-            ResolveNode(edge.TargetContainingTypeFullName);
+            // Same-type guard mirrors the edge self-drop; extraction already dropped these, so it is defensive.
+            if (string.Equals(sourceKey, containingKey, StringComparison.Ordinal)) return;
+
+            ResolveNode(sourceKey);
+            ResolveNode(containingKey);
 
             // Member facts are functions of the SymbolId, so the first mention wins and every later one agrees.
-            _memberFacts.TryAdd(edge.MemberSymbolId, new MemberEdgeFacts(edge.TargetContainingTypeFullName, edge.MemberName, edge.MemberKind));
+            // The containing type is stored as the NODE key rather than the name, because that is what
+            // BuildMemberEdges resolves with — a member on a shadowed name would otherwise always be hung on
+            // the source declaration, whichever assembly the reference actually bound.
+            _memberFacts.TryAdd(edge.MemberSymbolId, new MemberEdgeFacts(containingKey, edge.MemberName, edge.MemberKind));
 
-            SortedSet<FragmentSite> sites = FragmentSiteSets.For(_memberEdgeSites, (edge.SourceFullName, edge.MemberSymbolId));
+            SortedSet<FragmentSite> sites = FragmentSiteSets.For(_memberEdgeSites, (sourceKey, edge.MemberSymbolId));
             foreach (FragmentSite site in edge.Sites) sites.Add(site);
         }
 
-        private void MergeCatchEdge(FragmentCatchEdge edge)
+        private void MergeCatchEdge(IReadOnlyDictionary<string, string> suppliers, FragmentCatchEdge edge)
         {
-            if (!MergeSimpleEdge(edge.SourceFullName, edge.CaughtFullName, _catchEdgeSites, edge.Sites)) return;
+            if (!MergeSimpleEdge(suppliers, edge.SourceFullName, edge.CaughtFullName, _catchEdgeSites, edge.Sites)) return;
+
+            // Both subsets key on the same NODE pair the edge itself did, not on the names — Materialize
+            // looks them up with the keys _catchEdgeSites holds, so a subset keyed on anything else would
+            // silently miss on a shadowed name and read as "no unfiltered site here".
+            (string Source, string Caught) key = (NodeKeyFor(suppliers, edge.SourceFullName), NodeKeyFor(suppliers, edge.CaughtFullName));
 
             // The unfiltered subset unions under the same key and the same guard. Unioning the UNFILTERED sites
             // is what keeps a `#if`-divergent filter honest: a (file, line) filtered in one fragment and
             // unfiltered in another reads unfiltered here, the truthful answer for a ban.
-            SortedSet<FragmentSite> unfilteredSites = FragmentSiteSets.For(_catchEdgeUnfilteredSites, (edge.SourceFullName, edge.CaughtFullName));
+            SortedSet<FragmentSite> unfilteredSites = FragmentSiteSets.For(_catchEdgeUnfilteredSites, key);
             foreach (FragmentSite site in edge.UnfilteredSites) unfilteredSites.Add(site);
 
             // The swallowing subset unions the same way, and for the same reason: a (file, line) that rethrows
             // in one fragment and swallows in another reads swallowing here.
-            SortedSet<FragmentSite> swallowingSites = FragmentSiteSets.For(_catchEdgeSwallowingSites, (edge.SourceFullName, edge.CaughtFullName));
+            SortedSet<FragmentSite> swallowingSites = FragmentSiteSets.For(_catchEdgeSwallowingSites, key);
             foreach (FragmentSite site in edge.SwallowingSites) swallowingSites.Add(site);
         }
 
@@ -395,18 +593,19 @@ internal static class FragmentMerger
         }
 
         /// <summary>
-        ///     The declared-anywhere node for <paramref name="fqn" />, else a shallow external node minted
-        ///     once from the first-fragment-wins facts table. Every FQN reachable here was recorded as an
-        ///     external by whichever fragment references it, so the table always has an entry when the FQN
-        ///     is not declared.
+        ///     The node <paramref name="nodeKey" /> denotes: the declared-anywhere node for a plain
+        ///     fully-qualified name, else a shallow external node minted once from the first-fragment-wins
+        ///     facts table — which is both an ordinary external and, under a shadow key, the assembly's
+        ///     half of a name a project also declares. Every key reachable here was recorded by whichever
+        ///     fragment references it, so the table always has an entry when the key names no declaration.
         /// </summary>
-        private TypeNode ResolveNode(string fqn)
+        private TypeNode ResolveNode(string nodeKey)
         {
-            if (_nodes.TryGetValue(fqn, out TypeNode? node)) return node;
+            if (_nodes.TryGetValue(nodeKey, out TypeNode? node)) return node;
 
-            FragmentExternal external = _externalFacts[fqn];
+            FragmentExternal external = _externalFacts[nodeKey];
             node = external.Facts.ToTypeNode(external.AssemblyName, isExternal: true);
-            _nodes[fqn] = node;
+            _nodes[nodeKey] = node;
             return node;
         }
 
@@ -425,8 +624,15 @@ internal static class FragmentMerger
             foreach ((string fqn, SortedSet<string> losers) in _conflatedLosers)
                 _nodes[fqn].AlsoDeclaredBy = losers.ToList();
 
+            // Ordered by name, then by the two facts that tell a shadowed name's two nodes apart — the
+            // declaration first, then the supplying assemblies ordinal. FullName stopped being a total
+            // order the moment one name could denote a source declaration and a referenced assembly's
+            // type of that name, and without the tie-break the remainder would fall through to dictionary
+            // enumeration order, costing every rendered document its byte-stability.
             List<TypeNode> types = _nodes.Values
                 .OrderBy(n => n.FullName, StringComparer.Ordinal)
+                .ThenBy(n => n.IsExternal ? 1 : 0)
+                .ThenBy(n => n.ProjectName, StringComparer.Ordinal)
                 .ToList();
 
             List<ReferenceEdge> edges = FragmentSiteSets.OrderedPairs(
@@ -460,16 +666,21 @@ internal static class FragmentMerger
                 (lifetime, service, impl, sites) => new ServiceRegistration(
                     lifetime, service, impl, FragmentSiteSets.Locations(sites)));
 
-            // The advisory notes: project-level first (ordinal by project), then per-type (ordinal by FQN) —
-            // coarse fact before fine, and each half sorted on the key it groups by, so the list is stable
-            // across runs regardless of the order the distinct notes were first raised.
+            // The advisory notes: the two project-level kinds first, each ordinal by project, then the
+            // per-type kind (ordinal by FQN) — coarse fact before fine, and each sorted on the key it
+            // groups by, so the list is stable across runs regardless of the order the distinct notes were
+            // first raised.
             IEnumerable<string> frameworkCollapseNotes = _multiFrameworkWinners.Keys
                 .OrderBy(projectName => projectName, StringComparer.Ordinal)
                 .Select(FrameworkCollapseNote);
+            IEnumerable<string> shadowedNameNotes = ShadowedNamesByProject()
+                .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                .Select(entry => ShadowedNamesNote(entry.Key, entry.Value));
             IEnumerable<string> conflationNotes = _conflatedLosers.Keys
                 .OrderBy(fqn => fqn, StringComparer.Ordinal)
                 .Select(ConflationNote);
             List<string> mergeNotes = frameworkCollapseNotes
+                .Concat(shadowedNameNotes)
                 .Concat(conflationNotes)
                 .ToList();
 
@@ -490,7 +701,7 @@ internal static class FragmentMerger
                 if (memberReferences.TryGetValue(symbolId, out MemberReference? reference)) return reference;
 
                 MemberEdgeFacts facts = _memberFacts[symbolId];
-                reference = new MemberReference(_nodes[facts.ContainingFullName], facts.Name, symbolId, facts.Kind);
+                reference = new MemberReference(_nodes[facts.ContainingNodeKey], facts.Name, symbolId, facts.Kind);
                 memberReferences[symbolId] = reference;
                 return reference;
             }
@@ -538,9 +749,11 @@ internal static class FragmentMerger
         }
 
         /// <summary>
-        ///     The merge-side facts a <see cref="MemberReference" /> needs beyond its SymbolId: declaring-type FQN, name,
-        ///     kind.
+        ///     The merge-side facts a <see cref="MemberReference" /> needs beyond its SymbolId: the declaring type's
+        ///     node key — the key rather than the bare name, because a name a project declares and a referenced
+        ///     assembly supplies denotes two nodes and the member hangs on the one its reference bound — plus name
+        ///     and kind.
         /// </summary>
-        private readonly record struct MemberEdgeFacts(string ContainingFullName, string Name, MemberKind Kind);
+        private readonly record struct MemberEdgeFacts(string ContainingNodeKey, string Name, MemberKind Kind);
     }
 }

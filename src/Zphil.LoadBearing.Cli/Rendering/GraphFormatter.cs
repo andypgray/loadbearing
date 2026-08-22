@@ -26,6 +26,9 @@ internal static class GraphFormatter
     private const string SkeletonMultiplyDeclaredElisionLine =
         "  (elided at skeleton grain — rerun without --skeleton for the multiply-declared types)";
 
+    private const string SkeletonShadowedElisionLine =
+        "  (elided at skeleton grain — rerun without --skeleton for the shadowed type names)";
+
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them: the namespace inventory becomes one elision line at overview grain, the external references
@@ -47,6 +50,10 @@ internal static class GraphFormatter
 
         lines.Add("Types declared by more than one project:");
         lines.AddRange(MultiplyDeclaredTypeLines(summary, grain));
+        lines.Add("");
+
+        lines.Add("Type names a referenced assembly also supplies:");
+        lines.AddRange(ShadowedTypeLines(summary, grain));
         lines.Add("");
 
         lines.Add("Namespaces:");
@@ -108,6 +115,29 @@ internal static class GraphFormatter
     {
         return $"  {type.Type} — declared by {string.Join(", ", type.DeclaredBy)}; "
                + $"facts follow {type.FactsFollow}";
+    }
+
+    // The second coverage statement, sited beside the first because they answer the same question — why a
+    // selection over a project does not reach every use of a name it declares. This one's answer is that the
+    // name means two types, and the line names both halves plus who reaches the far one.
+    private static IEnumerable<string> ShadowedTypeLines(GraphSummary summary, DocumentGrain grain)
+    {
+        if (grain >= DocumentGrain.Skeleton && summary.ShadowedTypes.Count > 0)
+            return [SkeletonShadowedElisionLine];
+
+        return summary.ShadowedTypes.Count > 0
+            ? summary.ShadowedTypes.Select(ShadowedTypeLine)
+            : ["  (none)"];
+    }
+
+    private static string ShadowedTypeLine(ShadowedTypeSummary type)
+    {
+        string bound = type.BoundFromAssemblyBy.Count > 0
+            ? string.Join(", ", type.BoundFromAssemblyBy)
+            : "nothing";
+
+        return $"  {type.Type} — declared by {type.DeclaredBy}; also supplied by {string.Join(", ", type.SuppliedBy)}, "
+               + $"which {bound} binds";
     }
 
     private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, DocumentGrain grain)

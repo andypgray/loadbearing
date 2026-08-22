@@ -71,7 +71,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "several projects, a project referencing its own compiled-in copy is not an edge to the declarer the " +
         "type was attributed to, and multiplyDeclaredTypes[] names those types with every declaring project " +
         "and the one whose facts won — arch.Project() on any other declarer will not select them (the key is " +
-        "absent when the solution has none). " +
+        "absent when the solution has none). shadowedTypes[] is the other coverage key: a full name a project " +
+        "declares that a referenced assembly also supplies means two types, so a rule naming it reaches both " +
+        "while arch.Project() over the declaring project reaches only the declaration. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +
@@ -194,7 +196,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "grain, never a narrower subject.")]
         bool overview = false,
         [Description(
-            "Elide the namespace inventories, the external-reference rows and the multiply-declared types, "
+            "Elide the namespace inventories, the external-reference rows, the multiply-declared types and the "
+            + "shadowed names, "
             + "keeping every project, its declared references and type count, and the observed project "
             + "edges; each elided section is reported as a count. Coarser than overview, still not a "
             + "narrower subject.")]

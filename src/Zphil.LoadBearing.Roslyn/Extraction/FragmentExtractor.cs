@@ -915,10 +915,14 @@ internal static class FragmentExtractor
                 _registrationSites,
                 (lifetime, service, impl, sites) => new FragmentServiceRegistration(lifetime, service, impl, sites.ToList()));
 
+            // The assembly name is read off the IAssemblySymbol rather than the compilation's own option
+            // string, because the merge compares it against a FragmentExternal's — which ResolveName below
+            // reads off ContainingAssembly.Name, the same surface. Taking both operands from Roslyn's one
+            // notion of an assembly's name is what makes that comparison meaningful by construction.
             return new CodebaseFragment(
                 input.ProjectName, input.TargetFramework, input.ProjectReferences, declaredTypes, externals, edges,
                 memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
-                serviceRegistrations, input.SolutionMember);
+                serviceRegistrations, input.SolutionMember, input.Compilation.Assembly.Name);
         }
     }
 

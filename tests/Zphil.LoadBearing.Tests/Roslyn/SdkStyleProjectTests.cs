@@ -78,6 +78,8 @@ public sealed class SdkStyleProjectTests
         "MyApp.Domain.csproj: SDK-style, assets file present",
         "MyApp.Legacy.Billing.csproj: SDK-style, assets file present",
         "MyApp.Web.csproj: SDK-style, assets file present",
+        "ShadowedApp.Product.Tests.csproj: SDK-style, assets file present",
+        "ShadowedApp.Product.csproj: SDK-style, assets file present",
         "SlnxApp.Core.csproj: SDK-style, assets file present",
         // This repo's own projects, which are always restored — the same pairing over files nobody wrote to
         // be a fixture.

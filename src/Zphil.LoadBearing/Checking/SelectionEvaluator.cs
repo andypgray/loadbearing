@@ -19,7 +19,7 @@ namespace Zphil.LoadBearing.Checking;
 /// </remarks>
 internal sealed class SelectionEvaluator
 {
-    private readonly Dictionary<string, TypeNode> _byFullName;
+    private readonly ILookup<string, TypeNode> _byFullName;
     private readonly Dictionary<(SelectionNoun, SelectionPosition), IReadOnlyList<TypeNode>> _byNoun = new();
     private readonly CodebaseModel _model;
     private readonly List<TypeNode> _solutionDeclared;
@@ -34,8 +34,12 @@ internal sealed class SelectionEvaluator
         // otherwise a full linear scan of the type universe — the largest list in the model — per operand
         // per rule. It preserves Types order within a key, so the sets it feeds are populated in exactly
         // the order the equivalent Where scan populated them.
-        _byFullName = new Dictionary<string, TypeNode>(model.Types.Count, StringComparer.Ordinal);
-        foreach (TypeNode type in model.Types) _byFullName[type.FullName] = type;
+        //
+        // A lookup rather than a dictionary because a full name is not unique: where a project declares a
+        // name a referenced assembly also supplies, the model carries both (GRAMMAR §4.1). An indexer here
+        // would silently keep whichever came last in Types order and make the other invisible to every
+        // typeof operand — a ban that reaches only one of two types it names is worse than a slow scan.
+        _byFullName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
     }
 
     // The project-name index, built on first use in the same shape ConstraintEvaluator's edge indexes take,
@@ -124,12 +128,14 @@ internal sealed class SelectionEvaluator
                 IEnumerable<TypeNode> declaring = ByProjectName[project.Name];
                 return subject ? declaring.Where(t => !t.IsExternal) : declaring;
             case TypeNoun typeNoun:
-                // Types is unique by FullName (same-FQN declarers are conflated at merge), so the scan
-                // was a dictionary lookup wearing a Where: at most one node, position-filtered.
+                // The scan is a lookup wearing a Where: every node carrying the name, position-filtered.
+                // Usually that is one — one source file compiled into several projects is conflated at merge,
+                // and a name nothing declares is a single external. It is two where a project declares a name
+                // a referenced assembly also supplies (GRAMMAR §4.1), and naming BOTH is what the position
+                // filter below then makes right: in subject position the source declaration alone survives,
+                // and in target position a ban reaches either binding rather than whichever node sorted last.
                 string fullName = TypeNounFullName(typeNoun.Type);
-                return _byFullName.TryGetValue(fullName, out TypeNode? named) && !(subject && named.IsExternal)
-                    ? new[] { named }
-                    : Array.Empty<TypeNode>();
+                return _byFullName[fullName].Where(named => !(subject && named.IsExternal));
             case RegisteredNoun registered:
                 // Membership = service ∪ implementation FQNs of the recognized registrations at this lifetime
                 // (null = any lifetime, §4.7). Filtering the position-correct universe (subject = solution-

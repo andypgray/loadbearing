@@ -40,6 +40,7 @@ internal static class GraphJsonRenderer
         // empty array or a zero count — so a solution with nothing to say carries neither of its two keys at
         // any grain, and its survey is byte-identical to the one before the statement existed.
         bool anyMultiplyDeclaredTypes = summary.MultiplyDeclaredTypes.Count > 0;
+        bool anyShadowedTypes = summary.ShadowedTypes.Count > 0;
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
@@ -58,6 +59,10 @@ internal static class GraphJsonRenderer
                 ? summary.MultiplyDeclaredTypes.Select(t => new GraphMultiplyDeclaredTypeJson(t.Type, t.DeclaredBy, t.FactsFollow)).ToList()
                 : null,
             anyMultiplyDeclaredTypes && elideExternalEdges ? summary.MultiplyDeclaredTypes.Count : null,
+            anyShadowedTypes && !elideExternalEdges
+                ? summary.ShadowedTypes.Select(t => new GraphShadowedTypeJson(t.Type, t.DeclaredBy, t.SuppliedBy, t.BoundFromAssemblyBy)).ToList()
+                : null,
+            anyShadowedTypes && elideExternalEdges ? summary.ShadowedTypes.Count : null,
             workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
             trust.ModelIncomplete,
             trust.FailedProjects,

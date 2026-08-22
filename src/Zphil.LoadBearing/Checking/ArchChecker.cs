@@ -317,6 +317,7 @@ public static class ArchChecker
             .OrderBy(v => v.OrderKey.Primary, StringComparer.Ordinal)
             .ThenBy(v => v.OrderKey.Secondary, StringComparer.Ordinal)
             .ThenBy(v => v.OrderKey.Tertiary, StringComparer.Ordinal)
+            .ThenBy(v => v.OrderKey.Quaternary, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -330,6 +331,7 @@ public static class ArchChecker
             .OrderBy(p => p.Violation.OrderKey.Primary, StringComparer.Ordinal)
             .ThenBy(p => p.Violation.OrderKey.Secondary, StringComparer.Ordinal)
             .ThenBy(p => p.Violation.OrderKey.Tertiary, StringComparer.Ordinal)
+            .ThenBy(p => p.Violation.OrderKey.Quaternary, StringComparer.Ordinal)
             .ToList();
     }
 }

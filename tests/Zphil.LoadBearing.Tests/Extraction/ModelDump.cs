@@ -31,22 +31,22 @@ internal static class ModelDump
 
         builder.AppendLine("== EDGES ==");
         foreach (ReferenceEdge edge in model.Edges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Target.FullName)
+                .Append(Endpoint(edge.Target))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .AppendLine("]");
 
         builder.AppendLine("== MEMBER EDGES ==");
         foreach (MemberEdge edge in model.MemberEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
                 .Append(edge.Member.SymbolId)
                 .Append(" (")
                 .Append(edge.Member.Kind)
                 .Append(' ')
-                .Append(edge.Member.ContainingType.FullName)
+                .Append(Endpoint(edge.Member.ContainingType))
                 .Append('.')
                 .Append(edge.Member.Name)
                 .Append(") @ [")
@@ -55,18 +55,18 @@ internal static class ModelDump
 
         builder.AppendLine("== CONSTRUCTOR EDGES ==");
         foreach (ConstructorEdge edge in model.ConstructorEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Constructed.FullName)
+                .Append(Endpoint(edge.Constructed))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .AppendLine("]");
 
         builder.AppendLine("== INJECTION EDGES ==");
         foreach (InjectionEdge edge in model.InjectionEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Injected.FullName)
+                .Append(Endpoint(edge.Injected))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .AppendLine("]");
@@ -76,9 +76,9 @@ internal static class ModelDump
         // all-filtered edge renders `unfiltered=[] swallowing=[]`; an all-rethrowing one `swallowing=[]`.
         builder.AppendLine("== CATCH EDGES ==");
         foreach (CatchEdge edge in model.CatchEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Caught.FullName)
+                .Append(Endpoint(edge.Caught))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .Append("] unfiltered=[")
@@ -89,18 +89,18 @@ internal static class ModelDump
 
         builder.AppendLine("== THROW EDGES ==");
         foreach (ThrowEdge edge in model.ThrowEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Thrown.FullName)
+                .Append(Endpoint(edge.Thrown))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .AppendLine("]");
 
         builder.AppendLine("== EXPOSURE EDGES ==");
         foreach (ExposureEdge edge in model.ExposureEdges)
-            builder.Append(edge.Source.FullName)
+            builder.Append(Endpoint(edge.Source))
                 .Append(" -> ")
-                .Append(edge.Exposed.FullName)
+                .Append(Endpoint(edge.Exposed))
                 .Append(" @ [")
                 .Append(RenderSites(edge.Sites))
                 .AppendLine("]");
@@ -244,11 +244,20 @@ internal static class ModelDump
     // and the constructed display name — so a closed generic's substituted arguments are pinned too.
     private static string RenderConstruction(TypeConstruction construction)
     {
-        return $"{construction.Definition.FullName}::{construction.FullName}";
+        return $"{FullNameOf(construction.Definition)}::{construction.FullName}";
     }
 
     private static string FullNameOf(ITypeInfo? info)
     {
-        return info is TypeNode node ? node.FullName : "<null>";
+        return info is TypeNode node ? Endpoint(node) : "<null>";
+    }
+
+    // An endpoint's node, not merely its name. A full name a project declares and a referenced assembly
+    // also supplies denotes two nodes, and on the name alone an edge into one renders exactly like an edge
+    // into the other — leaving this dump untotal for precisely the comparison that needs it most, a cache
+    // hit or a replay that resolved an endpoint to the wrong one of the two.
+    private static string Endpoint(TypeNode node)
+    {
+        return $"{node.FullName}@{node.ProjectName}";
     }
 }

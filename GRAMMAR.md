@@ -255,6 +255,18 @@ lands only where the whole list is static and one form:
 - **Targets** range over **all referenced types, including metadata references** —
   `MustNotReference(typeof(SqlConnection))` and `arch.Namespace("System.Web.*")` as a target
   both work against BCL/NuGet types.
+- **One fully-qualified name can mean two types.** A project declares a name that a referenced
+  assembly also supplies: a stand-in written under a package's own namespace, a polyfill under
+  a BCL one. The model carries both — the source declaration, and a shallow external attributed
+  to the supplying assembly — and every reference resolves to whichever the referencing
+  compilation actually bound. So a project that references the package reaches the package's
+  type and never the declaring project's, on the edge axes and in the hierarchy alike. A rule
+  naming the type reaches both; `arch.Project` is what tells them apart, because the external
+  one carries the supplying **assembly**'s name, so a project selection over the declaring
+  project reaches the declaration alone. Nothing else splits: one source file compiled into
+  several projects still means one node (§4.1 subjects, `arch.Project` misses the other
+  declarers), and a name no project declares is one node as before. `check` reports the split
+  as an advisory note, and the codebase survey states it as a coverage key.
 - **`MustOnly*` complement universe = solution-declared types — for the *reference* verbs.**
   BCL/NuGet references are
   exempt, and the fragment states it: *"must reference only {list} (external packages are not
@@ -382,6 +394,12 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   `(ruleId, subject symbol ID)`.
 - Symbol IDs are Roslyn `DocumentationCommentId` strings — stable across file moves and
   formatting.
+- A symbol ID names a name, not a node. Where a fully-qualified name means several types — see the
+  reference universe above — they share an ID, so a baseline entry written for either grandfathers
+  the other. That is deliberate: an ID that forked on which assembly supplied the name would not
+  survive the package upgrade it exists to survive. It is also a widening, so prefer fixing such a
+  pair to baselining it; the survey's shadowed-name key is where the split shows before a baseline
+  is written.
 
 ### 4.4 Migrate defaults
 

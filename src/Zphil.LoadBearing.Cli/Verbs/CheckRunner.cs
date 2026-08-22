@@ -69,7 +69,7 @@ internal sealed class CheckRunner(
         // check is the one verb that folds the advisory merge notes into its rendered diagnostics stream
         // (stderr warning: lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures
         // first. It has already extracted by the time it renders, so it is the only verb whose merge notes
-        // exist yet, and the same-FQN conflation advisories are read here beside the violations they can
+        // exist yet, and the merge advisories are read here beside the violations they can
         // explain. They never reach the gate: that decision is WorkspaceDiagnostics' and keys on the load
         // failures alone.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;

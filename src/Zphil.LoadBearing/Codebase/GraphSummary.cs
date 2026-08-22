@@ -19,12 +19,14 @@ public sealed class GraphSummary
         IReadOnlyList<ProjectSummary> projects,
         IReadOnlyList<ProjectEdgeSummary> projectEdges,
         IReadOnlyList<ExternalEdgeSummary> externalEdges,
-        IReadOnlyList<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes)
+        IReadOnlyList<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes,
+        IReadOnlyList<ShadowedTypeSummary> shadowedTypes)
     {
         Projects = projects;
         ProjectEdges = projectEdges;
         ExternalEdges = externalEdges;
         MultiplyDeclaredTypes = multiplyDeclaredTypes;
+        ShadowedTypes = shadowedTypes;
     }
 
     /// <summary>The projects, ordered by name (ordinal) — the <see cref="CodebaseModel.Projects" /> order.</summary>
@@ -41,6 +43,13 @@ public sealed class GraphSummary
     ///     overwhelming common case — the survey's coverage statement about its own project attribution.
     /// </summary>
     public IReadOnlyList<MultiplyDeclaredTypeSummary> MultiplyDeclaredTypes { get; }
+
+    /// <summary>
+    ///     The full names a project declares that a referenced assembly also supplies, ordered by full name
+    ///     (ordinal), and empty for the overwhelming common case — the survey's coverage statement about the
+    ///     one place a name does not identify a type.
+    /// </summary>
+    public IReadOnlyList<ShadowedTypeSummary> ShadowedTypes { get; }
 }
 
 /// <summary>
@@ -157,6 +166,42 @@ public sealed class MultiplyDeclaredTypeSummary
     ///     other name in <see cref="DeclaredBy" /> is a project whose <c>arch.Project</c> selection misses it.
     /// </summary>
     public string FactsFollow { get; }
+}
+
+/// <summary>
+///     One full name that means two different types: a project declares it, and a referenced assembly no
+///     project of this solution produces supplies it too — a stand-in declared under a package's own
+///     namespace, or a polyfill under a BCL one. Both are in the model, and each reference reaches whichever
+///     the referencing project actually bound, so this is what a rule author needs before writing a rule
+///     about the name: an <c>arch.Project</c> selection over <see cref="DeclaredBy" /> reaches the declared
+///     one alone, while a rule naming the type reaches both.
+/// </summary>
+public sealed class ShadowedTypeSummary
+{
+    internal ShadowedTypeSummary(
+        string type, string declaredBy, IReadOnlyList<string> suppliedBy, IReadOnlyList<string> boundFromAssemblyBy)
+    {
+        Type = type;
+        DeclaredBy = declaredBy;
+        SuppliedBy = suppliedBy;
+        BoundFromAssemblyBy = boundFromAssemblyBy;
+    }
+
+    /// <summary>The shared fully-qualified name.</summary>
+    public string Type { get; }
+
+    /// <summary>The project that declares it in source.</summary>
+    public string DeclaredBy { get; }
+
+    /// <summary>The referenced assemblies supplying the same name, ordinal-ordered.</summary>
+    public IReadOnlyList<string> SuppliedBy { get; }
+
+    /// <summary>
+    ///     The projects whose references reach the assembly's type rather than the declaration,
+    ///     ordinal-ordered — the half that makes the entry readable on its own, and the reason a scoped
+    ///     survey keeps an entry whose declarer is out of scope.
+    /// </summary>
+    public IReadOnlyList<string> BoundFromAssemblyBy { get; }
 }
 
 /// <summary>

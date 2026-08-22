@@ -62,7 +62,42 @@ public static class GraphSummarizer
             .Select(type => new MultiplyDeclaredTypeSummary(type.FullName, DeclarersOf(type), type.ProjectName))
             .ToList();
 
-        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes);
+        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes, ShadowedTypes(model));
+    }
+
+    // The second coverage statement, and the only place a name in this model does not identify a type: a
+    // project declares a full name that a referenced assembly also supplies, so Types carries both nodes.
+    // Read straight off the type universe rather than from a field, because two nodes sharing a name IS the
+    // fact — nothing else in the merge produces one, so the grouping cannot report a false positive.
+    private static List<ShadowedTypeSummary> ShadowedTypes(CodebaseModel model)
+    {
+        ILookup<string, TypeNode> byName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
+
+        // Which projects actually reach the assembly's half. A reader shown only the declarer cannot tell
+        // whether the split costs them anything; this is the half that says whom it costs.
+        ILookup<TypeNode, string> bindersOf = model.Edges
+            .Where(edge => edge.Target.IsExternal)
+            .ToLookup(edge => edge.Target, edge => edge.Source.ProjectName);
+
+        return byName
+            .Where(group => group.Count() > 1)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new ShadowedTypeSummary(
+                group.Key,
+                group.First(node => !node.IsExternal)
+                    .ProjectName,
+                [
+                    .. group.Where(node => node.IsExternal)
+                        .Select(node => node.ProjectName)
+                        .OrderBy(name => name, StringComparer.Ordinal)
+                ],
+                [
+                    .. group.Where(node => node.IsExternal)
+                        .SelectMany(node => bindersOf[node])
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(name => name, StringComparer.Ordinal)
+                ]))
+            .ToList();
     }
 
     // A reference from a project into a type that project declares itself. Extraction attributes a
@@ -139,7 +174,15 @@ public static class GraphSummarizer
             .Where(type => type.DeclaredBy.Any(project => Matches(projectGlobs, project)))
             .ToList();
 
-        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes);
+        // Either end keeps the entry, the rule the project edges take: the reader anchored on the product
+        // project is the one whose reference reaches the assembly rather than the declaration, and narrowing
+        // on the declaring project alone would drop the entry from exactly the scope that needs it.
+        List<ShadowedTypeSummary> shadowedTypes = summary.ShadowedTypes
+            .Where(type => Matches(projectGlobs, type.DeclaredBy)
+                           || type.BoundFromAssemblyBy.Any(project => Matches(projectGlobs, project)))
+            .ToList();
+
+        return new GraphSummary(projects, projectEdges, externalEdges, multiplyDeclaredTypes, shadowedTypes);
     }
 
     private static bool Matches(IReadOnlyList<string> globs, string projectName)

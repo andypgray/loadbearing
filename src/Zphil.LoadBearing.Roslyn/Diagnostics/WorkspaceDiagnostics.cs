@@ -58,7 +58,8 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     here can be a fatal evaluation error or a restore warning and nothing downstream can tell.
 /// </param>
 /// <param name="MergeNotes">
-///     The advisory notes the fragment merge raised (same-FQN cross-project conflation). Informational:
+///     The advisory notes the fragment merge raised (same-FQN cross-project conflation, a multi-framework
+///     collapse, a name a referenced assembly also supplies). Informational:
 ///     they ride the rendered stream where a caller asks for them, and never gate.
 /// </param>
 /// <param name="FailedProjects">
@@ -97,7 +98,7 @@ internal readonly record struct WorkspaceDiagnostics(
     ///     The load failures <em>and</em> the merge notes with the MSBuild-selection note appended, or empty
     ///     when there is neither. <c>check</c> alone renders this: it is the one verb that has already
     ///     extracted by the time it renders, so it is the only one whose merge notes exist yet, and the
-    ///     same-FQN conflation advisories are read there beside the violations they can explain.
+    ///     merge advisories are read there beside the violations they can explain.
     /// </summary>
     internal IReadOnlyList<string> RenderedWithMergeNotes => Compose([.. LoadFailures, .. MergeNotes]);
 

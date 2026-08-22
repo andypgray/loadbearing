@@ -50,6 +50,9 @@ public sealed class GraphCommandTests
         Types declared by more than one project:
           (none)
 
+        Type names a referenced assembly also supplies:
+          (none)
+
         Namespaces:
           MyApp.Domain: MyApp.Domain (8)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
@@ -82,6 +85,9 @@ public sealed class GraphCommandTests
           MyApp.Web -> MyApp.Legacy.Billing: 3
 
         Types declared by more than one project:
+          (none)
+
+        Type names a referenced assembly also supplies:
           (none)
 
         Namespaces:

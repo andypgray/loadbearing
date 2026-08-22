@@ -78,6 +78,12 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   `arch.Project(...)` naming any other declarer will not select the type, so a rule written on
   it is quietly narrower than it reads. The key is absent when the solution has none, which is
   the common case.
+- `shadowedTypes[]` — the full names a project declares that a referenced assembly also supplies:
+  a stand-in written under a package's own namespace, a polyfill under a BCL one. The name means
+  two types, and each reference reaches whichever the referencing project bound, so a rule naming
+  the type reaches both while `arch.Project(...)` over the declaring project reaches only the
+  declaration. Each entry names the type, that project, the supplying assemblies, and the projects
+  binding the assembly instead. Absent when the solution has none.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
@@ -86,6 +92,7 @@ projects[]              { name, solutionMember?, projectReferences[], types, nam
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
+shadowedTypes[]         { type, declaredBy, suppliedBy[], boundFromAssemblyBy[] }
 ```
 
 Grain is a ladder, and an over-budget survey walks down it by itself rather than coming back
@@ -93,16 +100,17 @@ cut. At overview grain — `overview: true`, or the server's own first step — 
 stamps `"grain": "overview"` and elides each project's `namespaces`; every project, edge and
 external row survives. At skeleton grain — `skeleton: true`, or the server's second step when
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
-and `multiplyDeclaredTypes[]` too, reporting how many rows went as `externalEdgeCount` and
-`multiplyDeclaredTypeCount`; the projects and their edges stay. Read the stamp: a survey with
-no `grain` is the complete one. An absent `multiplyDeclaredTypes` with no
-`multiplyDeclaredTypeCount` beside it means the solution has none; the count key is what tells
-elision from absence.
+and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
+`externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
+edges stay. Read the stamp: a survey with no `grain` is the complete one. An absent coverage key
+with no count beside it means the solution has none; the count key is what tells elision from
+absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
 outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of its declarers is
-in scope. On a solution too big to survey whole even at skeleton grain, scope is
+in scope. A `shadowedTypes[]` entry survives on either end too — its declaring project, or any
+project binding the assembly. On a solution too big to survey whole even at skeleton grain, scope is
 the knob left — grain has nowhere further to go.
 
 From the survey, write down **hypotheses, not conclusions**:

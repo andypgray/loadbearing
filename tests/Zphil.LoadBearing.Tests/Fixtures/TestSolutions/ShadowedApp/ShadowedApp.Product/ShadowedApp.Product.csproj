@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The product half. It binds a type from the package below, and the test project beside it declares
+         its own type of that same full name; nothing gives this project a reference path to that one, so
+         the reference has to resolve to the package. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- A PackageReference would otherwise turn on .NET's NuGet vulnerability audit. The audit fetches
+             advisory data from every configured feed, and an unreachable private feed emits NU1900 warnings
+             that MSBuildWorkspace surfaces as workspace diagnostics - tripping check's fail-closed gate. A
+             throwaway test fixture needs no audit, and disabling it keeps the workspace load clean and
+             offline-deterministic. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- PrivateAssets=all so the package does NOT flow to the test project, which is the whole reason a
+             real test project writes stand-ins in the first place. Drop it and the stand-in collides with the
+             package type there, and this bed stops mirroring the shape it exists for.
+             Restored UNLOCKED (no packages.lock.json under Fixtures/) - the lock-file policy lives only in
+             the tests project, never here. The version matches MyApp.Web's, so the restore is already warm. -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" PrivateAssets="all" />
+    </ItemGroup>
+</Project>

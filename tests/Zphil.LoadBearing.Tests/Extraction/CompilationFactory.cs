@@ -52,6 +52,30 @@ internal static class CompilationFactory
         return new CompilationInput(CreateCompilation(projectName, [CoreLibrary, referenced.ToMetadataReference()], files), projectName, [referencedProjectName]);
     }
 
+    /// <summary>
+    ///     A project input compiled against <paramref name="packages" /> as bare metadata references — the
+    ///     MSBuild-free stand-in for a <c>PackageReference</c>. Each package compilation must be handed here
+    ///     and <em>never</em> extracted as an input of its own, or it is a project of the solution rather
+    ///     than a package it references.
+    /// </summary>
+    /// <remarks>
+    ///     The difference from <see cref="CompileReferencing" /> is the empty project-reference list, and it
+    ///     matters: the merged project roster, the survey's declared-reference graph and the cache's Merkle
+    ///     edges all read that list, so naming a package there would have a fixture assert a project graph no
+    ///     csproj declares.
+    /// </remarks>
+    public static CompilationInput CompileAgainstPackages(
+        string projectName, IReadOnlyList<Compilation> packages, params (string Path, string Source)[] files)
+    {
+        MetadataReference[] references =
+        [
+            CoreLibrary,
+            .. packages.Select(package => package.ToMetadataReference())
+        ];
+
+        return new CompilationInput(CreateCompilation(projectName, references, files), projectName, []);
+    }
+
     /// <summary>The runtime core library — the one metadata reference the MSBuild-free path needs.</summary>
     public static MetadataReference CoreLibrary { get; } = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
 

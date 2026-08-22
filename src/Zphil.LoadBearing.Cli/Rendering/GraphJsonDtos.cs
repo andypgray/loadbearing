@@ -78,6 +78,18 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     <see cref="MultiplyDeclaredTypes" /> is elided at skeleton grain — never rendered as a bare
 ///     <c>0</c>, so a healthy solution's document is untouched.
 /// </param>
+/// <param name="ShadowedTypes">
+///     The full names a project declares that a referenced assembly also supplies — a stand-in under a
+///     package's namespace, a polyfill under a BCL one — each with the declaring project, the supplying
+///     assemblies, and the projects whose references reach the assembly's type instead. Null (omitted) when
+///     the solution has none, and null at skeleton grain where <see cref="ShadowedTypeCount" /> stands in.
+///     The one place a name in this model does not identify a type: a rule naming it reaches both, while
+///     <c>arch.Project</c> over <c>declaredBy</c> reaches the declared one alone.
+/// </param>
+/// <param name="ShadowedTypeCount">
+///     How many shadowed-name entries the elision dropped, present only when <see cref="ShadowedTypes" /> is
+///     elided at skeleton grain — never a bare <c>0</c>, on the same rule as its sibling above.
+/// </param>
 internal sealed record GraphJson(
     int SchemaVersion,
     string Solution,
@@ -89,6 +101,8 @@ internal sealed record GraphJson(
     int? ExternalEdgeCount,
     IReadOnlyList<GraphMultiplyDeclaredTypeJson>? MultiplyDeclaredTypes,
     int? MultiplyDeclaredTypeCount,
+    IReadOnlyList<GraphShadowedTypeJson>? ShadowedTypes,
+    int? ShadowedTypeCount,
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
@@ -131,3 +145,15 @@ internal sealed record GraphMultiplyDeclaredTypeJson(
     string Type,
     IReadOnlyList<string> DeclaredBy,
     string FactsFollow);
+
+/// <summary>
+///     One full name that denotes two types: the project declaring it, the referenced assemblies supplying
+///     it, and the projects whose references reach the assembly's rather than the declaration.
+///     <c>boundFromAssemblyBy</c> is what makes the entry readable on its own — without it a reader knows a
+///     name is shared but not whether anything actually depends on the split.
+/// </summary>
+internal sealed record GraphShadowedTypeJson(
+    string Type,
+    string DeclaredBy,
+    IReadOnlyList<string> SuppliedBy,
+    IReadOnlyList<string> BoundFromAssemblyBy);

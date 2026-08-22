@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The test half, mirroring the common idiom honestly: it declares a stand-in under the PACKAGE's own
+         namespace so its sources compile without the package, and it carries no PackageReference of its own.
+         Adding one - or dropping PrivateAssets from the product's - makes the stand-in collide with the
+         package type and silently disarms every assertion on this bed. Do not add one.
+         The ProjectReference below is the control: a genuine Tests -> Product edge that must survive. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../ShadowedApp.Product/ShadowedApp.Product.csproj" />
+    </ItemGroup>
+</Project>

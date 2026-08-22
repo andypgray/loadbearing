@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
@@ -348,6 +349,49 @@ public sealed class FragmentRoundTripTests
         // since ModelDump does not render the notes.
         roundTripped.Select(fragment => fragment.TargetFramework)
             .ShouldBe(["net10.0", "netstandard2.0"]);
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+        direct.MergeNotes.ShouldNotBeEmpty();
+        fromCache.MergeNotes.ShouldBe(direct.MergeNotes);
+        fromCache.ShouldModelTheSameAs(direct);
+    }
+
+    [Fact]
+    public void RoundTrip_AssemblyNames_SurviveOntoTheShadowedNameSplit()
+    {
+        // Arrange — a project declaring a name a referenced assembly also supplies. The assembly name is the
+        // only fact that tells the merge those are two types rather than one, so a hit that dropped it would
+        // replay the phantom edge into the declaring project while the cold run resolved to the assembly.
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public class Widget {}
+                                                                      """));
+        var product = new CompilationInput(
+            CompilationFactory.CreateCompilation(
+                "Product", [CompilationFactory.CoreLibrary, vendor.ToMetadataReference()], ("Service.cs", """
+                                                                                                          namespace Product;
+                                                                                                          public class Service { private Vendor.Widget widget; }
+                                                                                                          """)),
+            "Product", []);
+        CompilationInput tests = CompilationFactory.Compile("Product.Tests", ("Mocks.cs", """
+                                                                                          namespace Vendor;
+                                                                                          public class Widget {}
+                                                                                          """));
+        IReadOnlyList<CodebaseFragment> fragments = new[] { product, tests }
+            .Select(FragmentExtractor.Extract)
+            .ToList();
+
+        // Act
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert — the field itself, then the two observables that depend on it. The merge note is a pure
+        // function of the assembly names and ModelDump does not render notes, so a dropped field would
+        // replay as silence on a hit while the cold run spoke; the dump comparison catches the other half,
+        // the edge that would land on the declaring project instead of the assembly.
+        roundTripped.Select(fragment => fragment.AssemblyName)
+            .ShouldBe(["Product", "Product.Tests"]);
         CodebaseModel direct = FragmentMerger.Merge(fragments);
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
         direct.MergeNotes.ShouldNotBeEmpty();

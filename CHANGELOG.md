@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The survey now names the type names a referenced assembly also supplies.** `shadowedTypes`
+  carries the name, the project declaring it, the assemblies supplying it, and the projects whose
+  references reach the assembly's type instead, so a rule author can see before writing a rule that
+  the name means two things. The key is absent when a solution has none, so `schemaVersion` stays 1
+  and a healthy solution's survey is byte-identical to the one it was before. At skeleton grain it
+  elides to `shadowedTypeCount`, beside the multiply-declared rows it sits with. The human survey
+  gains a matching section, reading `(none)` when there is nothing to report.
+
 - **The survey now names the types that more than one project declares, and which project's facts
   they follow.** `multiplyDeclaredTypes` carries the type, every project declaring it, and the one
   whose facts and project attribution it follows, so a rule author can see before writing a subject
@@ -23,6 +31,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing to report and one line per type when there is.
 
 ### Fixed
+
+- **A stand-in declared under a package's namespace no longer steals product code's references to
+  the package.** Extraction unified types by fully-qualified name, and a source declaration beat a
+  referenced assembly's type of that name everywhere — so a test project declaring
+  `AvalonDock.DockingManager` as a mock, the ordinary test idiom, took every product reference to
+  the real `AvalonDock.DockingManager` with it. On ILSpy that made a product-must-not-reference-tests
+  rule report two violations against a test assembly no product project has a reference path to, one
+  of them in generated XAML, and an accept-all `baseline --init` froze both as day-zero debt. A
+  reference now resolves to whichever type the referencing compilation actually bound: the model
+  carries both, the declaration and a shallow external attributed to the supplying assembly, and the
+  split is decided by assembly identity rather than by which project happened to declare the name
+  first. Every unknown fails open, so a fragment that cannot name its own assembly changes nothing.
+  The reference the product makes is kept rather than dropped, which means a rule aimed at the
+  package's own type still sees it, and the hierarchy axis resolves the same way, so a type deriving
+  from the package no longer reads as deriving from the mock. `check` reports the split as an
+  advisory note, one line per declaring project. A name a solution declares that nothing outside it
+  supplies is unaffected, as is a name compiled into several projects from one file — that stays one
+  node, and `arch.Project` on the other declarers still misses it.
+  The extraction cache's schema moves with the new fact, so the first run after upgrading rebuilds it.
 
 - **The survey no longer reports a project as referencing another when it compiles that project's
   source itself.** Where one file is compiled into several projects (a linked `<Compile Include>`,

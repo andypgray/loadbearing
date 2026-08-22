@@ -36,6 +36,17 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         default, only so a hand-built fragment need not name a fact it has no way to know — the default is
 ///         the honest answer there, not a convenience.
 ///     </para>
+///     <para>
+///         <see cref="AssemblyName" /> is the fourth, and it is <em>not</em> <see cref="ProjectName" /> under
+///         another name: the project name is the csproj's own file name, while this is what the compilation
+///         emits, and an <c>&lt;AssemblyName&gt;</c> property or a renamed csproj parts them. The distinction
+///         earns its place because this is the only string comparable against a
+///         <see cref="FragmentExternal.AssemblyName" /> — the assembly some other fragment's compilation
+///         actually bound a name to — which is how the merge tells a reference this project satisfied from one
+///         a referenced assembly of the same full name satisfied. It carries a default for the same reason
+///         <see cref="SolutionMember" /> does, and <see langword="null" /> is read as unknown throughout: an
+///         unknown assembly never makes the merge conclude anything.
+///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(
     string ProjectName,
@@ -51,4 +62,5 @@ internal sealed record CodebaseFragment(
     IReadOnlyList<FragmentThrowEdge> ThrowEdges,
     IReadOnlyList<FragmentExposureEdge> ExposureEdges,
     IReadOnlyList<FragmentServiceRegistration> ServiceRegistrations,
-    bool? SolutionMember = null);
+    bool? SolutionMember = null,
+    string? AssemblyName = null);
