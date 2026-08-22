@@ -40,7 +40,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — a verdict reached " +
         "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
-        "checked — a clean report then covers a subset; say so.";
+        "checked — a clean report then covers a subset; say so. " +
+        "unsupportedProjects names the declared projects this product cannot read at all (C# only), each " +
+        "with its reason — no rule can be violated in one, so a clean report over a polyglot solution is " +
+        "not a clean solution either.";
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
@@ -48,7 +51,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "burndown still returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — " +
         "counts from a partial model; report that rather than quoting them as whole. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
-        "they contribute no violations, so every count reads low.";
+        "they contribute no violations, so every count reads low. unsupportedProjects names the declared " +
+        "projects this product cannot read at all (C# only): their zero is permanent, not burndown.";
 
     private const string ExplainDescription =
         "Return one rule's because, fix, posture payload, and linked prose as text.";
@@ -80,7 +84,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Narrow with overview or skeleton (coarser grain) or projects (fewer projects); an over-budget survey " +
         "coarsens its own grain, as far as skeleton, rather than being cut. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never loaded — " +
-        "a project absent from the survey may simply be out of view.";
+        "a project absent from the survey may simply be out of view. unsupportedProjects is the third " +
+        "coverage key and the one that bounds the survey's subject: the declared projects this product " +
+        "cannot read at all (C# only), each with its reason, so projects[] shorter than the solution is a " +
+        "stated fact rather than something to infer by opening the solution file.";
 
     [McpServerTool(
         Name = ArchToolNames.Check,

@@ -36,12 +36,29 @@ internal static class GraphFormatter
     ///     disappears. A section with nothing to elide keeps its <c>(none)</c> instead, which is why a
     ///     healthy solution's skeleton still says outright that no type is declared twice.
     /// </summary>
-    public static IReadOnlyList<string> Lines(GraphSummary summary, string solutionName, DocumentGrain grain)
+    /// <param name="summary">The survey to format.</param>
+    /// <param name="solutionName">The solution's file name, for the heading.</param>
+    /// <param name="grain">How much of each section to render.</param>
+    /// <param name="unsupportedProjects">
+    ///     The declared projects this product could not read, as the shared trust stamp composed them —
+    ///     relativized, and each already carrying its reason, so this line and the document's own key cannot
+    ///     disagree about what the run could read. Passed in rather than taken off <paramref name="summary" />
+    ///     because it is a fact about the load rather than about the codebase: the summary describes what was
+    ///     extracted, and this names what never could be. For that reason it is also unaffected by
+    ///     <c>--projects</c>, which scopes the summary alone.
+    /// </param>
+    public static IReadOnlyList<string> Lines(
+        GraphSummary summary, string solutionName, DocumentGrain grain,
+        IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
         var lines = new List<string> { $"Codebase survey: {solutionName}", "" };
 
         lines.Add($"Projects ({summary.Projects.Count}):");
         lines.AddRange(summary.Projects.Select(ProjectLine));
+        lines.Add("");
+
+        lines.Add("Projects the solution declares that this survey could not read:");
+        lines.AddRange(UnsupportedProjectLines(unsupportedProjects));
         lines.Add("");
 
         lines.Add("Observed project references (distinct type pairs):");
@@ -64,6 +81,20 @@ internal static class GraphFormatter
         lines.AddRange(ExternalEdgeLines(summary, grain));
 
         return lines;
+    }
+
+    // Sited straight under the roster, because it is the roster's own caveat: these are the projects that
+    // would have been lines above it. Reads "(none)" on an all-C# solution rather than vanishing, per this
+    // formatter's standing rule — a section that appears only when it has content is one a reader never
+    // learns to look for, and this is the section whose absence was the defect. Never elided at any grain:
+    // it is bounded by the solution rather than the codebase, and a coarser survey is where a reader most
+    // needs to know it is of part of the solution.
+    private static IEnumerable<string> UnsupportedProjectLines(
+        IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
+    {
+        return unsupportedProjects.Count > 0
+            ? unsupportedProjects.Select(project => $"  {project.Project} — {project.Reason}")
+            : ["  (none)"];
     }
 
     private static IEnumerable<string> NamespaceLines(GraphSummary summary, DocumentGrain grain)

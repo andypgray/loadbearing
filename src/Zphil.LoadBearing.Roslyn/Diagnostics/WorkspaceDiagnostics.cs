@@ -6,8 +6,8 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     Everything a run knows about how well its workspace loaded, as one value: the
 ///     <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" /> that gate, the
 ///     <see cref="LoadFailures" /> and <see cref="MergeNotes" /> that never do, the
-///     <see cref="UncheckedProjects" /> that scope the verdict instead of deciding it, plus the rendering both
-///     surfaces read and the gate decision every verb makes.
+///     <see cref="UncheckedProjects" /> and <see cref="UnsupportedProjects" /> that scope the verdict instead
+///     of deciding it, plus the rendering both surfaces read and the gate decision every verb makes.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -78,15 +78,24 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     is every edge their package references would have produced, and the two causes share one slot because
 ///     they share one remedy (<c>dotnet restore</c>) and one consequence.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     The absolute paths of the projects the solution declares in a language this product cannot read —
+///     an <c>.fsproj</c>, a <c>.vbproj</c>, a <c>.sqlproj</c> — ordinal-sorted, and read off the solution
+///     file rather than off the load. It takes <see cref="UncheckedProjects" />' posture rather than
+///     <see cref="FailedProjects" />': a project no extractor can read makes the universe smaller, never
+///     wrong, so it says what the run covers and decides nothing. Without it the run simply surveyed fewer
+///     projects than the solution declares and said so nowhere.
+/// </param>
 internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> LoadFailures,
     IReadOnlyList<string> MergeNotes,
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
-    IReadOnlyList<string> RestoreFailedProjects)
+    IReadOnlyList<string> RestoreFailedProjects,
+    IReadOnlyList<string> UnsupportedProjects)
 {
     /// <summary>A run with nothing to report — nothing failed to load, and no diagnostics or merge notes.</summary>
-    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], []);
+    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], []);
 
     /// <summary>
     ///     The load failures with the MSBuild-selection note appended, or empty for a clean load. What five

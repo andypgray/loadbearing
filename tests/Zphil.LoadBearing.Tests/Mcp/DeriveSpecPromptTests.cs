@@ -134,6 +134,26 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_WarnsAgainstHandTrimmingTheSolutionAddRewrite()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — on a multi-configuration solution the CLI's own rewrite dwarfs the spec project it
+        // adds, which reads as damage against the recipe's one-diff close; the tidy-looking repair is a
+        // hand-written Debug/Release entry that leaves the spec project unbuilt everywhere else. Both
+        // halves must survive prose edits: that the rewrite is correct, and that trimming it is not.
+        string text = result.ShouldHaveTextContent();
+        text.ShouldContain("rewrite more of a `.sln` than the one project it adds");
+        text.ShouldContain("skips a project with no mapping for it");
+        text.ShouldContain("not to be trimmed by hand");
+    }
+
+    [Fact]
     public void DeriveSpec_LoadsEmbeddedRecipe_NonTrivial()
     {
         // A rename of the .md or its manifest id would otherwise surface only when a client calls

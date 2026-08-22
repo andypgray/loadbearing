@@ -79,6 +79,16 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///         and the direction the guess would fail in is refusing a healthy legacy solution.
 ///     </para>
 ///     <para>
+///         <b>Only C# projects are asked about.</b> A solution's projects in other languages reach the loaded
+///         solution — F# does, measured — and this predicate used to blame them like any other, which is a
+///         false refusal twice over: their packages are not in the model because the projects are not in the
+///         model, and the remedy it names cannot help. Measured on a two-project bed with the C# half fully
+///         restored, that was exit 2 naming the <c>.fsproj</c> alone. Such a project is stated under
+///         <c>WorkspaceDiagnostics.UnsupportedProjects</c> instead, which says what the run covers rather
+///         than refusing it. The narrowing is safe in the direction that matters: this arm can now only blame
+///         projects the model actually holds.
+///     </para>
+///     <para>
 ///         <b>The one carve-out, and why no other.</b> The NuGet audit family (NU19xx) is excluded by
 ///         <em>code</em>, because an advisory's publication date and an audit fetch's network reachability are
 ///         external, time-varying inputs that say nothing about how this codebase is built while resolution
@@ -120,6 +130,13 @@ internal static class RestoreFailures
         foreach (Project project in solution.Projects)
         {
             if (project.FilePath is not { } filePath) continue;
+
+            // A project in another language reaches the loaded solution — measured on a two-project bed
+            // whose .fsproj arrived here with its output paths — and its packages cannot affect a model that
+            // never included it. Blaming one refused a solution whose C# half was restored perfectly:
+            // measured on that bed, exit 2 naming the .fsproj alone. Skipped before any file is read, so
+            // this also spares the assets probe for every project the model does not contain.
+            if (!string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal)) continue;
 
             string fullPath = Path.GetFullPath(filePath);
             if (Path.GetDirectoryName(fullPath) is not { } projectDirectory) continue;

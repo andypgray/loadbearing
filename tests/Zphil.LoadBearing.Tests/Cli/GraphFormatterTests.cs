@@ -20,7 +20,8 @@ public sealed class GraphFormatterTests
     public void Lines_MixedSolutionMembership_AnnotatesOnlyThePassenger()
     {
         // Act
-        IReadOnlyList<string> lines = GraphFormatter.Lines(MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full);
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
 
         // Assert — the annotation sits between the name and the em-dash, so the rest of the line reads
         // exactly as every other project's does and the roster still scans as one column of names. The
@@ -32,6 +33,42 @@ public sealed class GraphFormatterTests
                 "  Acme.Passenger (not a solution member) — 1 type; references: (none)",
                 "  Acme.Unread — 1 type; references: (none)"
             ]);
+    }
+
+    [Fact]
+    public void Lines_NoUnsupportedProjects_KeepsTheSectionReadingNone()
+    {
+        // The formatter's standing rule, applied to the section whose absence WAS the defect: a section
+        // that appears only when it has content is one a reader never learns to look for, so an all-C#
+        // solution says outright that nothing went unread rather than saying nothing at all.
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        Section(lines, "Projects the solution declares that this survey could not read:")
+            .ShouldBe(["  (none)"]);
+    }
+
+    [Fact]
+    public void Lines_UnsupportedProjects_ReadTheReasonTheDocumentCarries()
+    {
+        // The reason is composed once, on the shared trust stamp, and arrives here already paired with its
+        // path — so this line and the document's own entry cannot disagree about what the run could read.
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full,
+            [new UnsupportedProjectStamp("Acme.Signals/Acme.Signals.fsproj", "not a C# project")]);
+
+        Section(lines, "Projects the solution declares that this survey could not read:")
+            .ShouldBe(["  Acme.Signals/Acme.Signals.fsproj — not a C# project"]);
+    }
+
+    // One section: the lines between its heading and the blank line closing it.
+    private static IReadOnlyList<string> Section(IReadOnlyList<string> lines, string heading)
+    {
+        return lines
+            .SkipWhile(line => !line.Equals(heading, StringComparison.Ordinal))
+            .Skip(1)
+            .TakeWhile(line => line.Length > 0)
+            .ToList();
     }
 
     // The roster block alone: the lines between the "Projects (n):" header and the blank line closing it.

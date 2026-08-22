@@ -58,6 +58,9 @@ internal static class CliRunner
 
     public static string DerivedSpecDll => Metadata("DerivedSpecPath");
 
+    /// <summary>The spec for the polyglot bed, whose one rule holds — so its report is genuinely clean.</summary>
+    public static string PolyglotSpecDll => Metadata("PolyglotSpecPath");
+
     /// <summary>The net10 spec whose <c>Define()</c> anchors a type from a .NET shared framework.</summary>
     public static string SharedFrameworkSpecDll => Metadata("SharedFrameworkSpecPath");
 

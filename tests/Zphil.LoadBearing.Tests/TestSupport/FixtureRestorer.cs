@@ -29,8 +29,12 @@ internal static class FixtureRestorer
         string testSolutionsDir = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
         if (!Directory.Exists(testSolutionsDir)) return true;
 
+        // Every project kind, not just *.csproj. A bed holding a project in another language restores the
+        // same way and needs the same assets file — and probing the C# half alone short-circuits the sweep
+        // the moment those are restored, leaving the other project unrestored and blamed by the restore
+        // detector, which refuses the run.
         bool anyUnrestored = Directory
-            .EnumerateFiles(testSolutionsDir, "*.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(testSolutionsDir, "*.*proj", SearchOption.AllDirectories)
             .Any(projectPath => !File.Exists(
                 Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json")));
         if (!anyUnrestored) return true;

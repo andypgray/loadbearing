@@ -156,7 +156,7 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, or a hit would deserialize the new field as its
     // default and answer with a fact the extraction never recorded.
-    private const int CurrentSchemaVersion = 21;
+    private const int CurrentSchemaVersion = 22;
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;
@@ -291,6 +291,7 @@ internal sealed class ExtractionCacheStore
             extraction.LoadDiagnostics.FailedProjects,
             extraction.LoadDiagnostics.UncheckedProjects,
             extraction.LoadDiagnostics.RestoreFailedProjects,
+            extraction.LoadDiagnostics.UnsupportedProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -372,11 +373,11 @@ internal sealed class ExtractionCacheStore
                 dirtyProjects.Add(project.ProjectName);
         }
 
-        // Re-paired once, here, from the flat lists the manifest persists — the only place the four become a
+        // Re-paired once, here, from the flat lists the manifest persists — the only place the five become a
         // verdict again, so no consumer can assemble them in a different order.
         var loadDiagnostics = new WorkspaceDiagnostics(
             manifest.Diagnostics, [], manifest.FailedProjects, manifest.UncheckedProjects,
-            manifest.RestoreFailedProjects);
+            manifest.RestoreFailedProjects, manifest.UnsupportedProjects);
 
         if (dirtyProjects.Count == 0)
         {

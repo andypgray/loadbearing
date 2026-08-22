@@ -3,9 +3,10 @@ using Zphil.LoadBearing.Checking;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `status --json` — its own document with its own schemaVersion (2), distinct from
-// `check --json`. Serialized camelCase, indented, nulls omitted. The five workspace slots below are
-// additive and null (omitted) on every run whose workspace loaded, whose NuGet packages resolved and that no
-// solution filter narrowed, so the schema stays version 2 and a clean document is byte-identical.
+// `check --json`. Serialized camelCase, indented, nulls omitted. The six workspace slots below are
+// additive and null (omitted) on every run whose workspace loaded, whose NuGet packages resolved, whose
+// solution is all C# and that no solution filter narrowed, so the schema stays version 2 and a clean
+// document is byte-identical.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="WorkspaceDiagnostics">
@@ -39,6 +40,13 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     by whatever these projects hold. Measured as what the solution declares minus what loaded, so a
 ///     filter that narrows nothing omits the key.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     Which projects the solution declares that this product cannot read — each a solution-relative,
+///     forward-slashed project path with the reason — or null (omitted) for an all-C# solution. The burndown
+///     reads low here the same way <see cref="UncheckedProjects" /> makes it read low, and permanently: a
+///     project the extractor cannot read will never contribute a violation to burn down, so its zero is a
+///     property of this product rather than progress the team made.
+/// </param>
 internal sealed record StatusJson(
     int SchemaVersion,
     string Solution,
@@ -49,6 +57,7 @@ internal sealed record StatusJson(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     StatusSummaryJson Summary);
 
 /// <summary>

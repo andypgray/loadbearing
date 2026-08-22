@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every document now states the projects it could not read.** LoadBearing surveys and checks C#
+  projects only, and until now a solution holding an `.fsproj`, a `.vbproj` or a `.sqlproj` simply
+  produced a shorter `projects` array with nothing to say about the difference — so a spec derived
+  from the survey could silently fail to reach a shipped product surface, and a clean `check` over a
+  polyglot solution read as a clean solution. `unsupportedProjects` now carries each declared
+  project this product cannot read, with its reason, in `graph`, `check` and `status` `--json`, in
+  the matching MCP documents, and as a fourth SARIF notification. It is read from the solution file
+  rather than the workspace, so it is complete where the loaded solution is not: `.fsproj` is the
+  only non-C# kind that reaches a workspace at all. It never gates — a project this tool cannot
+  read makes the model smaller than the solution, not wrong about it, so it takes
+  `uncheckedProjects`' posture rather than `failedProjects`'. The key is absent for an all-C#
+  solution, so every schema version is unchanged and an all-C# document is byte-identical to the
+  one it was before. The human `graph` survey gains a matching section reading `(none)` when there
+  is nothing to report, and `check` and `status` gain a one-line stamp above their answers.
+
 - **The survey now names the type names a referenced assembly also supplies.** `shadowedTypes`
   carries the name, the project declaring it, the assemblies supplying it, and the projects whose
   references reach the assembly's type instead, so a rule author can see before writing a rule that
@@ -31,6 +46,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing to report and one line per type when there is.
 
 ### Fixed
+
+- **The derive recipe now expects `dotnet sln add` to rewrite more of a solution than the one project
+  it adds.** The CLI unions its default platforms into a `.sln`'s configuration list and writes the
+  project-configuration table out complete, so adding one spec project to a dozen-project solution
+  inserts a hundred-plus lines — which, against a recipe that closes by asking for one reviewable
+  diff, read as damage. The repair that reading invites is worse than the diff: revert the rewrite,
+  hand-write an entry mapping only `Debug|Any CPU` and `Release|Any CPU`, and the project registers
+  while having no mapping under any other combination the solution declares. A solution build under
+  one of those skips it behind an `MSB4121` warning and still exits 0, so the build stays green
+  while `check` reads a stale spec assembly, or none at all. The scaffold step now states that the
+  rewrite is legitimate and says not to hand-trim it, and the closing step names the solution file
+  as often the largest hunk in the single diff it asks for.
+- **A solution whose C# projects all restored is no longer refused because a project in another
+  language did not.** The restore detector walked every project the workspace loaded, including the
+  `.fsproj` that reaches it, and blamed one whose packages are missing — but those packages cannot
+  affect a model that never contained the project, so the run refused a healthy polyglot solution
+  and named a project no `dotnet restore` of the C# estate would fix. Both structural detectors now
+  skip projects this product cannot read. A visible consequence: an unrestored polyglot solution's
+  refusal now names only its C# projects, which is a smaller and more accurate list than before.
 
 - **A stand-in declared under a package's namespace no longer steals product code's references to
   the package.** Extraction unified types by fully-qualified name, and a source declaration beat a

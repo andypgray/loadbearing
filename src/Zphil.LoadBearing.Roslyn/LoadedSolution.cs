@@ -25,6 +25,7 @@ public sealed class LoadedSolution : IDisposable
         TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
         FailedProjects = (report ?? ProjectLoadReport.Empty).Failed;
         UncheckedProjects = (report ?? ProjectLoadReport.Empty).Unchecked;
+        UnsupportedProjects = (report ?? ProjectLoadReport.Empty).Unsupported;
         RestoreFailedProjects = restoreFailedProjects ?? [];
     }
 
@@ -76,7 +77,19 @@ public sealed class LoadedSolution : IDisposable
     public IReadOnlyList<string> UncheckedProjects { get; }
 
     /// <summary>
-    ///     This load's verdict as the one value every surface reads — the three project lists above beside
+    ///     The absolute paths of the projects this solution declares in a language this product cannot read,
+    ///     ordinal-sorted — read off the solution file rather than the load, since a project that was never
+    ///     going to load leaves no shape in one. Empty for an all-C# solution.
+    /// </summary>
+    /// <remarks>
+    ///     Never gates, on <see cref="UncheckedProjects" />' terms rather than <see cref="FailedProjects" />':
+    ///     the model is smaller than the solution, not wrong about it. What it exists for is that until it
+    ///     did, the survey listed fewer projects than the solution declares and named the difference nowhere.
+    /// </remarks>
+    public IReadOnlyList<string> UnsupportedProjects { get; }
+
+    /// <summary>
+    ///     This load's verdict as the one value every surface reads — the four project lists above beside
     ///     the failure messages the load reported, which only the caller has: the loader writes them to a
     ///     sink it was handed, so they never land on this type. Merge notes are empty by construction, since
     ///     only extraction produces them and none has run at load time.
@@ -84,7 +97,8 @@ public sealed class LoadedSolution : IDisposable
     /// <param name="loadFailures">The workspace-load failure messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        return new WorkspaceDiagnostics(loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects);
+        return new WorkspaceDiagnostics(
+            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects);
     }
 
     /// <summary>Disposes the underlying workspace.</summary>

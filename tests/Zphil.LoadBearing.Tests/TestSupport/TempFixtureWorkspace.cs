@@ -48,8 +48,10 @@ internal sealed class TempFixtureWorkspace : IDisposable
 
     // Spelled out rather than left to a search pattern: a three-character pattern is documented to match
     // longer extensions too, so ".sln" alone is not a reliable way to include — or exclude — its siblings.
+    // Every project kind a bed may hold, not just C#: a bed with a project in another language restores it
+    // like any other, and leaving that extension out would let an edit to it reuse a stale restore.
     private static readonly string[] RestoreRelevantExtensions =
-        [".csproj", ".sln", ".slnx", ".slnf", ".props", ".targets"];
+        [".csproj", ".fsproj", ".vbproj", ".sln", ".slnx", ".slnf", ".props", ".targets"];
 
     private static readonly Lock LeaseGate = new();
 

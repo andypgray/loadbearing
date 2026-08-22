@@ -3,16 +3,22 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The wire shape of `graph --json` — the pre-spec codebase survey, its own document with its own
 // schemaVersion (1), distinct from check and status. Serialized camelCase, indented, nulls omitted.
 // Grouped counts only, never per-site dumps (the minimal-token posture); sites come later from `check`.
-// The eight optional slots below — grain, projectsScope, multiplyDeclaredTypes, and the five workspace ones
-// — are additive and null (omitted) on a full, unscoped survey of a healthy solution whose workspace
-// loaded, whose NuGet packages resolved and that no solution filter narrowed, so the schema stays version 1
-// and the default document is byte-identical to the one before they existed. A run whose model is
-// incomplete reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses
-// before extraction.
+// The optional slots below — grain, projectsScope, the coverage statements, and the workspace ones — are
+// additive and null (omitted) on a full, unscoped survey of an all-C# solution whose workspace loaded,
+// whose NuGet packages resolved and that no solution filter narrowed, so the schema stays version 1 and the
+// default document is byte-identical to the one before they existed. A run whose model is incomplete
+// reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses before
+// extraction.
 //
 // multiplyDeclaredTypes is the survey's first COVERAGE STATEMENT — a flat, optional, top-level key saying
 // what the survey above does not cover, absent when there is nothing to say, and elided to a count at
 // skeleton grain because its content scales with the codebase rather than with the schema.
+//
+// unsupportedProjects is the coverage statement one level up: not what the survey misses inside the
+// projects it read, but which declared projects it never read at all. It rides the trust stamp rather than
+// this document's own ladder, so it is NOT elided at any grain — its length scales with the SOLUTION (0-3
+// entries in practice, not with the codebase), and a coarser document is exactly where a reader most needs
+// to know the survey is of part of the solution.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
 /// <param name="Grain">
@@ -90,6 +96,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     How many shadowed-name entries the elision dropped, present only when <see cref="ShadowedTypes" /> is
 ///     elided at skeleton grain — never a bare <c>0</c>, on the same rule as its sibling above.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     Which projects the solution declares that this product cannot read — each a solution-relative,
+///     forward-slashed project path with the reason — or null (omitted) for an all-C# solution. The survey's
+///     coverage statement about its own <em>subject</em> rather than its contents: without it the
+///     <c>projects</c> array is simply shorter than the solution, and a reader who never opens the solution
+///     file cannot tell a codebase with two projects from a survey that read two of three. Not scoped by
+///     <c>projectsScope</c> — it is a fact about the load, like its three neighbours — and not elided at any
+///     grain.
+/// </param>
 internal sealed record GraphJson(
     int SchemaVersion,
     string Solution,
@@ -107,7 +122,8 @@ internal sealed record GraphJson(
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
-    IReadOnlyList<string>? RestoreFailedProjects);
+    IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects);
 
 /// <summary>
 ///     One project: whether the solution declares it, its declared references, solution-declared type count,

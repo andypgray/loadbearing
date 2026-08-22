@@ -28,13 +28,15 @@ internal sealed class ReplayedSolution : IDisposable
     internal ReplayedSolution(
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        IReadOnlyList<string>? failedProjects = null)
+        IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? unsupportedProjects = null)
     {
         Workspace = workspace;
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
         FailedProjects = failedProjects ?? [];
+        UnsupportedProjects = unsupportedProjects ?? [];
     }
 
     /// <summary>The in-memory workspace the replayed solution was added to.</summary>
@@ -84,15 +86,30 @@ internal sealed class ReplayedSolution : IDisposable
     public IReadOnlyList<string> RestoreFailedProjects { get; } = [];
 
     /// <summary>
-    ///     This replay's verdict as the one value every surface reads — the two project lists above beside the
-    ///     replay messages the caller's own sink collected, which never land on this type. Unchecked projects
-    ///     are empty: a binlog records what was built, not what a solution declares, so there is nothing to
-    ///     have left out. Merge notes are empty by construction, as on the MSBuild path.
+    ///     The absolute paths of the projects this capture built in a language the replay cannot read,
+    ///     ordinal-sorted — the same fact <see cref="LoadedSolution.UnsupportedProjects" /> carries, so a
+    ///     document says what it covers on both paths.
+    /// </summary>
+    /// <remarks>
+    ///     Read from the capture rather than from a solution file, which is the only difference between the
+    ///     two paths here: a binlog records what was built, so the compiler invocations the C#-only predicate
+    ///     declines <em>are</em> the answer, and they are collected at the moment of declining them. A
+    ///     project the build skipped entirely is therefore invisible — the replay analog of the MSBuild
+    ///     path's undeclared-passenger limit.
+    /// </remarks>
+    public IReadOnlyList<string> UnsupportedProjects { get; }
+
+    /// <summary>
+    ///     This replay's verdict as the one value every surface reads — the three project lists above beside
+    ///     the replay messages the caller's own sink collected, which never land on this type. Unchecked
+    ///     projects are empty: a binlog records what was built, not what a solution declares, so there is
+    ///     nothing to have left out. Merge notes are empty by construction, as on the MSBuild path.
     /// </summary>
     /// <param name="loadFailures">The replay messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        return new WorkspaceDiagnostics(loadFailures, [], FailedProjects, [], RestoreFailedProjects);
+        return new WorkspaceDiagnostics(
+            loadFailures, [], FailedProjects, [], RestoreFailedProjects, UnsupportedProjects);
     }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>

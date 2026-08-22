@@ -7,10 +7,11 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 namespace Zphil.LoadBearing.Roslyn.Solutions;
 
 /// <summary>
-///     A solution file's declared <c>.csproj</c> membership, split into the two sets a solution filter makes
-///     different: what the load is <see cref="Required">entitled to demand</see> and what the underlying
-///     solution <see cref="Declared">contains at all</see>. For an unfiltered <c>.sln</c>/<c>.slnx</c> the two
-///     are the same list. Which solution a filter points at is
+///     A solution file's declared membership: the <c>.csproj</c> half split into the two sets a solution
+///     filter makes different — what the load is <see cref="Required">entitled to demand</see> and what the
+///     underlying solution <see cref="Declared">contains at all</see> — beside the
+///     <see cref="Unsupported">projects in another language</see> that no load can reach. For an unfiltered
+///     <c>.sln</c>/<c>.slnx</c> the first two are the same list. Which solution a filter points at is
 ///     <see cref="SolutionProjectFileParser.TryReadReferencedSolution">its own question</see>, asked where it
 ///     arises: both callers ask before the load, where no membership object exists to read.
 /// </summary>
@@ -23,15 +24,37 @@ namespace Zphil.LoadBearing.Roslyn.Solutions;
 ///     Every <c>.csproj</c> the underlying solution declares, filter or no filter. Subtracting what actually
 ///     loaded from this is what makes a narrowed universe nameable.
 /// </param>
+/// <param name="Unsupported">
+///     Every other declared project — an <c>.fsproj</c>, <c>.vbproj</c>, <c>.sqlproj</c>, <c>.vcxproj</c>,
+///     <c>.shproj</c>, anything whose extension ends in <c>proj</c> and is not <c>.csproj</c>. Deliberately
+///     <em>not</em> merged into <see cref="Declared" />: the three consumers of that set all mean "a project
+///     this run was obliged to check", and adding a project no extractor can read would turn every polyglot
+///     solution into a load failure. What this set is for is saying so out loud, which is the one thing the
+///     survey could not do while these entries were simply dropped.
+/// </param>
 internal sealed record SolutionMembership(
     IReadOnlyList<string> Required,
-    IReadOnlyList<string> Declared);
+    IReadOnlyList<string> Declared,
+    IReadOnlyList<string> Unsupported);
 
 /// <summary>
-///     Reads a solution file's <em>declared</em> <c>.csproj</c> membership textually, with no MSBuild.
-///     Handles the classic <c>.sln</c>, the XML <c>.slnx</c>, and the JSON solution-filter <c>.slnf</c>
-///     formats; non-<c>.csproj</c> entries (solution folders, shared projects, database projects) are ignored,
-///     and both slash spellings resolve.
+///     One solution file's declared projects, partitioned by whether this product can read them:
+///     <paramref name="Csproj" /> is what the extractor loads, <paramref name="Unsupported" /> is every other
+///     declared <c>*proj</c>. Solution folders are in neither — they are not projects.
+/// </summary>
+/// <param name="Csproj">The declared <c>.csproj</c> paths, absolute and deduplicated, in declaration order.</param>
+/// <param name="Unsupported">
+///     The declared non-<c>.csproj</c> project paths, absolute and deduplicated, in declaration order.
+/// </param>
+internal sealed record DeclaredProjects(
+    IReadOnlyList<string> Csproj,
+    IReadOnlyList<string> Unsupported);
+
+/// <summary>
+///     Reads a solution file's <em>declared</em> project membership textually, with no MSBuild. Handles the
+///     classic <c>.sln</c>, the XML <c>.slnx</c>, and the JSON solution-filter <c>.slnf</c> formats; entries
+///     are partitioned into the <c>.csproj</c> members a load can produce and the projects in other languages
+///     it cannot, solution folders are neither, and both slash spellings resolve.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -56,11 +79,27 @@ internal sealed record SolutionMembership(
 ///         knows the checked set, which is why the narrowing is computed there and not here.
 ///     </para>
 ///     <para>
+///         <b>
+///             A fourth question, asked of the same text: what does the solution declare that this product
+///             cannot read?
+///         </b>
+///         <see cref="SolutionMembership.Unsupported" /> is that answer, and it is derived
+///         here rather than from <c>solution.Projects</c> because only the solution file sees all of it. F#
+///         is the one non-C# kind that reaches a loaded solution at all — it plugs into Roslyn's
+///         <em>workspace</em> model while having no Roslyn compiler behind it, so it loads and then supports
+///         no compilation. A <c>.vbproj</c> never loads, because this repo references only the C# workspace
+///         package and so has no VB language service in its MEF host; <c>.sqlproj</c>, <c>.vcxproj</c> and
+///         <c>.shproj</c> have no Roslyn loader either. Reading the declaration is also the same answer on a
+///         cold run, a cache hit and a warm session by construction, and it needs no workspace. The residual
+///         limit is the mirror of the existing passenger case: a non-C# project dragged in by a
+///         <c>ProjectReference</c> and declared in no solution file stays invisible.
+///     </para>
+///     <para>
 ///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
 ///         does not evaluate configurations, conditions, or nested-project ownership. Paths are made absolute
 ///         against the solution file's directory but not symlink-canonicalized — callers canonicalize both
 ///         sides at comparison time (matching <c>SpecResolver.IsProjectFile</c>), so this stays pure and
-///         disk-independent for its <see cref="ParseCsprojMembers" /> core.
+///         disk-independent for its <see cref="ParseDeclaredProjects" /> core.
 ///     </para>
 /// </remarks>
 internal static class SolutionProjectFileParser
@@ -96,31 +135,37 @@ internal static class SolutionProjectFileParser
     ///     solution it references. Throws on an unreadable or malformed file; callers that must not fail open
     ///     catch it.
     /// </summary>
+    /// <remarks>
+    ///     Under a <c>.slnf</c> the unsupported entries are the <em>referenced solution's</em>, unfiltered.
+    ///     Filtering them would be a claim a filter cannot support: leaving an <c>.fsproj</c> out of a
+    ///     selection does not make it surveyable, so hiding it would only restore the silence.
+    /// </remarks>
     internal static SolutionMembership ReadDeclaredMembership(string solutionPath)
     {
         string fullPath = Path.GetFullPath(solutionPath);
         if (!IsFilterFormat(fullPath))
         {
-            IReadOnlyList<string> members = ReadCsprojMembers(fullPath);
-            return new SolutionMembership(members, members);
+            DeclaredProjects projects = ReadDeclaredProjects(fullPath);
+            return new SolutionMembership(projects.Csproj, projects.Csproj, projects.Unsupported);
         }
 
         (string referencedSolution, IReadOnlyList<string> requested) =
             ParseFilter(File.ReadAllText(fullPath), Path.GetDirectoryName(fullPath)!);
 
-        IReadOnlyList<string> declared = ReadCsprojMembers(referencedSolution);
+        DeclaredProjects referenced = ReadDeclaredProjects(referencedSolution);
+        IReadOnlyList<string> declared = referenced.Csproj;
 
         // Roslyn's own rule, reproduced exactly: an empty projects array is not an empty selection, it is
         // "no filtering at all". Intersecting instead would load nothing and report the whole solution
         // dropped — the degraded answer this type exists to avoid, arrived at from the other side.
-        if (requested.Count == 0) return new SolutionMembership(declared, declared);
+        if (requested.Count == 0) return new SolutionMembership(declared, declared, referenced.Unsupported);
 
         var selected = new HashSet<string>(requested, PathComparison.Comparer);
         List<string> required = declared
             .Where(selected.Contains)
             .ToList();
 
-        return new SolutionMembership(required, declared);
+        return new SolutionMembership(required, declared, referenced.Unsupported);
     }
 
     /// <summary>
@@ -225,36 +270,67 @@ internal static class SolutionProjectFileParser
     /// </summary>
     internal static IReadOnlyList<string> ReadCsprojMembers(string solutionPath)
     {
+        return ReadDeclaredProjects(solutionPath).Csproj;
+    }
+
+    /// <summary>
+    ///     Reads <paramref name="solutionPath" /> from disk and partitions its declared projects into the
+    ///     <c>.csproj</c> members and everything else. Dispatches on the file extension (<c>.slnx</c> ⇒ XML,
+    ///     else classic).
+    /// </summary>
+    internal static DeclaredProjects ReadDeclaredProjects(string solutionPath)
+    {
         string fullPath = Path.GetFullPath(solutionPath);
         string text = File.ReadAllText(fullPath);
         string directory = Path.GetDirectoryName(fullPath)!;
-        return ParseCsprojMembers(text, Path.GetExtension(fullPath), directory);
+        return ParseDeclaredProjects(text, Path.GetExtension(fullPath), directory);
     }
 
     /// <summary>
     ///     The pure text-to-paths core, testable without disk: parses <paramref name="solutionText" /> per
-    ///     <paramref name="extension" /> (<c>.slnx</c> ⇒ XML, else classic <c>.sln</c>), keeps only
-    ///     <c>.csproj</c> entries, and resolves each against <paramref name="solutionDirectory" />
-    ///     (normalizing both slash spellings). Duplicate paths collapse.
+    ///     <paramref name="extension" /> (<c>.slnx</c> ⇒ XML, else classic <c>.sln</c>), splits the declared
+    ///     entries into <c>.csproj</c> and every other project kind, and resolves each against
+    ///     <paramref name="solutionDirectory" /> (normalizing both slash spellings). Duplicate paths collapse.
     /// </summary>
-    internal static IReadOnlyList<string> ParseCsprojMembers(
+    /// <remarks>
+    ///     <b>A declared entry is a project when its extension ends in <c>proj</c>.</b> That test buys the
+    ///     whole non-C# family — <c>.fsproj</c>, <c>.vbproj</c>, <c>.sqlproj</c>, <c>.vcxproj</c>,
+    ///     <c>.shproj</c>, and whatever the next tool mints — without a list this parser would have to keep
+    ///     current, and it excludes solution folders for free: a classic <c>.sln</c> folder line carries a
+    ///     bare name in the path field, and a <c>.slnx</c> <c>&lt;Folder&gt;</c> is not a <c>Project</c>
+    ///     element at all.
+    /// </remarks>
+    internal static DeclaredProjects ParseDeclaredProjects(
         string solutionText, string extension, string solutionDirectory)
     {
         IEnumerable<string> relativePaths = extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase)
             ? ParseSlnx(solutionText)
             : ParseSln(solutionText);
 
-        var results = new List<string>();
+        var csproj = new List<string>();
+        var unsupported = new List<string>();
         var seen = new HashSet<string>(PathComparison.Comparer);
         foreach (string relative in relativePaths)
         {
-            if (!relative.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!IsProjectEntry(relative)) continue;
 
             string fullPath = Path.GetFullPath(Path.Combine(solutionDirectory, Normalize(relative)));
-            if (seen.Add(fullPath)) results.Add(fullPath);
+            if (!seen.Add(fullPath)) continue;
+
+            if (relative.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) csproj.Add(fullPath);
+            else unsupported.Add(fullPath);
         }
 
-        return results;
+        return new DeclaredProjects(csproj, unsupported);
+    }
+
+    // Read off the declared spelling rather than Path.GetExtension: a dotted directory segment is no threat
+    // here (the extension is the last one either way), but a bare solution-folder name is exactly what must
+    // not match, and "ends in proj" says that in one test.
+    private static bool IsProjectEntry(string relativePath)
+    {
+        return Path.GetExtension(relativePath)
+            .EndsWith("proj", StringComparison.OrdinalIgnoreCase);
     }
 
     // Solution files and filters are both written with whichever slash the authoring tool prefers.

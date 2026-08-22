@@ -49,7 +49,7 @@ internal sealed class DiagnosticInjectingSolutionSource(
     {
         SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solutionPath, ct);
         var injected = new WorkspaceDiagnostics(
-            diagnostics, [], failedProjects ?? [], uncheckedProjects ?? [], restoreFailedProjects ?? []);
+            diagnostics, [], failedProjects ?? [], uncheckedProjects ?? [], restoreFailedProjects ?? [], []);
         // Every warm affordance the inner handle carried is forwarded, not just the ones a caller happens to
         // exercise today: this double re-wraps a real handle, so anything it drops silently sends the run
         // down the cold path and quietly changes what the gate is being tested against.

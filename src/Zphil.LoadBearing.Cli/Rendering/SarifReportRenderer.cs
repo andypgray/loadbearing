@@ -65,8 +65,8 @@ internal static class SarifReportRenderer
     ///     every site path solution-relative; <paramref name="executionSuccessful" /> becomes the
     ///     invocation verdict (false when the incomplete-model gate will exit 2); and
     ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty).
-    ///     The failed, restore-failed and unchecked projects <paramref name="diagnostics" /> carries each add
-    ///     one further structured notification when non-empty, so a whole, healthy run
+    ///     The failed, restore-failed, unchecked and unsupported projects <paramref name="diagnostics" />
+    ///     carries each add one further structured notification when non-empty, so a whole, healthy run
     ///     (<see cref="WorkspaceDiagnostics.None" />) renders exactly what it always rendered.
     /// </summary>
     internal static string Serialize(
@@ -90,12 +90,13 @@ internal static class SarifReportRenderer
         IReadOnlyList<string> failedProjects = trust.FailedProjects ?? [];
         IReadOnlyList<string> restoreFailedProjects = trust.RestoreFailedProjects ?? [];
         IReadOnlyList<string> uncheckedProjects = trust.UncheckedProjects ?? [];
+        IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects = trust.UnsupportedProjects ?? [];
 
         var run = new SarifRun(
             new SarifTool(driver),
             BuildInvocations(
                 executionSuccessful, workspaceDiagnostics, failedProjects, restoreFailedProjects,
-                uncheckedProjects),
+                uncheckedProjects, unsupportedProjects),
             BuildOriginalUriBaseIds(),
             BuildResults(report, relativizer));
         var log = new SarifLog(SchemaUri, SarifVersion, [run]);
@@ -120,7 +121,7 @@ internal static class SarifReportRenderer
     }
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
-    // the diagnostics themselves ride as warning-level notifications, and the three structured facts add one
+    // the diagnostics themselves ride as warning-level notifications, and the four structured facts add one
     // notification each after them, in the order the CLI refusals state them: the model being wrong outranks
     // the model being small, and a failed load outranks a failed restore. The block is omitted when there is
     // nothing to say, so a whole clean run is unchanged.
@@ -129,7 +130,8 @@ internal static class SarifReportRenderer
         IReadOnlyList<string> workspaceDiagnostics,
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> restoreFailedProjects,
-        IReadOnlyList<string> uncheckedProjects)
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
         List<SarifNotification> notifications = workspaceDiagnostics
             .Select(diagnostic => new SarifNotification(new SarifMessage(diagnostic), WarningLevel))
@@ -138,6 +140,7 @@ internal static class SarifReportRenderer
         if (failedProjects.Count > 0) notifications.Add(LoadFailureNotification(failedProjects));
         if (restoreFailedProjects.Count > 0) notifications.Add(RestoreFailureNotification(restoreFailedProjects));
         if (uncheckedProjects.Count > 0) notifications.Add(NarrowingNotification(uncheckedProjects));
+        if (unsupportedProjects.Count > 0) notifications.Add(UnsupportedNotification(unsupportedProjects));
 
         return [new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null)];
     }
@@ -199,6 +202,27 @@ internal static class SarifReportRenderer
             new SarifMessage(
                 $"A solution filter narrowed this run: {subject}, so these results cover part of the "
                 + $"solution: {string.Join(", ", uncheckedProjects)}"),
+            WarningLevel);
+    }
+
+    // The other half of "these results cover part of the solution", and the half no filter explains: a
+    // project written in a language this product cannot read is never in the model, so no alert can ever be
+    // raised in it and a clean scan over a polyglot solution silently reads as clean over all of it. Warning
+    // rather than error, beside the narrowing one and for its reason: the results are true, they are simply
+    // not the whole solution's. Composed here per this file's convention that each renderer formats its own
+    // messages; the reason each entry carries is the shared stamp's, so the prose and the JSON key cannot
+    // disagree about what the run could read.
+    private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
+    {
+        string subject = unsupportedProjects.Count == 1
+            ? "1 project the solution declares was not surveyed"
+            : $"{unsupportedProjects.Count} projects the solution declares were not surveyed";
+        IEnumerable<string> entries = unsupportedProjects
+            .Select(project => $"{project.Project} ({project.Reason})");
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"{subject}, so these results cover part of the solution: {string.Join(", ", entries)}"),
             WarningLevel);
     }
 

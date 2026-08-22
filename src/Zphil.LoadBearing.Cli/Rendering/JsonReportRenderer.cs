@@ -49,7 +49,7 @@ internal static class JsonReportRenderer
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
-        // Every argument is named, which is what holds the four trust slots to the record's declaration
+        // Every argument is named, which is what holds the five trust slots to the record's declaration
         // order for a reader; the key order is the DTO's to state.
         var document = new CheckJson(
             SchemaVersion: 3,
@@ -62,6 +62,7 @@ internal static class JsonReportRenderer
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,
+            UnsupportedProjects: trust.UnsupportedProjects,
             Summary: new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- A REAL F# project, not a renamed csproj — which is the whole point of this bed. F# has its own
+         compiler and no Roslyn language service behind it, so a project like this reaches the workspace
+         model and then supports no compilation: there is no syntax tree, no semantic model and nothing to
+         extract. Excluding it is forced; saying so is not, and until this bed existed the survey said
+         nothing at all.
+         FSharp.Core is an implicit reference the F# targets add, and it resolves from the SDK's own
+         library-packs rather than a feed — so this stays package-free in the sense that matters here: the
+         startup restore sweep costs no network. Restored UNLOCKED, like every other bed. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <!-- FSharp.Core is implicit but it is still a PackageReference, which turns on .NET's NuGet
+             vulnerability audit; an unreachable private feed then emits NU1900 warnings that
+             MSBuildWorkspace surfaces as workspace diagnostics. Measured on this bed: with the audit on and
+             the feed away, the survey carries a diagnostic naming this file — machine-dependent noise in a
+             document the tests read. Every other fixture with a package reference disables it for the same
+             reason. -->
+        <NuGetAudit>false</NuGetAudit>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Library.fs" />
+    </ItemGroup>
+</Project>

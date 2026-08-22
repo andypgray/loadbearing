@@ -58,9 +58,10 @@ internal sealed class CheckRunner(
         IReadOnlyList<string> ruleGlobs = GlobList.Parse(request.Rules);
         IReadOnlyList<ArchRule> rules = CheckPipeline.SelectRules(source.Model, ruleGlobs);
 
-        // Both stamps are human-channel only: under --json the document carries the same two facts in
-        // uncheckedProjects and rulesFilter.
+        // All three stamps are human-channel only: under --json the document carries the same facts in
+        // uncheckedProjects, unsupportedProjects and rulesFilter.
         NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.CheckStamp);
+        UnsupportedProjectsNotices.Stamp(human, source, UnsupportedProjectsNotice.CheckStamp);
         WriteFilterStamp(human, ruleGlobs, rules.Count, source.Model.Rules.Count);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, request.DiffBase, rules, ct);

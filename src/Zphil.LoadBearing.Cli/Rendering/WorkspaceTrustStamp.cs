@@ -4,15 +4,34 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The four facts every document stamps about how far its own contents can be trusted: whether the model
-///     is incomplete, and which projects failed to load, went unchecked, or had no packages restored.
+///     One declared project this product could not read, and why — the entry shape of
+///     <see cref="WorkspaceTrustStamp.UnsupportedProjects" />.
+/// </summary>
+/// <remarks>
+///     <b>An object rather than a bare path, and one reason string rather than a taxonomy.</b> The object is
+///     what lets a later finding add a <em>kind</em> of reason without minting a second key. The single
+///     reason is the other half of the same judgement: the path already carries the extension, so
+///     per-language wording would add near-identical strings without adding a fact, and this parser cannot
+///     honestly classify every <c>*proj</c> it may meet — it recognises "not a <c>.csproj</c>", which is
+///     exactly what the sentence says.
+/// </remarks>
+/// <param name="Project">The project, solution-relative and forward-slashed like every other path.</param>
+/// <param name="Reason">Why the run could not read it.</param>
+internal sealed record UnsupportedProjectStamp(string Project, string Reason);
+
+/// <summary>
+///     The five facts every document stamps about how far its own contents can be trusted: whether the model
+///     is incomplete, and which projects failed to load, went unchecked, had no packages restored, or are
+///     written in a language this product cannot read.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Three of the four are adjacent lists of the same type, which is a swap the compiler cannot see: a
+///         Three of the five are adjacent lists of the same type, which is a swap the compiler cannot see: a
 ///         reorder exchanging what failed to load with what a solution filter left unchecked type-checks
 ///         cleanly and reaches the wire. Composed once here, off one <see cref="WorkspaceDiagnostics" /> and
 ///         by name, that reorder is untypeable — and no document decides on its own which list is which.
+///         <see cref="UnsupportedProjects" /> is a different type for a different reason, but it lands here
+///         for the same one: this is where a path becomes the thing a document prints.
 ///     </para>
 ///     <para>
 ///         The empty-to-null policy is the other half. A project list that is empty says nothing, so it is
@@ -20,6 +39,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         is what keeps a clean document byte-identical to the one it always was. Every document still
 ///         declares its own slots and their order; SARIF reads the same stamp and unwraps the nulls, because
 ///         an empty list emits no notification there, which is the same omission.
+///     </para>
+///     <para>
+///         <b>The reason text is composed here, once.</b> Four surfaces state it — three JSON documents and
+///         the SARIF log — and composing it at each would let the wire key and the prose disagree about what
+///         the run could read. This is also the only place that knows the path is about to be relativized,
+///         which is what the reader will actually see.
 ///     </para>
 /// </remarks>
 /// <param name="ModelIncomplete">
@@ -34,16 +59,28 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <param name="RestoreFailedProjects">
 ///     The projects whose NuGet packages are not in the model, or <see langword="null" /> when they all are.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     The declared projects this product cannot read, each with its reason, or <see langword="null" /> for
+///     an all-C# solution. Unlike its three siblings this is not a verdict about the load — nothing here was
+///     ever going to load — so it never reaches <see cref="ModelIncomplete" />.
+/// </param>
 internal readonly record struct WorkspaceTrustStamp(
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
-    IReadOnlyList<string>? RestoreFailedProjects)
+    IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects)
 {
+    /// <summary>
+    ///     The reason every unsupported entry carries. One string for the whole set, deliberately — see
+    ///     <see cref="UnsupportedProjectStamp" />.
+    /// </summary>
+    internal const string NotACsharpProject = "not a C# project";
+
     /// <summary>
     ///     Reads the stamp off a load's own verdict, relativizing every project path.
     /// </summary>
-    /// <param name="diagnostics">The load's verdict, carrying the three project lists.</param>
+    /// <param name="diagnostics">The load's verdict, carrying the four project lists.</param>
     /// <param name="relativizer">
     ///     The document's relativizer — the paths land solution-relative and forward-slashed, like every
     ///     other path in it, so a machine path never reaches a golden.
@@ -54,7 +91,8 @@ internal readonly record struct WorkspaceTrustStamp(
             diagnostics.IsIncomplete ? true : null,
             Relative(diagnostics.FailedProjects, relativizer),
             Relative(diagnostics.UncheckedProjects, relativizer),
-            Relative(diagnostics.RestoreFailedProjects, relativizer));
+            Relative(diagnostics.RestoreFailedProjects, relativizer),
+            Unsupported(diagnostics.UnsupportedProjects, relativizer));
     }
 
     private static IReadOnlyList<string>? Relative(
@@ -63,6 +101,15 @@ internal readonly record struct WorkspaceTrustStamp(
         return projects.Count == 0
             ? null
             : projects.Select(relativizer.Relative)
+                .ToList();
+    }
+
+    private static IReadOnlyList<UnsupportedProjectStamp>? Unsupported(
+        IReadOnlyList<string> projects, PathFormat.Relativizer relativizer)
+    {
+        return projects.Count == 0
+            ? null
+            : projects.Select(project => new UnsupportedProjectStamp(relativizer.Relative(project), NotACsharpProject))
                 .ToList();
     }
 }

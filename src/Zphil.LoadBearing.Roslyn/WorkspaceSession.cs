@@ -396,6 +396,7 @@ public sealed class WorkspaceSession : IAsyncDisposable
             FailedProjects = loadVerdict.FailedProjects,
             UncheckedProjects = loadVerdict.UncheckedProjects,
             RestoreFailedProjects = loadVerdict.RestoreFailedProjects,
+            UnsupportedProjects = loadVerdict.UnsupportedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };

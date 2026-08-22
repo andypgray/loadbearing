@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A spec for the PolyglotApp fixture whose one rule holds, so a check run exits 0. That clean
+         verdict is the point: the defect it guards is a green report over a solution holding projects
+         the model never contained, saying nothing about them. References only Core; loaded by the CLI
+         e2e tests via the spec flag. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Zphil.LoadBearing\Zphil.LoadBearing.csproj" />
+    </ItemGroup>
+
+</Project>

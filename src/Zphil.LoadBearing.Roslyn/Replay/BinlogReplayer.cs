@@ -1,5 +1,6 @@
 using Basic.CompilerLog.Util;
 using Microsoft.CodeAnalysis;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Solutions;
 
@@ -82,8 +83,13 @@ internal static class BinlogReplayer
 
         ct.ThrowIfCancellationRequested();
 
+        // Filled by the predicate below as the reader walks the capture — the one moment the dropped
+        // projects are visible on this path.
+        var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
+
         var reader = SolutionReader.Create(
-            binlogPath, BasicAnalyzerKind.OnDisk, predicate: IsReplayableCSharpCall);
+            binlogPath, BasicAnalyzerKind.OnDisk,
+            predicate: call => IsReplayableCSharpCall(call, unsupportedProjects));
 
         AdhocWorkspace? workspace = null;
         try
@@ -116,7 +122,12 @@ internal static class BinlogReplayer
             // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
             IReadOnlyList<string> failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
 
-            return new ReplayedSolution(workspace, reader, stripped, targetFrameworks, failedProjects);
+            List<string> unsupported = unsupportedProjects
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList();
+
+            return new ReplayedSolution(
+                workspace, reader, stripped, targetFrameworks, failedProjects, unsupported);
         }
         catch
         {
@@ -190,11 +201,22 @@ internal static class BinlogReplayer
         return outputPath + extension;
     }
 
-    // The C#-only filter, layered onto SolutionReader's own default (regular compiler calls). VB projects
-    // surface as CompilerCalls with IsCSharp == false; dropping them here is how the C#-only contract is
-    // enforced, so a mixed-language solution replays its C# projects and silently ignores the rest.
-    private static bool IsReplayableCSharpCall(CompilerCall call)
+    // The C#-only filter, layered onto SolutionReader's own default (regular compiler calls). A project in
+    // another language surfaces as a CompilerCall with IsCSharp == false; dropping it here is how the
+    // C#-only contract is enforced, so a mixed-language capture replays its C# projects and states the rest.
+    //
+    // The dropped paths are collected rather than discarded because this is the same silence the survey had
+    // on the MSBuild path: the fact was already in hand at the moment of dropping it, and nothing downstream
+    // could recover it — a binlog records what was built, so there is no solution file here to read the
+    // answer off instead.
+    private static bool IsReplayableCSharpCall(CompilerCall call, ICollection<string> droppedProjects)
     {
-        return call is { Kind: CompilerCallKind.Regular, IsCSharp: true };
+        if (call.Kind != CompilerCallKind.Regular) return false;
+        if (call.IsCSharp) return true;
+
+        if (call.ProjectFilePath is { Length: > 0 } projectFilePath)
+            droppedProjects.Add(Path.GetFullPath(projectFilePath));
+
+        return false;
     }
 }

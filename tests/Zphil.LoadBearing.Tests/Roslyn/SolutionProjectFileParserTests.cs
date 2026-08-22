@@ -7,10 +7,11 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 
 /// <summary>
 ///     Tests for <see cref="SolutionProjectFileParser" />, no fixture solution anywhere. They pin the
-///     textual csproj-membership extraction both the capture's coverage check and
+///     textual project-membership extraction both the capture's coverage check and
 ///     <see cref="SpecExclusion" />'s membership subtraction depend on: both solution formats, both slash
-///     spellings, the rule that only <c>.csproj</c> entries count (solution folders and other project kinds
-///     are ignored), and which formats the parser owns at all.
+///     spellings, the partition that sends <c>.csproj</c> entries to the load and every other project kind
+///     to the coverage statement (with solution folders in neither), and which formats the parser owns at
+///     all.
 ///     <para>
 ///         The <see cref="SolutionProjectFileParser.ParseFilter" /> rows pin the half a solution filter adds:
 ///         its <em>two</em> resolution bases — the referenced solution against the filter's own directory,
@@ -28,7 +29,7 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// </summary>
 public sealed class SolutionProjectFileParserTests
 {
-    // A path root that need not exist — ParseCsprojMembers resolves textually via Path.GetFullPath.
+    // A path root that need not exist — ParseDeclaredProjects resolves textually via Path.GetFullPath.
     private static readonly string SolutionDirectory = Path.Combine(Path.GetTempPath(), "sln-parse-tests");
 
     // The filter and the solution it points at deliberately live in different directories, which is the only
@@ -38,8 +39,23 @@ public sealed class SolutionProjectFileParserTests
     private static readonly string ReferencedSolution =
         Path.GetFullPath(Path.Combine(SolutionDirectory, "solutions", "App.sln"));
 
+    /// <summary>
+    ///     Every project kind a solution may declare beside <c>.csproj</c>, one row each. F# is the only one
+    ///     of them that reaches a loaded solution at all, which is why it — and only it — also has a
+    ///     heavyweight bed; the rest come free with the "ends in <c>proj</c>" partition and are pinned here,
+    ///     over text, rather than by four more solutions on disk.
+    /// </summary>
+    public static TheoryData<string, string> UnsupportedProjectKindCases => new()
+    {
+        { "Fs", "fsproj" },
+        { "Vb", "vbproj" },
+        { "Database", "sqlproj" },
+        { "Native", "vcxproj" },
+        { "Shared", "shproj" }
+    };
+
     [Fact]
-    public void ParseCsprojMembers_ClassicSln_ReturnsCsprojsIgnoringFolders()
+    public void ParseDeclaredProjects_ClassicSln_ReturnsCsprojsIgnoringFolders()
     {
         // Arrange — a Domain project (backslash), a Web project (forward slash), and a solution folder.
         const string text = """
@@ -53,19 +69,21 @@ public sealed class SolutionProjectFileParserTests
                             """;
 
         // Act
-        IReadOnlyList<string> members = SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory);
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
 
-        // Assert — both csprojs (either slash spelling resolves), the folder dropped.
-        members.ShouldBe([
+        // Assert — both csprojs (either slash spelling resolves); the folder is not a project at all, so it
+        // lands in neither half rather than being reported as something this product could not read.
+        declared.Csproj.ShouldBe([
             Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj")),
             Path.GetFullPath(Path.Combine(SolutionDirectory, "nested", "Beta", "Beta.csproj"))
         ]);
+        declared.Unsupported.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ParseCsprojMembers_Slnx_ReturnsCsprojsIgnoringNonCsprojAndNesting()
+    public void ParseDeclaredProjects_Slnx_ReturnsCsprojsIgnoringNonProjectEntriesAndNesting()
     {
-        // Arrange — a root project, a folder-nested project, and a non-csproj entry.
+        // Arrange — a root project, a folder-nested project, and an entry that is not a project file.
         const string text = """
                             <Solution>
                               <Project Path="Alpha\Alpha.csproj" />
@@ -77,24 +95,73 @@ public sealed class SolutionProjectFileParserTests
                             """;
 
         // Act
-        IReadOnlyList<string> members = SolutionProjectFileParser.ParseCsprojMembers(text, ".slnx", SolutionDirectory);
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".slnx", SolutionDirectory);
 
-        // Assert — both csprojs (nesting flattened, both slash spellings), the markdown dropped.
-        members.ShouldBe([
+        // Assert — both csprojs (nesting flattened, both slash spellings); the markdown is not a project.
+        declared.Csproj.ShouldBe([
             Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj")),
             Path.GetFullPath(Path.Combine(SolutionDirectory, "nested", "Beta", "Beta.csproj"))
         ]);
+        declared.Unsupported.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [MemberData(nameof(UnsupportedProjectKindCases))]
+    public void ParseDeclaredProjects_AProjectInAnotherLanguage_IsNamedRatherThanDropped(
+        string name, string extension)
+    {
+        // Arrange — one readable project beside one this product cannot read, which is the whole shape of a
+        // polyglot solution. Both slash spellings and both formats are covered by the rows above; what this
+        // adds is that the extension test is "ends in proj" rather than a list of the kinds anyone thought of.
+        var text = $"""
+                    <Solution>
+                      <Project Path="Alpha\Alpha.csproj" />
+                      <Project Path="{name}/{name}.{extension}" />
+                    </Solution>
+                    """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".slnx", SolutionDirectory);
+
+        // Assert — the csproj half is untouched, so a polyglot solution loads exactly what it always did;
+        // what changes is that the other project is now a fact the run can state.
+        declared.Csproj.ShouldBe([Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj"))]);
+        declared.Unsupported.ShouldBe([Path.GetFullPath(Path.Combine(SolutionDirectory, name, $"{name}.{extension}"))]);
     }
 
     [Fact]
-    public void ParseCsprojMembers_NoProjects_ReturnsEmpty()
+    public void ParseDeclaredProjects_ClassicSlnSolutionFolder_IsNotReportedAsAProjectWeCannotRead()
+    {
+        // A classic .sln puts a bare folder name in the very field a project path occupies, so the one test
+        // that keeps folders out of the coverage statement is the extension. Pinned on its own because
+        // getting it wrong would name "Solution Items" as an unreadable project on every classic solution in
+        // existence — a false claim on the most common format there is.
+        const string text = """
+                            Microsoft Visual Studio Solution File, Format Version 12.00
+                            Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{33333333-3333-3333-3333-333333333333}"
+                            EndProject
+                            """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
+
+        // Assert
+        declared.Csproj.ShouldBeEmpty();
+        declared.Unsupported.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ParseDeclaredProjects_NoProjects_ReturnsEmpty()
     {
         // Arrange — a header-only solution with no project lines.
         const string text = "Microsoft Visual Studio Solution File, Format Version 12.00\n";
 
-        // Act + Assert
-        SolutionProjectFileParser.ParseCsprojMembers(text, ".sln", SolutionDirectory)
-            .ShouldBeEmpty();
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
+
+        // Assert
+        declared.Csproj.ShouldBeEmpty();
+        declared.Unsupported.ShouldBeEmpty();
     }
 
     [Fact]

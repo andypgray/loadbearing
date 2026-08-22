@@ -23,6 +23,7 @@
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppLayerSpec/Zphil.LoadBearing.MyAppLayerSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppRenderSpec/Zphil.LoadBearing.MyAppRenderSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.MyAppViolatedSpec/Zphil.LoadBearing.MyAppViolatedSpec.csproj" />
+    <Project Path="tests/Fixtures/Zphil.LoadBearing.PolyglotAppSpec/Zphil.LoadBearing.PolyglotAppSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.SharedFrameworkSpec/Zphil.LoadBearing.SharedFrameworkSpec.csproj" />
     <Project Path="tests/Fixtures/Zphil.LoadBearing.SpecFixture/Zphil.LoadBearing.SpecFixture.csproj" />
   </Folder>

@@ -55,9 +55,10 @@ internal sealed class StatusRunner(
         IReadOnlyList<string> renderedDiagnostics = diagnostics.Rendered;
         WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
 
-        // The narrowing stamp is human-channel only, where the document carries the same fact in
-        // uncheckedProjects.
+        // Both stamps are human-channel only, where the document carries the same facts in
+        // uncheckedProjects and unsupportedProjects.
         NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.StatusStamp);
+        UnsupportedProjectsNotices.Stamp(human, source, UnsupportedProjectsNotice.StatusStamp);
 
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
         if (request.Json)

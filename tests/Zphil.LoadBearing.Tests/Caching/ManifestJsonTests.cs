@@ -204,6 +204,7 @@ public sealed class ManifestJsonTests
             FailedProjects: ["C:/repo/src/Broken/Broken.csproj"],
             UncheckedProjects: ["C:/repo/src/Filtered/Filtered.csproj"],
             RestoreFailedProjects: ["C:/repo/src/Unrestored/Unrestored.csproj"],
+            UnsupportedProjects: ["C:/repo/src/Signals/Signals.fsproj"],
             Fragments: [FullyPopulatedFragment()]);
     }
 

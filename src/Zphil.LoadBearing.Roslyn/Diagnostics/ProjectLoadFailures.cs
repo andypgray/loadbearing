@@ -5,9 +5,10 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 
 /// <summary>
-///     What one load produced, in the two shapes a verdict has to distinguish: the projects that
-///     <see cref="Failed" /> — which gates — and the declared members left <see cref="Unchecked" /> by a
-///     solution filter, which narrows the verdict without invalidating it.
+///     What one load produced, in the three shapes a verdict has to distinguish: the projects that
+///     <see cref="Failed" /> — which gates — the declared members left <see cref="Unchecked" /> by a
+///     solution filter, which narrows the verdict without invalidating it, and the
+///     <see cref="Unsupported" /> projects no load could have produced, which state the run's coverage.
 /// </summary>
 /// <param name="Failed">
 ///     Absolute <c>.csproj</c> paths of the projects that failed to load. A non-empty list makes the model
@@ -19,12 +20,19 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     broken one, so this must never gate; it exists so a green cannot be mistaken for a green over the
 ///     whole solution.
 /// </param>
+/// <param name="Unsupported">
+///     Absolute paths of the projects the solution declares in another language, read straight off the
+///     solution file rather than measured against the load. Nothing here was ever going to load, so — like
+///     <see cref="Unchecked" /> and unlike <see cref="Failed" /> — it must never gate: the model is smaller
+///     than the solution, not wrong about it.
+/// </param>
 internal sealed record ProjectLoadReport(
     IReadOnlyList<string> Failed,
-    IReadOnlyList<string> Unchecked)
+    IReadOnlyList<string> Unchecked,
+    IReadOnlyList<string> Unsupported)
 {
-    /// <summary>The report for a load with nothing to say — no failures, no narrowing.</summary>
-    internal static ProjectLoadReport Empty { get; } = new([], []);
+    /// <summary>The report for a load with nothing to say — no failures, no narrowing, nothing unreadable.</summary>
+    internal static ProjectLoadReport Empty { get; } = new([], [], []);
 }
 
 /// <summary>
@@ -125,6 +133,14 @@ internal sealed record ProjectLoadReport(
 ///         <see cref="SolutionMembership.Declared" /> are the same list and anything missing has already been
 ///         blamed.
 ///     </para>
+///     <para>
+///         <b>A third list rides along that this predicate does not measure at all.</b>
+///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file — the projects
+///         declared in another language — and is carried here only because this is where declared membership
+///         is already read. It is deliberately outside both subtractions above: those ask what a load owed
+///         and did not deliver, while an <c>.fsproj</c> was never owed. Both arms skip such a project for
+///         the same reason, so a polyglot solution cannot be refused for holding one.
+///     </para>
 /// </remarks>
 internal static class ProjectLoadFailures
 {
@@ -144,12 +160,14 @@ internal static class ProjectLoadFailures
         var failed = new HashSet<string>(PathComparison.Comparer);
 
         // Arm 2 first, over what did load: a multi-target-framework project is several Projects behind one
-        // file path, so the set collapses them to the one csproj a reader would go and fix.
+        // file path, so the set collapses them to the one csproj a reader would go and fix. A project in
+        // another language is skipped — see NotACsharpProject on why it must not be able to gate.
         foreach (Project project in solution.Projects)
-            if (LoadedEmpty(project) && project.FilePath is { } filePath)
+            if (!NotACsharpProject(project) && LoadedEmpty(project) && project.FilePath is { } filePath)
                 failed.Add(Path.GetFullPath(filePath));
 
         var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
+        IReadOnlyList<string> unsupported = [];
 
         if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
         {
@@ -169,12 +187,17 @@ internal static class ProjectLoadFailures
             foreach (string declared in membership.Declared)
                 if (!loadedFiles.Contains(declared) && !failed.Contains(declared))
                     uncheckedMembers.Add(declared);
+
+            // Not measured against the load at all: this is what the solution file says, and an entry here
+            // was never a candidate to load. Sorting it too keeps every list on this report ordered the
+            // same way, so a document reads the same on any OS.
+            unsupported = Sorted(membership.Unsupported);
         }
 
-        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers));
+        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), unsupported);
     }
 
-    private static IReadOnlyList<string> Sorted(HashSet<string> paths)
+    private static IReadOnlyList<string> Sorted(IEnumerable<string> paths)
     {
         return paths
             .OrderBy(path => path, StringComparer.Ordinal)
@@ -187,5 +210,17 @@ internal static class ProjectLoadFailures
     private static bool LoadedEmpty(Project project)
     {
         return project.OutputFilePath is null && project.CompilationOutputInfo.AssemblyPath is null;
+    }
+
+    // F# reaches a loaded solution — measured on a two-project bed, where the workspace produced a Project
+    // for the .fsproj and the extractor's own language filters dropped it — so this arm can see a project
+    // the model was never going to contain. Blaming one would refuse a healthy polyglot solution as a load
+    // failure, which is precisely the disease this predicate was written to cure; the run states such a
+    // project under its coverage statement instead. Measured on that bed the arm does not currently fire
+    // (the .fsproj carried its output paths), so this is the guard that keeps it that way rather than a fix
+    // for an observed refusal — unlike RestoreFailures', which was measured falsely refusing.
+    private static bool NotACsharpProject(Project project)
+    {
+        return !string.Equals(project.Language, LanguageNames.CSharp, StringComparison.Ordinal);
     }
 }

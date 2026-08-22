@@ -84,6 +84,13 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   the type reaches both while `arch.Project(...)` over the declaring project reaches only the
   declaration. Each entry names the type, that project, the supplying assemblies, and the projects
   binding the assembly instead. Absent when the solution has none.
+- `unsupportedProjects[]` — the projects the solution declares that this product cannot read at
+  all, each with its reason. LoadBearing surveys **C# projects only**: an `.fsproj`, a `.vbproj`,
+  a `.sqlproj` is not in `projects[]`, contributes no edges, and can never violate a rule you
+  write. Read this **first**, before treating `projects[]` as the estate: without it the roster is
+  simply shorter than the solution and nothing says so, and a spec derived from it silently cannot
+  reach whatever ships from those projects. Absent when the solution is all C#. Unlike the two
+  coverage keys above it is never elided — it is bounded by the solution, not the codebase.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
@@ -93,6 +100,7 @@ projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
 shadowedTypes[]         { type, declaredBy, suppliedBy[], boundFromAssemblyBy[] }
+unsupportedProjects[]   { project, reason }
 ```
 
 Grain is a ladder, and an over-budget survey walks down it by itself rather than coming back
@@ -102,16 +110,17 @@ external row survives. At skeleton grain — `skeleton: true`, or the server's s
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
 and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
 `externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
-edges stay. Read the stamp: a survey with no `grain` is the complete one. An absent coverage key
-with no count beside it means the solution has none; the count key is what tells elision from
-absence.
+edges stay. `unsupportedProjects[]` survives every rung whole, having no count key at all. Read
+the stamp: a survey with no `grain` is the complete one. An absent coverage key with no count
+beside it means the solution has none; the count key is what tells elision from absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
 outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of its declarers is
 in scope. A `shadowedTypes[]` entry survives on either end too — its declaring project, or any
-project binding the assembly. On a solution too big to survey whole even at skeleton grain, scope is
-the knob left — grain has nowhere further to go.
+project binding the assembly. `unsupportedProjects[]` does not scope either: it is a fact about
+the load rather than about the roster. On a solution too big to survey whole even at skeleton
+grain, scope is the knob left — grain has nowhere further to go.
 
 From the survey, write down **hypotheses, not conclusions**:
 
@@ -191,6 +200,18 @@ Add it to the solution (`dotnet sln add arch/MyApp.ArchSpec/MyApp.ArchSpec.cspro
 Spec discovery is by convention: **the unique solution project that references
 `Zphil.LoadBearing.dll`** — via the package or via a project reference. As a solution member,
 the spec project is excluded from the checked universe — its own types never trip your rules.
+
+**Expect `dotnet sln add` to rewrite more of a `.sln` than the one project it adds.** The CLI
+unions its default platforms (`x64`, `x86`) into the solution's configuration list, then writes the
+project-configuration table out complete: an `ActiveCfg`/`Build.0` pair per project per
+configuration × platform combination. On a dozen-project solution that is a hundred-plus inserted
+lines for the one project you added. The rewrite is legitimate, not damage: those mappings are what
+make the spec project, and every other member, build under every combination the solution declares.
+Do not revert it to hand-write a narrower entry mapping only `Debug|Any CPU` and `Release|Any CPU`.
+The project registers either way (`dotnet sln list` shows it), but a solution build under any other
+declared combination skips a project with no mapping for it — MSBuild names it in an `MSB4121`
+warning and still exits 0, so the build stays green while `check` reads a stale spec assembly, or
+none at all.
 
 **Source-checkout setups only**: `dotnet sln add` follows project references, so it may also
 add the LoadBearing contract library to the solution — and **solution membership decides
@@ -469,7 +490,9 @@ Have the human run `loadbearing render MyApp.sln`: it writes the managed block i
 directory when rules are anchored on that layer (the local-rules card). Then commit —
 spec project, `arch/baselines/**`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
-acknowledged debt, and the generated context in a single change.
+acknowledged debt, and the generated context in a single change. On a multi-configuration `.sln`
+the largest hunk in that diff is often the solution file itself: the configuration-table expansion
+from step 2, which is mechanical, expected, and not to be trimmed by hand.
 
 Report the outcome: rules by posture, debt counts per Migrate rule, any rule left
 deliberately red with its violation count, dragons documented, and anything you dropped at

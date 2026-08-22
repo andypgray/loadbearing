@@ -2,6 +2,7 @@ using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
@@ -91,7 +92,7 @@ internal sealed class GraphRunner(
                 request, scoped, source.SolutionDirectory, solutionName, renderedDiagnostics, diagnostics,
                 projectGlobs);
         else
-            WriteHuman(request, summary, scoped, solutionName, projectGlobs);
+            WriteHuman(request, summary, scoped, solutionName, projectGlobs, source.SolutionDirectory, diagnostics);
 
         return 0;
     }
@@ -124,7 +125,7 @@ internal sealed class GraphRunner(
     // of the solution this covers, and why an edge below may name a project the roster does not.
     private void WriteHuman(
         GraphRequest request, GraphSummary summary, GraphSummary scoped, string solutionName,
-        IReadOnlyList<string> projectGlobs)
+        IReadOnlyList<string> projectGlobs, string solutionDirectory, WorkspaceDiagnostics diagnostics)
     {
         if (projectGlobs.Count > 0)
         {
@@ -132,7 +133,13 @@ internal sealed class GraphRunner(
             output.WriteLine();
         }
 
-        foreach (string line in GraphFormatter.Lines(scoped, solutionName, request.Grain))
+        // Read off the same stamp the --json document is composed from, so the terminal reader and the
+        // document cannot disagree about which projects the survey could not read, or how they are spelled.
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
+
+        foreach (string line in GraphFormatter.Lines(
+                     scoped, solutionName, request.Grain, trust.UnsupportedProjects ?? []))
             output.WriteLine(line);
     }
 

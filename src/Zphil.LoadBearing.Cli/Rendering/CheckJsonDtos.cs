@@ -9,9 +9,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
 // without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects`,
-// `restoreFailedProjects`, `uncheckedProjects` and `rulesFilter` slots are additive the same way: null
-// (omitted) on every run whose workspace loaded, whose NuGet packages resolved, that no solution filter
-// narrowed, and that checked the whole spec — so a clean document is unchanged.
+// `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects` and `rulesFilter` slots are additive
+// the same way: null (omitted) on every run whose workspace loaded, whose NuGet packages resolved, that no
+// solution filter narrowed, whose solution is all C#, and that checked the whole spec — so a clean document
+// is unchanged.
 // The grain slots — `grain`, `violationCount`, `siteCount` — are additive in the same sense and absent from
 // every full-grain report, which is every report the CLI writes unless asked otherwise. They hold the schema
 // at version 3, as the survey's own ladder held it at 1: a consumer reading a full document cannot tell
@@ -74,6 +75,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     loaded, never read from the filter's own selection — a filter whose transitive project references
 ///     pull the rest of the solution in narrows nothing and omits the key.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     Which projects the solution declares that this product cannot read — each a solution-relative,
+///     forward-slashed project path with the reason — or null (omitted) for an all-C# solution. Beside
+///     <see cref="UncheckedProjects" /> rather than <see cref="FailedProjects" /> and for its reason: it
+///     scopes the verdict instead of invalidating it, so it never reaches <see cref="ModelIncomplete" /> and
+///     every rule below still ran and answered, over a universe that never included these projects. A clean
+///     verdict over a polyglot solution is the exact reading this slot qualifies — no rule can be violated
+///     in a project the model does not contain, and the report had no way to say so.
+/// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
@@ -85,6 +95,7 @@ internal sealed record CheckJson(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     SummaryJson Summary,
     IReadOnlyList<RuleJson> Rules,
     IReadOnlyList<string> WorkspaceDiagnostics);

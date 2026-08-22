@@ -45,6 +45,13 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     identical, so recomputing can only ever agree — at the cost of a parse per project on the path whose
 ///     whole promise is that it opens nothing.
 /// </param>
+/// <param name="UnsupportedProjects">
+///     The absolute paths of the projects the solution declared in another language on the recorded run.
+///     <em>Paths only</em>: the reason each one carries is a pure function of its extension and is composed
+///     at render time, so this stays a homogeneous bag of paths and the reason cannot drift between a cold
+///     run and a hit. Persisted for its siblings' reason — a hit owns no solution file read of its own — and
+///     a hit that dropped the coverage statement would restore the very silence it was added to break.
+/// </param>
 internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,
@@ -55,6 +62,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
+    IReadOnlyList<string> UnsupportedProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>

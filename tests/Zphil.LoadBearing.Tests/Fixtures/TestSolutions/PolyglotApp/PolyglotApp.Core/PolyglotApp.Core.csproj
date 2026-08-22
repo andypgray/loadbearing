@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The half of the polyglot bed this product can read. It exists so the survey has something to say:
+         a coverage statement is only testable beside a real answer, and "the survey listed 1 of the 2
+         projects the solution declares" is the exact shape the defect produced on a real codebase.
+         Package-free like the other TestSolutions beds: the whole restore resolves from the SDK, so the
+         startup sweep costs no network. Restored UNLOCKED — the lock-file policy lives only in the tests
+         project, never here. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+    </PropertyGroup>
+</Project>

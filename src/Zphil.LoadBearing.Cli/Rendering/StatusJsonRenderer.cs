@@ -43,6 +43,7 @@ internal static class StatusJsonRenderer
             trust.FailedProjects,
             trust.UncheckedProjects,
             trust.RestoreFailedProjects,
+            trust.UnsupportedProjects,
             new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,

@@ -78,6 +78,10 @@ public sealed class SdkStyleProjectTests
         "MyApp.Domain.csproj: SDK-style, assets file present",
         "MyApp.Legacy.Billing.csproj: SDK-style, assets file present",
         "MyApp.Web.csproj: SDK-style, assets file present",
+        // The polyglot bed's C# half. Its .fsproj sibling is deliberately not a row: the corpus scans
+        // *.csproj, and RestoreFailures now skips a project in another language before it ever asks this
+        // predicate — so a row for one would describe a path that cannot be reached.
+        "PolyglotApp.Core.csproj: SDK-style, assets file present",
         "ShadowedApp.Product.Tests.csproj: SDK-style, assets file present",
         "ShadowedApp.Product.csproj: SDK-style, assets file present",
         "SlnxApp.Core.csproj: SDK-style, assets file present",

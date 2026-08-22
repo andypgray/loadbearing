@@ -67,7 +67,8 @@ internal static class GraphJsonRenderer
             trust.ModelIncomplete,
             trust.FailedProjects,
             trust.UncheckedProjects,
-            trust.RestoreFailedProjects);
+            trust.RestoreFailedProjects,
+            trust.UnsupportedProjects);
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.GraphJson);
     }

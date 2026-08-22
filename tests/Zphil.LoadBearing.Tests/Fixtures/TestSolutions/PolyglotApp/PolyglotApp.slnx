@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PolyglotApp.Core/PolyglotApp.Core.csproj" />
+  <Project Path="PolyglotApp.Fs/PolyglotApp.Fs.fsproj" />
+</Solution>

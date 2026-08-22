@@ -95,6 +95,12 @@
                           ReferenceOutputAssembly="false"
                           OutputItemType="DerivedSpecAssembly"
                           Private="false" />
+        <!-- The spec for the polyglot bed: its one rule holds, so the check e2e can assert that a report
+             which is genuinely clean still names the project the model never contained. -->
+        <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.PolyglotAppSpec\Zphil.LoadBearing.PolyglotAppSpec.csproj"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="PolyglotSpecAssembly"
+                          Private="false" />
         <!-- The spec whose typeof() anchor lives in a .NET shared framework — the load failure no build
              setting can fix. Its own csproj explains why CopyLocalLockFileAssemblies is on there. -->
         <ProjectReference Include="..\Fixtures\Zphil.LoadBearing.SharedFrameworkSpec\Zphil.LoadBearing.SharedFrameworkSpec.csproj"
@@ -179,6 +185,10 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>DerivedSpecPath</_Parameter1>
                 <_Parameter2>@(DerivedSpecAssembly->'%(FullPath)')</_Parameter2>
+            </AssemblyAttribute>
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>PolyglotSpecPath</_Parameter1>
+                <_Parameter2>@(PolyglotSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>SharedFrameworkSpecPath</_Parameter1>
