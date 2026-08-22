@@ -53,14 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to hang a subject count on.
 
 - **Every document now states the projects it could not read.** LoadBearing surveys and checks C#
-  projects only, and until now a solution holding an `.fsproj`, a `.vbproj` or a `.sqlproj` simply
+  projects only, and until now a solution holding an `.fsproj`, a `.vbproj` or a `.sqlproj`
   produced a shorter `projects` array with nothing to say about the difference — so a spec derived
   from the survey could silently fail to reach a shipped product surface, and a clean `check` over a
   polyglot solution read as a clean solution. `unsupportedProjects` now carries each declared
   project this product cannot read, with its reason, in `graph`, `check` and `status` `--json`, in
   the matching MCP documents, and as a fourth SARIF notification. It is read from the solution file
   rather than the workspace, so it is complete where the loaded solution is not: `.fsproj` is the
-  only non-C# kind that reaches a workspace at all. It never gates — a project this tool cannot
+  only non-C# kind that reaches a workspace at all. It never gates — a project this product cannot
   read makes the model smaller than the solution, not wrong about it, so it takes
   `uncheckedProjects`' posture rather than `failedProjects`'. The key is absent for an all-C#
   solution, so every schema version is unchanged and an all-C# document is byte-identical to the

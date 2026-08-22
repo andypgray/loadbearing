@@ -410,9 +410,8 @@ When it cannot bind, the server starts anyway and every tool call returns the re
 any solution it saw one level down. Each reply also names the CLI command that reads the same
 model, because rebinding the server takes a client-config edit and a relaunch. The failure is
 readable in the client rather than arriving as a server that would not start. However the
-server is launched, the rule from Installing
-still applies: restore and build the solution first; the checker never builds, and a stale
-build gives stale verdicts.
+server is launched, the rule from Installing still applies: restore and build the solution
+first; the checker never builds, and a stale build gives stale verdicts.
 
 `dnx` launches the server straight from nuget.org without the global install; the `--` hands
 everything after it to the tool:
@@ -428,15 +427,14 @@ install time: put the solution in the config's `args` after `mcp`, or set
 `LOADBEARING_SOLUTION_PATH` in its `env`.
 
 `dnx` ships with the .NET 10 SDK, but installing that SDK is not what makes the command exist:
-`dotnet` picks
-an SDK per directory, honouring the nearest `global.json` at or above the working directory,
-and `dnx` is present only where the SDK picked there is 10 or newer. A repository pinning an
-older SDK (the normal state of the codebases this tool is built for) has no `dnx` at its root
-however much .NET 10 is installed beside it, and a registry client launching there sees a
-server that died before the handshake, with the reason on stderr alone. Wire such a
-repository with the installed `loadbearing` command instead: the global tool needs a .NET 10
-SDK installed on the machine, `dnx` needs one selected in the working directory, and a
-`global.json` pinning lower blocks only the second.
+`dotnet` picks an SDK per directory, honouring the nearest `global.json` at or above the
+working directory, and `dnx` is present only where the SDK picked there is 10 or newer. A
+repository pinning an older SDK (the normal state of the codebases this tool is built for)
+has no `dnx` at its root however much .NET 10 is installed beside it, and a registry client
+launching there sees a server that died before the handshake, with the reason on stderr
+alone. Wire such a repository with the installed `loadbearing` command instead: the global
+tool needs a .NET 10 SDK installed on the machine, `dnx` needs one selected in the working
+directory, and a `global.json` pinning lower blocks only the second.
 
 ## Building
 
