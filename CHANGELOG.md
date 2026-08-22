@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The README's count of the rules governing this repository is held to the board it renders.**
+  It read `Eighteen rules` from 2026-08-01 through four published releases while the spec grew to
+  thirty, and it sits in the sentence promising the page is spec-derived, so the claim that the
+  page cannot rot was the part rotting. It now reads thirty, the second mention two screens down
+  states no number of its own, and a new doc-hygiene gate holds any such claim to the rule bullets
+  the committed `AGENTS.md` managed block carries. The board is the authority rather than the spec
+  source: counting `arch.Rule(` misses the two the `DotNetGuidance` pack contributes and scores a
+  quarantined scope as nothing. It is also not `check`'s count, which is thirty-one once that scope
+  desugars into its two children.
+- **The README no longer presents `context` as a command-line verb.** It listed `context` beside
+  `check`, `status` and `graph` and wrote `context --path`, but there is no such verb: the surface
+  is the `arch_context` MCP tool, as `loadbearing --help`'s seven verbs already said. Both mentions
+  now name the tool. The behaviour described was right; only the surface was misnamed.
+
 ## [0.6.0] - 2026-08-22
 
 ### Added
