@@ -374,7 +374,12 @@ public sealed class ExtractionCacheStoreTests
             specs,
             new WorkspaceDiagnostics(
                 ["load-diag-1", "load-diag-2"], [], ["/repo/Broken/Broken.csproj"], [],
-                ["/repo/Unrestored/Unrestored.csproj"], ["/repo/Fs/Fs.fsproj"], []));
+                ["/repo/Unrestored/Unrestored.csproj"],
+                [
+                    new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
+                    new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+                ],
+                []));
         store.Write(store.CaptureFingerprint(solution.Projects), extraction)
             .ShouldBeTrue();
 
@@ -401,6 +406,13 @@ public sealed class ExtractionCacheStoreTests
         // either from, so a manifest that lost one would answer green exactly where the cold run refuses.
         result.LoadDiagnostics.FailedProjects.ShouldBe(["/repo/Broken/Broken.csproj"]);
         result.LoadDiagnostics.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
+        // The coverage statement round-trips with its classification, not just its paths. The kind is the
+        // producer's verdict and a hit owns no solution file to re-read it from, so a manifest that stored
+        // paths alone would leave the reason to be guessed again on the one path that cannot check.
+        result.LoadDiagnostics.UnsupportedProjects.ShouldBe([
+            new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
+            new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+        ]);
     }
 
     [Fact]

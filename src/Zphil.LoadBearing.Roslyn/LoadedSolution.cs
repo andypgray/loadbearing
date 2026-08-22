@@ -77,16 +77,28 @@ public sealed class LoadedSolution : IDisposable
     public IReadOnlyList<string> UncheckedProjects { get; }
 
     /// <summary>
-    ///     The absolute paths of the projects this solution declares in a language this product cannot read,
-    ///     ordinal-sorted — read off the solution file rather than the load, since a project that was never
-    ///     going to load leaves no shape in one. Empty for an all-C# solution.
+    ///     The projects this solution declares that no extractor reaches, each with its
+    ///     <see cref="UnsupportedProjectKind" /> and ordinal-sorted by path — read off the solution file
+    ///     rather than the load, since a project that was never going to load leaves no shape in one. Empty
+    ///     for a solution every project of which this product can read.
     /// </summary>
     /// <remarks>
-    ///     Never gates, on <see cref="UncheckedProjects" />' terms rather than <see cref="FailedProjects" />':
-    ///     the model is smaller than the solution, not wrong about it. What it exists for is that until it
-    ///     did, the survey listed fewer projects than the solution declares and named the difference nowhere.
+    ///     <para>
+    ///         Never gates, on <see cref="UncheckedProjects" />' terms rather than
+    ///         <see cref="FailedProjects" />': the model is smaller than the solution, not wrong about it.
+    ///         What it exists for is that until it did, the survey listed fewer projects than the solution
+    ///         declares and named the difference nowhere.
+    ///     </para>
+    ///     <para>
+    ///         <b>Internal where its three siblings are public</b>, because it alone carries a taxonomy. The
+    ///         others are bare paths and say all they will ever say; this one's kinds are expected to grow as
+    ///         project shapes this product cannot read are told apart, and a kind on a public surface would
+    ///         be a compatibility promise about a set that is not finished. It travels the way
+    ///         <see cref="WorkspaceDiagnostics" /> and its <c>MultiTargetedProject</c>s already do — visible
+    ///         to the CLI, the adapter and the tests through <c>InternalsVisibleTo</c>, and to nobody else.
+    ///     </para>
     /// </remarks>
-    public IReadOnlyList<string> UnsupportedProjects { get; }
+    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
 
     /// <summary>
     ///     This load's verdict as the one value every surface reads — the four project lists above beside

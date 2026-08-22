@@ -29,7 +29,7 @@ internal sealed class ReplayedSolution : IDisposable
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
         IReadOnlyList<string>? failedProjects = null,
-        IReadOnlyList<string>? unsupportedProjects = null)
+        IReadOnlyList<UnsupportedProject>? unsupportedProjects = null)
     {
         Workspace = workspace;
         _reader = reader;
@@ -86,18 +86,20 @@ internal sealed class ReplayedSolution : IDisposable
     public IReadOnlyList<string> RestoreFailedProjects { get; } = [];
 
     /// <summary>
-    ///     The absolute paths of the projects this capture built in a language the replay cannot read,
-    ///     ordinal-sorted — the same fact <see cref="LoadedSolution.UnsupportedProjects" /> carries, so a
-    ///     document says what it covers on both paths.
+    ///     The projects this capture built in a language the replay cannot read, ordinal-sorted by path —
+    ///     the same fact <see cref="LoadedSolution.UnsupportedProjects" /> carries, so a document says what
+    ///     it covers on both paths, and internal for that property's reason.
     /// </summary>
     /// <remarks>
     ///     Read from the capture rather than from a solution file, which is the only difference between the
     ///     two paths here: a binlog records what was built, so the compiler invocations the C#-only predicate
-    ///     declines <em>are</em> the answer, and they are collected at the moment of declining them. A
-    ///     project the build skipped entirely is therefore invisible — the replay analog of the MSBuild
+    ///     declines <em>are</em> the answer, and they are collected at the moment of declining them. Every
+    ///     entry is therefore <see cref="UnsupportedProjectKind.NotCsharp" />, and that is a property of the
+    ///     evidence rather than a simplification: this path sees compilations, and a shared project is not
+    ///     one. A project the build skipped entirely is invisible here — the replay analog of the MSBuild
     ///     path's undeclared-passenger limit.
     /// </remarks>
-    public IReadOnlyList<string> UnsupportedProjects { get; }
+    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
 
     /// <summary>
     ///     This replay's verdict as the one value every surface reads — the three project lists above beside

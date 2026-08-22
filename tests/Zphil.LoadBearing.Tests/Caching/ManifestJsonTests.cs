@@ -7,6 +7,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Caching;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Replay;
 
 namespace Zphil.LoadBearing.Tests.Caching;
@@ -48,14 +49,15 @@ public sealed class ManifestJsonTests
         byte[] generated = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJson.Context.CacheManifest);
         byte[] reflected = JsonSerializer.SerializeToUtf8Bytes(manifest, ReflectionResolvedOptions());
 
-        // The non-vacuity guard, and the point of the closed converter list: all four graph enums reach the
-        // wire as their names. A missing registration writes the ordinal instead — which both resolvers would
+        // The non-vacuity guard, and the point of the closed converter list: every graph enum reaches the
+        // wire as its name. A missing registration writes the ordinal instead — which both resolvers would
         // do identically, so the comparison below cannot catch it.
         string json = generated.ShouldBeTheSameJsonAs(reflected);
         json.ShouldContain("\"Kind\":\"Interface\"");
         json.ShouldContain("\"Accessibility\":\"Internal\"");
         json.ShouldContain("\"MemberKind\":\"Property\"");
         json.ShouldContain("\"Lifetime\":\"Scoped\"");
+        json.ShouldContain("\"Kind\":\"SharedProject\"");
     }
 
     [Fact]
@@ -204,7 +206,13 @@ public sealed class ManifestJsonTests
             FailedProjects: ["C:/repo/src/Broken/Broken.csproj"],
             UncheckedProjects: ["C:/repo/src/Filtered/Filtered.csproj"],
             RestoreFailedProjects: ["C:/repo/src/Unrestored/Unrestored.csproj"],
-            UnsupportedProjects: ["C:/repo/src/Signals/Signals.fsproj"],
+            // A shared project rather than the .fsproj a reader would expect first: its kind is the non-zero
+            // member, and this fixture's whole discipline is that a converter which stopped applying writes
+            // a visibly different value rather than the name's own ordinal zero.
+            UnsupportedProjects:
+            [
+                new UnsupportedProject("C:/repo/src/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+            ],
             Fragments: [FullyPopulatedFragment()]);
     }
 

@@ -30,7 +30,10 @@ namespace Zphil.LoadBearing.Xunit;
 ///         rather than pass against a partial model. Override <see cref="AllowWorkspaceDiagnostics" /> to opt
 ///         into checking the partial model as it loaded. A solution filter is the opposite case — a smaller
 ///         model rather than a wrong one — so the rule cases keep their verdicts and only
-///         <see cref="Workspace_LoadedCompletely" /> skips.
+///         <see cref="Workspace_LoadedCompletely" /> skips. A solution declaring projects no extractor
+///         reaches (an <c>.fsproj</c>, a shared project) is the same case arrived at from the other side, and
+///         skips it the same way: nothing about the run went wrong, and a test by that name still cannot
+///         claim the whole solution.
 ///     </para>
 ///     <para>
 ///         Rules enumerate at <em>discovery</em> time from the spec alone (no Roslyn, no workspace), so the
@@ -172,10 +175,20 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes silently on a complete load.
     /// </summary>
     /// <remarks>
-    ///     A <c>.slnf</c> <see cref="SolutionPath" /> that left declared projects unchecked also skips it,
-    ///     naming them (<see cref="NarrowedUniverseNotice.AdapterSkip" />). The rule cases keep reporting
-    ///     there — a narrowed universe is a smaller true answer, unlike a partial model — but this test is
-    ///     the completeness claim itself, and a filtered run cannot make it.
+    ///     <para>
+    ///         Two other things also skip it, both of them ways a whole load still covers less than the
+    ///         solution: a <c>.slnf</c> <see cref="SolutionPath" /> that left declared projects unchecked
+    ///         (<see cref="NarrowedUniverseNotice.AdapterSkip" />), and a solution declaring projects no
+    ///         extractor reaches — an <c>.fsproj</c>, a <c>.vbproj</c>, a shared project
+    ///         (<see cref="UnsupportedProjectsNotice.AdapterSkip" />). The rule cases keep reporting through
+    ///         both — a smaller universe is a smaller true answer, unlike a partial model — but this test is
+    ///         the completeness claim itself, and neither run can make it.
+    ///     </para>
+    ///     <para>
+    ///         A solution can be both at once, so the causes compose: one block each, in the order the CLI
+    ///         states them. What never composes with them is the broken model above, which outranks both and
+    ///         has already answered.
+    ///     </para>
     /// </remarks>
     [Fact]
     public async Task Workspace_LoadedCompletely()
@@ -188,11 +201,20 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         }
 
         // Only ever a clean load by here: a broken model outranks a small one, and it has already answered.
-        if (run.Diagnostics.UncheckedProjects.Count == 0) return;
+        var blocks = new List<string>();
 
-        IReadOnlyList<string> uncheckedProjects = NarrowedUniverseNotice.Relative(
-            run.Diagnostics.UncheckedProjects, run.SolutionDirectory);
-        Assert.Skip(NarrowedUniverseNotice.AdapterSkip(Path.GetFileName(run.SolutionPath), uncheckedProjects));
+        if (run.Diagnostics.UncheckedProjects.Count > 0)
+            blocks.Add(
+                NarrowedUniverseNotice.AdapterSkip(
+                    Path.GetFileName(run.SolutionPath),
+                    NarrowedUniverseNotice.Relative(run.Diagnostics.UncheckedProjects, run.SolutionDirectory)));
+
+        if (run.Diagnostics.UnsupportedProjects.Count > 0)
+            blocks.Add(
+                UnsupportedProjectsNotice.AdapterSkip(
+                    UnsupportedProjectsNotice.Relative(run.Diagnostics.UnsupportedProjects, run.SolutionDirectory)));
+
+        if (blocks.Count > 0) Assert.Skip(string.Join("\n", blocks));
     }
 
     // Lazily start (and then share) the one check run for this closed TSpec, seeded by the first case's
@@ -223,6 +245,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         var diagnostics = new List<string>();
         LoadedSolution? opened = null;
+        // Escapes the extraction delegate the way `opened` does, and for the same reason: the merge's two
+        // facts exist only once a model has been merged, and this is the one place the adapter holds one.
+        CodebaseModel? extracted = null;
         try
         {
             CheckReport report = await ArchCheckSequence.ExecuteAsync(
@@ -242,6 +267,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                         : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
                         loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
+                    extracted = codebase;
                     // The unchecked projects come out of this load, which is why they ride the extraction
                     // rather than the call: nothing above this line has opened a workspace to measure them.
                     return new ExtractedCodebase(codebase, loaded.UncheckedProjects);
@@ -249,15 +275,18 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                 null, CancellationToken.None);
 
             Dictionary<string, RuleResult> byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
-            // Neither of the merge's two facts: the adapter has no channel that renders them, so its
-            // diagnostics are the load failures alone. The project lists come off the load itself — null only
-            // where no load happened, which is also the case where there is nothing to have failed, skipped
-            // or been unable to read.
+            // Both of the merge's two facts, and neither is rendered: the adapter has no channel that shows
+            // them, but they are documented as one pair filled from one read, and an adapter holding the
+            // merged model while passing empty lists is what made that claim false here. The project lists
+            // come off the load itself — null only where no load happened, which is also the case where
+            // there is nothing to have failed, gone unchecked, or been out of reach.
             return new ArchCheckRun(
                 byId, solutionDirectory, fullSolutionPath,
                 new WorkspaceDiagnostics(
-                    diagnostics, [], opened?.FailedProjects ?? [], opened?.UncheckedProjects ?? [],
-                    opened?.RestoreFailedProjects ?? [], opened?.UnsupportedProjects ?? [], []));
+                    diagnostics, extracted?.MergeNotes ?? [], opened?.FailedProjects ?? [],
+                    opened?.UncheckedProjects ?? [], opened?.RestoreFailedProjects ?? [],
+                    opened?.UnsupportedProjects ?? [],
+                    extracted is null ? [] : MultiTargetedProjects.Of(extracted)));
         }
         finally
         {

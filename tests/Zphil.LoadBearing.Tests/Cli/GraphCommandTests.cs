@@ -43,7 +43,7 @@ public sealed class GraphCommandTests
           MyApp.Legacy.Billing — 4 types; references: (none)
           MyApp.Web — 18 types; references: MyApp.Legacy.Billing
 
-        Projects the solution declares that this survey could not read:
+        Projects the solution declares that this survey does not cover:
           (none)
 
         Observed project references (distinct type pairs):
@@ -83,7 +83,7 @@ public sealed class GraphCommandTests
         Projects (1):
           MyApp.Web — 18 types; references: MyApp.Legacy.Billing
 
-        Projects the solution declares that this survey could not read:
+        Projects the solution declares that this survey does not cover:
           (none)
 
         Observed project references (distinct type pairs):

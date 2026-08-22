@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 
 namespace Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -33,6 +34,72 @@ internal sealed record MultiTargetedProject(
     string Project,
     IReadOnlyList<string> TargetFrameworks,
     string? FactsFollow);
+
+/// <summary>
+///     Reads <see cref="MultiTargetedProject" />s off a merged model — the one owner of the projection, so
+///     every composer that holds a model fills the slot the same way.
+/// </summary>
+/// <remarks>
+///     It lives beside the record rather than at any one caller because the record's own documentation
+///     promises the slot and <c>MergeNotes</c> are filled from the same merge on the same read. A composer
+///     that projected for itself could honour that promise differently, and one that had no projection to
+///     reach for simply passed an empty list — which is what made the promise false for the xUnit adapter
+///     while it held the very model the answer comes off.
+/// </remarks>
+internal static class MultiTargetedProjects
+{
+    /// <summary>
+    ///     The projects <paramref name="codebase" /> holds that arrived as several compilations, each with
+    ///     its frameworks and the one its shared types' facts came from. Empty for a solution whose projects
+    ///     each target one framework, which is most of them.
+    /// </summary>
+    /// <remarks>
+    ///     Wider than the merge notes by design: a note is raised only where two frameworks declared the same
+    ///     type, so a project whose frameworks share nothing has no note and is still checked against one of
+    ///     them.
+    /// </remarks>
+    internal static IReadOnlyList<MultiTargetedProject> Of(CodebaseModel codebase)
+    {
+        return codebase.Projects
+            .Where(project => project.TargetFrameworks.Count > 0)
+            .Select(project => new MultiTargetedProject(
+                project.Name, project.TargetFrameworks, project.FactsFollow))
+            .ToList();
+    }
+}
+
+/// <summary>
+///     Why a project the solution declares is outside the model — the classification its producer already
+///     made, carried to the surfaces rather than re-derived at the edge that composes the sentence.
+/// </summary>
+/// <remarks>
+///     Two members rather than one per language: the path already carries the extension, so per-language
+///     wording would add near-identical strings without adding a fact. What earns a member of its own is a
+///     project whose absence means something <em>different</em>, and only the shared project does.
+/// </remarks>
+internal enum UnsupportedProjectKind
+{
+    /// <summary>
+    ///     A project in a language this product has no extractor for — an <c>.fsproj</c>, a <c>.vbproj</c>,
+    ///     a <c>.sqlproj</c>, a <c>.vcxproj</c>, or a compiler invocation the replay declined as non-C#.
+    /// </summary>
+    NotCsharp,
+
+    /// <summary>
+    ///     A shared project (<c>.shproj</c>): a language-neutral container whose <c>.projitems</c> files are
+    ///     compiled into every project that imports it. Its code is very often C#, and where an importing
+    ///     project is in the model that code is in the model too — so the only honest thing to say about it
+    ///     is its shape, which is what sets it apart from <see cref="NotCsharp" />.
+    /// </summary>
+    SharedProject
+}
+
+/// <summary>
+///     One project the solution declares that no extractor reached, and the kind of reason it did not.
+/// </summary>
+/// <param name="Path">The absolute path to the project file.</param>
+/// <param name="Kind">What kind of project it is — which is what the reason a reader sees is composed from.</param>
+internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Kind);
 
 /// <summary>
 ///     Everything a run knows about how well its workspace loaded, as one value: the
@@ -112,12 +179,15 @@ internal sealed record MultiTargetedProject(
 ///     they share one remedy (<c>dotnet restore</c>) and one consequence.
 /// </param>
 /// <param name="UnsupportedProjects">
-///     The absolute paths of the projects the solution declares in a language this product cannot read —
-///     an <c>.fsproj</c>, a <c>.vbproj</c>, a <c>.sqlproj</c> — ordinal-sorted, and read off the solution
-///     file rather than off the load. It takes <see cref="UncheckedProjects" />' posture rather than
-///     <see cref="FailedProjects" />': a project no extractor can read makes the universe smaller, never
-///     wrong, so it says what the run covers and decides nothing. Without it the run simply surveyed fewer
-///     projects than the solution declares and said so nowhere.
+///     The projects the solution declares that no extractor reached — each an absolute path with the
+///     <see cref="UnsupportedProjectKind" /> its producer classified it as — ordinal-sorted by path, and
+///     read off the solution file rather than off the load. It takes <see cref="UncheckedProjects" />'
+///     posture rather than <see cref="FailedProjects" />': a project no extractor can read makes the
+///     universe smaller, never wrong, so it says what the run covers and decides nothing. Without it the run
+///     simply surveyed fewer projects than the solution declares and said so nowhere. The kind travels
+///     because both producers knew it and only the composing edge had to guess: classifying by extension
+///     there mislabelled a shared project as a language this product cannot read, which is wrong twice over
+///     (see <see cref="UnsupportedProjectKind.SharedProject" />).
 /// </param>
 /// <param name="MultiTargetedProjects">
 ///     The projects one <c>.csproj</c> of which yielded several compilations, each with its frameworks and
@@ -136,7 +206,7 @@ internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
-    IReadOnlyList<string> UnsupportedProjects,
+    IReadOnlyList<UnsupportedProject> UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject> MultiTargetedProjects)
 {
     /// <summary>A run with nothing to report — nothing failed to load, and no diagnostics or merge notes.</summary>

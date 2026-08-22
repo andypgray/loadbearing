@@ -39,7 +39,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class PolyglotSurveyE2ETests
 {
-    private const string UnsupportedHeading = "Projects the solution declares that this survey could not read:";
+    private const string UnsupportedHeading = "Projects the solution declares that this survey does not cover:";
 
     [Fact]
     public async Task Graph_SolutionDeclaringAnFsproj_NamesItAndWhyFromTheDocumentAlone()
@@ -240,7 +240,7 @@ public sealed class PolyglotSurveyE2ETests
         result.ShouldSucceed();
         result.Out.NormalizedTrimmed()
             .ShouldStartWith(
-                "1 project the solution declares was not read — this product surveys C# projects only:\n"
+                "1 project the solution declares was not surveyed:\n"
                 + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
                 + "The burndown below counts only the projects this product can read: these contribute no "
                 + "violations and never will, so every count reads low by whatever they hold.");
@@ -261,7 +261,7 @@ public sealed class PolyglotSurveyE2ETests
         result.ShouldSucceed();
         result.Out.NormalizedTrimmed()
             .ShouldStartWith(
-                "1 project the solution declares was not read — this product surveys C# projects only:\n"
+                "1 project the solution declares was not surveyed:\n"
                 + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
                 + "The verdict below covers only the projects this product can read, so a clean result here "
                 + "is not a clean solution.");

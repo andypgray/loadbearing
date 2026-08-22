@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -40,18 +41,23 @@ public sealed class SolutionProjectFileParserTests
         Path.GetFullPath(Path.Combine(SolutionDirectory, "solutions", "App.sln"));
 
     /// <summary>
-    ///     Every project kind a solution may declare beside <c>.csproj</c>, one row each. F# is the only one
-    ///     of them that reaches a loaded solution at all, which is why it — and only it — also has a
-    ///     heavyweight bed; the rest come free with the "ends in <c>proj</c>" partition and are pinned here,
-    ///     over text, rather than by four more solutions on disk.
+    ///     Every project kind a solution may declare in another language, one row each. F# is the only one of
+    ///     them that reaches a loaded solution at all, which is why it — and only it — also has a heavyweight
+    ///     bed; the rest come free with the "ends in <c>proj</c>" partition and are pinned here, over text,
+    ///     rather than by three more solutions on disk.
     /// </summary>
+    /// <remarks>
+    ///     The <c>.shproj</c> is deliberately not among them: it is the one extension this partition catches
+    ///     that is not a language at all, so it has a named fact of its own
+    ///     (<see cref="ParseDeclaredProjects_ASharedProject_IsClassifiedByShapeRatherThanAsAnotherLanguage" />)
+    ///     rather than a row asserting the answer the others get.
+    /// </remarks>
     public static TheoryData<string, string> UnsupportedProjectKindCases => new()
     {
         { "Fs", "fsproj" },
         { "Vb", "vbproj" },
         { "Database", "sqlproj" },
-        { "Native", "vcxproj" },
-        { "Shared", "shproj" }
+        { "Native", "vcxproj" }
     };
 
     [Fact]
@@ -124,9 +130,40 @@ public sealed class SolutionProjectFileParserTests
         DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".slnx", SolutionDirectory);
 
         // Assert — the csproj half is untouched, so a polyglot solution loads exactly what it always did;
-        // what changes is that the other project is now a fact the run can state.
+        // what changes is that the other project is now a fact the run can state, carrying the kind this
+        // parser classified it as rather than leaving a later reader to re-derive one from the extension.
         declared.Csproj.ShouldBe([Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj"))]);
-        declared.Unsupported.ShouldBe([Path.GetFullPath(Path.Combine(SolutionDirectory, name, $"{name}.{extension}"))]);
+        declared.Unsupported.ShouldBe([
+            new UnsupportedProject(
+                Path.GetFullPath(Path.Combine(SolutionDirectory, name, $"{name}.{extension}")),
+                UnsupportedProjectKind.NotCsharp)
+        ]);
+    }
+
+    [Fact]
+    public void ParseDeclaredProjects_ASharedProject_IsClassifiedByShapeRatherThanAsAnotherLanguage()
+    {
+        // A shared project is the one entry the "ends in proj" partition catches that is not a language: it
+        // is a container whose .projitems files compile into every project that imports it, so its code is
+        // very often C# and reaches the model through the importer. Classifying it with the .fsproj was the
+        // defect — a single reason string then told every reader "not a C# project" about a project whose
+        // sources usually are, and which is not missing from the model at all.
+        const string text = """
+                            <Solution>
+                              <Project Path="Alpha\Alpha.csproj" />
+                              <Project Path="Shared/Shared.shproj" />
+                            </Solution>
+                            """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".slnx", SolutionDirectory);
+
+        // Assert
+        declared.Unsupported.ShouldBe([
+            new UnsupportedProject(
+                Path.GetFullPath(Path.Combine(SolutionDirectory, "Shared", "Shared.shproj")),
+                UnsupportedProjectKind.SharedProject)
+        ]);
     }
 
     [Fact]

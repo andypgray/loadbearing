@@ -307,20 +307,11 @@ internal sealed class CodebaseSource : IDisposable
         // regenerates them through FragmentMerger — the cache stores fragments, never notes. Captured here,
         // off the one exit, so Diagnostics can surface them beside the workspace-load failures.
         mergeNotes = codebase.MergeNotes;
-        multiTargetedProjects = MultiTargetedProjectsOf(codebase);
+        // The other half of the same read, off the shared projection rather than one of this file's own: the
+        // slot's contract is that it and the notes come from one merge, and an owner beside the record is
+        // what lets every composer holding a model keep that promise the same way.
+        multiTargetedProjects = MultiTargetedProjects.Of(codebase);
         return codebase;
-    }
-
-    // The projects that arrived as several compilations, read off the same model the notes came from. Wider
-    // than the notes by design: a note is raised only where two frameworks declared the same type, so a
-    // project whose frameworks share nothing has no note and is still checked against one of them.
-    private static IReadOnlyList<MultiTargetedProject> MultiTargetedProjectsOf(CodebaseModel codebase)
-    {
-        return codebase.Projects
-            .Where(project => project.TargetFrameworks.Count > 0)
-            .Select(project => new MultiTargetedProject(
-                project.Name, project.TargetFrameworks, project.FactsFollow))
-            .ToList();
     }
 
     private async Task<CodebaseModel> ExtractCoreAsync(

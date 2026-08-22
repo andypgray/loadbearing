@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Replay;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -20,14 +21,16 @@ internal static class ManifestJson
     /// <summary>The shared serializer options for both persisted manifests.</summary>
     /// <remarks>
     ///     Compact, with enums written as their names: readability over the few bytes, and rename-safe — an
-    ///     unrecognized name degrades to a parse-error miss rather than a silently wrong value. The four
+    ///     unrecognized name degrades to a parse-error miss rather than a silently wrong value. The
     ///     converters are registered per enum rather than through the open
     ///     <see cref="JsonStringEnumConverter" /> factory, so the set that reaches disk is visible and stays
     ///     trim-safe; neither form carries a naming policy, so both spell the members verbatim and the bytes
-    ///     are the ones every cache file written before the generator already holds. A fifth enum joining the
-    ///     DTO graph would fall through to the integer default and change the on-disk schema silently, so
-    ///     <c>ManifestJsonTests</c> holds this list against the graph rather than leaving it to vigilance.
-    ///     Exposed for the round-trip pin.
+    ///     are the ones every cache file written before the generator already holds. An enum joining the DTO
+    ///     graph with no entry here would fall through to the integer default and change the on-disk schema
+    ///     silently, so <c>ManifestJsonTests</c> holds this list against the graph rather than leaving it to
+    ///     vigilance — and that test is what says a new arrival is registered here rather than by a
+    ///     <see cref="JsonConverterAttribute" /> of its own, which would satisfy the serializer while
+    ///     emptying the list of the property it is kept for. Exposed for the round-trip pin.
     /// </remarks>
     public static readonly JsonSerializerOptions Options = new()
     {
@@ -37,7 +40,8 @@ internal static class ManifestJson
             new JsonStringEnumConverter<TypeKind>(),
             new JsonStringEnumConverter<Accessibility>(),
             new JsonStringEnumConverter<MemberKind>(),
-            new JsonStringEnumConverter<Lifetime>()
+            new JsonStringEnumConverter<Lifetime>(),
+            new JsonStringEnumConverter<UnsupportedProjectKind>()
         }
     };
 

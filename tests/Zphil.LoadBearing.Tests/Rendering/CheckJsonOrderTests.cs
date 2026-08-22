@@ -44,7 +44,8 @@ public sealed class CheckJsonOrderTests
         workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
         diagnostics: new WorkspaceDiagnostics(
             [], [], ["App.Web/App.Web.csproj"], ["App.Reports/App.Reports.csproj"],
-            ["App.Data/App.Data.csproj"], ["App.Signals/App.Signals.fsproj"],
+            ["App.Data/App.Data.csproj"],
+            [new UnsupportedProject("App.Signals/App.Signals.fsproj", UnsupportedProjectKind.NotCsharp)],
             [new MultiTargetedProject("App.Shared", ["net10.0", "netstandard2.0"], "net10.0")]),
         rulesFilter: ["layer/*"],
         grain: DocumentGrain.Full);

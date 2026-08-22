@@ -21,15 +21,15 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     whole solution.
 /// </param>
 /// <param name="Unsupported">
-///     Absolute paths of the projects the solution declares in another language, read straight off the
-///     solution file rather than measured against the load. Nothing here was ever going to load, so — like
-///     <see cref="Unchecked" /> and unlike <see cref="Failed" /> — it must never gate: the model is smaller
-///     than the solution, not wrong about it.
+///     The projects the solution declares that no extractor reaches, each with its
+///     <see cref="UnsupportedProjectKind" />, read straight off the solution file rather than measured
+///     against the load. Nothing here was ever going to load, so — like <see cref="Unchecked" /> and unlike
+///     <see cref="Failed" /> — it must never gate: the model is smaller than the solution, not wrong about it.
 /// </param>
 internal sealed record ProjectLoadReport(
     IReadOnlyList<string> Failed,
     IReadOnlyList<string> Unchecked,
-    IReadOnlyList<string> Unsupported)
+    IReadOnlyList<UnsupportedProject> Unsupported)
 {
     /// <summary>The report for a load with nothing to say — no failures, no narrowing, nothing unreadable.</summary>
     internal static ProjectLoadReport Empty { get; } = new([], [], []);
@@ -135,8 +135,8 @@ internal sealed record ProjectLoadReport(
 ///     </para>
 ///     <para>
 ///         <b>A third list rides along that this predicate does not measure at all.</b>
-///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file — the projects
-///         declared in another language — and is carried here only because this is where declared membership
+///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file — the projects no
+///         extractor reaches — and is carried here only because this is where declared membership
 ///         is already read. It is deliberately outside both subtractions above: those ask what a load owed
 ///         and did not deliver, while an <c>.fsproj</c> was never owed. Both arms skip such a project for
 ///         the same reason, so a polyglot solution cannot be refused for holding one.
@@ -167,7 +167,7 @@ internal static class ProjectLoadFailures
                 failed.Add(Path.GetFullPath(filePath));
 
         var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
-        IReadOnlyList<string> unsupported = [];
+        IReadOnlyList<UnsupportedProject> unsupported = [];
 
         if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
         {
@@ -189,9 +189,12 @@ internal static class ProjectLoadFailures
                     uncheckedMembers.Add(declared);
 
             // Not measured against the load at all: this is what the solution file says, and an entry here
-            // was never a candidate to load. Sorting it too keeps every list on this report ordered the
-            // same way, so a document reads the same on any OS.
-            unsupported = Sorted(membership.Unsupported);
+            // was never a candidate to load. Sorted on the path, so every list on this report is ordered the
+            // same way and a document reads the same on any OS — the kind rides along and orders nothing,
+            // because a reader looks these up by project.
+            unsupported = membership.Unsupported
+                .OrderBy(project => project.Path, StringComparer.Ordinal)
+                .ToList();
         }
 
         return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), unsupported);

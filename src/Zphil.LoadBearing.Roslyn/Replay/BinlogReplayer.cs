@@ -122,8 +122,11 @@ internal static class BinlogReplayer
             // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
             IReadOnlyList<string> failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
 
-            List<string> unsupported = unsupportedProjects
+            // Every one of them is NotCsharp by construction: the predicate below drops a compiler call for
+            // exactly one reason, and a shared project mints no compiler call of its own to be dropped.
+            List<UnsupportedProject> unsupported = unsupportedProjects
                 .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotCsharp))
                 .ToList();
 
             return new ReplayedSolution(

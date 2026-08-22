@@ -4,35 +4,35 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     One declared project this product could not read, and why — the entry shape of
+///     One declared project the run did not reach, and why — the entry shape of
 ///     <see cref="WorkspaceTrustStamp.UnsupportedProjects" />.
 /// </summary>
 /// <remarks>
-///     <b>An object rather than a bare path, and one reason string rather than a taxonomy.</b> The object is
-///     what lets a later finding add a <em>kind</em> of reason without minting a second key. The single
-///     reason is the other half of the same judgement: the path already carries the extension, so
-///     per-language wording would add near-identical strings without adding a fact, and this parser cannot
-///     honestly classify every <c>*proj</c> it may meet — it recognises "not a <c>.csproj</c>", which is
-///     exactly what the sentence says.
+///     <b>An object rather than a bare path, and still one reason string on the wire.</b> The object is what
+///     lets a consumer that needs to branch take a <em>kind</em> without minting a second key — an option
+///     deliberately unspent, because nothing downstream branches yet. What the entry carries is the sentence
+///     <see cref="UnsupportedProjectsNotice.Reason" /> composes from the kind the producer classified, so
+///     the wording is one author's and the shape here does not have to grow to say a second thing.
 /// </remarks>
 /// <param name="Project">The project, solution-relative and forward-slashed like every other path.</param>
-/// <param name="Reason">Why the run could not read it.</param>
+/// <param name="Reason">Why the run did not reach it.</param>
 internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 {
     /// <summary>
-    ///     The entry as a human line reads it: the project, then why. One owner, so the survey's own section
-    ///     and the stamp a verb writes above its answer cannot spell the same entry two ways.
+    ///     The entry as a human line reads it: the project, then why. Deferred to the one owner of that join,
+    ///     so the survey's own section, the stamp a verb writes above its answer and the adapter's skip
+    ///     cannot spell the same entry three ways.
     /// </summary>
     internal string Describe()
     {
-        return $"{Project} — {Reason}";
+        return UnsupportedProjectsNotice.Entry(Project, Reason);
     }
 }
 
 /// <summary>
 ///     The six facts every document stamps about how far its own contents can be trusted: whether the model
-///     is incomplete, and which projects failed to load, went unchecked, had no packages restored, are
-///     written in a language this product cannot read, or were read from one of several compilations.
+///     is incomplete, and which projects failed to load, went unchecked, had no packages restored, were
+///     outside anything this product can survey, or were read from one of several compilations.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -51,10 +51,12 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///         an empty list emits no notification there, which is the same omission.
 ///     </para>
 ///     <para>
-///         <b>The reason text is composed here, once.</b> Four surfaces state it — three JSON documents and
-///         the SARIF log — and composing it at each would let the wire key and the prose disagree about what
-///         the run could read. This is also the only place that knows the path is about to be relativized,
-///         which is what the reader will actually see.
+///         <b>The reason text is read here, once.</b> Four surfaces state it — three JSON documents and the
+///         SARIF log — and asking for it at each would let the wire key and the prose disagree about what the
+///         run reached. The sentence itself belongs to <see cref="UnsupportedProjectsNotice" />, beside the
+///         human stamps that have to agree with it; what this type owns is the pairing, because this is the
+///         only place that knows the path is about to be relativized, which is what the reader will actually
+///         see.
 ///     </para>
 /// </remarks>
 /// <param name="ModelIncomplete">
@@ -70,9 +72,9 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///     The projects whose NuGet packages are not in the model, or <see langword="null" /> when they all are.
 /// </param>
 /// <param name="UnsupportedProjects">
-///     The declared projects this product cannot read, each with its reason, or <see langword="null" /> for
-///     an all-C# solution. Unlike its three siblings this is not a verdict about the load — nothing here was
-///     ever going to load — so it never reaches <see cref="ModelIncomplete" />.
+///     The declared projects no extractor reached, each with its reason, or <see langword="null" /> when the
+///     run reached them all. Unlike its three siblings this is not a verdict about the load — nothing here
+///     was ever going to load — so it never reaches <see cref="ModelIncomplete" />.
 /// </param>
 /// <param name="MultiTargetedProjects">
 ///     The projects one <c>.csproj</c> of which yielded several compilations, or <see langword="null" /> when
@@ -91,12 +93,6 @@ internal readonly record struct WorkspaceTrustStamp(
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects)
 {
-    /// <summary>
-    ///     The reason every unsupported entry carries. One string for the whole set, deliberately — see
-    ///     <see cref="UnsupportedProjectStamp" />.
-    /// </summary>
-    internal const string NotACsharpProject = "not a C# project";
-
     /// <summary>
     ///     Reads the stamp off a load's own verdict, relativizing every project path.
     /// </summary>
@@ -138,11 +134,12 @@ internal readonly record struct WorkspaceTrustStamp(
     }
 
     private static IReadOnlyList<UnsupportedProjectStamp>? Unsupported(
-        IReadOnlyList<string> projects, PathFormat.Relativizer relativizer)
+        IReadOnlyList<UnsupportedProject> projects, PathFormat.Relativizer relativizer)
     {
         return projects.Count == 0
             ? null
-            : projects.Select(project => new UnsupportedProjectStamp(relativizer.Relative(project), NotACsharpProject))
+            : projects.Select(project => new UnsupportedProjectStamp(
+                    relativizer.Relative(project.Path), UnsupportedProjectsNotice.Reason(project.Kind)))
                 .ToList();
     }
 }

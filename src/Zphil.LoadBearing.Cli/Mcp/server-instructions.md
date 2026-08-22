@@ -13,5 +13,5 @@ One prompt, `derive_spec` — the onboarding recipe to run when spec resolution 
 - Over the client budget `arch_check`/`arch_graph` coarsen their own grain; narrow with `rules`/`projects`, never page.
 - The server is bound to one solution + one spec at start; the tools take no solution argument.
 - The first call loads the workspace — seconds on a large solution — then it stays warm, reconciled per call. The server never builds: build first or results are stale.
-- A failed load or restore makes the model wrong, not smaller: `arch_graph` errors naming them (build/restore precondition); `arch_check`/`arch_status` stamp `modelIncomplete: true` + `failedProjects`/`restoreFailedProjects` — report that, never plain green. Smaller, not wrong: `uncheckedProjects` (a filter), `unsupportedProjects` (non-C# projects).
+- A failed load or restore makes the model wrong, not smaller: `arch_graph` errors naming them (build/restore precondition); `arch_check`/`arch_status` stamp `modelIncomplete: true` + `failedProjects`/`restoreFailedProjects` — report that, never plain green. Smaller, not wrong: `uncheckedProjects` (a filter), `unsupportedProjects` (not surveyed).
 - Drill down with `arch_explain <rule-id>`; the always-on summary lives in the root `AGENTS.md` managed block.

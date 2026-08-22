@@ -13,6 +13,12 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     surface lost it: the tools pass <see cref="TextWriter.Null" /> there. Pure over an in-memory value,
 ///     so no workspace is opened; the note's own text and the rendered-once-per-verb behaviour are pinned by
 ///     <c>WorkspaceDiagnosticsGateE2ETests</c>.
+///     <para>
+///         The last two rows share the file's economics rather than its subject: they pin what
+///         <see cref="WorkspaceTrustStamp.From(WorkspaceDiagnostics, string)" /> makes of an unsupported
+///         project, over a hand-built <see cref="WorkspaceDiagnostics" /> and no bed at all — which is what a
+///         fixture solution per project kind would have cost.
+///     </para>
 /// </summary>
 public sealed class WorkspaceDiagnosticsRendererTests
 {
@@ -90,5 +96,39 @@ public sealed class WorkspaceDiagnosticsRendererTests
 
         error.ToString()
             .ShouldBe($"a load failure{Environment.NewLine}");
+    }
+
+    [Fact]
+    public void From_ASharedProjectBesideAnFsproj_GivesThemDifferentReasons()
+    {
+        // The mislabel, as a pin. One reason string was stamped onto every path, so a .shproj — a container
+        // whose .projitems compile into the projects that import it, very often C# and already in the model
+        // through them — was reported as "not a C# project" on every surface. Both kinds in one stamp,
+        // because what went wrong was not the wording of either but that one sentence covered both.
+        var diagnostics = new WorkspaceDiagnostics(
+            [], [], [], [], [],
+            [
+                new UnsupportedProject("/repo/Signals/Signals.fsproj", UnsupportedProjectKind.NotCsharp),
+                new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+            ],
+            []);
+
+        WorkspaceTrustStamp stamp = WorkspaceTrustStamp.From(diagnostics, "/repo");
+
+        (stamp.UnsupportedProjects ?? []).Select(project => project.Describe())
+            .ShouldBe([
+                "Signals/Signals.fsproj — not a C# project",
+                "Shared/Shared.shproj — a shared project, compiled into the projects that import it"
+            ]);
+    }
+
+    [Fact]
+    public void From_NoUnsupportedProjects_OmitsTheKeyRatherThanWritingAnEmptyList()
+    {
+        // The empty-to-null policy, on the slot whose type changed: a run that reached every declared project
+        // says nothing, which is what keeps a clean document byte-identical to the one it always was.
+        WorkspaceTrustStamp stamp = WorkspaceTrustStamp.From(WorkspaceDiagnostics.None, "/repo");
+
+        stamp.UnsupportedProjects.ShouldBeNull();
     }
 }

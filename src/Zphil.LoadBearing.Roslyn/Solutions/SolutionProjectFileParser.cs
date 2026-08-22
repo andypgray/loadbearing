@@ -26,16 +26,17 @@ namespace Zphil.LoadBearing.Roslyn.Solutions;
 /// </param>
 /// <param name="Unsupported">
 ///     Every other declared project — an <c>.fsproj</c>, <c>.vbproj</c>, <c>.sqlproj</c>, <c>.vcxproj</c>,
-///     <c>.shproj</c>, anything whose extension ends in <c>proj</c> and is not <c>.csproj</c>. Deliberately
-///     <em>not</em> merged into <see cref="Declared" />: the three consumers of that set all mean "a project
-///     this run was obliged to check", and adding a project no extractor can read would turn every polyglot
-///     solution into a load failure. What this set is for is saying so out loud, which is the one thing the
-///     survey could not do while these entries were simply dropped.
+///     <c>.shproj</c>, anything whose extension ends in <c>proj</c> and is not <c>.csproj</c> — each carrying
+///     the <see cref="UnsupportedProjectKind" /> this parser classified it as. Deliberately <em>not</em>
+///     merged into <see cref="Declared" />: the three consumers of that set all mean "a project this run was
+///     obliged to check", and adding a project no extractor can read would turn every polyglot solution into
+///     a load failure. What this set is for is saying so out loud, which is the one thing the survey could
+///     not do while these entries were simply dropped.
 /// </param>
 internal sealed record SolutionMembership(
     IReadOnlyList<string> Required,
     IReadOnlyList<string> Declared,
-    IReadOnlyList<string> Unsupported);
+    IReadOnlyList<UnsupportedProject> Unsupported);
 
 /// <summary>
 ///     One solution file's declared projects, partitioned by whether this product can read them:
@@ -44,11 +45,14 @@ internal sealed record SolutionMembership(
 /// </summary>
 /// <param name="Csproj">The declared <c>.csproj</c> paths, absolute and deduplicated, in declaration order.</param>
 /// <param name="Unsupported">
-///     The declared non-<c>.csproj</c> project paths, absolute and deduplicated, in declaration order.
+///     The declared non-<c>.csproj</c> projects, absolute and deduplicated, in declaration order, each with
+///     the <see cref="UnsupportedProjectKind" /> its extension says it is. Classified here because here is
+///     where the extension is already being tested: a consumer handed bare paths would have to re-derive it,
+///     and the one that did got the shared project wrong.
 /// </param>
 internal sealed record DeclaredProjects(
     IReadOnlyList<string> Csproj,
-    IReadOnlyList<string> Unsupported);
+    IReadOnlyList<UnsupportedProject> Unsupported);
 
 /// <summary>
 ///     Reads a solution file's <em>declared</em> project membership textually, with no MSBuild. Handles the
@@ -93,6 +97,14 @@ internal sealed record DeclaredProjects(
 ///         cold run, a cache hit and a warm session by construction, and it needs no workspace. The residual
 ///         limit is the mirror of the existing passenger case: a non-C# project dragged in by a
 ///         <c>ProjectReference</c> and declared in no solution file stays invisible.
+///     </para>
+///     <para>
+///         <b>The <c>.shproj</c> is not one of the languages, and is classified apart.</b> A shared project
+///         is a language-neutral container: its <c>.projitems</c> files are compiled into every project that
+///         imports it, so its code is very often C# and reaches the model through the importer. It belongs
+///         in the unsupported set — nothing loads the <c>.shproj</c> itself, and a reader looking for it in
+///         the roster will not find it — but under <see cref="UnsupportedProjectKind.SharedProject" />
+///         rather than as another language.
 ///     </para>
 ///     <para>
 ///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
@@ -308,7 +320,7 @@ internal static class SolutionProjectFileParser
             : ParseSln(solutionText);
 
         var csproj = new List<string>();
-        var unsupported = new List<string>();
+        var unsupported = new List<UnsupportedProject>();
         var seen = new HashSet<string>(PathComparison.Comparer);
         foreach (string relative in relativePaths)
         {
@@ -318,10 +330,22 @@ internal static class SolutionProjectFileParser
             if (!seen.Add(fullPath)) continue;
 
             if (relative.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) csproj.Add(fullPath);
-            else unsupported.Add(fullPath);
+            else unsupported.Add(new UnsupportedProject(fullPath, KindOf(relative)));
         }
 
         return new DeclaredProjects(csproj, unsupported);
+    }
+
+    // The whole taxonomy, in one test, sited where the extension is already being read. Everything the
+    // "ends in proj" partition catches is another language except the shared project, which is no language
+    // at all — so the default arm stays honest about the family this parser cannot enumerate, and the one
+    // extension that means something else is named.
+    private static UnsupportedProjectKind KindOf(string relativePath)
+    {
+        return Path.GetExtension(relativePath)
+            .Equals(".shproj", StringComparison.OrdinalIgnoreCase)
+            ? UnsupportedProjectKind.SharedProject
+            : UnsupportedProjectKind.NotCsharp;
     }
 
     // Read off the declared spelling rather than Path.GetExtension: a dotted directory segment is no threat

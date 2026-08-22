@@ -98,15 +98,16 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     internal IReadOnlyList<string> RestoreFailedProjects { get; init; } = [];
 
     /// <summary>
-    ///     The absolute paths of the projects the solution declares in a language this product cannot read,
-    ///     from the load that produced this snapshot. Never a gate input — it states coverage.
+    ///     The projects the solution declares that no extractor reaches, each with its
+    ///     <see cref="UnsupportedProjectKind" />, from the load that produced this snapshot. Never a gate
+    ///     input — it states coverage.
     /// </summary>
     /// <remarks>
     ///     Generation-scoped like its three siblings, and the most plainly so: it is read off the solution
     ///     file, which is a structural input the reconcile sweep already watches, so adding or removing an
     ///     <c>.fsproj</c> forces a full reload and the fact is recomputed there.
     /// </remarks>
-    internal IReadOnlyList<string> UnsupportedProjects { get; init; } = [];
+    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; init; } = [];
 
     /// <summary>
     ///     This snapshot's load verdict as the one value every surface reads: the diagnostics and the four

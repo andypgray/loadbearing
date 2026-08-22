@@ -4,8 +4,8 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     The one place the CLI composes an unsupported-projects stamp: which declared projects this product
-///     could not read, and why.
+///     The one place the CLI composes an unsupported-projects stamp: which declared projects the run did not
+///     reach, and why.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -27,7 +27,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 internal static class UnsupportedProjectsNotices
 {
     /// <summary>
-    ///     Writes the stamp above a verb's answer, or nothing at all for an all-C# solution.
+    ///     Writes the stamp above a verb's answer, or nothing at all when the run reached every declared
+    ///     project.
     /// </summary>
     /// <param name="output">The verb's stdout writer — the stamp scopes what follows it there.</param>
     /// <param name="source">The run's codebase source, carrying the load's verdict and the solution root.</param>

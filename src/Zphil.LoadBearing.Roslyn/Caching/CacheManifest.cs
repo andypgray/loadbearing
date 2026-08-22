@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Roslyn.Diagnostics;
+
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
@@ -46,11 +48,14 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     whole promise is that it opens nothing.
 /// </param>
 /// <param name="UnsupportedProjects">
-///     The absolute paths of the projects the solution declared in another language on the recorded run.
-///     <em>Paths only</em>: the reason each one carries is a pure function of its extension and is composed
-///     at render time, so this stays a homogeneous bag of paths and the reason cannot drift between a cold
-///     run and a hit. Persisted for its siblings' reason — a hit owns no solution file read of its own — and
-///     a hit that dropped the coverage statement would restore the very silence it was added to break.
+///     The projects the solution declared that no extractor reached on the recorded run, each with the
+///     <see cref="UnsupportedProjectKind" /> its producer classified it as. The kind is stored rather than
+///     re-derived on a hit because deriving it is what went wrong: the extension is what a producer reads,
+///     and a consumer reading it a second time reached a different answer for a <c>.shproj</c>. Persisting
+///     the producer's own verdict is what keeps the reason identical between a cold run and a hit, which is
+///     the property this slot has always been here for. Persisted at all for its siblings' reason — a hit
+///     owns no solution file read of its own — and a hit that dropped the coverage statement would restore
+///     the very silence it was added to break.
 /// </param>
 internal sealed record CacheManifest(
     int SchemaVersion,
@@ -62,7 +67,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
-    IReadOnlyList<string> UnsupportedProjects,
+    IReadOnlyList<UnsupportedProject> UnsupportedProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>

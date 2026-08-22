@@ -18,6 +18,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class GraphFormatterTests
 {
+    private const string UnsupportedHeading = "Projects the solution declares that this survey does not cover:";
+
     [Fact]
     public void Lines_MixedSolutionMembership_AnnotatesOnlyThePassenger()
     {
@@ -41,26 +43,35 @@ public sealed class GraphFormatterTests
     public void Lines_NoUnsupportedProjects_KeepsTheSectionReadingNone()
     {
         // The formatter's standing rule, applied to the section whose absence WAS the defect: a section
-        // that appears only when it has content is one a reader never learns to look for, so an all-C#
-        // solution says outright that nothing went unread rather than saying nothing at all.
+        // that appears only when it has content is one a reader never learns to look for, so a solution the
+        // survey covers whole says outright that nothing was left out rather than saying nothing at all.
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
 
-        Section(lines, "Projects the solution declares that this survey could not read:")
+        Section(lines, UnsupportedHeading)
             .ShouldBe(["  (none)"]);
     }
 
     [Fact]
     public void Lines_UnsupportedProjects_ReadTheReasonTheDocumentCarries()
     {
-        // The reason is composed once, on the shared trust stamp, and arrives here already paired with its
-        // path — so this line and the document's own entry cannot disagree about what the run could read.
+        // The reason is composed once, off the kind its producer classified, and arrives here already paired
+        // with its path — so this line and the document's own entry cannot disagree about what the run
+        // reached. Two entries, because the heading above them states no cause: each says its own, and a
+        // shared project's is not the .fsproj's.
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full,
-            [new UnsupportedProjectStamp("Acme.Signals/Acme.Signals.fsproj", "not a C# project")]);
+            [
+                new UnsupportedProjectStamp("Acme.Signals/Acme.Signals.fsproj", "not a C# project"),
+                new UnsupportedProjectStamp(
+                    "Acme.Shared/Acme.Shared.shproj", "a shared project, compiled into the projects that import it")
+            ]);
 
-        Section(lines, "Projects the solution declares that this survey could not read:")
-            .ShouldBe(["  Acme.Signals/Acme.Signals.fsproj — not a C# project"]);
+        Section(lines, UnsupportedHeading)
+            .ShouldBe([
+                "  Acme.Signals/Acme.Signals.fsproj — not a C# project",
+                "  Acme.Shared/Acme.Shared.shproj — a shared project, compiled into the projects that import it"
+            ]);
     }
 
     [Fact]

@@ -94,6 +94,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema version is unchanged and a single-framework solution's documents are byte-identical to
   the ones before.
 
+### Changed
+
+- **A shared project is no longer reported as a language this product cannot read.**
+  `unsupportedProjects` stamped one reason, `not a C# project`, onto every entry, while the two
+  places that produce the set each knew more: the solution parser tests the extension, and the
+  binlog replay reads whether a compiler call was C#. That single sentence was wrong about the
+  `.shproj`. A shared project is language-neutral — a container whose `.projitems` files compile
+  into every project that imports it — so its code is very often C#, and where an importing project
+  is in the model that code is in the model with it. Each producer now carries its classification
+  through to the surfaces, and a shared project reads `a shared project, compiled into the projects
+  that import it` wherever the key or its human twin appears: `graph`, `check` and `status`, in
+  `--json` and in the terminal, and in `check --sarif`'s coverage notification. The wire
+  shape is unchanged — still `{project, reason}`, no new key — so every document holding no
+  `.shproj` is byte-identical to the one before, and only the extraction cache's own schema moves,
+  which makes the first run after upgrading cold. The sentence above the entries drops its
+  hardcoded cause with them: the human stamp now reads `1 project the solution declares was not
+  surveyed` and the survey's section is headed `Projects the solution declares that this survey does
+  not cover`, leaving each entry to say why for itself.
+
+- **The xUnit adapter's completeness test now states unsupported projects too.**
+  `Workspace_LoadedCompletely` reported an incomplete model and a narrowing filter, and said nothing
+  about a solution declaring projects no extractor reaches — so a polyglot solution's rule tests went
+  green with no coverage statement anywhere, while `check` and `status` both stamped one. It now
+  skips carrying the projects and their reasons, exactly as it does under a filter: the rule verdicts
+  are real and keep reporting, but a test by that name cannot claim the whole solution. This is a
+  behaviour change for a consumer whose solution declares an `.fsproj`, a `.vbproj` or a shared
+  project — a test that passed now skips, carrying the reason. A solution that is both filtered and
+  polyglot states both causes.
+
 ### Fixed
 
 - **An unbound MCP server now leads with a recovery the reader can actually perform.** A server that

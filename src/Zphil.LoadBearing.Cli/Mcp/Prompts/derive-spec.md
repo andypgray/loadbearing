@@ -99,12 +99,14 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   the type reaches both while `arch.Project(...)` over the declaring project reaches only the
   declaration. Each entry names the type, that project, the supplying assemblies, and the projects
   binding the assembly instead. Absent when the solution has none.
-- `unsupportedProjects[]` — the projects the solution declares that this product cannot read at
-  all, each with its reason. LoadBearing surveys **C# projects only**: an `.fsproj`, a `.vbproj`,
-  a `.sqlproj` is not in `projects[]`, contributes no edges, and can never violate a rule you
-  write. Read this **first**, before treating `projects[]` as the estate: without it the roster is
-  simply shorter than the solution and nothing says so, and a spec derived from it silently cannot
-  reach whatever ships from those projects. Absent when the solution is all C#. Unlike the two
+- `unsupportedProjects[]` — the projects the solution declares that this survey does not cover,
+  each with its reason. A project in another language (an `.fsproj`, a `.vbproj`, a `.sqlproj`) is
+  not in `projects[]`, contributes no edges, and can never violate a rule you write. A shared
+  project (`.shproj`) is not in `projects[]` either, but its `.projitems` are compiled into every
+  project that imports it, so its code is already surveyed under those names. Read this **first**,
+  before treating `projects[]` as the estate: without it the roster is simply shorter than the
+  solution and nothing says so, and a spec derived from it silently cannot reach whatever ships
+  from those projects. Absent when the survey covers every declared project. Unlike the two
   coverage keys above it is never elided — it is bounded by the solution, not the codebase.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):

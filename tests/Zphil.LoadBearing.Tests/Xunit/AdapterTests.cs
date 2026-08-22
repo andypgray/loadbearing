@@ -22,7 +22,10 @@ namespace Zphil.LoadBearing.Tests.Xunit;
 ///     <c>AllowWorkspaceDiagnostics</c> flips that pair over. Three more cover the opposite case against a
 ///     narrowing <c>.slnf</c> — a smaller model rather than a wrong one — where a rule whose subject the
 ///     filter kept still reports its verdict, a rule whose subject it dropped skips carrying the filter's
-///     name, and <c>Workspace_LoadedCompletely</c> skips because it is the completeness claim itself.
+///     name, and <c>Workspace_LoadedCompletely</c> skips because it is the completeness claim itself. Two
+///     more cover the second way a whole load still covers less than the solution, against the polyglot
+///     fixture: the same test skips naming the <c>.fsproj</c> and its reason, and the rule over the C#
+///     project still reports.
 /// </summary>
 [Collection("Serial")]
 public sealed class AdapterTests
@@ -192,6 +195,35 @@ public sealed class AdapterTests
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldEndWith(NarrowedUniverseNotice.RuleSkipReason("BillingOnly.slnf", 2));
+    }
+
+    [Fact]
+    public async Task PolyglotSolution_SkipsTheCompletenessClaimNamingWhatItCouldNotReach()
+    {
+        // The adapter received the unsupported projects and rendered them nowhere, so a polyglot solution's
+        // rule tests went green with no coverage statement anywhere — while check and status both stamped
+        // one. Nothing here failed: this is a smaller true answer, like a filter's, and the one test whose
+        // name IS the completeness claim is the one that cannot make it.
+        Exception? exception = await CaughtAsync(() => new PolyglotArchTests().Workspace_LoadedCompletely());
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.NormalizedLines()
+            .ShouldContain(
+                "1 project the solution declares was not surveyed:\n"
+                + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
+                + "Rule verdicts come from the projects this product can read, but a test by this name "
+                + "cannot pass while the solution declares projects the model never held.");
+    }
+
+    [Fact]
+    public async Task PolyglotSolution_StillReportsEveryRuleCase()
+    {
+        // The line between an unreadable project and a broken model, in one assertion: the C# project loaded
+        // whole and the rule over it reached a real verdict, so the rule cases report rather than skip the
+        // way BrokenApp's do.
+        Exception? exception = await Record.ExceptionAsync(() => new PolyglotArchTests().Rule_Holds(PolyglotRuleId));
+
+        exception.ShouldBeNull();
     }
 
     [Fact]
@@ -395,6 +427,34 @@ public sealed class AdapterTests
     private sealed class BillingOnlyWebArchTests : ArchRuleTests<BillingOnlyWebInlineSpec>
     {
         protected override string SolutionPath => BillingOnlyFilter;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    private const string PolyglotRuleId = "naming/interfaces";
+
+    // The one bed in the suite declaring a project no extractor reaches: a real .fsproj, not a renamed
+    // .csproj, beside one ordinary C# project. Read in place from the test output like the two drivers
+    // above — FixtureRestorer restores every solution under TestSolutions/ at assembly startup, so the C#
+    // project loads whole and the skip below is about coverage rather than a broken model.
+    private static string PolyglotSolution =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "PolyglotApp", "PolyglotApp.slnx");
+
+    // A verbatim inline copy of the fixture spec's one rule, which holds over the C# project — so the rule
+    // case below reaches a genuine verdict rather than an empty-subject pass, and the skip is provably about
+    // the .fsproj alone.
+    private sealed class PolyglotInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule(PolyglotRuleId)
+                .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("PolyglotApp.Core.*").MustHavePrefix("I"))
+                .Because("House naming convention; agents grep by I-prefix.");
+        }
+    }
+
+    private sealed class PolyglotArchTests : ArchRuleTests<PolyglotInlineSpec>
+    {
+        protected override string SolutionPath => PolyglotSolution;
         protected override string? ExcludeProjectName => null;
     }
 }
