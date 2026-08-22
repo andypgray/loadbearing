@@ -443,7 +443,8 @@ public sealed class CheckCommandE2ETests
     public async Task Check_ViolatedSpecJsonWithSarif_StdoutStaysPureJson()
     {
         // --json owns stdout. --sarif writes its report to the file, and the human-mode `wrote <path>` line is
-        // suppressed under --json, so a hook still parses a single JSON document off stdout.
+        // suppressed under --json, so a hook still parses a single JSON document off stdout. The parse below is
+        // the whole claim: it rejects trailing content, so a leaked wrote line cannot hide behind the document.
         using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
         string sarifPath = temp.PathOf("violated-check.sarif");
 
@@ -452,7 +453,6 @@ public sealed class CheckCommandE2ETests
 
         result.ShouldReportViolations();
         using JsonDocument _ = result.ShouldHaveJsonStdout();
-        result.Out.ShouldNotContain("wrote");
         File.Exists(sarifPath)
             .ShouldBeTrue();
         File.ReadAllText(sarifPath)
