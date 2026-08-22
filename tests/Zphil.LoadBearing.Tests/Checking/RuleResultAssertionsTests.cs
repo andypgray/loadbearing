@@ -42,13 +42,13 @@ public sealed class RuleResultAssertionsTests
                                       """;
 
     [Fact]
-    public void ShouldHaveFailedWithEdge_KindMismatch_Reds()
+    public void ShouldHaveFailedWithSingleEdge_KindMismatch_Reds()
     {
         // A Catch violation asserted as a Reference: the batched property conditions must surface it rather
         // than swallow it, which is what makes the helper safe to use at a hundred sites.
         RuleResult result = Caught(OneCatch);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdge(ViolationKind.Reference, "App.Handler", "Errors.DbError");
+        Action assertion = () => result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Handler", "Errors.DbError");
 
         Should.Throw<ShouldAssertException>(assertion);
     }

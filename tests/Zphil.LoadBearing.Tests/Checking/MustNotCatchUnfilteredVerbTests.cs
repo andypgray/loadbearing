@@ -90,7 +90,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
 
         // The subject covers FilteredHandler too, and the single-item claim below is the verb's whole point:
         // its identical catch of the identical type is absent from the report.
-        result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.DataHandler catches Errors.DbError");
@@ -122,7 +122,7 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // unfiltered site ALONE — so every printed file:line is a site the rule actually objects to, which is what
         // lets the verb reuse the Catch kind and its "{source} catches {target}" line without printing a falsehood.
         MixedModel.CatchEdge("App.MixedHandler", "Errors.DbError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([9, 11]);
 
         RuleResult result = Checker.Run(MixedModel, arch =>

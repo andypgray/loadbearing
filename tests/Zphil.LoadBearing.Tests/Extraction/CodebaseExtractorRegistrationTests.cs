@@ -610,7 +610,7 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           """));
 
         model.Registration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([9]);
     }
 }

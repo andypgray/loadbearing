@@ -51,7 +51,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Construction, "App.WidgetFactory", "Widgets.Widget");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Construction, "App.WidgetFactory", "Widgets.Widget");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.WidgetFactory constructs Widgets.Widget");
@@ -98,7 +98,7 @@ public sealed class MustNotConstructVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Construction, "App.Factory", "Widgets.Widget");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Construction, "App.Factory", "Widgets.Widget");
     }
 
     [Fact]

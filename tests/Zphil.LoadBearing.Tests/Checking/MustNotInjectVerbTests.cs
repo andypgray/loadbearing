@@ -61,7 +61,7 @@ public sealed class MustNotInjectVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.CaptiveSingleton injects App.IScopedDep");

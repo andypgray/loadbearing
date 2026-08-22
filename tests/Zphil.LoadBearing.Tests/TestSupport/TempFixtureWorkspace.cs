@@ -241,7 +241,7 @@ internal sealed class TempFixtureWorkspace : IDisposable
     {
         string root = Path.Combine(TestTempRoot.For("fixtures"), Guid.NewGuid()
             .ToString("N"));
-        CopyTree(source, root);
+        DirectoryTree.Copy(source, root, relative => !IsBuildArtifact(relative));
         return root;
     }
 
@@ -306,23 +306,15 @@ internal sealed class TempFixtureWorkspace : IDisposable
             .SequenceEqual(File.ReadAllBytes(target));
     }
 
-    private static void CopyTree(string source, string destination)
+    /// <summary>
+    ///     Whether <paramref name="path" /> lies under a <c>bin/</c> or <c>obj/</c> directory. Takes an
+    ///     absolute path or one relative to any root, with or without a leading separator: the leading one is
+    ///     supplied here, so a path whose own first segment is <c>bin/</c> is caught like every other.
+    /// </summary>
+    internal static bool IsBuildArtifact(string path)
     {
-        Directory.CreateDirectory(destination);
-        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
-        {
-            if (IsBuildArtifact(file, source)) continue;
-
-            string target = destination + file.Substring(source.Length);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, true);
-        }
-    }
-
-    /// <summary>Whether <paramref name="relativePath" /> lies under a <c>bin/</c> or <c>obj/</c> directory.</summary>
-    internal static bool IsBuildArtifact(string relativePath)
-    {
-        string normalized = relativePath.Replace('\\', '/');
+        string normalized = "/" + path.Replace('\\', '/')
+            .TrimStart('/');
         return normalized.Contains("/bin/") || normalized.Contains("/obj/");
     }
 

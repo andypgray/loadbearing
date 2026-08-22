@@ -5,6 +5,29 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 /// <summary>Query helpers over a <see cref="CodebaseModel" /> to keep extraction assertions terse.</summary>
 internal static class ModelQuery
 {
+    /// <summary>The lines of a list of sites, in recorded order: <c>edge.Sites.Lines()</c>.</summary>
+    /// <remarks>
+    ///     On the sites rather than on each edge. The eight edge kinds share no sited contract in the shipped
+    ///     model, so the shorter <c>edge.Lines()</c> cost one identical overload per kind — and three more
+    ///     verbs besides, for the edges carrying a second site list (<c>UnfilteredLines</c>,
+    ///     <c>SwallowingLines</c>, <c>DeclarationLines</c>), where the verb had to encode which list it meant.
+    ///     Naming the list at the call site says that in the reader's own words and leaves one verb to
+    ///     maintain. Adding the contract to <c>src/</c> to buy the shorter spelling back would put shipped API
+    ///     in the service of a test helper.
+    /// </remarks>
+    public static IReadOnlyList<int> Lines(this IEnumerable<SourceLocation> sites)
+    {
+        return sites.Select(site => site.Line)
+            .ToList();
+    }
+
+    /// <summary>The files of a list of sites, in recorded order.</summary>
+    public static IReadOnlyList<string> Files(this IEnumerable<SourceLocation> sites)
+    {
+        return sites.Select(site => site.FilePath)
+            .ToList();
+    }
+
     public static TypeNode Type(this CodebaseModel model, string fullName)
     {
         return model.Types.Single(t => t.FullName == fullName);
@@ -20,18 +43,6 @@ internal static class ModelQuery
         return model.Edges.Any(e => e.Source.FullName == sourceFullName && e.Target.FullName == targetFullName);
     }
 
-    public static IReadOnlyList<int> Lines(this ReferenceEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
-    }
-
-    public static IReadOnlyList<string> Files(this ReferenceEdge edge)
-    {
-        return edge.Sites.Select(s => s.FilePath)
-            .ToList();
-    }
-
     public static MemberEdge MemberEdge(this CodebaseModel model, string sourceFullName, string memberSymbolId)
     {
         return model.MemberEdges.Single(e => e.Source.FullName == sourceFullName && e.Member.SymbolId == memberSymbolId);
@@ -40,12 +51,6 @@ internal static class ModelQuery
     public static IReadOnlyList<MemberEdge> MemberEdges(this CodebaseModel model, string sourceFullName)
     {
         return model.MemberEdges.Where(e => e.Source.FullName == sourceFullName)
-            .ToList();
-    }
-
-    public static IReadOnlyList<int> Lines(this MemberEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
             .ToList();
     }
 
@@ -65,12 +70,6 @@ internal static class ModelQuery
     public static bool HasConstructorEdge(this CodebaseModel model, string sourceFullName, string constructedFullName)
     {
         return model.ConstructorEdges.Any(e => e.Source.FullName == sourceFullName && e.Constructed.FullName == constructedFullName);
-    }
-
-    public static IReadOnlyList<int> Lines(this ConstructorEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
     }
 
     public static string FullName(this ITypeInfo type)
@@ -96,12 +95,6 @@ internal static class ModelQuery
         return model.InjectionEdges.Any(e => e.Source.FullName == sourceFullName && e.Injected.FullName == injectedFullName);
     }
 
-    public static IReadOnlyList<int> Lines(this InjectionEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
-    }
-
     // ── catch edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
 
     public static CatchEdge CatchEdge(this CodebaseModel model, string sourceFullName, string caughtFullName)
@@ -118,29 +111,6 @@ internal static class ModelQuery
     public static bool HasCatchEdge(this CodebaseModel model, string sourceFullName, string caughtFullName)
     {
         return model.CatchEdges.Any(e => e.Source.FullName == sourceFullName && e.Caught.FullName == caughtFullName);
-    }
-
-    public static IReadOnlyList<int> Lines(this CatchEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
-    }
-
-    /// <summary>The lines of the edge's unfiltered sites — the subset whose clause spells no `when` filter.</summary>
-    public static IReadOnlyList<int> UnfilteredLines(this CatchEdge edge)
-    {
-        return edge.UnfilteredSites.Select(s => s.Line)
-            .ToList();
-    }
-
-    /// <summary>
-    ///     The lines of the edge's swallowing sites — the unfiltered subset whose block does not end in a
-    ///     `throw`.
-    /// </summary>
-    public static IReadOnlyList<int> SwallowingLines(this CatchEdge edge)
-    {
-        return edge.SwallowingSites.Select(s => s.Line)
-            .ToList();
     }
 
     // ── throw edges (GRAMMAR §4.8) ────────────────────────────────────────────────────────────────────────
@@ -161,12 +131,6 @@ internal static class ModelQuery
         return model.ThrowEdges.Any(e => e.Source.FullName == sourceFullName && e.Thrown.FullName == thrownFullName);
     }
 
-    public static IReadOnlyList<int> Lines(this ThrowEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
-    }
-
     // ── exposure edges (GRAMMAR §4.9) ─────────────────────────────────────────────────────────────────────
 
     public static ExposureEdge ExposureEdge(this CodebaseModel model, string sourceFullName, string exposedFullName)
@@ -185,12 +149,6 @@ internal static class ModelQuery
         return model.ExposureEdges.Any(e => e.Source.FullName == sourceFullName && e.Exposed.FullName == exposedFullName);
     }
 
-    public static IReadOnlyList<int> Lines(this ExposureEdge edge)
-    {
-        return edge.Sites.Select(s => s.Line)
-            .ToList();
-    }
-
     // ── registration facts (GRAMMAR §4.7) ─────────────────────────────────────────────────────────────────
 
     public static ServiceRegistration Registration(
@@ -203,12 +161,6 @@ internal static class ModelQuery
         this CodebaseModel model, Lifetime lifetime, string serviceFullName, string? implementationFullName)
     {
         return model.ServiceRegistrations.Any(r => r.Lifetime == lifetime && r.ServiceFullName == serviceFullName && r.ImplementationFullName == implementationFullName);
-    }
-
-    public static IReadOnlyList<int> Lines(this ServiceRegistration registration)
-    {
-        return registration.Sites.Select(s => s.Line)
-            .ToList();
     }
 
     // ── declared members (GRAMMAR §4.6) ───────────────────────────────────────────────────────────────────
@@ -228,12 +180,6 @@ internal static class ModelQuery
     public static IReadOnlyList<string> MemberIds(this TypeNode type)
     {
         return type.Members.Select(m => m.SymbolId)
-            .ToList();
-    }
-
-    public static IReadOnlyList<int> DeclarationLines(this MemberNode member)
-    {
-        return member.DeclarationSites.Select(s => s.Line)
             .ToList();
     }
 

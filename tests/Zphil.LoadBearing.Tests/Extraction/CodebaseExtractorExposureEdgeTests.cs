@@ -27,7 +27,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // The return type's name syntax mints the §4.1 reference edge; the exposure channel rides beside it.
         model.ExposureEdge("N.C", "N.Gadget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
         model.HasEdge("N.C", "N.Gadget")
             .ShouldBeTrue();
@@ -47,7 +47,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
             .Select(e => e.Exposed.FullName)
             .ShouldBe(["N.Gadget"]);
         model.ExposureEdge("N.C", "N.Gadget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -61,7 +61,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
                                                          """);
 
         model.ExposureEdge("N.C", "N.Gadget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -75,7 +75,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
                                                          """);
 
         model.ExposureEdge("N.C", "N.Gadget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -89,7 +89,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
                                                          """);
 
         model.ExposureEdge("N.C", "N.Notify")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -108,10 +108,10 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.HasExposureEdge("N.C", "N.Order")
             .ShouldBeTrue();
         model.ExposureEdge("N.C", "System.Threading.Tasks.Task<TResult>")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
         model.ExposureEdge("N.C", "N.Order")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -288,7 +288,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
             .Select(e => e.Exposed.FullName)
             .ShouldBe(["N.Delta"]);
         model.ExposureEdge("N.Svc", "N.Delta")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([11]);
     }
 

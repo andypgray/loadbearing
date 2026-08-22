@@ -46,6 +46,29 @@ internal static class CliResultAssertions
     }
 
     /// <summary>
+    ///     Asserts this run came out byte for byte as <paramref name="expected" /> did — same exit code, same
+    ///     stdout, same stderr.
+    /// </summary>
+    /// <remarks>
+    ///     The one verb here that names no exit contract. The others each pin a constant — 0, 1, 2 — and read
+    ///     fragments out of one channel; this one pins whole channels against another run computed at
+    ///     runtime, and takes whatever exit code that run reached. That is the shape of the guarantee it
+    ///     serves: a replayed run is indistinguishable from the cold one, whatever the cold one did.
+    /// </remarks>
+    internal static CliResult ShouldMatchTheOutputOf(this CliResult actual, CliResult expected)
+    {
+        string report = $"This run:{Environment.NewLine}{Describe(actual)}{Environment.NewLine}"
+                        + $"The run it should match:{Environment.NewLine}{Describe(expected)}";
+
+        actual.ShouldSatisfyAllConditions(
+            () => actual.Exit.ShouldBe(expected.Exit, report),
+            () => actual.Out.ShouldBe(expected.Out, report),
+            () => actual.Err.ShouldBe(expected.Err, report));
+
+        return actual;
+    }
+
+    /// <summary>
     ///     Asserts stdout is one parseable JSON document and hands it back. The caller owns the
     ///     <see cref="JsonDocument" />.
     /// </summary>

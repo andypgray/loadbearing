@@ -46,14 +46,14 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The `catch (MyError)` node mints the catch channel ONLY; the inner `MyError` name syntax mints the
         // §4.1 reference edge on its own visit. Both stand at line 8, exactly once (the explicit-`new` precedent).
         model.CatchEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([8]);
         model.CatchEdges("N.Worker")
             .ShouldHaveSingleItem();
         model.HasEdge("N.Worker", "N.MyError")
             .ShouldBeTrue();
         model.Edge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([8]);
     }
 
@@ -76,7 +76,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // NO reference edge — the catch channel is the sole source of the fact.
         CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
         edge.Caught.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([7]);
         model.HasEdge("N.Worker", "System.Exception")
             .ShouldBeFalse();
@@ -117,7 +117,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // The `when` filter never suppresses the catch edge, and its contents mint their own ordinary edges.
         model.CatchEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([9]);
         model.HasEdge("N.Worker", "N.Guard")
             .ShouldBeTrue();
@@ -188,7 +188,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         model.HasCatchEdge("N.Worker", "N.Boom<T>")
             .ShouldBeTrue();
         model.CatchEdge("N.Worker", "N.Boom<T>")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([8]);
     }
 
@@ -271,7 +271,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // precedent), the same way a top-level reference does.
         CatchEdge edge = model.CatchEdge("Program", "System.InvalidOperationException");
         edge.Caught.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([2]);
     }
 
@@ -322,9 +322,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // ExtractFromCompilations_BareCatchNotEndingInThrow_RecordsSystemExceptionSwallowing), which assert
         // the unfiltered subset on the way to the rethrow fact rather than repeating it in a row of their own.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -345,9 +345,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // The synthesized caught type is the same as for a bare `catch`; only the filter fact differs.
         CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([7]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -370,7 +370,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The honesty boundary: filter presence is syntactic. A `when (true)` catches everything the unfiltered
         // form would, and the axis still records it filtered — judging what a filter tests is not this fact's job.
         model.CatchEdge("N.Worker", "N.MyError")
-            .UnfilteredLines()
+            .UnfilteredSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -394,9 +394,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // One edge keyed (source, caught) as always; the two clauses split across the two site lists.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8, 10]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([10]);
     }
 
@@ -421,9 +421,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // unfiltered clause. Recording the FILTERED subset instead would mark the collapsed site filtered and
         // hide a real unfiltered catch from a ban; recording the unfiltered subset errs toward the red answer.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
     }
 
@@ -554,11 +554,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBe([8]);
     }
 
@@ -582,11 +582,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The rethrow leaves the edge and its unfiltered subset untouched — it only keeps the site out of the
         // swallowing subset, which is the whole of the new fact.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -609,9 +609,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // `throw new X(…)` and a bare `throw;` are both throw statements, so the fact reads the same for the
         // translate-and-throw shape as for cleanup-and-rethrow — the throw operand is never judged.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -633,11 +633,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // Self-contained down to the site list, deliberately: this is the only fact left carrying the
         // unfiltered subset for a bare `catch`, so it may not lean on a sibling for `Lines()`.
         CatchEdge edge = model.CatchEdge("N.Worker", "System.Exception");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([7]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([7]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBe([7]);
     }
 
@@ -660,11 +660,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The swallowing subset is a subset of the UNFILTERED subset, not of the sites: a filtered clause that
         // swallows is where the handler named its expectations, and stays lawful.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBeEmpty();
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -687,9 +687,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The documented honesty boundary, one side: the fact is the block's LAST STATEMENT, never an all-paths
         // flow analysis, so a handler that can leave without throwing still reads as throwing.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -713,9 +713,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         // The other side of the same boundary, and the reason it is stated rather than hidden: a handler that
         // throws on some path but ends on another statement reads as swallowing.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBe([8]);
     }
 
@@ -738,11 +738,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([8, 10]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([8, 10]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBe([10]);
     }
 
@@ -769,11 +769,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // One site, not two: the collapse is the premise, so asserting it here is what keeps the corner real.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([7]);
-        edge.UnfilteredLines()
+        edge.UnfilteredSites.Lines()
             .ShouldBe([7]);
-        edge.SwallowingLines()
+        edge.SwallowingSites.Lines()
             .ShouldBe([7]);
     }
 

@@ -56,7 +56,7 @@ public sealed class MustNotExposeVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Expose, "App.Facade", "Secrets.Secret");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Expose, "App.Facade", "Secrets.Secret");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.Facade exposes Secrets.Secret");

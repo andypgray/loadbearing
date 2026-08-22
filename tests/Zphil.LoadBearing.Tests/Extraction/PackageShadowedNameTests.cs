@@ -180,16 +180,16 @@ public sealed class PackageShadowedNameTests
 
         product.Caught.IsExternal.ShouldBeTrue();
         product.Caught.ProjectName.ShouldBe("Vendor");
-        product.UnfilteredLines()
+        product.UnfilteredSites.Lines()
             .ShouldBe([7]);
-        product.SwallowingLines()
+        product.SwallowingSites.Lines()
             .ShouldBe([7]);
 
         tests.Caught.IsExternal.ShouldBeFalse();
         tests.Caught.ProjectName.ShouldBe("Product.Tests");
-        tests.UnfilteredLines()
+        tests.UnfilteredSites.Lines()
             .ShouldBeEmpty();
-        tests.SwallowingLines()
+        tests.SwallowingSites.Lines()
             .ShouldBeEmpty();
     }
 
@@ -240,7 +240,7 @@ public sealed class PackageShadowedNameTests
                     .Because("The inverse of the rule above, to prove both selections are live."))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Reference, "Product.Tests.WidgetTests", "Product.Service");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "Product.Tests.WidgetTests", "Product.Service");
     }
 
     [Fact]

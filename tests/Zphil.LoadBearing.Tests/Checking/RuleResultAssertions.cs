@@ -113,7 +113,7 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
-    ///     Asserts the rule failed on exactly one edge violation of <paramref name="kind" />, running from
+    ///     Asserts the rule failed on an edge violation of <paramref name="kind" />, running from
     ///     <paramref name="source" /> to <paramref name="target" /> and carrying at least one site.
     /// </summary>
     /// <remarks>
@@ -122,7 +122,7 @@ internal static class RuleResultAssertions
     ///     belongs, so it belongs in the argument list. Which slot a kind fills is the same mapping
     ///     <see cref="Violation.BaselineIdentity" /> reads, so no second copy of it lives here.
     /// </remarks>
-    internal static Violation ShouldHaveFailedWithEdge(
+    internal static Violation ShouldHaveFailedWithSingleEdge(
         this RuleResult result, ViolationKind kind, string source, string target)
     {
         string report = Describe(result);
@@ -155,10 +155,10 @@ internal static class RuleResultAssertions
     ///         kind-agnostic sort, so nothing goes uncovered by this tolerance.
     ///     </para>
     ///     <para>
-    ///         Takes an array rather than <c>params</c>: this differs from
-    ///         <see cref="ShouldHaveFailedWithEdge" /> by one letter, and under <c>params</c> the singular's
-    ///         argument list would silently compile against the plural as a two-element set. A bracketed
-    ///         collection expression makes that a compile error.
+    ///         Takes an array rather than <c>params</c>, so the brackets carry the exhaustiveness at the call
+    ///         site: under <c>params</c> a one-edge assertion is written as a bare string, which reads as
+    ///         naming one edge among however many the rule found. <c>["A -&gt; B"]</c> reads as the whole set,
+    ///         which is what it claims.
     ///     </para>
     /// </remarks>
     internal static RuleResult ShouldHaveFailedWithEdges(

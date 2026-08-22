@@ -16,7 +16,9 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     <para>
 ///         The scoping rows below pin <see cref="GraphSummarizer.Scope" />'s asymmetry: a project edge
 ///         survives on <em>either</em> endpoint, an external edge on its source alone, and a surviving
-///         project keeps its declared references verbatim.
+///         project keeps its declared references verbatim. Both coverage statements take the either-end
+///         rule too — a multiply-declared type on any of its declarers, a shadowed one on its declarer or
+///         any of the projects binding the assembly instead.
 ///     </para>
 /// </summary>
 public sealed class GraphSummarizerTests
@@ -499,6 +501,37 @@ public sealed class GraphSummarizerTests
         scoped.MultiplyDeclaredTypes.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Scope_ShadowedType_SurvivesWhenABinderIsInScope()
+    {
+        // Arrange — Product.Tests declares Vendor.Widget and Product binds the package's; the scope names the
+        // binder alone. The glob matcher takes a project name whole, so "Product" misses "Product.Tests" and
+        // the declaring end is genuinely out of scope rather than swept in by a prefix.
+        GraphSummary summary = GraphSummarizer.Summarize(ShadowedSourceModel());
+
+        // Act
+        GraphSummary scoped = GraphSummarizer.Scope(summary, ["Product"]);
+
+        // Assert — either end keeps the entry, the same rule the project edges take. Keying on the declarer
+        // alone would drop it from precisely the scope that needs it: the reader anchored on Product is the
+        // one whose reference reaches the assembly rather than the declaration.
+        scoped.ShadowedTypes.Select(t => t.Type)
+            .ShouldBe(["Vendor.Widget"]);
+    }
+
+    [Fact]
+    public void Scope_ShadowedTypeWithNeitherEndInScope_IsNarrowedOut()
+    {
+        // Arrange
+        GraphSummary summary = GraphSummarizer.Summarize(ShadowedSourceModel());
+
+        // Act — a project that neither declares the name nor binds the assembly's.
+        GraphSummary scoped = GraphSummarizer.Scope(summary, ["Other"]);
+
+        // Assert — a complete survey of a smaller subject, so an entry neither end reaches goes.
+        scoped.ShadowedTypes.ShouldBeEmpty();
+    }
+
     // One framework's compilation of the one project, declaring the type both of them declare.
     private static CompilationInput Framework(string targetFramework)
     {
@@ -526,6 +559,39 @@ public sealed class GraphSummarizerTests
                                                                             """));
 
         return CodebaseExtractor.ExtractFromCompilations([lib, app]);
+    }
+
+    // One name declared twice with the ends split across projects, which is what a stand-in under a package's
+    // own namespace produces: Product binds Vendor.Widget out of the assembly, Product.Tests declares its own
+    // and references Product. Vendor is handed over as a metadata reference and never extracted — an input
+    // would make it a project of the solution, and the split would be cross-project conflation instead.
+    // PackageShadowedNameTests pins the DeclaredBy/BoundFromAssemblyBy halves this scoping row rests on.
+    private static CodebaseModel ShadowedSourceModel()
+    {
+        Compilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public class Widget {}
+                                                                      """));
+
+        CompilationInput product = CompilationFactory.CompileAgainstPackages(
+            "Product", [vendor], ("Service.cs", """
+                                                namespace Product;
+                                                public class Service { private Vendor.Widget widget; }
+                                                """));
+
+        CompilationInput tests = CompilationFactory.CompileReferencing(
+            "Product.Tests", product.Compilation, "Product",
+            ("Mocks/Vendor.cs", """
+                                namespace Vendor;
+                                public class Widget {}
+                                """),
+            ("WidgetTests.cs", """
+                               namespace Product.Tests;
+                               public class WidgetTests { private Vendor.Widget stub; }
+                               """));
+
+        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
     }
 
     // Three projects in a chain — Contoso.Web -> Acme.App -> Acme.Lib — with one external edge, out of

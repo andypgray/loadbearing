@@ -47,24 +47,14 @@ internal static class SpecOutputStager
                        + string.Join("-", withheldFileNames.Select(Path.GetFileNameWithoutExtension));
         string stagedDirectory = Path.Combine(TestTempRoot.For("staged-specs"), label);
 
-        if (Directory.Exists(stagedDirectory)) Directory.Delete(stagedDirectory, true);
-        CopyExcept(sourceDirectory, stagedDirectory, withheld);
+        // Read-only-tolerant, and the framework delete is not: File.Copy carries the read-only attribute
+        // across, so one read-only file in a spec's output stages read-only and the next StageWithout of the
+        // same combination throws partway through. The same call McpChildHarness.StageDirectory makes, for
+        // the same reason.
+        ReadOnlyTolerant.DeleteTree(stagedDirectory);
+        DirectoryTree.Copy(
+            sourceDirectory, stagedDirectory, relative => !withheld.Contains(Path.GetFileName(relative)));
 
         return Path.Combine(stagedDirectory, specFileName);
-    }
-
-    private static void CopyExcept(string sourceDirectory, string targetDirectory, HashSet<string> withheld)
-    {
-        Directory.CreateDirectory(targetDirectory);
-
-        foreach (string file in Directory.EnumerateFiles(sourceDirectory))
-        {
-            string name = Path.GetFileName(file);
-            if (withheld.Contains(name)) continue;
-            File.Copy(file, Path.Combine(targetDirectory, name));
-        }
-
-        foreach (string directory in Directory.EnumerateDirectories(sourceDirectory))
-            CopyExcept(directory, Path.Combine(targetDirectory, Path.GetFileName(directory)), withheld);
     }
 }

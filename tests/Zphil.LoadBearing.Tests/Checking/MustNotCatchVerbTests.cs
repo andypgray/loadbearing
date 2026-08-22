@@ -58,7 +58,7 @@ public sealed class MustNotCatchVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.DataHandler catches Errors.DbError");

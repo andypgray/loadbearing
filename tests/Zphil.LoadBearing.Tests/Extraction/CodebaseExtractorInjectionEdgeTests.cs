@@ -24,7 +24,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdge("N.Svc", "N.IDep")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -38,7 +38,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdge("N.Svc", "N.IDep")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -52,7 +52,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdge("N.Rec", "N.IDep")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -90,10 +90,10 @@ public sealed class CodebaseExtractorInjectionEdgeTests
         model.HasInjectionEdge("N.C", "N.Order")
             .ShouldBeTrue();
         model.InjectionEdge("N.C", "N.IHandler<T>")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
         model.InjectionEdge("N.C", "N.Order")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -137,7 +137,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
 
         InjectionEdge edge = model.InjectionEdge("N.C", "System.IDisposable");
         edge.Injected.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([2]);
     }
 
@@ -215,7 +215,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdge("N.Svc", "N.IDep")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([6, 7]);
     }
 }

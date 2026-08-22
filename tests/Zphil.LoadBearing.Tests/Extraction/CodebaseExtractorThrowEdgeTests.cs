@@ -28,7 +28,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // The same site yields all three facts: the throw edge (§4.8), the construction edge (§4.5), and the
         // §4.1 reference edge from the `MyError` name — recorded beside one another, never instead.
         model.ThrowEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
         model.HasConstructorEdge("N.Worker", "N.MyError")
             .ShouldBeTrue();
@@ -65,7 +65,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // The expression-bodied `=> throw new X()` is a throw EXPRESSION (the most common form in the wild).
         model.ThrowEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -86,7 +86,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // A `?? throw` right-operand is a throw expression.
         model.ThrowEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([7]);
     }
 
@@ -108,7 +108,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // A switch-expression arm is a throw expression.
         model.ThrowEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([8]);
     }
 
@@ -131,7 +131,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // `throw ex` mints the VARIABLE's static type — the deliberate asymmetry with the bare rethrow `throw;`
         // (which mints nothing): under strict MustOnlyThrow, `catch (Exception ex) { throw ex; }` is red.
         model.ThrowEdge("N.Worker", "N.MyError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([8]);
     }
 
@@ -283,7 +283,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // precedent).
         ThrowEdge edge = model.ThrowEdge("Program", "System.InvalidOperationException");
         edge.Thrown.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([1]);
     }
 

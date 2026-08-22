@@ -152,7 +152,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             "MyApp.Web.HomeController", "M:System.Text.StringBuilder.Append(System.String)");
 
         append.Member.ContainingType.IsExternal.ShouldBeTrue();
-        append.Lines()
+        append.Sites.Lines()
             .ShouldBe([13, 19]);
     }
 
@@ -160,7 +160,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     public void ExtractFromSolutionAsync_WebToBillingFacadeEdge_PinsCleanFacadeSites()
     {
         fixture.Model.Edge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([17, 20]);
     }
 
@@ -168,7 +168,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     public void ExtractFromSolutionAsync_WebToBillingCalculatorEdge_PinsNonFacadeSites()
     {
         fixture.Model.Edge("MyApp.Web.InvoiceController", "MyApp.Legacy.Billing.BillingCalculator")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([9, 10]);
     }
 
@@ -179,7 +179,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.InvoiceController", "System.Data.DataTable");
 
         edge.Target.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([14, 16]);
     }
 
@@ -190,7 +190,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.HomeController", "System.Data.DataTable");
 
         edge.Target.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([24, 26]);
     }
 
@@ -201,15 +201,15 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         // P: member edges on the new external System.DateTime at the appended lines — the rows time/inject-clock
         // bans. The parallel type edge to System.DateTime (return types + the reads) is the new external node.
         fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.Now")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([32]);
         fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.UtcNow")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([37]);
 
         ReferenceEdge dateTime = fixture.Model.Edge("MyApp.Web.HomeController", "System.DateTime");
         dateTime.Target.IsExternal.ShouldBeTrue();
-        dateTime.Lines()
+        dateTime.Sites.Lines()
             .ShouldBe([30, 32, 35, 37]);
     }
 
@@ -293,7 +293,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
 
         edge.Target.IsExternal.ShouldBeTrue();
         edge.Target.ProjectName.ShouldNotBeNullOrEmpty();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([9, 13, 14, 19]);
     }
 
@@ -482,7 +482,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         // co-existing §4.1 reference edge.
         CatchEdge swallow = fixture.Model.CatchEdge("MyApp.Web.ReportEndpoint", "System.Exception");
         swallow.Caught.IsExternal.ShouldBeTrue();
-        swallow.Lines()
+        swallow.Sites.Lines()
             .ShouldBe([15]);
         fixture.Model.CatchEdges("MyApp.Web.ReportEndpoint")
             .Select(e => e.Caught.FullName)
@@ -494,12 +494,12 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         // its one site is recorded unfiltered, while RetryPolicy catches the identical external type behind a
         // filter and records none. Both edges — and both reference edges — exist either way, which is the
         // difference the filter-aware verb reads and the plain catch verb cannot see.
-        swallow.UnfilteredLines()
+        swallow.UnfilteredSites.Lines()
             .ShouldBe([15]);
         CatchEdge guarded = fixture.Model.CatchEdge("MyApp.Domain.RetryPolicy", "System.Exception");
-        guarded.Lines()
+        guarded.Sites.Lines()
             .ShouldBe([18]);
-        guarded.UnfilteredLines()
+        guarded.UnfilteredSites.Lines()
             .ShouldBeEmpty();
         fixture.Model.HasEdge("MyApp.Domain.RetryPolicy", "System.Exception")
             .ShouldBeTrue();
@@ -509,16 +509,16 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
         // ends its block in `throw;`, so its site is recorded unfiltered and NOT swallowing. That difference is
         // what the rethrow-aware verb reads and neither of the other two catch verbs can see; RetryPolicy's
         // filtered clause is out of both subsets, the subset-of-a-subset holding end to end.
-        swallow.SwallowingLines()
+        swallow.SwallowingSites.Lines()
             .ShouldBe([15]);
         CatchEdge rethrowing = fixture.Model.CatchEdge("MyApp.Web.ReportPublisher", "System.Exception");
-        rethrowing.Lines()
+        rethrowing.Sites.Lines()
             .ShouldBe([22]);
-        rethrowing.UnfilteredLines()
+        rethrowing.UnfilteredSites.Lines()
             .ShouldBe([22]);
-        rethrowing.SwallowingLines()
+        rethrowing.SwallowingSites.Lines()
             .ShouldBeEmpty();
-        guarded.SwallowingLines()
+        guarded.SwallowingSites.Lines()
             .ShouldBeEmpty();
 
         // At least one ThrowEdge: OrderApproval's whole throw set, pinned — the in-solution domain exception at
@@ -528,12 +528,12 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             .Select(e => e.Thrown.FullName)
             .ShouldBe(["MyApp.Domain.OrderRuleViolation", "System.InvalidOperationException"]);
         fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "MyApp.Domain.OrderRuleViolation")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([12]);
 
         ThrowEdge bclThrow = fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException");
         bclThrow.Thrown.IsExternal.ShouldBeTrue();
-        bclThrow.Lines()
+        bclThrow.Sites.Lines()
             .ShouldBe([17]);
         fixture.Model.HasEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException")
             .ShouldBeTrue();

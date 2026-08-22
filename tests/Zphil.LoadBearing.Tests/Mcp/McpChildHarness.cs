@@ -287,18 +287,7 @@ internal static class McpChildHarness
         // File.Copy carries the read-only attribute across, so a staged tree can only be re-staged by a
         // delete that clears it.
         ReadOnlyTolerant.DeleteTree(targetDirectory);
-        CopyRecursive(sourceDirectory, targetDirectory);
-    }
-
-    private static void CopyRecursive(string sourceDirectory, string targetDirectory)
-    {
-        Directory.CreateDirectory(targetDirectory);
-
-        foreach (string file in Directory.EnumerateFiles(sourceDirectory))
-            File.Copy(file, Path.Combine(targetDirectory, Path.GetFileName(file)));
-
-        foreach (string directory in Directory.EnumerateDirectories(sourceDirectory))
-            CopyRecursive(directory, Path.Combine(targetDirectory, Path.GetFileName(directory)));
+        DirectoryTree.Copy(sourceDirectory, targetDirectory);
     }
 }
 

@@ -252,19 +252,19 @@ public sealed class FragmentRoundTripTests
             .ShouldBe(
                 [("M.Handler", "N.DomainError"), ("M.Handler", "System.FormatException")]);
         direct.CatchEdge("M.Handler", "N.DomainError")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([9, 10, 18]);
         direct.CatchEdge("M.Handler", "N.DomainError")
-            .UnfilteredLines()
+            .UnfilteredSites.Lines()
             .ShouldBe([10, 18]);
         direct.CatchEdge("M.Handler", "N.DomainError")
-            .SwallowingLines()
+            .SwallowingSites.Lines()
             .ShouldBe([18]);
         direct.CatchEdge("M.Handler", "System.Exception")
-            .UnfilteredLines()
+            .UnfilteredSites.Lines()
             .ShouldBe([11]);
         direct.CatchEdge("M.Handler", "System.Exception")
-            .SwallowingLines()
+            .SwallowingSites.Lines()
             .ShouldBeEmpty();
         fromCache.ShouldModelTheSameAs(direct);
     }

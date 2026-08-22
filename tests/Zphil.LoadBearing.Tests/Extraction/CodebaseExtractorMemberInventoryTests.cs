@@ -404,12 +404,12 @@ public sealed class CodebaseExtractorMemberInventoryTests
         split.Member("M:N.Split.B")
             .FilePaths.ShouldBe(["PartB.cs"]);
         split.Member("M:N.Split.B")
-            .DeclarationLines()
+            .DeclarationSites.Lines()
             .ShouldBe([2]);
         split.Member("M:N.Split.C")
             .FilePaths.ShouldBe(["PartA.cs"]);
         split.Member("M:N.Split.C")
-            .DeclarationLines()
+            .DeclarationSites.Lines()
             .ShouldBe([2]);
     }
 

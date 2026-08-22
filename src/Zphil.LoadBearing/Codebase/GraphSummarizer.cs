@@ -126,6 +126,14 @@ public static class GraphSummarizer
     ///         reason to read the entry is that a subject anchored inside the scope will miss the type, and
     ///         a declarer outside it is the half that explains why.
     ///     </para>
+    ///     <para>
+    ///         A <see cref="GraphSummary.ShadowedTypes" /> entry takes the same either-end rule across its two
+    ///         different ends: it survives when its <see cref="ShadowedTypeSummary.DeclaredBy" /> project is in
+    ///         scope, or when any of its <see cref="ShadowedTypeSummary.BoundFromAssemblyBy" /> projects is.
+    ///         Those are rarely the same project — the declarer is the test assembly carrying the stand-in,
+    ///         the binder the product code reaching the package — so narrowing on the declarer alone would
+    ///         drop the entry from exactly the scope whose author needs it.
+    ///     </para>
     /// </remarks>
     /// <param name="summary">The survey to narrow.</param>
     /// <param name="projectGlobs">The project-name globs; empty means every project.</param>

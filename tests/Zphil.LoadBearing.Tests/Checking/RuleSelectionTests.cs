@@ -151,7 +151,7 @@ public sealed class RuleSelectionTests
         report.RulesFailed.ShouldBe(1);
         report.HasViolations.ShouldBeTrue();
         report.Results.Single()
-            .ShouldHaveFailedWithEdge(ViolationKind.Reference, "App.Web.OldController", "App.Data.Db");
+            .ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.OldController", "App.Data.Db");
     }
 
     [Fact]

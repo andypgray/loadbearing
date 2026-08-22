@@ -70,7 +70,7 @@ public sealed class MustOnlyThrowVerbTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Throw, "App.Service", "Errors.InfraError");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Throw, "App.Service", "Errors.InfraError");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.Service throws Errors.InfraError");

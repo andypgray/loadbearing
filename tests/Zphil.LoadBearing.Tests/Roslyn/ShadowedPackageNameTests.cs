@@ -128,7 +128,7 @@ public sealed class ShadowedPackageNameTests
                     .Enforce(arch.Project(Tests).MustNotReference(arch.Project(Product)))
                     .Because("The inverse, so neither selection can be silently empty."))
             .Single()
-            .ShouldHaveFailedWithEdge(
+            .ShouldHaveFailedWithSingleEdge(
                 ViolationKind.Reference, "ShadowedApp.Product.Tests.RegistryTests", "ShadowedApp.Product.Registry");
     }
 

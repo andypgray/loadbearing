@@ -104,7 +104,7 @@ public sealed class NarrowedUniverseSkipTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");
     }
 
     [Fact]

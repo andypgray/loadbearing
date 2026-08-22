@@ -110,7 +110,7 @@ public sealed class MustNotSwallowVerbTests
 
         // The subject covers all four handlers, and the single-item claim below is the verb's whole point:
         // only the handler that holds the failure is in the report.
-        result.ShouldHaveFailedWithEdge(ViolationKind.Catch, "App.Swallower", "Errors.DbError");
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Catch, "App.Swallower", "Errors.DbError");
 
         string block = result.HumanBlock();
         block.ShouldContain("App.Swallower catches Errors.DbError");
@@ -187,7 +187,7 @@ public sealed class MustNotSwallowVerbTests
         // which is what lets the verb reuse the Catch kind and its "{source} catches {target}" line without
         // printing a falsehood.
         MixedModel.CatchEdge("App.MixedHandler", "Errors.DbError")
-            .UnfilteredLines()
+            .UnfilteredSites.Lines()
             .ShouldBe([9, 11]);
 
         RuleResult result = Checker.Run(MixedModel, arch =>

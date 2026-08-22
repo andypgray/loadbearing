@@ -98,9 +98,9 @@ public sealed class CodebaseExtractorTypeTests
                          """));
 
         ReferenceEdge edge = model.Edge("N.P", "N.Dep");
-        edge.Files()
+        edge.Sites.Files()
             .ShouldBe(["PartA.cs", "PartB.cs"]);
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([3, 2]);
     }
 

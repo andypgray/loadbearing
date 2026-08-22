@@ -62,26 +62,26 @@ public sealed class WarmWorkspaceMcpTests
     // CancellationToken. Compiled to a throwaway DLL by SpecAssemblyCompiler because no committed fixture
     // spec carries this rule in isolation (MyAppViolatedSpec has it, plus fourteen rules of noise).
     // String-selected subject + BCL anchors only, so the spec depends on nothing but the core and the BCL.
-    private const string AcceptCancellationSpecSource = """
-                                                        using System.Threading;
-                                                        using System.Threading.Tasks;
-                                                        using Zphil.LoadBearing;
+    private const string AcceptCancellationSpecSource =
+        """
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Zphil.LoadBearing;
 
-                                                        namespace WarmAcceptCancellation
-                                                        {
-                                                            public sealed class AcceptCancellationSpec : IArchitectureSpec
-                                                            {
-                                                                public void Define(Arch arch)
-                                                                {
-                                                                    arch.Rule("async/accept-cancellation")
-                                                                        .Enforce(arch.Namespace("MyApp.Web.*").Methods
-                                                                            .Returning(typeof(Task), typeof(Task<>))
-                                                                            .MustAcceptParameter(typeof(CancellationToken)))
-                                                                        .Because("Async Web methods must honor cancellation.");
-                                                                }
-                                                            }
-                                                        }
-                                                        """;
+        namespace WarmAcceptCancellation
+        {
+            public sealed class AcceptCancellationSpec : IArchitectureSpec
+            {
+                public void Define(Arch arch)
+                {
+                    arch.Rule("async/accept-cancellation")
+                        .Enforce(arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task), typeof(Task<>))
+                            .MustAcceptParameter(typeof(CancellationToken)))
+                        .Because("Async Web methods must honor cancellation.");
+                }
+            }
+        }
+        """;
 
     [Fact]
     public async Task ArchCheck_SourceFileEditedOnDisk_ReflectsEditAndMatchesColdCli()

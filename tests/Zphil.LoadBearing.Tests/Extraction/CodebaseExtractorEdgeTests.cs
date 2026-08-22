@@ -22,7 +22,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.A", "N.B")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([2]);
     }
 
@@ -36,7 +36,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.C", "N.I")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -51,10 +51,10 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.S", "N.R")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
         model.Edge("N.S", "N.P")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -69,10 +69,10 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.H", "N.F")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
         model.Edge("N.H", "N.G")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -88,7 +88,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Decorated", "N.MyAttribute")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -118,7 +118,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.U", "N.T")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -133,7 +133,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Caster", "N.Derived")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -147,7 +147,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Maker", "N.Thing")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -166,7 +166,7 @@ public sealed class CodebaseExtractorEdgeTests
 
         // Line 6 (the target-typed new()) is the only site contributed purely by implicit creation.
         model.Edge("N.Factory", "N.Widget")
-            .Lines()
+            .Sites.Lines()
             .ShouldContain(6);
     }
 
@@ -181,7 +181,7 @@ public sealed class CodebaseExtractorEdgeTests
 
         ReferenceEdge edge = model.Edge("N.User", "N.Config");
         edge.Sites.ShouldHaveSingleItem();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -201,7 +201,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Client", "N.Service")
-            .Lines()
+            .Sites.Lines()
             .ShouldContain(7);
     }
 
@@ -215,7 +215,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Caller", "N.Ext")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -235,7 +235,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Reader", "N.Model")
-            .Lines()
+            .Sites.Lines()
             .ShouldContain(7);
     }
 
@@ -250,7 +250,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Wire", "N.Handlers")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([4]);
     }
 
@@ -264,7 +264,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          """);
 
         model.Edge("N.Namer", "N.Target")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -391,7 +391,7 @@ public sealed class CodebaseExtractorEdgeTests
         model.Edges.Select(e => (e.Source.FullName, e.Target.FullName))
             .ShouldBe([("N.C", "N.Alpha"), ("N.C", "N.Beta")]);
         model.Edge("N.C", "N.Alpha")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([6, 7]);
     }
 

@@ -48,7 +48,7 @@ public sealed class CodebaseExtractorMemberEdgeTests
             .ShouldHaveSingleItem();
         MemberEdge edge = model.MemberEdge("N.User", "P:N.Model.P");
         edge.Member.Kind.ShouldBe(MemberKind.Property);
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([7, 8]);
     }
 

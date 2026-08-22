@@ -24,7 +24,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         model.ConstructorEdge("N.Maker", "N.Thing")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -44,7 +44,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         model.HasEdge("N.Maker", "N.Thing")
             .ShouldBeTrue();
         model.Edge("N.Maker", "N.Thing")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -58,7 +58,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          """);
 
         model.ConstructorEdge("N.Maker", "N.Widget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
@@ -78,10 +78,10 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         // Line 6 (the target-typed new()) is the sole node contributing the Widget type edge purely from
         // implicit creation (there is no inner type-name syntax) — and it mints the ctor edge there too.
         model.ConstructorEdge("N.Factory", "N.Widget")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([6]);
         model.Edge("N.Factory", "N.Widget")
-            .Lines()
+            .Sites.Lines()
             .ShouldContain(6);
     }
 
@@ -96,7 +96,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         // new Box<int>() records the OPEN definition N.Box<T> (§4.1), and the co-existing type edge too.
         model.ConstructorEdge("N.Maker", "N.Box<T>")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
         model.HasEdge("N.Maker", "N.Box<T>")
             .ShouldBeTrue();
@@ -112,7 +112,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         ConstructorEdge edge = model.ConstructorEdge("N.Maker", "System.Text.StringBuilder");
         edge.Constructed.IsExternal.ShouldBeTrue();
-        edge.Lines()
+        edge.Sites.Lines()
             .ShouldBe([2]);
     }
 

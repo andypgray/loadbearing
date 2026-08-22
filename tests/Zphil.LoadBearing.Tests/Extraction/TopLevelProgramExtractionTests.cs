@@ -58,7 +58,7 @@ public sealed class TopLevelProgramExtractionTests
         Model.HasEdge("Program", "N.Worker")
             .ShouldBeTrue();
         Model.Edge("Program", "N.Worker")
-            .Lines()
+            .Sites.Lines()
             .ShouldBe([3]);
     }
 
