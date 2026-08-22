@@ -22,6 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `check`, `status` and `graph` and wrote `context --path`, but there is no such verb: the surface
   is the `arch_context` MCP tool, as `loadbearing --help`'s seven verbs already said. Both mentions
   now name the tool. The behaviour described was right; only the surface was misnamed.
+- **The `derive_spec` recipe teaches the whole shipped vocabulary again.** Six verbs had shipped
+  without the recipe ever naming them — `MustNotSwallow` on the exception axis, and 0.6.0's
+  `MustBelongTo`, `MustResideInProject`, `MustBeRegistered`, `MustBeGetOnly` and `MustBeReadonly` —
+  along with the member-side attribute vocabulary and the `.ThatAreStatic()` adjective. Each is
+  taught now, beside its axis; the exception-verb tallies in the semantics notes read five and
+  three to match; and the closing section routes to GRAMMAR.md, which the recipe had never named,
+  so the condensed reference finally says where the full grammar lives. A new test holds every
+  shipped `Constraint`-returning verb name to the recipe, so the next verb cannot ship untaught
+  unless a registry entry says why it is withheld.
+- **The `derive_spec` troubleshooting list catches up with the incomplete-model refusals.** The
+  two refusals — projects that failed to load, and projects whose NuGet packages did not
+  resolve — are the ones a broken tree actually produces, and the list had entries for
+  neither. Both are catalogued now, each with its own remedy. The load-diagnostics entry also
+  stops offering a locked-mode `NU1004` as its usual cause: since the restore refusal learned to
+  blame projects itself, that shape lands there instead, and what remains on the diagnostics arm
+  is load problems that blame no project in particular.
 
 ## [0.6.0] - 2026-08-22
 

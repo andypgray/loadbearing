@@ -203,6 +203,10 @@ internal static class IncompleteModelGate
     ///         before a runner exists to render any diagnostics beside it, so on <em>both</em> its surfaces
     ///         there is nothing above to point at.
     ///     </para>
+    ///     <para>
+    ///         The derive_spec prompt's troubleshooting list quotes both ledes (their counts glossed as
+    ///         "N projects"), so a wording change here moves that entry too.
+    ///     </para>
     /// </remarks>
     internal static string SpecRefusal(WorkspaceDiagnostics diagnostics)
     {

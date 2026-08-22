@@ -278,12 +278,22 @@ Errors you may see, verbatim, and what they mean:
   to name one.` — the spec project is not in the solution yet (`dotnet sln add`), or you need
   an explicit `--spec`. The line below it says how many C# projects the workspace held: a count
   far short of the solution's is the real finding, not the missing spec project.
+- `No spec project found: N projects failed to load, so a project that references
+  Zphil.LoadBearing.dll may be among them:` — followed by every failed project, uncapped. The
+  one that would have matched may be among the casualties, and `--spec` cannot repair a load,
+  so the remedy is the one the refusal names: restore and build, then retry.
+- `No spec project found: NuGet packages did not resolve for N projects, so a project that
+  references Zphil.LoadBearing.dll may have failed to resolve it:` — the quieter break: every
+  named project loaded completely, but without its package references, so a reference to the
+  contract library resolves to nothing and convention discovery cannot see it. Restore, then
+  retry. One broken tree can raise this and the previous refusal at once — they compose, each
+  naming its own projects.
 - `No spec project found: the workspace did not load cleanly, so a project that references
-  Zphil.LoadBearing.dll may have failed to resolve it:` — followed by the load failures, up to
-  three of them. The spec project may well be there; its reference to the contract library did
-  not resolve, which a broken restore is the usual cause of (`NU1004`, a lock file inconsistent
-  with the project). Repair the restore and build, then retry. `--spec` cannot help here — an
-  unresolved reference is unresolved whichever project you name.
+  Zphil.LoadBearing.dll may have failed to resolve it:` — followed by the diagnostics, up to
+  three of them: load problems that blame no project in particular, which is why this one says
+  "may" — that is all it knows. The spec project may well be there, its reference to the
+  contract library hidden by whatever the diagnostics describe. Restore and build, then retry.
+  `--spec` cannot help here — an unresolved reference is unresolved whichever project you name.
 - `Multiple spec projects found; pass --spec to disambiguate:` — more than one project
   references the contract library; the listed lines name each one's `.csproj`, so pass yours.
   A project that multi-targets is listed once: its frameworks are one spec project.
@@ -579,6 +589,12 @@ constructed type may be *referenced* but not *created*, keying the (source, cons
 included, keying the (source, injected) type pair; the natural operands are `Registered`
 selections — `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
 arch.Registered(Lifetime.Transient))` is the captive-dependency rule) ·
+`MustBeRegistered()` (nullary — the completeness half beside `MustNotInject`'s shape half: the
+injection verb constrains what the registered may depend on, this one demands the registration
+itself. Membership is `arch.Registered()`'s exactly, any lifetime, so the same visibility
+boundary applies with its polarity inverted: a registration the checker cannot see reds a
+correctly registered type, so an estate that registers through invisible routes should not use
+the verb) ·
 `MustNotCatch(target, …)` (bans `catch` clauses naming the target, keying the (source, caught)
 type pair; matching is exact at the definition level, so banning `Exception` does not ban its
 subclasses — though a bare `catch` counts as catching `Exception`) ·
@@ -586,6 +602,10 @@ subclasses — though a bare `catch` counts as catching `Exception`) ·
 `when` filter — a filtered broad catch is the good state it rewards; filter presence is
 syntactic, so `when (true)` counts as filtered, and a violation's sites are the unfiltered
 clauses alone, keying the same (source, caught) type pair) ·
+`MustNotSwallow(target, …)` (the same axis narrowed once more, to `catch` clauses that neither
+carry a `when` filter nor end their block in a `throw` — a filtered catch and a rethrowing
+catch are both good states it rewards; the throw fact is the block's last statement, syntactic,
+never an all-paths analysis, and the same (source, caught) type pair is keyed) ·
 `MustOnlyThrow(target, …)` (the strict throw allow-list: every `throw new X()` / `throw expr`
 must mint a listed type, with no exemption for external packages, keying the (source, thrown)
 type pair; a bare rethrow `throw;` mints nothing) ·
@@ -596,7 +616,13 @@ derived throw) ·
 `MustNotExpose(target, …)` (bans a type appearing in a public signature position — a return,
 parameter, or property/field/event type — of an effectively-public member, keying the (source,
 exposed) type pair; the type may be *referenced* internally but not *surfaced* on the public API) ·
-`MustResideInNamespace(glob)`
+`MustResideInNamespace(glob)` ·
+`MustResideInProject(name)` (one project name, no glob; a type that several projects compile is
+satisfied by any of its declarers, agreeing with `arch.Project`) ·
+`MustBelongTo(membership, …)` (the coverage verb: each membership is a selection naming where a
+type may live — layers, projects, namespaces — and a subject type no membership names is red;
+"any of several projects" is this verb with project memberships, and there is deliberately no
+`typeof` membership form — a single-type membership would collapse into "must be that type")
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
 `MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustNotImplement(type, …)` /
@@ -607,7 +633,7 @@ each with a generic twin — `MustNotImplement<T>()`, `MustNotDeriveFrom<T>()`,
 `MustBeAbstract` / `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
 
 The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>()` /
-`.AttributedWith<T>()`, the six `Must[Not]*<T>` hierarchy verbs, the `arch.Member<X>(x => x.M)` /
+`.AttributedWith<T>()`, the `Must[Not]*<T>` hierarchy verbs (member-side pair included), the `arch.Member<X>(x => x.M)` /
 `arch.Member(() => X.M)` anchors, and the static `MustNotUse(() => X.M)` verb forms — are pure
 sugar for the `typeof`/`nameof` form and reify identically; a generic twin needs the same
 compile-time reference the `typeof` does, so where you cannot have one, use the string overload
@@ -623,12 +649,21 @@ members, constrained directly: projections `.Members` / `.Methods` / `.Propertie
 / `.Events` · member adjectives `.WithSuffix` / `.WithPrefix` / `.WithNameMatching` ·
 `.Returning(typeof(Task))` (methods-only, so it chains only off `.Methods`; matches the
 declared return type at the definition level — `typeof(Task<>)` matches every construction,
-and a closed generic like `typeof(Task<int>)` is refused) · `.Where(pred, description:)` ·
+and a closed generic like `typeof(Task<int>)` is refused) · `.AttributedWith(attributeType)`
+(declared member attributes only, with the same `<T>` and string forms as the type-side
+adjective; renders as a prefix on the subject head — "`[Audit]`-attributed methods of …") ·
+`.ThatAreStatic()` (the static members alone; prefixes the head the same way — "static fields
+of …" — and stacked prefixes concatenate in authoring order) · `.Where(pred, description:)` ·
 member verbs `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustBePublic` /
 `MustBeInternal` / `MustBePrivate` · `MustBeStatic` / `MustBeAbstract` / `MustBeVirtual` ·
+`MustBeAttributedWith` / `MustNotBeAttributedWith` (the type-side pair again, generic twins and
+string forms included) ·
 `MustAcceptParameter(typeof(CancellationToken))` (methods-only, so it chains only off
 `.Methods` like `.Returning`; one anchor, matched at the definition level — `typeof(IProgress<>)`
 matches every construction, and a closed generic is refused) ·
+`MustBeGetOnly()` (properties-only, so it chains only off `.Properties`; strict about the
+declaration — an `init`-only setter is a setter, so it reds) · `MustBeReadonly()` (fields-only,
+so it chains only off `.Fields`; a `const` field satisfies it, const being readonly's superset) ·
 `.Must(pred, description:)` (member predicates see `IMemberInfo`, parameters included). The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in
 `MyApp.Web.*` returning `Task` must be named `*Async`."*
@@ -657,8 +692,9 @@ within one segment, never crossing a dot; lone `*` = everything. So `MyApp.Domai
 source-level member access; "construct" means a source-level object creation (`new`, including
 target-typed `new()`); "inject" means a source-level constructor-parameter dependency (primary
 constructors included); "catch" means a source-level `catch` clause (a bare `catch` counts as
-`System.Exception`, and whether the clause spells a `when` filter is recorded beside it, so a
-ban can reach the unfiltered ones alone); "throw" means a source-level `throw` of the thrown
+`System.Exception`; whether the clause spells a `when` filter, and whether its block ends in a
+`throw`, are recorded beside it, so a ban can reach the unfiltered ones — or the swallowing
+ones — alone); "throw" means a source-level `throw` of the thrown
 expression's static type (bare rethrows `throw;` are not recorded); "expose" means a type named in a public signature position (a public member's return, parameter, or property/field/event type) of an externally visible type: the checker records all seven edge kinds. A construction ban keys the
 (source, constructed) type pair (overload-indifferent) and is honest about reflection — a DI
 *registration* mints only a type reference, never a construct edge, so a container-resolved type is
@@ -679,9 +715,9 @@ packages are exempt, and the rendered sentence says so) and is strict — list a
 selection among its allowed targets if self-references are fine. `MustOnlyThrow` is stricter
 still: external thrown types ARE constrained (no type must throw a BCL exception), so its
 sentence carries no exemption; `MustNotThrow` is its ban twin, and a spec may carry either or
-both. All four exception verbs match their operands exactly — banning `Exception` never flags a
-narrower catch or a derived throw, which is the good state — and the two catch verbs key the
-same (source, caught) edge, so a baseline entry means the same thing under either.
+both. All five exception verbs match their operands exactly — banning `Exception` never flags a
+narrower catch or a derived throw, which is the good state — and the three catch verbs key the
+same (source, caught) edge, so a baseline entry means the same thing under any of them.
 `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
 matches any construction. `AttributedWith` sees declared attributes only. The `MustNot*`
@@ -698,5 +734,9 @@ subject fails the rule; an inert target warns; both are authoring signals, not c
 - `arch_context <path>` — the architecture scope cards covering a directory (a quarantined
   scope's dragons, a layer's local rules).
 - `loadbearing status` — the burndown after baselining.
+- [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) — the canonical
+  fluent-language spec: the complete vocabulary with its rendered prose fragments and pinned
+  semantics. The authoring reference above is its condensed subset; when a rule needs a form
+  not shown here, look there before improvising.
 - The generated `AGENTS.md` block is the always-on summary; this recipe's output is what
   keeps it true.

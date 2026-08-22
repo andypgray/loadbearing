@@ -154,6 +154,23 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_RoutesToTheGrammar()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — the authoring reference is a condensed subset of the published grammar; the recipe
+        // must say where the full vocabulary lives, or an agent mid-derive has nowhere to go past the
+        // subset but improvisation.
+        string text = result.ShouldHaveTextContent();
+        text.ShouldContain("https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md");
+    }
+
+    [Fact]
     public void DeriveSpec_LoadsEmbeddedRecipe_NonTrivial()
     {
         // A rename of the .md or its manifest id would otherwise surface only when a client calls
