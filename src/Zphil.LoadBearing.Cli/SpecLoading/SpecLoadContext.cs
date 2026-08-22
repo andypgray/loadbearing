@@ -38,13 +38,6 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         In the long-lived MCP server a path load pinned the spec's build output — the spec DLL and the
-    ///         five dependencies beside it — and every <c>dotnet build</c> of the spec project then failed
-    ///         with MSB3021/MSB3027 until the server was killed. Killing it is terminal for a stdio server
-    ///         (the client never reconnects one), which silently disarmed the per-edit <c>arch_check</c> hook
-    ///         for the rest of the session.
-    ///     </para>
-    ///     <para>
     ///         A path that is not on disk is handed to the loader rather than opened as a stream, so the
     ///         failure is the loader's own <see cref="FileNotFoundException" /> naming that path. That is the
     ///         spec DLL itself going missing between resolution and load — a rebuild landing underneath a
@@ -76,12 +69,9 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
     ///     Returning the contract assembly here rather than null is what makes the bind
     ///     <em>version-agnostic</em>, and that is the whole point. Falling through to the Default context
     ///     looks equivalent — the same assembly comes back — but the default binder also enforces
-    ///     requested-version ≤ available-version, and a host carries exactly one contract version. A spec
-    ///     compiled against a newer one (a vendored or source-built contract identifies as 1.0.0.0, and a
-    ///     packaged one tracked <c>&lt;Version&gt;</c> until it was pinned) then failed to bind at all, and
-    ///     the loader reported it as a plain missing file — the shape reported in issue #19, where the
-    ///     rendered remedy was to build a spec that was already built, beside a contract DLL already on
-    ///     disk. Version is not what makes the contract type identical on both sides; the assembly is, so
+    ///     requested-version ≤ available-version, and a host carries exactly one contract version, so a
+    ///     spec compiled against any newer one fails to bind at all and the loader reports a plain missing
+    ///     file. Version is not what makes the contract type identical on both sides; the assembly is, so
     ///     the version is the wrong thing to bind on. A spec that turns out to need contract API this copy
     ///     does not have fails later, in <c>Define()</c>, where <see cref="SpecContractMismatch" /> can name
     ///     both versions and the remedy.

@@ -8,23 +8,12 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Only the literals ever varied.</b> <see cref="IncompleteModelGate" /> and
-///         <see cref="NarrowedUniverseNotice" /> both defend their per-surface wording as separate messages
-///         rather than one parameterized string — each names what <em>that</em> surface cannot do — but the
-///         assembly beneath the wording was never the part that differed, and the spec-resolution refusal
-///         reaches for the same shape a third time.
-///     </para>
-///     <para>
 ///         <b>A colon promises a block, so composing one over nothing is refused here.</b> A lede ending in
-///         a colon and answered by the remedy line reads as truncated output — the reader is sent to look at
-///         evidence and finds the next sentence where it should have been. The rule was already written down
-///         at one call site: <see cref="SolutionDiscovery.NotFoundMessage" /> withholds its heading when the
-///         walk-up saw nothing one level down, because "a walk-up that saw nothing one level down must not
-///         announce a list it is about to leave empty". Enforcing it here is what makes it hold at all of
-///         them. A caller whose list can be empty therefore either guards the whole block on that list — as
+///         a colon and answered by the remedy line reads as truncated output. A caller whose list can be
+///         empty therefore either guards the whole block on that list — as
 ///         <see cref="IncompleteModelGate" /> does, once per cause — or ends its lede in a full stop, as
-///         <c>NotFoundMessage</c> does; that is the one call site that legitimately composes over nothing,
-///         and the guard is what keeps it the only one.
+///         <see cref="SolutionDiscovery.NotFoundMessage" /> does; that is the one call site that
+///         legitimately composes over nothing, and the guard is what keeps it the only one.
 ///     </para>
 ///     <para>
 ///         <b>The block is LF-joined, never platform-joined.</b> A composed block is one comparable value

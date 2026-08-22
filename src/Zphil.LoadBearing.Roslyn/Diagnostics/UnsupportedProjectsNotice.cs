@@ -8,17 +8,13 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The third subject to reach <see cref="EvidenceBlock" />, and the quietest.</b>
-///         <see cref="IncompleteModelGate" /> says the model is <em>wrong</em> and refuses;
-///         <see cref="NarrowedUniverseNotice" /> says the operator asked for less than the solution and
-///         scopes; this one says the product itself reaches less than the solution, and scopes for the same
-///         reason. Nothing here is anybody's mistake and there is no remedy to offer — which is exactly why
-///         it had to be said out loud rather than left to a shorter list.
+///         <b>The third subject to reach <see cref="EvidenceBlock" />, and the quietest.</b> Nothing here
+///         is anybody's mistake and there is no remedy to offer — no argument to this run would have
+///         widened it — so every tail closes on the reading being denied rather than on a command.
 ///     </para>
 ///     <para>
-///         <b>Per-verb tails rather than one parameterized string</b>, on the two neighbours' reasoning: they
-///         share a shape, not a template. Each says what <em>that</em> verb's answer is missing — a verdict
-///         that cannot be clean for the solution, counts that read low and always will.
+///         <b>Per-verb tails rather than one parameterized string</b>, on the two neighbours' reasoning:
+///         they share a shape, not a template — each says what <em>that</em> verb's answer is missing.
 ///     </para>
 ///     <para>
 ///         <b>No <c>graph</c> tail, deliberately.</b> The survey states this as a section of its own roster
@@ -133,11 +129,6 @@ internal static class UnsupportedProjectsNotice
     ///     <see cref="NarrowedUniverseNotice.AdapterSkip" />'s reason: the rule verdicts are real, but a test
     ///     by that name cannot pass while the solution declares projects the model never held.
     /// </summary>
-    /// <remarks>
-    ///     Unlike its narrowing twin it offers nothing to run instead, because there is nothing: no argument
-    ///     to this run would have widened it. The tail therefore closes on the reading rather than on a
-    ///     remedy, which is this whole subject's posture.
-    /// </remarks>
     /// <param name="unsupportedProjects">The solution-relative entries, each already carrying its reason.</param>
     internal static string AdapterSkip(IReadOnlyList<string> unsupportedProjects)
     {
@@ -161,9 +152,9 @@ internal static class UnsupportedProjectsNotice
     // where NarrowedUniverseNotice.Subject takes the same two words from: the clause is this file's, the
     // English is nobody's.
     //
-    // It states no cause. The clause that used to ("this product surveys C# projects only") was both a
-    // duplicate of what every entry beneath it says and false about one of them: a shared project's code is
-    // very often C#. A lede scopes; the entries say why, each for itself.
+    // It states no cause: a cause clause would duplicate what every entry beneath it says — and "C# only"
+    // would be false about a shared project, whose code is very often C#. A lede scopes; the entries say
+    // why, each for itself.
     private static string Subject(int unsupportedProjectCount)
     {
         string noun = Plurals.Noun(unsupportedProjectCount, "project");

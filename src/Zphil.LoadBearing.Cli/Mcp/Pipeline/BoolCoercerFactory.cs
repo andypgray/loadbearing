@@ -15,37 +15,15 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Handled token shapes for any <c>bool</c> (or <c>bool?</c>) parameter:
+///         Admitted for any <c>bool</c> parameter: the boolean tokens; a string
+///         <see cref="bool.TryParse(string,out bool)" /> accepts (case-insensitive, surrounding
+///         whitespace tolerated — <c>"1"</c>, <c>"yes"</c> and <c>"on"</c> are guesses at a caller's
+///         intent rather than spellings of a boolean, so they refuse); and a single-element array whose
+///         element itself coerces, the same slip <see cref="StringCoercerFactory" /> forgives. Anything
+///         else throws <see cref="UserErrorException" /> naming the offending value or token kind —
+///         including the empty array, which cannot mean "absent" the way it does for a string, because a
+///         non-nullable <c>bool</c> has no null to fall back to.
 ///     </para>
-///     <list type="bullet">
-///         <item>
-///             <description><c>True</c> / <c>False</c> → pass through.</description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>String</c> that <see cref="bool.TryParse(string,out bool)" /> accepts — <c>"true"</c>,
-///                 <c>"False"</c>, <c>" TRUE "</c>: case-insensitive, surrounding whitespace tolerated →
-///                 coerce. Nothing else is admitted, because <c>"1"</c>, <c>"yes"</c> and <c>"on"</c> are
-///                 guesses at a caller's intent rather than spellings of a boolean.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>StartArray</c> holding a single element that itself coerces (<c>[true]</c>,
-///                 <c>["true"]</c>) → unwrap. The same one-element-array slip
-///                 <see cref="StringCoercerFactory" /> forgives.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Anything else — an unparseable string, the empty array, an array with multiple elements,
-///                 a number (<c>1</c> is not <c>true</c> here), <c>Null</c>, an object → throw
-///                 <see cref="UserErrorException" /> naming the offending value or token kind. Note the
-///                 empty array cannot mean "absent" the way it does for a string: a non-nullable
-///                 <c>bool</c> has no null to fall back to.
-///             </description>
-///         </item>
-///     </list>
 ///     <para>
 ///         A <see cref="JsonConverter{T}" /> over <c>bool</c> serves a future <c>bool?</c> parameter too:
 ///         <see cref="System.Text.Json" /> wraps the registered value-type converter for

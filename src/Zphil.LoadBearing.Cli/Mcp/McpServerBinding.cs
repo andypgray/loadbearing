@@ -11,12 +11,10 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Startup runs discovery once ahead of all that, and what it does with a failure depends on whether
-///         <see cref="Solution" /> was given. An argument that does not resolve exits 2 — the operator named
-///         something wrong, and a server that answers every call with that error is worse than not starting.
-///         With no argument the walk-up is optional by documentation, so its failure only records a reason: the
-///         server starts unbound and announces it (<c>McpServerCommand.ResolveBoundSolution</c>). Per-call
-///         resolution is what makes that coherent — the tools repeat the same discovery and the same message.
+///         Startup runs discovery once ahead of all that; what it does with a failure — exit 2 for an
+///         argument that does not resolve, an unbound start that announces itself for an argument-less
+///         walk-up — lives at <c>McpServerCommand.ResolveBoundSolution</c>. Per-call resolution is what
+///         makes that coherent: the tools repeat the same discovery and the same message.
 ///     </para>
 ///     <para>
 ///         <b>How an MCP tool call differs from a CLI run is a four-part policy, and it lives here.</b> Every

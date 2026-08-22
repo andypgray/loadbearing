@@ -72,39 +72,25 @@ internal sealed record DeclaredProjects(
 ///         project MSBuild loaded", which is why this lives beside them rather than inside <c>Replay</c>.
 ///     </para>
 ///     <para>
-///         <b>A filter is a seed set, not the universe.</b> Measured against a three-project bed whose
-///         references chain <c>Domain → Web → Billing</c>: a filter naming <c>Domain</c> alone loads all
-///         three, one naming <c>Web</c> loads two, one naming the leaf loads one. Roslyn loads a filter's
-///         projects <em>plus their transitive <c>ProjectReference</c> closure</em>, and
-///         <c>DisableTransitiveProjectReferences</c> does not suppress it — that property governs what
+///         <b>A filter is a seed set, not the universe.</b> Roslyn loads a filter's projects
+///         <em>plus their transitive <c>ProjectReference</c> closure</em> — measured, and
+///         <c>DisableTransitiveProjectReferences</c> does not suppress it: that property governs what
 ///         MSBuild hands the compiler, not what the workspace loader walks. So
-///         <see cref="SolutionMembership.Required" /> is what a load must produce, never what it will:
-///         subtracting it from what loaded would name projects that were checked. Only the loaded solution
-///         knows the checked set, which is why the narrowing is computed there and not here.
+///         <see cref="SolutionMembership.Required" /> is what a load must produce, never all it will;
+///         only the loaded solution knows the checked set, which is why the narrowing is computed there
+///         and not here.
 ///     </para>
 ///     <para>
 ///         <b>
 ///             A fourth question, asked of the same text: what does the solution declare that this product
 ///             cannot read?
 ///         </b>
-///         <see cref="SolutionMembership.Unsupported" /> is that answer, and it is derived
-///         here rather than from <c>solution.Projects</c> because only the solution file sees all of it. F#
-///         is the one non-C# kind that reaches a loaded solution at all — it plugs into Roslyn's
-///         <em>workspace</em> model while having no Roslyn compiler behind it, so it loads and then supports
-///         no compilation. A <c>.vbproj</c> never loads, because this repo references only the C# workspace
-///         package and so has no VB language service in its MEF host; <c>.sqlproj</c>, <c>.vcxproj</c> and
-///         <c>.shproj</c> have no Roslyn loader either. Reading the declaration is also the same answer on a
-///         cold run, a cache hit and a warm session by construction, and it needs no workspace. The residual
+///         <see cref="SolutionMembership.Unsupported" /> is that answer, derived here rather than from
+///         <c>solution.Projects</c> because only the solution file sees all of it — F# alone reaches a
+///         loaded solution, every other non-C# kind never loads — and a text read is the same answer on a
+///         cold run, a cache hit and a warm session by construction, needing no workspace. The residual
 ///         limit is the mirror of the existing passenger case: a non-C# project dragged in by a
 ///         <c>ProjectReference</c> and declared in no solution file stays invisible.
-///     </para>
-///     <para>
-///         <b>The <c>.shproj</c> is not one of the languages, and is classified apart.</b> A shared project
-///         is a language-neutral container: its <c>.projitems</c> files are compiled into every project that
-///         imports it, so its code is very often C# and reaches the model through the importer. It belongs
-///         in the unsupported set — nothing loads the <c>.shproj</c> itself, and a reader looking for it in
-///         the roster will not find it — but under <see cref="UnsupportedProjectKind.SharedProject" />
-///         rather than as another language.
 ///     </para>
 ///     <para>
 ///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
@@ -341,9 +327,8 @@ internal static partial class SolutionProjectFileParser
             : UnsupportedProjectKind.NotCsharp;
     }
 
-    // Read off the declared spelling rather than Path.GetExtension: a dotted directory segment is no threat
-    // here (the extension is the last one either way), but a bare solution-folder name is exactly what must
-    // not match, and "ends in proj" says that in one test.
+    // A bare solution-folder name is exactly what must not match here, and "ends in proj" excludes it in
+    // one test while catching every project extension, present or future.
     private static bool IsProjectEntry(string relativePath)
     {
         return Path.GetExtension(relativePath)
@@ -379,7 +364,7 @@ internal static partial class SolutionProjectFileParser
     ///     A classic-<c>.sln</c> project line:
     ///     <c>Project("{TypeGuid}") = "Name", "Relative\Path.csproj", "{ProjectGuid}"</c>. The second quoted
     ///     field (named group <c>path</c>) is the project path; solution folders put a folder name there
-    ///     instead, filtered out later by the <c>.csproj</c> extension test.
+    ///     instead, filtered out later by the ends-in-<c>proj</c> entry test.
     /// </summary>
     [GeneratedRegex(
         "Project\\(\"\\{[^}]*\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"(?<path>[^\"]*)\"",

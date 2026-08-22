@@ -23,6 +23,17 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         file degrades to a miss rather than an error — see <see cref="ExtractionCacheStore" />.
 ///     </para>
 /// </remarks>
+/// <param name="SchemaVersion">The manifest schema version; a mismatch is a whole-cache miss.</param>
+/// <param name="ToolVersion">
+///     The writing tool's informational version (<see cref="FileStamping.CurrentToolVersion" />); a
+///     mismatch is a whole-cache miss.
+/// </param>
+/// <param name="StructuralStamps">
+///     The stamps of every structural input (<see cref="ProjectCone.SolutionStructuralPaths" />), absent
+///     files included.
+/// </param>
+/// <param name="Projects">One entry per cached project, carrying its stamps and invalidation keys.</param>
+/// <param name="SpecResolutions">The recorded spec resolutions a hit replays without a workspace.</param>
 /// <param name="Diagnostics">
 ///     The workspace-load diagnostics the recorded run collected, replayed verbatim on a hit so cached and
 ///     cold output are byte-identical on a diagnostic-bearing solution.
@@ -50,13 +61,11 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// <param name="UnsupportedProjects">
 ///     The projects the solution declared that no extractor reached on the recorded run, each with the
 ///     <see cref="UnsupportedProjectKind" /> its producer classified it as. The kind is stored rather than
-///     re-derived on a hit because deriving it is what went wrong: the extension is what a producer reads,
-///     and a consumer reading it a second time reached a different answer for a <c>.shproj</c>. Persisting
-///     the producer's own verdict is what keeps the reason identical between a cold run and a hit, which is
-///     the property this slot has always been here for. Persisted at all for its siblings' reason — a hit
-///     owns no solution file read of its own — and a hit that dropped the coverage statement would restore
-///     the very silence it was added to break.
+///     re-derived on a hit — a consumer's own extension read reached a different answer for a
+///     <c>.shproj</c>, measured — so a cold run and a hit stay word-identical. Persisted at all for its
+///     siblings' reason: a hit owns no solution file read of its own.
 /// </param>
+/// <param name="Fragments">Every fragment the recorded run extracted, in cold (ordinal-project) order.</param>
 internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,

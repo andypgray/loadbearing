@@ -65,14 +65,12 @@ internal static class BinlogReplayer
     ///         </item>
     ///     </list>
     ///     The analyzer host is <see cref="BasicAnalyzerKind.OnDisk" />: it executes the build's own
-    ///     analyzers/generators, surfaced as on-disk <c>AnalyzerFileReference</c> instances — the shape the
-    ///     <c>MSBuildWorkspace</c> path itself produces (it surfaces analyzers/generators as on-disk file
-    ///     references and runs them when producing compilations), which is why it is the fidelity match.
-    ///     <see cref="BasicAnalyzerKind.None" /> is rejected deliberately: it would skip generator execution
-    ///     and inject the capture's <em>stale</em> generated files, breaking the read-from-current-disk
-    ///     contract; <see cref="BasicAnalyzerKind.InMemory" /> also runs generators but loads analyzers into
-    ///     a private context rather than the file-reference shape MSBuild uses.
-    ///     The differential fidelity test is the gate on this choice.
+    ///     analyzers/generators as on-disk <c>AnalyzerFileReference</c>s — the shape the
+    ///     <c>MSBuildWorkspace</c> path itself produces, which is why it is the fidelity match; the other
+    ///     two kinds would either inject the capture's <em>stale</em> generated files
+    ///     (<see cref="BasicAnalyzerKind.None" />) or load analyzers outside that shape
+    ///     (<see cref="BasicAnalyzerKind.InMemory" />). The differential fidelity test is the gate on this
+    ///     choice.
     /// </remarks>
     public static ReplayedSolution Replay(
         string binlogPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
@@ -208,10 +206,8 @@ internal static class BinlogReplayer
     // another language surfaces as a CompilerCall with IsCSharp == false; dropping it here is how the
     // C#-only contract is enforced, so a mixed-language capture replays its C# projects and states the rest.
     //
-    // The dropped paths are collected rather than discarded because this is the same silence the survey had
-    // on the MSBuild path: the fact was already in hand at the moment of dropping it, and nothing downstream
-    // could recover it — a binlog records what was built, so there is no solution file here to read the
-    // answer off instead.
+    // The dropped paths are collected rather than discarded because nothing downstream could recover them:
+    // a binlog records what was built, so there is no solution file here to read the answer off instead.
     private static bool IsReplayableCSharpCall(CompilerCall call, ICollection<string> droppedProjects)
     {
         if (call.Kind != CompilerCallKind.Regular) return false;

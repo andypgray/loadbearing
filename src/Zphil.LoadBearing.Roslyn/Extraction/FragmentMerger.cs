@@ -29,32 +29,20 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///     </para>
 ///     <para>
 ///         So a fully-qualified name can denote two nodes: the source declaration, and a shallow external
-///         attributed to the supplying assembly — the shape a test project's stand-in under a package's own
-///         namespace makes, where product code binds the package while the test project compiles its own.
-///         Each fragment's endpoints resolve to whichever its compilation actually bound, on every axis
-///         including the hierarchy, so product code never reads as depending on the test assembly and the
-///         stand-in stays a first-class declared type of the project that wrote it. The split is confined to
-///         that case: a name no fragment declares is one external node as before, and one source file
-///         compiled into several projects still conflates to a single node (the paragraph below). It is
-///         disclosed as an advisory <see cref="CodebaseModel.MergeNotes">merge note</see>, one per declaring
-///         project rather than per name, and again in the survey.
+///         attributed to the supplying assembly, where the assembly a fragment bound the name from is one
+///         no declaring fragment produces. Each fragment's endpoints resolve to whichever its compilation
+///         actually bound, on every axis including the hierarchy, and the split is disclosed as an advisory
+///         <see cref="CodebaseModel.MergeNotes">merge note</see> and again in the survey. Internally every
+///         table pairing endpoints keys on a <c>NodeKey</c> — the name, plus the supplying assembly where
+///         it is the shadow — never on the name alone: a table indexed by node is not keyed by
+///         <see langword="string" />, so crossing between the two key spaces has to be spelled and a missed
+///         crossing does not compile.
 ///     </para>
 ///     <para>
-///         Internally a node is keyed by a <c>NodeKey</c> — that name, plus the supplying assembly where it
-///         is the shadow — rather than by the name alone. Only the merge sees those keys, and every table
-///         pairing endpoints keys on them, so an edge into one of two same-named types cannot collapse onto
-///         the other. The type is the point as much as the key is: a table indexed by <em>name</em> is
-///         keyed by <see langword="string" /> and one indexed by node is not, so crossing between them has
-///         to be spelled and a missed crossing does not compile.
-///     </para>
-///     <para>
-///         A later declarer under a <em>different</em> project name is same-FQN cross-project conflation.
-///         Facts still follow the first declarer, and it is recorded twice over: as an advisory
-///         <see cref="CodebaseModel.MergeNotes">merge note</see> — one per conflated FQN naming every
-///         losing project, so a type several projects shadow costs one line rather than one per shadow —
-///         and as <see cref="TypeNode.AlsoDeclaredBy" /> on the winning node, which is the queryable form
-///         a consumer that must act on the conflation — the survey's edge suppression, the checker's
-///         N-way membership — reads instead of the prose.
+///         A later declarer under a <em>different</em> project name is same-FQN cross-project conflation:
+///         facts still follow the first declarer, recorded as a merge note and as
+///         <see cref="TypeNode.AlsoDeclaredBy" /> on the winning node — the queryable form a consumer that
+///         must act on the conflation reads instead of the prose.
 ///     </para>
 ///     <para>
 ///         A later declarer under the <em>same</em> project name is one project file's several target
@@ -471,7 +459,7 @@ internal static class FragmentMerger
             NoteShadowIfForeign(fqn, external);
         }
 
-        // The shadow test, stated once. Four guards, and each is a fail-open rather than an optimisation:
+        // The shadow test, stated once. Every guard is a fail-open rather than an optimisation:
         //   • the supplying assembly unknown — an error symbol whose ContainingAssembly is null reaches
         //     extraction as "" — so there is nothing to compare;
         //   • no declaring assembly known at all (a hand-built fragment, a cache written before the
@@ -683,10 +671,10 @@ internal static class FragmentMerger
                 _nodes[NodeKey.Unshadowed(fqn)].AlsoDeclaredBy = losers.ToList();
 
             // Ordered by name, then by the two facts that tell a shadowed name's two nodes apart — the
-            // declaration first, then the supplying assemblies ordinal. FullName stopped being a total
-            // order the moment one name could denote a source declaration and a referenced assembly's
-            // type of that name, and without the tie-break the remainder would fall through to dictionary
-            // enumeration order, costing every rendered document its byte-stability.
+            // declaration first, then the supplying assemblies ordinal. One name can denote a source
+            // declaration and a referenced assembly's type of that name, so FullName alone is not a total
+            // order, and without the tie-break the remainder falls through to dictionary enumeration
+            // order, costing every rendered document its byte-stability.
             List<TypeNode> types = _nodes.Values
                 .OrderBy(n => n.FullName, StringComparer.Ordinal)
                 .ThenBy(n => n.IsExternal ? 1 : 0)
@@ -754,8 +742,7 @@ internal static class FragmentMerger
 
         // The split kept as a fact rather than only as the sentence ShadowedNamesNote composes from the same
         // tables, for the reason AlsoDeclaredBy exists beside ConflationNote: the consumers that must ACT on
-        // it — the survey's coverage statement, a rule author asking whose facts won — cannot read prose, and
-        // the alternative they fell back on was rediscovering the split by grouping the type universe on name.
+        // it — the survey's coverage statement, a rule author asking whose facts won — cannot read prose.
         //
         // The binder roster is indexed rather than looked up defensively: an entry in _shadowingAssemblies
         // exists only because some fragment's external minted it, and that same fragment's supplier pass
@@ -794,10 +781,9 @@ internal static class FragmentMerger
                 (src, symbolId, sites) => new MemberEdge(_nodes[src], MemberReferenceFor(symbolId), FragmentSiteSets.Locations(sites)));
         }
 
-        // An instance method rather than a static one because a project node now states two facts the merge
-        // already computed: every framework its fragments carried, and — where they shared a type — the one
-        // whose facts those types took. This is the only ProjectNode construction site in the tree, so the
-        // tables reach the model here or nowhere.
+        // A project node states two facts the merge already computed — every framework its fragments
+        // carried, and, where they shared a type, the one whose facts those types took. This is the only
+        // ProjectNode construction site in the tree, so the tables reach the model here or nowhere.
         private List<ProjectNode> BuildProjects(IReadOnlyList<CodebaseFragment> fragments)
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
@@ -824,10 +810,9 @@ internal static class FragmentMerger
                 .ToList();
         }
 
-        // Stated only where there is more than one framework to state. A single-framework project — and every
-        // hand-built input, whose fragments carry no framework at all — has nothing a name does not already
-        // say, and an empty list is what keeps its rendered documents the ones they were before the fact
-        // existed.
+        // Stated only where there is more than one framework to state: a single-framework project — and
+        // every hand-built input, whose fragments carry no framework at all — has nothing a name does not
+        // already say.
         private IReadOnlyList<string>? TargetFrameworksOf(string projectName)
         {
             SortedSet<string>? frameworks = _frameworksByProject.GetValueOrDefault(projectName);
@@ -861,11 +846,10 @@ internal static class FragmentMerger
         /// </summary>
         /// <remarks>
         ///     <para>
-        ///         Two key spaces the merge held in one <see langword="string" /> until this type told them
-        ///         apart. A table indexed by <em>name</em> — <c>_declarationSites</c>, <c>_conflatedLosers</c>,
-        ///         <c>_hierarchy</c>, <c>_shadowingAssemblies</c> — stays keyed by string, so every crossing
-        ///         into the node tables spells <see cref="Unshadowed" /> and a crossing left out does not
-        ///         compile, where the same omission used to read as "no sites here".
+        ///         The merge's two key spaces, told apart by type. A table indexed by <em>name</em> —
+        ///         <c>_declarationSites</c>, <c>_conflatedLosers</c>, <c>_hierarchy</c>,
+        ///         <c>_shadowingAssemblies</c> — stays keyed by string, so every crossing into the node
+        ///         tables spells <see cref="Unshadowed" /> and a crossing left out does not compile.
         ///     </para>
         ///     <para>
         ///         Its equality is ordinal on both fields by construction (a record struct over

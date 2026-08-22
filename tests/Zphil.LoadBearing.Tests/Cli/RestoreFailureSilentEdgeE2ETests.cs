@@ -15,15 +15,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What was measured, and why it needed a bed of its own.</b> One tree, one spec, the NuGet feed
-///         the only variable and no rebuild between the runs: restored, <c>check</c> exited 1 on a rule
-///         forbidding a package namespace; with the feed unreachable it exited <b>0</b>, and the rule
-///         reported itself inert because its target selection matched no types. <c>graph --json</c> settled
-///         which half was wrong — the external edge the violation rests on was in the restored run's survey
-///         and absent from the broken one. The violation was not missed; the edge it rests on was never
-///         extracted. Nothing shorter than a real restore can hold that: every cheaper surface pin downstream
-///         of the gate takes the project list as given, and the whole question here is whether the list is
-///         produced at all.
+///         <b>Why the defect needs a bed of its own.</b> With the restore broken, the external edge a
+///         violation rests on is never extracted, so the rule reports itself inert and the run passes —
+///         the violation is not missed; the survey it rests on is. Nothing shorter than a real restore
+///         can hold that: every cheaper surface pin downstream of the gate takes the project list as
+///         given, and the whole question here is whether the list is produced at all.
 ///     </para>
 ///     <para>
 ///         <b>Hermetic, with no committed binary.</b> The package is manufactured into a folder feed at test
@@ -251,7 +247,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
     private static CliResult Check(TempFixtureWorkspace workspace, string specDll, params string[] extra)
     {
         string[] arguments =
-            ["check", workspace.SolutionPath, "--spec", specDll, "--no-cache", ..extra];
+            ["check", workspace.SolutionPath, "--spec", specDll, "--no-cache", .. extra];
         return CliRunner.InvokeColdAsync(arguments)
             .GetAwaiter()
             .GetResult();

@@ -51,9 +51,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 {
     /// <summary>
     ///     The solution (<c>.sln</c>/<c>.slnx</c>) to check the spec against, or a <c>.slnf</c> filter over
-    ///     one — which checks the projects it selects plus their transitive references, and so answers over
-    ///     part of the solution: every rule case still reports its verdict, and
-    ///     <see cref="Workspace_LoadedCompletely" /> skips naming the declared projects the run never checked.
+    ///     one — a narrowed run, whose consequences the class remarks state.
     /// </summary>
     protected abstract string SolutionPath { get; }
 
@@ -75,9 +73,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     /// </summary>
     /// <remarks>
     ///     By default a load failure fails <see cref="Workspace_LoadedCompletely" /> and skips every rule
-    ///     case, because a rule whose subject lived in an unloaded project selects nothing and every other
-    ///     rule was measured over a codebase missing whole projects — a run against a partial model reports
-    ///     verdicts it never reached. With
+    ///     case — a run against a partial model reports verdicts it never reached. With
     ///     <see langword="true" />, rule verdicts come from the partial model as it loaded, and
     ///     <see cref="Workspace_LoadedCompletely" /> skips rather than pass under a name that would then be
     ///     false.
@@ -176,13 +172,10 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Two other things also skip it, both of them ways a whole load still covers less than the
-    ///         solution: a <c>.slnf</c> <see cref="SolutionPath" /> that left declared projects unchecked
-    ///         (<see cref="NarrowedUniverseNotice.AdapterSkip" />), and a solution declaring projects no
-    ///         extractor reaches — an <c>.fsproj</c>, a <c>.vbproj</c>, a shared project
-    ///         (<see cref="UnsupportedProjectsNotice.AdapterSkip" />). The rule cases keep reporting through
-    ///         both — a smaller universe is a smaller true answer, unlike a partial model — but this test is
-    ///         the completeness claim itself, and neither run can make it.
+    ///         The two smaller-universe cases the class remarks describe — a narrowing <c>.slnf</c> and a
+    ///         solution declaring projects no extractor reaches — also skip it: the rule cases keep
+    ///         reporting through both, but this test is the completeness claim itself, and neither run can
+    ///         make it.
     ///     </para>
     ///     <para>
     ///         A solution can be both at once, so the causes compose: one block each, in the order the CLI
@@ -276,10 +269,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
             Dictionary<string, RuleResult> byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
             // Both of the merge's two facts, and neither is rendered: the adapter has no channel that shows
-            // them, but they are documented as one pair filled from one read, and an adapter holding the
-            // merged model while passing empty lists is what made that claim false here. The project lists
-            // come off the load itself — null only where no load happened, which is also the case where
-            // there is nothing to have failed, gone unchecked, or been out of reach.
+            // them, but they are documented as one pair filled from one read. The project lists come off
+            // the load itself — null only where no load happened, which is also the case where there is
+            // nothing to have failed, gone unchecked, or been out of reach.
             return new ArchCheckRun(
                 byId, solutionDirectory, fullSolutionPath,
                 new WorkspaceDiagnostics(

@@ -21,18 +21,14 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     </para>
 ///     <para>
 ///         <b>It names what was not checked, never what the filter did not select.</b> Those are different
-///         sets, and only the first is true. Roslyn loads a filter's projects plus their transitive
-///         <c>ProjectReference</c> closure, so a filter selecting two of three projects routinely checks all
-///         three; a notice built from the filter text would name the third as skipped in a run that checked
-///         it. The evidence therefore comes from <c>WorkspaceDiagnostics.UncheckedProjects</c>, which is what
-///         actually loaded subtracted from what the solution declares — and which is empty, so nothing
-///         prints, whenever a filter narrows nothing.
+///         sets and only the first is true: Roslyn loads a filter's selection plus its transitive
+///         <c>ProjectReference</c> closure, so filter text over-names. The evidence therefore comes from
+///         <c>WorkspaceDiagnostics.UncheckedProjects</c> — what actually loaded, subtracted from what the
+///         solution declares — and is empty, so nothing prints, whenever a filter narrows nothing.
 ///     </para>
 ///     <para>
 ///         <b>Per-verb tails rather than one parameterized string</b>, for
-///         <see cref="IncompleteModelGate" />'s reason: they share a shape, not a template. Each says
-///         what <em>that</em> verb's answer is missing — a verdict that cannot be clean for the solution,
-///         counts that read low, a survey with projects out of view.
+///         <see cref="IncompleteModelGate" />'s reason: they share a shape, not a template.
 ///     </para>
 /// </remarks>
 internal static class NarrowedUniverseNotice

@@ -60,35 +60,24 @@ internal enum CodebaseSourceOutcome
 ///         <b>One walk per source, however many models a run asks for.</b> The fragments are walked at most
 ///         once for the source's lifetime and the merged models are memoized against them, keyed by
 ///         exclusion — the same two tiers <see cref="SessionFragmentStore" /> holds for the warm path, and
-///         through its key, so the two cannot disagree about when a merge repeats. The split matters because
-///         the costs are three orders of magnitude apart: <c>render --diagram</c> asks for the spec's
-///         exclusions to place its cards and then for none at all to draw the survey, which before this was
-///         two full walks of the solution for one run.
+///         through its key, so the two cannot disagree about when a merge repeats.
 ///     </para>
 ///     <para>
-///         <b>The warm MCP path leaves the persisted cache untouched.</b> Tool calls pass <c>--no-cache</c>
-///         (a <see cref="CodebaseSourceOutcome.Disabled" /> run), so <c>cache.json</c> and the warm
-///         <see cref="WorkspaceSession" /> keep independent lifetimes and never race on the file. That
-///         Disabled branch is not always a full cold walk, though: when the handle carries a warm codebase
-///         producer (<see cref="SolutionHandle.WarmCodebase" />) it takes the session store's model instead,
-///         so a warm re-check re-walks only the projects whose bytes changed — and re-merges only when one
-///         of them did.
+///         <b>The warm MCP path leaves the persisted cache untouched</b> (tool calls pass <c>--no-cache</c>,
+///         a <see cref="CodebaseSourceOutcome.Disabled" /> run). A Disabled run is not always a full cold
+///         walk, though: when the handle carries a warm codebase producer
+///         (<see cref="SolutionHandle.WarmCodebase" />) it takes the session store's model instead, so a
+///         warm re-check re-walks only the projects whose bytes changed — and re-merges only when one of
+///         them did.
 ///     </para>
 ///     <para>
-///         <b>
-///             Which verbs front the persisted cache is a policy, and it sorts them by what they read
-///             absence as.
-///         </b>
-///         A verb that reads <em>presence</em> — a violation it saw, a rule it found, a card it can place —
-///         may front it, and <c>check</c>, <c>status</c>, <c>graph</c>, <c>render</c>, <c>explain</c> and
-///         <c>baseline --add</c> all do. <c>baseline --init</c> and <c>baseline --accept-reductions</c> read
-///         <em>absence as evidence</em> — "not in the model" becomes "no longer happening", written into a
-///         file that outlives the run — so they force a cache-free extraction: a stale hit is a third route
-///         to the smaller-than-real model the incomplete-model and narrowing gates already refuse those two
-///         modes on, and the only one of the three that raises no diagnostic either gate can see. There is
-///         one spec-ful entry point rather than a cache-free overload beside it, so every caller spells its
-///         policy as the <c>noCache</c> argument instead of inheriting one from the ladder it was written
-///         on.
+///         <b>Which verbs front the persisted cache is a policy sorted by what each reads absence as.</b>
+///         A verb that reads presence may front it; <c>baseline --init</c> and
+///         <c>baseline --accept-reductions</c> read absence as evidence and force a cache-free extraction,
+///         because a stale hit replays its recorded load diagnostics and neither refusal gate can see it.
+///         There is one spec-ful entry point rather than a cache-free overload beside it, so every caller
+///         spells its policy as the <c>noCache</c> argument instead of inheriting one from the ladder it
+///         was written on.
 ///     </para>
 /// </remarks>
 internal sealed class CodebaseSource : IDisposable
@@ -371,8 +360,6 @@ internal sealed class CodebaseSource : IDisposable
         }
 
         // One walk per source, then one merge per distinct exclusion set over the fragments it produced.
-        // `render --diagram` is why: it asks for the spec's exclusions to place the cards and then for none
-        // at all to draw the survey, and before this it paid the whole walk twice for the difference.
         fragments ??= await WalkFragmentsAsync(ct);
         return MergedFor(fragments, excludeProjectNames);
     }

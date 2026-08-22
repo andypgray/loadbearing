@@ -11,9 +11,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What it buys.</b> A measured run opened <b>146</b> <c>MSBuildWorkspace</c>es (~2.5 s each
-///         for the MyApp fixture, ~17-24 s for this repo's own solution) against a serial path of ~435 s.
-///         Nearly all of them re-opened a solution some earlier test in the same class had already loaded.
+///         <b>What it buys.</b> Measured: nearly every workspace open in a full run re-opened a solution
+///         some earlier test in the same class had already loaded.
 ///     </para>
 ///     <para>
 ///         <b>Correct by reconcile, not by luck.</b> Every acquisition goes through
@@ -44,8 +43,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         first, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Four, not
 ///         three: a leased fixture copy mints a fresh key for every class that takes one, so with three slots
 ///         that churn is what does the evicting — and the victim is this repo's own solution, the single most
-///         expensive load there is (~17-24 s), between its two distant consumers. The fourth slot keeps it
-///         resident across them.
+///         expensive load there is, between its two distant consumers. The fourth slot keeps it resident
+///         across them.
 ///     </para>
 /// </remarks>
 internal static class WarmWorkspacePool

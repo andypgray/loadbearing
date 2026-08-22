@@ -13,46 +13,13 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///     <see cref="EnumValidationConverterFactory" />'s "name + <c>Enum.IsDefined</c>" rule.
 /// </summary>
 /// <remarks>
-///     <para>
-///         Generic over every <c>TEnum[]</c> parameter, so the enum-array shape is coerced as
-///         forgivingly as its scalar (<see cref="EnumValidationConverterFactory" />) and
-///         <c>string[]</c> siblings without a per-parameter registration. Handled token shapes for
-///         any <c>TEnum[]</c> parameter where <c>TEnum</c> is an enum:
-///     </para>
-///     <list type="bullet">
-///         <item>
-///             <description>
-///                 <c>StartArray</c> → read each element as a string, parse via
-///                 <see cref="Enum.TryParse{T}(string,bool,out T)" /> and <see cref="Enum.IsDefined" />.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>String</c> whose contents parse as a JSON array of strings → unwrap and
-///                 map each element through the same parse path.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Any other <c>String</c> → single-element <c>[parsed]</c>.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Unknown enum names (at either the top-level string or inside an array) throw
-///                 <see cref="UserErrorException" /> with the full valid-values list — same
-///                 message shape as <see cref="EnumValidationConverterFactory" />.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Numbers, booleans, objects, or arrays containing non-string elements throw
-///                 <see cref="UserErrorException" /> naming the offending token kind. Integer
-///                 elements are deliberately NOT admitted as enum values, and neither are
-///                 comma-separated name lists — see <see cref="EnumStringHelper.ResolvesByArithmetic" />.
-///             </description>
-///         </item>
-///     </list>
+///     Generic over every <c>TEnum[]</c> parameter, so the enum-array shape is coerced as forgivingly
+///     as its scalar and <c>string[]</c> siblings without a per-parameter registration: a real array, a
+///     JSON-encoded array inside a string, or a bare scalar string, each element parsed by the shared
+///     name rule. An unknown name throws <see cref="UserErrorException" /> with the full valid-values
+///     list — the same message shape as the scalar converter — and any other token kind refuses naming
+///     it. Integer elements are deliberately not admitted as enum values, and neither are
+///     comma-separated name lists — see <see cref="EnumStringHelper.ResolvesByArithmetic" />.
 /// </remarks>
 internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
 {

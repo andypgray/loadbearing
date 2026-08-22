@@ -9,6 +9,13 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // document is byte-identical.
 
 /// <summary>The root <c>status --json</c> document.</summary>
+/// <param name="SchemaVersion">The burndown document's schema version — 2.</param>
+/// <param name="Solution">
+///     The solution's file name — the run's subject, and never a path, so the document is
+///     machine-independent.
+/// </param>
+/// <param name="SpecAssembly">The spec DLL's file name — which spec's rules answered.</param>
+/// <param name="Rules">One entry per rule in the spec — status carries no narrowing knob.</param>
 /// <param name="WorkspaceDiagnostics">
 ///     The workspace-load diagnostics, or null (omitted) when there were none — the same array
 ///     <c>check --json</c> carries, so <c>arch_status</c> stops being a surface where they are destroyed.
@@ -47,6 +54,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     project the extractor cannot read will never contribute a violation to burn down, so its zero is a
 ///     property of this product rather than progress the team made.
 /// </param>
+/// <param name="Summary">The roll-up: rule counts plus the ratchet burndown totals.</param>
 internal sealed record StatusJson(
     int SchemaVersion,
     string Solution,

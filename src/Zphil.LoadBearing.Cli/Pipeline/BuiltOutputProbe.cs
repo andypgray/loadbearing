@@ -12,13 +12,11 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 /// <remarks>
 ///     <para>
 ///         <b>Why a search rather than arithmetic.</b> An evaluated output path can name a directory no
-///         build ever writes. A parent <c>Directory.Build.props</c> carrying
-///         <c>&lt;OutputPath&gt;bin\$(Configuration)\&lt;/OutputPath&gt;</c> is imported before the SDK
-///         defaults <c>Configuration</c>, so the evaluation yields a flat <c>bin\</c> while every real build
-///         lands in <c>bin\Debug\</c>; <c>UseArtifactsOutput</c> moves the whole tree under
-///         <c>artifacts\bin\&lt;Project&gt;\&lt;config&gt;\</c>; and a solution built in one configuration
-///         evaluates in another. Fixed hop counting over such a path climbs past the project or re-appends a
-///         segment that is not a target framework, because it assumes a shape it did not construct.
+///         build ever writes: a parent props file can set the output path before the SDK defaults the
+///         properties it interpolates (evaluating to a flat <c>bin\</c>), <c>UseArtifactsOutput</c>
+///         relocates the whole tree, and a solution built in one configuration evaluates in another.
+///         Fixed hop counting over such a path climbs past the project or re-appends a segment that is
+///         not a target framework, because it assumes a shape it did not construct.
 ///     </para>
 ///     <para>
 ///         <b>The named output root is the ceiling of the walk, never the anchor.</b> The walk starts at the
@@ -26,17 +24,17 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 ///         <c>artifacts</c>. The search anchors at the deepest directory in that walk that exists and widens
 ///         toward the ceiling only while it finds nothing — a directory's existence is no evidence of a
 ///         build, because the design-time build the workspace load runs creates the evaluated directory
-///         itself, empty, before resolution ever reads the disk (measured live on the artifacts layout).
-///         Anchoring deep is what keeps <c>artifacts/bin/&lt;OtherProject&gt;/…</c> out of scope whenever
-///         the project's own subtree holds any candidate, instead of making it a ranking problem.
+///         itself, empty, before resolution ever reads the disk (measured live). Anchoring deep is what
+///         keeps <c>artifacts/bin/&lt;OtherProject&gt;/…</c> out of scope whenever the project's own
+///         subtree holds any candidate, instead of making it a ranking problem.
 ///     </para>
 ///     <para>
-///         <b>Why the intermediate refusal is not already implied by that.</b> With this anchor rule the
-///         intermediate tree is out of scope in all three measured layouts — <c>obj</c> is never under
-///         <c>bin</c>, and never under <c>artifacts/bin</c>. The refusal is what makes "never an intermediate
-///         assembly" hold structurally in <em>any</em> layout rather than incidentally in the measured ones:
-///         it demonstrably fires when <c>BaseIntermediateOutputPath</c> is redirected under the output root,
-///         which is the tree the negative-control test builds.
+///         <b>Why the intermediate refusal is not already implied by that.</b> Under the SDK's own layouts
+///         the anchor rule alone keeps <c>obj</c> out of scope — it is never under <c>bin</c> or
+///         <c>artifacts/bin</c>. The refusal is what makes "never an intermediate assembly" hold
+///         structurally in <em>any</em> layout rather than incidentally in those: it demonstrably fires
+///         when <c>BaseIntermediateOutputPath</c> is redirected under the output root, which is the tree
+///         the negative-control test builds.
 ///     </para>
 /// </remarks>
 internal static class BuiltOutputProbe
@@ -117,11 +115,10 @@ internal static class BuiltOutputProbe
     ///     walk was ever created.
     /// </summary>
     /// <remarks>
-    ///     A chain rather than one anchor because a directory's existence is no evidence of a build: the
-    ///     design-time build the workspace load runs creates the evaluated output directory — empty — before
-    ///     spec resolution ever reads the disk, so the deepest existing directory can be a shell with the
-    ///     real build one level up. The search widens only while it finds nothing, which keeps another
-    ///     project's same-named output out of scope whenever this project's own subtree yields any candidate.
+    ///     A chain rather than one anchor because the deepest existing directory can be an empty shell the
+    ///     design-time build created, with the real build one level up; widening only while the search
+    ///     finds nothing keeps another project's same-named output out of scope whenever this project's
+    ///     own subtree yields any candidate.
     /// </remarks>
     internal static IReadOnlyList<string> AnchorChainFor(string evaluatedOutputPath)
     {

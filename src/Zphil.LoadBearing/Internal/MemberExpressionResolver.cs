@@ -18,8 +18,8 @@ namespace Zphil.LoadBearing.Internal;
 /// </summary>
 internal static class MemberExpressionResolver
 {
-    // The poison messages share one code (the BlankPattern precedent). The resolver stores the core; the
-    // validator appends " (used by '{id}')." Each names the shape that failed and steers to the cure.
+    // The poison messages share one code. The resolver stores the core; the validator appends
+    // " (used by '{id}')." Each names the shape that failed and steers to the cure.
     private const string NotMemberAccess =
         "A member anchor lambda must be a single property, field, or method access " +
         "(x => x.Member or () => Type.Member); this lambda body is neither";

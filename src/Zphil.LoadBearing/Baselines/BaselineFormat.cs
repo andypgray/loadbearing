@@ -12,7 +12,8 @@ namespace Zphil.LoadBearing.Baselines;
 ///     carry an optional <c>because</c> attribution as its last property, folded into the digest.
 ///     Rules sort ordinal by ID; entries sort ordinal by <c>((Source ?? Subject), (Target ?? ""))</c>. The
 ///     <c>digest</c> is SHA-256 over a separate line-oriented rendering of the parsed entries
-///     (<see cref="DigestInput" />), so formatting or line-ending changes (an autocrlf checkout) are
+///     (<see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}})" />), so
+///     formatting or line-ending changes (an autocrlf checkout) are
 ///     invisible while entry changes are not — tamper-<em>evident</em>, with git review the human gate.
 /// </remarks>
 public static class BaselineFormat
@@ -75,7 +76,11 @@ public static class BaselineFormat
         return DigestInput(SortRules(rules));
     }
 
-    /// <summary>The SHA-256 lowercase-hex digest over <see cref="DigestInput" /> (UTF-8 bytes).</summary>
+    /// <summary>
+    ///     The SHA-256 lowercase-hex digest over
+    ///     <see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}})" />
+    ///     (UTF-8 bytes).
+    /// </summary>
     public static string ComputeDigest(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
         return ComputeDigest(SortRules(rules));

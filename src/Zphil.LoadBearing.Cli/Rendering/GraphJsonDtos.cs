@@ -10,17 +10,16 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // reaches this document only under --allow-workspace-diagnostics, since graph otherwise refuses before
 // extraction.
 //
-// multiplyDeclaredTypes is the survey's first COVERAGE STATEMENT — a flat, optional, top-level key saying
-// what the survey above does not cover, absent when there is nothing to say, and elided to a count at
-// skeleton grain because its content scales with the codebase rather than with the schema.
-//
-// unsupportedProjects is the coverage statement one level up: not what the survey misses inside the
-// projects it read, but which declared projects it never read at all. It rides the trust stamp rather than
-// this document's own ladder, so it is NOT elided at any grain — its length scales with the SOLUTION (0-3
-// entries in practice, not with the codebase), and a coarser document is exactly where a reader most needs
-// to know the survey is of part of the solution.
+// multiplyDeclaredTypes and shadowedTypes are coverage statements about the survey's contents, so they
+// elide to counts at skeleton grain; unsupportedProjects is one about its subject, so it rides the trust
+// stamp instead and is elided at no grain.
 
 /// <summary>The root <c>graph --json</c> document.</summary>
+/// <param name="SchemaVersion">The survey document's schema version — 1.</param>
+/// <param name="Solution">
+///     The solution's file name — the survey's subject, and never a path, so the document is
+///     machine-independent.
+/// </param>
 /// <param name="Grain">
 ///     <c>overview</c> when the namespace inventories were elided, <c>skeleton</c> when the
 ///     external-reference rows went with them, or null (omitted) at full grain — so a document that says
@@ -31,6 +30,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     The project-name globs the survey was narrowed to, or null (omitted) when it covers the whole
 ///     solution. Present, it explains why <c>projectEdges</c> can name a project <c>projects</c> does not:
 ///     an edge survives scoping on either endpoint.
+/// </param>
+/// <param name="Projects">One row per project the survey read, ordered by name.</param>
+/// <param name="ProjectEdges">
+///     The observed cross-project reference edges, grouped by (source, target) project pair.
 /// </param>
 /// <param name="WorkspaceDiagnostics">
 ///     The workspace-load diagnostics, or null (omitted) when there were none.
@@ -149,13 +152,9 @@ internal sealed record GraphJson(
 ///         solution's projects, which the coarsest survey still lists in full.
 ///     </para>
 ///     <para>
-///         <c>generated</c> is deliberately <em>not</em> a top-level coverage statement, which is what the
-///         other survey-level omissions above are. A coverage statement says what the survey does not
-///         cover, and every one of them names something with no home in the rows above it — but a generated
-///         type has a home: it is already inside this project's <c>types</c>, and inside its namespace's.
-///         A top-level array would leave the larger number standing as if it were the whole story and
-///         correct it in a footnote, and a count key beside it would count rows rather than types. So the
-///         qualifier sits on the number it qualifies, in both places that number appears.
+///         <c>generated</c> is a qualifier on the number it qualifies, in both places that number
+///         appears — deliberately never a top-level coverage statement, because a generated type already
+///         has a home in this project's <c>types</c> and in its namespace's.
 ///     </para>
 /// </remarks>
 internal sealed record GraphProjectJson(

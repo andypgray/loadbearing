@@ -70,14 +70,11 @@ internal readonly record struct SessionCodebase(
 ///         a read never races a re-extraction, and the returned set is always internally consistent.
 ///     </para>
 ///     <para>
-///         <b>The merge is memoized too.</b> Reusing a clean project's fragments still left every call
-///         rebuilding the whole <see cref="CodebaseModel" /> from them — every node, every hierarchy list,
-///         every edge site set across the solution — which in the steady state (an armed per-edit check, or
-///         two tools called back to back) is the same model built again from the same inputs.
-///         <see cref="GetCodebaseAsync" /> therefore memoizes it against
-///         <see cref="SessionFragmentSet.Version" /> and the caller's exclusion set. Handing back the same
-///         instance is safe because a merged model is read-only once built: the merge is the only writer of
-///         a <c>TypeNode</c>'s hierarchy and members, and every consumer — the checker, the renderers, the
+///         <b>The merge is memoized too.</b> <see cref="GetCodebaseAsync" /> memoizes the merged model
+///         against <see cref="SessionFragmentSet.Version" /> and the caller's exclusion set, so a
+///         steady-state call hands back the model its predecessor built. Handing back the same instance is
+///         safe because a merged model is read-only once built: the merge is the only writer of a
+///         <c>TypeNode</c>'s hierarchy and members, and every consumer — the checker, the renderers, the
 ///         summarizer — reads.
 ///     </para>
 /// </remarks>
@@ -115,9 +112,8 @@ internal sealed class SessionFragmentStore : IDisposable
     // The fragment-set version the memo above holds models for; -1 until the first merge.
     private long mergedVersion = -1;
 
-    // The ordered whole set for the version in orderedVersion, and that version (-1 until the first walk).
-    // Same discipline as the merge memo one field up, for the same reason: a steady-state call re-sorted
-    // every fragment in the solution to produce a list the merge memo then made no use of. Both fields are
+    // The ordered whole set for the version in orderedVersion, and that version (-1 until the first walk) —
+    // the merge memo's discipline one field up, so a steady-state call re-sorts nothing. Both fields are
     // only ever touched under the extraction gate, which the two walks and their one reader all hold.
     private IReadOnlyList<CodebaseFragment>? orderedFragments;
     private long orderedVersion = -1;

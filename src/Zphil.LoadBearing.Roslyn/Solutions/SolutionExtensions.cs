@@ -65,14 +65,11 @@ internal static class SolutionExtensions
     /// <remarks>
     ///     <para>
     ///         <b>Why one spelling.</b> Roslyn's <c>MSBuildProjectLoader</c> appends a <c>(tfm)</c>
-    ///         discriminator whenever one project file yields more than one <see cref="Project" />, so a
-    ///         multi-target-framework <c>Foo.csproj</c> arrives as <c>Foo(net10.0)</c> and
-    ///         <c>Foo(netstandard2.0)</c>. Nothing downstream wants those names: <c>arch.Project("Foo")</c>
-    ///         would select nothing, spec-project discovery would see two projects where one csproj exists,
-    ///         and the fragment store, the extraction cache, and the exclusion walk would each key their
-    ///         halves on different strings. Normalizing here — at the load boundary, where all three
-    ///         producers of a <see cref="Solution" /> meet — makes <see cref="Project.Name" /> simply
-    ///         <em>be</em> the right string, so no reader can get it wrong.
+    ///         discriminator whenever one project file yields more than one <see cref="Project" />, and
+    ///         everything downstream keys on the undecorated csproj name. Normalizing here — at the load
+    ///         boundary, where all three producers of a <see cref="Solution" /> meet — makes
+    ///         <see cref="Project.Name" /> simply <em>be</em> the right string, so no reader can get it
+    ///         wrong.
     ///     </para>
     ///     <para>
     ///         The clean name is read from the project file rather than parsed out of the decorated one: a

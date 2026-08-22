@@ -57,13 +57,10 @@ public sealed class LoadedSolution : IDisposable
     ///     disjoint from <see cref="FailedProjects" /> by construction.
     /// </summary>
     /// <remarks>
-    ///     Carried in its own slot rather than folded into <see cref="FailedProjects" /> because these projects
-    ///     <em>did</em> load — naming them as "failed to load" would be false — and because the remedy differs:
-    ///     <c>dotnet restore</c>, rather than <c>dotnet build</c>. The two causes share this one slot for the
-    ///     same reason, from the other direction: they ask for the same command and leave the same hole, and a
-    ///     consumer that could tell them apart would have nothing different to do about it. What they share
-    ///     with each other is the consequence: every package edge these projects declare is missing from the
-    ///     model, so a rule over one is measured against edges that were never extracted.
+    ///     Its own slot rather than a fold into <see cref="FailedProjects" />: these projects <em>did</em>
+    ///     load, and the remedy differs (<c>dotnet restore</c>, not <c>dotnet build</c>). The full rationale
+    ///     rides the one value every surface reads — <see cref="WorkspaceDiagnostics" />' slot of the same
+    ///     name.
     /// </remarks>
     public IReadOnlyList<string> RestoreFailedProjects { get; }
 
@@ -86,8 +83,6 @@ public sealed class LoadedSolution : IDisposable
     ///     <para>
     ///         Never gates, on <see cref="UncheckedProjects" />' terms rather than
     ///         <see cref="FailedProjects" />': the model is smaller than the solution, not wrong about it.
-    ///         What it exists for is that until it did, the survey listed fewer projects than the solution
-    ///         declares and named the difference nowhere.
     ///     </para>
     ///     <para>
     ///         <b>Internal where its three siblings are public</b>, because it alone carries a taxonomy. The

@@ -36,6 +36,10 @@ internal enum CacheOutcome
 ///     output — and the fail-closed decision — are identical on a solution that does not load completely or
 ///     did not restore.
 /// </remarks>
+/// <param name="Outcome">What the validation decided — hit, partial, or miss.</param>
+/// <param name="ReusableFragments">The clean projects' fragments, reusable as stored.</param>
+/// <param name="DirtyProjects">The project names to re-extract on a <see cref="CacheOutcome.Partial" /> read.</param>
+/// <param name="SpecResolutions">The recorded spec resolutions a hit replays without a workspace.</param>
 /// <param name="LoadDiagnostics">
 ///     The recorded load verdict, carried whole rather than as the four lists the manifest stores it in:
 ///     every surface downstream reads this one value, so a hit hands them exactly what a cold load hands

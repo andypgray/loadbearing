@@ -13,12 +13,10 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     external-edit reconcile, incremental sync, semaphores, two-phase ready tasks, warmup) exists here.
 /// </summary>
 /// <remarks>
-///     This is the one-shot <em>primitive</em>. The CLI and the xUnit adapter build directly on it and
-///     keep its restored-solution staleness contract: each invocation opens a fresh workspace, reads the
-///     solution once, and disposes it, so the loaded snapshot is only ever as current as the moment of the
-///     load. The other lifetime — a host-managed, long-lived solution that reconciles against disk before
-///     each read — lives in <see cref="WorkspaceSession" />, which owns this primitive rather than
-///     replacing it.
+///     The one-shot <em>primitive</em>: each invocation opens a fresh workspace, reads the solution once,
+///     and disposes it, so the loaded snapshot is only ever as current as the moment of the load. The CLI
+///     and the xUnit adapter build directly on it and keep that staleness contract; the warm lifetime,
+///     <see cref="WorkspaceSession" />, owns this primitive rather than replacing it.
 /// </remarks>
 public static class WorkspaceLoader
 {

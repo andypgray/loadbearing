@@ -17,12 +17,8 @@ namespace Zphil.LoadBearing.Roslyn;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Lifetime contract.</b> <see cref="WorkspaceLoader" /> is the one-shot primitive: a check or
-///         render run opens a workspace, reads once, and disposes, so it needs no reconcile machinery and
-///         the CLI and xUnit adapter keep that restored-solution staleness contract. This type is the
-///         other lifetime — a warm MCP server that answers many tool calls against one loaded solution.
-///         It is lazy: the first <see cref="GetCurrentAsync" /> performs the full load (no eager warmup),
-///         which preserves per-call error-text parity with the cold path.
+///         <b>Lazy by contract.</b> The first <see cref="GetCurrentAsync" /> performs the full load — no
+///         eager warmup — which preserves per-call error-text parity with the cold path.
 ///     </para>
 ///     <para>
 ///         <b>Correct at call time, by construction — no watcher.</b> The solution only has to be correct

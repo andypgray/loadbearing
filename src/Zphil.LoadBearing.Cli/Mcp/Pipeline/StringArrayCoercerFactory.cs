@@ -12,33 +12,12 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///     the model nothing actionable and burns retries.
 /// </summary>
 /// <remarks>
-///     <para>
-///         Handled token shapes for any <c>string[]</c> parameter:
-///     </para>
-///     <list type="bullet">
-///         <item>
-///             <description><c>StartArray</c> → read as a normal JSON array of strings.</description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>String</c> whose contents parse as a JSON array of strings → return the
-///                 unwrapped array. Surrounding whitespace is tolerated.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Any other <c>String</c> (including the empty string and strings that look like
-///                 arrays but are not valid JSON arrays of strings) → return a single-element
-///                 array containing the string verbatim.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 Any other token (number, object, boolean) → throw <see cref="UserErrorException" />
-///                 naming the offending token kind.
-///             </description>
-///         </item>
-///     </list>
+///     A real array reads normally, and a string whose contents parse as a JSON array of strings
+///     returns the unwrapped array, surrounding whitespace tolerated. Any other string — the empty
+///     string and near-array strings that are not valid JSON arrays of strings included — returns a
+///     single-element array holding it verbatim, because a bare string where an array is advertised
+///     is the caller's likeliest intent rather than an error. Any other token throws
+///     <see cref="UserErrorException" /> naming the offending token kind.
 /// </remarks>
 internal sealed class StringArrayCoercerFactory : JsonConverterFactory
 {

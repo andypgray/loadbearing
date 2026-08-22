@@ -74,8 +74,7 @@ internal static class FileStamping
     /// </summary>
     /// <remarks>
     ///     Unbuffered and declared sequential rather than opened through <see cref="File.OpenRead" />: the
-    ///     digest already reads front to back in large blocks, so the default 4 KB buffer only bought a
-    ///     second copy of every byte in the solution.
+    ///     digest already reads front to back in large blocks, so buffering pays nothing here.
     /// </remarks>
     internal static string? TryHashFile(string path)
     {

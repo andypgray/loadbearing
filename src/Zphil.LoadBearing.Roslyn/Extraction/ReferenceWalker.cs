@@ -88,8 +88,8 @@ internal static class ReferenceWalker
 
             // Each channel is normalized to its OriginalDefinition and gated independently, so an explicit
             // `new Foo()` (which rides on Target: null, Constructed: Foo) — and a bare `catch` (Target: null,
-            // Caught: Exception) — is never dropped by a type-channel guard. The co-existence matrix rows are
-            // what catch a regression here.
+            // Caught: Exception) — is never dropped by a type-channel guard. The coexistence tests are what
+            // catch a regression here.
             INamedTypeSymbol? targetDefinition = ReferencedDefinition(resolved.Target);
             INamedTypeSymbol? constructedDefinition = ReferencedDefinition(resolved.Constructed);
             INamedTypeSymbol? caughtDefinition = ReferencedDefinition(resolved.Caught);
@@ -148,16 +148,10 @@ internal static class ReferenceWalker
     }
 
     /// <summary>
-    ///     Resolves a syntax node to (the type it binds a name to, the §4.5 member it uses, the type it
-    ///     constructs, the §4.8 type it catches, whether that catch spells a <c>when</c> filter, whether its
-    ///     block ends in a <c>throw</c>, the §4.8 type it throws). The type is <see langword="null" />
+    ///     Resolves a syntax node to its channels; each arm below names only the channels it sets, and the
+    ///     class remarks state where each channel can be non-null. The type is <see langword="null" />
     ///     when the node is not a reference at all (namespaces, type parameters, locals/params, discards,
-    ///     dynamic, arrays/pointers, predefined-type keywords, and unresolved names all fall through). The
-    ///     member is <see langword="null" /> whenever the node is not a member use (a constructor is never a
-    ///     use). The constructed channel is non-null only on the two object-creation arms, and null there too
-    ///     for a delegate creation. The caught channel is non-null only on the <c>catch</c>-clause arm; the
-    ///     thrown channel only on the two throw arms (a bare rethrow leaves it null). Both catch bits are
-    ///     <see langword="false" /> on every arm but the <c>catch</c>-clause one.
+    ///     dynamic, arrays/pointers, predefined-type keywords, and unresolved names all fall through).
     /// </summary>
     private static WalkChannels Resolve(SyntaxNode node, SemanticModel model, INamedTypeSymbol? bareCatchType)
     {
@@ -188,9 +182,8 @@ internal static class ReferenceWalker
             // arm (a typed catch's type-name syntax is a SimpleName visited on its own, minting the reference
             // edge; this arm carries the caught channel ONLY — no double-mint). A `when` filter is an ordinary
             // sub-expression walked on its own visits, so it never suppresses this edge. Beside the caught type
-            // this arm also records WHETHER the clause spells a filter and WHETHER its block's last statement is
-            // a throw — two separate bits, syntactic only, that leave the caught channel and every edge-minting
-            // rule exactly as they were.
+            // this arm also records whether the clause spells a filter and whether its block's last statement
+            // is a throw — two separate, purely syntactic bits.
             case CatchClauseSyntax catchClause:
                 return new WalkChannels(
                     Caught: CaughtTypeOf(catchClause, model, bareCatchType),
@@ -348,9 +341,8 @@ internal static class ReferenceWalker
 /// <remarks>
 ///     The channels are deliberately independent: a node can carry a construction and no type reference, a
 ///     catch and no type reference, or a throw and a construction at once, and nothing here couples them.
-///     What the shape buys over the seven-position tuple it replaces is that a channel can no longer be
-///     transposed with its neighbour at a call site — the two <see cref="bool" />s in the middle were the
-///     hazard, being the only pair the compiler could not tell apart.
+///     The record shape is what keeps a channel from being transposed with its neighbour at a call site —
+///     the two <see cref="bool" />s are the pair the compiler could not otherwise tell apart.
 /// </remarks>
 /// <param name="Target">The type a name binds to (GRAMMAR §4.1).</param>
 /// <param name="Member">The member a name uses (§4.5); rides the <paramref name="Target" /> channel.</param>

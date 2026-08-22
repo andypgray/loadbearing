@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 ///     <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em>
 ///     the output paths of its direct project references: a spec project references the contract library as a
 ///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
-///     convention must see both (the derive walk caught the P2P blind spot).
+///     convention must see both.
 ///     <see cref="FilePath" /> is the candidate's own <c>.csproj</c>, and it is what the convention counts by:
 ///     a multi-target-framework project file yields one Roslyn project per framework, and those are one
 ///     candidate rather than an ambiguity. It carries no default on purpose — a caller with no project file in
@@ -446,11 +446,8 @@ internal static class SpecResolver
             // intermediate here would refuse every replayed run.
             if (File.Exists(outputFilePath)) return outputFilePath;
 
-            // The evaluated path can name a directory no build ever writes, in any configuration:
-            // MSBuildWorkspace evaluates in its default configuration whatever the caller built, and a
-            // props file spelling `bin\$(Configuration)\` is imported before the SDK defaults Configuration
-            // at all, evaluating to a flat `bin\`. So search the tree the build actually wrote, from the
-            // SDK's own output root down, rather than doing arithmetic over a path shape we did not build.
+            // The evaluated path can name a directory no build ever writes, in any configuration — the
+            // shapes are BuiltOutputProbe's remarks — so search the tree the build actually wrote.
             if (BuiltOutputProbe.Find(outputFilePath, intermediateAssemblyPath) is { } built) return built;
         }
 

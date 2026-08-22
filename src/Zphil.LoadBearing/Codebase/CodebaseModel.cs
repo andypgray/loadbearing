@@ -149,12 +149,11 @@ public sealed class CodebaseModel
     ///         stand-in under a package's own namespace, a polyfill under a BCL one. Both types are in
     ///         <see cref="Types" />, and each reference reaches whichever the referencing compilation bound,
     ///         so a rule naming the type reaches both while an <c>arch.Project</c> selection over the
-    ///         declaring project reaches only the declaration. One note per declaring project rather than per
-    ///         name, on the same reasoning as the framework note above: the answer is the same for all of
-    ///         them, and a solution carrying a dozen shims would otherwise spend a dozen lines. The queryable
-    ///         form is the second node itself, and — for a consumer that needs the split named rather than
-    ///         inferred from two nodes wearing one name — <see cref="ShadowedNames" />, which is also what
-    ///         the survey's coverage key is a projection of.
+    ///         declaring project reaches only the declaration. One note per declaring project rather than
+    ///         per name. The queryable form is the second node itself, and — for a consumer that needs the
+    ///         split named rather than inferred from two nodes wearing one name —
+    ///         <see cref="ShadowedNames" />, which is also what the survey's coverage key is a projection
+    ///         of.
     ///     </para>
     ///     <para>
     ///         All three kinds are purely informational — the model is complete and correct, just carrying an

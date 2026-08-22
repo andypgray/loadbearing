@@ -9,12 +9,10 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What was measured.</b> A published build refused a solution — exit 2, "the model is incomplete"
-///         — in the same run in which it evaluated the solution's one rule and passed it. The whole cause was
-///         <c>NU1510</c>, NuGet's advice that a package the shared framework now carries could be removed
-///         from the csproj. Silencing that one warning flipped the run to exit 0, so which warning gated was
-///         measured rather than inferred. .NET 10 emits it for a large and growing set of packages, so the
-///         population is every repository still referencing one.
+///         <b>What this keeps closed.</b> <c>NU1510</c> — NuGet's advice that a package the shared
+///         framework now carries could be removed from the csproj — refused a solution whose one rule
+///         passed, and which warning gated was measured, not inferred. .NET 10 emits it for a large and
+///         growing set of packages, so the population is every repository still referencing one.
 ///     </para>
 ///     <para>
 ///         <b>Why a real bed rather than an injected string.</b>

@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Roslyn;
 ///     </para>
 ///     <para>
 ///         Lives in <c>.Roslyn</c> (net-current) rather than Core, because
-///         <see cref="System.IO.DirectoryInfo.ResolveLinkTarget(bool)" /> is net6+ and Core is
+///         <see cref="System.IO.FileSystemInfo.ResolveLinkTarget(bool)" /> is net6+ and Core is
 ///         netstandard2.0. The resolution is a fixed-point walk:
 ///         <see cref="System.IO.Path.GetFullPath(string)" /> first, then repeatedly find the deepest
 ///         symlinked ancestor, follow it to its final target, and reattach the remainder until no symlink

@@ -15,90 +15,38 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The measurement this exists for.</b> One tree, one spec, the NuGet feed the only variable and no
-///         rebuild between the runs: with the feed reachable <c>check</c> exited 1 on a rule forbidding a
-///         package namespace; with the feed unreachable it exited <b>0</b>, and the rule reported itself inert
-///         because its target selection matched no types. <c>graph --json</c> settled which half was wrong —
-///         the external edge the violation rests on was in the restored run's survey and absent from the
-///         broken one. The violation was not missed; the edge it rests on was never extracted.
+///         The verdict is a file read, never a diagnostic parse. A failed restore <em>does</em> write
+///         <c>project.assets.json</c> — measured — with the failure recorded in its <c>logs</c> array as a
+///         <c>{ "code": …, "level": … }</c> pair, and both fields are invariant: <c>NU1301</c> is
+///         <c>NU1301</c> and <c>Error</c> is <c>Error</c> whatever language the UI renders in. So a project
+///         whose assets file carries a non-audit <c>level: Error</c> entry failed its restore, in any locale.
 ///     </para>
 ///     <para>
-///         <b>Why <see cref="ProjectLoadFailures" /> cannot see it.</b> A project whose restore failed still
-///         <em>loads completely</em> — full document set, both output paths — so it presents none of the shapes
-///         that predicate reads, nothing is blamed, and the model is silently missing every package edge. That
-///         is the design working as intended rather than a regression: the gate was deliberately moved off
-///         diagnostic text onto loaded structure, because message matching refused solutions whose rules all
-///         passed and refused in German what it let through in English.
+///         The candidate paths come from <see cref="IntermediateOutputTree.AssetsPathsOf" /> — the same
+///         primitive the cache stamps, so the file this reads and the file that invalidates the cache are the
+///         same file by construction. The first candidate that exists wins: default-first, then deepest-first
+///         up the intermediate tree, so a shallower shared intermediate root cannot shadow a project's own
+///         file.
 ///     </para>
 ///     <para>
-///         <b>Why the assets file, and why it is not a diagnostic parse.</b> A failed restore <em>does</em>
-///         write <c>project.assets.json</c> — measured, and contrary to what was expected — with an empty
-///         <c>libraries</c> section and the failure recorded in its <c>logs</c> array as a
-///         <c>{ "code": …, "level": … }</c> pair. Both fields are invariant: <c>NU1301</c> is <c>NU1301</c> and
-///         <c>Error</c> is <c>Error</c> whatever language the UI renders in. So a project whose assets file
-///         carries a <c>level: Error</c> entry is a project whose restore failed, in any locale — a file read,
-///         not a message match. The assets file hands back exactly the two facts Roslyn's
-///         <c>MSBuildDiagnosticLogger</c> throws away, since it records <c>BuildEventArgs.Message</c> and never
-///         <c>.Code</c>.
+///         A bad read is not a failure: every degradation — unreadable file, malformed JSON, an unexpected
+///         node kind, an unknown layout — answers "not failed". Silence is the only safe answer for a file
+///         that could not be read, because the alternative is refusing a healthy solution, the disease the
+///         structural gate cures.
 ///     </para>
 ///     <para>
-///         <b>Where the file is, spelled nowhere.</b> The candidate paths come from
-///         <see cref="IntermediateOutputTree.AssetsPathsOf" />, which already derives the default layout,
-///         <c>UseArtifactsOutput</c>, and a redirected <c>BaseIntermediateOutputPath</c> from the project's own
-///         evaluated paths — the same primitive the cache stamps, so the file this reads and the file that
-///         invalidates the cache are the same file by construction. The first candidate that exists wins: the
-///         list is ordered default-first and then deepest-first up the intermediate tree, so a shallower shared
-///         intermediate root cannot shadow a project's own file.
+///         No assets file at all asserts nothing on its own — a non-SDK-style .NET Framework project never
+///         writes one, and those are exactly the codebases this product is built for — and asserts "the
+///         restore never ran" for an SDK-style project, which writes one on every restore and still loads
+///         completely without one. So absence is read together with <see cref="SdkStyleProject.IsSdkStyle" />,
+///         and only the SDK-style project is blamed. The residual limit: a non-SDK-style project using
+///         <c>PackageReference</c> that was never restored stays invisible, because its absent assets file
+///         cannot be told from a <c>packages.config</c> project's.
 ///     </para>
 ///     <para>
-///         <b>A bad read is not a failure.</b> Every degradation — unreadable file, malformed JSON, an
-///         unexpected node kind, an unknown layout — answers "not failed", the same posture the repo's one
-///         other NuGet-manifest parse takes. Silence is the only safe answer for a file that could not be read:
-///         the alternative is refusing a healthy solution, which is the disease the structural gate was written
-///         to cure. A false negative is the safe direction, and it is where every degradation lands.
-///     </para>
-///     <para>
-///         <b>No assets file at all, and why that took a second read.</b> Absence asserts nothing on its own:
-///         a non-SDK-style .NET Framework project never writes an assets file — measured on this repo's own
-///         <c>Fixtures/LegacySolutions/ClassicApp</c> bed — and those are exactly the codebases this product is
-///         built for, so "absent ⇒ failed" would refuse them wholesale. It asserts a great deal for an
-///         SDK-style project, which writes one on every restore, and which was measured to <em>load completely</em>
-///         without one — full document and reference sets, both output paths, zero workspace
-///         diagnostics — while missing every package edge exactly as a failed restore leaves it. So the
-///         absence is read together with <see cref="SdkStyleProject.IsSdkStyle" />, whose corpus is the
-///         measurement that licensed this arm: every project in this repo and its fixture trees, classified,
-///         and paired with whether an assets file is really on disk. The two agreed everywhere except the
-///         three beds deliberately left unrestored.
-///     </para>
-///     <para>
-///         <b>The residual limit, which is narrower and still real.</b> A <em>non</em>-SDK-style project that
-///         uses <c>PackageReference</c> and was never restored stays invisible. It would write an assets file,
-///         so its absent one is a fact — but the absence is indistinguishable from a <c>packages.config</c>
-///         project's, and telling them apart means reading item groups rather than the project's shape. The
-///         same posture applies as before: what is unmeasured stays unmeasured rather than being guessed at,
-///         and the direction the guess would fail in is refusing a healthy legacy solution.
-///     </para>
-///     <para>
-///         <b>Only C# projects are asked about.</b> A solution's projects in other languages reach the loaded
-///         solution — F# does, measured — and this predicate used to blame them like any other, which is a
-///         false refusal twice over: their packages are not in the model because the projects are not in the
-///         model, and the remedy it names cannot help. Measured on a two-project bed with the C# half fully
-///         restored, that was exit 2 naming the <c>.fsproj</c> alone. Such a project is stated under
-///         <c>WorkspaceDiagnostics.UnsupportedProjects</c> instead, which says what the run covers rather
-///         than refusing it. The narrowing is safe in the direction that matters: this arm can now only blame
-///         projects the model actually holds.
-///     </para>
-///     <para>
-///         <b>The one carve-out, and why no other.</b> The NuGet audit family (NU19xx) is excluded by
-///         <em>code</em>, because an advisory's publication date and an audit fetch's network reachability are
-///         external, time-varying inputs that say nothing about how this codebase is built while resolution
-///         itself succeeded and the model is complete — refusing on one is literally issue #19. The family is
-///         <c>level: Warning</c> by default so it does not fire unpromoted, but <c>TreatWarningsAsErrors</c>
-///         promotes it, and the code match that was impossible in Roslyn's diagnostic stream is available here.
-///         Any <em>other</em> warning promoted to an error (an <c>NU1605</c> downgrade being the common one)
-///         gates, deliberately: restore exited non-zero by the operator's own configuration of their own
-///         dependency graph rather than on an external input, so their build is broken — and the refusal is
-///         loud, names the projects, and has an opt-out.
+///         The NuGet audit family (NU19xx) is excluded by code even where <c>TreatWarningsAsErrors</c>
+///         promoted it to <c>level: Error</c>; any <em>other</em> promoted warning gates, deliberately —
+///         restore exited non-zero by the operator's own configuration of their own dependency graph.
 ///     </para>
 /// </remarks>
 internal static class RestoreFailures
@@ -131,11 +79,10 @@ internal static class RestoreFailures
         {
             if (project.FilePath is not { } filePath) continue;
 
-            // A project in another language reaches the loaded solution — measured on a two-project bed
-            // whose .fsproj arrived here with its output paths — and its packages cannot affect a model that
-            // never included it. Blaming one refused a solution whose C# half was restored perfectly:
-            // measured on that bed, exit 2 naming the .fsproj alone. Skipped before any file is read, so
-            // this also spares the assets probe for every project the model does not contain.
+            // A project in another language reaches the loaded solution with its output paths, and its
+            // packages cannot affect a model that never included it — blaming one falsely refused a
+            // solution whose C# half was restored perfectly (measured). Skipped before any file is read,
+            // so this also spares the assets probe for every project the model does not contain.
             if (!ProjectLanguages.IsCSharp(project)) continue;
 
             string fullPath = Path.GetFullPath(filePath);

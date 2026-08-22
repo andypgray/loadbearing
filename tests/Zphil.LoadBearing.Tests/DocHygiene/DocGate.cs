@@ -11,19 +11,18 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 /// <typeparam name="TQuote">What the scanner lifts: a rule quote, a count, a written path, an anchor, a fence.</typeparam>
 /// <remarks>
 ///     <para>
-///         <b>Why the harness owns exactly these two facts.</b> They are the ones whose absence is silent.
-///         A gate whose scanner stops matching goes green over nothing, and a doc nobody registered is
-///         outside the gate with no failure anywhere — which is how a sixth gate came to be written from
-///         scratch, and how one of the five shipped without the registry sweep at all. Everything a gate
-///         does with what it scanned — classify, exempt, pin — stays in the gate, because the root pairing
-///         and the per-root hoist those need are the gate's own.
+///         <b>Why the harness owns exactly these two facts.</b> They are the ones whose absence is silent:
+///         a gate whose scanner stops matching goes green over nothing, and a doc nobody registered is
+///         outside the gate with no failure anywhere. Everything a gate does with what it scanned —
+///         classify, exempt, pin — stays in the gate, because the root pairing and the per-root hoist
+///         those need are the gate's own.
 ///     </para>
 ///     <para>
 ///         <b>Why the nouns are parameters.</b> Each gate's failure text is the wording its reader already
-///         knows, and moving five near-identical messages behind one harness must not quietly normalize
-///         them. So the emptiness header is composed from three words — the doc-set noun, the plural of
-///         what is yielded, the scanner's name — and the registry sweep from three more, and each gate
-///         passes its own. <see cref="DocGateTests" /> pins the composed text.
+///         knows, and moving near-identical messages behind one harness must not quietly normalize them.
+///         So the emptiness header is composed from three words — the doc-set noun, the plural of what is
+///         yielded, the scanner's name — and the registry sweep from three more, and each gate passes its
+///         own. <see cref="DocGateTests" /> pins the composed text.
 ///     </para>
 ///     <para>
 ///         <b>Scanning is memoized</b> because the registry sweep reads every tracked markdown file and the

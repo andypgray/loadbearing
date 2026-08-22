@@ -282,10 +282,9 @@ internal static class FragmentExtractor
     // Effective visibility (GRAMMAR §4.9): the member is public AND every containing type up the chain is
     // public. A public member nested in an internal type is not surface, so it mints nothing — the honesty
     // boundary (an internal member is not part of the type's external contract). No explicit interface
-    // implementation ever reaches this gate: IsInventoried (§4.6) drops all three kinds before the exposure
-    // pass runs — a METHOD impl via the non-Ordinary MethodKind screen, a PROPERTY or EVENT impl via its
-    // non-empty ExplicitInterfaceImplementations. So the inventory filter, not this gate, is what keeps
-    // explicit impls (Private plumbing) out of the exposure graph.
+    // implementation ever reaches this gate — IsInventoried (§4.6) drops all three kinds before the
+    // exposure pass runs, so the inventory filter, not this gate, is what keeps explicit impls (Private
+    // plumbing) out of the exposure graph.
     private static bool IsEffectivelyPublicMember(ISymbol member)
     {
         if (member.DeclaredAccessibility != RoslynAccessibility.Public) return false;
@@ -373,10 +372,8 @@ internal static class FragmentExtractor
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
         // The per-tree semantic-model memo. Compilation.GetSemanticModel mints a NEW model every call — no
-        // provider is attached — and the edge pass asks once per declaring syntax reference, so a file
-        // holding a partial part and two nested types used to rebind its usings three times over before the
-        // registration pass rebound them once more. One model per tree is all any pass ever needed, and it
-        // dies with this state.
+        // provider is attached — and the edge pass asks once per declaring syntax reference, so one model
+        // per tree is minted on first ask and dies with this state.
         private readonly Dictionary<SyntaxTree, SemanticModel> _semanticModels = new();
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
@@ -736,9 +733,7 @@ internal static class FragmentExtractor
         // generated when [System.CodeDom.Compiler.GeneratedCode] sits on it or on any type containing it — so the
         // nested types a generator emits inside an attributed container ride along without carrying their own
         // attribute — OR when every file declaring it is generator output (GeneratedSourceSignals). The second
-        // signal is what reaches the generators that emit no attribute at all: a compiled Razor view carries
-        // [RazorCompiledItemMetadata] and a banner and nothing else, so under the attribute alone a whole web
-        // tier's worth of views read as hand-written code a rule could hold its author to.
+        // signal is what reaches the generators that emit no attribute at all — a compiled Razor view, measured.
         //
         // ALL declaring files, never any: the attribute is a claim about a type, the file signals are claims
         // about a file, and a file fact lifts to a type only when it holds of every file declaring it. The

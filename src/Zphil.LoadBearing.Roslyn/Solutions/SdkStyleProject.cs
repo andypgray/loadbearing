@@ -12,13 +12,6 @@ namespace Zphil.LoadBearing.Roslyn.Solutions;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why anything needs to know.</b> Absence of an assets file asserts nothing on its own: a
-///         non-SDK-style .NET Framework project never writes one, and those are exactly the codebases this
-///         product is built for. It asserts a great deal for an SDK-style project, which writes one on every
-///         restore — so "no assets file" there means the restore never ran, and every package edge is missing
-///         from the model exactly as a failed restore leaves it.
-///     </para>
-///     <para>
 ///         <b>The three shapes, and why all three.</b> An SDK-style project can declare its SDK as an
 ///         attribute on the root (<c>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;</c> — what every template
 ///         writes), as a child element (<c>&lt;Sdk Name="…" /&gt;</c>), or as a pair of explicit imports

@@ -42,104 +42,27 @@ internal sealed record ProjectLoadReport(
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why not the diagnostics.</b> Roslyn's <c>DiagnosticReporter</c> re-wraps every project-load log
-///         item as <see cref="WorkspaceDiagnosticKind.Failure" /> with the item's real kind discarded, so an
-///         MSBuild <em>warning</em> and a fatal evaluation error arrive at a host looking identical, and it
-///         records <c>BuildEventArgs.Message</c> and never <c>.Code</c>. A gate that reads that stream can
-///         only guess from wording, and wording is neither a contract nor language-independent: a NuGet
-///         "will not be pruned" advisory refused a solution whose rules all passed, and the same audit-fetch
-///         failure that exits 0 in English exited 2 in German. The one <c>ILogger</c> overload that looks
-///         like an escape hatch is not one — <c>MSBuildProjectLoader</c> passes it only to
-///         <c>IsBinaryLogger</c>, so capturing real codes would cost a binlog write and parse per run.
+///         Both arms are structural, and no message text is an input to any verdict. Arm 1: a
+///         <c>.csproj</c> the solution file declares that produced no <see cref="Project" />. Arm 2: a
+///         <see cref="Project" /> carrying neither an evaluated <see cref="Project.OutputFilePath" /> nor a
+///         <see cref="CompilationOutputInfo.AssemblyPath" /> — the shape Roslyn leaves behind when a
+///         project's evaluation produced a real failure.
 ///     </para>
 ///     <para>
-///         <b>What is available instead.</b> Roslyn already computes the answer and then throws the label
-///         away: a project whose evaluation produced a real failure becomes
-///         <c>ProjectFileInfo.CreateEmpty</c>, and a solution member whose <c>.csproj</c> is not on disk
-///         never becomes a <see cref="Project" /> at all. Both leave a shape in the loaded solution, and both
-///         yield a project <em>path</em> — which is why a refusal can name what failed rather than quote a
-///         sentence about it.
+///         The restore half is <see cref="RestoreFailures" />', not this predicate's: a project whose NuGet
+///         packages did not resolve loads completely and presents neither arm, so a sibling reads it off
+///         disk where this one reads only the loaded <see cref="Solution" />. Both feed one gate; the lists
+///         stay separate because these projects loaded and the remedy differs.
 ///     </para>
 ///     <para>
-///         <b>The two arms, and the measurements that chose them.</b> Loaded shapes were recorded across ten
-///         beds before this predicate was written, because a code read had already been wrong about this area
-///         once.
-///         <list type="number">
-///             <item>
-///                 <b>Declared but absent</b> — a <c>.csproj</c> the solution file declares that produced no
-///                 <see cref="Project" />.
-///             </item>
-///             <item>
-///                 <b>Loaded but empty</b> — a <see cref="Project" /> with neither an evaluated
-///                 <see cref="Project.OutputFilePath" /> nor a
-///                 <see cref="CompilationOutputInfo.AssemblyPath" />. That is the <c>CreateEmpty</c> shape:
-///                 measured on a project naming an unresolvable SDK and on one whose csproj XML is malformed,
-///                 both of which loaded with zero documents, zero analyzer references, one metadata reference
-///                 (<c>mscorlib</c>) and both paths null, while all twelve healthy projects measured carried
-///                 both paths.
-///             </item>
-///         </list>
-///         The counts are deliberately <em>not</em> the predicate. Zero metadata references never occurs —
-///         a failed project keeps <c>mscorlib</c> — and zero analyzer references occurs on healthy projects
-///         (a non-SDK-style .NET Framework project, and the <c>netstandard2.0</c> leg of a
-///         multi-target-framework one), so either would refuse a solution that loaded perfectly well. Both
-///         arms are also unaffected by <see cref="SolutionExtensions.StripUnresolvedReferences" />, which
-///         removed nothing in any bed measured.
-///     </para>
-///     <para>
-///         <b>The restore half is <see cref="RestoreFailures" />', not this predicate's.</b> A project whose
-///         NuGet packages did not resolve still completes the design-time build and loads with its full
-///         document and reference set, both output paths included, so it presents neither arm above — while
-///         every edge its package references would have produced is missing from the model, which was
-///         measured to turn a failing rule green. That is read off the project's own
-///         <c>project.assets.json</c> — which a failed restore does write, and which a restore that never ran
-///         leaves absent — by a sibling that reads disk where this one reads only the loaded
-///         <see cref="Solution" />. Both feed one gate; the lists stay separate because these projects loaded
-///         and the remedy differs.
-///     </para>
-///     <para>
-///         <b>A <em>never</em>-restored solution is invisible to this predicate, and no longer to its sibling.</b>
-///         A project with no <c>project.assets.json</c> at all loads exactly as a restored one
-///         does and raises no workspace diagnostic, so it gated under the message-matching predicate no more
-///         than it does under this one. What changed is what its absent assets file means to
-///         <see cref="RestoreFailures" />: absence asserts nothing for a non-SDK-style .NET Framework project,
-///         which never writes one and which this product explicitly supports, and asserts "the restore never
-///         ran" for an SDK-style one, which writes one on every restore. Reading
-///         <see cref="SdkStyleProject.IsSdkStyle" /> tells the two apart, so the sibling blames the second and
-///         still leaves the first alone. What stays invisible is narrower: a non-SDK-style project using
-///         <c>PackageReference</c> that was never restored, whose absent assets file cannot be told from a
-///         <c>packages.config</c> project's.
-///     </para>
-///     <para>
-///         <b>A solution filter narrows arm 1 rather than disabling it.</b> A <c>.slnf</c> legitimately
-///         loads a subset, so its unselected members are not failures — but the arm used to be skipped
-///         wholesale for a filter, which meant a selected project that genuinely failed to load was invisible
-///         to the gate. Reading <see cref="SolutionMembership.Required" /> instead of the raw member list
-///         keeps the false positives out <em>and</em> restores the arm: what a filter asked for and did not
-///         get is a failure like any other. That is sound only because Roslyn refuses a filter naming a
-///         non-member outright — measured, both for a <c>.csproj</c> absent from disk and for one present but
-///         outside the solution — so every project a well-formed filter selects is one the load was obliged
-///         to produce.
-///     </para>
-///     <para>
-///         <b>The same subtraction names the narrowing.</b> Against
-///         <see cref="SolutionMembership.Declared" /> — every member, filter or no filter — what neither
-///         loaded nor failed is what the run simply did not check. That set is
-///         <see cref="ProjectLoadReport.Unchecked" />, and it is deliberately <em>not</em> derived from the
-///         filter text: Roslyn loads a filter's projects plus their transitive <c>ProjectReference</c>
-///         closure, so a filter naming two of three projects routinely checks all three. Naming the third as
-///         skipped would be a false claim of a gap, which is worse than announcing no narrowing at all. The
-///         set is empty for every unfiltered solution, where <see cref="SolutionMembership.Required" /> and
-///         <see cref="SolutionMembership.Declared" /> are the same list and anything missing has already been
-///         blamed.
-///     </para>
-///     <para>
-///         <b>A third list rides along that this predicate does not measure at all.</b>
-///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file — the projects no
-///         extractor reaches — and is carried here only because this is where declared membership
-///         is already read. It is deliberately outside both subtractions above: those ask what a load owed
-///         and did not deliver, while an <c>.fsproj</c> was never owed. Both arms skip such a project for
-///         the same reason, so a polyglot solution cannot be refused for holding one.
+///         A solution filter narrows arm 1 rather than disabling it: the arm reads
+///         <see cref="SolutionMembership.Required" />, so a selected project that failed to load is blamed
+///         like any other. <see cref="ProjectLoadReport.Unchecked" /> is the subtraction against
+///         <see cref="SolutionMembership.Declared" />, deliberately <em>not</em> derived from filter text —
+///         Roslyn loads a filter's projects plus their transitive <c>ProjectReference</c> closure, so filter
+///         text overstates the gap. <see cref="ProjectLoadReport.Unsupported" /> rides along unmeasured,
+///         read off the solution file and outside both subtractions: a project no extractor reaches was
+///         never owed, so a polyglot solution cannot be refused for holding one.
 ///     </para>
 /// </remarks>
 internal static class ProjectLoadFailures
@@ -215,13 +138,11 @@ internal static class ProjectLoadFailures
         return project.OutputFilePath is null && project.CompilationOutputInfo.AssemblyPath is null;
     }
 
-    // F# reaches a loaded solution — measured on a two-project bed, where the workspace produced a Project
-    // for the .fsproj and the extractor's own language filters dropped it — so this arm can see a project
-    // the model was never going to contain. Blaming one would refuse a healthy polyglot solution as a load
-    // failure, which is precisely the disease this predicate was written to cure; the run states such a
-    // project under its coverage statement instead. Measured on that bed the arm does not currently fire
-    // (the .fsproj carried its output paths), so this is the guard that keeps it that way rather than a fix
-    // for an observed refusal — unlike RestoreFailures', which was measured falsely refusing.
+    // F# reaches a loaded solution with its output paths — measured — so this arm can see a project the
+    // model was never going to contain, and blaming one would refuse a healthy polyglot solution as a load
+    // failure; the run states such a project under its coverage statement instead. A keep-it-that-way
+    // guard rather than a fix for an observed refusal — unlike RestoreFailures', which was measured
+    // falsely refusing.
     private static bool NotACsharpProject(Project project)
     {
         return !ProjectLanguages.IsCSharp(project);

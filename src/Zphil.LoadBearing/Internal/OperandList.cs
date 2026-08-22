@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Internal;
 /// <remarks>
 ///     The parameters are named <c>first</c> and <c>more</c> deliberately: the guards spell
 ///     <c>nameof(first)</c> and <c>nameof(more)</c> here, so every
-///     <see cref="ArgumentNullException.ParamName" /> a caller sees is the name on the public overload
+///     <see cref="ArgumentException.ParamName" /> a caller sees is the name on the public overload
 ///     they actually called.
 /// </remarks>
 internal static class OperandList

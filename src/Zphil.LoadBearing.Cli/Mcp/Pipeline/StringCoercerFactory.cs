@@ -13,34 +13,12 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Handled token shapes for any <c>string</c> (or <c>string?</c>) parameter:
+///         A string passes through verbatim — one that merely looks like an array (<c>"[A]"</c>) is
+///         deliberately NOT unwrapped, because a literal string argument must survive untouched. A
+///         one-element array unwraps to its string, and the empty array coerces to <c>null</c>, the
+///         semantic match for "absent". Anything else — a longer array, a non-string element, any
+///         other token — throws <see cref="UserErrorException" /> naming the offending token kind.
 ///     </para>
-///     <list type="bullet">
-///         <item>
-///             <description>
-///                 <c>String</c> → pass through verbatim. Strings that happen to look like
-///                 arrays (e.g. <c>"[A]"</c>) are NOT unwrapped — a literal string argument
-///                 must survive untouched.
-///             </description>
-///         </item>
-///         <item>
-///             <description><c>Null</c> → <c>null</c>.</description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>StartArray</c> with a single <c>String</c> element (<c>["A"]</c>) →
-///                 unwrap to the string. The empty array <c>[]</c> coerces to <c>null</c>
-///                 (semantic match for "absent").
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <c>StartArray</c> with multiple elements, with a non-string element, or
-///                 any other token (number, object, boolean) → throw <see cref="UserErrorException" />
-///                 naming the offending token kind.
-///             </description>
-///         </item>
-///     </list>
 ///     <para>
 ///         <see cref="JsonConverter{T}" /> on <c>string?</c> serves both <c>string</c> and
 ///         <c>string?</c> parameters: <c>string</c> is a reference type and

@@ -17,27 +17,28 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // The `grain` slot is additive in the same sense and absent from every full-grain report, which is every
 // report the CLI writes unless asked otherwise; it holds the schema at version 3, as the survey's own ladder
 // held it at 1 — a consumer reading a full document cannot tell it exists. The per-rule `violationCount` and
-// per-violation `siteCount` are unconditional at every grain: while each stood in for its elided array, a
-// defensive absent-means-zero read answered 0 wherever the array was rendered instead — silently wrong
-// precisely for a failed rule — so each is always written, ahead of the array it summarizes.
-// CheckJson's slot order is the verdict first, and deliberately: the request echo, then the trust stamps,
-// then `summary`, then `rules`, with `workspaceDiagnostics` last. System.Text.Json writes a record's
-// declaration order verbatim, so this list is the wire order. Below the ladder's coarsest rung a reader with
-// a response budget cuts at the last newline that fits, and that cut lands inside `rules` — the bulk — so a
-// trailing roll-up was amputated exactly when it mattered most, check overrunning only when it is red-heavy.
-// The stamps precede `summary` so a caveat never arrives after the counts it invalidates.
-// `workspaceDiagnostics` stays trailing because it is MSBuild's evidence rather than the verdict, it has no
-// ceiling, and the actionable half of it is already hoisted into `failedProjects` and
-// `restoreFailedProjects`. On a clean run every stamp is omitted, so ordering them costs the unchanged
-// document nothing: key order, not shape, and schemaVersion stays 3.
+// per-violation `siteCount` are unconditional at every grain, each declared ahead of the array it
+// summarizes. Declaration order IS the wire order (System.Text.Json writes it verbatim), and CheckJson's is
+// a deliberate ranking: the request echo, then the trust stamps, then `summary`, then `rules`, with
+// `workspaceDiagnostics` last — a stamp never arrives after the counts it invalidates, and a downstream
+// cut lands in the bulk rather than on the roll-up.
 
 /// <summary>The root JSON document — the only thing written to stdout in <c>--json</c> mode.</summary>
+/// <param name="SchemaVersion">The report's schema version — 3.</param>
+/// <param name="Solution">
+///     The solution's file name — the run's subject, and never a path, so the document is
+///     machine-independent.
+/// </param>
+/// <param name="SpecAssembly">The spec DLL's file name — which spec's rules answered.</param>
 /// <param name="Grain">
 ///     <c>overview</c> when each violation's sites were elided, <c>skeleton</c> when the violations went with
 ///     them, or null (omitted) at full grain — so a document that says nothing about grain is the complete
 ///     one, and a consumer can tell a coarser report from a cleaner solution without diffing it. A coarser
 ///     report is never a narrower one: every rule the run selected is here at every rung, with its verdict
 ///     and its prose, which is what makes an automatic degrade safe on a surface the caller cannot re-ask.
+/// </param>
+/// <param name="DiffBase">
+///     The git ref the Quarantine tripwire compared against, or null (omitted) when the run took no diff.
 /// </param>
 /// <param name="RulesFilter">
 ///     The rule-ID globs the run was narrowed to, or null (omitted) when it checked the whole spec. Present,
@@ -101,6 +102,13 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     it. <c>workspaceDiagnostics</c> carries the same fact as an English sentence, and only for the
 ///     projects whose frameworks actually collapsed a type; this is the keyed form, and it covers the rest.
 /// </param>
+/// <param name="Summary">
+///     The roll-up counts — of what ran, so under <see cref="RulesFilter" /> they cover the subset.
+/// </param>
+/// <param name="Rules">One entry per rule the run selected, present at every grain.</param>
+/// <param name="WorkspaceDiagnostics">
+///     MSBuild's own words about the load — evidence rather than verdict; empty on a clean load.
+/// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
     string Solution,
@@ -124,6 +132,16 @@ internal sealed record CheckJson(
 ///     camelCase wire spelling is <see cref="LoadBearingJson.Options" />'s to apply, so a renderer cannot
 ///     write a value no member names.
 /// </summary>
+/// <param name="Id">The post-desugar rule ID.</param>
+/// <param name="Posture">The rule's declared posture.</param>
+/// <param name="Status">The evaluation status.</param>
+/// <param name="Sentence">The rule's rendered English sentence.</param>
+/// <param name="Because">The rule's rationale prose.</param>
+/// <param name="Fix">The rule's fix hint, or null (omitted) when the spec declares none.</param>
+/// <param name="SkipReason">
+///     Why the run reached no verdict for this rule, or null (omitted) when it was evaluated.
+/// </param>
+/// <param name="Baseline">The ratchet state, or null (omitted) for a non-ratcheted rule.</param>
 /// <param name="ViolationCount">
 ///     How many violations the rule found, at every grain. The count is the stable key a consumer scripts
 ///     against, so it never substitutes for <see cref="Violations" /> or yields to it — while it stood in
@@ -149,6 +167,7 @@ internal sealed record CheckJson(
 ///     grain — it is two integers, and the coarser the report the more a reader needs to know the verdict
 ///     is partly about code nobody wrote.
 /// </param>
+/// <param name="Warnings">The rule's non-fatal warnings; empty when there are none.</param>
 internal sealed record RuleJson(
     string Id,
     Posture Posture,
@@ -168,6 +187,17 @@ internal sealed record RuleJson(
 internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 
 /// <summary>One violation; the null slots are omitted per kind.</summary>
+/// <param name="Kind">Which shape of violation this is — it decides which slots below are populated.</param>
+/// <param name="Source">The referencing type's full name, for dependency kinds; null (omitted) otherwise.</param>
+/// <param name="Target">The referenced type's full name, for dependency kinds; null (omitted) otherwise.</param>
+/// <param name="TargetMember">
+///     The banned member's raw symbol ID, for a <c>memberUse</c> violation; null (omitted) otherwise.
+/// </param>
+/// <param name="Subject">The offending type's full name, for shape kinds; null (omitted) otherwise.</param>
+/// <param name="SubjectMember">
+///     The offending member's raw symbol ID, for a <c>memberShape</c> violation; null (omitted) otherwise.
+/// </param>
+/// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
 /// <param name="SiteCount">
 ///     How many sites the violation occurs at, at every grain — <see cref="Sites" /> is its expansion, not
 ///     its replacement, on the same reasoning as <see cref="RuleJson" />'s violation count. A coarser

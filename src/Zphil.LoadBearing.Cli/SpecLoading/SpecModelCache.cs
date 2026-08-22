@@ -26,12 +26,11 @@ namespace Zphil.LoadBearing.Cli.SpecLoading;
 ///         error the cold CLI raises rather than replaying a stale success or a cached exception.
 ///     </para>
 ///     <para>
-///         <b>What this does to assembly-load-context lifetime: strictly less.</b>
-///         <see cref="ModelPipeline.LoadModel" /> already unloads its collectible context in a
-///         <c>finally</c> and already documents that the context cannot actually collect while the model it
-///         produced roots the spec's <c>Type</c> references. Caching the model keeps one such context alive
-///         instead of minting a new uncollectable one per tool call. Nothing is loaded by path
-///         (<see cref="SpecLoadContext.LoadWithoutLocking" />), so no build output is pinned either way.
+///         <b>What this does to assembly-load-context lifetime: strictly less.</b> A collectible context
+///         cannot actually collect while the model it produced roots the spec's <c>Type</c> references, so
+///         caching the model keeps one such context alive instead of minting a new uncollectable one per
+///         tool call. Nothing is loaded by path (<see cref="SpecLoadContext.LoadWithoutLocking" />), so no
+///         build output is pinned either way.
 ///     </para>
 /// </remarks>
 internal sealed class SpecModelCache

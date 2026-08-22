@@ -49,10 +49,10 @@ internal sealed record SpecExclusionProject(
 ///     </para>
 ///     <para>
 ///         <b>A solution filter reads through to the solution it filters</b>, and against that solution's
-///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's selection.
-///         Membership answers "is this project solution material?", which a filter does not change: a member
-///         the filter left out but a reference dragged in anyway is still the codebase under law, not spec
-///         plumbing. Selecting instead would exclude it — the silent shrink this type exists to prevent.
+///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's
+///         selection: membership answers "is this project solution material?", which a filter does not
+///         change. Selecting instead would exclude a member a reference dragged in anyway — the silent
+///         shrink this type exists to prevent.
 ///     </para>
 /// </remarks>
 internal static class SpecExclusion
@@ -170,23 +170,13 @@ internal static class SpecExclusion
     ///     rather than have it derived a second time.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         <b>The canonical slot is a caller-honoured guarantee, and deliberately not a type-level one.</b>
-    ///         Canonicalizing probes the filesystem at every path segment, and spec resolution already holds
-    ///         every project's resolved spelling by the time it gets here — so deriving it again costs one such
-    ///         chain per project on every warm tool call, for an answer the caller has in hand. A newtype would
-    ///         make the promise checkable, and would also have to be threaded through
-    ///         <see cref="SpecExclusionProject" />, whose tuple shape is what keeps the pure core testable with
-    ///         no workspace and no disk. So the promise rides on the parameter's name: pass what
-    ///         <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or pass nothing.
-    ///     </para>
-    ///     <para>
-    ///         Nothing validates it, and nothing can afford to: a check that re-resolved in order to compare
-    ///         would pay exactly the walk the slot exists to avoid. A caller that passes a spelling the
-    ///         solution file never declared gets "not a member" — the silent-shrink direction this type says it
-    ///         must never be wrong in — which is why the slot is filled by the one caller that resolved the
-    ///         path itself and left null by everyone else.
-    ///     </para>
+    ///     The canonical slot is a caller-honoured guarantee, deliberately not a validated one: nothing can
+    ///     afford to check it, because re-resolving in order to compare would pay exactly the
+    ///     filesystem-probing walk the slot exists to avoid on every warm call. Pass what
+    ///     <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or pass nothing. A
+    ///     spelling the solution file never declared answers "not a member" — the silent-shrink direction
+    ///     this type says it must never be wrong in — which is why the slot is filled by the one caller
+    ///     that resolved the path itself and left null by everyone else.
     /// </remarks>
     internal static bool IsDeclaredMember(
         IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)

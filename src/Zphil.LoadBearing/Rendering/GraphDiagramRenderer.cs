@@ -28,16 +28,14 @@ namespace Zphil.LoadBearing.Rendering;
 public static class GraphDiagramRenderer
 {
     // Every node ID carries this prefix, which is what keeps a project name from ever being lexed as
-    // something other than a node. Mermaid's flowchart grammar (flow.jison, read 2026-07-26) has 19 lex
-    // rules whose pattern is a bare word — end, graph, flowchart, subgraph, style, class, classDef,
-    // linkStyle, default, interpolate, call, href, click, flowchart-elk, swimlane-beta, _self, _blank,
-    // _parent, _top — and none of them is anchored to the start of a statement, so a project of any of
-    // those names would break the whole diagram rather than just its own node. Matching that list instead
-    // would be correct only until the grammar grows a twentieth word, and this renderer runs against other
-    // people's solutions, where "graph" or "class" is a plausible project name. A prefix cannot rot.
-    // It also makes the grammar's case sensitivity irrelevant rather than something to rely on, and it
-    // closes a second hazard for free: the link rules read a leading o or x as an arrowhead
-    // (\s*[xo<]?\-\-+[-xo>]\s*), and no prefixed ID can begin with either.
+    // something other than a node. Mermaid's flowchart grammar reserves bare words — end, graph, class,
+    // subgraph and more — none of them anchored to the start of a statement, so a project of any of
+    // those names would break the whole diagram rather than just its own node. Matching that list
+    // instead would be correct only until the grammar grows a new word, and this renderer runs against
+    // other people's solutions, where "graph" or "class" is a plausible project name. A prefix cannot
+    // rot. It also makes the grammar's case sensitivity irrelevant rather than something to rely on,
+    // and it closes a second hazard for free: the link rules read a leading o or x as an arrowhead,
+    // and no prefixed ID can begin with either.
     private const string NodeIdPrefix = "p_";
 
     private const string EmptyScopeNodeId = NodeIdPrefix + "none";

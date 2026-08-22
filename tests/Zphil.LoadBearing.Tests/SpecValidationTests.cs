@@ -620,8 +620,8 @@ public class SpecValidationTests
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidAcceptParameterSpec()));
     }
 
-    // GRAMMAR §8 item 21: a category-invalid hierarchy anchor, both polarities. One shared code covers the three categories
-    // (the item-18 precedent); the check applies to the positives' single anchor and every anchor in a
+    // GRAMMAR §8 item 21: a category-invalid hierarchy anchor, both polarities. One shared code covers
+    // the three categories; the check applies to the positives' single anchor and every anchor in a
     // negative's list, all reported in the same all-at-once pass with the rule's spec-source file:line.
     [Fact]
     public void HierarchyAnchorWrongCategory_NonInterfaceOnMustNotImplement_IsReported()

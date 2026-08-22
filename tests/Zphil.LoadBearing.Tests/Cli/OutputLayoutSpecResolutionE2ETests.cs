@@ -35,15 +35,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         assertion for it.
 ///     </para>
 ///     <para>
-///         <b>Cost, measured rather than guessed.</b> Each arm is a private copy, a real
-///         <c>dotnet restore</c>, a real <c>dotnet build -c Release</c> and a cold workspace load. Over four
-///         green runs of the filtered suite that came to <b>8–23 s per fact</b> — both facts landing within a
-///         few seconds of each other every time — and 29–54 s for the whole <c>dotnet test</c> invocation
-///         including its build and discovery. That is the same band as
-///         <c>ArtifactsOutputCacheE2ETests</c>, measured beside it at 11–12 s per fact and 40 s end to end,
-///         so the real build each arm adds over that class's restore-only arms costs less than the
-///         run-to-run spread. A third arm costs the same again: add one only for a layout that is not a
-///         reshuffle of these two.
+///         <b>Cost.</b> Each arm is a private copy, a real <c>dotnet restore</c>, a real
+///         <c>dotnet build -c Release</c> and a cold workspace load — seconds per fact, measured in the
+///         same band as <c>ArtifactsOutputCacheE2ETests</c>' restore-only arms, so the real build adds
+///         less than the run-to-run spread. A third arm costs the same again: add one only for a layout
+///         that is not a reshuffle of these two.
 ///     </para>
 /// </remarks>
 [Collection("Serial")]

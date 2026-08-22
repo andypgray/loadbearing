@@ -67,10 +67,9 @@ public static class GraphSummarizer
 
     // The second coverage statement, and the only place a name in this model does not identify a type: a
     // project declares a full name that a referenced assembly also supplies, so Types carries both nodes.
-    // A projection of the fact the merge stamped, the shape MultiplyDeclaredTypes above already takes — so
-    // the survey's two coverage statements read the same way, and neither rediscovers its subject by
-    // grouping the type universe on name. Reading the stamped fact is also the only way to state the binder
-    // roster truthfully: the edges see one name per edge minted, which is not every name a project binds.
+    // A projection of the fact the merge stamped, never re-derived by grouping the type universe — reading
+    // the stamped fact is also the only way to state the binder roster truthfully, because the edges see
+    // one name per edge minted, which is not every name a project binds.
     private static List<ShadowedTypeSummary> ShadowedTypes(CodebaseModel model)
     {
         return model.ShadowedNames

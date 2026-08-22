@@ -9,27 +9,17 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why git decides the scope.</b> What the hygiene gates check is that nothing internal
-///         ships publicly, and tracked-by-git is precisely what ships; every other definition of the
-///         set is an approximation of it. It also excludes the gitignored private working layer and
-///         every build output without a list to maintain, and it cannot grow a blind spot the day
-///         someone adds a top-level directory.
+///         Git decides the scope. What the hygiene gates check is that nothing internal ships
+///         publicly, and tracked-by-git is precisely what ships; every other definition of the set
+///         approximates it — through a hand-written exclusion list whose going stale is the very
+///         defect these gates exist to catch. Tracked-by-git also excludes the gitignored private
+///         working layer and every build output without a list to maintain, and it cannot grow a
+///         blind spot the day someone adds a top-level directory. When git is missing this throws
+///         rather than yielding nothing, because a gate that silently scans an empty set is worse
+///         than no gate.
 ///     </para>
 ///     <para>
-///         <b>The alternative, considered and rejected:</b> a directory walk from the repository root
-///         filtered by a build-output predicate. That needs a hand-written exclusion list for the
-///         private roots — and a hand-written list going stale is the very defect these gates exist
-///         to catch, the shape of the five-file gate a tree-wide policy outgrew.
-///     </para>
-///     <para>
-///         <b>The cost is one subprocess,</b> already paid on every leg of CI: this project runs git
-///         for the diff-base fixtures on all three legs, and the workflow gates on a git command of
-///         its own, so git on PATH is already a hard prerequisite of a green suite. When git is
-///         missing this throws rather than yielding nothing, because a gate that silently scans an
-///         empty set is worse than no gate.
-///     </para>
-///     <para>
-///         <b>Plain <c>ls-files</c>, not <c>-z</c>.</b> <see cref="ChildProcess.Run" />'s capture is
+///         Plain <c>ls-files</c>, not <c>-z</c>: <see cref="ChildProcess.Run" />'s capture is
 ///         line-oriented and LF-normalized, which is exactly what plain <c>ls-files</c> emits. The
 ///         quoting that <c>-z</c> exists to solve is instead pinned absent by a fact over the path
 ///         character set, so the day a path needs quoting the gate says so rather than silently

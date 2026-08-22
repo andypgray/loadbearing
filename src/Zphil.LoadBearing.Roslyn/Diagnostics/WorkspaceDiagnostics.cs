@@ -41,10 +41,8 @@ internal sealed record MultiTargetedProject(
 /// </summary>
 /// <remarks>
 ///     It lives beside the record rather than at any one caller because the record's own documentation
-///     promises the slot and <c>MergeNotes</c> are filled from the same merge on the same read. A composer
-///     that projected for itself could honour that promise differently, and one that had no projection to
-///     reach for simply passed an empty list — which is what made the promise false for the xUnit adapter
-///     while it held the very model the answer comes off.
+///     promises the slot and <c>MergeNotes</c> are filled from the same merge on the same read; a composer
+///     that projected for itself could honour that promise differently.
 /// </remarks>
 internal static class MultiTargetedProjects
 {
@@ -111,45 +109,28 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What gates is a set of projects, not a set of sentences.</b> Every MSBuild project-load log
-///         item — warnings included — reaches a host as
-///         <see cref="Microsoft.CodeAnalysis.WorkspaceDiagnosticKind.Failure" /> with no code, so deciding
-///         "did the model fail to build" from that stream means matching message text, and message text is
-///         neither a contract nor language-independent. It refused solutions whose rules all passed (a NuGet
-///         pruning advisory) and refused in German what it let through in English (the same audit-fetch
-///         failure). So the decision moved off the text entirely, onto two structural facts read at the load
-///         boundary: <see cref="ProjectLoadFailures" /> reads which projects failed off the loaded solution's
-///         own structure, and <see cref="RestoreFailures" /> reads which projects' packages are not in the
-///         model off the assets files they point at. This type carries both answers to every surface. The
-///         diagnostics render; they decide nothing.
+///         What gates is a set of projects, not a set of sentences: the decision rests on two structural
+///         facts read at the load boundary — <see cref="ProjectLoadFailures" /> off the loaded solution,
+///         <see cref="RestoreFailures" /> off the assets files — and never on diagnostic text, which is
+///         neither a contract nor language-independent. The diagnostics render; they decide nothing. The two
+///         causes stay two lists (separate facts, separate remedies) and meet at <see cref="IsIncomplete" />,
+///         because the consequence is one: a rule measured against a model missing what it is about does not
+///         answer, it guesses.
 ///     </para>
 ///     <para>
-///         <b>Two causes, one gate.</b> They are separate lists because they are separate facts with separate
-///         remedies — a project that never loaded declares no types at all, while one whose packages did not
-///         resolve loaded completely and is merely missing every package edge — but they meet at
-///         <see cref="IsIncomplete" />, because the consequence is the same in the only way that decides
-///         anything: a rule measured against a model missing what it is about does not answer, it guesses.
-///         Measured on a purpose-built bed with the feed as the only variable: exit 1 restored, exit 0 broken,
-///         and the missing external edge visible in <c>graph --json</c>.
+///         One type rather than a handful of lists because the streams must not be swapped: the gate keys
+///         strictly on the two blamed-project lists, while the rendered stream carries the rest. Held as bare
+///         <c>IReadOnlyList&lt;string&gt;</c>s the swap type-checks; held here, <see cref="IsIncomplete" />
+///         and <see cref="Gates" /> take no list at all and the swap is untypeable — a caller chooses only
+///         between <see cref="Rendered" /> and <see cref="RenderedWithMergeNotes" />, which are both
+///         rendering choices.
 ///     </para>
 ///     <para>
-///         <b>Why one type rather than a handful of lists.</b> The streams must not be swapped: the gate keys
-///         strictly on the two blamed-project lists, while the rendered stream carries the load diagnostics, the
-///         MSBuild-selection note and — for <c>check</c> — the merge notes as well. Held as bare
-///         <c>IReadOnlyList&lt;string&gt;</c>s the swap type-checks, so every consumer had to carry a comment
-///         warning against it. Held here, <see cref="IsIncomplete" /> and <see cref="Gates" /> take no list
-///         at all and the swap is untypeable; a caller chooses only between <see cref="Rendered" /> and
-///         <see cref="RenderedWithMergeNotes" />, which are both rendering choices.
-///     </para>
-///     <para>
-///         <b>The MSBuild-selection note rides the composed list, not the write.</b> Both renderings append
-///         it once, and callers hand that one list to <em>both</em> the stderr echo and the JSON document.
-///         That is what makes it reachable from MCP, where the tools pass <see cref="TextWriter.Null" /> as
-///         the error writer: appending at write time reached stderr only.
-///     </para>
-///     <para>
-///         <b>Quiet runs stay quiet.</b> An empty input composes to an empty list, so a clean run says
-///         nothing about MSBuild on any surface. The note is diagnostic context, not a banner.
+///         The MSBuild-selection note rides the composed list, not the write: both renderings append it
+///         once, and callers hand that one list to <em>both</em> the stderr echo and the JSON document —
+///         appending at write time reached stderr only, which MCP (passing <see cref="TextWriter.Null" /> as
+///         the error writer) never sees. An empty input composes to an empty list, so a clean run says
+///         nothing about MSBuild on any surface.
 ///     </para>
 /// </remarks>
 /// <param name="LoadFailures">
@@ -183,11 +164,9 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     <see cref="UnsupportedProjectKind" /> its producer classified it as — ordinal-sorted by path, and
 ///     read off the solution file rather than off the load. It takes <see cref="UncheckedProjects" />'
 ///     posture rather than <see cref="FailedProjects" />': a project no extractor can read makes the
-///     universe smaller, never wrong, so it says what the run covers and decides nothing. Without it the run
-///     simply surveyed fewer projects than the solution declares and said so nowhere. The kind travels
-///     because both producers knew it and only the composing edge had to guess: classifying by extension
-///     there mislabelled a shared project as a language this product cannot read, which is wrong twice over
-///     (see <see cref="UnsupportedProjectKind.SharedProject" />).
+///     universe smaller, never wrong, so it says what the run covers and decides nothing. The kind travels
+///     from the producer that knew it rather than being re-derived at the composing edge, where an
+///     extension test misreads a shared project (see <see cref="UnsupportedProjectKind.SharedProject" />).
 /// </param>
 /// <param name="MultiTargetedProjects">
 ///     The projects one <c>.csproj</c> of which yielded several compilations, each with its frameworks and
@@ -196,9 +175,7 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     what compiled twice — and it takes <see cref="UnsupportedProjects" />' posture rather than
 ///     <see cref="FailedProjects" />': the model is complete and every rule answered, over one framework's
 ///     view of the projects named here. So it scopes the verdict, never invalidates it, and never reaches
-///     <see cref="Gates" />. Wider than the notes, deliberately: a note is raised only where two frameworks
-///     declared the same type, while a project whose frameworks share nothing is still a project that
-///     compiled more than once, and that is unsayable in prose the merge does not raise.
+///     <see cref="Gates" />.
 /// </param>
 internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> LoadFailures,

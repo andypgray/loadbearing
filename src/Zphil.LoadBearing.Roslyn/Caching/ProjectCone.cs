@@ -44,9 +44,8 @@ internal static class ProjectCone
     ///     <para>
     ///         <b>Lazy, and that is the point.</b> Two of the three callers ask only whether the walk finds
     ///         <em>anything</em> new and stop at the first hit — the warm session's per-call reconcile sweep
-    ///         among them, which runs on every MCP tool call. A scan that materialized the cone first paid
-    ///         for the whole tree before either could exit, so the early exits were decoration. Streaming the
-    ///         walk is what makes them real; the callers that do need the whole set are unaffected.
+    ///         among them, which runs on every MCP tool call — so the walk streams; the callers that need
+    ///         the whole set are unaffected.
     ///     </para>
     ///     <para>
     ///         Both tests are ordinal — the <c>.cs</c> suffix and the pruned directory names — so a

@@ -16,10 +16,8 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 ///         is what keeps an author's partial class authored when a generator completes it in a second file.
 ///     </para>
 ///     <para>
-///         Nothing here reads a file path. A path answer ('is it under <c>obj/</c>', 'does it end
-///         <c>.g.cs</c>') is sound for the question 'may a tool edit this file' and unsound for the question
-///         this asks, 'is this a rule subject' — the two disagree on exactly the partial types that matter,
-///         and the conventions vary per generator and per build.
+///         Nothing here reads a file path: a path answer is sound for "may a tool edit this file" and
+///         unsound for the question this asks, "is this a rule subject".
 ///     </para>
 ///     <para>
 ///         This file's own header must never spell the banner text: the constants below are the only place

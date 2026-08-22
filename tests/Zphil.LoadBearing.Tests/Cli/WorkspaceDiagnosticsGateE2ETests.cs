@@ -81,10 +81,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // completely, which is exactly why it needs its own slot: nothing about the loaded solution says so.
     private const string RestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
 
-    // The NU1510 pruning advisory, captured verbatim from a restore of a net10.0 project referencing a
-    // package the shared framework now carries. It is an ordinary restore warning, it says nothing about
-    // whether the model built, and it refused a solution whose one rule passed — the defect this class's
-    // fourth part exists to keep closed. .NET 10 emits it for a large and growing set of packages.
+    // The NU1510 pruning advisory, captured verbatim. An ordinary restore warning that says nothing about
+    // whether the model built — and it refused a solution whose one rule passed, the defect this class's
+    // fourth part exists to keep closed.
     private const string PruningAdvisory =
         "Msbuild failed when processing the file '/src/App/App.csproj' with message: PackageReference "
         + "System.Text.Encodings.Web will not be pruned. Consider removing this package from your "
@@ -96,19 +95,18 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "System.Text.Encodings.Web wird nicht gekürzt. Erwägen Sie, dieses Paket aus Ihren Abhängigkeiten "
         + "zu entfernen, da es wahrscheinlich nicht erforderlich ist.";
 
-    // The NU1900 audit-fetch failure in German, captured verbatim from a restore against an unreachable feed
-    // under DOTNET_CLI_UI_LANGUAGE=de. The hardest case in the family and the reason a text matcher could
-    // never be finished: no GHSA URL, no NU1900 token, and neither English phrase the old matcher keyed on.
+    // The NU1900 audit-fetch failure in German, captured verbatim. The hardest case in the family and the
+    // reason a text matcher could never be finished: no GHSA URL, no NU1900 token, and no English phrase
+    // to key on.
     private const string GermanAuditFetchFailure =
         "Msbuild failed when processing the file '/src/App/App.csproj' with message: Fehler beim Abrufen von "
         + "Paketsicherheitsrisikodaten: Der Dienstindex für die Quelle "
         + "\"https://nuget.fieldtest.invalid/v3/index.json\" konnte nicht geladen werden.";
 
-    // A NuGetAudit advisory in the shape MSBuildWorkspace actually delivers one, captured from a run over a
-    // solution referencing System.Security.Cryptography.Xml 4.7.0: Roslyn's project-load frame, package +
-    // version, severity, GHSA URL — and no NU1902 anywhere, because Roslyn records BuildEventArgs.Message
-    // and never .Code. This constant used to carry the code, which is why the gate could pass this test and
-    // still red every real solution with a vulnerable package (issue #19).
+    // A NuGetAudit advisory in the shape MSBuildWorkspace actually delivers one, captured verbatim:
+    // Roslyn's project-load frame, package + version, severity, GHSA URL — and no NU1902 anywhere, because
+    // Roslyn records BuildEventArgs.Message and never .Code. Carrying the code here would let the gate pass
+    // this test while missing every real advisory.
     // The project path is written with forward slashes — the shape a non-Windows load produces — so the
     // constant can be asserted against JSON and SARIF payloads verbatim, without backslash escaping
     // standing between the test and the advisory text that is the actual subject.
@@ -196,9 +194,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_WorkspaceLoadDiagnostic_NamesTheMsBuildSelectionAndTheOverrideVariable()
     {
-        // "A project failed to load" is nearly always a question about which MSBuild opened it, and until
-        // this line existed the answer was unobtainable: MsBuildBootstrap described its choice in four
-        // places and printed it in none, so a load failure arrived as a bare exit code.
+        // "A project failed to load" is nearly always a question about which MSBuild opened it, so the
+        // selection and the override variable print beside the failure.
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
 
         result.Err.ShouldContain(

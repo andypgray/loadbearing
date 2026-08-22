@@ -39,10 +39,8 @@ internal static class BuildOutputDirectories
     ///     with no such segment, so a linked source file outside the cone stays tracked.
     /// </summary>
     /// <remarks>
-    ///     Walked as spans over the single relative path it has to materialize. This is asked once per
-    ///     document per project on every cold load — the largest input any cache probe faces — where a split
-    ///     plus a LINQ pass allocated an array and a string per segment to answer a question that reads three
-    ///     characters.
+    ///     Walked as spans over the single relative path it has to materialize — hot path: asked once per
+    ///     document per project on every cold load, the largest input any cache probe faces.
     /// </remarks>
     internal static bool IsUnderBuildOutput(string projectDirectory, string path)
     {

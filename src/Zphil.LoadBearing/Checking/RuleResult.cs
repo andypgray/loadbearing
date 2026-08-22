@@ -94,11 +94,8 @@ public sealed class RuleResult
     ///     anyone can act on.
     /// </summary>
     /// <remarks>
-    ///     Reported for passing and failing rules alike, because a green rule aimed mostly at generator
-    ///     output is exactly as misaimed as a red one and has less to draw attention to it. It carries no
-    ///     advice: <c>.Authored()</c> is often the right narrowing and often not — a rule forbidding a
-    ///     generated JSON context from writing to stdout means what it says — so this states a fact about
-    ///     the subject and leaves the judgement where it belongs.
+    ///     Reported for passing and failing rules alike, and it carries no advice — this states a fact
+    ///     about the subject and leaves the judgement where it belongs.
     /// </remarks>
     public int SubjectGeneratedTypes { get; }
 

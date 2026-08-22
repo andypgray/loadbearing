@@ -24,13 +24,10 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///         <b>What gates.</b> Strictly two sets of projects: the ones that failed to load
 ///         (<see cref="WorkspaceDiagnostics.FailedProjects" />), read off the loaded solution's structure by
 ///         <see cref="ProjectLoadFailures" />, and the ones whose NuGet packages are not in the model
-///         (<see cref="WorkspaceDiagnostics.RestoreFailedProjects" />), read off their assets files — present
-///         and recording an error, or absent where an SDK-style project would have written one — by
+///         (<see cref="WorkspaceDiagnostics.RestoreFailedProjects" />), read off their assets files by
 ///         <see cref="RestoreFailures" />. Never the diagnostics: MSBuild severity does not survive
-///         Roslyn's project-load reporting, so <see cref="WorkspaceDiagnostics.LoadFailures" /> carries fatal
-///         evaluation errors and ordinary restore warnings in one indistinguishable stream, and a gate that
-///         read it refused solutions whose rules all passed — and refused in German what it let through in
-///         English. The decision itself lives on <see cref="WorkspaceDiagnostics.Gates" />, where the
+///         Roslyn's project-load reporting, so no message text is an input to any verdict in any
+///         language. The decision itself lives on <see cref="WorkspaceDiagnostics.Gates" />, where the
 ///         gating and the rendered streams cannot be swapped; what stays here is the wording each surface
 ///         uses once it has fired.
 ///     </para>
@@ -56,10 +53,8 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///         have had to parse for.
 ///     </para>
 ///     <para>
-///         <b>Why per-surface messages rather than one parameterized string.</b> They share a shape, not a
-///         template: each names what <em>that</em> surface cannot do and what is at stake if it did it
-///         anyway. Only the assembly of the evidence block is shared, and that was never the part that
-///         varied.
+///         <b>Per-surface messages, not one parameterized string</b> — they share a shape, not a
+///         template, and only the assembly of the evidence block is shared.
 ///     </para>
 /// </remarks>
 internal static class IncompleteModelGate
@@ -200,10 +195,7 @@ internal static class IncompleteModelGate
     ///         Like <see cref="ContextCaveat" /> it gates nothing: it is the same two causes with the same two
     ///         remedies, said where spec resolution meets them. It belongs here rather than at the call site
     ///         because spec resolution runs <em>before</em> any verb's gate can fire, so this is the message a
-    ///         reader on a broken tree actually meets — and a second, hand-rolled answer to one condition is
-    ///         exactly how the four verbs came to disagree in the first place. Hand-rolled, it quoted the load
-    ///         failures for either cause, so a run incomplete only because a restore failed promised a list of
-    ///         failed projects and printed none.
+    ///         reader on a broken tree actually meets.
     ///     </para>
     ///     <para>
     ///         It carries the blamed projects inline rather than pointing at warnings printed above, for

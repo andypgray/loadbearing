@@ -9,12 +9,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Six verbs wrote the same three steps — read the unchecked projects off
+///         What lives here is the CLI's half — read the unchecked projects off
 ///         <see cref="CodebaseSource.Diagnostics" />, name the filter by its file name, relativize the paths
-///         against the solution directory — and only the wording that followed differed. The wording stays in
-///         <see cref="NarrowedUniverseNotice" />, because the xUnit adapter renders the same vocabulary and
-///         has no <see cref="CodebaseSource" /> to hand; what lives here is the CLI's half, which is the part
-///         that had six copies.
+///         against the solution directory. The wording stays in <see cref="NarrowedUniverseNotice" />,
+///         because the xUnit adapter renders the same vocabulary and has no <see cref="CodebaseSource" />
+///         to hand.
 ///     </para>
 ///     <para>
 ///         Two forms, because a narrowed universe means two different things. <see cref="Stamp" /> scopes an

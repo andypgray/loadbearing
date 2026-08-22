@@ -10,25 +10,15 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 /// <remarks>
 ///     <para>
 ///         Roslyn's <c>MSBuildWorkspace</c> spawns a separate <c>BuildHost</c> process to load
-///         project files. The BuildHost's <c>FindMSBuild</c> calls
+///         project files, and the BuildHost's <c>FindMSBuild</c> calls
 ///         <see cref="MSBuildLocator.QueryVisualStudioInstances()" /> and picks the highest-version
-///         instance. An early VS 18 preview (observed 2026-07) shipped MSBuild assemblies that
-///         crashed with a <c>TypeInitializationException</c> for
-///         <c>Microsoft.Build.Shared.XMakeElements</c> when loading legacy projects (those using
-///         the old MSBuild XML namespace <c>http://schemas.microsoft.com/developer/msbuild/2003</c>).
-///         That crash no longer reproduces — VS 18.6 loads such a project cleanly — so the 16/17
-///         preference in <see cref="SelectBestInstance" /> is caution about a moving target rather
-///         than a workaround for a known break, and <see cref="LastSelection" /> exists so a machine
-///         that ends up somewhere else says so instead of failing as a bare exit code.
-///     </para>
-///     <para>
-///         Workaround: select a stable VS instance ourselves (via <see cref="VsWhereLocator" />)
-///         and propagate the choice to the BuildHost subprocess via <c>VSINSTALLDIR</c> +
-///         <c>VSCMD_VER</c> env vars. MSBuildLocator honours these as a synthetic "developer
-///         console" instance (see <c>MSBuildLocator.GetDevConsoleInstance</c>). Setting
-///         <c>VSCMD_VER=99.0</c> ensures the dev console wins the descending-version sort in the
-///         BuildHost. We avoid <c>VisualStudioVersion</c> because that env var is also read by
-///         MSBuild itself during project evaluation.
+///         instance it can see — previews included, a moving target this process cannot vouch for.
+///         So a stable VS instance is selected here (via <see cref="VsWhereLocator" />) and the
+///         choice propagates to the BuildHost subprocess via <c>VSINSTALLDIR</c> + <c>VSCMD_VER</c>,
+///         which MSBuildLocator honours as a synthetic "developer console" instance (see
+///         <c>MSBuildLocator.GetDevConsoleInstance</c>); <c>VSCMD_VER=99.0</c> wins the BuildHost's
+///         descending-version sort. <c>VisualStudioVersion</c> is avoided because MSBuild itself
+///         reads that variable during project evaluation.
 ///     </para>
 ///     <para>
 ///         <b>Why vswhere instead of MSBuildLocator.QueryVisualStudioInstances:</b> see
@@ -41,10 +31,9 @@ public static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
 
-    // The layout every Visual Studio install puts MSBuild under, as the two sentences that quote it spell it:
-    // Windows separators, because it is prose about a VS install root. The probe itself lives in
-    // TryRegisterFromVsRoot, and a reader sent to a directory the code never probed is the drift this exists
-    // to stop.
+    // The layout every Visual Studio install puts MSBuild under — quoted by the guidance sentences and
+    // probed by TryRegisterFromVsRoot, so the directory a reader is sent to is the directory the code
+    // probed. Windows separators: every VS install root is a Windows path.
     private const string MsBuildBinLayout = @"MSBuild\Current\Bin";
 
     // The tail an instance taken outside the preferred VS 16/17 set carries in its description. The
@@ -110,14 +99,13 @@ public static class MsBuildBootstrap
     /// <param name="instances">Candidate VS instances, typically the output of <see cref="VsWhereLocator.Query" />.</param>
     /// <returns>The chosen instance, or <see langword="null" /> when <paramref name="instances" /> is empty.</returns>
     /// <remarks>
-    ///     The preference for 16/17 is conservative: those are the widely-tested LTS-era versions
+    ///     The preference for 16/17 is conservative — those are the widely-tested LTS-era versions
     ///     that load both legacy <c>http://schemas.microsoft.com/developer/msbuild/2003</c> projects
-    ///     and modern SDK-style ones. A newer major is taken only when no 16/17 is installed — the
-    ///     shape of a runner image that ships VS 2026 alone — and the selection then says so rather
-    ///     than reading as an ordinary pick (see <see cref="DescribeSelection" /> and
-    ///     <see cref="LastSelection" />). The one crash that motivated the preference was an early
-    ///     VS 18 preview and does not reproduce on VS 18.6, so what is kept here is caution, not a
-    ///     workaround. Users who actually want a newer MSBuild can opt in with
+    ///     and modern SDK-style ones — and it is caution about a moving target, not a workaround for
+    ///     a known break. A newer major is taken only when no 16/17 is installed — the shape of a
+    ///     runner image that ships VS 2026 alone — and the selection then says so rather than
+    ///     reading as an ordinary pick (see <see cref="DescribeSelection" /> and
+    ///     <see cref="LastSelection" />). Users who actually want a newer MSBuild can opt in with
     ///     <see cref="LoadBearingEnvVars.VsInstallPath" />.
     /// </remarks>
     internal static VsInstance? SelectBestInstance(IReadOnlyList<VsInstance> instances)
@@ -214,7 +202,7 @@ public static class MsBuildBootstrap
     // ourselves degrades to MSBuildLocator's defaults rather than failing a run over it.
     private static (string MsBuildBin, string MsBuildExe, bool Registered) TryRegisterFromVsRoot(string vsRoot)
     {
-        string msBuildBin = Path.Combine(vsRoot, "MSBuild", "Current", "Bin");
+        string msBuildBin = Path.Combine(vsRoot, MsBuildBinLayout);
         string msBuildExe = Path.Combine(msBuildBin, "MSBuild.exe");
         if (!File.Exists(msBuildExe)) return (msBuildBin, msBuildExe, false);
 
