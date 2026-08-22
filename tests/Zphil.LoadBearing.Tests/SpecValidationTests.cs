@@ -808,4 +808,37 @@ public class SpecValidationTests
         // nothing — loud on a positive (always red), silent on a negative. That is the hatch's stated cost.
         Should.NotThrow(() => ArchModelBuilder.Build(new NonsenseStringHierarchyAnchorSpec()));
     }
+
+    // ---- Project names (GRAMMAR §8 item 15). A project name carries no glob structure, so blank is the whole
+    //      of its well-formedness and it reports through the shared Code.BlankPattern family under its own
+    //      label. One SelectionPatterns arm covers the noun wherever it stands — subject, operand, Except
+    //      payload, quarantined scope — and one ConstraintPatterns arm covers the verb. ----
+
+    [Fact]
+    public void BlankPattern_BlankProjectNames_AreReportedInOnePass()
+    {
+        // One blank per position — the noun as a subject, the noun as a target operand, and the verb's own
+        // name — all three reported together, each steered to the rule that spells it.
+        SpecValidationException ex = BuildExpectingFailure(new BlankProjectNameSpec());
+
+        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 3);
+        ex.ShouldHaveError(Code.BlankPattern, "project/noun-subject")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:864: Blank project name on 'project/noun-subject'.");
+        ex.ShouldHaveError(Code.BlankPattern, "project/noun-operand")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:865: Blank project name on 'project/noun-operand'.");
+        ex.ShouldHaveError(Code.BlankPattern, "project/verb")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:866: Blank project name on 'project/verb'.");
+    }
+
+    [Fact]
+    public void ValidProjectNames_BuildWithoutError()
+    {
+        // Blankness is the whole check: a name is never held against the codebase here, because validation
+        // runs before any workspace exists. A name no project carries is a rule that reds at check time — the
+        // namespace-glob precedent — not a spec that refuses to build.
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidProjectNamesSpec()));
+    }
 }

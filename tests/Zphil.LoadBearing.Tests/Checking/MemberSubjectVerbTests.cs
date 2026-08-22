@@ -10,8 +10,9 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     The member modal verbs over the fast path (GRAMMAR §4.6, §5.7): per-verb pass/fail for all ten
-///     verbs (naming, accessibility, static/abstract/virtual, and the <c>Must</c> escape hatch), the
+///     The member modal verbs over the fast path (GRAMMAR §4.6, §5.7): per-verb pass/fail for the ten
+///     one-flag verbs (naming, accessibility, static/abstract/virtual, and the <c>Must</c> escape hatch —
+///     the two §5.7 mutability verbs carry real semantics and their own files), the
 ///     projection kind filter, <c>Returning</c> at the definition level (exact / open-generic / void /
 ///     multi-anchor), the deterministic <c>(DeclaringType.FullName, SymbolId)</c> ordering, the member
 ///     escape hatches reaching real extracted facts end-to-end (acceptance box 2), the empty
@@ -648,7 +649,7 @@ public sealed class MemberSubjectVerbTests
             .Single();
         regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
-        FailedMemberIds(regressed)
+        regressed.MemberShapeSubjects()
             .ShouldBe(["M:App.Async.HomeController.Delete"]);
     }
 
@@ -715,7 +716,7 @@ public sealed class MemberSubjectVerbTests
             .Single();
         regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
-        FailedMemberIds(regressed)
+        regressed.MemberShapeSubjects()
             .ShouldBe(["M:App.Cancel.Api.Purge"]);
     }
 
@@ -817,18 +818,10 @@ public sealed class MemberSubjectVerbTests
 
     private static IReadOnlyList<string> FailedMemberIds(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        RuleResult result = Checker.Run(codebase, arch => arch.Rule("member/x")
+        return Checker.Run(codebase, arch => arch.Rule("member/x")
                 .Enforce(constraint(arch))
                 .Because("b"))
-            .Single();
-        return FailedMemberIds(result);
-    }
-
-    private static IReadOnlyList<string> FailedMemberIds(RuleResult result)
-    {
-        return result.Violations
-            .Where(v => v.Kind == ViolationKind.MemberShape)
-            .Select(v => v.SubjectMember!.SymbolId)
-            .ToList();
+            .Single()
+            .MemberShapeSubjects();
     }
 }

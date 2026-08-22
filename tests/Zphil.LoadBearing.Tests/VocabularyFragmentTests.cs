@@ -149,7 +149,7 @@ public class VocabularyFragmentTests
             .ShouldBe("Types must be internal.");
     }
 
-    // ---- Member modal verbs (GRAMMAR §5.7): one pin per verb, all ten ----
+    // ---- Member modal verbs (GRAMMAR §5.7): one pin per verb ----
 
     [Fact]
     public void Member_MustHaveSuffix_ReusesTypeSideNamingFragment()
@@ -238,6 +238,34 @@ public class VocabularyFragmentTests
         // An open-generic anchor renders declared type-parameter names — typeof(IProgress<>) → `IProgress<T>`.
         SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter(typeof(IProgress<>)))
             .ShouldBe("Methods of types must accept a parameter of type `IProgress<T>`.");
+    }
+
+    [Fact]
+    public void Member_MustBeGetOnly_RendersFragment()
+    {
+        // Properties-only by receiver type (GRAMMAR §5.7) — the fragment is the hyphenated adjective, not a
+        // clause about setters, so the sentence stays as short as the verbs beside it.
+        SentenceRenderer.Sentence(Arch.Types.Properties.MustBeGetOnly())
+            .ShouldBe("Properties of types must be get-only.");
+    }
+
+    [Fact]
+    public void Member_MustBeReadonly_RendersFragment()
+    {
+        // Fields-only by receiver type (GRAMMAR §5.7). The fragment spells the C# keyword, which is why the
+        // verb is MustBeReadonly while the fact it reads is IMemberInfo.IsReadOnly.
+        SentenceRenderer.Sentence(Arch.Types.Fields.MustBeReadonly())
+            .ShouldBe("Fields of types must be readonly.");
+    }
+
+    // ---- Member shape adjective (GRAMMAR §5.7, §6): a head premodifier, like the member attribute one ----
+
+    [Fact]
+    public void Member_ThatAreStatic_PremodifiesTheKindPlural()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Fields.ThatAreStatic()
+                .MustBeReadonly())
+            .ShouldBe("Static fields of types must be readonly.");
     }
 
     // ---- Registered noun fragments + the injection-ban verb (GRAMMAR §4.7, §5.1, §5.3) ----
@@ -437,5 +465,37 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.Methods.MustNotBeAttributedWith(
                 typeof(ApiControllerAttribute), typeof(SerializableAttribute)))
             .ShouldBe("Methods of types must not be attributed with `[ApiController]` or `[Serializable]`.");
+    }
+
+    // ---- Membership and coverage verbs (GRAMMAR §5.3, §4.1, §4.7): where a type must live, and that it
+    //      must be registered at all ----
+
+    [Fact]
+    public void MustResideInProject_BackticksProjectName()
+    {
+        // The project-residence verb (GRAMMAR §5.3): "must reside in project `{name}`". The project noun's
+        // "project" word rides in the verb phrase, so the sentence names the axis rather than a bare glob.
+        SentenceRenderer.Sentence(Arch.Types.MustResideInProject("MyApp.Web"))
+            .ShouldBe("Types must reside in project `MyApp.Web`.");
+    }
+
+    [Fact]
+    public void MustBelongTo_OrJoinsTheMembershipsInReferencePosition()
+    {
+        // The coverage verb (GRAMMAR §5.3, §10): "must belong to {list}". The memberships render in
+        // reference position and or-join, so the any-of reading is stated by the sentence itself rather
+        // than left to a reader's assumption about how a list of memberships is quantified.
+        SentenceRenderer.Sentence(Arch.Types.MustBelongTo(
+                Arch.Layer("Domain", "MyApp.Domain.*"), Arch.Layer("Web", "MyApp.Web.*")))
+            .ShouldBe("Types must belong to the Domain layer or the Web layer.");
+    }
+
+    [Fact]
+    public void MustBeRegistered_RendersFragment()
+    {
+        // The registration-completeness verb (GRAMMAR §5.3, §4.7): nullary, because its membership is a
+        // fact read from the container registrations rather than anything the sentence authors.
+        SentenceRenderer.Sentence(Arch.Types.MustBeRegistered())
+            .ShouldBe("Types must be registered.");
     }
 }

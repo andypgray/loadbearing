@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "skeleton",
   "summary": {
-    "rulesChecked": 18,
+    "rulesChecked": 23,
     "rulesPassed": 2,
-    "rulesFailed": 15,
+    "rulesFailed": 20,
     "rulesSkipped": 1,
-    "violations": 25,
+    "violations": 36,
     "warnings": 1
   },
   "rules": [
@@ -231,6 +231,56 @@
       "sentence": "The Domain layer must not throw `InvalidOperationException`.",
       "because": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
       "fix": "Throw OrderRuleViolation instead of System.InvalidOperationException.",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types named `*Service` must reside in project `MyApp.Web`.",
+      "because": "Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep.",
+      "fix": "Move the service into the MyApp.Web project.",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types in `MyApp.*` must belong to the Domain layer or the Web layer.",
+      "because": "A type in no declared layer is governed by no layer rule; the two layers are the covering set.",
+      "fix": "Move the type into a declared layer's namespace, or declare its layer in this spec.",
+      "violationCount": 4,
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types implementing `IHandler<T>` or types named `*Scheduler` must be registered.",
+      "because": "Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup.",
+      "fix": "Register the type in ServiceWiring.Configure.",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Properties of the Domain layer must be get-only.",
+      "because": "A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it.",
+      "fix": "Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one.",
+      "violationCount": 3,
+      "warnings": []
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Static fields of the Web layer must be readonly.",
+      "because": "A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so.",
+      "fix": "Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls.",
       "violationCount": 1,
       "warnings": []
     }

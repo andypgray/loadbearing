@@ -109,6 +109,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema version is unchanged and a single-framework solution's documents are byte-identical to
   the ones before.
 
+- **Three membership verbs close the ungoverned-remainder hole: `MustBelongTo`,
+  `MustResideInProject` and `MustBeRegistered`.** A type added outside every declared layer used
+  to be silently lawless — no rule swept it, no card covered it, and `check` stayed green.
+  `subject.MustBelongTo(domain, web)` renders "must belong to the Domain layer or the Web layer"
+  and reds every subject type no membership names; this repository's own spec now proves its five
+  shipping projects carry no ungoverned remainder. `MustResideInProject("MyApp.Web")` is the
+  residence twin: any declarer of a multiply-declared type satisfies it, so the verb agrees with
+  `arch.Project`. `MustBeRegistered()` demands a type's registration in the DI container, with
+  exactly `arch.Registered()`'s membership — and a registration the extraction cannot see
+  (assembly scanning, keyed overloads, raw `ServiceDescriptor`) reds a correctly registered type,
+  so an estate that registers by convention should not take the verb. Violations are per-subject
+  shape verdicts carrying the type's declaration sites as evidence, and a blank project name now
+  refuses at spec build on the noun and the verb alike, closing `arch.Project("")`'s silent
+  acceptance.
+
+- **Two member mutability verbs open the state axis: `MustBeGetOnly` and `MustBeReadonly`.**
+  A rule whose real subject is "the members something can write to" had no way to say so. The
+  model carried a member's name, kind, accessibility and async-ness and nothing at all about
+  whether it could be assigned, so "value objects are immutable" and "no static mutable state"
+  were inexpressible even through the escape hatch, which can only read facts the model has.
+  `domain.Properties.MustBeGetOnly()` renders "Properties of the Domain layer must be get-only"
+  and reds every property declaring a setter; `core.Fields.ThatAreStatic().MustBeReadonly()`
+  renders "Static fields of the Core layer must be readonly", the new `.ThatAreStatic()` member
+  adjective narrowing the subject to the statics. This repository's own spec now holds every node
+  a spec author can name get-only, and its writable statics down to seven named locations.
+  Two semantic decisions, both taken rather than fallen into: **an `init`-only setter reds under
+  `MustBeGetOnly`** — get-only is a claim about the declaration, not about when the write is
+  allowed to happen, so a positional record's generated `{ get; init; }` fails the verb — and
+  **a `const` field passes `MustBeReadonly`**, const being readonly's superset, so the law asks
+  for the weakest thing that closes the hole. Both are honest about their reach: they read the
+  shape of a declaration, not deep immutability, so a get-only property whose type is itself
+  mutable still hands the caller something it can write through, and `HasSetter` is
+  accessibility-blind — a `private set` is a setter. Nothing about identity or document format
+  moves: a member violation keys the member's own `DocumentationCommentId` exactly as before, so
+  existing baselines keep matching and every `--json` and SARIF schema version is unchanged. The
+  extraction cache's own schema does move, 24 to 25, which degrades to a clean miss — the first
+  run after upgrading is cold, and nothing else about it is observable. `Selection.Properties`
+  and `Selection.Fields` now return `PropertySelection` and `FieldSelection` rather than
+  `MemberSelection`: every existing chain compiles unchanged, both types belonging to the same
+  hierarchy, but a more derived return type is a binary-breaking change, so a spec assembly built
+  against an earlier package needs a recompile rather than an edit.
+
 ### Changed
 
 - **`arch.Project` now reaches every declarer of a type compiled into several projects, and an

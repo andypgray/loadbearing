@@ -75,6 +75,43 @@ public interface IMemberInfo
     /// </summary>
     IReadOnlyList<IAttributeInfo> Attributes { get; }
 
+    /// <summary>
+    ///     Whether a property declares a setter accessor of any kind — a <c>private set</c>, an
+    ///     <c>internal set</c> and an <c>init</c> all report <c>true</c> — and <c>false</c> for every
+    ///     non-property member (GRAMMAR §4.6). Accessibility-blind: the fact is that a setter exists, not
+    ///     that a caller outside the type can reach it. Declaration shape, not deep immutability: a property
+    ///     with no setter still hands back a value the caller may mutate. Additive contract growth, the §5.6
+    ///     discipline.
+    /// </summary>
+    bool HasSetter { get; }
+
+    /// <summary>
+    ///     Whether a property's setter is <c>init</c>-only, and <c>false</c> for every non-property member
+    ///     and for a plain <c>set</c> (GRAMMAR §4.6). Refines <see cref="HasSetter" /> rather than competing
+    ///     with it — an init-only setter is a setter, so this implies it. Recorded as its own fact so the
+    ///     setter's kind is available to a predicate even where no verb reads it. Additive contract growth,
+    ///     the §5.6 discipline.
+    /// </summary>
+    bool HasInitOnlySetter { get; }
+
+    /// <summary>
+    ///     Whether a field is declared <c>readonly</c>, and <c>false</c> for every non-field member and for a
+    ///     <c>const</c> field — the two are disjoint declarations, not a refinement (GRAMMAR §4.6). The
+    ///     casing is deliberate and will not match a verb spelling the same word: a fact name mirrors its
+    ///     source, here <c>IFieldSymbol.IsReadOnly</c>, the symbol API extraction reads, where a verb name
+    ///     mirrors the fragment it renders and so the C# keyword. Declaration shape, not deep immutability:
+    ///     a readonly field of a mutable type is still mutated through it. Additive contract growth, the
+    ///     §5.6 discipline.
+    /// </summary>
+    bool IsReadOnly { get; }
+
+    /// <summary>
+    ///     Whether a field is declared <c>const</c>, and <c>false</c> for every non-field member
+    ///     (GRAMMAR §4.6). A const field is also <see cref="IsStatic" />. Additive contract growth, the §5.6
+    ///     discipline.
+    /// </summary>
+    bool IsConst { get; }
+
     /// <summary>The distinct file paths declaring the member, verbatim as compiled.</summary>
     IReadOnlyList<string> FilePaths { get; }
 }

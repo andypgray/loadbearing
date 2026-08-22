@@ -159,6 +159,15 @@ internal static class ModelDump
             .Append(" async=")
             .Append(member.IsAsync)
             .AppendLine();
+        builder.Append("  hasSetter=")
+            .Append(member.HasSetter)
+            .Append(" hasInitOnlySetter=")
+            .Append(member.HasInitOnlySetter)
+            .Append(" readOnly=")
+            .Append(member.IsReadOnly)
+            .Append(" const=")
+            .Append(member.IsConst)
+            .AppendLine();
         builder.Append("  returnType=")
             .Append(member.ReturnTypeFullName ?? "<null>")
             .Append(" memberType=")

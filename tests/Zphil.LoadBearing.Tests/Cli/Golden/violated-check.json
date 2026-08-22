@@ -3,11 +3,11 @@
   "solution": "MyApp.sln",
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "summary": {
-    "rulesChecked": 18,
+    "rulesChecked": 23,
     "rulesPassed": 2,
-    "rulesFailed": 15,
+    "rulesFailed": 20,
     "rulesSkipped": 1,
-    "violations": 25,
+    "violations": 36,
     "warnings": 1
   },
   "rules": [
@@ -565,6 +565,187 @@
             {
               "file": "MyApp.Domain/OrderApproval.cs",
               "line": 17
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types named `*Service` must reside in project `MyApp.Web`.",
+      "because": "Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep.",
+      "fix": "Move the service into the MyApp.Web project.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Domain.OrderService",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 5
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types in `MyApp.*` must belong to the Domain layer or the Web layer.",
+      "because": "A type in no declared layer is governed by no layer rule; the two layers are the covering set.",
+      "fix": "Move the type into a declared layer's namespace, or declare its layer in this spec.",
+      "violationCount": 4,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.BillingCalculator",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/BillingCalculator.cs",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.BillingFacade",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/BillingFacade.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.IBillingFacade",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/IBillingFacade.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.RoundingMode",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/RoundingMode.cs",
+              "line": 3
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types implementing `IHandler<T>` or types named `*Scheduler` must be registered.",
+      "because": "Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup.",
+      "fix": "Register the type in ServiceWiring.Configure.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.InvoiceCreatedHandler",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceCreatedHandler.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.RefundProcessor",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/RefundProcessor.cs",
+              "line": 3
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Properties of the Domain layer must be get-only.",
+      "because": "A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it.",
+      "fix": "Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one.",
+      "violationCount": 3,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Money.Amount",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Money.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Order.Reference",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Order.cs",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Order.Total",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Order.cs",
+              "line": 7
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Static fields of the Web layer must be readonly.",
+      "because": "A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so.",
+      "fix": "Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "F:MyApp.Web.ReportBudget.RenderCount",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportBudget.cs",
+              "line": 18
             }
           ]
         }

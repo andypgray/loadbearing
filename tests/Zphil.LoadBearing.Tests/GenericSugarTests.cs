@@ -120,6 +120,27 @@ public class GenericSugarTests
     }
 
     [Fact]
+    public void MemberAttributedWith_GenericOnPropertySelection_KeepsMustBeGetOnlyReachable()
+    {
+        // The PropertySelection overload returns a PropertySelection, so the properties-only verb chains off
+        // the sugar — this would not compile against the MemberSelection overload alone.
+        Checker.Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>()
+                .MustBeGetOnly())
+            .ShouldBe(Checker.Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute))
+                .MustBeGetOnly()));
+    }
+
+    [Fact]
+    public void MemberAttributedWith_GenericOnFieldSelection_KeepsMustBeReadonlyReachable()
+    {
+        // The FieldSelection twin of the row above — the fields-only verb after the sugar.
+        Checker.Sentence(arch => arch.Types.Fields.AttributedWith<SugarAttribute>()
+                .MustBeReadonly())
+            .ShouldBe(Checker.Sentence(arch => arch.Types.Fields.AttributedWith(typeof(SugarAttribute))
+                .MustBeReadonly()));
+    }
+
+    [Fact]
     public void MemberMustBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
         Checker.Sentence(arch => arch.Types.Methods.MustBeAttributedWith<SugarAttribute>())

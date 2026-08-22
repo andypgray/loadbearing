@@ -24,8 +24,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         every rule the run selected — grain is never scope.
 ///     </para>
 ///     <para>
-///         The fixture's rungs are 16.5k / 13.3k / 9.1k characters, a modest 81% and 55%, because the MyApp
-///         solution has 25 violations over 28 sites. That ratio is an artefact of the fixture, not of the
+///         The fixture's rungs are 23.1k / 17.8k / 11.5k characters, a modest 77% and 50%, because the MyApp
+///         solution has 36 violations over 39 sites. That ratio is an artefact of the fixture, not of the
 ///         design: sites are the one array with no ceiling, so on the legacy migration this exists for the
 ///         compression is unbounded. What these rows pin is which rung comes back and that it is whole — not
 ///         how much it saved.

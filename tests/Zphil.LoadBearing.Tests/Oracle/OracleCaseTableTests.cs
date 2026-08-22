@@ -253,6 +253,123 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.HomeController");
     }
 
+    // Row 10 (residence twin): *Service types must reside in the Web project. The first Should()-position
+    // residence row: LoadBearing's MustResideInProject is declarer membership (any declaring project
+    // satisfies), ArchUnitNET's ResideInAssembly is assembly membership — on this single-targeted fixture
+    // the two coincide. OrderService is declared by MyApp.Domain, red on both substrates; InvoiceService
+    // resides where the rule says and is green.
+    [Fact]
+    public void Row10_ServiceTypesMustResideInWebProject()
+    {
+        IReadOnlySet<string> loadBearing = LoadBearingShapeViolators(arch =>
+            arch.Rule("oracle/services-in-web")
+                .Enforce(arch.Types.WithSuffix("Service").MustResideInProject("MyApp.Web"))
+                .Because("Oracle row 10: Service types reside in the Web project."));
+
+        IArchRule rule = ArchRuleDefinition.Types()
+            .That()
+            .HaveNameEndingWith("Service")
+            .Should()
+            .ResideInAssembly(oracle.Web);
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
+
+        AssertOracleAgreement(loadBearing, archUnit, "MyApp.Domain.OrderService");
+    }
+
+    // Row 11 (membership twin): every MyApp.* type must belong to the Domain layer or the Web layer.
+    // LoadBearing's MustBelongTo resolves its layer operands in subject position and tests plain
+    // containment; ArchUnitNET says the same thing as a Should()/OrShould() disjunction of exact-namespace
+    // residences (MyApp's namespaces are flat, so exact match and the subtree glob coincide — the same
+    // mapping rows 1–4 pin). The subject is namespace-matched on BOTH sides so compiler-emitted
+    // global-namespace types fall out of both substrates. The four Billing types are outside both layers.
+    [Fact]
+    public void Row11_EveryMyAppTypeMustBelongToDomainOrWeb()
+    {
+        IReadOnlySet<string> loadBearing = LoadBearingShapeViolators(arch =>
+            arch.Rule("oracle/no-ungoverned-types")
+                .Enforce(arch.Namespace("MyApp.*")
+                    .MustBelongTo(arch.Layer("Domain", "MyApp.Domain.*"), arch.Layer("Web", "MyApp.Web.*")))
+                .Because("Oracle row 11: every MyApp type belongs to a declared layer."));
+
+        IArchRule rule = ArchRuleDefinition.Types()
+            .That()
+            .ResideInNamespaceMatching("MyApp.*")
+            .Should()
+            .ResideInNamespace("MyApp.Domain")
+            .OrShould()
+            .ResideInNamespace("MyApp.Web");
+        IReadOnlySet<string> archUnit = oracle.FailingTypeNames(rule);
+
+        AssertOracleAgreement(
+            loadBearing, archUnit,
+            "MyApp.Legacy.Billing.BillingCalculator",
+            "MyApp.Legacy.Billing.BillingFacade",
+            "MyApp.Legacy.Billing.IBillingFacade",
+            "MyApp.Legacy.Billing.RoundingMode");
+    }
+
+    // Row 12 (member-shape twin): the Domain layer's properties must declare no setter. A strict twin rather
+    // than a reduction — ArchUnitNET's NotHaveSetter() is SetterVisibility == NotAccessible, and its loader
+    // gives an `init` accessor a real set method, so a `{ get; init; }` property reds on BOTH substrates,
+    // which is exactly LoadBearing's semantics: get-only is a claim about the declaration (GRAMMAR §5.7).
+    // Money is a positional readonly record struct, so its generated Amount is the init carrier; Order's
+    // Reference and Total are plain `{ get; set; }`. Two scoping facts of the pinned 0.13.3 package shape the
+    // ArchUnitNET side: it has no AreDeclaredInTypesThat(), so the declaring-type scope goes through the
+    // AreDeclaredIn(IObjectProvider<IType>) overload over the same namespace predicate rows 1-4 use; and a
+    // nested type carries no namespace of its own in IL, so Order.Line sits in the empty namespace there and
+    // its two get-only properties are outside the ArchUnitNET subject while LoadBearing keeps them in. That
+    // last difference is not observable here, because those two are green on both readings.
+    [Fact]
+    public void Row12_DomainPropertiesMustBeGetOnlyIncludingInitOnlySetters()
+    {
+        IReadOnlySet<string> loadBearing = LoadBearingMemberShapeViolators(arch =>
+            arch.Rule("oracle/domain-values-immutable")
+                .Enforce(arch.Namespace("MyApp.Domain.*").Properties.MustBeGetOnly())
+                .Because("Oracle row 12: Domain properties declare no setter."));
+
+        IArchRule rule = ArchRuleDefinition.PropertyMembers()
+            .That()
+            .AreDeclaredIn(ArchRuleDefinition.Types()
+                .That()
+                .ResideInNamespace("MyApp.Domain"))
+            .Should()
+            .NotHaveSetter();
+        IReadOnlySet<string> archUnit = oracle.FailingMemberDeclaringTypeNames(rule);
+
+        AssertOracleAgreement(loadBearing, archUnit, "MyApp.Domain.Money", "MyApp.Domain.Order");
+    }
+
+    // Row 13 (member-shape twin at type granularity, with one stated divergence): the Web layer's STATIC
+    // fields must be readonly. ArchUnitNET's BeReadOnly() is Writability == ReadOnly, and its field loader
+    // maps Writability from Cecil's IsInitOnly alone — so a `const` field reads Writable there and reds,
+    // where LoadBearing greens it because const is readonly's superset (GRAMMAR §5.7). 0.13.3 cannot express
+    // const-satisfies at all: FieldMember carries no IsConst. At member granularity the two therefore diverge
+    // on ReportBudget.MaxRows. The oracle's contract is verdict-level at type granularity (the class remarks'
+    // documented boundary), and at that granularity the divergence is not observable: both substrates reduce
+    // to { MyApp.Web.ReportBudget }, which genuinely declares a static field that is not readonly on either
+    // reading. const-satisfies is pinned by MustBeReadonlyVerbTests.MustBeReadonly_ConstField_Passes, not here.
+    [Fact]
+    public void Row13_WebStaticFieldsMustBeReadonlyAtDeclaringTypeGranularity()
+    {
+        IReadOnlySet<string> loadBearing = LoadBearingMemberShapeViolators(arch =>
+            arch.Rule("oracle/no-static-mutable")
+                .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic().MustBeReadonly())
+                .Because("Oracle row 13: static fields of the Web layer are readonly."));
+
+        IArchRule rule = ArchRuleDefinition.FieldMembers()
+            .That()
+            .AreStatic()
+            .And()
+            .AreDeclaredIn(ArchRuleDefinition.Types()
+                .That()
+                .ResideInNamespace("MyApp.Web"))
+            .Should()
+            .BeReadOnly();
+        IReadOnlySet<string> archUnit = oracle.FailingMemberDeclaringTypeNames(rule);
+
+        AssertOracleAgreement(loadBearing, archUnit, "MyApp.Web.ReportBudget");
+    }
+
     /// <summary>
     ///     The oracle assertion: both substrates equal the pinned expected set (so a shared blind spot is
     ///     caught), and equal each other (the agreement claim). Sets are compared order-insensitively.
@@ -293,8 +410,9 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     }
 
     // A member-shape rule's violators reduced to DECLARING-TYPE FullNames — the bridge to the oracle's
-    // type-granularity compare (row 9). LoadBearing keys the specific member (M: DocId); the oracle agrees on
-    // which types own an offending member, exactly as row 8 agrees on which types read the clock.
+    // type-granularity compare (rows 9, 12 and 13). LoadBearing keys the specific member (M: DocId); the
+    // oracle agrees on which types own an offending member, exactly as row 8 agrees on which types read the
+    // clock.
     private IReadOnlySet<string> LoadBearingMemberShapeViolators(Action<Arch> define)
     {
         return Checker.Run(workspace.Model, define)

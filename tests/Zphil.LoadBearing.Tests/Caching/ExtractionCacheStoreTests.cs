@@ -39,6 +39,11 @@ public sealed class ExtractionCacheStoreTests
     // answer green on a model missing every package edge — the exact silent pass this field was added to
     // close. The version it was written under has to be enough to reject it.
     [InlineData(18)]
+    // A v24 cache predates the member mutability facts (schema bumped 24→25): its members carry no setter or
+    // field-writability flags, so on a hit every property would replay as get-only and every field as
+    // writable — a get-only rule would pass vacuously over a codebase full of settable properties, and a
+    // readonly rule would red every field it saw.
+    [InlineData(24)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange

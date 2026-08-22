@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Microsoft.Build.Locator;
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.MsBuild;
@@ -19,8 +20,9 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         Model, Checking, Rendering — cut Core into the pieces <c>layering/model-independent</c> needs
 ///         to name. Checking and Rendering carry no anchored rule on purpose: a declared layer with
 ///         nothing to say renders a module-map row and no card, an honest negative. The union-subject
-///         rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c> and the exception laws) place
-///         no card either — a union has no single home directory.
+///         rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>,
+///         <c>model/reified-nodes-immutable</c>, <c>state/no-static-mutable</c> and the exception laws)
+///         place no card either — a union has no single home directory.
 ///     </para>
 ///     <para>
 ///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
@@ -44,7 +46,12 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
 ///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
 ///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
-///         prefix and a suffix, which say it more exactly. The predicate escape hatch is the one entry
+///         prefix and a suffix, which say it more exactly. <c>MustBeRegistered</c> idles because nothing
+///         here is registered by convention: the composition root wires a hand-written list of
+///         infrastructure singletons, so a completeness rule over them could only restate that list at
+///         itself — a tautology wearing a law's clothes. Its consumer is an estate where a naming
+///         convention implies registration (every <c>*Handler</c>, say) and a type can carry the name
+///         while missing the wiring. The predicate escape hatch is the one entry
 ///         that came off this list: the three <c>api/*-front-door</c> rules use it because a curated set
 ///         of names is the thing the vocabulary genuinely cannot say — no prefix, suffix or pattern picks
 ///         out "the types an author spells". The unused sugar overloads and the unused
@@ -113,9 +120,43 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
     ];
 
     /// <summary>
+    ///     The static fields whose mutability is load-bearing, exempted from <c>state/no-static-mutable</c>.
+    ///     Keyed <c>{DeclaringType}.{Name}</c> rather than by type name, because unlike a broad catch a
+    ///     second mutable static in the same class is exactly what this law should still catch. Three
+    ///     families and nothing else:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <b>Interlocked/Volatile locations</b> — <c>WorkspaceLoader._loadCount</c>,
+    ///             <c>IdleTimeoutWatchdog.s_lastActivityTicks</c>, <c>IdleTimeoutWatchdog.s_inFlightCount</c>,
+    ///             <c>ServerShutdown.s_hasExited</c>: a compare-and-swap needs a writable location, so
+    ///             `readonly` is not expressible here, not merely unfashionable.
+    ///         </item>
+    ///         <item>
+    ///             <b>Lock-guarded one-shot state</b> — <c>IdleTimeoutWatchdog.s_drainWaiter</c> (registered
+    ///             and nulled under DrainLock) and <c>ArchRuleTests.s_run</c> (the per-closed-generic check
+    ///             memo published under Gate; per-TSpec caching is the whole design).
+    ///         </item>
+    ///         <item>
+    ///             <b>The clock seam</b> — <c>IdleTimeoutWatchdog.s_timestampProvider</c>: the only way to
+    ///             test an idle timeout without sleeping for it.
+    ///         </item>
+    ///     </list>
+    /// </summary>
+    private static readonly HashSet<string> SanctionedMutableStatics =
+    [
+        "ArchRuleTests.s_run",
+        "IdleTimeoutWatchdog.s_drainWaiter",
+        "IdleTimeoutWatchdog.s_inFlightCount",
+        "IdleTimeoutWatchdog.s_lastActivityTicks",
+        "IdleTimeoutWatchdog.s_timestampProvider",
+        "ServerShutdown.s_hasExited",
+        "WorkspaceLoader._loadCount"
+    ];
+
+    /// <summary>
     ///     The curated root namespace of the contract package — what a spec author gets from
     ///     <c>using Zphil.LoadBearing;</c> and a dot. Three groups: the entry point and the spec interface,
-    ///     the nouns and enums an author writes as arguments, and the five static classes holding the
+    ///     the nouns and enums an author writes as arguments, and the seven static classes holding the
     ///     extension methods that are the verbs themselves. <c>IRuleBuilder</c>, <c>IScopeBuilder</c> and
     ///     <c>Member</c> are here because authors do name them — the validation corpus spells all three in
     ///     type position — even though a chain never has to.
@@ -125,6 +166,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "Accessibility",
         "Arch",
         "Constraint",
+        "FieldSelectionConstraints",
         "IArchitectureSpec",
         "IAttributeInfo",
         "IMemberInfo",
@@ -140,6 +182,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "MethodSelectionConstraints",
         "MigrationPolicy",
         "Posture",
+        "PropertySelectionConstraints",
         "QuarantineRole",
         "Selection",
         "SelectionAdjectives",
@@ -227,6 +270,27 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "added without touching it.")
             .Fix("Keep the dependency one-way: give Model the data, and let Checking or Rendering read it.");
 
+        arch.Rule("arch/no-ungoverned-types")
+            .Enforce(arch.AnyOf(
+                    arch.Project("Zphil.LoadBearing"),
+                    arch.Project("Zphil.LoadBearing.Roslyn"),
+                    arch.Project("Zphil.LoadBearing.Cli"),
+                    arch.Project("Zphil.LoadBearing.Xunit"),
+                    arch.Project("Zphil.LoadBearing.Packs.DotNet"))
+                .Authored()
+                .Except(arch.Types.WithNameMatching("Program"))
+                .MustBelongTo(core, extraction, host, adapter, pack))
+            .Because("A type outside every declared layer is governed by nothing: no rule sweeps it, no card " +
+                     "covers it, and check stays green while it accretes. The subject names the five projects " +
+                     "rather than a namespace glob because a glob reaches only the namespaces someone " +
+                     "predicted, and the failure this rule exists to catch is a type arriving under a root " +
+                     "nobody did. The five assembly-shaped layers are the whole cover — Model, Checking and " +
+                     "Rendering are cuts inside Core, not additions beside it. Two exemptions, both principled: " +
+                     "generated types nobody can move, and Program, which top-level statements synthesize into " +
+                     "the global namespace no glob can name.")
+            .Fix("Put the type in a namespace one of the five layers covers, or add its namespace to a layer " +
+                 "in this spec and say in review what the layer now means.");
+
         arch.Rule("cli/no-stdout")
             .Enforce(host
                 .MustNotUse(
@@ -272,6 +336,19 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "attribute compiles, registers nothing, and its tools silently vanish from the server.")
             .Fix("Put [McpServerToolType] on the tool class (see ArchTools), and keep tool classes in " +
                  "Zphil.LoadBearing.Cli.Mcp.Tools.");
+
+        arch.Rule("mcp/tool-types-in-cli")
+            .Enforce(arch.Types.AttributedWith("ModelContextProtocol.Server.McpServerToolTypeAttribute")
+                .MustResideInProject("Zphil.LoadBearing.Cli"))
+            .Because("The converse of mcp/tool-types-attributed: that rule keeps every type in the tools " +
+                     "namespace attributed, and this one keeps every attributed type in the CLI. The " +
+                     "ModelContextProtocol SDK is the CLI's package reference alone, so a tool class declared " +
+                     "in Core or Roslyn would drag the SDK into that package's closure — Core's rides into " +
+                     "every spec project that references the contract library. The subject anchors on the " +
+                     "attribute's fully-qualified name, and an empty subject fails loudly, so a rename in the " +
+                     "SDK reds this rule rather than quietly emptying it.")
+            .Fix("Move the tool class into Zphil.LoadBearing.Cli.Mcp.Tools beside ArchTools; only the CLI " +
+                 "references the MCP SDK.");
 
         arch.Rule("roslyn/no-msbuildlocator-query")
             .Enforce(arch.Types.InNamespace("Zphil.LoadBearing.*")
@@ -396,6 +473,25 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Throw a type that names the failure — one of this repo's own error types, or the closest " +
                  "BCL type such as InvalidOperationException or IOException — so a handler can filter on it.");
 
+        arch.Rule("state/no-static-mutable")
+            .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
+                .Authored()
+                .Fields.ThatAreStatic()
+                .Where(m => !SanctionedMutableStatics.Contains(m.DeclaringType.Name + "." + m.Name),
+                    description: "that are not one of the sanctioned mutable statics (the Interlocked " +
+                                 "locations, the lock-guarded one-shot state, and the clock seam)")
+                .MustBeReadonly())
+            .Because("A writable static is process-wide state in a library a long-lived MCP server calls " +
+                     "concurrently and every spec project links: whoever wrote to it last decides what the " +
+                     "next caller reads, and nothing in the type system says so. A const counts as readonly " +
+                     "here — it is readonly's superset — so the law asks for the weakest thing that closes " +
+                     "the hole. The subject is fields only; the two static `{ get; private set; }` " +
+                     "diagnostics properties (MsBuildBootstrap.LastSelection, MsBuildGate.LastAcquisition) " +
+                     "are outside it, and deliberately: a property-side twin is residue, not a gap here.")
+            .Fix("Make it `readonly` or `const`. If it genuinely has to be written — an Interlocked location, " +
+                 "a lock-guarded one-shot, or a test seam — add it to SanctionedMutableStatics in this spec " +
+                 "with the family it belongs to, and say in review which one.");
+
         arch.Rule("packs/depends-on-core-only")
             .Enforce(pack.MustOnlyReference(core, pack))
             .Because("A spec project takes the rule pack as a reference of its own, and the whole of what " +
@@ -424,6 +520,31 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "stays in the root namespace with the rest of the authoring surface.")
             .Fix("Put the new constraint node in Zphil.LoadBearing.Model beside its siblings, and handle it " +
                  "in ConstraintEvaluator and SentenceRenderer.");
+
+        // The adjective and noun hierarchies (SelectionAdjective, MemberAdjective, SelectionNoun) are
+        // internal and this project has no InternalsVisibleTo, so a typeof anchor cannot reach them and
+        // they stay outside the union below. String anchors on their fully-qualified names are the
+        // drop-in widening if review wants total cover: all three are already get-only, so it would
+        // widen the subject and leave the verdict where it is. Not taken here — the string form is the
+        // escape hatch for a type a spec project cannot reference at all, and these three are Core's own.
+        arch.Rule("model/reified-nodes-immutable")
+            .Enforce(arch.AnyOf(
+                    arch.Types.DerivedFrom<Selection>(),
+                    arch.Types.DerivedFrom<Constraint>(),
+                    arch.Types.DerivedFrom<MemberSelection>())
+                .Properties.MustBeGetOnly())
+            .Because("A spec compiles to these nodes and both render targets read them back, so a node is a " +
+                     "value: the same spec must render the same sentence and check to the same verdict " +
+                     "whoever walks it, and a settable property is the one way a walker could change what " +
+                     "the next walker sees. The three roots are the whole reified hierarchy an author can " +
+                     "name — a selection, a constraint, and the member selection a projection mints — and " +
+                     "their private-protected constructors mean no assembly outside Core can add a fourth. " +
+                     "The BUILDERS are deliberately outside this law and stay mutable: a RuleRegistration " +
+                     "accumulates a posture and a constraint across chained calls, which is what makes the " +
+                     "stage machine a stage machine. They derive from none of these roots, so nothing here " +
+                     "has to except them.")
+            .Fix("Take the value in the constructor and expose it `{ get; }`. If a node genuinely has to " +
+                 "accumulate, it is a builder, not a node — put it beside RuleRegistration.");
 
         arch.Rule("api/core-front-door")
             .Enforce(arch.Types.InNamespace("Zphil.LoadBearing")

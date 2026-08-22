@@ -289,25 +289,64 @@ public sealed class SelfSpecTests
     [Fact]
     public void SanctionedBroadCatchers_AreExactlyTheSevenHoldAndContinueBoundaries()
     {
+        ShouldCarrySanctionedSet("SanctionedBroadCatchers")
+            .ShouldBe(
+                [
+                    "ArchChecker",
+                    "ArchRuleTests",
+                    "CommandEntryPoint",
+                    "IdleTimeoutWatchdog",
+                    "ParentProcessWatcher",
+                    "ServerShutdown",
+                    "VsWhereLocator"
+                ], customMessage: "a name added here leaves the broad-catch law; add it with its reason in the set's " +
+                                  "xmldoc, or rewrite the handler to filter or rethrow.");
+    }
+
+    /// <summary>
+    ///     The sanctioned-mutable-static pin, the broad-catcher pin's twin over the other exemption list.
+    ///     <c>state/no-static-mutable</c> carves seven fields out of its own subject, and the key here is
+    ///     <c>{DeclaringType}.{Name}</c> rather than a type name, so the list can only grow one field at a
+    ///     time — which is exactly the growth that turns an exemption list into a null law. Pinning the
+    ///     exact seven makes every addition a deliberate act: the list can only grow by moving this
+    ///     assertion in the same commit, where a reviewer sees the field and its family together.
+    /// </summary>
+    [Fact]
+    public void SanctionedMutableStatics_AreExactlyTheSevenLoadBearingWrites()
+    {
+        ShouldCarrySanctionedSet("SanctionedMutableStatics")
+            .ShouldBe(
+                [
+                    "ArchRuleTests.s_run",
+                    "IdleTimeoutWatchdog.s_drainWaiter",
+                    "IdleTimeoutWatchdog.s_inFlightCount",
+                    "IdleTimeoutWatchdog.s_lastActivityTicks",
+                    "IdleTimeoutWatchdog.s_timestampProvider",
+                    "ServerShutdown.s_hasExited",
+                    "WorkspaceLoader._loadCount"
+                ], customMessage: "a name added here leaves the static-mutability law; add it with its family in the " +
+                                  "set's xmldoc — an Interlocked location, lock-guarded one-shot state, or the clock " +
+                                  "seam — or make the field readonly or const.");
+    }
+
+    /// <summary>
+    ///     The contents of one of the self-spec's private exemption sets, ordinally sorted — the reader the
+    ///     two pins above share, so the reflection and the guard beside it are written once.
+    /// </summary>
+    /// <remarks>
+    ///     Asserting, hence the name: the set is <c>private static</c> and reached by reflection, so a
+    ///     rename or a deletion would otherwise surface as a <see cref="NullReferenceException" /> in the
+    ///     caller rather than as the instruction to move the pin with it.
+    /// </remarks>
+    private static IReadOnlyList<string> ShouldCarrySanctionedSet(string fieldName)
+    {
         FieldInfo? field = typeof(LoadBearingArchSpec).GetField(
-            "SanctionedBroadCatchers", BindingFlags.NonPublic | BindingFlags.Static);
-        field.ShouldNotBeNull("the self-spec no longer carries a SanctionedBroadCatchers set; move this pin with it.");
+            fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+        field.ShouldNotBeNull($"the self-spec no longer carries a {fieldName} set; move this pin with it.");
 
         var sanctioned = (HashSet<string>)field.GetValue(null)!;
-        List<string> ordered = sanctioned.OrderBy(name => name, StringComparer.Ordinal)
+        return sanctioned.OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
-
-        ordered.ShouldBe(
-            [
-                "ArchChecker",
-                "ArchRuleTests",
-                "CommandEntryPoint",
-                "IdleTimeoutWatchdog",
-                "ParentProcessWatcher",
-                "ServerShutdown",
-                "VsWhereLocator"
-            ], customMessage: "a name added here leaves the broad-catch law; add it with its reason in the set's " +
-                              "xmldoc, or rewrite the handler to filter or rethrow.");
     }
 
     /// <summary>Every <c>Must*</c> verb on Core's public surface, by name.</summary>

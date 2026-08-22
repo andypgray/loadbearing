@@ -350,6 +350,21 @@ public sealed class CodebaseExtractorMemberInventoryTests
             .IsStatic.ShouldBeTrue();
         c.Member("F:N.C.Inst")
             .IsStatic.ShouldBeFalse();
+
+        // IsConst and IsReadOnly are DISJOINT, not nested: a const field is not `readonly` in C# declaration
+        // semantics, so anything asking whether a field can be reassigned has to read both facts.
+        c.Member("F:N.C.Max")
+            .IsConst.ShouldBeTrue();
+        c.Member("F:N.C.Max")
+            .IsReadOnly.ShouldBeFalse();
+        c.Member("F:N.C.Ro")
+            .IsReadOnly.ShouldBeTrue();
+        c.Member("F:N.C.Ro")
+            .IsConst.ShouldBeFalse();
+        c.Member("F:N.C.Shared")
+            .IsReadOnly.ShouldBeFalse();
+        c.Member("F:N.C.Inst")
+            .IsReadOnly.ShouldBeFalse();
     }
 
     [Fact]
@@ -777,5 +792,189 @@ public sealed class CodebaseExtractorMemberInventoryTests
             .Members.Single(m => m.Name == "OnScan")
             .Attributes.Select(a => a.FullName)
             .ShouldBe(["N.AlsoOnImplementingAttribute", "N.OnDefiningAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_PropertySetterShapes_AutoGetSet_GetOnly_InitOnly()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Settable { get; set; }
+                                                             public int GetOnly { get; }
+                                                             public int InitOnly { get; init; }
+                                                         }
+                                                         """);
+
+        // The three canonical property shapes and the pair of facts that separates them (GRAMMAR §4.6):
+        // HasSetter records that a setter accessor exists at all, HasInitOnlySetter which kind it is — so an
+        // init-only property reports BOTH, never the get-only pair. The pair refines rather than competes.
+        TypeNode c = model.Type("N.C");
+        c.Member("P:N.C.Settable")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Settable")
+            .HasInitOnlySetter.ShouldBeFalse();
+        c.Member("P:N.C.GetOnly")
+            .HasSetter.ShouldBeFalse();
+        c.Member("P:N.C.GetOnly")
+            .HasInitOnlySetter.ShouldBeFalse();
+        c.Member("P:N.C.InitOnly")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.InitOnly")
+            .HasInitOnlySetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_ExpressionBodiedProperty_HasNoSetter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public int P => 1; }
+                                                         """);
+
+        // An expression-bodied property is a getter and nothing else — the shorthand declares no setter to
+        // find, so it reads exactly as `{ get; }` does.
+        MemberNode p = model.Type("N.C")
+            .Member("P:N.C.P");
+        p.HasSetter.ShouldBeFalse();
+        p.HasInitOnlySetter.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_ManualAccessorsAndPrivateSetter_StillCountAsSetters()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             private int backing;
+                                                             public int Manual { get { return backing; } set { backing = value; } }
+                                                             public int Restricted { get; private set; }
+                                                             public int Shared { get; internal set; }
+                                                         }
+                                                         """);
+
+        // ACCESSIBILITY-BLIND, the honesty boundary: the fact is that a setter exists, not that a caller
+        // outside the type can reach it. A hand-written accessor body, a `private set` and an `internal set`
+        // are each a setter, so none of the three is get-only however unreachable the write is.
+        TypeNode c = model.Type("N.C");
+        c.Member("P:N.C.Manual")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Restricted")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Shared")
+            .HasSetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_AbstractAndInterfaceProperty_WithSetter_ReportHasSetter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public abstract class A { public abstract int P { get; set; } }
+                                                         public interface I { int Q { get; set; } }
+                                                         """);
+
+        // C# declaration semantics, as everywhere else in §4.6: a bodiless accessor is still a declared
+        // setter, so an abstract property and an interface property each report one. What is recorded is the
+        // shape of the declaration, never whether an implementation was written.
+        model.Type("N.A")
+            .Member("P:N.A.P")
+            .HasSetter.ShouldBeTrue();
+        model.Type("N.I")
+            .Member("P:N.I.Q")
+            .HasSetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_StaticProperty_CarriesNoFieldFlags()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public static int P { get; set; } }
+                                                         """);
+
+        // Kind-scoping in the negative direction, the IsAsync contract applied to the field facts: a property
+        // is never IsReadOnly and never IsConst, whatever else it is.
+        MemberNode p = model.Type("N.C")
+            .Member("P:N.C.P");
+        p.IsStatic.ShouldBeTrue();
+        p.IsReadOnly.ShouldBeFalse();
+        p.IsConst.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_Method_CarriesNoMutabilityFlags()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public void Do() {} }
+                                                         """);
+
+        // The other half of the same contract: all four mutability facts are simply false on a method, so a
+        // member subject sweeping every kind can read them without a kind test first.
+        MemberNode go = model.Type("N.C")
+            .Member("M:N.C.Do");
+        go.HasSetter.ShouldBeFalse();
+        go.HasInitOnlySetter.ShouldBeFalse();
+        go.IsReadOnly.ShouldBeFalse();
+        go.IsConst.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_PositionalRecordAndRecordStruct_PropertiesAreInitOnly_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public record R(int X);
+                                                         public readonly record struct S(int Y);
+                                                         """);
+
+        // EMPIRICAL PIN: the property a positional parameter generates carries an INIT-ONLY setter on both a
+        // record class and a readonly record struct — observed Roslyn behaviour, not a designed rule. It is
+        // why a positional record is a settable shape rather than a get-only one, so the two facts have to be
+        // read off the generated property rather than assumed from the record's own immutability.
+        MemberNode x = model.Type("N.R")
+            .Member("P:N.R.X");
+        x.HasSetter.ShouldBeTrue();
+        x.HasInitOnlySetter.ShouldBeTrue();
+        MemberNode y = model.Type("N.S")
+            .Member("P:N.S.Y");
+        y.HasSetter.ShouldBeTrue();
+        y.HasInitOnlySetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_PartialPropertyParts_ReadTheMergedSymbolsSetter_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host
+                           {
+                               public partial int Count { get; set; }
+                               public partial int Label { get; }
+                           }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host
+                            {
+                                public partial int Count { get => 0; set {} }
+                                public partial int Label { get => 1; }
+                            }
+                            """));
+
+        // EMPIRICAL PIN, the partial-method row's C# 13 twin: a partial property's defining and implementing
+        // parts resolve to ONE inventory member (Single throws on a duplicate), and the setter fact is read
+        // off that merged symbol — so the get-only pair reports no setter while the get/set pair does, and
+        // being partial is not itself a shape.
+        TypeNode host = model.Type("N.Host");
+        MemberNode count = host.Members.Single(m => m.Name == "Count");
+        count.HasSetter.ShouldBeTrue();
+        count.HasInitOnlySetter.ShouldBeFalse();
+        MemberNode label = host.Members.Single(m => m.Name == "Label");
+        label.HasSetter.ShouldBeFalse();
     }
 }

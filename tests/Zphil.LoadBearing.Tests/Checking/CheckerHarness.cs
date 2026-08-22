@@ -217,6 +217,12 @@ internal static class Checker
         return result.Violators(ViolationKind.Shape, v => v.Subject!.FullName);
     }
 
+    /// <summary>Member-shape violation subject SymbolIds, in report order (§4.6).</summary>
+    public static IReadOnlyList<string> MemberShapeSubjects(this RuleResult result)
+    {
+        return result.Violators(ViolationKind.MemberShape, v => v.SubjectMember!.SymbolId);
+    }
+
     /// <summary>
     ///     This result rendered as the human failure block, relative to the current directory — the text a
     ///     developer reads from the CLI or the xUnit adapter.

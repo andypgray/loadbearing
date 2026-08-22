@@ -74,6 +74,8 @@ internal static class MemberSelectionEvaluator
                 // anchor throws here — during resolution — exactly like the type-side attribute adjective.
                 Func<MemberNode, bool> attributeMatch = MemberAttributeMatcher(attributed.Anchor);
                 return current.Where(attributeMatch);
+            case MemberThatAreStaticAdjective:
+                return current.Where(member => member.IsStatic);
             case MemberWhereAdjective where:
                 return current.Where(member => SelectionEvaluator.InvokePredicate(where.Predicate, member, "Where"));
             default:

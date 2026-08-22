@@ -187,5 +187,58 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Enforce(domain.MustNotThrow(typeof(InvalidOperationException)))
             .Because("InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.")
             .Fix("Throw OrderRuleViolation instead of System.InvalidOperationException.");
+
+        // Enforce (shape, residence): the spec's first shape-kind emitters — the three rules from here
+        // down carry a verdict about the subject type itself, so a violation has no source/target/member
+        // slots and its sites are the type's own declaration sites. OrderService is declared by
+        // MyApp.Domain, so it reds with its declaration site as the evidence; InvoiceService is declared
+        // by MyApp.Web and is green.
+        arch.Rule("layering/services-in-web")
+            .Enforce(arch.Types.WithSuffix("Service").MustResideInProject("MyApp.Web"))
+            .Because("Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep.")
+            .Fix("Move the service into the MyApp.Web project.");
+
+        // Enforce (shape, membership): the ungoverned-remainder rule — every MyApp.* type must belong to
+        // a declared layer. All four MyApp.Legacy.Billing types red: Billing is quarantined under
+        // legacy/billing above, but a quarantine is not a layer — the two rules read the same namespace
+        // and answer different questions. The four-red form is deliberate; narrowing the subject to
+        // shrink the report would hide exactly the remainder this rule exists to surface.
+        arch.Rule("layering/no-ungoverned-types")
+            .Enforce(arch.Namespace("MyApp.*").MustBelongTo(domain, web))
+            .Because("A type in no declared layer is governed by no layer rule; the two layers are the covering set.")
+            .Fix("Move the type into a declared layer's namespace, or declare its layer in this spec.");
+
+        // Enforce (shape, registration): membership in the DI registration facts — the same set
+        // arch.Registered() reads. InvoiceCreatedHandler and RefundProcessor implement IHandler<T> but
+        // are never registered, so both red; ReportScheduler carries the Scheduler suffix AND is
+        // registered as a singleton in ServiceWiring, so it is green — which makes the reds a statement
+        // about registration, not about the verb.
+        arch.Rule("di/handlers-registered")
+            .Enforce(arch.AnyOf(
+                    arch.Types.Implementing(typeof(IHandler<>)),
+                    arch.Types.WithSuffix("Scheduler"))
+                .MustBeRegistered())
+            .Because("Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup.")
+            .Fix("Register the type in ServiceWiring.Configure.");
+
+        // Enforce (member-shape, mutability): the Domain layer's properties must declare no setter. Three
+        // reds across two types, one per settable shape: Order.Reference and Order.Total are `{ get; set; }`,
+        // and Money — a positional `readonly record struct` — carries the generated `{ get; init; }` Amount,
+        // which reds too, because get-only is STRICT (GRAMMAR §5.7): an init-only setter is still a setter.
+        // Order.Line's Name and Price are `{ get; }` and green, which is what makes the three reds a
+        // statement about setters rather than about properties.
+        arch.Rule("domain/values-immutable")
+            .Enforce(domain.Properties.MustBeGetOnly())
+            .Because("A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it.")
+            .Fix("Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one.");
+
+        // Enforce (member-shape, mutability + the first member shape adjective): the Web layer's STATIC
+        // fields must be readonly. ReportBudget.RenderCount is the one red; DefaultFormat is static readonly
+        // and MaxRows is const, both green — a const field satisfies the verb. The .ThatAreStatic() adjective
+        // keeps ReportPublisher's writable instance _attempts out of the subject.
+        arch.Rule("state/no-static-mutable")
+            .Enforce(web.Fields.ThatAreStatic().MustBeReadonly())
+            .Because("A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so.")
+            .Fix("Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls.");
     }
 }

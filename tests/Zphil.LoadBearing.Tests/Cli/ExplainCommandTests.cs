@@ -54,8 +54,10 @@ public sealed class ExplainCommandTests
                 "  api/return-dtos\n" +
                 "  async/accept-cancellation\n" +
                 "  data-access/no-inline-sql\n" +
+                "  di/handlers-registered\n" +
                 "  di/handlers-via-registry\n" +
                 "  di/no-captive-dependencies\n" +
+                "  domain/values-immutable\n" +
                 "  exceptions/domain-throws-domain\n" +
                 "  exceptions/no-bare-bcl-throw\n" +
                 "  exceptions/no-general-catch\n" +
@@ -64,10 +66,13 @@ public sealed class ExplainCommandTests
                 "  layering/billing-independent\n" +
                 "  layering/domain-independent\n" +
                 "  layering/no-ghost\n" +
+                "  layering/no-ungoverned-types\n" +
+                "  layering/services-in-web\n" +
                 "  legacy/billing/containment\n" +
                 "  legacy/billing/tripwire\n" +
                 "  naming/async-suffix\n" +
-                "  naming/nonexistent");
+                "  naming/nonexistent\n" +
+                "  state/no-static-mutable");
     }
 
     [Fact]

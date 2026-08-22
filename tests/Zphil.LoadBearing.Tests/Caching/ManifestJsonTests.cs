@@ -239,7 +239,11 @@ public sealed class ManifestJsonTests
             ReturnTypeFullName: "System.Threading.Tasks.Task",
             MemberTypeFullName: "N.Msg",
             Parameters: [parameter],
-            Attributes: [construction]);
+            Attributes: [construction],
+            HasSetter: true,
+            HasInitOnlySetter: true,
+            IsReadOnly: true,
+            IsConst: true);
         var member = new FragmentMember(memberFacts, [site]);
 
         var typeFacts = new TypeFacts(

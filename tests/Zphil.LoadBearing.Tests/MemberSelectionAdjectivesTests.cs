@@ -5,12 +5,14 @@ using Zphil.LoadBearing.Fluent;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     Null-argument guards on the member-adjective vocabulary (<see cref="MemberSelectionAdjectives" />):
-///     each public narrowing extension routes its string/predicate argument through <c>Guard.NotNull</c>,
-///     so a null argument is a programmer error that throws <see cref="ArgumentNullException" /> at the
-///     call site — naming the offending parameter — rather than minting a selection that resolves emptily
-///     later. The receiver is a <see cref="MethodSelection" />, so each call binds to the member-side
-///     vocabulary (GRAMMAR §5.7), never the identically-named type-side twin.
+///     The member-adjective vocabulary's guards and self-type contract
+///     (<see cref="MemberSelectionAdjectives" />). Each public narrowing extension routes its
+///     string/predicate argument through <c>Guard.NotNull</c>, so a null argument is a programmer error
+///     that throws <see cref="ArgumentNullException" /> at the call site — naming the offending parameter
+///     — rather than minting a selection that resolves emptily later. Every receiver here is a concrete
+///     member selection, so each call binds to the member-side vocabulary (GRAMMAR §5.7), never the
+///     identically-named type-side twin; the guard rows spell a <see cref="MethodSelection" />, and the
+///     closing row spells all three, because preserving each is its claim.
 /// </summary>
 public sealed class MemberSelectionAdjectivesTests
 {
@@ -57,5 +59,23 @@ public sealed class MemberSelectionAdjectivesTests
     {
         Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.AttributedWith((string)null!))
             .ParamName.ShouldBe("attributeFullName");
+    }
+
+    [Fact]
+    public void ThatAreStatic_PreservesTheConcreteSelectionType()
+    {
+        // A COMPILE-TIME pin: the TSelf shape returns each projection's own type, so the kind-only verb
+        // beside it stays reachable after the adjective. Each line below would fail to compile against a
+        // bare MemberSelection return, which is the whole claim — the assertions merely observe that the
+        // three chains do reify.
+        Arch.Types.Methods.ThatAreStatic()
+            .Returning(typeof(Task))
+            .ShouldBeOfType<MethodSelection>();
+        Arch.Types.Properties.ThatAreStatic()
+            .MustBeGetOnly()
+            .ShouldNotBeNull();
+        Arch.Types.Fields.ThatAreStatic()
+            .MustBeReadonly()
+            .ShouldNotBeNull();
     }
 }

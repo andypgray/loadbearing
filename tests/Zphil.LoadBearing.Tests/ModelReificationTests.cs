@@ -1,5 +1,6 @@
 using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Tests.Checking;
@@ -300,6 +301,57 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void PropertySubjectRule_ReifiesToWalkableMemberConstraint()
+    {
+        // The .Properties projection mints a PropertySelection, which is what carries the kind-only verb —
+        // the reified node is the same walkable MemberConstraint shape every other member verb reifies to.
+        var constraint = Checker.Model(arch => arch.Rule("domain/values-immutable")
+                .Enforce(arch.Namespace("MyApp.Domain.*").Properties.MustBeGetOnly())
+                .Because("A value another thread can write is not a value."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MemberMustBeGetOnlyConstraint>();
+
+        constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Property);
+        constraint.MemberSubject.ShouldBeOfType<PropertySelection>();
+        constraint.Subject.ShouldBeSameAs(constraint.MemberSubject.Source);
+        constraint.MemberOperands.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FieldSubjectRule_ReifiesToWalkableMemberConstraint()
+    {
+        var constraint = Checker.Model(arch => arch.Rule("state/no-static-mutable")
+                .Enforce(arch.Namespace("MyApp.Web.*").Fields.MustBeReadonly())
+                .Because("A writable static is process-wide state nothing declares."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MemberMustBeReadonlyConstraint>();
+
+        constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Field);
+        constraint.MemberSubject.ShouldBeOfType<FieldSelection>();
+        constraint.Subject.ShouldBeSameAs(constraint.MemberSubject.Source);
+        constraint.MemberOperands.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void StaticAdjective_ReifiesOntoTheMemberSelection_KeepingTheConcreteType()
+    {
+        // The adjective lands in the member selection's adjective list, and Rebuild returns the concrete
+        // type — which is what keeps the kind-only verb reachable after it, in any order.
+        var constraint = Checker.Model(arch => arch.Rule("state/no-static-mutable")
+                .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic().MustBeReadonly())
+                .Because("A writable static is process-wide state nothing declares."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MemberMustBeReadonlyConstraint>();
+
+        constraint.MemberSubject.Adjectives.OfType<MemberThatAreStaticAdjective>()
+            .ShouldHaveSingleItem();
+        constraint.MemberSubject.ShouldBeOfType<FieldSelection>();
+    }
+
+    [Fact]
     public void RegisteredNoun_WithLifetime_ReifiesToInjectConstraintCarryingLifetimes()
     {
         // arch.Registered(Lifetime.X) reifies to a RegisteredNoun carrying that lifetime; MustNotInject
@@ -489,6 +541,92 @@ public class ModelReificationTests
             typeof(SqlConnection));
     }
 
+    // ---- Membership and coverage verbs (GRAMMAR §5.3, §4.1, §4.7): one operand-carrying node, one
+    //      string-carrying node and one nullary node ----
+
+    [Fact]
+    public void MustBelongToRule_ReifiesToWalkableMembershipConstraint()
+    {
+        // The coverage verb stores its memberships on the shared operand list, so the generic walks reach
+        // them with no special-casing, and Memberships is a domain-named alias over that one list rather
+        // than a second copy — which is what asserting Operands against it holds.
+        ArchRule rule = Checker.Model(arch => arch.Rule("layering/no-ungoverned-types")
+                .Enforce(arch.Types.MustBelongTo(arch.Namespace("MyApp.Domain.*")))
+                .Because("A type in no declared layer is governed by nothing."))
+            .Rules.Single();
+
+        rule.ShouldReifyToWalkableDependencyConstraint<MustBelongToConstraint>(constraint => constraint.Memberships);
+    }
+
+    [Fact]
+    public void MustBelongTo_ExplicitTypeMembership_RoundTripsThroughTheOperandList()
+    {
+        // There is deliberately NO (Type first, params Type[] more) sugar twin on this verb, and the
+        // absence is the point of this row: a membership names WHERE a type may live — a layer, a project,
+        // a namespace — so a bare typeof operand would degenerate into "must be that type" rather than
+        // "must belong to". Writing the type selection out is still legal, and reifies like any other
+        // membership, which is what keeps the missing overload a choice rather than a gap.
+        var constraint = Checker.Model(arch => arch.Rule("legacy/billing/facade-only")
+                .Enforce(arch.Types.MustBelongTo(
+                    arch.Type(typeof(IBillingFacade)), arch.Namespace("MyApp.Domain.*")))
+                .Because("Reason."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustBelongToConstraint>();
+
+        // Memberships in authoring order, each carrying its own noun.
+        constraint.Memberships.Count.ShouldBe(2);
+        constraint.Memberships[0]
+            .Noun.ShouldBeOfType<TypeNoun>()
+            .Type.ShouldBe(typeof(IBillingFacade));
+        constraint.Memberships[1]
+            .Noun.ShouldBeOfType<NamespaceNoun>()
+            .Glob.ShouldBe("MyApp.Domain.*");
+        constraint.Operands.ShouldBe(constraint.Memberships);
+    }
+
+    [Fact]
+    public void MustResideInProjectRule_ReifiesToWalkableProjectConstraint()
+    {
+        // A string-carrying shape verb: the project name rides on the node itself, so the rule names no
+        // selection beyond its subject and both walk hooks stay empty.
+        ArchRule rule = Checker.Model(arch => arch.Rule("layering/services-in-web")
+                .Enforce(arch.Types.MustResideInProject("MyApp.Web"))
+                .Because("A service type belongs to the project that hosts it."))
+            .Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustResideInProjectConstraint>();
+
+        constraint.ProjectName.ShouldBe("MyApp.Web");
+        constraint.Operands.ShouldBeEmpty();
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MustBeRegisteredRule_ReifiesToWalkableNullaryConstraint()
+    {
+        // The nullary shape verb: its membership is an extracted fact rather than an authored operand, so
+        // there is nothing on the node for a walk to reach and the subject is the only selection the rule
+        // names — the node's whole payload is which verb it is.
+        ArchRule rule = Checker.Model(arch => arch.Rule("di/handlers-registered")
+                .Enforce(arch.Types.MustBeRegistered())
+                .Because("A type the container never sees cannot be resolved."))
+            .Rules.Single();
+
+        rule.Posture.ShouldBe(Posture.Enforce);
+        var constraint = rule.Constraint.ShouldBeOfType<MustBeRegisteredConstraint>();
+
+        constraint.Operands.ShouldBeEmpty();
+        constraint.MemberOperands.ShouldBeEmpty();
+        // Subject selection intact — the bare Types noun, no adjectives.
+        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject.Adjectives.ShouldBeEmpty();
+    }
+
     // ---- Surface union: arch.AnyOf reification (GRAMMAR §5.1) ----
 
     [Fact]
@@ -604,8 +742,8 @@ public class ModelReificationTests
 }
 
 /// <summary>
-///     The shared claim the dependency-verb rows above make about a reified <see cref="ArchRule" />, as an
-///     extension so the rule each row already arranged reads as the sentence's subject.
+///     The shared claim the operand-carrying-verb rows above make about a reified <see cref="ArchRule" />, as
+///     an extension so the rule each row already arranged reads as the sentence's subject.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -621,14 +759,16 @@ public class ModelReificationTests
 file static class ArchRuleReificationAssertions
 {
     /// <summary>
-    ///     Asserts <paramref name="rule" /> reified to the walkable shape every dependency-shape verb shares:
-    ///     an Enforce <typeparamref name="TConstraint" /> carrying one target, with the generic walk reaching
-    ///     that target through <c>Operands</c>, an empty member hook, and the subject selection intact.
+    ///     Asserts <paramref name="rule" /> reified to the walkable shape every operand-carrying verb shares —
+    ///     the dependency verbs and the coverage verb alike: an Enforce <typeparamref name="TConstraint" />
+    ///     carrying one operand, with the generic walk reaching that operand through <c>Operands</c>, an empty
+    ///     member hook, and the subject selection intact.
     /// </summary>
     /// <remarks>
-    ///     <paramref name="targets" /> is a parameter because each verb declares its own <c>Targets</c> rather
-    ///     than inheriting one from <see cref="OperandConstraint" /> — reading it through the concrete type is
-    ///     what keeps every row pinning the property its own verb publishes.
+    ///     <paramref name="targets" /> is a parameter because each verb declares its own domain-named list
+    ///     (<c>Targets</c>, <c>Memberships</c>) rather than inheriting one from
+    ///     <see cref="OperandConstraint" /> — reading it through the concrete type is what keeps every row
+    ///     pinning the property its own verb publishes.
     /// </remarks>
     internal static void ShouldReifyToWalkableDependencyConstraint<TConstraint>(
         this ArchRule rule, Func<TConstraint, IReadOnlyList<Selection>> targets)
@@ -639,10 +779,11 @@ file static class ArchRuleReificationAssertions
         var constraint = rule.Constraint.ShouldBeOfType<TConstraint>(report);
         IReadOnlyList<Selection> declared = targets(constraint);
 
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
+        // Operands in authoring order; the verb's own list is an alias over them (the operand walk hook, NOT
+        // MemberOperands).
         declared.ShouldHaveSingleItem(report);
         constraint.Operands.ShouldBe(declared, report);
-        // A dependency-shape verb overrides Operands, not MemberOperands — its member hook is empty.
+        // An operand-carrying verb overrides Operands, not MemberOperands — its member hook is empty.
         constraint.MemberOperands.ShouldBeEmpty(report);
         // Subject selection intact — the bare Types noun, no adjectives.
         constraint.Subject.Noun.ShouldBeOfType<TypesNoun>(report);

@@ -571,6 +571,9 @@ internal static class SpecValidator
             case MustResideInNamespaceConstraint c:
                 yield return (c.Glob, PatternKind.NamespacePattern);
                 break;
+            case MustResideInProjectConstraint c:
+                yield return (c.ProjectName, PatternKind.ProjectName);
+                break;
             case MustHaveNameMatchingConstraint c:
                 yield return (c.Glob, PatternKind.NamePattern);
                 break;
@@ -653,7 +656,9 @@ internal static class SpecValidator
 
     private static IEnumerable<(string Value, PatternKind Kind)> SelectionPatterns(Selection selection)
     {
-        // A NamespaceNoun carries a glob; a LayerNoun's globs are validated once in ValidateLayers (their
+        // A NamespaceNoun carries a glob and a ProjectNoun a name, both checked here — this one arm covers
+        // every position a noun can stand in (subject, operand, Except payload, quarantined scope), because
+        // each position reaches this walk. A LayerNoun's globs are validated once in ValidateLayers (their
         // use-independent home), so they are not re-checked here. A UnionSelection has no single noun, so
         // its operands answer for it — and either way the adjective loop below runs, because a union
         // carries adjectives of its own (AnyOf(a, b).InNamespace("") must reach the blank-pattern check).
@@ -662,6 +667,7 @@ internal static class SpecValidator
             foreach ((string, PatternKind) pattern in SelectionPatterns(member))
                 yield return pattern;
         else if (selection.Noun is NamespaceNoun ns) yield return (ns.Glob, PatternKind.NamespacePattern);
+        else if (selection.Noun is ProjectNoun project) yield return (project.Name, PatternKind.ProjectName);
 
         foreach (SelectionAdjective adjective in selection.Adjectives)
             switch (adjective)
@@ -720,9 +726,9 @@ internal static class SpecValidator
     }
 
     /// <summary>
-    ///     What a glob, affix or string anchor is, for the pattern walk: the label the error names it by
-    ///     ("Blank interface name on 'rule/id'.") and whether it carries namespace structure, which is what
-    ///     decides between the blank check alone and the full dead-subtree-prefix check.
+    ///     What a glob, affix, project name or string anchor is, for the pattern walk: the label the error
+    ///     names it by ("Blank interface name on 'rule/id'.") and whether it carries namespace structure,
+    ///     which is what decides between the blank check alone and the full dead-subtree-prefix check.
     /// </summary>
     /// <remarks>
     ///     One instance per kind, so each label literal is written once and the two facts about a kind
@@ -740,6 +746,7 @@ internal static class SpecValidator
         internal static readonly PatternKind AttributeName = new("attribute name", false);
         internal static readonly PatternKind InterfaceName = new("interface name", false);
         internal static readonly PatternKind BaseTypeName = new("base type name", false);
+        internal static readonly PatternKind ProjectName = new("project name", false);
 
         /// <summary>The noun the BlankPattern / UnanchoredSubtreePattern messages name this kind by.</summary>
         internal string Label { get; } = label;

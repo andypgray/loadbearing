@@ -52,6 +52,10 @@ internal sealed record FragmentMember(
             declarationSites,
             filePaths,
             parameters,
-            attributes);
+            attributes,
+            hasSetter: Facts.HasSetter,
+            hasInitOnlySetter: Facts.HasInitOnlySetter,
+            isReadOnly: Facts.IsReadOnly,
+            isConst: Facts.IsConst);
     }
 }

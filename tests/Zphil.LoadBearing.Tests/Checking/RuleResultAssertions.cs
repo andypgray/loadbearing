@@ -190,6 +190,53 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the rule failed on exactly one shape violation, naming <paramref name="subject" /> and
+    ///     evidenced by <paramref name="sites" /> — the offending type's own declaration sites, each
+    ///     rendered <c>file:line</c> (GRAMMAR §4.4).
+    /// </summary>
+    /// <remarks>
+    ///     A shape violation has no edge to cite, so its sites are the whole of what an agent can jump to,
+    ///     and the two facts are asserted together because a subject without its evidence is half the
+    ///     claim. Exactly one violation of any kind, which is stricter than
+    ///     <see cref="ShouldHaveFailedWithSubjects" /> over a single-element set: nothing rides along
+    ///     unnamed.
+    /// </remarks>
+    internal static Violation ShouldHaveFailedWithSubjectAtSites(
+        this RuleResult result, string subject, string[] sites)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Violation violation = result.Violations.ShouldHaveSingleItem(report);
+
+        violation.ShouldSatisfyAllConditions(
+            () => violation.Kind.ShouldBe(ViolationKind.Shape, report),
+            () => violation.Subject!.FullName.ShouldBe(subject, report),
+            () => RenderedSites(violation).ShouldBe(sites, report));
+
+        return violation;
+    }
+
+    /// <summary>
+    ///     The member twin of <see cref="ShouldHaveFailedWithSubjectAtSites" />: exactly one member-shape
+    ///     violation, naming <paramref name="symbolId" /> — the member's own DocId (GRAMMAR §4.6) — and
+    ///     evidenced by <paramref name="sites" />.
+    /// </summary>
+    internal static Violation ShouldHaveFailedWithMemberAtSites(
+        this RuleResult result, string symbolId, string[] sites)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Violation violation = result.Violations.ShouldHaveSingleItem(report);
+
+        violation.ShouldSatisfyAllConditions(
+            () => violation.Kind.ShouldBe(ViolationKind.MemberShape, report),
+            () => violation.SubjectMember!.SymbolId.ShouldBe(symbolId, report),
+            () => RenderedSites(violation).ShouldBe(sites, report));
+
+        return violation;
+    }
+
+    /// <summary>
     ///     Asserts the rule failed carrying every one of <paramref name="edges" /> as a violation of
     ///     <paramref name="kind" /> — and says nothing about what else it carries, for the rows whose fixture
     ///     is a whole solution and whose claim is that one edge is in the report.
@@ -271,6 +318,21 @@ internal static class RuleResultAssertions
     {
         return result.Violations.Where(violation => violation.Kind == kind)
             .Select(violation => Edge(violation) ?? NothingPopulated)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     A violation's sites, each rendered <c>file:line</c>, in the order the violation carries them —
+    ///     the same rendering <see cref="Describe(Violation)" /> puts in the failure text, so an expectation
+    ///     and the report it reds beside are spelled alike.
+    /// </summary>
+    /// <remarks>
+    ///     Order is asserted rather than tolerated: site order is the extractor's declaration order, pinned
+    ///     in its own right, so a shuffled list is a finding and not noise.
+    /// </remarks>
+    private static IReadOnlyList<string> RenderedSites(Violation violation)
+    {
+        return violation.Sites.Select(site => site.ToString())
             .ToList();
     }
 

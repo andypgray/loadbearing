@@ -182,6 +182,24 @@ public sealed class OracleArchitecture
             .ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    ///     The declaring-type FullNames of the MyApp-declared MEMBERS that fail <paramref name="rule" /> — the
+    ///     member-row analog of <see cref="FailingTypeNames" />, reduced to type granularity (the row 8/9
+    ///     bridge). A member rule cannot go through <see cref="FailingTypeNames" />: its
+    ///     <c>OfType&lt;IType&gt;</c> drops every failing <c>PropertyMember</c>/<c>FieldMember</c> and returns
+    ///     the empty set, which would read as agreement.
+    /// </summary>
+    public IReadOnlySet<string> FailingMemberDeclaringTypeNames(IArchRule rule)
+    {
+        return rule.Evaluate(Architecture)
+            .Where(result => !result.Passed)
+            .Select(result => result.EvaluatedObject)
+            .OfType<IMember>()
+            .Select(member => member.DeclaringType.FullName)
+            .Where(_declaredNames.Contains)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
     private static string ShouldHaveBakedPath(string key)
     {
         string? path = typeof(OracleArchitecture).Assembly

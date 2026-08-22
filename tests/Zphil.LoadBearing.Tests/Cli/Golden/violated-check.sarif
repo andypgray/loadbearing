@@ -317,6 +317,96 @@
               "properties": {
                 "posture": "enforce"
               }
+            },
+            {
+              "id": "layering/services-in-web",
+              "shortDescription": {
+                "text": "Types named `*Service` must reside in project `MyApp.Web`."
+              },
+              "fullDescription": {
+                "text": "Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep."
+              },
+              "help": {
+                "text": "Move the service into the MyApp.Web project."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/no-ungoverned-types",
+              "shortDescription": {
+                "text": "Types in `MyApp.*` must belong to the Domain layer or the Web layer."
+              },
+              "fullDescription": {
+                "text": "A type in no declared layer is governed by no layer rule; the two layers are the covering set."
+              },
+              "help": {
+                "text": "Move the type into a declared layer's namespace, or declare its layer in this spec."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "di/handlers-registered",
+              "shortDescription": {
+                "text": "Types implementing `IHandler<T>` or types named `*Scheduler` must be registered."
+              },
+              "fullDescription": {
+                "text": "Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup."
+              },
+              "help": {
+                "text": "Register the type in ServiceWiring.Configure."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "domain/values-immutable",
+              "shortDescription": {
+                "text": "Properties of the Domain layer must be get-only."
+              },
+              "fullDescription": {
+                "text": "A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it."
+              },
+              "help": {
+                "text": "Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "state/no-static-mutable",
+              "shortDescription": {
+                "text": "Static fields of the Web layer must be readonly."
+              },
+              "fullDescription": {
+                "text": "A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so."
+              },
+              "help": {
+                "text": "Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
             }
           ]
         }
@@ -1059,6 +1149,270 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-in-web",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Domain.OrderService|MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/BillingCalculator.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.BillingCalculator|MyApp.Legacy.Billing/BillingCalculator.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.BillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/BillingFacade.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.BillingFacade|MyApp.Legacy.Billing/BillingFacade.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/IBillingFacade.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.IBillingFacade|MyApp.Legacy.Billing/IBillingFacade.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/RoundingMode.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.RoundingMode|MyApp.Legacy.Billing/RoundingMode.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-registered",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceCreatedHandler"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Web.InvoiceCreatedHandler|MyApp.Web/InvoiceCreatedHandler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-registered",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.RefundProcessor"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/RefundProcessor.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Web.RefundProcessor|MyApp.Web/RefundProcessor.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Money.Amount"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Money.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||P:MyApp.Domain.Money.Amount|MyApp.Domain/Money.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Order.Reference"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Order.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||P:MyApp.Domain.Order.Reference|MyApp.Domain/Order.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Order.Total"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Order.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||P:MyApp.Domain.Order.Total|MyApp.Domain/Order.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "state/no-static-mutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportBudget.RenderCount"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportBudget.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||F:MyApp.Web.ReportBudget.RenderCount|MyApp.Web/ReportBudget.cs|0"
           },
           "baselineState": "new"
         }

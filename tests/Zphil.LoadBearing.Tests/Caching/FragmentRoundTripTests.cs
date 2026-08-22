@@ -26,7 +26,8 @@ public sealed class FragmentRoundTripTests
         // constructed interfaces, attributes (with an external System.Attribute) on a type AND on a member, a
         // [GeneratedCode] type and the nested type that inherits the flag through the containing-type walk,
         // cross-project references, partials across files (declaration-site union), a multi-site edge,
-        // externals, and a multi-TFM project.
+        // externals, a multi-TFM project, and a carrier of every member mutability shape (const, static
+        // readonly, writable field, get/set property, get-only property) beside the record's init-only one.
         IReadOnlyList<CodebaseFragment> fragments = ExtractRichSolution();
 
         // Act
@@ -46,6 +47,30 @@ public sealed class FragmentRoundTripTests
             .Member("M:N.Handler.Handle(N.Msg)")
             .AttributeNames()
             .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+
+        // The same non-vacuity guard for the four mutability facts: each is a bool whose absent value is
+        // false, so a dropped field round-trips equal unless something in the solution reads true. One
+        // assertion per fact, on both sides.
+        direct.Member("N.Money", "P:N.Money.Amount")
+            .HasInitOnlySetter.ShouldBeTrue();
+        direct.Member("N.Budget", "F:N.Budget.Max")
+            .IsConst.ShouldBeTrue();
+        direct.Member("N.Budget", "F:N.Budget.Name")
+            .IsReadOnly.ShouldBeTrue();
+        direct.Member("N.Budget", "P:N.Budget.Mutable")
+            .HasSetter.ShouldBeTrue();
+        direct.Member("N.Budget", "P:N.Budget.Frozen")
+            .HasSetter.ShouldBeFalse();
+        fromCache.Member("N.Money", "P:N.Money.Amount")
+            .HasInitOnlySetter.ShouldBeTrue();
+        fromCache.Member("N.Budget", "F:N.Budget.Max")
+            .IsConst.ShouldBeTrue();
+        fromCache.Member("N.Budget", "F:N.Budget.Name")
+            .IsReadOnly.ShouldBeTrue();
+        fromCache.Member("N.Budget", "P:N.Budget.Mutable")
+            .HasSetter.ShouldBeTrue();
+        fromCache.Member("N.Budget", "P:N.Budget.Frozen")
+            .HasSetter.ShouldBeFalse();
 
         // Total-fact equality: the round-trip is invisible to the merged model.
         fromCache.ShouldModelTheSameAs(direct);
@@ -459,6 +484,14 @@ public sealed class FragmentRoundTripTests
                              public class Msg {}
                              [Mark] public class Handler : IHandler<Msg>, IDerived<Msg> { [Mark] public void Handle(Msg m) {} }
                              [System.CodeDom.Compiler.GeneratedCode("Tool", "1.0")] public class Emitted { public class Inner {} }
+                             public class Budget
+                             {
+                                 public const int Max = 5;
+                                 public static readonly string Name = "b";
+                                 public static int Count;
+                                 public int Mutable { get; set; }
+                                 public int Frozen { get; }
+                             }
                              """),
             ("SplitA.cs", """
                           namespace N;

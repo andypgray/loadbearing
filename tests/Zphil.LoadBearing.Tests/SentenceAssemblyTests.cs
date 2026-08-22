@@ -929,4 +929,163 @@ public class SentenceAssemblyTests
                 .AttributedWith(typeof(AuditAttribute)))
             .ShouldBe("`[ApiController]`-attributed `[Audit]`-attributed methods of types");
     }
+
+    // ---- The member mutability verbs and the static adjective (GRAMMAR §5.7, §6). A member subject never
+    //      speaks in collective layer voice: the layer sits in REFERENCE position, so the type-subject
+    //      bare-layer/adjective-bearing voice switch has nothing to switch here ----
+
+    [Fact]
+    public void MustBeGetOnly_MemberSubjectOverALayer_RendersInMemberVoice()
+    {
+        Layer domain = Arch.Layer("Domain", "MyApp.Domain.*");
+        SentenceRenderer.Sentence(domain.Properties.MustBeGetOnly())
+            .ShouldBe("Properties of the Domain layer must be get-only.");
+    }
+
+    [Fact]
+    public void ThatAreStatic_PremodifiesTheKindPlural()
+    {
+        // The head prefix leads the kind plural, and the layer stays in reference position behind it.
+        Layer core = Arch.Layer("Core", "MyApp.Core.*");
+        SentenceRenderer.Sentence(core.Fields.ThatAreStatic()
+                .MustBeReadonly())
+            .ShouldBe("Static fields of the Core layer must be readonly.");
+    }
+
+    [Fact]
+    public void ThatAreStaticAndAttributedWith_HeadPrefixesConcatenateInAuthoringOrder()
+    {
+        // Two head prefixes from DIFFERENT families now meet for the first time, and they concatenate rather
+        // than one winning: stacked prefixes are an INTERSECTION, so both must reach the sentence or it would
+        // describe a wider subject than the checker uses. Authoring order decides which leads — pinned in
+        // both orders, because the order is the observable fact and neither reading is the renderer's to
+        // canonicalize.
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.AttributedWith(typeof(AuditAttribute))
+                .ThatAreStatic())
+            .ShouldBe("`[Audit]`-attributed static fields of types");
+
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.ThatAreStatic()
+                .AttributedWith(typeof(AuditAttribute)))
+            .ShouldBe("Static `[Audit]`-attributed fields of types");
+    }
+
+    [Fact]
+    public void ThatAreStatic_WithMemberWhere_KeepsTheWhereSentenceFinal()
+    {
+        // Three placements in one member subject: the prefix leads, the type reference follows the kind
+        // plural, and the Where canonicalizes sentence-final whatever the chain order.
+        SentenceRenderer.MemberSubject(Arch.Types.Fields
+                .Where(m => !m.IsConst, "that are not constants")
+                .ThatAreStatic())
+            .ShouldBe("Static fields of types that are not constants");
+    }
+
+    // ---- The coverage verb (GRAMMAR §5.3, §6, §10): its memberships render in reference position through
+    //      the SHARED target list, so layers read as layers and colliding types widen like any other list ----
+
+    [Fact]
+    public void MustBelongTo_BareLayerSubject_SpeaksCollectively()
+    {
+        // Layer voice (§6): a bare layer subject speaks collectively on the coverage verb too, and a single
+        // membership joins to itself — no degenerate "or" list.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustBelongTo(Arch.Layer("Application", "MyApp.*")))
+            .ShouldBe("The Web layer must belong to the Application layer.");
+    }
+
+    [Fact]
+    public void MustBelongTo_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        // Head truth under adjectives (§6): a WithSuffix-bearing layer subject switches to types voice, while
+        // the membership keeps its own collective reference fragment on the far side of the verb.
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.WithSuffix("Controller")
+                .MustBelongTo(Arch.Layer("Application", "MyApp.*")))
+            .ShouldBe("Types in the Web layer named `*Controller` must belong to the Application layer.");
+    }
+
+    [Fact]
+    public void MustBelongTo_ThreeMemberships_JoinWithCommasAndOr_NoOxfordComma()
+    {
+        // Shares TargetList with the dependency verbs, so three memberships join "`A`, `B` or `C`" with no
+        // Oxford comma — and the or-join is what says the rule is satisfied by ANY one of them.
+        Constraint constraint = Arch.Types.MustBelongTo(
+            Arch.Layer("Core", "MyApp.Core.*"),
+            Arch.Layer("Host", "MyApp.Host.*"),
+            Arch.Layer("Adapter", "MyApp.Adapter.*"));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must belong to the Core layer, the Host layer or the Adapter layer.");
+    }
+
+    [Fact]
+    public void MustBelongTo_CollidingTypeMemberships_QualifyWithMinimalTrailingSegments()
+    {
+        // The list is genuinely the shared one: a type-selection membership widens by the same minimal-
+        // trailing-segments rule the dependency target lists use.
+        Constraint constraint = Arch.Types.MustBelongTo(
+            Arch.Type(typeof(Order)), Arch.Type(typeof(Stubs.Sales.Order)));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must belong to `Billing.Order` or `Sales.Order`.");
+    }
+
+    // ---- Project residence (GRAMMAR §5.3, §6): the verb names the project axis in its own phrase, so a
+    //      project-noun subject and a project-named verb can meet in one sentence ----
+
+    [Fact]
+    public void MustResideInProject_BareLayerSubject_SpeaksCollectively()
+    {
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.MustResideInProject("MyApp.Web"))
+            .ShouldBe("The Web layer must reside in project `MyApp.Web`.");
+    }
+
+    [Fact]
+    public void MustResideInProject_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        Layer web = Arch.Layer("Web", "MyApp.Web.*");
+        SentenceRenderer.Sentence(web.WithSuffix("Controller")
+                .MustResideInProject("MyApp.Web"))
+            .ShouldBe("Types in the Web layer named `*Controller` must reside in project `MyApp.Web`.");
+    }
+
+    [Fact]
+    public void MustResideInProject_ProjectSubject_RendersBothProjectNames()
+    {
+        // The one sentence where the project noun's locative and the verb's own project phrase meet: the
+        // subject names where the types are, the verb names where they must be, and both survive.
+        SentenceRenderer.Sentence(Arch.Project("A")
+                .MustResideInProject("B"))
+            .ShouldBe("Types in project `A` must reside in project `B`.");
+    }
+
+    // ---- Registration completeness (GRAMMAR §5.3, §4.7, §6): a nullary verb, so the whole sentence past
+    //      "must" is fixed and every reading difference lives in the subject ----
+
+    [Fact]
+    public void MustBeRegistered_BareLayerSubject_SpeaksCollectively()
+    {
+        Layer services = Arch.Layer("Services", "MyApp.Services.*");
+        SentenceRenderer.Sentence(services.MustBeRegistered())
+            .ShouldBe("The Services layer must be registered.");
+    }
+
+    [Fact]
+    public void MustBeRegistered_AdjectiveBearingLayerSubject_SwitchesToTypesVoice()
+    {
+        Layer services = Arch.Layer("Services", "MyApp.Services.*");
+        SentenceRenderer.Sentence(services.WithSuffix("Service")
+                .MustBeRegistered())
+            .ShouldBe("Types in the Services layer named `*Service` must be registered.");
+    }
+
+    [Fact]
+    public void MustBeRegistered_RegisteredSubject_KeepsTheLifetimeQualifiedHead()
+    {
+        // Degenerate but legal, and the reason it is pinned: the Registered noun's head IS its fragment
+        // (§5.1), so a subject that already names the registration fact keeps that head in front of the
+        // verb that tests it — never a false bare "Types must be registered."
+        SentenceRenderer.Sentence(Arch.Registered(Lifetime.Singleton)
+                .MustBeRegistered())
+            .ShouldBe("Singleton-registered types must be registered.");
+    }
 }

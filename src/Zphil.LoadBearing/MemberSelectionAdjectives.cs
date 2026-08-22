@@ -68,13 +68,27 @@ public static class MemberSelectionAdjectives
         return Append(selection, new MemberAttributedWithAdjective(anchor));
     }
 
+    /// <summary>
+    ///     Narrows to members declared <c>static</c>: "static fields of …". Like the attribute twin the
+    ///     fragment premodifies the member head, so the fact stays attached to the noun it narrows, and the
+    ///     two prefixes concatenate in authoring order when both are present (GRAMMAR §5.7, §6).
+    /// </summary>
+    public static TSelf ThatAreStatic<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberThatAreStaticAdjective());
+    }
+
     // The generic twin is receiver-typed rather than TSelf-generic, and that asymmetry with every other
     // adjective in this file is deliberate: C# has no PARTIAL type inference, so a two-type-parameter
     // AttributedWith<TSelf, T>(this TSelf, ...) would force `selection.AttributedWith<MethodSelection,
     // MyAttribute>()` at every call site — the sugar's whole point is that the type argument is the only
-    // thing written. One overload per receiver recovers what TSelf was there for: the MethodSelection
-    // overload keeps `.Returning` and MustAcceptParameter reachable after the sugar, and KindMemberSelection
-    // is internal, so no other concrete member selection exists to lose. Do not "fix" this back to TSelf.
+    // thing written. One overload per receiver recovers what TSelf was there for, so the set has to cover
+    // every concrete member selection there is: MethodSelection keeps `.Returning` and MustAcceptParameter
+    // reachable after the sugar, PropertySelection keeps MustBeGetOnly, FieldSelection keeps MustBeReadonly,
+    // and the MemberSelection overload serves .Members/.Events, whose KindMemberSelection is internal. A new
+    // projection type ships its overload here or its kind-only verb silently stops compiling after the
+    // sugar. Do not "fix" this back to TSelf.
 
     /// <summary>
     ///     Narrows to members carrying attribute <typeparamref name="T" /> —
@@ -92,6 +106,28 @@ public static class MemberSelectionAdjectives
     ///     <see cref="MethodSelection.Returning" /> and <c>MustAcceptParameter</c> reachable after the sugar.
     /// </summary>
     public static MethodSelection AttributedWith<T>(this MethodSelection selection)
+        where T : Attribute
+    {
+        return selection.AttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     Narrows to properties carrying attribute <typeparamref name="T" /> —
+    ///     <c>≡ AttributedWith(typeof(T))</c>. The <see cref="PropertySelection" /> receiver is what keeps
+    ///     <c>MustBeGetOnly</c> reachable after the sugar.
+    /// </summary>
+    public static PropertySelection AttributedWith<T>(this PropertySelection selection)
+        where T : Attribute
+    {
+        return selection.AttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     Narrows to fields carrying attribute <typeparamref name="T" /> —
+    ///     <c>≡ AttributedWith(typeof(T))</c>. The <see cref="FieldSelection" /> receiver is what keeps
+    ///     <c>MustBeReadonly</c> reachable after the sugar.
+    /// </summary>
+    public static FieldSelection AttributedWith<T>(this FieldSelection selection)
         where T : Attribute
     {
         return selection.AttributedWith(typeof(T));

@@ -10,7 +10,9 @@ namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
 ///     The one bed in the fast-path checker tests where a single source file compiles into more than one
-///     project (GRAMMAR §4.1), shared by this class and <see cref="MultiplyDeclaredAttributionTests" />.
+///     project (GRAMMAR §4.1), shared by this class, <see cref="MultiplyDeclaredAttributionTests" /> and
+///     <see cref="MustResideInProjectVerbTests" /> — membership, edge attribution, and the residence verb
+///     read the same three declarers rather than each staging a multi-project extraction of its own.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -184,7 +186,7 @@ public sealed class MultiplyDeclaredMembershipTests
                     .Because("Awaitable methods are discovered by suffix."))
             .Single();
 
-        result.Violators(ViolationKind.MemberShape, violation => violation.SubjectMember!.SymbolId)
+        result.MemberShapeSubjects()
             .ShouldBe(["M:Shared.Widget.Run"]);
     }
 

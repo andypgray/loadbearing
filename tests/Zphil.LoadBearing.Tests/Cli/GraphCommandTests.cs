@@ -41,7 +41,7 @@ public sealed class GraphCommandTests
         Projects (3):
           MyApp.Domain — 8 types; references: MyApp.Web
           MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 18 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 19 types; references: MyApp.Legacy.Billing
 
         Projects the solution declares that this survey does not cover:
           (none)
@@ -59,7 +59,7 @@ public sealed class GraphCommandTests
         Namespaces:
           MyApp.Domain: MyApp.Domain (8)
           MyApp.Legacy.Billing: MyApp.Legacy.Billing (4)
-          MyApp.Web: MyApp.Web (18)
+          MyApp.Web: MyApp.Web (19)
 
         External references (by namespace root):
           MyApp.Domain -> System: 3
@@ -81,7 +81,7 @@ public sealed class GraphCommandTests
         Codebase survey: MyApp.sln
 
         Projects (1):
-          MyApp.Web — 18 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 19 types; references: MyApp.Legacy.Billing
 
         Projects the solution declares that this survey does not cover:
           (none)

@@ -103,7 +103,7 @@ public static class AgentContextRenderer
     {
         Guard.NotNull(model, nameof(model));
 
-        bool hasRegisteredNoun = model.Rules.Any(rule => rule.Constraint is { } constraint && CarriesRegisteredNoun(constraint));
+        bool needsRegisteredGlossary = model.Rules.Any(rule => rule.Constraint is { } constraint && NeedsRegisteredGlossary(constraint));
         var sections = new List<string>
         {
             ProvenanceLine(specName),
@@ -113,7 +113,7 @@ public static class AgentContextRenderer
 
         // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
         // non-inject verb, and MustNotInject can ban a plain type), so it is its own paragraph (GRAMMAR §10).
-        if (hasRegisteredNoun) sections.Add(GlossaryRegisteredLine);
+        if (needsRegisteredGlossary) sections.Add(GlossaryRegisteredLine);
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));
 
@@ -144,13 +144,16 @@ public static class AgentContextRenderer
         return string.Join("; ", clauses) + ". " + GlossaryTail;
     }
 
-    // True when a rule's subject or any operand carries a Registered noun (GRAMMAR §10) — descending through
-    // Except payloads and the internal Quarantine union, since a Registered noun in any of those still renders the
-    // word "registered" in the block's prose and so must gate the glossary line. The descent is the shared
+    // True when a rule renders the word "registered" (GRAMMAR §10) — out of the VERB, which spells it with no
+    // noun to carry it, or out of a Registered noun in the subject or any operand. The noun half descends
+    // through Except payloads and the internal Quarantine union, since a Registered noun in any of those still
+    // renders the word in the block's prose and so must gate the glossary line. The descent is the shared
     // SelectionWalk, so the block glosses exactly the nouns validation sees; the union guard is
     // SpecValidator.CheckLifetimes's, and it is load-bearing because a UnionSelection has no noun to read.
-    private static bool CarriesRegisteredNoun(Constraint constraint)
+    private static bool NeedsRegisteredGlossary(Constraint constraint)
     {
+        if (constraint is MustBeRegisteredConstraint) return true;
+
         IEnumerable<Selection> selections = SelectionWalk.ConstraintSelections(constraint);
         return selections.Any(selection => selection is not UnionSelection && selection.Noun is RegisteredNoun);
     }

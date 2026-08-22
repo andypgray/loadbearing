@@ -477,7 +477,7 @@ public sealed class CheckCommandE2ETests
         // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
         // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
         result.ShouldSucceed(
-            "Checking 1 of 18 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            "Checking 1 of 23 rules matching 'layering/billing-independent'; the verdict below covers only those, "
             + "so a clean result here is not a clean solution.");
         result.Out.ShouldNotContain("layering/domain-independent");
     }
@@ -491,7 +491,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
         result.ShouldReportViolations(
-            "Checking 5 of 18 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            "Checking 5 of 23 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
             + "result here is not a clean solution.",
             "FAIL exceptions/no-general-catch",
             "FAIL exceptions/no-bare-bcl-throw");

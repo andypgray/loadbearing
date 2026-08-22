@@ -236,10 +236,34 @@ public static class SelectionConstraints
         return new MustOnlyThrowConstraint(subject, WrappedTypes(subject, first, more));
     }
 
+    /// <summary>
+    ///     The subject must belong to at least one of the memberships — the coverage verb, whose reds are
+    ///     the subject types no membership names (GRAMMAR §5.3, §10). The memberships or-join in the
+    ///     rendered sentence ("must belong to the Domain layer or the Web layer"), so the any-of reading is
+    ///     stated by the sentence itself. There is deliberately no type sugar: memberships name where a
+    ///     type may live — layers, projects, namespaces — and a bare <c>typeof</c> operand would degenerate
+    ///     into "must be that type" (GRAMMAR §3.3).
+    /// </summary>
+    public static Constraint MustBelongTo(this Selection subject, Selection first, params Selection[] more)
+    {
+        return new MustBelongToConstraint(subject, Selections(subject, first, more));
+    }
+
     /// <summary>The subject must reside in a namespace glob.</summary>
     public static Constraint MustResideInNamespace(this Selection subject, string glob)
     {
         return new MustResideInNamespaceConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+    }
+
+    /// <summary>
+    ///     The subject must reside in the named project — declared-by membership (GRAMMAR §5.3, §4.1), so
+    ///     any declarer of a type several projects compile satisfies it. Single-name arity mirrors
+    ///     <see cref="MustResideInNamespace" />; several projects is <see cref="MustBelongTo" /> with
+    ///     project memberships.
+    /// </summary>
+    public static Constraint MustResideInProject(this Selection subject, string projectName)
+    {
+        return new MustResideInProjectConstraint(Subject(subject), NotNull(projectName, nameof(projectName)));
     }
 
     /// <summary>The subject's type names must end with a suffix.</summary>
@@ -471,6 +495,20 @@ public static class SelectionConstraints
     public static Constraint MustBeInternal(this Selection subject)
     {
         return new MustBeInternalConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     The subject must be registered in a container — the completeness half of the DI axis beside
+    ///     <see cref="MustNotInject(Selection,Selection,Selection[])" />'s shape half (GRAMMAR §5.3, §4.7).
+    ///     Membership is exactly <c>arch.Registered()</c>'s, at any lifetime. Registration is read from
+    ///     source-visible container registrations, so a registration the extraction cannot see — assembly
+    ///     scanning, keyed overloads, a raw <c>ServiceDescriptor</c>, an extension compiled into a
+    ///     package — makes a correctly registered type a false red; an estate that registers by convention
+    ///     should not use the verb.
+    /// </summary>
+    public static Constraint MustBeRegistered(this Selection subject)
+    {
+        return new MustBeRegisteredConstraint(Subject(subject));
     }
 
     /// <summary>

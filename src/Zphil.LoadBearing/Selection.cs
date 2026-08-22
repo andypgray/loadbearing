@@ -42,11 +42,17 @@ public abstract class Selection
     /// </summary>
     public MethodSelection Methods => new(this, Array.Empty<MemberAdjective>());
 
-    /// <summary>The declared properties of the selected types (GRAMMAR §4.6): "properties of {ref}".</summary>
-    public MemberSelection Properties => new KindMemberSelection(this, MemberKindFilter.Property, Array.Empty<MemberAdjective>());
+    /// <summary>
+    ///     The declared properties of the selected types (GRAMMAR §4.6): "properties of {ref}". A
+    ///     <see cref="PropertySelection" />, so <c>.MustBeGetOnly()</c> is available.
+    /// </summary>
+    public PropertySelection Properties => new(this, Array.Empty<MemberAdjective>());
 
-    /// <summary>The declared fields of the selected types (GRAMMAR §4.6): "fields of {ref}".</summary>
-    public MemberSelection Fields => new KindMemberSelection(this, MemberKindFilter.Field, Array.Empty<MemberAdjective>());
+    /// <summary>
+    ///     The declared fields of the selected types (GRAMMAR §4.6): "fields of {ref}". A
+    ///     <see cref="FieldSelection" />, so <c>.MustBeReadonly()</c> is available.
+    /// </summary>
+    public FieldSelection Fields => new(this, Array.Empty<MemberAdjective>());
 
     /// <summary>The declared events of the selected types (GRAMMAR §4.6): "events of {ref}".</summary>
     public MemberSelection Events => new KindMemberSelection(this, MemberKindFilter.Event, Array.Empty<MemberAdjective>());

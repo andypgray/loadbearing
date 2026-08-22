@@ -856,3 +856,22 @@ internal sealed class NonsenseStringHierarchyAnchorSpec : IArchitectureSpec
         arch.Rule("area/constructed").Enforce(arch.Types.MustNotImplement("N.IHandler<System.Int32>")).Because("Reason.");
     }
 }
+
+internal sealed class BlankProjectNameSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("project/noun-subject").Enforce(arch.Project("").MustBeSealed()).Because("Reason.");
+        arch.Rule("project/noun-operand").Enforce(arch.Types.MustNotReference(arch.Project("   "))).Because("Reason.");
+        arch.Rule("project/verb").Enforce(arch.Types.MustResideInProject(" ")).Because("Reason.");
+    }
+}
+
+internal sealed class ValidProjectNamesSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("project/named-noun").Enforce(arch.Project("Some.Name").MustBeSealed()).Because("Reason.");
+        arch.Rule("project/named-verb").Enforce(arch.Types.MustResideInProject("Another.Name")).Because("Reason.");
+    }
+}

@@ -162,7 +162,7 @@ internal sealed class ExtractionCacheStore
     // its name and its type while taking a different value for identical inputs, so a hit would replay the old
     // answer forever with nothing to distinguish it. The suite cannot catch a missed bump — every run gets a
     // fresh cache directory — so the discipline is the only guard.
-    private const int CurrentSchemaVersion = 24;
+    private const int CurrentSchemaVersion = 25;
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;

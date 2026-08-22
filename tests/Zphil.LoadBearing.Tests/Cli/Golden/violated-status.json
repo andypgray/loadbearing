@@ -191,12 +191,47 @@
       "status": "failed",
       "violations": 1,
       "warnings": 0
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 4,
+      "warnings": 0
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 18,
+    "rulesChecked": 23,
     "rulesPassed": 2,
-    "rulesFailed": 15,
+    "rulesFailed": 20,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

@@ -15,7 +15,9 @@ namespace Zphil.LoadBearing.Codebase;
 ///     </para>
 ///     <para>
 ///         The flags carry C# declaration semantics, not IL (GRAMMAR §4.6): an <c>override</c> member is
-///         not <see cref="IsVirtual" />, an interface member is <see cref="IsAbstract" />. Exactly one of
+///         not <see cref="IsVirtual" />, an interface member is <see cref="IsAbstract" />, and a
+///         <c>const</c> field is not <see cref="IsReadOnly" /> — the two are disjoint declarations, where
+///         <see cref="HasInitOnlySetter" /> instead refines <see cref="HasSetter" />. Exactly one of
 ///         <see cref="ReturnTypeFullName" /> (methods; <c>System.Void</c> for void) and
 ///         <see cref="MemberTypeFullName" /> (properties/fields/events) is non-null. Only solution-declared
 ///         types carry members; external nodes hold an empty <see cref="TypeNode.Members" />.
@@ -38,7 +40,11 @@ public sealed class MemberNode : IMemberInfo
         IReadOnlyList<SourceLocation> declarationSites,
         IReadOnlyList<string> filePaths,
         IReadOnlyList<IParameterInfo>? parameters = null,
-        IReadOnlyList<IAttributeInfo>? attributes = null)
+        IReadOnlyList<IAttributeInfo>? attributes = null,
+        bool hasSetter = false,
+        bool hasInitOnlySetter = false,
+        bool isReadOnly = false,
+        bool isConst = false)
     {
         DeclaringType = declaringType;
         SymbolId = symbolId;
@@ -55,6 +61,10 @@ public sealed class MemberNode : IMemberInfo
         FilePaths = filePaths;
         Parameters = parameters ?? Array.Empty<IParameterInfo>();
         Attributes = attributes ?? Array.Empty<IAttributeInfo>();
+        HasSetter = hasSetter;
+        HasInitOnlySetter = hasInitOnlySetter;
+        IsReadOnly = isReadOnly;
+        IsConst = isConst;
     }
 
     /// <summary>
@@ -107,6 +117,18 @@ public sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public IReadOnlyList<IAttributeInfo> Attributes { get; }
+
+    /// <inheritdoc />
+    public bool HasSetter { get; }
+
+    /// <inheritdoc />
+    public bool HasInitOnlySetter { get; }
+
+    /// <inheritdoc />
+    public bool IsReadOnly { get; }
+
+    /// <inheritdoc />
+    public bool IsConst { get; }
 
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; }

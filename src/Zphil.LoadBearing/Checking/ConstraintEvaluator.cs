@@ -166,6 +166,19 @@ internal sealed class ConstraintEvaluator
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
+            case MustResideInProjectConstraint c:
+                // The N-way declarer predicate, never ProjectName equality: one source file compiled into
+                // several projects resides in every one of them (GRAMMAR §4.1).
+                return Shape(subjects, t => t.IsDeclaredBy(c.ProjectName));
+            case MustBelongToConstraint c:
+                // Memberships resolve in SUBJECT position — they name where a subject may live, not an
+                // edge's far end — and the test is plain membership, because there is no edge to attribute.
+                SelectionAdmission membership =
+                    SelectionAdmission.Operands(_selections, c.Memberships, SelectionPosition.Subject);
+                return Shape(subjects, membership.Contains);
+            case MustBeRegisteredConstraint:
+                HashSet<TypeNode> registered = _selections.RegisteredMembers(SelectionPosition.Subject);
+                return Shape(subjects, registered.Contains);
             case MustHaveSuffixConstraint c:
                 return Shape(subjects, t => t.Name.EndsWith(c.Suffix, StringComparison.Ordinal));
             case MustHavePrefixConstraint c:
@@ -628,6 +641,16 @@ internal sealed class ConstraintEvaluator
                 return MemberShape(members, m => m.IsAbstract);
             case MemberMustBeVirtualConstraint:
                 return MemberShape(members, m => m.IsVirtual);
+            case MemberMustBeGetOnlyConstraint:
+                // STRICT (GRAMMAR §5.7): lawful iff the property declares NO setter accessor at all. An
+                // init-only setter IS a setter, so `{ get; init; }` reds — get-only is a claim about the
+                // declaration, not about when the write is allowed to happen.
+                return MemberShape(members, m => !m.HasSetter);
+            case MemberMustBeReadonlyConstraint:
+                // A const field SATISFIES the verb (GRAMMAR §5.7): const is readonly's superset — readonly,
+                // static and compile-time at once — so redding one would demand something weaker than what
+                // is already there.
+                return MemberShape(members, m => m.IsReadOnly || m.IsConst);
             case MemberMustBeAttributedWithConstraint c:
                 // The same matcher the member attribute ADJECTIVE narrows with (MemberSelectionEvaluator),
                 // built once eagerly per anchor so an unrepresentable anchor throws (→ RuleError) before any

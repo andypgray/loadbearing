@@ -19,6 +19,10 @@ namespace Zphil.LoadBearing.Checking;
 /// </remarks>
 internal sealed class SelectionEvaluator
 {
+    // The one noun MustBeRegistered resolves through, shared by every rule that uses the verb: the Scanned
+    // memo is keyed on the noun by reference, so a per-call instance would rescan the universe per rule.
+    private static readonly RegisteredNoun AnyLifetimeRegistered = new(null);
+
     private readonly ILookup<string, TypeNode> _byFullName;
     private readonly Dictionary<(SelectionNoun, SelectionPosition), IReadOnlyList<TypeNode>> _byNoun = new();
     private readonly CodebaseModel _model;
@@ -214,6 +218,22 @@ internal sealed class SelectionEvaluator
                 return true;
 
         return false;
+    }
+
+    /// <summary>
+    ///     The nodes <c>arch.Registered()</c> names at any lifetime, in the given position (GRAMMAR §4.7) —
+    ///     the set <c>MustBeRegistered</c> tests its subjects against.
+    /// </summary>
+    /// <remarks>
+    ///     Resolved through the noun's own arm rather than off the registration facts directly, so the verb's
+    ///     membership IS the noun's and the two cannot drift.
+    /// </remarks>
+    internal HashSet<TypeNode> RegisteredMembers(SelectionPosition position)
+    {
+        // A set rather than the memo's list because every subject is tested against it; the constructor
+        // names that where a spread would leave it to the return type.
+        // ReSharper disable once UseCollectionExpression
+        return new HashSet<TypeNode>(ByNoun(AnyLifetimeRegistered, position));
     }
 
     // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7): the union of the service and

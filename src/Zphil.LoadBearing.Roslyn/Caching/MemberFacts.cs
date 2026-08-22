@@ -38,6 +38,15 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         ordinal by <see cref="FragmentConstruction.ConstructedName" />, and empty when the member declares
 ///         none.
 ///     </para>
+///     <para>
+///         The mutability facts are kind-scoped the same way (GRAMMAR §4.6): <see cref="HasSetter" /> and
+///         <see cref="HasInitOnlySetter" /> are read off a property's setter accessor and are false for every
+///         other kind; <see cref="IsReadOnly" /> and <see cref="IsConst" /> off a field's declaration and are
+///         false for every other kind. <see cref="HasInitOnlySetter" /> implies <see cref="HasSetter" /> — an
+///         init-only setter is a setter, so the pair refines rather than competes. <see cref="IsReadOnly" />
+///         and <see cref="IsConst" /> are disjoint: a <c>const</c> field is not <c>readonly</c> in C#
+///         declaration semantics, so a reader after "cannot be reassigned" has to take both.
+///     </para>
 /// </remarks>
 internal sealed record MemberFacts(
     string SymbolId,
@@ -51,4 +60,8 @@ internal sealed record MemberFacts(
     string? ReturnTypeFullName,
     string? MemberTypeFullName,
     IReadOnlyList<ParameterFacts> Parameters,
-    IReadOnlyList<FragmentConstruction> Attributes);
+    IReadOnlyList<FragmentConstruction> Attributes,
+    bool HasSetter,
+    bool HasInitOnlySetter,
+    bool IsReadOnly,
+    bool IsConst);
