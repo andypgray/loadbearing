@@ -29,7 +29,7 @@
         <!-- The library-authoring pair (extensibility + assert), not the xunit.v3 metapackage — a test
              library references these, its consumers keep the metapackage + a runner. -->
         <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
-        <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+        <PackageReference Include="xunit.v3.assert" Version="4.0.0" />
     </ItemGroup>
 
 </Project>
