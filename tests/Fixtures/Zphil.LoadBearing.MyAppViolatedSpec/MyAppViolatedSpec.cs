@@ -240,5 +240,51 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Enforce(web.Fields.ThatAreStatic().MustBeReadonly())
             .Because("A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so.")
             .Fix("Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls.");
+
+        // Enforce (artifact, frameworks): the spec's first project-subject emitters — the four rules from
+        // here down judge a project rather than any type inside it, so a violation names a project and its
+        // sites are declaration lines in a csproj, never C# code. Where the defect is an absence — no lock
+        // file asked for, no IsPackable declared — there is no declaration to point at and the site falls
+        // back to the project file's first line. This first one is the plain shape: every MyApp project
+        // targets net10.0 and the allow-list names the LTS the hosts are on, so all three red at their own
+        // TargetFramework lines — one violation per project, never one per framework, because the law is
+        // about the project's whole target set.
+        arch.Rule("packaging/supported-frameworks")
+            .Enforce(arch.Projects.Matching("MyApp.*").MustOnlyTarget("net8.0"))
+            .Because("The hosts this app deploys to are on the net8.0 LTS; a project that targets anything newer builds here and fails to start there.")
+            .Fix("Set `TargetFramework` to `net8.0`, or upgrade the hosts first and move this rule with them.");
+
+        // Enforce (artifact, packages): the same subject, one red. MyApp.Web declares the solution's only
+        // PackageReference, so the site is that reference's own line in MyApp.Web.csproj rather than the
+        // project's first line — the declaration exists, and pointing anywhere else would send a reader
+        // hunting for it. Domain and Legacy.Billing declare none and are green, which is what makes the one
+        // red a statement about that reference instead of about the verb.
+        arch.Rule("packaging/no-feed-dependencies")
+            .Enforce(arch.Projects.Matching("MyApp.*").MustReferenceNoPackages())
+            .Because("This solution builds on an agent with no feed access; a `PackageReference` is the one thing in a project file that needs the network.")
+            .Fix("Use a type the SDK already supplies, or reference an assembly the repository carries.");
+
+        // Enforce (artifact, restore): narrowed to the one project a lock file would mean anything for.
+        // Nothing here locks its restore, but Domain and Legacy.Billing resolve nothing from a feed, so a
+        // lock over them would pin an empty graph; MyApp.Web is where the pin has content, and its csproj
+        // says in as many words that it restores unlocked. An absence again, so the site is the project
+        // file rather than a declaration.
+        arch.Rule("packaging/locked-restore")
+            .Enforce(arch.Projects.Named("MyApp.Web").MustLockPackages())
+            .Because("An unpinned restore resolves a different package graph on a different day; the build CI passed is then not the build that ships.")
+            .Fix("Set `RestorePackagesWithLockFile` to true and commit the lock file the next restore produces.");
+
+        // Enforce (artifact, publishing + the project-side .Except): nothing here is meant to reach a feed,
+        // and the SDK's default settles that question the other way for any project that stays silent — so
+        // Domain and Web both red with their project file as the site, an absence with no declaration to
+        // name. Legacy.Billing is carved out of the subject rather than baselined: it is still published for
+        // the nightly batch nobody has ported, and a carve-out says so in the sentence where a baseline
+        // would only say "not yet".
+        arch.Rule("packaging/nothing-published")
+            .Enforce(arch.Projects.Matching("MyApp.*")
+                .Except(arch.Projects.Named("MyApp.Legacy.Billing"))
+                .MustNotBePackable())
+            .Because("The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed.")
+            .Fix("Set `IsPackable` to false in the project file.");
     }
 }

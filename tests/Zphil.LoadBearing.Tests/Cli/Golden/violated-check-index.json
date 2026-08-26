@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "index",
   "summary": {
-    "rulesChecked": 23,
+    "rulesChecked": 27,
     "rulesPassed": 2,
-    "rulesFailed": 20,
+    "rulesFailed": 24,
     "rulesSkipped": 1,
-    "violations": 36,
+    "violations": 43,
     "warnings": 1
   },
   "rules": [
@@ -217,6 +217,34 @@
       "posture": "enforce",
       "status": "failed",
       "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "packaging/supported-frameworks",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 3,
+      "warnings": []
+    },
+    {
+      "id": "packaging/no-feed-dependencies",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "packaging/locked-restore",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "packaging/nothing-published",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 2,
       "warnings": []
     }
   ],

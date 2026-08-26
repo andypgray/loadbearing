@@ -24,11 +24,11 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         every rule the run selected — grain is never scope.
 ///     </para>
 ///     <para>
-///         The fixture's rungs are 23.1k / 17.8k / 11.5k characters, a modest 77% and 50%, because the MyApp
-///         solution has 36 violations over 39 sites. That ratio is an artefact of the fixture, not of the
-///         design: sites are the one array with no ceiling, so on the legacy migration this exists for the
-///         compression is unbounded. What these rows pin is which rung comes back and that it is whole — not
-///         how much it saved.
+///         The fixture's rungs are 27.2k / 20.8k / 13.5k / 5.9k characters — overview and skeleton a modest
+///         77% and 50% of full, because the MyApp solution has 43 violations over 46 sites. That ratio is an
+///         artefact of the fixture, not of the design: sites are the one array with no ceiling, so on the
+///         legacy migration this exists for the compression is unbounded. What these rows pin is which rung
+///         comes back and that it is whole — not how much it saved.
 ///     </para>
 /// </remarks>
 [Collection("Serial")]
@@ -130,12 +130,13 @@ public sealed class CheckCommandTests
     }
 
     [Fact]
-    public async Task Check_EveryRung_KeepsEveryRuleWithItsVerdictAndProse()
+    public async Task Check_SkeletonGrain_KeepsEveryRuleWithItsVerdictAndProse()
     {
-        // Arrange — the reason the ladder stops where it does. Prose scales with the rule count, which is
-        // authored and small; violations and sites scale with the codebase, which is what overruns a
-        // channel. Dropping because/fix would take the floor to 27% of the full document and leave an id and
-        // a number — a report nothing can act on.
+        // Arrange — why skeleton is the last rung that still answers on its own. Prose scales with the rule
+        // count, which is authored and small; violations and sites scale with the codebase, which is what
+        // overruns a channel. Dropping the prose takes this fixture's 13.5k to 5.9k — 22% of the full
+        // document, an id and a number per rule — which is a menu for the next call, not a verdict: index's
+        // job, one rung further down, for the reader whose alternative was a cut report.
         var full = new StringWriter();
         var skeleton = new StringWriter();
 

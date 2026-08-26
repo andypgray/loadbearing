@@ -72,6 +72,10 @@ public sealed class ExplainCommandTests
                 "  legacy/billing/tripwire\n" +
                 "  naming/async-suffix\n" +
                 "  naming/nonexistent\n" +
+                "  packaging/locked-restore\n" +
+                "  packaging/no-feed-dependencies\n" +
+                "  packaging/nothing-published\n" +
+                "  packaging/supported-frameworks\n" +
                 "  state/no-static-mutable");
     }
 

@@ -407,6 +407,78 @@
               "properties": {
                 "posture": "enforce"
               }
+            },
+            {
+              "id": "packaging/supported-frameworks",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*` must target only `net8.0`."
+              },
+              "fullDescription": {
+                "text": "The hosts this app deploys to are on the net8.0 LTS; a project that targets anything newer builds here and fails to start there."
+              },
+              "help": {
+                "text": "Set `TargetFramework` to `net8.0`, or upgrade the hosts first and move this rule with them."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/no-feed-dependencies",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*` must reference no NuGet packages (declared references only; transitive dependencies are not seen)."
+              },
+              "fullDescription": {
+                "text": "This solution builds on an agent with no feed access; a `PackageReference` is the one thing in a project file that needs the network."
+              },
+              "help": {
+                "text": "Use a type the SDK already supplies, or reference an assembly the repository carries."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/locked-restore",
+              "shortDescription": {
+                "text": "Project `MyApp.Web` must lock package restore."
+              },
+              "fullDescription": {
+                "text": "An unpinned restore resolves a different package graph on a different day; the build CI passed is then not the build that ships."
+              },
+              "help": {
+                "text": "Set `RestorePackagesWithLockFile` to true and commit the lock file the next restore produces."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/nothing-published",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing` must not be packable."
+              },
+              "fullDescription": {
+                "text": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed."
+              },
+              "help": {
+                "text": "Set `IsPackable` to false in the project file."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
             }
           ]
         }
@@ -1413,6 +1485,174 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|||F:MyApp.Web.ReportBudget.RenderCount|MyApp.Web/ReportBudget.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Domain|MyApp.Domain/MyApp.Domain.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Legacy.Billing|MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/no-feed-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web references package Microsoft.Extensions.DependencyInjection.Abstractions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/locked-restore",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/nothing-published",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Domain|MyApp.Domain/MyApp.Domain.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/nothing-published",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
           },
           "baselineState": "new"
         }

@@ -226,12 +226,40 @@
       "status": "failed",
       "violations": 1,
       "warnings": 0
+    },
+    {
+      "id": "packaging/supported-frameworks",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/no-feed-dependencies",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/locked-restore",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/nothing-published",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 23,
+    "rulesChecked": 27,
     "rulesPassed": 2,
-    "rulesFailed": 20,
+    "rulesFailed": 24,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 1,
     "fixedAwaitingAcceptance": 0

@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "overview",
   "summary": {
-    "rulesChecked": 23,
+    "rulesChecked": 27,
     "rulesPassed": 2,
-    "rulesFailed": 20,
+    "rulesFailed": 24,
     "rulesSkipped": 1,
-    "violations": 36,
+    "violations": 43,
     "warnings": 1
   },
   "rules": [
@@ -521,6 +521,90 @@
         {
           "kind": "memberShape",
           "subjectMember": "F:MyApp.Web.ReportBudget.RenderCount",
+          "siteCount": 1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/supported-frameworks",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*` must target only `net8.0`.",
+      "because": "The hosts this app deploys to are on the net8.0 LTS; a project that targets anything newer builds here and fails to start there.",
+      "fix": "Set `TargetFramework` to `net8.0`, or upgrade the hosts first and move this rule with them.",
+      "violationCount": 3,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Domain",
+          "siteCount": 1
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Legacy.Billing",
+          "siteCount": 1
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "siteCount": 1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/no-feed-dependencies",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*` must reference no NuGet packages (declared references only; transitive dependencies are not seen).",
+      "because": "This solution builds on an agent with no feed access; a `PackageReference` is the one thing in a project file that needs the network.",
+      "fix": "Use a type the SDK already supplies, or reference an assembly the repository carries.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "package": "Microsoft.Extensions.DependencyInjection.Abstractions",
+          "siteCount": 1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/locked-restore",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Project `MyApp.Web` must lock package restore.",
+      "because": "An unpinned restore resolves a different package graph on a different day; the build CI passed is then not the build that ships.",
+      "fix": "Set `RestorePackagesWithLockFile` to true and commit the lock file the next restore produces.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "siteCount": 1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/nothing-published",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing` must not be packable.",
+      "because": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed.",
+      "fix": "Set `IsPackable` to false in the project file.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Domain",
+          "siteCount": 1
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
           "siteCount": 1
         }
       ],
