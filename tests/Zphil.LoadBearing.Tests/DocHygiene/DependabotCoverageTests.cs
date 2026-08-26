@@ -36,10 +36,6 @@ public sealed class DependabotCoverageTests
 
     private const string LockFileName = "packages.lock.json";
 
-    // The number of projects carrying a committed lock file. Pinned as well as cross-checked,
-    // because a coordinated change — a seventh project, listed correctly — still has prose to move.
-    private const int LockFileProjectCount = 6;
-
     private static readonly Regex EcosystemEntry = new(@"^\s*-\s*package-ecosystem:\s*(?<name>\S+)\s*$");
 
     private static readonly Regex DirectoriesKey = new(@"^\s*directories:\s*$");
@@ -77,21 +73,6 @@ public sealed class DependabotCoverageTests
         // Assert: the arm above compares two sets, and an empty parse would make it pass by reading
         // nothing rather than by finding agreement.
         listed.ShouldNotBeEmpty($"No directories were parsed out of the nuget update entry in {DependabotConfig}.");
-    }
-
-    [Fact]
-    public void CommittedLockFiles_StillNumberSix()
-    {
-        // Act
-        IReadOnlyList<string> committed = CommittedLockFileDirectories();
-
-        // Assert: the count is written out in prose as well as enforced. It is stated in the comment
-        // above the update list in .github/dependabot.yml and in the restore comment in
-        // .github/workflows/ci.yml, and SECURITY.md's supply-chain promise covers whatever the set
-        // holds, so all of them move together with this number.
-        committed.Count.ShouldBe(
-            LockFileProjectCount,
-            $"The committed {LockFileName} count moved:\n{string.Join("\n", committed)}");
     }
 
     // Every tracked lock file's directory, in the leading-slash repository-relative form the update

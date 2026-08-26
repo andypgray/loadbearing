@@ -113,6 +113,8 @@ Arch
  ├─ .Member(Expression<Func<object?>>)        → Member  (static value-member anchor; §4.5)
  ├─ .Member(Expression<Action>)               → Member  (static void-method anchor; §4.5)
  ├─ .Types            → Selection      (all solution-declared types)
+ ├─ .Projects         → ProjectSelection (all solution-declared projects, as build
+ │                                      artifacts — the third subject stratum; §4.10)
  ├─ .Rule(id)         → IRuleBuilder   (registers the node immediately)
  └─ .Scope(id)        → IScopeBuilder  (registers the node immediately)
 
@@ -129,6 +131,10 @@ PropertySelection — a MemberSelection minted by .Properties that additionally 
                .MustBeGetOnly() → Constraint (terminal; §5.7)
 FieldSelection — a MemberSelection minted by .Fields that additionally offers
                .MustBeReadonly() → Constraint (terminal; §5.7)
+ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Except / .Where)
+               → ProjectSelection; project modal verbs (MustOnlyTarget /
+               MustReferenceNoPackages / MustLockPackages / MustNotBePackable / .Must)
+               → Constraint (terminal; §4.10, §5.8)
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
 IEnforceRule — .Because / .Fix
 IMigrateRule — .Because / .Fix / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
@@ -166,6 +172,12 @@ Structural consequences, all deliberate:
   `MethodSelection`, `MustBeGetOnly` on `PropertySelection`, `MustBeReadonly` on
   `FieldSelection` — so calling one off any other projection is uncompilable by
   construction — a structural consequence, not a validated one.
+- **`ProjectSelection` is the third closed hierarchy, disjoint from both.** `arch.Projects`
+  names build artifacts where `arch.Project(name)` keeps naming the types a project declares
+  (§5.1) — the `Types`-property/`Type`-method coexistence, one stratum up. Shared vocabulary
+  names (`.Except`, `.Where`, `.Must`) bind purely by receiver type, and a project constraint
+  has no type-side subject to offer: its subject slot is null exactly there, so every
+  type-side reader dispatches on the constraint's stratum before reading one (§4.10).
 
 ### 3.3 Dependency-verb overloads (pinned)
 
@@ -892,6 +904,40 @@ consumes it.
   property/field/event type) on a public member of an externally visible type"* whenever the
   spec carries a `MustNotExpose` rule.
 
+### 4.10 Project subjects (artifact facts)
+
+`arch.Projects` selects the solution's projects as build artifacts — the third subject
+stratum (§3.2). `arch.Project(name)` keeps meaning the types the project declares; the
+artifact stratum is where a rule speaks about the project itself: what it targets, what it
+declares as package references, whether it locks restore and whether it packs.
+
+- **Facts are evaluated, never parsed from the csproj XML.** What a verb reads is what
+  MSBuild evaluation answers after SDK defaults and every import: the lock policy a
+  repository declares once in a shared props file, and the `IsPackable` default nothing
+  declares anywhere, are both facts the raw project file does not carry. The verb facts are
+  the declared target frameworks (the list is total, and a classic project's framework
+  normalizes to the short moniker, `net48`), the declared `PackageReference`s,
+  `RestorePackagesWithLockFile`, and `IsPackable`. `MustOnlyTarget` compares monikers
+  ordinally against the normalized short forms.
+- **Declared references only.** The package facts are the project's own declarations — the
+  transitive graph is a different fact — and `MustReferenceNoPackages` says so in its
+  sentence (§5.8) rather than in a doc a reader has to know to look up.
+- **Unknown passes.** A load path that cannot carry a fact records absence, never a default,
+  and every project verb passes on absence: a rule that reds on a project nothing evaluated
+  is reporting the load's own gaps as architecture violations, which is `modelIncomplete`'s
+  channel, not a verdict's.
+- **Identity is `project:{name}`.** A project has no documentation-comment ID, so the
+  identity wears the DocId shape and displays verbatim. It rides baseline entries unchanged,
+  so every posture composes — a TFM migration is an ordinary ratcheted burndown.
+- **The site is the declaration that won the evaluation** — regularly a props file above the
+  project, not the csproj — and where the defect is an absence, the site falls back to the
+  project file itself. `MustReferenceNoPackages` mints one violation per declared package,
+  each sited at its own declaration, all sharing the project's identity: the law is about
+  the project, so one baseline entry blesses the whole list and does not move when the list
+  does.
+- **A narrowed run skips a project rule that selects nothing**, exactly as it skips a type
+  rule whose subject a filter erased.
+
 ## 5. Vocabulary v1 (closed; every member ships with pinned fragments)
 
 ### 5.1 Nouns
@@ -1144,6 +1190,16 @@ writability; both false for every non-field, and disjoint from each other), and 
 with an `init`-only setter has a setter. The
 contract grows additively, exactly like `ITypeInfo`.
 
+Project-predicate input contract (`IProjectInfo`, the input to a project `.Where`/`.Must`,
+§4.10): `Name`, `TargetFrameworks` (ordinal-ordered, normalized to the short moniker; empty
+where nothing evaluated the project), `PackageReferences` (the declared packages, ordinal by
+name, each carrying its declaration site — declared references only, §4.10),
+`ProjectReferences` (referenced project names, ordinal-ordered), and the tri-state
+`IsPackable` and `LocksPackages` — `bool?`, `null` meaning the evaluation never happened
+rather than that the property is off. A predicate that treats unknown as false asserts
+something the model never measured; treat unknown as passing, exactly as the shipped verbs do
+(§4.10). This contract grows additively too.
+
 Descriptions are **required parameters** (uncompilable without) and must be non-blank (§8
 item 5). Phrasing conventions, pinned by example tests:
 
@@ -1264,6 +1320,37 @@ at all, and a field passes iff it is `readonly` or `const`. The receiver-typed g
 grows to four overloads with them (above), which is the price of a new projection type — a
 projection that ships a kind-only verb ships its sugar overload too, or the verb silently stops
 compiling after the sugar.
+
+### 5.8 Project vocabulary (project subjects, §4.10)
+
+**The noun** (mints a `ProjectSelection`; the fragment is the subject head, §6):
+
+| Combinator | Fragment (subject head) |
+|---|---|
+| `arch.Projects` | "projects" — every solution-declared project, as a build artifact (§4.10) |
+
+**Project adjectives** (reduced relative clauses on the project set):
+
+| Combinator | Fragment |
+|---|---|
+| `.Named("Zphil.LoadBearing")` | the head itself: "project `Zphil.LoadBearing`" for one name, "projects `A` or `B`" for several |
+| `.Matching("Zphil.*")` | head becomes "projects matching `Zphil.*`" ("matching `A` or `B`" over several globs) |
+| `.Packable()` | head prefix: "packable" — premodifies the head ("packable projects", "packable project `A`"), the set named by the evaluated fact that admits membership (§4.10) |
+| `.Except(...)` | "except project `X`" ("except projects `A` or `B`") — composes as everywhere else |
+| `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6), over `IProjectInfo` (§5.6) |
+
+**Project modal verbs** (turn a `ProjectSelection` into a terminal `Constraint`):
+
+| Combinator | Fragment |
+|---|---|
+| `.MustOnlyTarget("netstandard2.0")` | "must target only `netstandard2.0`" ("only `netstandard2.0` or `net8.0`" for several) — strict on the `MustOnlyThrow` model, and strict by omission: the declared-framework universe is closed, so no external remainder exists for a caveat to disclaim (contrast §4.1) |
+| `.MustReferenceNoPackages()` | "must reference no NuGet packages (declared references only; transitive dependencies are not seen)" — zero-arity (§10); the honesty boundary rides in the sentence |
+| `.MustLockPackages()` | "must lock package restore" |
+| `.MustNotBePackable()` | "must not be packable" |
+| `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IProjectInfo, bool>` (§5.6) |
+
+The whole project vocabulary shipped complete per the admission rule (§10): reification,
+pinned fragments, the evaluated facts (§4.10), and the checker semantics landed together.
 
 ## 6. Sentence assembly
 
@@ -1490,10 +1577,28 @@ compiling after the sugar.
     reds it loudly, whereas the silent slip this item exists to catch is the always-passing
     `MustNot` verb. Reported in the same all-at-once pass with the rule's
     spec-source `file:line`, like items 19/20.
+22. Project selection minted on a different `Arch` instance — the §3.2 fresh-instance
+    contract, project flavor ("A project selection used by '{id}' was minted on a different
+    Arch instance; it is not registered with this model."). Its own code beside items 10 and
+    13 so the message names what was foreign. The walk includes `Except` payloads — the one
+    way a project selection nests, and therefore the one way a foreign one can hide inside a
+    local subject.
+23. Blank/whitespace project name or glob on the artifact stratum — a `.Named` operand
+    (`Blank project name on '{id}'.`) or a `.Matching` glob (`Blank project name pattern on
+    '{id}'.`) left empty. A blank name matches no project and a blank glob matches every
+    one; both are almost always an authoring slip, and the two failure shapes are far enough
+    apart that neither is left for check time to explain. Same message shape as item 15, so
+    a reader who has met one blank-operand error has met them all.
+24. Blank/whitespace target framework on `MustOnlyTarget` (`Blank target framework on
+    '{id}'.`). A blank moniker matches nothing, so it silently narrows the allow-list rather
+    than widening it — the rule stays green until a project targets the framework the author
+    meant to permit.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
-extended to descend through a `MemberConstraint`'s member subject and verb (§4.6).
+extended to descend through a `MemberConstraint`'s member subject and verb (§4.6) — and the
+project escape-hatch descriptions the same way: a project `Must` description, and project
+`Where` descriptions wherever the subject nests one, `Except` payloads included (§4.10).
 
 Every walk in this catalog descends through a union (§5.1) on both axes — its operands *and* its
 own adjectives — so `AnyOf(a, b).Where(p, "")` reaches item 5, `AnyOf(a, b).InNamespace("")`
@@ -1542,7 +1647,7 @@ agent fixing a spec sees every problem in one pass.
 
 ## 10. Naming morphology (style guide for vocabulary growth)
 
-- **Nouns**: bare plurals or PascalCase names (`Types`, `Layer`, `Project`); the registration
+- **Nouns**: bare plurals or PascalCase names (`Types`, `Projects`, `Layer`, `Project`); the registration
   noun is a bare participle (`Registered`) — it names the set by the fact that admits
   membership.
 - **Projections**: bare plurals naming the member kind (`Members`, `Methods`, `Properties`,
@@ -1550,7 +1655,8 @@ agent fixing a spec sees every problem in one pass.
 - **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`) or prepositional
   phrases (`InNamespace`, `WithSuffix`, `OfKind`). A bare past participle (`Authored`) names the
   set by the fact that admits membership, the adjective twin of the `Registered` noun, and reads
-  attributively in front of the head (§6). A verb-plus-object compound is not licensed:
+  attributively in front of the head (§6); the bare adjective `Packable` names the artifact set
+  the same way (§5.8). A verb-plus-object compound is not licensed:
   `ExceptGenerated` would both duplicate `Except` and stop reading as a modifier of the noun.
 - **Constraints**: `Must[Not]` + verb phrase; polarity lexical; the noun rides along where a
   bare preposition would be ambiguous (`MustResideInNamespace`). The member-access verb is
@@ -1613,7 +1719,11 @@ agent fixing a spec sees every problem in one pass.
   registration facts (§4.7), not an authored operand. `MustBeGetOnly` and `MustBeReadonly` are
   nullary for the same reason and a different one: what they test is a fact of the declaration
   itself, so there is no operand to take — the receiver type carries everything the verb needs
-  to know.
+  to know. `MustLockPackages` and `MustNotBePackable` are nullary on that same clause (§5.8),
+  and `MustReferenceNoPackages()` is the deliberate inversion of this bullet's rule: the empty
+  list is the law it states, so the emptiness takes its own verb rather than an empty argument
+  list, while `MustOnlyTarget` keeps `(first, more)` — an empty allow-list would be meaningless
+  there.
 - **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
   generic sugar — all reifying to one internal anchor, so form choice is invisible to the
@@ -1640,7 +1750,9 @@ agent fixing a spec sees every problem in one pass.
   ratchet) together. The mutability family (§4.6, §5.7) shipped on the same terms in one piece:
   the four declaration facts, the two verbs, the `.ThatAreStatic()` adjective, pinned fragments
   for all three, checker semantics for both verbs, and the ratchet — no half of it reifying
-  ahead of the half that reads it.
+  ahead of the half that reads it. The project stratum (§4.10, §5.8) shipped whole on the same
+  terms: the noun, three adjectives, four verbs, pinned fragments, the evaluated facts, and
+  checker semantics in one piece.
 
 ## 11. Growth paths (designed-for, not built)
 
@@ -1736,6 +1848,14 @@ residue the dependency verbs carry above); laundering awareness — a signature 
 static-signature fact, and internal members are not surface), so a flow- or cast-aware form
 would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
 exposure data (exposure edges stay out of the graph).
+
+On the project stratum (§4.10): `.Under(pathGlob…)` — its first consumer, an
+examples-never-pack rule, lives outside this solution's universe; `MustNotReferencePackage` —
+this repository has no live package ban to consume it, and a rule invented to give it one
+would pin vocabulary no law needs; and `MustSetProperty` / `MustSetPackageAsset`, whose named
+next consumer is the `ExcludeAssets=runtime` law the `Microsoft.Build.*` references already
+live by. Also unbuilt, each waiting on a consumer: `AnyOf` over project selections, and card
+placement for artifact selections — a project rule renders into the root block only.
 
 On the string anchors (§5.2): **constructed-generic** anchoring — a string naming a
 construction rather than a definition (`"MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>"`)

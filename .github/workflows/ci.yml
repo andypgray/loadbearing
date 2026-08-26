@@ -81,9 +81,10 @@ jobs:
       # either way — but only for as long as the runner keeps setting that variable, and the day it
       # stops, the restore goes unlocked silently with nothing red. Spelled here it is unconditional.
       # The flag applies to every project in the graph, which costs nothing: locked mode only bites
-      # where a lock file exists, so the six lock-file projects are held to their committed graph
-      # while the arch project and the throwaway fixtures, which carry no lock file by design,
-      # restore unlocked exactly as before.
+      # where a lock file exists, so every lock-file project is held to its committed graph while
+      # the arch project and the throwaway fixtures, which carry no lock file by design, restore
+      # unlocked exactly as before. Which projects those are is a law rather than a count:
+      # packaging/shipping-locks-restore requires a lock file of everything that ships.
       - name: Restore
         run: dotnet restore Zphil.LoadBearing.slnx --locked-mode
 

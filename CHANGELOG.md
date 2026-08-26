@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A rule can take a project as its subject: `arch.Projects` and the packaging verbs.** The
+  spec's third subject stratum, beside types and members: `.Named`, `.Matching` and `.Packable`
+  select projects as build artifacts, and four verbs state the packaging laws —
+  `MustOnlyTarget` (strict: a project's declared frameworks are a closed set, so there is no
+  remainder for a caveat to disclaim), `MustReferenceNoPackages` (zero-arity: the empty list is
+  the law it states; its sentence carries the honesty boundary, declared references only),
+  `MustLockPackages`, and `MustNotBePackable`, with `.Must` over `IProjectInfo` as the escape
+  hatch. The facts are evaluated, never parsed from the csproj XML: the lock policy a
+  repository declares once in a shared props file and the `IsPackable` default nothing declares
+  are both facts the raw file does not carry. A violation's site is whichever declaration
+  actually won the evaluation — regularly a props file above the project — falling back to the
+  project file where the defect is an absence, and a fact no load path could evaluate passes
+  rather than reds: a rule firing on a project nothing evaluated would be reporting the load's
+  own gaps as architecture violations. Identity is `project:{name}`, riding baselines
+  unchanged, so every posture composes and a TFM migration is an ordinary ratcheted burndown.
+- Four new rules over this repository's real code: `packaging/core-netstandard-only` (Core
+  targets `netstandard2.0` alone — the one TFM a net48 spec project and the net10 host can
+  both load), `packaging/core-carries-nothing` (the shipped package description's
+  zero-dependency claim, checked for the first time), `packaging/shipping-locks-restore`
+  (packable `Zphil.*` projects lock restore), and `packaging/only-the-four-ship` (exactly the
+  four shipping packages are packable — the law the release pipeline held only by counting
+  nupkgs). The six-lock-files arithmetic pin retires with them: fixtures fall out by not being
+  subjects rather than by counting.
 - **A fourth grain, `index`, below `skeleton` — the ladder's floor and the narrowing menu.**
   `--index` on `check` and `graph`, `index` on `arch_check` and `arch_graph`. The survey keeps every
   project's name, solution membership and type count; the report keeps every rule's ID, posture,

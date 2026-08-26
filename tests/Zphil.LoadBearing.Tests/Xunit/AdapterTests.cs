@@ -71,6 +71,10 @@ public sealed class AdapterTests
                 "api/core-front-door",
                 "api/extraction-front-door",
                 "api/host-front-door",
+                "packaging/core-netstandard-only",
+                "packaging/core-carries-nothing",
+                "packaging/shipping-locks-restore",
+                "packaging/only-the-four-ship",
                 "mcp/env-through-seam",
                 "roslyn/msbuild-bootstrap/containment",
                 "roslyn/msbuild-bootstrap/tripwire"

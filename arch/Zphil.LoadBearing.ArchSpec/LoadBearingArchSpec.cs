@@ -11,8 +11,10 @@ namespace Zphil.LoadBearing.ArchSpec;
 /// <summary>
 ///     LoadBearing's own architecture spec — the dogfood render source, governing this repo's real code
 ///     so the product governs itself honestly. It exercises all three postures across eight declared
-///     layers, and every rule below is a genuine boundary: nothing in the build system prevents breaking
-///     it. The rendered block lives in the committed root <c>AGENTS.md</c>, kept current by the self-spec
+///     layers, and every rule below is a genuine boundary: nothing in the build system states these laws,
+///     and almost nothing prevents breaking them — the release pipeline's four-package count and
+///     locked-mode restore graze two of the packaging rules, each checking a downstream outcome rather
+///     than the law. The rendered block lives in the committed root <c>AGENTS.md</c>, kept current by the self-spec
 ///     tests. Each rule carries its own law, <c>Because</c> and <c>Fix</c>, so this comment holds only
 ///     what the code cannot say.
 ///     <para>
@@ -46,14 +48,7 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
 ///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
 ///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
-///         prefix and a suffix, which say it more exactly. The four packaging verbs —
-///         <c>MustOnlyTarget</c>, <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c> and
-///         <c>MustNotBePackable</c> — are the newest vocabulary and simply not yet adopted. Their
-///         consumers here are real: the contract package's single-TFM pin and its zero-dependency
-///         guarantee, locked restore on everything that ships, and the short list of projects that may
-///         pack all live today in project files, workflow counts and review habit rather than in rules —
-///         held less legibly than a rule would hold them, which makes this an adoption waiting to happen
-///         rather than a reason the verbs idle for good. <c>MustBeRegistered</c> idles because nothing
+///         prefix and a suffix, which say it more exactly. <c>MustBeRegistered</c> idles because nothing
 ///         here is registered by convention: the composition root wires a hand-written list of
 ///         infrastructure singletons, so a completeness rule over them could only restate that list at
 ///         itself — a tautology wearing a law's clothes. Its consumer is an estate where a naming
@@ -599,6 +594,46 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "thirty types it calls.")
             .Fix("Put the type in Verbs, Pipeline, SpecLoading or Rendering beside its siblings. If it is " +
                  "really part of the entry path, add its name to HostFrontDoor in this spec.");
+
+        // The four packaging rules judge a project rather than any type in it, so their subjects are
+        // project selections and their sites are lines in a project or props file. A broad one is bounded to `Zphil.*`
+        // rather than left bare: the MyApp fixture solutions ride into this universe as passengers of the
+        // spec fixtures' project references, and they are packable and unlocked, so an unbounded artifact
+        // subject reds on code this repository does not ship and does not govern.
+        arch.Rule("packaging/core-netstandard-only")
+            .Enforce(arch.Projects.Named("Zphil.LoadBearing").MustOnlyTarget("netstandard2.0"))
+            .Because("netstandard2.0 is the one TFM a net48 spec project and the net10 host can both load; " +
+                     "Core is the contract every spec references, so its TFM is the product's reach.")
+            .Fix("Anything needing a newer API belongs in Zphil.LoadBearing.Roslyn or the CLI, never Core.");
+
+        arch.Rule("packaging/core-carries-nothing")
+            .Enforce(arch.Projects.Named("Zphil.LoadBearing").MustReferenceNoPackages())
+            .Because("Every consumer's spec csproj takes Core directly; a package Core drags along is imposed " +
+                     "on every estate that adopts the tool, and a net48 spec has to resolve it too.")
+            .Fix("Use what the netstandard2.0 surface already supplies, or put the dependency behind " +
+                 "Zphil.LoadBearing.Roslyn or the CLI, where a package reference costs only the tool.");
+
+        arch.Rule("packaging/shipping-locks-restore")
+            .Enforce(arch.Projects.Matching("Zphil.*").Packable().MustLockPackages())
+            .Because("CI restores locked; a shipping project without a lock file floats its dependency graph " +
+                     "under audit.")
+            .Fix("Set `RestorePackagesWithLockFile` to true and commit the packages.lock.json the next " +
+                 "restore writes; src/Directory.Build.props already carries the policy for everything under it.");
+
+        arch.Rule("packaging/only-the-four-ship")
+            .Enforce(arch.Projects.Matching("Zphil.*")
+                .Except(arch.Projects.Named(
+                    "Zphil.LoadBearing",
+                    "Zphil.LoadBearing.Roslyn",
+                    "Zphil.LoadBearing.Xunit",
+                    "Zphil.LoadBearing.Cli"))
+                .MustNotBePackable())
+            .Because("Exactly four packages ship, and the SDK packs by default, so a project that stays " +
+                     "silent about it is one release-pipeline accident away from publishing this " +
+                     "repository's internals under a name nobody reviewed.")
+            .Fix("Set `IsPackable` to false in the project file. A project that genuinely should ship joins " +
+                 "the four named in this rule's subject, and the release pipeline's package count, in the " +
+                 "same change.");
 
         arch.Rule("mcp/env-through-seam")
             .Migrate(
