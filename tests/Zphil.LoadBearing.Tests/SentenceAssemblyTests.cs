@@ -1088,4 +1088,73 @@ public class SentenceAssemblyTests
                 .MustBeRegistered())
             .ShouldBe("Singleton-registered types must be registered.");
     }
+
+    // ---- The project stratum (GRAMMAR §4.10, §6): the same four placements over a head that is the noun
+    //      itself, so `.Named` substitutes it and there is no locative to carry ----
+
+    [Fact]
+    public void BareProjectsSubject_IsCapitalizedHead()
+    {
+        SentenceRenderer.ProjectSubject(Arch.Projects)
+            .ShouldBe("Projects");
+    }
+
+    [Fact]
+    public void NamedProjects_TwoNames_SubstituteTheHeadAsAnOrList()
+    {
+        // One name reads "project `A`" and several read "projects `A` or `B`" — the head agrees in number
+        // with what it names, which is what keeps a two-project law from reading like a one-project one.
+        SentenceRenderer.Sentence(Arch.Projects.Named("A", "B")
+                .MustLockPackages())
+            .ShouldBe("Projects `A` or `B` must lock package restore.");
+    }
+
+    [Fact]
+    public void PackableAndMatching_StackAsPrefixThenInlineClause()
+    {
+        // The head-prefix lands in front of the head and the inline clause after it, in exactly the order
+        // the type side assembles `.Authored()` and `.InNamespace(...)`.
+        SentenceRenderer.Sentence(Arch.Projects.Packable()
+                .Matching("Zphil.*")
+                .MustNotBePackable())
+            .ShouldBe("Packable projects matching `Zphil.*` must not be packable.");
+    }
+
+    [Fact]
+    public void ProjectExcept_CanonicalizesSentenceFinalWithNoClosingComma()
+    {
+        // The payload renders in reference position — the same phrase, uncapitalized — and there is no
+        // closing comma, exactly as the type-side Except.
+        SentenceRenderer.Sentence(Arch.Projects.Matching("Zphil.*")
+                .Except(Arch.Projects.Named("Zphil.LoadBearing.Cli"))
+                .MustNotBePackable())
+            .ShouldBe(
+                "Projects matching `Zphil.*`, except project `Zphil.LoadBearing.Cli` must not be packable.");
+    }
+
+    [Fact]
+    public void ProjectWhere_RendersItsDescriptionSentenceFinal()
+    {
+        SentenceRenderer.Sentence(Arch.Projects
+                .Where(project => project.IsPackable == true, description: "whose name ends in a digit")
+                .MustLockPackages())
+            .ShouldBe("Projects whose name ends in a digit must lock package restore.");
+    }
+
+    [Fact]
+    public void MustOnlyTarget_TwoFrameworks_OrJoinsThem()
+    {
+        SentenceRenderer.Sentence(Arch.Projects.Named("Zphil.LoadBearing")
+                .MustOnlyTarget("netstandard2.0", "net8.0"))
+            .ShouldBe("Project `Zphil.LoadBearing` must target only `netstandard2.0` or `net8.0`.");
+    }
+
+    [Fact]
+    public void BareProjectsInReferencePosition_IsTheUncapitalizedPhrase()
+    {
+        // Reference position differs from subject position by capitalization alone: a project selection has
+        // one head and no noun that reads differently as a reference.
+        SentenceRenderer.ProjectReference(Arch.Projects.Named("A"))
+            .ShouldBe("project `A`");
+    }
 }

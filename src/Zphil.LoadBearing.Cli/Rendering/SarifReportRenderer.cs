@@ -318,6 +318,9 @@ internal static class SarifReportRenderer
             ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
             ViolationKind.Shape => violation.Subject!.FullName,
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
+            ViolationKind.ProjectShape => violation.Package is { } package
+                ? $"{violation.SubjectProject!.Name} references package {package.Name}"
+                : violation.SubjectProject!.Name,
             _ => string.Empty
         };
     }

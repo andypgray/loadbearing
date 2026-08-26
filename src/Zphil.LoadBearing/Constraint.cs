@@ -12,13 +12,22 @@ namespace Zphil.LoadBearing;
 /// </remarks>
 public abstract class Constraint
 {
-    private protected Constraint(Selection subject)
+    private protected Constraint(Selection? subject)
     {
         Subject = subject;
     }
 
-    /// <summary>The selection the constraint is asserted over.</summary>
-    internal Selection Subject { get; }
+    /// <summary>The type selection the constraint is asserted over, or null for a project constraint.</summary>
+    /// <remarks>
+    ///     Null <em>exactly</em> when the constraint is a project constraint (GRAMMAR §4.10), whose subject
+    ///     is a project selection and has no type selection to stand in — where a member constraint hands up
+    ///     the type selection its projection was taken from. Every type-side reader of this slot therefore
+    ///     either dispatches on the constraint type first (the sentence renderer, the checker) or runs
+    ///     downstream of a reader that did. Nothing enforces that by hand: the nullable-flow analysis is the
+    ///     audit, so a forgotten dispatch is a build warning rather than a
+    ///     <see cref="NullReferenceException" /> in the field.
+    /// </remarks>
+    internal Selection? Subject { get; }
 
     /// <summary>The modal verb phrase, lowercase, beginning with "must" (GRAMMAR §5.3).</summary>
     internal abstract string VerbPhrase { get; }

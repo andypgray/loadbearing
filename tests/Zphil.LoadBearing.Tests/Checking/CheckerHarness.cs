@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -223,6 +224,31 @@ internal static class Checker
         return result.Violators(ViolationKind.MemberShape, v => v.SubjectMember!.SymbolId);
     }
 
+    /// <summary>Project-shape violation subject names, in report order (§4.10).</summary>
+    public static IReadOnlyList<string> ProjectSubjects(this RuleResult result)
+    {
+        return result.Violators(ViolationKind.ProjectShape, v => v.SubjectProject!.Name);
+    }
+
+    /// <summary>
+    ///     The projects <paramref name="select" /> matches over <paramref name="codebase" />, in report
+    ///     order — the project-stratum twin of <see cref="Selects" /> and read back the same way, through a
+    ///     probe rule nothing can satisfy.
+    /// </summary>
+    /// <remarks>
+    ///     The probe is the escape hatch with a constant-false predicate rather than a naming verb, because
+    ///     every packaging verb passes a project whose facts nothing evaluated — which would make the probe
+    ///     silently under-report exactly the fixtures the absent-fact rows are built from.
+    /// </remarks>
+    public static IReadOnlyList<string> SelectsProjects(CodebaseModel codebase, Func<Arch, ProjectSelection> select)
+    {
+        return Run(codebase, arch => arch.Rule("probe/projects")
+                .Enforce(select(arch).Must(_ => false, description: "be selected by the probe"))
+                .Because("b"))
+            .Single()
+            .ProjectSubjects();
+    }
+
     /// <summary>
     ///     This result rendered as the human failure block, relative to the current directory — the text a
     ///     developer reads from the CLI or the xUnit adapter.
@@ -334,6 +360,45 @@ internal static class Checker
         violation.GetProperty("sites")
             .GetArrayLength()
             .ShouldBeGreaterThan(0);
+    }
+
+    /// <summary>
+    ///     Asserts the first violation of the first rule renders as a project subject:
+    ///     <paramref name="kind" /> over <paramref name="subjectProject" />, with <c>package</c> present
+    ///     only when <paramref name="package" /> is given, and every type- and member-level slot omitted.
+    ///     The fourth distinct slot combination the wire format carries.
+    /// </summary>
+    public static void ShouldRenderProjectShapeViolation(
+        this CheckReport report, string kind, string subjectProject, string? package = null)
+    {
+        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
+        document.RootElement.GetProperty("schemaVersion")
+            .GetInt32()
+            .ShouldBe(3);
+        JsonElement violation = FirstViolation(document);
+        violation.GetProperty("kind")
+            .GetString()
+            .ShouldBe(kind);
+        violation.GetProperty("subjectProject")
+            .GetString()
+            .ShouldBe(subjectProject);
+
+        if (package is null)
+            violation.TryGetProperty("package", out _)
+                .ShouldBeFalse();
+        else
+            violation.GetProperty("package")
+                .GetString()
+                .ShouldBe(package);
+
+        violation.TryGetProperty("source", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("target", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("subject", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("subjectMember", out _)
+            .ShouldBeFalse();
     }
 
     private static string Pair(Violation v)

@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Fluent;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary>
@@ -12,13 +14,50 @@ namespace Zphil.LoadBearing.Model;
 internal static class SelectionWalk
 {
     /// <summary>The constraint's subject tree followed by each operand's tree, in operand order.</summary>
+    /// <remarks>
+    ///     A project constraint contributes no type selection at all — its subject is a project selection
+    ///     and its <see cref="Constraint.Subject" /> is null (GRAMMAR §4.10) — so it walks out empty here
+    ///     and through <see cref="ConstraintProjectSelections" /> instead. Nothing about the type-side walk
+    ///     changes: a rule with no type selections simply has none to report.
+    /// </remarks>
     internal static IEnumerable<Selection> ConstraintSelections(Constraint constraint)
     {
-        foreach (Selection selection in ExpandSelection(constraint.Subject)) yield return selection;
+        if (constraint.Subject is { } subject)
+            foreach (Selection selection in ExpandSelection(subject))
+                yield return selection;
 
         foreach (Selection operand in constraint.Operands)
         foreach (Selection selection in ExpandSelection(operand))
             yield return selection;
+    }
+
+    /// <summary>
+    ///     The project selections a constraint reaches — its project subject and the payloads nested under
+    ///     that subject's <c>Except</c> adjectives — or nothing at all for every type- and member-subject
+    ///     constraint. The project-stratum twin of <see cref="ConstraintSelections" />, kept beside it so
+    ///     the two walks a validation pass needs are read in one place.
+    /// </summary>
+    internal static IEnumerable<ProjectSelection> ConstraintProjectSelections(Constraint constraint)
+    {
+        if (constraint is not ProjectConstraint project) yield break;
+
+        foreach (ProjectSelection selection in ExpandProjectSelection(project.ProjectSubject)) yield return selection;
+    }
+
+    /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>
+    /// <remarks>
+    ///     There is no union arm: the project stratum has no <c>AnyOf</c>, because <c>.Named(a, b)</c> and
+    ///     <c>.Matching(a, b)</c> already say "either of these" without one. <c>Except</c> is the only way a
+    ///     project selection nests.
+    /// </remarks>
+    internal static IEnumerable<ProjectSelection> ExpandProjectSelection(ProjectSelection selection)
+    {
+        yield return selection;
+
+        foreach (ProjectAdjective adjective in selection.Adjectives)
+            if (adjective is ProjectExceptAdjective except)
+                foreach (ProjectSelection nested in ExpandProjectSelection(except.Payload))
+                    yield return nested;
     }
 
     /// <summary>The selection itself, then its union parts, then the payloads of its own <c>Except</c> adjectives.</summary>

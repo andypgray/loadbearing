@@ -122,6 +122,9 @@ internal static class SpecValidator
         foreach ((string label, string? value) in RuleProse(rule)) CheckProse(value, label, rule.Id, rule.Location, errors);
 
         CheckForeign(RuleSelections(rule), rule.Id, arch, rule.Location, errors);
+        CheckForeignProjects(rule, arch, errors);
+        CheckProjectPatterns(rule, errors);
+        CheckTargetFrameworks(rule, errors);
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
@@ -224,6 +227,69 @@ internal static class SpecValidator
                     $"A selection used by '{id}' was minted on a different Arch instance; it is not registered with this model.", location));
                 return;
             }
+    }
+
+    // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign. A project selection carries its own
+    // Arch (it has no underlying type selection to borrow one from), so it needs its own walk — the type-side
+    // one reaches nothing on a project constraint, whose Subject is null. Reported once per rule, mirroring
+    // CheckForeign's report-once-and-return, and anchored at the consuming rule's spec-source location as
+    // every other foreign report is. The walk includes the Except payloads, which is the one way a project
+    // selection nests and therefore the one way a foreign one can hide inside a local subject.
+    private static void CheckForeignProjects(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is null) return;
+
+        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(rule.Constraint))
+            if (!ReferenceEquals(selection.Owner, arch))
+            {
+                errors.Add(new SpecValidationError(Code.ForeignProjectSelection, rule.Id,
+                    $"A project selection used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model.",
+                    rule.Location));
+                return;
+            }
+    }
+
+    // GRAMMAR §8 item 23: the blank check over a project subject's own operands — the .Named names and the
+    // .Matching globs. Its own code rather than the shared BlankPattern because the two shapes fail in
+    // opposite directions (a blank name matches nothing, a blank glob matches everything) and the catalog
+    // entry has to be able to say so. Same message shape as CheckPattern's, so a reader who has met one
+    // blank-operand error has met them all.
+    private static void CheckProjectPatterns(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is null) return;
+
+        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(rule.Constraint))
+        foreach (ProjectAdjective adjective in selection.Adjectives)
+            switch (adjective)
+            {
+                case ProjectNamedAdjective named:
+                    foreach (string name in named.Names) CheckProjectPattern(name, "project name", rule, errors);
+
+                    break;
+                case ProjectMatchingAdjective matching:
+                    foreach (string glob in matching.Globs) CheckProjectPattern(glob, "project name pattern", rule, errors);
+
+                    break;
+            }
+    }
+
+    private static void CheckProjectPattern(string value, string label, RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            errors.Add(new SpecValidationError(Code.BlankProjectPattern, rule.Id, $"Blank {label} on '{rule.Id}'.", rule.Location));
+    }
+
+    // GRAMMAR §8 item 24: MustOnlyTarget's own operands. A blank moniker matches nothing, so it narrows the
+    // allow-list silently — the rule stays green until a project targets the framework the author meant to
+    // permit, which is exactly the class of slip the catalog exists to catch at build.
+    private static void CheckTargetFrameworks(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MustOnlyTargetConstraint target) return;
+
+        foreach (string framework in target.Frameworks)
+            if (string.IsNullOrWhiteSpace(framework))
+                errors.Add(new SpecValidationError(Code.BlankTargetFramework, rule.Id,
+                    $"Blank target framework on '{rule.Id}'.", rule.Location));
     }
 
     // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
@@ -508,9 +574,22 @@ internal static class SpecValidator
                 if (adjective is MemberWhereAdjective memberWhere)
                     yield return ("description", memberWhere.Description);
 
+        // The project escape hatches (GRAMMAR §4.10, §8 item 5 via the same extended walk): the project Must
+        // description and any project Where descriptions on the project subject, including those nested under
+        // its Except payloads.
+        if (constraint is ProjectMustConstraint projectMust) yield return ("description", projectMust.Description);
+
+        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(constraint))
+        foreach (ProjectAdjective adjective in selection.Adjectives)
+            if (adjective is ProjectWhereAdjective projectWhere)
+                yield return ("description", projectWhere.Description);
+
         // For a member constraint, Subject is the underlying type selection (Subject => MemberSubject.Source),
-        // so this also walks any type-side Where/Except used before the projection.
-        foreach ((string, string?) prose in SelectionProse(constraint.Subject)) yield return prose;
+        // so this also walks any type-side Where/Except used before the projection. Null for a project
+        // constraint, whose subject is not a type selection at all — the loop above is its walk.
+        if (constraint.Subject is { } subject)
+            foreach ((string, string?) prose in SelectionProse(subject))
+                yield return prose;
 
         foreach (Selection operand in constraint.Operands)
         foreach ((string, string?) prose in SelectionProse(operand))
@@ -629,8 +708,12 @@ internal static class SpecValidator
         }
 
         // The subject selection tree (for a member constraint this is the underlying type selection,
-        // Subject => MemberSubject.Source) and the dependency-verb operands.
-        foreach ((string, PatternKind) pattern in SelectionPatterns(constraint.Subject)) yield return pattern;
+        // Subject => MemberSubject.Source) and the dependency-verb operands. A project constraint has no type
+        // selection here; its own operands ride CheckProjectPatterns and CheckTargetFrameworks (items 23–24),
+        // which need their own codes rather than this walk's shared BlankPattern.
+        if (constraint.Subject is { } subject)
+            foreach ((string, PatternKind) pattern in SelectionPatterns(subject))
+                yield return pattern;
 
         foreach (Selection operand in constraint.Operands)
         foreach ((string, PatternKind) pattern in SelectionPatterns(operand))

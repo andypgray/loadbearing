@@ -150,6 +150,11 @@ public static class LawDiagramRenderer
         }
 
         Constraint constraint = rule.Constraint!;
+
+        // A project-subject rule has no place on a diagram of type-layer references: its subject is a
+        // project selection, so Subject is null (GRAMMAR §4.10), the classifier above has already declined
+        // its verb, and it flows to the compact list like any other rule the drawing cannot hold. Subject
+        // takes a nullable selection precisely so a subjectless rule needs no arm of its own here.
         LawPlace? subject = places.Subject(constraint.Subject);
         if (subject is null)
         {

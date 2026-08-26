@@ -117,5 +117,28 @@ public enum SpecValidationErrorCode
     ///     covers all three categories, fired over the positives' single anchor and every anchor in a
     ///     negative's list.
     /// </summary>
-    HierarchyAnchorWrongCategory
+    HierarchyAnchorWrongCategory,
+
+    /// <summary>
+    ///     A project selection minted on a different <see cref="Arch" /> instance (§8 item 22) — the
+    ///     project-stratum sibling of <see cref="ForeignSelection" /> and <see cref="ForeignMember" />. Its
+    ///     own code rather than a widening of <see cref="ForeignSelection" /> because the message has to
+    ///     name what was foreign for the author to find it.
+    /// </summary>
+    ForeignProjectSelection,
+
+    /// <summary>
+    ///     A blank or whitespace project name or name glob (§8 item 23): a <c>.Named</c> operand or a
+    ///     <c>.Matching</c> glob left empty. A blank name matches no project and a blank glob matches every
+    ///     one, so either is almost certainly an authoring slip — and the two failure shapes are far apart
+    ///     enough that neither should be discovered at check time.
+    /// </summary>
+    BlankProjectPattern,
+
+    /// <summary>
+    ///     A blank or whitespace target framework operand on <c>MustOnlyTarget</c> (§8 item 24). A blank
+    ///     moniker matches nothing, so it silently narrows the allow-list rather than widening it — the
+    ///     rule stays green until a project targets the framework the author meant to permit.
+    /// </summary>
+    BlankTargetFramework
 }

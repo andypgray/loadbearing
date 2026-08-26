@@ -57,6 +57,20 @@ public class SpecValidationTests
     [InlineData(typeof(UnionBlankPatternSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(UnionForeignExceptPayloadSpec), Code.ForeignSelection, "area/rule")]
     [InlineData(typeof(UnionForeignOperandSpec), Code.ForeignSelection, "area/rule")]
+    // The project stratum (GRAMMAR §4.10). A project selection carries its own Arch — it has no underlying
+    // type selection to borrow one from — so §8 item 22 is its own walk, and it reaches an Except payload
+    // exactly as the type-side foreign walk does. The blank checks (items 23–24) take their own codes
+    // rather than the shared BlankPattern, because a blank project name matches nothing while a blank glob
+    // matches everything and the catalog has to be able to say which. Blank project escape-hatch
+    // descriptions ride the existing BlankProse, which already covers a description anywhere (item 5).
+    [InlineData(typeof(ForeignProjectSelectionSpec), Code.ForeignProjectSelection, "area/rule")]
+    [InlineData(typeof(ForeignProjectExceptPayloadSpec), Code.ForeignProjectSelection, "area/rule")]
+    [InlineData(typeof(BlankProjectPatternSpec), Code.BlankProjectPattern, "project/blank-name")]
+    [InlineData(typeof(BlankProjectPatternSpec), Code.BlankProjectPattern, "project/blank-glob")]
+    [InlineData(typeof(BlankProjectPatternSpec), Code.BlankProjectPattern, "project/blank-in-except")]
+    [InlineData(typeof(BlankTargetFrameworkSpec), Code.BlankTargetFramework, "area/rule")]
+    [InlineData(typeof(BlankProjectWhereSpec), Code.BlankProse, "area/rule")]
+    [InlineData(typeof(BlankProjectMustSpec), Code.BlankProse, "area/rule")]
     public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, Code code, string ruleId)
     {
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
@@ -195,6 +209,40 @@ public class SpecValidationTests
         ex.ShouldHaveError(Code.ForeignMember, "area/rule")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:187: A member used by 'area/rule' was minted on a different Arch instance; it is not registered with this model.");
+    }
+
+    [Fact]
+    public void ForeignProjectSelection_ProjectSubjectFromAnotherArch_IsReported()
+    {
+        // Named as a PROJECT selection rather than folded into the type-side message: an author whose rule
+        // mixes strata needs the report to say which one was foreign to find it.
+        SpecValidationException ex = BuildExpectingFailure(new ForeignProjectSelectionSpec());
+
+        ex.ShouldHaveError(Code.ForeignProjectSelection, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:884: A project selection used by 'area/rule' was minted on a different Arch instance; it is not registered with this model.");
+    }
+
+    [Fact]
+    public void BlankProjectPattern_BlankNameAndBlankGlob_AreReportedByKind()
+    {
+        // One code, two labels: the message names which operand was left empty, because a blank name
+        // matches nothing while a blank glob matches everything.
+        SpecValidationException ex = BuildExpectingFailure(new BlankProjectPatternSpec());
+
+        ex.ShouldHaveError(Code.BlankProjectPattern, "project/blank-name")
+            .Message.ShouldBe("SpecValidationSpecs.cs:903: Blank project name on 'project/blank-name'.");
+        ex.ShouldHaveError(Code.BlankProjectPattern, "project/blank-glob")
+            .Message.ShouldBe("SpecValidationSpecs.cs:904: Blank project name pattern on 'project/blank-glob'.");
+    }
+
+    [Fact]
+    public void BlankTargetFramework_OnMustOnlyTarget_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankTargetFrameworkSpec());
+
+        ex.ShouldHaveError(Code.BlankTargetFramework, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:915: Blank target framework on 'area/rule'.");
     }
 
     [Fact]

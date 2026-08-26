@@ -70,6 +70,18 @@ public enum ViolationKind
     /// </summary>
     Expose,
 
+    /// <summary>
+    ///     A subject project failing a packaging or escape verb (GRAMMAR §4.10): <c>SubjectProject</c> with
+    ///     the offending fact's declaration <c>Sites</c> — which may be a props file above the project, and
+    ///     may be empty where the fact has no site to point at. One per (rule, project), except
+    ///     <c>MustReferenceNoPackages</c>, which mints one per declared package reference with
+    ///     <c>Package</c> naming it and the package's own declaration as the site. Those per-package
+    ///     violations deliberately share one identity — the project's — because the law is about the
+    ///     project and a baseline entry blessing it must not have to be re-written each time the package
+    ///     list changes.
+    /// </summary>
+    ProjectShape,
+
     /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
     EmptySubject,
 

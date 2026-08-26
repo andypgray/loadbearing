@@ -7,9 +7,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // Quarantine tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
 // Clustered in one file: these records are one cohesive DTO, not product types.
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
-// §4.5) and `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
-// §4.6) are null on every other kind and so omitted — the schema stays version 3, byte-identical for specs
-// without a member-target or member-subject rule. The `modelIncomplete`, `failedProjects`,
+// §4.5), `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
+// §4.6) and `subjectProject`/`package` pair (an offending project and, for the per-package violations, the
+// package it declares, GRAMMAR §4.10) are null on every other kind and so omitted — the schema stays
+// version 3, byte-identical for specs without a member-target, member-subject or project-subject rule. The `modelIncomplete`, `failedProjects`,
 // `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects`, `multiTargetedProjects` and
 // `rulesFilter` slots are additive the same way: null (omitted) on every run whose workspace loaded, whose
 // NuGet packages resolved, that no solution filter narrowed, whose solution is all C# and single-framework,
@@ -221,6 +222,16 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 /// <param name="SubjectMember">
 ///     The offending member's raw symbol ID, for a <c>memberShape</c> violation; null (omitted) otherwise.
 /// </param>
+/// <param name="SubjectProject">
+///     The offending project's name, for a <c>projectShape</c> violation; null (omitted) otherwise. The
+///     name, not the <c>project:</c> identity form — the identity is a baseline key and this document
+///     spells subjects the way a reader spells them.
+/// </param>
+/// <param name="Package">
+///     The offending package's name, for the per-package <c>projectShape</c> violations a
+///     <c>MustReferenceNoPackages</c> rule mints; null (omitted) on every other violation, that rule's
+///     siblings included.
+/// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
 /// <param name="SiteCount">
 ///     How many sites the violation occurs at, at every grain — <see cref="Sites" /> is its expansion, not
@@ -241,6 +252,8 @@ internal sealed record ViolationJson(
     string? TargetMember,
     string? Subject,
     string? SubjectMember,
+    string? SubjectProject,
+    string? Package,
     string? Detail,
     int SiteCount,
     IReadOnlyList<SiteJson>? Sites);

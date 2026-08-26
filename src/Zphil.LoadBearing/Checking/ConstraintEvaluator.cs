@@ -44,6 +44,9 @@ internal sealed class ConstraintEvaluator
     /// <summary>The pinned message on an empty <em>member</em> subject failure (the member analog, GRAMMAR §4.6).</summary>
     internal const string EmptyMemberSubjectMessage = "The subject selection matched no solution-declared members.";
 
+    /// <summary>The pinned message on an empty <em>project</em> subject failure (the project analog, GRAMMAR §4.10).</summary>
+    internal const string EmptyProjectSubjectMessage = "The subject selection matched no solution-declared projects.";
+
     /// <summary>
     ///     The pinned warning text every forbidden-set verb raises on an inert target (GRAMMAR §4.1) —
     ///     one string for the whole family, so a correction to what "inert" means cannot land on some
@@ -60,11 +63,13 @@ internal sealed class ConstraintEvaluator
     private readonly EdgeIndex<ExposureEdge> _exposureEdgesBySource;
     private readonly EdgeIndex<InjectionEdge> _injectionEdgesBySource;
     private readonly EdgeIndex<MemberEdge> _memberEdgesBySource;
+    private readonly IReadOnlyList<ProjectNode> _projects;
     private readonly SelectionEvaluator _selections;
     private readonly EdgeIndex<ThrowEdge> _throwEdgesBySource;
 
     internal ConstraintEvaluator(CodebaseModel model, SelectionEvaluator selections)
     {
+        _projects = model.Projects;
         _edgesBySource = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Source);
         _edgesByTarget = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Target);
         _memberEdgesBySource = new EdgeIndex<MemberEdge>(model.MemberEdges, e => e.Source);
@@ -89,11 +94,17 @@ internal sealed class ConstraintEvaluator
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
         Evaluate(Constraint constraint)
     {
+        // A project constraint ranges over the solution's PROJECTS (GRAMMAR §4.10), so it dispatches before
+        // everything below: it has no type subject to resolve at all — Constraint.Subject is null for it —
+        // and its own empty check speaks in project terms.
+        if (constraint is ProjectConstraint projectConstraint) return EvaluateProject(projectConstraint);
+
         // Loud per-operand emptiness for a union subject (GRAMMAR §9), ahead of the member dispatch because
         // MemberConstraint.Subject IS the underlying type selection — so one gate covers the type- and
         // member-subject paths alike. The gate hands back the admission it folded the operands into, so
-        // the union subject is neither evaluated a second time nor attributed a second time.
-        (IReadOnlyList<Violation> emptyOperands, SelectionAdmission? resolved) = ResolveSubject(constraint.Subject);
+        // the union subject is neither evaluated a second time nor attributed a second time. The bang is the
+        // project dispatch above: every constraint that reaches here carries a type selection.
+        (IReadOnlyList<Violation> emptyOperands, SelectionAdmission? resolved) = ResolveSubject(constraint.Subject!);
         if (resolved is not { } admission) return (emptyOperands, NoWarnings, default);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
@@ -715,6 +726,96 @@ internal sealed class ConstraintEvaluator
                 violations.Add(Violation.MemberShape(member, member.DeclarationSites));
 
         return (violations, NoWarnings);
+    }
+
+    // The packaging verbs (GRAMMAR §4.10): resolve the project subject, then test each surviving project
+    // against the verb's artifact predicate. An empty project subject fails with the project-flavored
+    // message (the analog of the empty type and member subjects). Coverage is the zero pair — it counts
+    // TYPES, and a project rule materializes none, so reporting anything else would be a claim about a set
+    // this rule never had.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateProject(
+        ProjectConstraint constraint)
+    {
+        IReadOnlyList<ProjectNode> subjects = ProjectSelectionEvaluator.Resolve(constraint.ProjectSubject, _projects);
+        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptyProjectSubjectMessage)], NoWarnings, default);
+
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchProject(constraint, subjects);
+        return (violations, warnings, default);
+    }
+
+    // The project-verb dispatch, lifted out of EvaluateProject for the same reason Dispatch was. Every arm
+    // holds one honesty rule: a fact nothing evaluated is null, and unknown PASSES — a rule that redded on
+    // an unevaluated project would be reporting the load's own gaps as architecture violations.
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchProject(
+        ProjectConstraint constraint, IReadOnlyList<ProjectNode> subjects)
+    {
+        switch (constraint)
+        {
+            case MustOnlyTargetConstraint c:
+                // All over an empty framework list is vacuously true, which is exactly the absent-fact pass:
+                // a project nothing evaluated declares nothing to judge.
+                var permitted = new HashSet<string>(c.Frameworks, StringComparer.Ordinal);
+                return ProjectShape(
+                    subjects,
+                    project => project.TargetFrameworks.All(permitted.Contains),
+                    project => project.TargetFrameworksSite);
+            case MustReferenceNoPackagesConstraint:
+                return ForbiddenPackages(subjects);
+            case MustLockPackagesConstraint:
+                // Null passes and false reds: `!= false` is the tri-state, written as the one comparison
+                // that says so rather than as a two-arm test that reads like a bug.
+                return ProjectShape(
+                    subjects, project => project.LocksPackages != false, project => project.LocksPackagesSite);
+            case MustNotBePackableConstraint:
+                return ProjectShape(
+                    subjects, project => project.IsPackable != true, project => project.IsPackableSite);
+            case ProjectMustConstraint c:
+                // No site: a predicate is a claim about the whole project, and no single declaration in it is
+                // the one that failed. An unlocated violation is the honest form of that.
+                return ProjectShape(
+                    subjects,
+                    project => SelectionEvaluator.InvokePredicate(c.Predicate, project, "Must"),
+                    _ => null);
+            default:
+                // Fail closed: as with the type- and member-subject switches, an unhandled project verb is a
+                // missing arm, not a pass — throw so it surfaces (contained per-rule by ArchChecker).
+                throw new InvalidOperationException($"Unhandled project constraint '{constraint.GetType().Name}'.");
+        }
+    }
+
+    // The one walk behind the packaging shape verbs: one violation per failing project, sited at whatever
+    // declared the fact the verb read — which is regularly a props file above the project, and is null where
+    // nothing evaluated it.
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ProjectShape(
+        IReadOnlyList<ProjectNode> subjects, Func<ProjectNode, bool> holds, Func<ProjectNode, SourceLocation?> siteOf)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+            if (!holds(subject))
+                violations.Add(Violation.ProjectShape(subject, AtSite(siteOf(subject))));
+
+        return (violations, NoWarnings);
+    }
+
+    // MustReferenceNoPackages (GRAMMAR §4.10): one violation per DECLARED package, sited at that reference's
+    // own declaration, so a project taking eight packages reports eight lines to delete rather than one line
+    // saying eight. A project declaring none passes — and so does a project nothing evaluated, because an
+    // empty package list is those two states wearing one face and the honest reading of both is silence.
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenPackages(
+        IReadOnlyList<ProjectNode> subjects)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+        foreach (PackageReference package in subject.PackageReferences)
+            violations.Add(Violation.ProjectPackage(subject, package));
+
+        return (violations, NoWarnings);
+    }
+
+    // A nullable fact site as a violation's evidence list: the one site it has, or nothing to point at.
+    private static IReadOnlyList<SourceLocation> AtSite(SourceLocation? site)
+    {
+        return site is null ? Array.Empty<SourceLocation>() : [site];
     }
 
     // A verb's forbidden set or allow-list: every operand resolved in target position and folded into one

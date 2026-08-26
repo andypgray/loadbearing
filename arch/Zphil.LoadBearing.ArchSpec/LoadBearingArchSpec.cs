@@ -46,7 +46,14 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
 ///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
 ///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
-///         prefix and a suffix, which say it more exactly. <c>MustBeRegistered</c> idles because nothing
+///         prefix and a suffix, which say it more exactly. The four packaging verbs —
+///         <c>MustOnlyTarget</c>, <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c> and
+///         <c>MustNotBePackable</c> — are the newest vocabulary and simply not yet adopted. Their
+///         consumers here are real: the contract package's single-TFM pin and its zero-dependency
+///         guarantee, locked restore on everything that ships, and the short list of projects that may
+///         pack all live today in project files, workflow counts and review habit rather than in rules —
+///         held less legibly than a rule would hold them, which makes this an adoption waiting to happen
+///         rather than a reason the verbs idle for good. <c>MustBeRegistered</c> idles because nothing
 ///         here is registered by convention: the composition root wires a hand-written list of
 ///         infrastructure singletons, so a completeness rule over them could only restate that list at
 ///         itself — a tautology wearing a law's clothes. Its consumer is an estate where a naming
@@ -156,10 +163,12 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
     /// <summary>
     ///     The curated root namespace of the contract package — what a spec author gets from
     ///     <c>using Zphil.LoadBearing;</c> and a dot. Three groups: the entry point and the spec interface,
-    ///     the nouns and enums an author writes as arguments, and the seven static classes holding the
+    ///     the nouns and enums an author writes as arguments, and the nine static classes holding the
     ///     extension methods that are the verbs themselves. <c>IRuleBuilder</c>, <c>IScopeBuilder</c> and
     ///     <c>Member</c> are here because authors do name them — the validation corpus spells all three in
-    ///     type position — even though a chain never has to.
+    ///     type position — even though a chain never has to. <c>ITypeInfo</c>, <c>IMemberInfo</c> and
+    ///     <c>IProjectInfo</c> are here for the same reason: an escape-hatch predicate spells its
+    ///     parameter type.
     /// </summary>
     private static readonly HashSet<string> CoreFrontDoor =
     [
@@ -171,6 +180,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "IAttributeInfo",
         "IMemberInfo",
         "IParameterInfo",
+        "IProjectInfo",
         "IRuleBuilder",
         "IScopeBuilder",
         "ITypeInfo",
@@ -182,6 +192,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "MethodSelectionConstraints",
         "MigrationPolicy",
         "Posture",
+        "ProjectSelectionAdjectives",
+        "ProjectSelectionConstraints",
         "PropertySelectionConstraints",
         "QuarantineRole",
         "Selection",
@@ -521,24 +533,26 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Put the new constraint node in Zphil.LoadBearing.Model beside its siblings, and handle it " +
                  "in ConstraintEvaluator and SentenceRenderer.");
 
-        // The adjective and noun hierarchies (SelectionAdjective, MemberAdjective, SelectionNoun) are
-        // internal and this project has no InternalsVisibleTo, so a typeof anchor cannot reach them and
-        // they stay outside the union below. String anchors on their fully-qualified names are the
-        // drop-in widening if review wants total cover: all three are already get-only, so it would
-        // widen the subject and leave the verdict where it is. Not taken here — the string form is the
-        // escape hatch for a type a spec project cannot reference at all, and these three are Core's own.
+        // The adjective and noun hierarchies (SelectionAdjective, MemberAdjective, ProjectAdjective,
+        // SelectionNoun) are internal and this project has no InternalsVisibleTo, so a typeof anchor
+        // cannot reach them and they stay outside the union below. String anchors on their fully-qualified
+        // names are the drop-in widening if review wants total cover: all four are already get-only, so it
+        // would widen the subject and leave the verdict where it is. Not taken here — the string form is the
+        // escape hatch for a type a spec project cannot reference at all, and these four are Core's own.
         arch.Rule("model/reified-nodes-immutable")
             .Enforce(arch.AnyOf(
                     arch.Types.DerivedFrom<Selection>(),
                     arch.Types.DerivedFrom<Constraint>(),
-                    arch.Types.DerivedFrom<MemberSelection>())
+                    arch.Types.DerivedFrom<MemberSelection>(),
+                    arch.Types.DerivedFrom<ProjectSelection>())
                 .Properties.MustBeGetOnly())
             .Because("A spec compiles to these nodes and both render targets read them back, so a node is a " +
                      "value: the same spec must render the same sentence and check to the same verdict " +
                      "whoever walks it, and a settable property is the one way a walker could change what " +
-                     "the next walker sees. The three roots are the whole reified hierarchy an author can " +
-                     "name — a selection, a constraint, and the member selection a projection mints — and " +
-                     "their private-protected constructors mean no assembly outside Core can add a fourth. " +
+                     "the next walker sees. The four roots are the whole reified hierarchy an author can " +
+                     "name — a selection, a constraint, the member selection a projection mints, and the " +
+                     "project selection the artifact noun mints — and their private-protected constructors " +
+                     "mean no assembly outside Core can add a fifth. " +
                      "The BUILDERS are deliberately outside this law and stay mutable: a RuleRegistration " +
                      "accumulates a posture and a constraint across chained calls, which is what makes the " +
                      "stage machine a stage machine. They derive from none of these roots, so nothing here " +

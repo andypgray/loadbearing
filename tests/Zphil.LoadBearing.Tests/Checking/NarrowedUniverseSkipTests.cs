@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Checking.Targets;
 
 namespace Zphil.LoadBearing.Tests.Checking;
@@ -80,6 +81,38 @@ public sealed class NarrowedUniverseSkipTests
     }
 
     [Fact]
+    public void Check_ProjectSubjectMatchedNothingUnderNarrowing_Skips()
+    {
+        // The fourth empty-selection site (GRAMMAR §4.10). A filter that dropped whole projects is exactly
+        // what an empty PROJECT subject looks like — more directly than for any type subject — so the run
+        // declines rather than accusing the spec of naming a project the solution does not have.
+        RuleResult result = Checker.Run(OneProject(), BaselineIndex.Empty, Narrowed(), arch =>
+                arch.Rule("packaging/x")
+                    .Enforce(arch.Projects.Named("App.Dropped").MustNotBePackable())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveSkipped(SkipReason);
+    }
+
+    [Fact]
+    public void Check_EmptyProjectSubjectWithNoNarrowing_IsStillRed()
+    {
+        // The same guard the type side carries: over the whole solution an empty project subject is a spec
+        // defect and stays loud.
+        // The cast names which of the harness's two three-argument overloads this row wants: over a
+        // CodebaseModel a bare null is ambiguous between the diff context and the narrowing, and it is the
+        // absence of a NARROWING that this row is about.
+        RuleResult result = Checker.Run(OneProject(), BaselineIndex.Empty, (NarrowedUniverse?)null, arch =>
+                arch.Rule("packaging/x")
+                    .Enforce(arch.Projects.Named("App.Dropped").MustNotBePackable())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyProjectSubjectMessage);
+    }
+
+    [Fact]
     public void Check_EmptySubjectWithNoNarrowing_IsStillRed()
     {
         // The invariant this whole change is measured against: an unfiltered run must reach byte-identical
@@ -127,5 +160,12 @@ public sealed class NarrowedUniverseSkipTests
     private static NarrowedUniverse Narrowed()
     {
         return new NarrowedUniverse(SkipReason);
+    }
+
+    // A solution the filter left one project of — so a rule naming any other project reaches nothing, which
+    // is what a dropped project looks like from inside the check.
+    private static CodebaseModel OneProject()
+    {
+        return ProjectFacts.Solution(ProjectFacts.Project("App.Kept"));
     }
 }

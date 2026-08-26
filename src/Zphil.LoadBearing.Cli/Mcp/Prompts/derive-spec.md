@@ -686,6 +686,26 @@ so it chains only off `.Fields`; a `const` field satisfies it, const being reado
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in
 `MyApp.Web.*` returning `Task` must be named `*Async`."*
 
+**Project subjects** — `arch.Projects` names the solution's projects as build artifacts rather than
+as sets of types (`arch.Project(name)` is the unrelated *type* noun, and both keep their meanings):
+project adjectives `.Named(name, …)` (exact, ordinal) / `.Matching(glob, …)` (`*` over one token — a
+project name carries no dot-segment structure) · `.Packable()` (the projects an evaluation reported as
+producing a package) · `.Except(projects)` · `.Where(pred, description:)` · project verbs
+`MustOnlyTarget(tfm, …)` (the allow-list of short monikers — `netstandard2.0`, `net48`; a classic
+project's `v4.8` reads `net48` here — and strict, with no external exemption, because a project's
+frameworks are a closed set) · `MustReferenceNoPackages()` (zero-arity, because the empty list *is* the
+law: one violation per `PackageReference` the project declares, and declared references only — packages
+arriving transitively through a project reference are not seen) · `MustLockPackages()`
+(`RestorePackagesWithLockFile`) · `MustNotBePackable()` (the SDK defaults `IsPackable` on, so this is
+what makes an internal project's opt-out checkable rather than assumed) · `.Must(pred, description:)`
+(project predicates see `IProjectInfo`: name, target frameworks, package and project references, and the
+two flags). Every fact here is read from the build's own evaluation, never from the project file's XML —
+the property a rule is about is very often set in a `Directory.Build.props` above the project — so a
+violation points at whichever declaration actually won, and a fact nothing evaluated is unknown and
+always passes. The flagship:
+`arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
+*"Projects matching `MyApp.*`, except project `MyApp.Cli` must not be packable."*
+
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |
 NeverExpand)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(types...)`]

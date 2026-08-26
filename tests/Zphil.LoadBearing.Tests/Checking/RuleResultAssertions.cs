@@ -217,6 +217,44 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the rule failed on exactly the project violations <paramref name="projects" /> names,
+    ///     each rendered as the offending project's name — or, for the per-package violations
+    ///     <c>MustReferenceNoPackages</c> mints, as <c>{project} -&gt; {package}</c> (GRAMMAR §4.10). In any
+    ///     order, for the reason given on <see cref="ShouldHaveFailedWithEdges" />.
+    /// </summary>
+    internal static RuleResult ShouldHaveFailedWithProjectSubjects(this RuleResult result, string[] projects)
+    {
+        string report = Describe(result);
+        RequireExpectation(projects, report);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Rendered(result, ViolationKind.ProjectShape)
+            .ShouldBe(projects, ignoreOrder: true, customMessage: report);
+
+        return result;
+    }
+
+    /// <summary>
+    ///     The project twin of <see cref="ShouldHaveFailedWithSubjectAtSites" />: exactly one project
+    ///     violation, naming <paramref name="project" /> and evidenced by <paramref name="sites" /> — the
+    ///     <c>file:line</c> that declared the fact the verb read, which is regularly a props file above the
+    ///     project and is empty where nothing declared it (GRAMMAR §4.10).
+    /// </summary>
+    internal static Violation ShouldHaveFailedWithProjectAtSites(
+        this RuleResult result, string project, string[] sites)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Violation violation = result.Violations.ShouldHaveSingleItem(report);
+
+        violation.ShouldSatisfyAllConditions(
+            () => violation.Kind.ShouldBe(ViolationKind.ProjectShape, report),
+            () => violation.SubjectProject!.Name.ShouldBe(project, report),
+            () => RenderedSites(violation).ShouldBe(sites, report));
+
+        return violation;
+    }
+
+    /// <summary>
     ///     The member twin of <see cref="ShouldHaveFailedWithSubjectAtSites" />: exactly one member-shape
     ///     violation, naming <paramref name="symbolId" /> — the member's own DocId (GRAMMAR §4.6) — and
     ///     evidenced by <paramref name="sites" />.
@@ -406,8 +444,11 @@ internal static class RuleResultAssertions
     {
         string? source = violation.Source?.FullName
                          ?? violation.Subject?.FullName
-                         ?? violation.SubjectMember?.SymbolId;
-        string? target = violation.Target?.FullName ?? violation.Member?.SymbolId;
+                         ?? violation.SubjectMember?.SymbolId
+                         ?? violation.SubjectProject?.Name;
+        string? target = violation.Target?.FullName
+                         ?? violation.Member?.SymbolId
+                         ?? violation.Package?.Name;
 
         if (source is null) return null;
 

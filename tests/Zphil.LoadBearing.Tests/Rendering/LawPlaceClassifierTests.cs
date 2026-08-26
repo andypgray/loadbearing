@@ -250,7 +250,7 @@ public sealed class LawPlaceClassifierTests
 
     private static Selection Subject(ArchitectureModel model, int rule = 0)
     {
-        return model.Rules[rule].Constraint!.Subject;
+        return model.Rules[rule].Constraint!.Subject!;
     }
 
     private static Selection Operand(ArchitectureModel model, int rule = 0, int operand = 0)

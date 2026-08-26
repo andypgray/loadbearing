@@ -16,7 +16,7 @@ namespace Zphil.LoadBearing.Codebase;
 ///     evaluation never happened rather than that the property is off — the tri-state
 ///     <see cref="SolutionMember" /> holds to.
 /// </remarks>
-public sealed class ProjectNode
+public sealed class ProjectNode : IProjectInfo
 {
     internal ProjectNode(
         string name,

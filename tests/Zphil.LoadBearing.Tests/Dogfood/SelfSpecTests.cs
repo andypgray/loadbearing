@@ -361,8 +361,11 @@ public sealed class SelfSpecTests
             .ToList();
     }
 
-    // A constraint node's type name is its verb plus the `Constraint` suffix, with the member-level twins
-    // carrying a `Member` prefix (MemberMustHaveSuffixConstraint is MustHaveSuffix on a member subject).
+    // A constraint node's type name is its verb plus the `Constraint` suffix, with the member- and
+    // project-level twins carrying a `Member` or `Project` prefix where a bare name would collide with the
+    // type side's (MemberMustHaveSuffixConstraint is MustHaveSuffix on a member subject;
+    // ProjectMustConstraint is Must on a project one). The four packaging verbs need no prefix and carry
+    // none — their names are theirs alone.
     private static string VerbName(Type constraintType)
     {
         string name = constraintType.Name;
@@ -370,6 +373,8 @@ public sealed class SelfSpecTests
             name = name.Substring(0, name.Length - "Constraint".Length);
         if (name.StartsWith("Member", StringComparison.Ordinal))
             name = name.Substring("Member".Length);
+        if (name.StartsWith("Project", StringComparison.Ordinal))
+            name = name.Substring("Project".Length);
 
         return name;
     }
@@ -392,7 +397,7 @@ public sealed class SelfSpecTests
         // the spec actually ships. layering/core-no-roslyn's subject is the bare Core layer.
         ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
         Selection coreLayer = model.Rule("layering/core-no-roslyn")
-            .Constraint!.Subject;
+            .Constraint!.Subject!;
         Selection coreProject = coreLayer.Owner.Project("Zphil.LoadBearing");
 
         var evaluator = new SelectionEvaluator(codebase);

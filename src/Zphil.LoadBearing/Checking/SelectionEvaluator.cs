@@ -402,6 +402,23 @@ internal sealed class SelectionEvaluator
         }
     }
 
+    // The project-flavored guarded invoke (GRAMMAR §5.6, §4.10): the project `.Where`/`.Must` escape
+    // hatches run here so a throwing predicate becomes a RuleError naming the project, not an aborted run —
+    // the exact shape of the two invokes above. A project's own name is its whole identity, so there is no
+    // qualified form to compose.
+    internal static bool InvokePredicate(Func<IProjectInfo, bool> predicate, IProjectInfo project, string hatch)
+    {
+        try
+        {
+            return predicate(project);
+        }
+        catch (Exception ex)
+        {
+            throw new RuleEvaluationException(
+                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{project.Name}`: {ex.Message}");
+        }
+    }
+
     // The declaring-type-dot-member identity for a member escape-hatch error; the declaring type is always
     // a TypeNode (IMemberInfo.DeclaringType), so its FullName is available for a fully-qualified name.
     private static string MemberIdentity(IMemberInfo member)

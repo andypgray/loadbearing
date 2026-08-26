@@ -16,6 +16,8 @@ public sealed class Violation
         TypeNode? subject,
         MemberReference? member,
         MemberNode? subjectMember,
+        ProjectNode? subjectProject,
+        PackageReference? package,
         IReadOnlyList<SourceLocation> sites,
         string? detail)
     {
@@ -25,6 +27,8 @@ public sealed class Violation
         Subject = subject;
         Member = member;
         SubjectMember = subjectMember;
+        SubjectProject = subjectProject;
+        Package = package;
         Sites = sites;
         Detail = detail;
     }
@@ -55,6 +59,17 @@ public sealed class Violation
     /// <summary>The offending declared member (MemberShape kind); null otherwise.</summary>
     public MemberNode? SubjectMember { get; }
 
+    /// <summary>The offending subject project (ProjectShape kind, GRAMMAR §4.10); null otherwise.</summary>
+    public ProjectNode? SubjectProject { get; }
+
+    /// <summary>
+    ///     The offending declared package reference — populated only by the per-package
+    ///     <c>MustReferenceNoPackages</c> violations, and null on every other ProjectShape and every other
+    ///     kind. Its presence is what parts "this project is wrong" from "this project declares this
+    ///     package".
+    /// </summary>
+    public PackageReference? Package { get; }
+
     /// <summary>The reference or declaration sites carrying the violation; empty for EmptySubject/RuleError.</summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
@@ -65,7 +80,9 @@ public sealed class Violation
     ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
     ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
     ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
-    ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId).
+    ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId); a
+    ///     ProjectShape mirrors it as (project Name, package Name), the package name standing where a
+    ///     Target would, so one project's per-package violations sort by the package they name.
     /// </summary>
     /// <remarks>
     ///     The fourth slot exists because the first three no longer separate every pair of violations: a full
@@ -80,11 +97,13 @@ public sealed class Violation
     {
         get
         {
-            // A MemberShape's declaring-type FullName is the only primary key that is not a Source or a
-            // Subject; every other kind leaves SubjectMember null and never reaches it.
+            // A MemberShape's declaring-type FullName and a ProjectShape's project Name are the only
+            // primary keys that are not a Source or a Subject; every other kind leaves both null and never
+            // reaches them.
             string primary = (Source ?? Subject)?.FullName
+                             ?? SubjectProject?.Name
                              ?? (SubjectMember is { } member ? member.DeclaringTypeFullName : string.Empty);
-            string secondary = Target?.FullName ?? string.Empty;
+            string secondary = Target?.FullName ?? Package?.Name ?? string.Empty;
             string tertiary = Member?.SymbolId ?? SubjectMember?.SymbolId ?? string.Empty;
             string quaternary = (Target ?? Subject)?.ProjectName ?? string.Empty;
             return (primary, secondary, tertiary, quaternary);
@@ -112,6 +131,12 @@ public sealed class Violation
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
+            // A project has no DocumentationCommentId, so it keys on its own name under a `project:` tag —
+            // the same shape a DocId wears, and SymbolIds.Display passes it through verbatim because
+            // `project` is not a one-letter tag. Both project factories key the same way, so the per-package
+            // violations of one project share one identity: the law is about the project, and a baseline
+            // entry blessing it must not have to be rewritten every time the package list moves.
+            ViolationKind.ProjectShape => BaselineEntry.ForSubject("project:" + SubjectProject!.Name),
             _ => null
         };
     }
@@ -148,27 +173,51 @@ public sealed class Violation
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.MemberUse, source, null, null, member, null, sites, null);
+        return new Violation(ViolationKind.MemberUse, source, null, null, member, null, null, null, sites, null);
     }
 
     internal static Violation Shape(TypeNode subject, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Shape, null, null, subject, null, null, sites, null);
+        return new Violation(ViolationKind.Shape, null, null, subject, null, null, null, null, sites, null);
     }
 
     internal static Violation MemberShape(MemberNode subjectMember, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.MemberShape, null, null, null, null, subjectMember, sites, null);
+        return new Violation(ViolationKind.MemberShape, null, null, null, null, subjectMember, null, null, sites, null);
+    }
+
+    /// <summary>
+    ///     A subject project failing a packaging or escape verb (GRAMMAR §4.10), evidenced by the offending
+    ///     fact's declaration sites — which may be empty, because a fact nothing declared has nowhere to
+    ///     point and an unlocated finding is more honest than a made-up one.
+    /// </summary>
+    internal static Violation ProjectShape(ProjectNode subject, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.ProjectShape, null, null, null, null, null, subject, null, sites, null);
+    }
+
+    /// <summary>
+    ///     One declared package reference counting against <c>MustReferenceNoPackages</c>, sited at the
+    ///     reference's own declaration — which may be a props file above the project. Shares
+    ///     <see cref="ProjectShape" />'s kind and its project-keyed identity; <see cref="Package" /> is what
+    ///     tells the two apart.
+    /// </summary>
+    internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
+    {
+        return new Violation(
+            ViolationKind.ProjectShape, null, null, null, null, null, subject, package, [package.Site], null);
     }
 
     internal static Violation EmptySubject(string detail)
     {
-        return new Violation(ViolationKind.EmptySubject, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
+        return new Violation(
+            ViolationKind.EmptySubject, null, null, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
     }
 
     internal static Violation RuleError(string detail)
     {
-        return new Violation(ViolationKind.RuleError, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
+        return new Violation(
+            ViolationKind.RuleError, null, null, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
     }
 
     // The one constructor call the six edge factories share: an edge violation is a (source, target) pair
@@ -176,6 +225,6 @@ public sealed class Violation
     private static Violation Edge(
         ViolationKind kind, TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(kind, source, target, null, null, null, sites, null);
+        return new Violation(kind, source, target, null, null, null, null, null, sites, null);
     }
 }

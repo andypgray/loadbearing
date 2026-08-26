@@ -88,6 +88,52 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveSubject_ProjectByNameAndIdentityForm_ReturnsMatchingViolation()
+    {
+        // A project has no DocumentationCommentId, so its identity is `project:{Name}` (GRAMMAR §4.10) —
+        // and a --subject takes either that or the bare name, exactly as a type subject takes either its
+        // full name or its T: id.
+        Violation shape = Violation.ProjectShape(Project("Zphil.Internal"), Array.Empty<SourceLocation>());
+        Violation[] violations = [shape];
+
+        Violation byName = BaselineAddMatcher.ResolveSubject("r", violations, "Zphil.Internal");
+        Violation byIdentity = BaselineAddMatcher.ResolveSubject("r", violations, "project:Zphil.Internal");
+
+        byName.ShouldBeSameAs(shape);
+        byIdentity.ShouldBeSameAs(shape);
+    }
+
+    [Fact]
+    public void ResolveSubject_PerPackageViolationsOfOneProject_ResolveToFirstNotAmbiguous()
+    {
+        // The NEW identity shape this stratum introduces: a MustReferenceNoPackages rule mints one violation
+        // per declared package, and they all share the project's identity — so --subject over the project
+        // name resolves rather than refusing as ambiguous, and one entry grandfathers the whole list.
+        ProjectNode project = Project("Zphil.Domain");
+        Violation json = Violation.ProjectPackage(project, Package("Newtonsoft.Json"));
+        Violation serilog = Violation.ProjectPackage(project, Package("Serilog"));
+        Violation[] violations = [json, serilog];
+
+        BaselineAddMatcher.ResolveSubject("r", violations, "Zphil.Domain")
+            .ShouldBeSameAs(json);
+    }
+
+    [Fact]
+    public void ResolveSubject_ProjectNoMatch_ListsCandidatesInProjectArrowPackageForm()
+    {
+        ProjectNode project = Project("Zphil.Domain");
+        Violation packageDebt = Violation.ProjectPackage(project, Package("Serilog"));
+        Violation packagingDebt = Violation.ProjectShape(Project("Zphil.Cli"), Array.Empty<SourceLocation>());
+
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveSubject("r", [packageDebt, packagingDebt], "Nope"),
+            "Zphil.Domain -> Serilog");
+
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveSubject("r", [packageDebt, packagingDebt], "Nope"), "Zphil.Cli");
+    }
+
+    [Fact]
     public void ResolveSubject_NoMatch_ListsCandidatesOrReportsNoViolations()
     {
         Violation shape = Violation.Shape(Node("N.S", "T:N.S"), Array.Empty<SourceLocation>());
@@ -279,6 +325,16 @@ public sealed class BaselineAddMatcherTests
         return new TypeNode(
             fullName, symbolId, fullName, "N", TypeKind.Class,
             Accessibility.Public, false, false, false, false, false, "Proj", false);
+    }
+
+    private static ProjectNode Project(string name)
+    {
+        return new ProjectNode(name, projectReferences: []);
+    }
+
+    private static PackageReference Package(string name)
+    {
+        return new PackageReference(name, new SourceLocation("Directory.Packages.props", 3));
     }
 
     private static MemberReference Member(string containingFullName, string name, string symbolId, MemberKind kind)

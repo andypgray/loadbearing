@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using Zphil.LoadBearing.Fluent;
 using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using Zphil.LoadBearing.Validation;
@@ -26,6 +27,21 @@ public sealed class Arch
 
     /// <summary>All types declared in the solution.</summary>
     public Selection Types => new RefinedSelection(this, TypesNoun.Instance, Array.Empty<SelectionAdjective>());
+
+    /// <summary>
+    ///     All projects the solution declares, as build artifacts rather than as sets of types
+    ///     (GRAMMAR §4.10) — the subject the packaging verbs range over. Refine it with
+    ///     <c>.Named</c>/<c>.Matching</c>/<c>.Packable</c>; <see cref="Project" /> is the unrelated noun
+    ///     naming the <em>types</em> a project declares, and both keep their meanings.
+    /// </summary>
+    /// <remarks>
+    ///     A property rather than a method, so a <c>Projects(params string[])</c> naming form cannot
+    ///     coexist with it (CS0102) — the same constraint that makes
+    ///     <see cref="AnyOf(System.Type,System.Type[])" /> the
+    ///     multi-type noun beside <see cref="Types" />. <c>arch.Projects.Named("A", "B")</c> is the naming
+    ///     form here, and it reads as the adjective it is.
+    /// </remarks>
+    public ProjectSelection Projects => new RefinedProjectSelection(this, Array.Empty<ProjectAdjective>());
 
     /// <summary>The registered rule and scope anchors, in authoring order.</summary>
     internal IReadOnlyList<Registration> Registrations => _registrations;

@@ -875,3 +875,63 @@ internal sealed class ValidProjectNamesSpec : IArchitectureSpec
         arch.Rule("project/named-verb").Enforce(arch.Types.MustResideInProject("Another.Name")).Because("Reason.");
     }
 }
+
+internal sealed class ForeignProjectSelectionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        var other = new Arch();
+        arch.Rule("area/rule").Enforce(other.Projects.Named("A").MustNotBePackable()).Because("Reason.");
+    }
+}
+
+internal sealed class ForeignProjectExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        var other = new Arch();
+        arch.Rule("area/rule")
+            .Enforce(arch.Projects.Matching("*").Except(other.Projects.Named("A")).MustNotBePackable())
+            .Because("Reason.");
+    }
+}
+
+internal sealed class BlankProjectPatternSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("project/blank-name").Enforce(arch.Projects.Named("   ").MustNotBePackable()).Because("Reason.");
+        arch.Rule("project/blank-glob").Enforce(arch.Projects.Matching("A", "").MustNotBePackable()).Because("Reason.");
+        arch.Rule("project/blank-in-except")
+            .Enforce(arch.Projects.Matching("*").Except(arch.Projects.Named(" ")).MustNotBePackable())
+            .Because("Reason.");
+    }
+}
+
+internal sealed class BlankTargetFrameworkSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Projects.Named("A").MustOnlyTarget("net8.0", "  ")).Because("Reason.");
+    }
+}
+
+internal sealed class BlankProjectWhereSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Projects.Where(project => project.IsPackable == true, "  ").MustNotBePackable())
+            .Because("Reason.");
+    }
+}
+
+internal sealed class BlankProjectMustSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Projects.Named("A").Must(project => project.IsPackable == true, ""))
+            .Because("Reason.");
+    }
+}

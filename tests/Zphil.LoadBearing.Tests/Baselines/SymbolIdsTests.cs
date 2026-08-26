@@ -29,4 +29,14 @@ public sealed class SymbolIdsTests
         SymbolIds.Display("unresolved:N.Thing.Member")
             .ShouldBe("unresolved:N.Thing.Member");
     }
+
+    [Fact]
+    public void Display_ProjectIdentity_PrintsVerbatim()
+    {
+        // A project subject keys on `project:{Name}` (GRAMMAR §4.10) — a tag of more than one letter, so the
+        // length-2 test fails it and the whole identity survives to the reader. Stripping the tag here would
+        // print a bare project name that no baseline file contains.
+        SymbolIds.Display("project:Zphil.LoadBearing.Cli")
+            .ShouldBe("project:Zphil.LoadBearing.Cli");
+    }
 }

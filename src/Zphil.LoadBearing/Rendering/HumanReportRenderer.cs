@@ -131,6 +131,21 @@ public static class HumanReportRenderer
                     else
                         unlocated.Add(memberLine);
                     break;
+                case ViolationKind.ProjectShape:
+                    // The Shape parallel over a project: its name, at whichever declaration carried the fact
+                    // the verb read — which may be a props file above the project, and may be nothing at all.
+                    // A per-package violation names the package too, in EdgeText's register (no backticks:
+                    // these lines are jump targets, not prose).
+                    ProjectNode project = violation.SubjectProject!;
+                    string projectText = violation.Package is { } package
+                        ? $"{project.Name} references package {package.Name}"
+                        : project.Name;
+                    SourceLocation? declared = violation.Sites.FirstOrDefault();
+                    if (declared is not null)
+                        located.Add((relativizer.Relative(declared.FilePath), declared.Line, projectText));
+                    else
+                        unlocated.Add(projectText);
+                    break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");
                     break;

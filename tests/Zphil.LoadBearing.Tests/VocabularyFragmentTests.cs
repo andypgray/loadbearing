@@ -498,4 +498,42 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.MustBeRegistered())
             .ShouldBe("Types must be registered.");
     }
+
+    // ---- The packaging verbs over a project subject (GRAMMAR §4.10): the artifact axis, whose subject is
+    //      the build output rather than a set of types ----
+
+    [Fact]
+    public void MustOnlyTarget_BackticksTheFrameworkAndCarriesNoCaveat()
+    {
+        // STRICT, and the caveat's ABSENCE is the strictness rendering — as with MustOnlyThrow. A project's
+        // target frameworks are a closed set, so there is nothing this rule declines to constrain.
+        SentenceRenderer.Sentence(Arch.Projects.Named("Zphil.LoadBearing").MustOnlyTarget("netstandard2.0"))
+            .ShouldBe("Project `Zphil.LoadBearing` must target only `netstandard2.0`.");
+    }
+
+    [Fact]
+    public void MustReferenceNoPackages_StatesTheDeclaredReferencesCaveat()
+    {
+        // The honesty boundary, pinned like MustOnlyReference's: the model holds what a project declares,
+        // so the sentence says the transitive graph is not seen rather than letting a reader assume it is.
+        SentenceRenderer.Sentence(Arch.Projects.Named("Zphil.LoadBearing").MustReferenceNoPackages())
+            .ShouldBe(
+                "Project `Zphil.LoadBearing` must reference no NuGet packages "
+                + "(declared references only; transitive dependencies are not seen).");
+    }
+
+    [Fact]
+    public void MustLockPackages_PremodifiedSubjectHead_RendersFragment()
+    {
+        // `.Packable()` premodifies the bare plural head, exactly as `.Authored()` does on the type side.
+        SentenceRenderer.Sentence(Arch.Projects.Packable().MustLockPackages())
+            .ShouldBe("Packable projects must lock package restore.");
+    }
+
+    [Fact]
+    public void MustNotBePackable_InlineGlobAdjective_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Projects.Matching("Zphil.*").MustNotBePackable())
+            .ShouldBe("Projects matching `Zphil.*` must not be packable.");
+    }
 }

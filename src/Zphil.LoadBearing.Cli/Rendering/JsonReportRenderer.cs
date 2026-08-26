@@ -129,8 +129,9 @@ internal static class JsonReportRenderer
 
     // A memberUse violation carries Source (the using type, as Reference does) and the banned member's raw
     // symbol ID in targetMember; a memberShape violation carries the offending member's raw symbol ID in
-    // subjectMember (Subject/Target stay null). Every slot is null-omitted, so a report from a spec with
-    // no member rule carries neither key.
+    // subjectMember (Subject/Target stay null); a projectShape violation carries the project's name in
+    // subjectProject and, when it is one of the per-package ones, the package's name beside it. Every slot
+    // is null-omitted, so a report from a spec with no member or project rule carries none of those keys.
     private static ViolationJson ToViolation(
         Violation violation, PathFormat.Relativizer relativizer, DocumentGrain grain)
     {
@@ -147,6 +148,8 @@ internal static class JsonReportRenderer
             violation.Member?.SymbolId,
             violation.Subject?.FullName,
             violation.SubjectMember?.SymbolId,
+            violation.SubjectProject?.Name,
+            violation.Package?.Name,
             violation.Detail,
             violation.Sites.Count,
             elideSites

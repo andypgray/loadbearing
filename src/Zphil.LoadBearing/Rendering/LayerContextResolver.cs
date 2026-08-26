@@ -96,7 +96,10 @@ public static class LayerContextResolver
     // one build shares the single Arch, and the evaluator never reads the owner).
     private static Selection BareLayer(ArchRule anchoredRule)
     {
-        Selection subject = anchoredRule.Constraint!.Subject;
+        // Both bangs are IsAnchoredOn's: it already read this constraint's subject and matched a LayerNoun
+        // on it, which no rule with a null constraint and no project-subject rule (whose Subject is null,
+        // GRAMMAR §4.10) can do. Only an anchored rule reaches here.
+        Selection subject = anchoredRule.Constraint!.Subject!;
         return new Layer(subject.Owner, (LayerNoun)subject.Noun);
     }
 }

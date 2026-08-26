@@ -62,6 +62,7 @@ internal static class BaselineAddMatcher
         {
             ViolationKind.Shape => Matches(violation.Subject!, subject),
             ViolationKind.MemberShape => MatchesMemberSubject(violation.SubjectMember!, subject),
+            ViolationKind.ProjectShape => MatchesProjectSubject(violation.SubjectProject!, subject),
             _ => false
         };
     }
@@ -70,6 +71,14 @@ internal static class BaselineAddMatcher
     {
         return string.Equals($"{member.DeclaringTypeFullName}.{member.Name}", subject, StringComparison.Ordinal)
                || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
+    }
+
+    // A project's bare name or its `project:` identity form (GRAMMAR §4.10) — the two spellings the same
+    // pair of forms a type subject takes, a readable name and the stored key.
+    private static bool MatchesProjectSubject(ProjectNode project, string subject)
+    {
+        return string.Equals(project.Name, subject, StringComparison.Ordinal)
+               || string.Equals("project:" + project.Name, subject, StringComparison.Ordinal);
     }
 
     private static Violation Resolve(string ruleId, IReadOnlyList<Violation> violations, IReadOnlyList<Violation> candidates, string echo)
@@ -142,6 +151,9 @@ internal static class BaselineAddMatcher
             ViolationKind.Shape => violation.Subject!.FullName,
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
             ViolationKind.MemberUse => $"{violation.Source!.FullName} -> {MemberDisplay.Of(violation.Member!)}",
+            ViolationKind.ProjectShape => violation.Package is { } package
+                ? $"{violation.SubjectProject!.Name} -> {package.Name}"
+                : violation.SubjectProject!.Name,
             _ => $"{violation.Source!.FullName} -> {violation.Target!.FullName}"
         };
     }

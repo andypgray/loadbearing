@@ -15,9 +15,16 @@ internal static class SentenceRenderer
     /// <summary>The full law sentence: <c>{Subject} {verb phrase}.</c></summary>
     internal static string Sentence(Constraint constraint)
     {
-        // A member constraint speaks over its member subject ("Methods of types in `MyApp.Web.*` …");
-        // every other constraint speaks over its type subject (GRAMMAR §4.6, §6).
-        string subject = constraint is MemberConstraint member ? MemberSubject(member.MemberSubject) : Subject(constraint.Subject);
+        // One arm per subject stratum (GRAMMAR §4.6, §4.10, §6): a member constraint speaks over its member
+        // subject ("Methods of types in `MyApp.Web.*` …"), a project constraint over its project subject
+        // ("Packable projects …"), and every other constraint over its type subject. This dispatch is also
+        // what makes the bare Subject read below safe — it is null exactly for the project arm above it.
+        string subject = constraint switch
+        {
+            MemberConstraint member => MemberSubject(member.MemberSubject),
+            ProjectConstraint project => ProjectSubject(project.ProjectSubject),
+            _ => Subject(constraint.Subject!)
+        };
         return subject + " " + constraint.VerbPhrase + ".";
     }
 
@@ -31,6 +38,26 @@ internal static class SentenceRenderer
     internal static string MemberSubject(MemberSelection selection)
     {
         return ProseFormat.Capitalize(MemberPhrase(selection));
+    }
+
+    /// <summary>The capitalized project-subject phrase for a project selection (GRAMMAR §4.10, §6).</summary>
+    internal static string ProjectSubject(ProjectSelection selection)
+    {
+        return ProseFormat.Capitalize(ProjectPhrase(selection));
+    }
+
+    /// <summary>
+    ///     How a project selection reads in reference position (GRAMMAR §4.10, §6) — the same phrase,
+    ///     uncapitalized, which is what an <c>Except</c> payload renders as inside a sentence.
+    /// </summary>
+    /// <remarks>
+    ///     There is no bare-noun special case here as there is on the type side: a project selection has one
+    ///     head and no noun that reads differently as a reference, so subject and reference position differ
+    ///     by capitalization alone.
+    /// </remarks>
+    internal static string ProjectReference(ProjectSelection selection)
+    {
+        return ProjectPhrase(selection);
     }
 
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
@@ -119,8 +146,10 @@ internal static class SentenceRenderer
         // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
         // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
         // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
-        (string? head, string? headPrefix, string inline, string subjectFinal) =
-            Placements(adjectives, headOverride ?? noun.SubjectHead, headPrefixOverride ?? string.Empty);
+        (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
+            adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            headOverride ?? noun.SubjectHead,
+            headPrefixOverride ?? string.Empty);
 
         return headPrefix + head + noun.Locative + inline + subjectFinal;
     }
@@ -149,8 +178,10 @@ internal static class SentenceRenderer
         IReadOnlyList<SelectionAdjective> adjectives = union.Adjectives;
         if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
-        (string? head, string? headPrefix, string inline, string subjectFinal) =
-            Placements(adjectives, headOverride, headPrefixOverride);
+        (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
+            adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            headOverride,
+            headPrefixOverride);
 
         IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
         if (nouns is not null)
@@ -161,31 +192,33 @@ internal static class SentenceRenderer
         return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
     }
 
-    // Where each adjective lands (GRAMMAR §5.2), accumulated in authoring order: Head and HeadPrefix
+    // Where each adjective lands (GRAMMAR §5.2, §4.10), accumulated in authoring order: Head and HeadPrefix
     // substitute, Inline and SubjectFinal concatenate. The caller supplies the seeds — Phrase its noun's
-    // head and an empty prefix, UnionPhrase the union's nullable overrides — so the two types-voice
-    // assemblies cannot disagree about a placement, and a fifth AdjectivePlacement is one edit rather than
-    // two silently-diverging ones. MemberPhrase keeps its own variant: its HeadPrefix arm concatenates
-    // rather than substitutes, which is a documented divergence and not a copy.
+    // head and an empty prefix, UnionPhrase the union's nullable overrides, ProjectPhrase the bare plural —
+    // so no two subject assemblies can disagree about a placement, and a fifth AdjectivePlacement is one
+    // edit rather than one per stratum. It takes (placement, fragment) pairs rather than an adjective list
+    // because the strata's adjective hierarchies are deliberately disjoint and share no base: the pairs are
+    // the whole of what placement needs from any of them. MemberPhrase keeps its own variant, and that one
+    // is a real divergence rather than a copy — its HeadPrefix arm concatenates where these substitute.
     private static (string? Head, string? HeadPrefix, string Inline, string SubjectFinal) Placements(
-        IReadOnlyList<SelectionAdjective> adjectives, string? head, string? headPrefix)
+        IEnumerable<(AdjectivePlacement Placement, string Fragment)> adjectives, string? head, string? headPrefix)
     {
         var inline = string.Empty;
         var subjectFinal = string.Empty;
-        foreach (SelectionAdjective adjective in adjectives)
-            switch (adjective.Placement)
+        foreach ((AdjectivePlacement placement, string fragment) in adjectives)
+            switch (placement)
             {
                 case AdjectivePlacement.Head:
-                    head = adjective.Fragment;
+                    head = fragment;
                     break;
                 case AdjectivePlacement.HeadPrefix:
-                    headPrefix = adjective.Fragment;
+                    headPrefix = fragment;
                     break;
                 case AdjectivePlacement.Inline:
-                    inline += adjective.Fragment;
+                    inline += fragment;
                     break;
                 case AdjectivePlacement.SubjectFinal:
-                    subjectFinal += adjective.Fragment;
+                    subjectFinal += fragment;
                     break;
             }
 
@@ -244,6 +277,21 @@ internal static class SentenceRenderer
             }
 
         return headPrefix + head + " of " + reference + inline + subjectFinal;
+    }
+
+    // Project-subject assembly (GRAMMAR §4.10, §6): the bare plural "projects" as the head, then the shared
+    // placement accumulator. It goes through Placements rather than a loop of its own because the project
+    // stratum's placements mean exactly what the type side's do — Named substitutes the head ("project `A`"),
+    // Packable premodifies it ("packable "), Matching is an inline reduced relative clause, and Except/Where
+    // canonicalize sentence-final. There is no locative: the head carries the whole noun.
+    private static string ProjectPhrase(ProjectSelection selection)
+    {
+        (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
+            selection.Adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            "projects",
+            string.Empty);
+
+        return headPrefix + head + inline + subjectFinal;
     }
 
     private static bool TryBareType(Selection selection, out Type type)

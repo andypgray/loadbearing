@@ -96,6 +96,36 @@ public sealed class EvaluatorFailClosedTests
     }
 
     [Fact]
+    public void ProjectApplyAdjective_UnknownProjectAdjective_ThrowsNamingTheType()
+    {
+        var selection = new RefinedProjectSelection(new Arch(), [new UnknownProjectAdjective()]);
+
+        var ex = Should.Throw<InvalidOperationException>(() => ProjectSelectionEvaluator.Resolve(selection, EmptyCodebase.Projects));
+        ex.Message.ShouldBe("Unhandled project adjective 'UnknownProjectAdjective'.");
+    }
+
+    [Fact]
+    public void UnknownProjectAdjectiveInRule_IsContainedAsRuleErrorNotCrash()
+    {
+        // The project-dispatch twin of the two rows above: a project verb over a fake-adjective subject
+        // routes the throw out of ConstraintEvaluator.Evaluate's project branch and is contained by
+        // ArchChecker.CheckRule as a per-rule RuleError. The project-switch default arm itself is
+        // unreachable for the same reason the member one is — ProjectConstraint's private protected
+        // constructor blocks a fake subclass across the InternalsVisibleTo boundary — so the containment
+        // guarantee is exercised through the selection the project verb evaluates.
+        var arch = new Arch();
+        var selection = new RefinedProjectSelection(arch, [new UnknownProjectAdjective()]);
+        Constraint constraint = selection.MustNotBePackable();
+        var model = new ArchitectureModel(
+            [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+
+        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+            .Results.Single();
+
+        result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled project adjective 'UnknownProjectAdjective'.");
+    }
+
+    [Fact]
     public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
     {
         // A UnionSelection is a union of selections (GRAMMAR §5.1), so it has no single noun: it renders
@@ -121,6 +151,13 @@ public sealed class EvaluatorFailClosedTests
     }
 
     private sealed class UnknownMemberAdjective : MemberAdjective
+    {
+        internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
+
+        internal override string Fragment => string.Empty;
+    }
+
+    private sealed class UnknownProjectAdjective : ProjectAdjective
     {
         internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 

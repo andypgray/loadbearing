@@ -235,7 +235,7 @@ public class ModelReificationTests
         constraint.Members[1]
             .Name.ShouldBe("UtcNow");
         // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
     }
 
@@ -252,7 +252,7 @@ public class ModelReificationTests
         constraint.Targets.ShouldHaveSingleItem();
         constraint.Operands.ShouldBe(constraint.Targets);
         // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
     }
 
@@ -294,7 +294,7 @@ public class ModelReificationTests
         // The inherited Subject is the underlying TYPE selection (Subject => MemberSubject.Source), so
         // foreign walks and Quarantine desugaring keep working on the type side.
         constraint.Subject.ShouldBeSameAs(constraint.MemberSubject.Source);
-        constraint.Subject.Noun.ShouldBeOfType<NamespaceNoun>();
+        constraint.Subject!.Noun.ShouldBeOfType<NamespaceNoun>();
 
         // Member subjects never populate MemberOperands (that hook is the MustNotUse target list).
         constraint.MemberOperands.ShouldBeEmpty();
@@ -352,6 +352,76 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void ProjectSubjectRule_ReifiesToWalkableProjectConstraintWithNoTypeSubject()
+    {
+        // The third subject stratum (GRAMMAR §4.10). Its ProjectSubject carries the selection, and the
+        // inherited type Subject is NULL — there is no underlying type selection to hand up, which is the
+        // whole point of departure from a member constraint. Every type-side walk therefore reaches nothing
+        // here, and the nullable-flow analysis is what audits that each of them dispatched first.
+        var constraint = Checker.Model(arch => arch.Rule("packaging/internal-not-shipped")
+                .Enforce(arch.Projects.Matching("Zphil.*").MustNotBePackable())
+                .Because("An internal project on the feed is an API nobody meant to promise."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustNotBePackableConstraint>();
+
+        constraint.Subject.ShouldBeNull();
+        constraint.Operands.ShouldBeEmpty();
+        constraint.MemberOperands.ShouldBeEmpty();
+        constraint.ProjectSubject.Adjectives.OfType<ProjectMatchingAdjective>()
+            .ShouldHaveSingleItem()
+            .Globs.ShouldBe(["Zphil.*"]);
+    }
+
+    [Fact]
+    public void ProjectAdjectives_ReifyOntoTheProjectSelectionInAuthoringOrder()
+    {
+        // Each adjective appends and clones, so the list is the chain in authoring order — the same
+        // immutable-value shape the type and member selections take.
+        var constraint = Checker.Model(arch => arch.Rule("packaging/locked-restore")
+                .Enforce(arch.Projects.Packable()
+                    .Named("Zphil.LoadBearing", "Zphil.LoadBearing.Cli")
+                    .Except(arch.Projects.Matching("*.Tests"))
+                    .MustLockPackages())
+                .Because("A drifting package graph is a build nobody can reproduce."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustLockPackagesConstraint>();
+
+        constraint.ProjectSubject.Adjectives.Select(adjective => adjective.GetType()
+                .Name)
+            .ShouldBe(["ProjectPackableAdjective", "ProjectNamedAdjective", "ProjectExceptAdjective"]);
+    }
+
+    [Fact]
+    public void ProjectVerbOperands_ReifyOntoTheirOwnConstraintNodes()
+    {
+        // The two operand-carrying project verbs publish their operands as their own domain-named lists —
+        // never through the type-side Operands hook, which stays empty because a project verb names no
+        // type selection at all.
+        var target = Checker.Model(arch => arch.Rule("packaging/contract-tfm")
+                .Enforce(arch.Projects.Named("Zphil.LoadBearing").MustOnlyTarget("netstandard2.0", "net8.0"))
+                .Because("The contract package has to load on every host the estate runs."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustOnlyTargetConstraint>();
+
+        target.Frameworks.ShouldBe(["netstandard2.0", "net8.0"]);
+        target.Operands.ShouldBeEmpty();
+
+        var must = Checker.Model(arch => arch.Rule("packaging/described")
+                .Enforce(arch.Projects.Named("Zphil.LoadBearing")
+                    .Must(project => project.IsPackable == true, description: "produce a package"))
+                .Because("A contract nobody ships is a contract nobody has."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<ProjectMustConstraint>();
+
+        must.Description.ShouldBe("produce a package");
+        must.Subject.ShouldBeNull();
+    }
+
+    [Fact]
     public void RegisteredNoun_WithLifetime_ReifiesToInjectConstraintCarryingLifetimes()
     {
         // arch.Registered(Lifetime.X) reifies to a RegisteredNoun carrying that lifetime; MustNotInject
@@ -365,7 +435,7 @@ public class ModelReificationTests
             .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
 
-        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>()
+        constraint.Subject!.Noun.ShouldBeOfType<RegisteredNoun>()
             .Lifetime.ShouldBe(Lifetime.Singleton);
         constraint.Operands.ShouldBe(constraint.Targets);
         constraint.Targets.Select(target => ((RegisteredNoun)target.Noun).Lifetime)
@@ -384,7 +454,7 @@ public class ModelReificationTests
             .Rules.Single()
             .Constraint
             .ShouldBeOfType<MustNotInjectConstraint>();
-        constraint.Subject.Noun.ShouldBeOfType<RegisteredNoun>()
+        constraint.Subject!.Noun.ShouldBeOfType<RegisteredNoun>()
             .Lifetime.ShouldBeNull();
     }
 
@@ -602,7 +672,7 @@ public class ModelReificationTests
         constraint.Operands.ShouldBeEmpty();
         constraint.MemberOperands.ShouldBeEmpty();
         // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
     }
 
@@ -623,7 +693,7 @@ public class ModelReificationTests
         constraint.Operands.ShouldBeEmpty();
         constraint.MemberOperands.ShouldBeEmpty();
         // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>();
+        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
     }
 
@@ -786,7 +856,7 @@ file static class ArchRuleReificationAssertions
         // An operand-carrying verb overrides Operands, not MemberOperands — its member hook is empty.
         constraint.MemberOperands.ShouldBeEmpty(report);
         // Subject selection intact — the bare Types noun, no adjectives.
-        constraint.Subject.Noun.ShouldBeOfType<TypesNoun>(report);
+        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>(report);
         constraint.Subject.Adjectives.ShouldBeEmpty(report);
     }
 
