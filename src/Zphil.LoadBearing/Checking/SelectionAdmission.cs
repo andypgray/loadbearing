@@ -11,13 +11,13 @@ namespace Zphil.LoadBearing.Checking;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <see cref="Admits" /> is the edge test, and it parts from <see cref="Contains" /> only on a
-///         node several projects declare. An edge whose source compiles its own copy of the target is
-///         intra-project — attributed to the projects both ends declare — so a project-headed operand
-///         admits the target only when the compiling project is one it named. Every other edge is
-///         attributed to the winner alone (<see cref="TypeNode.ProjectName" />), so a project-headed
-///         operand admits the target only when it named the winner. Heads that are not projects (a
-///         <c>typeof</c>, a namespace, a layer, <c>Registered</c>) are attribution-insensitive:
+///         <see cref="CountsEdge" /> is the edge test, and it parts from <see cref="Contains" /> only
+///         where an endpoint is a node several projects declare. It runs over
+///         <see cref="EdgeInstances" />: the subject selection bounds which instances the rule owns at
+///         whichever end it sits, and the operand selection is the predicate at the far end, asked at
+///         that instance's project for that end. Which project a selection names a node <em>at</em> is
+///         <see cref="NamingOf" />, and heads that are not projects (a <c>typeof</c>, a namespace, a
+///         layer, <c>Registered</c>) name it at every project — so
 ///         <c>arch.Project("P").MustNotReference(typeof(Shared))</c> reds on P's own compiled-in copy.
 ///     </para>
 ///     <para>
@@ -49,8 +49,8 @@ internal sealed class SelectionAdmission
 
     /// <summary>
     ///     Plain N-way membership: whether the selection names this node at all, attribution aside. The
-    ///     test every position that is not an edge end takes, and the one an edge's <em>source</em>
-    ///     operand takes — every declarer's copy genuinely makes the reference.
+    ///     test every position that is not an edge end takes, and what <see cref="CountsEdge" /> collapses
+    ///     to on an edge neither of whose endpoints more than one project declares.
     /// </summary>
     internal bool Contains(TypeNode node)
     {
@@ -58,31 +58,52 @@ internal sealed class SelectionAdmission
     }
 
     /// <summary>
-    ///     Whether the selection names <paramref name="node" /> <em>for an edge</em> the compilation of
-    ///     <paramref name="edgeSource" /> made — membership plus the §4.1 attribution rule stated in the
-    ///     remarks on this type.
+    ///     Whether one edge counts against a rule: whether any instance the <paramref name="subject" />
+    ///     owns puts the <paramref name="operand" /> at the far end, or (for <c>MustOnly*</c>, which asks
+    ///     with <paramref name="wantHit" /> false) fails to.
     /// </summary>
-    internal bool Admits(TypeNode node, TypeNode edgeSource)
+    /// <remarks>
+    ///     <para>
+    ///         The whole §4.1 edge rule, stated once for every verb at either end. The subject bounds
+    ///         ownership at the end it sits — <paramref name="subjectAtSource" /> says which — and the
+    ///         operand is the predicate at the other, each asked at that instance's project for that end
+    ///         (<see cref="NamingOf" />). A <c>MustNot*</c> verb violates on the first owned instance
+    ///         whose predicate holds; a <c>MustOnly*</c> verb on the first whose predicate fails.
+    ///     </para>
+    ///     <para>
+    ///         Returns on the first satisfying instance rather than counting them. Violation identity is
+    ///         the (source, target) type pair (§4.3), which is also what a baseline entry keys on, so an
+    ///         edge that satisfied a rule twice must still mint one violation.
+    ///     </para>
+    /// </remarks>
+    internal static bool CountsEdge(
+        SelectionAdmission subject, SelectionAdmission operand,
+        TypeNode source, TypeNode target, bool subjectAtSource, bool wantHit)
     {
-        // Nothing conflated, nothing to attribute: the fast path is the whole degenerate case, and it is
-        // reached without a dictionary probe on every ordinary codebase.
-        if (_conflated is null || node.AlsoDeclaredBy.Count == 0) return Contains(node);
-        if (!_conflated.TryGetValue(node, out Provenance? provenance)) return false;
-        if (provenance.NonProjectAdmitted) return true;
-
-        // Which projects the edge is attributed to is a property of the edge, not of the head that
-        // admitted the node, so it is decided once: the source declaring the target itself makes the edge
-        // intra-project, and every other edge belongs to the declarer whose facts the node carries.
-        bool intraProject = DeclaresAny(edgeSource, node);
-        List<string> heads = provenance.ProjectHeads;
-        for (var i = 0; i < heads.Count; i++)
+        // Nothing conflated at either end, nothing to attribute: one instance, and it is the edge itself.
+        // Edge-local rather than solution-wide, so a codebase with one linked file still takes it for
+        // every other edge — and it keeps an external endpoint away from the declarer walk below, whose
+        // ProjectName there is a supplying assembly's name rather than a project's.
+        if (source.AlsoDeclaredBy.Count == 0 && target.AlsoDeclaredBy.Count == 0)
         {
-            string head = heads[i];
-            bool attributed = intraProject
-                ? edgeSource.IsDeclaredBy(head)
-                : string.Equals(head, node.ProjectName, StringComparison.Ordinal);
+            TypeNode farEnd = subjectAtSource ? target : source;
+            return operand.Contains(farEnd) == wantHit;
+        }
 
-            if (attributed) return true;
+        SelectionAdmission atSource = subjectAtSource ? subject : operand;
+        SelectionAdmission atTarget = subjectAtSource ? operand : subject;
+        Naming sourceNaming = atSource.NamingOf(source);
+        Naming targetNaming = atTarget.NamingOf(target);
+
+        foreach (EdgeInstance instance in EdgeInstances.Of(source, target))
+        {
+            bool namesSource = sourceNaming.Names(instance.SourceProject);
+            bool namesTarget = targetNaming.Names(instance.TargetProject);
+            bool owned = subjectAtSource ? namesSource : namesTarget;
+            if (!owned) continue;
+
+            bool predicateHolds = subjectAtSource ? namesTarget : namesSource;
+            if (predicateHolds == wantHit) return true;
         }
 
         return false;
@@ -177,7 +198,7 @@ internal sealed class SelectionAdmission
 
     // What one leaf selection admitted its conflated members under: the project name where the noun is a
     // project, the attribution-insensitive flag under every other noun. A model that conflates nothing
-    // stages nothing at all, which is what makes Admits reduce to Contains there rather than by agreement.
+    // stages nothing at all, which is what makes NamingOf answer "at every project" there by construction.
     private static Dictionary<TypeNode, Provenance>? Stage(
         SelectionEvaluator selections, Selection selection, HashSet<TypeNode> members)
     {
@@ -207,18 +228,19 @@ internal sealed class SelectionAdmission
         return entry;
     }
 
-    // D(S) ∩ D(T) ≠ ∅ — whether the referencing compilation declares the target type itself, which is
-    // what makes an edge intra-project however the target node's facts were attributed.
-    private static bool DeclaresAny(TypeNode edgeSource, TypeNode node)
+    // Where this selection names one node — at every project, at the ones its project-headed selections
+    // spelled, or nowhere at all. Read once per end and then asked per instance, because it is a property
+    // of the (selection, node) pair and the instances only vary the project it is asked about.
+    private Naming NamingOf(TypeNode node)
     {
-        if (edgeSource.IsDeclaredBy(node.ProjectName)) return true;
+        if (!Members.Contains(node)) return Naming.Nowhere;
 
-        IReadOnlyList<string> alsoDeclaredBy = node.AlsoDeclaredBy;
-        for (var i = 0; i < alsoDeclaredBy.Count; i++)
-            if (edgeSource.IsDeclaredBy(alsoDeclaredBy[i]))
-                return true;
+        // A node one project declares is named at that project by anything that names it at all, and a
+        // model that conflates nothing stages no heads to narrow with.
+        if (_conflated is null || node.AlsoDeclaredBy.Count == 0) return Naming.Anywhere;
+        if (!_conflated.TryGetValue(node, out Provenance? provenance)) return Naming.Nowhere;
 
-        return false;
+        return provenance.NonProjectAdmitted ? Naming.Anywhere : Naming.At(provenance.ProjectHeads);
     }
 
     // What admitted one conflated node into a selection: the names of the project-headed selections that
@@ -229,5 +251,51 @@ internal sealed class SelectionAdmission
         internal List<string> ProjectHeads { get; } = [];
 
         internal bool NonProjectAdmitted { get; set; }
+    }
+
+    /// <summary>
+    ///     Where one selection names one node: at every project, at the listed ones, or nowhere. The
+    ///     per-node half of the §4.1 edge rule — <see cref="CountsEdge" /> resolves one per end and then
+    ///     asks it the project each instance reached.
+    /// </summary>
+    /// <remarks>
+    ///     "At every project" covers three different reasons that need no telling apart here: the node has
+    ///     one declarer, the model conflates nothing, or a head that is not a project admitted it
+    ///     (attribution-insensitive by §4.1). <see langword="default" /> is <see cref="Nowhere" />, which
+    ///     is what a node outside the selection gets — and the right answer for both polarities, since an
+    ///     operand that names nothing neither forbids nor allows.
+    /// </remarks>
+    private readonly struct Naming
+    {
+        private readonly IReadOnlyList<string>? _projectHeads;
+
+        private Naming(bool everyProject, IReadOnlyList<string>? projectHeads)
+        {
+            EveryProject = everyProject;
+            _projectHeads = projectHeads;
+        }
+
+        internal static Naming Nowhere => default;
+
+        internal static Naming Anywhere => new(true, null);
+
+        private bool EveryProject { get; }
+
+        internal static Naming At(IReadOnlyList<string> projectHeads)
+        {
+            return new Naming(false, projectHeads);
+        }
+
+        internal bool Names(string project)
+        {
+            if (EveryProject) return true;
+            if (_projectHeads is not { } heads) return false;
+
+            for (var i = 0; i < heads.Count; i++)
+                if (string.Equals(heads[i], project, StringComparison.Ordinal))
+                    return true;
+
+            return false;
+        }
     }
 }

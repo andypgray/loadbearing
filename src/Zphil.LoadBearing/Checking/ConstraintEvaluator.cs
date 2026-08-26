@@ -130,8 +130,9 @@ internal sealed class ConstraintEvaluator
 
     // The verb dispatch, lifted out of Evaluate unchanged so the coverage pair can ride beside the pair every
     // arm returns. No arm knows about coverage — the subject set it is measured from is already resolved.
-    // Only the two INVERSE verbs read the admission beside the set: there the subject sits at the edge's
-    // target end, where which project a reference is attributed to decides whether it counts (§4.1).
+    // Every EDGE verb reads the admission rather than the bare set: the subject bounds which of an edge's
+    // per-declarer instances the rule owns, at whichever end it sits (§4.1). The shape verbs and the member
+    // path take the set, because a rule with no edge has nothing to attribute.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Dispatch(
         Constraint constraint, HashSet<TypeNode> subjects, SelectionAdmission admission)
     {
@@ -142,27 +143,27 @@ internal sealed class ConstraintEvaluator
             case MustNotBeReferencedByConstraint c:
                 return ForbiddenReference(admission, c.Sources, inbound: true);
             case MustOnlyReferenceConstraint c:
-                return OnlyReference(subjects, c.Targets);
+                return OnlyReference(admission, c.Targets);
             case MustOnlyBeReferencedByConstraint c:
                 return OnlyBeReferencedBy(admission, c.Sources);
             case MustNotUseConstraint c:
                 return ForbiddenMemberUse(subjects, c.Members);
             case MustNotConstructConstraint c:
-                return ForbiddenConstruction(subjects, c.Targets);
+                return ForbiddenConstruction(admission, c.Targets);
             case MustNotInjectConstraint c:
-                return ForbiddenInjection(subjects, c.Targets);
+                return ForbiddenInjection(admission, c.Targets);
             case MustNotCatchConstraint c:
-                return ForbiddenCatch(subjects, c.Targets);
+                return ForbiddenCatch(admission, c.Targets);
             case MustNotCatchUnfilteredConstraint c:
-                return ForbiddenUnfilteredCatch(subjects, c.Targets);
+                return ForbiddenUnfilteredCatch(admission, c.Targets);
             case MustNotSwallowConstraint c:
-                return ForbiddenSwallow(subjects, c.Targets);
+                return ForbiddenSwallow(admission, c.Targets);
             case MustNotExposeConstraint c:
-                return ForbiddenExposure(subjects, c.Targets);
+                return ForbiddenExposure(admission, c.Targets);
             case MustOnlyThrowConstraint c:
-                return OnlyThrow(subjects, c.Targets);
+                return OnlyThrow(admission, c.Targets);
             case MustNotThrowConstraint c:
-                return ForbiddenThrow(subjects, c.Targets);
+                return ForbiddenThrow(admission, c.Targets);
             case MustResideInNamespaceConstraint c:
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Shape(subjects, t => namespacePattern.Matches(t.Namespace));
@@ -221,8 +222,8 @@ internal sealed class ConstraintEvaluator
 
     /// <summary>
     ///     The one walk behind every forbidden-set verb (GRAMMAR §4.1, §4.3, §4.5, §4.7, §4.8, §4.9):
-    ///     resolve the operands, keep each candidate edge whose non-subject endpoint is a forbidden
-    ///     operand, mint one violation per survivor from the sites that verb treats as evidence, and — for
+    ///     resolve the operands, keep each candidate edge that counts against the rule, mint one violation
+    ///     per survivor from the sites that verb treats as evidence, and — for
     ///     the arms that warn — raise the inert-target warning. Inert only when the forbidden operand set
     ///     is empty AND at least one operand is a pattern selection; a bare <c>typeof</c> target absent
     ///     from the codebase is the win condition, not a warning. <c>requireSites</c> is the refinement
@@ -230,32 +231,39 @@ internal sealed class ConstraintEvaluator
     ///     printed <c>file:line</c> is ever a site the ban permits.
     /// </summary>
     /// <remarks>
-    ///     <paramref name="attributionSourceOf" /> names the endpoint whose compilation made the edge —
-    ///     the source, for every verb whose operand sits at the target end. It is what tells a
-    ///     project-headed operand a reference into a type that project compiles itself from a reference
-    ///     into another project's declaration of the same name (GRAMMAR §4.1). Null hands the test back to
-    ///     plain membership, which is what the inbound reference verb wants: there the operand IS the
-    ///     edge's source, and every project declaring it genuinely makes the reference.
+    ///     <para>
+    ///         <paramref name="subject" /> rides beside the candidates because the §4.1 edge rule needs
+    ///         both ends of the same test: the subject bounds which of the edge's per-declarer instances
+    ///         the rule owns, and the operand set decides the far end at each of them. Which end the
+    ///         subject sits at is <paramref name="subjectAtSource" /> — true for every verb here but the
+    ///         inbound reference one.
+    ///     </para>
+    ///     <para>
+    ///         The live trap for that one arm: its operand admission is resolved in
+    ///         <see cref="SelectionPosition.Target" /> and then plays the edge's SOURCE role. Benign,
+    ///         because target position differs only by admitting external nodes and an edge source is
+    ///         always solution-declared, but it is no longer self-evident from the call.
+    ///     </para>
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenEdge<TEdge>(
         IEnumerable<TEdge> candidates,
+        SelectionAdmission subject,
         IReadOnlyList<Selection> operands,
-        Func<TEdge, TypeNode> operandOf,
+        Func<TEdge, TypeNode> sourceOf,
+        Func<TEdge, TypeNode> targetOf,
         Func<TEdge, IReadOnlyList<SourceLocation>> sitesOf,
         Func<TEdge, IReadOnlyList<SourceLocation>, Violation> toViolation,
+        bool subjectAtSource,
         bool requireSites,
-        bool warnInert,
-        Func<TEdge, TypeNode>? attributionSourceOf)
+        bool warnInert)
     {
         SelectionAdmission operandSet = ResolveOperands(operands);
         var violations = new List<Violation>();
 
         foreach (TEdge edge in candidates)
         {
-            TypeNode operand = operandOf(edge);
-            bool forbidden = attributionSourceOf is null
-                ? operandSet.Contains(operand)
-                : operandSet.Admits(operand, attributionSourceOf(edge));
+            bool forbidden = SelectionAdmission.CountsEdge(
+                subject, operandSet, sourceOf(edge), targetOf(edge), subjectAtSource, wantHit: true);
 
             if (!forbidden) continue;
 
@@ -293,26 +301,21 @@ internal sealed class ConstraintEvaluator
     ///     while the violation still names <c>Source</c> — the referencing type, where the edit happens.
     /// </summary>
     /// <remarks>
-    ///     The two directions carry the §4.1 attribution rule at opposite ends. Outbound it rides on the
-    ///     operand, which is the edge's target. Inbound the SUBJECT is the target, so it rides on the
-    ///     candidates instead: a project-headed subject counts an inbound reference only where the
-    ///     referencing compilation bound the copy that subject's project declares. Filtering candidates
-    ///     rather than violations is safe because walk order is unobservable (see <see cref="Keyed" />).
+    ///     The two directions are one test read from opposite ends (§4.1), which is why neither filters
+    ///     the candidates first: "some instance the subject owns puts the operand at the far end" is a
+    ///     claim about a declarer both ends agree on, and two independent filters cannot state it.
+    ///     Inbound, the subject sits at the target and bounds ownership there while the operand decides
+    ///     the source; outbound, the other way round.
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
-        SelectionAdmission subjects, IReadOnlyList<Selection> operands, bool inbound)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands, bool inbound)
     {
         ILookup<TypeNode, ReferenceEdge> index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
-        IEnumerable<ReferenceEdge> candidates = Keyed(subjects.Members, index);
-        if (inbound) candidates = candidates.Where(edge => subjects.Admits(edge.Target, edge.Source));
-
-        Func<ReferenceEdge, TypeNode> operandOf = inbound ? e => e.Source : e => e.Target;
-        Func<ReferenceEdge, TypeNode>? attributionSourceOf = inbound ? null : e => e.Source;
 
         return ForbiddenEdge(
-            candidates, operands, operandOf, e => e.Sites,
+            Keyed(subject.Members, index), subject, operands, e => e.Source, e => e.Target, e => e.Sites,
             (e, sites) => Violation.Reference(e.Source, e.Target, sites),
-            requireSites: false, warnInert: true, attributionSourceOf: attributionSourceOf);
+            subjectAtSource: !inbound, requireSites: false, warnInert: true);
     }
 
     // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
@@ -320,9 +323,10 @@ internal sealed class ConstraintEvaluator
     // overload. Per-overload edges yield per-overload MemberUse violations (the §4.3 identity substrate).
     // The banned set is resolved eagerly so a closed-generic member anchor is refused (RuleError) before
     // any edge is tested — mirroring the type-noun refusal in SelectionEvaluator.DefinitionFullName.
-    // Keyed on names rather than on nodes, the ban is attribution-insensitive by construction, which is
-    // the same answer a typeof operand gets from the §4.1 attribution rule: a member of a type several
-    // projects compile is banned in every one of them, its own compiled-in copy included.
+    // Keyed on names rather than on nodes, the ban is attribution-insensitive by construction, and it must
+    // stay that way: a (declaring type, name) string set has no head to read a project off, so there is no
+    // instance for it to be asked about. That is also the answer §4.1 already gives a typeof operand — a
+    // member of a type several projects compile is banned in every one of them, its own copy included.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenMemberUse(
         HashSet<TypeNode> subjects, IReadOnlyList<Member> members)
     {
@@ -353,12 +357,13 @@ internal sealed class ConstraintEvaluator
     ///     keyed on the type pair (overload-indifferent, §4.3).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenConstruction(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _constructorEdgesBySource.Lookup), operands, e => e.Constructed, e => e.Sites,
+            Keyed(subject.Members, _constructorEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Constructed, e => e.Sites,
             (e, sites) => Violation.Construction(e.Source, e.Constructed, sites),
-            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: false, warnInert: true);
     }
 
     /// <summary>
@@ -373,12 +378,13 @@ internal sealed class ConstraintEvaluator
     ///     §4.1). An empty operand set is silence, not a warning.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenInjection(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _injectionEdgesBySource.Lookup), operands, e => e.Injected, e => e.Sites,
+            Keyed(subject.Members, _injectionEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Injected, e => e.Sites,
             (e, sites) => Violation.Injection(e.Source, e.Injected, sites),
-            requireSites: false, warnInert: false, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: false, warnInert: false);
     }
 
     /// <summary>
@@ -390,12 +396,13 @@ internal sealed class ConstraintEvaluator
     ///     narrower <c>catch (IOException)</c>.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.Sites,
+            Keyed(subject.Members, _catchEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Caught, e => e.Sites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
-            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: false, warnInert: true);
     }
 
     /// <summary>
@@ -412,12 +419,13 @@ internal sealed class ConstraintEvaluator
     ///     §4.1 forbidden-set family's, both exactly as ForbiddenCatch.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenUnfilteredCatch(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.UnfilteredSites,
+            Keyed(subject.Members, _catchEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Caught, e => e.UnfilteredSites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
-            requireSites: true, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: true, warnInert: true);
     }
 
     /// <summary>
@@ -434,12 +442,13 @@ internal sealed class ConstraintEvaluator
     ///     the §4.1 forbidden-set family's.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenSwallow(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _catchEdgesBySource.Lookup), operands, e => e.Caught, e => e.SwallowingSites,
+            Keyed(subject.Members, _catchEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Caught, e => e.SwallowingSites,
             (e, sites) => Violation.Catch(e.Source, e.Caught, sites),
-            requireSites: true, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: true, warnInert: true);
     }
 
     /// <summary>
@@ -453,12 +462,13 @@ internal sealed class ConstraintEvaluator
     ///     allow-set is loud on its own.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenThrow(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _throwEdgesBySource.Lookup), operands, e => e.Thrown, e => e.Sites,
+            Keyed(subject.Members, _throwEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Thrown, e => e.Sites,
             (e, sites) => Violation.Throw(e.Source, e.Thrown, sites),
-            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: false, warnInert: true);
     }
 
     /// <summary>
@@ -469,45 +479,50 @@ internal sealed class ConstraintEvaluator
     ///     signature position, never a narrower <c>DataView</c> one (no hierarchy-aware matching).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> operands)
+        SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subjects, _exposureEdgesBySource.Lookup), operands, e => e.Exposed, e => e.Sites,
+            Keyed(subject.Members, _exposureEdgesBySource.Lookup), subject, operands,
+            e => e.Source, e => e.Exposed, e => e.Sites,
             (e, sites) => Violation.Expose(e.Source, e.Exposed, sites),
-            requireSites: false, warnInert: true, attributionSourceOf: e => e.Source);
+            subjectAtSource: true, requireSites: false, warnInert: true);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedTargets)
+        SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets)
     {
         SelectionAdmission allowed = ResolveOperands(allowedTargets);
         var violations = new List<Violation>();
 
         // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
         // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
-        // Strictness survives §4.1 attribution: a reference into a type the referencing project compiles
-        // itself is allowed by an entry naming THAT project, or by an entry that is not a project at all —
-        // never by an entry naming some other declarer of the same source file.
-        foreach (ReferenceEdge edge in Keyed(subjects, _edgesBySource.Lookup))
-            if (!edge.Target.IsExternal && !allowed.Admits(edge.Target, edge.Source))
+        // Strictness survives §4.1 attribution by flipping the polarity CountsEdge asks with: an edge is
+        // a violation when SOME instance the subject owns lands outside the allow-set. So an intra-copy
+        // edge is allowed by an entry naming the compiling project, or by an entry that is not a project
+        // at all — never by an entry naming some other declarer of the same source file.
+        foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesBySource.Lookup))
+            if (!edge.Target.IsExternal
+                && SelectionAdmission.CountsEdge(
+                    subject, allowed, edge.Source, edge.Target, subjectAtSource: true, wantHit: false))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
-        SelectionAdmission subjects, IReadOnlyList<Selection> allowedSources)
+        SelectionAdmission subject, IReadOnlyList<Selection> allowedSources)
     {
         SelectionAdmission allowed = ResolveOperands(allowedSources);
         var violations = new List<Violation>();
 
         // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
         // Edge sources are always solution-declared, so no external caveat is needed. The subject sits at
-        // the edge's target end, so it counts an edge only where the reference is attributed to it (§4.1),
-        // while the allow-set test stays plain membership — every declarer of an allowed source makes the
-        // reference itself.
-        foreach (ReferenceEdge edge in Keyed(subjects.Members, _edgesByTarget.Lookup))
-            if (subjects.Admits(edge.Target, edge.Source) && !allowed.Contains(edge.Source))
+        // the edge's TARGET end, so it bounds ownership there while the allow-set decides the source —
+        // one test rather than two, because "some instance the subject owns comes from an unallowed
+        // project" is a claim about one declarer and cannot be split across independent filters (§4.1).
+        foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesByTarget.Lookup))
+            if (SelectionAdmission.CountsEdge(
+                    subject, allowed, edge.Source, edge.Target, subjectAtSource: false, wantHit: false))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
         return (violations, NoWarnings);
@@ -521,16 +536,17 @@ internal sealed class ConstraintEvaluator
     // type absent from the model resolves empty and harmlessly allows nothing. MustOnly* never warns — an
     // empty allow-set is loud by itself (the point of departure from ForbiddenCatch). The allow-set is a
     // target position like any other, so §4.1 attribution decides membership here too: a project-headed
-    // entry allows a throw of a type several projects compile only where the throwing project is the one
-    // the edge is attributed to.
+    // entry allows a throw of a type several projects compile only at the instance whose throwing
+    // compilation reached that project's copy.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyThrow(
-        HashSet<TypeNode> subjects, IReadOnlyList<Selection> allowedThrows)
+        SelectionAdmission subject, IReadOnlyList<Selection> allowedThrows)
     {
         SelectionAdmission allowed = ResolveOperands(allowedThrows);
         var violations = new List<Violation>();
 
-        foreach (ThrowEdge edge in Keyed(subjects, _throwEdgesBySource.Lookup))
-            if (!allowed.Admits(edge.Thrown, edge.Source))
+        foreach (ThrowEdge edge in Keyed(subject.Members, _throwEdgesBySource.Lookup))
+            if (SelectionAdmission.CountsEdge(
+                    subject, allowed, edge.Source, edge.Thrown, subjectAtSource: true, wantHit: false))
                 violations.Add(Violation.Throw(edge.Source, edge.Thrown, edge.Sites));
 
         return (violations, NoWarnings);

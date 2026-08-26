@@ -1,24 +1,102 @@
 using Shared;
 using Xunit;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Roslyn.Extraction;
+using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     Edge attribution where one source file compiles into several projects (GRAMMAR §4.1). Membership
-///     alone decides every position that is not an edge end; at an edge end a project-headed operand asks
-///     which project the reference belongs to. An edge whose source declares the target itself is
-///     intra-project — it counts against the compiling project alone — and every other edge counts against
-///     the first declarer, whose facts the node carries. Heads that are not projects stay
-///     attribution-insensitive, an edge's <em>source</em> position stays plain membership, and
-///     <c>MustOnly*</c> stays strict.
+///     The second multi-declarer bed: one edge whose endpoints are declared by
+///     <em>
+///         overlapping but
+///         different
+///     </em>
+///     project sets (GRAMMAR §4.1), which <see cref="MultiplyDeclaredCodebase" /> cannot
+///     stage — there every shared type is declared by the same three projects, so every instance of every
+///     shared edge is intra-project.
 /// </summary>
 /// <remarks>
-///     The bed is <see cref="MultiplyDeclaredCodebase" />, described in full in its own remarks;
-///     <see cref="MultiplyDeclaredMembershipTests" /> carries the membership half over the same model. Every
-///     row here anchors its subject with a namespace where the claim is about the target end, so that the
-///     outward edge of the shared type itself — which every project-headed operand admits, since the shared
-///     type is declared by all three — cannot ride into a verdict the row is not making.
+///     <para>
+///         Three projects, handed to extraction in ordinal order so the winners are the ordinally first
+///         declarer of each shared type:
+///     </para>
+///     <list type="bullet">
+///         <item><c>Anchor</c> — the Beta file alone, and the declarer whose facts <c>Split.Beta</c> carries.</item>
+///         <item><c>Middle</c> — both files, so it declares both endpoints and compiles the edge into itself.</item>
+///         <item>
+///             <c>Shell</c> — the Alpha file, plus a real reference to <c>Anchor</c>'s compilation, so its
+///             copy of Alpha binds Anchor's Beta.
+///         </item>
+///     </list>
+///     <para>
+///         So <c>Split.Alpha</c> is declared by <c>Middle</c> and <c>Shell</c>, <c>Split.Beta</c> by
+///         <c>Anchor</c> and <c>Middle</c>, and the one <c>Split.Alpha → Split.Beta</c> edge stands for two
+///         instances that reach different projects: Middle's own copy, and Anchor's declaration from Shell.
+///         <c>Anchor</c> wins Beta's facts precisely so the cross-project instance names a project the
+///         source is not declared by, which is the case a single edge-global intra/cross decision cannot
+///         state.
+///     </para>
+/// </remarks>
+internal static class MixedDeclarerCodebase
+{
+    // The edge's source, compiled by Middle and Shell. Beta resolves to Middle's own copy in one and to
+    // Anchor's assembly in the other, which is what makes one model edge stand for two different reaches.
+    private const string AlphaFile = """
+                                     namespace Split
+                                     {
+                                         public class Alpha { public Beta B; }
+                                     }
+                                     """;
+
+    // The edge's target, compiled by Anchor and Middle.
+    private const string BetaFile = """
+                                    namespace Split
+                                    {
+                                        public class Beta {}
+                                    }
+                                    """;
+
+    /// <summary>The extracted bed, built once for every row that reads it.</summary>
+    internal static CodebaseModel Model { get; } = Extract();
+
+    private static CodebaseModel Extract()
+    {
+        CompilationInput anchor = CompilationFactory.Compile("Anchor", ("Split/Beta.cs", BetaFile));
+        CompilationInput middle = CompilationFactory.Compile(
+            "Middle", ("Split/Alpha.cs", AlphaFile), ("Split/Beta.cs", BetaFile));
+        CompilationInput shell = CompilationFactory.CompileReferencing(
+            "Shell", anchor.Compilation, "Anchor", ("Split/Alpha.cs", AlphaFile));
+
+        // Input order decides the winners, and it is ordinal here so both readings of "first declarer"
+        // agree: Anchor wins Beta, Middle wins Alpha.
+        return CodebaseExtractor.ExtractFromCompilations([anchor, middle, shell]);
+    }
+}
+
+/// <summary>
+///     Edge attribution where one source file compiles into several projects (GRAMMAR §4.1). Membership
+///     alone decides every position that is not an edge end; at an edge end one model edge stands for one
+///     reference per declarer of its source, each reaching that declarer's own copy of the target where it
+///     compiles one and the target's attributed declarer otherwise. The subject bounds which instances a
+///     rule owns and the operand decides the far end at each. Heads that are not projects stay
+///     attribution-insensitive, and <c>MustOnly*</c> stays strict.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The bed is <see cref="MultiplyDeclaredCodebase" />, described in full in its own remarks;
+///         <see cref="MultiplyDeclaredMembershipTests" /> carries the membership half over the same model,
+///         and <see cref="MixedDeclarerCodebase" /> stages the one shape it cannot — an edge whose two
+///         endpoints have overlapping but different declarer sets.
+///     </para>
+///     <para>
+///         Where the claim is about the target end alone, a row anchors its subject on a namespace, so the
+///         outward edge of the shared type itself cannot ride into a verdict the row is not making. That
+///         avoidance is also why the field found this class of defect and the suite did not, so the rows
+///         naming a project-headed subject over both endpoints exist to make that very shape the subject.
+///     </para>
 /// </remarks>
 public sealed class MultiplyDeclaredAttributionTests
 {
@@ -57,6 +135,39 @@ public sealed class MultiplyDeclaredAttributionTests
                 arch.Rule("layering/client-not-tool")
                     .Enforce(arch.Namespace("Client.*").MustNotReference(arch.Project("Tool")))
                     .Because("The client is built against a published contract."))
+            .Single()
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustNotReference_BothEndpointsCoDeclared_ProjectHeadedSubjectStaysGreen()
+    {
+        // The field's shape in miniature: a project-headed subject, and an edge BOTH of whose endpoints
+        // every declarer shares. Anchored on Tool, the rule owns Tool's instance alone — Tool's Widget
+        // reaching Tool's WidgetPart — which neither operand names, so nothing is forbidden. Through
+        // 0.6.1 this red on Shared.Widget -> Shared.WidgetPart, because the operand's own declarers were
+        // tested against the source's roster instead of against the project the instance reached.
+        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
+                arch.Rule("layering/tool-not-core-or-stub")
+                    .Enforce(arch.Project("Tool")
+                        .MustNotReference(arch.Project("Core"), arch.Project("Stub")))
+                    .Because("The tool ships without the core assembly."))
+            .Single()
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustNotBeReferencedBy_BothEndpointsCoDeclared_ProjectHeadedSubjectStaysGreen()
+    {
+        // The inbound mirror of the row above, and it needs both ends of one test: anchored on Core the
+        // subject owns Core's instance of the shared edge, and Core's copy of Widget is not something
+        // Project("Tool") names. Through 0.6.1 the two ends were filtered independently — the subject
+        // admitted the edge, then the source was tested by plain membership, which Project("Tool")
+        // satisfies for a type Tool declares — and the same edge red.
+        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
+                arch.Rule("layering/core-not-from-tool-project")
+                    .Enforce(arch.Project("Core").MustNotBeReferencedBy(arch.Project("Tool")))
+                    .Because("The core is consumed through the client."))
             .Single()
             .ShouldHavePassedClean();
     }
@@ -185,15 +296,18 @@ public sealed class MultiplyDeclaredAttributionTests
     [Fact]
     public void MustOnlyReference_IntraCopyEdge_AllowEntryNamingOnlyTheWinnerIsRed()
     {
-        // The same allow-list moved to the winner. Command's reference belongs to Tool, which the entry does
-        // not name, so it is unallowed — while the shared type's own outward edge stays allowed, because
-        // Core declares Widget too, so that edge is intra-project in Core as much as in Tool.
+        // The same allow-list moved to the winner, and a project-headed subject, so both instances the
+        // rule owns are Tool's. Neither is allowed by an entry naming Core: Command's reference reached
+        // Tool's copy of Widget, and Tool's copy of Widget reached Tool's copy of WidgetPart.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-core")
                     .Enforce(arch.Project("Tool").MustOnlyReference(arch.Project("Core")))
                     .Because("The tool builds on the core alone."))
             .Single()
-            .ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "Tool.Command", "Shared.Widget");
+            .ShouldHaveFailedWithEdges(ViolationKind.Reference, [
+                "Shared.Widget -> Shared.WidgetPart",
+                "Tool.Command -> Shared.Widget"
+            ]);
     }
 
     [Fact]
@@ -214,12 +328,58 @@ public sealed class MultiplyDeclaredAttributionTests
     {
         // The containment verb, with the subject at the target end again. Command is in neither allowed
         // project, so counting its reference into Tool's own copy would red the rule; anchored on Core the
-        // subject does not count it, while User's and Consumer's references are counted and allowed.
+        // subject does not own that instance, while User's and Consumer's references are owned and allowed.
+        // The green rests on the subject being WINNER-anchored: the same allow-list under Project("Tool")
+        // owns Tool's instances instead and reds on both, which the row below this one pins.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/core-only-from-client")
                     .Enforce(arch.Project("Core")
                         .MustOnlyBeReferencedBy(arch.AnyOf(arch.Project("Client"), arch.Project("Core"))))
                     .Because("The core is consumed through the client."))
+            .Single()
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustOnlyBeReferencedBy_IntraCopyEdge_AllowEntryNamingOnlyAnotherDeclarerIsRed()
+    {
+        // The allow-list is stricter under the instance model, and this is the row that says so. Anchored
+        // on Tool the subject owns Tool's instance of both inbound edges, and Project("Core") allows
+        // neither: Tool.Command is in no allowed project, and Tool's copy of Widget is allowed only by an
+        // entry naming Tool. Through 0.6.1 the shared edge was allowed, because membership alone was
+        // asked of the source and Project("Core") does contain Shared.Widget.
+        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
+                arch.Rule("layering/tool-only-from-core")
+                    .Enforce(arch.Project("Tool").MustOnlyBeReferencedBy(arch.Project("Core")))
+                    .Because("The tool's types are reached through the core."))
+            .Single()
+            .ShouldHaveFailedWithEdges(ViolationKind.Reference, [
+                "Shared.Widget -> Shared.WidgetPart",
+                "Tool.Command -> Shared.Widget"
+            ]);
+    }
+
+    [Fact]
+    public void MustNotReference_MixedDeclarerSets_ReadsEachInstanceAtTheProjectItReached()
+    {
+        // Overlapping-but-different declarer sets, which is where one intra/cross decision for the whole
+        // edge cannot be right for both instances. Shell's copy of Alpha declares no Beta, so its
+        // reference crosses into Anchor's declaration, and a ban on Anchor catches it. Through 0.6.1 the
+        // edge counted as intra-project outright — Middle declares both ends — and this stayed green.
+        Checker.Run(MixedDeclarerCodebase.Model, arch =>
+                arch.Rule("layering/shell-not-anchor")
+                    .Enforce(arch.Project("Shell").MustNotReference(arch.Project("Anchor")))
+                    .Because("The shell is built against its own sources."))
+            .Single()
+            .ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "Split.Alpha", "Split.Beta");
+
+        // The same edge under a ban on the project it never reached. Middle's instance is Middle's own
+        // business, and Shell's reached Anchor; through 0.6.1 this red, because the intra branch admitted
+        // every head the SOURCE was declared by rather than the one each instance actually compiled into.
+        Checker.Run(MixedDeclarerCodebase.Model, arch =>
+                arch.Rule("layering/shell-not-middle")
+                    .Enforce(arch.Project("Shell").MustNotReference(arch.Project("Middle")))
+                    .Because("The shell is built against its own sources."))
             .Single()
             .ShouldHavePassedClean();
     }

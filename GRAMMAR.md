@@ -280,26 +280,38 @@ lands only where the whole list is static and one form:
   model still carries **one node** for the type. Its facts — edges, member inventory,
   hierarchy — follow the first declarer in ordinal project order. Membership is N-way:
   `arch.Project` naming **any** declarer contains the type — as a subject, as a target
-  operand, in a member selection, inside a union. Edges add attribution on top. The projects
-  an edge *into* such a type counts against are the intersection of the two endpoints'
-  declarer sets when it is nonempty — the source compiled its own copy, so the edge is
-  intra-project — and the first declarer alone otherwise. A project-headed target operand
-  forbids (or, for `MustOnly*`, allows) the edge only when its project is among those, so a
-  declarer's reference to its own compiled-in copy never satisfies a ban aimed at another
-  declarer; a project-headed *subject* of `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy`
-  counts an edge by the same rule, because there the subject is the edge's target. The edge's
-  *source* belongs to every declarer — each one's compilation genuinely makes the reference —
-  so a source-side project operand reaches it from any of them. Selections not headed by a
-  project stay attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`,
-  `arch.Layer`, `arch.Registered`, and `MustNotUse`'s string-keyed member anchors, so
+  operand, in a member selection, inside a union. Edges add attribution on top, per
+  declarer. One model edge stands for one reference per declarer of its **source**: that
+  declarer reached its own copy of the target where it compiles one (intra-project), and the
+  target's first declarer otherwise. One rule then covers every reference verb at either
+  end. The **subject** bounds which of those instances the rule owns, at whichever end it
+  sits; the **operand** is the predicate at the far end, asked at the project that instance
+  reached. A `MustNot*` verb is violated by an owned instance whose predicate holds, a
+  `MustOnly*` verb by an owned instance whose predicate fails. So a declarer's reference to
+  its own compiled-in copy never satisfies a ban aimed at another declarer, and a shared
+  file's own outward edge answers to each declarer separately rather than to all of them at
+  once. A selection names a node **at** a project when it matches the node and either one
+  project declares it, or a head that is not a project admitted it, or that project is among
+  the ones its project-headed selections spelled. Heads that are not projects therefore stay
+  attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`, `arch.Layer`,
+  `arch.Registered`, and `MustNotUse`'s string-keyed member anchors, so
   `MustNotReference(typeof(T))` reds even on a project's own copy. `MustOnly*` stays strict
   (no implicit self-allowance, below): an intra-copy edge is satisfied only by an allow entry
-  naming the compiling project, or by a non-project entry containing the type. `Except`
-  subtracts by node identity: `arch.Project("A").Except(arch.Project("B"))` removes a
-  co-declared node from A's selection too. Where nothing is multiply declared this all
-  degenerates to the single-attribution reading, byte for byte. The attribution is disclosed
-  three ways: `check`'s advisory merge note, the survey's `multiplyDeclaredTypes` coverage
-  statement, and the winning node's `AlsoDeclaredBy` roster.
+  naming the compiling project, or by a non-project entry containing the type — including
+  where the edge runs between two shared types, which is allowed by an entry naming the
+  compiling project and by nothing else. `Except` subtracts by node identity:
+  `arch.Project("A").Except(arch.Project("B"))` removes a co-declared node from A's selection
+  too. Read as "A's copy but not B's" it is a trap — it deletes every shared type from A,
+  and the way to speak about one declarer's instances is to anchor the subject on that
+  project. Where nothing is multiply declared this all degenerates to the single-attribution
+  reading, byte for byte. One documented approximation remains: the merge unions each edge
+  family across declarers, so the instances of one edge carry the union of what the declaring
+  compilations observed. That is exact for a linked `<Compile Include>`, and a red-biased
+  over-approximation where the declarations differ — a same-FQN polyfill, or one file whose
+  `#if` gives each project a different body. The attribution is disclosed three ways:
+  `check`'s advisory merge note, the survey's `multiplyDeclaredTypes` coverage statement, and
+  the winning node's `AlsoDeclaredBy` roster; the survey's `projectEdges` reads the same
+  instances the verdict does, so a pair it does not render is a pair no rule will red.
 - **One project file can mean several compilations.** A multi-targeting project compiles once
   per framework; extraction walks them all, and the model unions them under the one project
   name. The union is lossless — types, references and solution membership all survive — except

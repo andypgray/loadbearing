@@ -13,10 +13,12 @@ public static class GraphSummarizer
 
     /// <summary>Builds the survey from an extracted model.</summary>
     /// <remarks>
-    ///     The project edges are the edges the code actually declares: a reference into a type the
-    ///     referencing project compiles itself is not one, however extraction attributed that type, and
-    ///     <see cref="GraphSummary.MultiplyDeclaredTypes" /> states the attribution that suppression rests on
-    ///     rather than leaving it silent.
+    ///     The project edges are the edges the code actually declares. Where one source file compiles into
+    ///     several projects the model's one edge stands for one reference per declarer (GRAMMAR §4.1), so
+    ///     each is read at the project it reached: a reference into a type the referencing project compiles
+    ///     itself is not a project edge, and a reference out of such a type is one from every declarer that
+    ///     made it. <see cref="GraphSummary.MultiplyDeclaredTypes" /> states the attribution all of that
+    ///     rests on rather than leaving it silent.
     /// </remarks>
     /// <param name="model">The extracted codebase to summarize.</param>
     /// <returns>The survey over every project in <paramref name="model" />.</returns>
@@ -35,11 +37,8 @@ public static class GraphSummarizer
 
         // Cross-project edges only: a same-project reference is never a cross-boundary rule candidate, so
         // it is excluded from the survey (the survey exists to seed layering/boundary rules).
-        List<ProjectEdgeSummary> projectEdges = model.Edges
-            .Where(edge => !edge.Target.IsExternal
-                           && edge.Source.ProjectName != edge.Target.ProjectName
-                           && !SourceAlsoDeclaresTarget(edge))
-            .GroupBy(edge => (Source: edge.Source.ProjectName, Target: edge.Target.ProjectName))
+        List<ProjectEdgeSummary> projectEdges = CrossProjectPairs(model)
+            .GroupBy(pair => pair)
             .Select(group => new ProjectEdgeSummary(group.Key.Source, group.Key.Target, group.Count()))
             .OrderBy(edge => edge.Source, StringComparer.Ordinal)
             .ThenBy(edge => edge.Target, StringComparer.Ordinal)
@@ -53,9 +52,9 @@ public static class GraphSummarizer
             .ThenBy(edge => edge.TargetNamespaceRoot, StringComparer.Ordinal)
             .ToList();
 
-        // The coverage statement behind the suppression above, and the fact a rule author needs before
-        // anchoring a subject on a project. Types are already ordinal by full name; the sort is spelled
-        // anyway so this list's stated order does not depend on the model's.
+        // The coverage statement behind the instance reading above, and the fact a rule author needs
+        // before anchoring a subject on a project. Types are already ordinal by full name; the sort is
+        // spelled anyway so this list's stated order does not depend on the model's.
         List<MultiplyDeclaredTypeSummary> multiplyDeclaredTypes = model.Types
             .Where(type => type.AlsoDeclaredBy.Count > 0)
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
@@ -78,17 +77,26 @@ public static class GraphSummarizer
             .ToList();
     }
 
-    // A reference from a project into a type that project declares itself. Extraction attributes a
-    // multiply-declared type to its first declarer alone, so a project compiling its own linked-in copy
-    // reaches a node stamped with somebody else's name — and rendering that as a cross-project edge invents
-    // a dependency no project file declares. Because model.Edges is one entry per type PAIR, dropping it
-    // here removes exactly those pairs and leaves every genuine pair between the same two projects, and its
-    // count, untouched. Deliberately coarser than the checker's per-edge attribution, which intersects the
-    // two endpoints' declarer rosters: the survey's only question is whether the pair is one no project
-    // file declares.
-    private static bool SourceAlsoDeclaresTarget(ReferenceEdge edge)
+    // The project pairs the code actually declares, one per edge instance that crosses a boundary. The
+    // model carries one node per full name and one edge per type PAIR, so a file compiled into several
+    // projects collapses N compilations of one reference into one entry; EdgeInstances is what unfolds it,
+    // and reading the same enumeration the checker's verdict reads is what keeps the survey from leading a
+    // rule author into a red the spec surface cannot fix. Both halves of the old single-attribution
+    // reading were wrong in opposite directions: a project compiling its own linked-in copy reached a node
+    // stamped with somebody else's name, which invented a dependency no project file declares, and a
+    // MULTIPLY-declared source was read at its winner alone, which lost every other declarer's genuine
+    // outward edge. An instance is emitted per (declarer, reached) pair, so a pair is still counted once
+    // per type pair per project pair.
+    private static IEnumerable<(string Source, string Target)> CrossProjectPairs(CodebaseModel model)
     {
-        return edge.Target.AlsoDeclaredBy.Contains(edge.Source.ProjectName, StringComparer.Ordinal);
+        foreach (ReferenceEdge edge in model.Edges)
+        {
+            if (edge.Target.IsExternal) continue;
+
+            foreach (EdgeInstance instance in EdgeInstances.Of(edge.Source, edge.Target))
+                if (!instance.IsIntraProject)
+                    yield return (instance.SourceProject, instance.TargetProject);
+        }
     }
 
     // Every declarer of a conflated type: the winner and the losers as one ordinal roster, which is what

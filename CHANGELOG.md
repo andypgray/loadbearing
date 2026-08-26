@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A reference between two types a linked source file compiles into several projects no longer reds
+  a ban aimed at another declarer.** 0.6.0 made `arch.Project` membership N-way, so a project noun
+  reaches every declarer of a shared file; the cure landed on selection and not on what an edge
+  counts against. Where both endpoints were co-declared — a `NativeProviderLoader.cs` linked into
+  three provider assemblies, a linked `AssemblyInfo`, a glob-linked shared file — `check` still
+  attributed the edge to every project the *source* was declared by, so
+  `mkl.MustNotReference(cuda, openBlas)` fired on a reference MKL's copy made to MKL's own copy. The
+  report contradicted itself in the same document: its advisory note said each declarer's reference
+  to its own compiled-in copy counts against that declarer alone, `graph` rendered no such project
+  edge, and the rule red anyway — a red an adopter could not fix from the spec surface.
+  An edge is now read per declarer of its source, each instance reaching that declarer's own copy of
+  the target where it compiles one and the target's first declarer otherwise; the subject bounds
+  which instances a rule owns and the operand decides the far end at each. `graph` reads the same
+  instances, so the survey and the verdict cannot part company again. GRAMMAR §4.1 states the rule.
+- **`graph` renders the outward edges of a shared file from every project that compiles it.** The
+  survey read such an edge at the source's first declarer alone, so a shared type referencing a type
+  only one project declares was rendered once and hidden for every other declarer. The mirror of the
+  fault above, under-reporting where the checker over-attributed.
+- **`MustOnlyReference` and `MustOnlyBeReferencedBy` are stricter on a shared file's own edges.**
+  An edge between two co-declared types is allowed only by an entry naming the compiling project, as
+  §4.1's no-implicit-self-allowance sentence has always said and the code did not. Before, an entry
+  naming any declarer allowed it, so a spec that reads green today can red — the fix, not a
+  regression, but it is the one place where this release can turn a passing rule red.
+
 ## [0.6.1] - 2026-08-22
 
 ### Fixed
