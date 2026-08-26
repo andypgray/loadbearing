@@ -41,11 +41,15 @@ internal readonly struct EdgeInstance
 ///         disagreeing.
 ///     </para>
 ///     <para>
-///         A struct enumerable over a struct enumerator, walked by index: this runs once per candidate
-///         edge per rule wherever anything is conflated, and an <see cref="IEnumerable{T}" /> would
-///         allocate a state machine there. Never call it for an ordinary edge — both callers keep a
-///         fast path for the case where neither endpoint is multiply declared, where the one instance
-///         it would yield is the edge itself.
+///         A struct enumerable over a struct enumerator, walked by index: the checker runs it once per
+///         candidate edge per rule wherever anything is conflated, and an <see cref="IEnumerable{T}" />
+///         would allocate a state machine there. That caller reaches it past a guard of its own for the
+///         edge neither of whose endpoints is multiply declared — but the guard is not an optimization a
+///         future caller inherits an obligation to copy: it is load-bearing there for a second reason,
+///         keeping an external endpoint, whose project name is a supplying assembly's rather than a
+///         project's, out of the declarer roster below. The survey has no such guard and needs none. It
+///         walks each edge once in total, so there is no per-rule multiplier to fold away, and the one
+///         instance an ordinary edge yields is the edge itself.
 ///     </para>
 /// </remarks>
 internal readonly struct EdgeInstances

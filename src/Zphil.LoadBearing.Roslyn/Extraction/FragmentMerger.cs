@@ -819,17 +819,17 @@ internal static class FragmentMerger
             string projectName, SortedSet<string> projectReferences, bool? solutionMember, ProjectArtifacts artifacts)
         {
             return new ProjectNode(
-                projectName,
-                projectReferences.ToList(),
-                solutionMember,
-                TargetFrameworksOf(projectName, artifacts),
-                FragmentSiteSets.Location(artifacts.TargetFrameworksSite),
-                _multiFrameworkWinners.GetValueOrDefault(projectName),
-                artifacts.PackageReferences(),
-                artifacts.IsPackable,
-                FragmentSiteSets.Location(artifacts.IsPackableSite),
-                artifacts.LocksPackages,
-                FragmentSiteSets.Location(artifacts.LocksPackagesSite));
+                name: projectName,
+                projectReferences: projectReferences.ToList(),
+                solutionMember: solutionMember,
+                targetFrameworks: TargetFrameworksOf(projectName, artifacts),
+                targetFrameworksSite: FragmentSiteSets.Location(artifacts.TargetFrameworksSite),
+                factsFollow: _multiFrameworkWinners.GetValueOrDefault(projectName),
+                packageReferences: artifacts.PackageReferences(),
+                isPackable: artifacts.IsPackable,
+                isPackableSite: FragmentSiteSets.Location(artifacts.IsPackableSite),
+                locksPackages: artifacts.LocksPackages,
+                locksPackagesSite: FragmentSiteSets.Location(artifacts.LocksPackagesSite));
         }
 
         // What the project declares, whatever it compiled to — so a single-framework project states its one
@@ -857,6 +857,39 @@ internal static class FragmentMerger
             if (right is null) return left;
 
             return left.Value || right.Value;
+        }
+
+        /// <summary>
+        ///     One tri-state artifact fact part-way through a fold: the verdict so far and the site of the
+        ///     fragment that decided it, which travel together because the site means nothing apart from the
+        ///     verdict it belongs to.
+        /// </summary>
+        /// <param name="Value">The verdict, or <see langword="null" /> while no fragment has stated one.</param>
+        /// <param name="Site">Where the fragment that decided <paramref name="Value" /> declared it.</param>
+        private readonly record struct ArtifactVerdict(bool? Value, FragmentSite? Site)
+        {
+            /// <summary>
+            ///     <paramref name="incoming" /> folded in: adopt the first verdict any fragment states, then
+            ///     upgrade to <paramref name="decisive" /> and take that fragment's site with it. A fragment
+            ///     that states nothing changes nothing, and a fold already at the decisive value is settled —
+            ///     so a union and an intersection are this one algorithm read from opposite ends.
+            /// </summary>
+            /// <param name="incoming">The fragment's own verdict, or <see langword="null" /> where it has none.</param>
+            /// <param name="incomingSite">Where that fragment declared it.</param>
+            /// <param name="decisive">
+            ///     The value that wins as soon as any fragment states it: <see langword="true" /> for
+            ///     packability, because one framework that packs makes the project pack, and
+            ///     <see langword="false" /> for the lock policy, because one framework whose restore writes no
+            ///     lock file leaves that restore unlocked.
+            /// </param>
+            internal ArtifactVerdict Fold(bool? incoming, FragmentSite? incomingSite, bool decisive)
+            {
+                if (incoming is not { } verdict) return this;
+                if (Value == decisive) return this;
+                if (Value is null || verdict == decisive) return new ArtifactVerdict(verdict, incomingSite);
+
+                return this;
+            }
         }
 
         /// <summary>
@@ -890,15 +923,17 @@ internal static class FragmentMerger
         private sealed class ProjectArtifacts
         {
             private readonly SortedSet<string> _frameworks = new(StringComparer.Ordinal);
-            private readonly Dictionary<string, FragmentSite> _packages = new(StringComparer.Ordinal);
+            private readonly List<FragmentPackageReference> _packages = [];
+            private ArtifactVerdict _packable;
+            private ArtifactVerdict _locks;
 
-            internal bool? IsPackable { get; private set; }
+            internal bool? IsPackable => _packable.Value;
 
-            internal FragmentSite? IsPackableSite { get; private set; }
+            internal FragmentSite? IsPackableSite => _packable.Site;
 
-            internal bool? LocksPackages { get; private set; }
+            internal bool? LocksPackages => _locks.Value;
 
-            internal FragmentSite? LocksPackagesSite { get; private set; }
+            internal FragmentSite? LocksPackagesSite => _locks.Site;
 
             internal FragmentSite? TargetFrameworksSite { get; private set; }
 
@@ -908,22 +943,10 @@ internal static class FragmentMerger
                 if (fragment.TargetFrameworksSite is { } frameworksSite && TargetFrameworksSite is null)
                     TargetFrameworksSite = frameworksSite;
 
-                foreach (FragmentPackageReference package in fragment.PackageReferences ?? [])
-                    if (!_packages.TryGetValue(package.Name, out FragmentSite existing)
-                        || package.Site.CompareTo(existing) < 0)
-                        _packages[package.Name] = package.Site;
+                _packages.AddRange(fragment.PackageReferences ?? []);
 
-                if (fragment.IsPackable is { } packable && IsPackable is not true)
-                {
-                    if (IsPackable is null || packable) IsPackableSite = fragment.IsPackableSite;
-                    IsPackable = IsPackable is null ? packable : IsPackable.Value || packable;
-                }
-
-                if (fragment.LocksPackages is { } locks && LocksPackages is not false)
-                {
-                    if (LocksPackages is null || !locks) LocksPackagesSite = fragment.LocksPackagesSite;
-                    LocksPackages = LocksPackages is null ? locks : LocksPackages.Value && locks;
-                }
+                _packable = _packable.Fold(fragment.IsPackable, fragment.IsPackableSite, decisive: true);
+                _locks = _locks.Fold(fragment.LocksPackages, fragment.LocksPackagesSite, decisive: false);
             }
 
             internal IReadOnlyList<string> TargetFrameworks()
@@ -933,10 +956,8 @@ internal static class FragmentMerger
 
             internal IReadOnlyList<PackageReference> PackageReferences()
             {
-                return _packages
-                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-                    .Select(entry => new PackageReference(entry.Key, new SourceLocation(entry.Value.File, entry.Value.Line)))
-                    .ToList();
+                return FragmentSiteSets.OrderedPackages(
+                    _packages, (name, site) => new PackageReference(name, FragmentSiteSets.Location(site)));
             }
         }
 

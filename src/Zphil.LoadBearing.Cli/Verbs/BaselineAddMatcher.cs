@@ -73,12 +73,13 @@ internal static class BaselineAddMatcher
                || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
     }
 
-    // A project's bare name or its `project:` identity form (GRAMMAR §4.10) — the two spellings the same
-    // pair of forms a type subject takes, a readable name and the stored key.
+    // A project's bare name or its identity form (GRAMMAR §4.10) — the same pair of spellings a type
+    // subject takes, a readable name and the stored key. The key comes off the node, so this end and the
+    // mint that writes the baseline entry cannot spell it apart.
     private static bool MatchesProjectSubject(ProjectNode project, string subject)
     {
         return string.Equals(project.Name, subject, StringComparison.Ordinal)
-               || string.Equals("project:" + project.Name, subject, StringComparison.Ordinal);
+               || string.Equals(project.SymbolId, subject, StringComparison.Ordinal);
     }
 
     private static Violation Resolve(string ruleId, IReadOnlyList<Violation> violations, IReadOnlyList<Violation> candidates, string echo)

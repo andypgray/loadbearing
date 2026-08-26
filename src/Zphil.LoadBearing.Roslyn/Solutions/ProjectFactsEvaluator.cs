@@ -35,7 +35,9 @@ internal readonly record struct ProjectEvaluationRequest(string? ProjectFile, st
 ///         That is the exact staleness the warm session's per-call reconcile exists to prevent, so nothing
 ///         here outlives the call. The collection is what makes a batch affordable in the first place: the
 ///         projects of one solution share nearly all of their imports, so the first evaluation pays for them
-///         and the rest do not.
+///         and the rest do not. Each project is unloaded as soon as its four facts have been copied out of
+///         it — the parsed imports it shares are held by the collection rather than by it, so a batch keeps
+///         them while holding one evaluated project at a time rather than all of them.
 ///     </para>
 ///     <para>
 ///         <b>Every failure is an absence.</b> MSBuild may be unavailable in this process, an import may not
@@ -133,17 +135,26 @@ internal static class ProjectFactsEvaluator
         };
         Project project = Project.FromFile(projectFile, options);
 
-        var projectSite = new FragmentSite(projectFile, ProjectFileLine);
-        string projectDirectory = Path.GetDirectoryName(projectFile) ?? projectFile;
+        try
+        {
+            var projectSite = new FragmentSite(projectFile, ProjectFileLine);
+            string projectDirectory = Path.GetDirectoryName(projectFile) ?? projectFile;
+            HashSet<string> projectCone = ProjectCone(projectDirectory);
 
-        (IReadOnlyList<string> frameworks, FragmentSite frameworksSite) =
-            ReadTargetFrameworks(project, projectDirectory, projectSite);
-        (bool? packable, FragmentSite packableSite) = ReadPackable(project, projectDirectory, projectSite);
-        (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, projectDirectory, projectSite);
+            (IReadOnlyList<string> frameworks, FragmentSite frameworksSite) =
+                ReadTargetFrameworks(project, projectCone, projectSite);
+            (bool? packable, FragmentSite packableSite) = ReadPackable(project, projectCone, projectSite);
+            (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, projectCone, projectSite);
+            IReadOnlyList<FragmentPackageReference> packages =
+                ReadPackageReferences(project, projectCone, projectSite);
 
-        return new ProjectArtifactFacts(
-            frameworks, frameworksSite, ReadPackageReferences(project, projectDirectory, projectSite),
-            packable, packableSite, locks, locksSite);
+            return new ProjectArtifactFacts(
+                frameworks, frameworksSite, packages, packable, packableSite, locks, locksSite);
+        }
+        finally
+        {
+            collection.UnloadProject(project);
+        }
     }
 
     // The SDK spelling first, because an SDK project defines both properties and the plural is authoritative
@@ -151,7 +162,7 @@ internal static class ProjectFactsEvaluator
     // normalizing: a project predating the SDK states a framework identifier and a version rather than a
     // moniker, and nothing downstream should have to know that two spellings of net48 exist.
     private static (IReadOnlyList<string> Frameworks, FragmentSite Site) ReadTargetFrameworks(
-        Project project, string projectDirectory, FragmentSite projectSite)
+        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
         foreach (string property in new[] { "TargetFrameworks", "TargetFramework" })
         {
@@ -166,7 +177,7 @@ internal static class ProjectFactsEvaluator
                 .OrderBy(framework => framework, StringComparer.Ordinal)
                 .ToList();
             if (frameworks.Count > 0)
-                return (frameworks, SiteOf(declared, projectDirectory, projectSite));
+                return (frameworks, SiteOf(declared, projectCone, projectSite));
         }
 
         ProjectProperty? version = project.GetProperty("TargetFrameworkVersion");
@@ -174,7 +185,7 @@ internal static class ProjectFactsEvaluator
 
         return classic is null
             ? ([], projectSite)
-            : ([classic], SiteOf(version, projectDirectory, projectSite));
+            : ([classic], SiteOf(version, projectCone, projectSite));
     }
 
     // ".NETFramework" + "v4.8" -> "net48". Only the .NET Framework identifier is spelled out, because it is
@@ -195,36 +206,37 @@ internal static class ProjectFactsEvaluator
     // true nor false is the same nothing — MSBuild would treat it as false, but a rule reading it as a
     // deliberate opt-out would be reasoning from a typo.
     private static (bool? Packable, FragmentSite Site) ReadPackable(
-        Project project, string projectDirectory, FragmentSite projectSite)
+        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
         ProjectProperty? declared = project.GetProperty("IsPackable");
         if (declared is null || !bool.TryParse(declared.EvaluatedValue.Trim(), out bool packable))
             return (null, projectSite);
 
-        return (packable, SiteOf(declared, projectDirectory, projectSite));
+        return (packable, SiteOf(declared, projectCone, projectSite));
     }
 
     // Undefined is false here, and that asymmetry with IsPackable is the fact rather than an inconsistency:
     // NuGet writes a lock file only when told to, so a project that says nothing has said no. Its site is
     // then the project file, which is where the missing declaration would go.
     private static (bool Locks, FragmentSite Site) ReadLockPolicy(
-        Project project, string projectDirectory, FragmentSite projectSite)
+        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
         ProjectProperty? declared = project.GetProperty("RestorePackagesWithLockFile");
         if (declared is null) return (false, projectSite);
 
         bool locks = bool.TryParse(declared.EvaluatedValue.Trim(), out bool parsed) && parsed;
-        return (locks, SiteOf(declared, projectDirectory, projectSite));
+        return (locks, SiteOf(declared, projectCone, projectSite));
     }
 
     // Declared references only. The SDK adds some of its own — NETStandard.Library to a netstandard project,
     // for one — and marks each of them implicit; they are nobody's declaration and nobody can remove them,
-    // so a rule about what a project depends on would only be able to fail on them. A name declared twice
-    // keeps the ordinally-first site, so the list is stable whatever order the conditions evaluated in.
+    // so a rule about what a project depends on would only be able to fail on them. Which of two declarations
+    // of one name survives, and in what order the survivors come out, is the shared fold's business rather
+    // than this reader's: the merge meets the same duplicates a framework at a time and must answer alike.
     private static IReadOnlyList<FragmentPackageReference> ReadPackageReferences(
-        Project project, string projectDirectory, FragmentSite projectSite)
+        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
-        var byName = new Dictionary<string, FragmentSite>(StringComparer.Ordinal);
+        var declarations = new List<FragmentPackageReference>();
         foreach (ProjectItem item in project.GetItems("PackageReference"))
         {
             if (string.Equals(item.GetMetadataValue("IsImplicitlyDefined"), "true", StringComparison.OrdinalIgnoreCase))
@@ -233,51 +245,54 @@ internal static class ProjectFactsEvaluator
             string name = item.EvaluatedInclude.Trim();
             if (name.Length == 0) continue;
 
-            FragmentSite site = SiteOf(item.Xml?.Location, projectDirectory, projectSite);
-            if (!byName.TryGetValue(name, out FragmentSite existing) || site.CompareTo(existing) < 0)
-                byName[name] = site;
+            FragmentSite site = SiteOf(item.Xml?.Location, projectCone, projectSite);
+            declarations.Add(new FragmentPackageReference(name, site));
         }
 
-        return byName
-            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => new FragmentPackageReference(entry.Key, entry.Value))
-            .ToList();
+        return FragmentSiteSets.OrderedPackages(
+            declarations, (name, site) => new FragmentPackageReference(name, site));
     }
 
-    private static FragmentSite SiteOf(ProjectProperty? declared, string projectDirectory, FragmentSite projectSite)
+    private static FragmentSite SiteOf(
+        ProjectProperty? declared, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
-        return SiteOf(declared?.Xml?.Location, projectDirectory, projectSite);
+        return SiteOf(declared?.Xml?.Location, projectCone, projectSite);
     }
 
     // A declaration is only worth citing where somebody reading this repository can go and change it. The
     // SDK's own defaults have real locations, but they name a directory on whichever machine ran the build,
     // so they degrade to the project file — which is where the override would be written anyway.
     private static FragmentSite SiteOf(
-        ElementLocation? location, string projectDirectory, FragmentSite projectSite)
+        ElementLocation? location, IReadOnlySet<string> projectCone, FragmentSite projectSite)
     {
         if (location is null || location.File.Length == 0) return projectSite;
 
-        return IsUnderProjectCone(location.File, projectDirectory)
+        return IsUnderProjectCone(location.File, projectCone)
             ? new FragmentSite(location.File, Math.Max(location.Line, ProjectFileLine))
             : projectSite;
     }
 
-    // The project's own directory or any directory above it — precisely the cone MSBuild discovers
-    // Directory.Build.props in, so a solution-wide policy file is cited and an SDK or package-cache import
-    // is not.
-    private static bool IsUnderProjectCone(string file, string projectDirectory)
+    // The project's own directory and every directory above it, each folded — precisely the cone MSBuild
+    // discovers Directory.Build.props in, so a solution-wide policy file is cited and an SDK or package-cache
+    // import is not. Built once per project because every site this reads is tested against it, and the
+    // common case — a declaration outside the cone — is the one that walks the chain to the drive root.
+    private static HashSet<string> ProjectCone(string projectDirectory)
+    {
+        var cone = new HashSet<string>(StringComparer.Ordinal);
+        for (string? directory = projectDirectory;
+             !string.IsNullOrEmpty(directory);
+             directory = Path.GetDirectoryName(directory))
+            cone.Add(PathComparison.Fold(Normalize(directory)));
+
+        return cone;
+    }
+
+    private static bool IsUnderProjectCone(string file, IReadOnlySet<string> projectCone)
     {
         string? declaringDirectory = Path.GetDirectoryName(file);
         if (string.IsNullOrEmpty(declaringDirectory)) return false;
 
-        string declaring = PathComparison.Fold(Normalize(declaringDirectory));
-        for (string? directory = projectDirectory;
-             !string.IsNullOrEmpty(directory);
-             directory = Path.GetDirectoryName(directory))
-            if (string.Equals(PathComparison.Fold(Normalize(directory)), declaring, StringComparison.Ordinal))
-                return true;
-
-        return false;
+        return projectCone.Contains(PathComparison.Fold(Normalize(declaringDirectory)));
     }
 
     private static string Normalize(string directory)

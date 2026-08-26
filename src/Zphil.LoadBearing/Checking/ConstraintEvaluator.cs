@@ -739,14 +739,16 @@ internal sealed class ConstraintEvaluator
         IReadOnlyList<ProjectNode> subjects = ProjectSelectionEvaluator.Resolve(constraint.ProjectSubject, _projects);
         if (subjects.Count == 0) return ([Violation.EmptySubject(EmptyProjectSubjectMessage)], NoWarnings, default);
 
-        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchProject(constraint, subjects);
-        return (violations, warnings, default);
+        IReadOnlyList<Violation> violations = DispatchProject(constraint, subjects);
+        return (violations, NoWarnings, default);
     }
 
     // The project-verb dispatch, lifted out of EvaluateProject for the same reason Dispatch was. Every arm
     // holds one honesty rule: a fact nothing evaluated is null, and unknown PASSES — a rule that redded on
-    // an unevaluated project would be reporting the load's own gaps as architecture violations.
-    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchProject(
+    // an unevaluated project would be reporting the load's own gaps as architecture violations. No arm has
+    // anything advisory to say, so the packaging stratum answers in violations alone and EvaluateProject
+    // supplies the empty warning list once.
+    private static IReadOnlyList<Violation> DispatchProject(
         ProjectConstraint constraint, IReadOnlyList<ProjectNode> subjects)
     {
         switch (constraint)
@@ -786,7 +788,7 @@ internal sealed class ConstraintEvaluator
     // The one walk behind the packaging shape verbs: one violation per failing project, sited at whatever
     // declared the fact the verb read — which is regularly a props file above the project, and is null where
     // nothing evaluated it.
-    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ProjectShape(
+    private static IReadOnlyList<Violation> ProjectShape(
         IReadOnlyList<ProjectNode> subjects, Func<ProjectNode, bool> holds, Func<ProjectNode, SourceLocation?> siteOf)
     {
         var violations = new List<Violation>();
@@ -794,22 +796,21 @@ internal sealed class ConstraintEvaluator
             if (!holds(subject))
                 violations.Add(Violation.ProjectShape(subject, AtSite(siteOf(subject))));
 
-        return (violations, NoWarnings);
+        return violations;
     }
 
     // MustReferenceNoPackages (GRAMMAR §4.10): one violation per DECLARED package, sited at that reference's
     // own declaration, so a project taking eight packages reports eight lines to delete rather than one line
     // saying eight. A project declaring none passes — and so does a project nothing evaluated, because an
     // empty package list is those two states wearing one face and the honest reading of both is silence.
-    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenPackages(
-        IReadOnlyList<ProjectNode> subjects)
+    private static IReadOnlyList<Violation> ForbiddenPackages(IReadOnlyList<ProjectNode> subjects)
     {
         var violations = new List<Violation>();
         foreach (ProjectNode subject in subjects)
         foreach (PackageReference package in subject.PackageReferences)
             violations.Add(Violation.ProjectPackage(subject, package));
 
-        return (violations, NoWarnings);
+        return violations;
     }
 
     // A nullable fact site as a violation's evidence list: the one site it has, or nothing to point at.

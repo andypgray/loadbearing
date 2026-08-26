@@ -47,6 +47,20 @@ public sealed class ProjectNode : IProjectInfo
     /// <summary>The project (assembly) name.</summary>
     public string Name { get; }
 
+    /// <summary>
+    ///     This project's stable identity (GRAMMAR §4.3, §4.10) — its own <see cref="Name" /> under a
+    ///     <c>project:</c> tag — beside <see cref="TypeNode.SymbolId" /> and
+    ///     <see cref="MemberNode.SymbolId" />, which a baseline key and a <c>--subject</c> both range over.
+    /// </summary>
+    /// <remarks>
+    ///     A project has no <c>DocumentationCommentId</c> to key on, so the tag is minted here rather than
+    ///     by extraction. It wears a DocId's shape without ever colliding with one: every DocId tag is a
+    ///     single letter, and the shared display helper strips only those, printing a longer tag verbatim.
+    ///     This is the one owner of the literal — the stored form of an existing baseline entry depends on
+    ///     it, so it is not free to move.
+    /// </remarks>
+    public string SymbolId => "project:" + Name;
+
     /// <summary>The names of the projects this project references, ordinal-ordered.</summary>
     public IReadOnlyList<string> ProjectReferences { get; }
 

@@ -375,47 +375,37 @@ internal sealed class SelectionEvaluator
 
     internal static bool InvokePredicate(Func<ITypeInfo, bool> predicate, TypeNode type, string hatch)
     {
-        try
-        {
-            return predicate(type);
-        }
-        catch (Exception ex)
-        {
-            throw new RuleEvaluationException(
-                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{type.FullName}`: {ex.Message}");
-        }
+        return Invoke<TypeNode>(predicate, type, hatch, subject => subject.FullName);
     }
 
     // The member-flavored guarded invoke (GRAMMAR §5.6): the member `.Where`/`.Must` escape hatches run
-    // here so a throwing predicate becomes a RuleError naming the member, not an aborted run — the exact
-    // shape of the type-side invoke above.
+    // here so a throwing predicate becomes a RuleError naming the member, not an aborted run.
     internal static bool InvokePredicate(Func<IMemberInfo, bool> predicate, IMemberInfo member, string hatch)
     {
-        try
-        {
-            return predicate(member);
-        }
-        catch (Exception ex)
-        {
-            throw new RuleEvaluationException(
-                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{MemberIdentity(member)}`: {ex.Message}");
-        }
+        return Invoke(predicate, member, hatch, MemberIdentity);
     }
 
-    // The project-flavored guarded invoke (GRAMMAR §5.6, §4.10): the project `.Where`/`.Must` escape
-    // hatches run here so a throwing predicate becomes a RuleError naming the project, not an aborted run —
-    // the exact shape of the two invokes above. A project's own name is its whole identity, so there is no
-    // qualified form to compose.
+    // The project-flavored guarded invoke (GRAMMAR §5.6, §4.10). A project's own name is its whole
+    // identity, so there is no qualified form to compose.
     internal static bool InvokePredicate(Func<IProjectInfo, bool> predicate, IProjectInfo project, string hatch)
+    {
+        return Invoke(predicate, project, hatch, subject => subject.Name);
+    }
+
+    // The guard the three strata share (GRAMMAR §5.6): a predicate that throws becomes a RuleEvaluationException
+    // the checker turns into a RuleError, so one bad lambda reds its own rule instead of aborting the run.
+    // Only the identity in the message differs per stratum, which is what `identityOf` supplies — and it is
+    // read in the catch, so a subject whose identity is expensive costs nothing on the passing path.
+    private static bool Invoke<T>(Func<T, bool> predicate, T subject, string hatch, Func<T, string> identityOf)
     {
         try
         {
-            return predicate(project);
+            return predicate(subject);
         }
         catch (Exception ex)
         {
             throw new RuleEvaluationException(
-                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{project.Name}`: {ex.Message}");
+                $"the `{hatch}` predicate threw {ex.GetType().Name} on `{identityOf(subject)}`: {ex.Message}");
         }
     }
 

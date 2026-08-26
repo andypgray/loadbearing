@@ -206,7 +206,7 @@ internal static class SpecValidator
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add(new SpecValidationError(Code.BlankPattern, id, $"Blank {kind.Label} on {subject}.", location));
+            ReportBlank(Code.BlankPattern, kind.Label, id, subject, location, errors);
             return;
         }
 
@@ -217,43 +217,68 @@ internal static class SpecValidator
             errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {kind.Label} '{value}' on {subject} {reason}.", location));
     }
 
+    // The one blank-operand sentence — "Blank {label} on {subject}." — every stratum's blank check renders.
+    // The catalog parts them by CODE, not by wording: they fail in different directions and each entry has
+    // to be able to say so, while a reader who has met one blank-operand error has met them all.
+    private static void ReportBlank(
+        Code code, string label, string? id, string subject, SpecSourceLocation? location, List<SpecValidationError> errors)
+    {
+        errors.Add(new SpecValidationError(code, id, $"Blank {label} on {subject}.", location));
+    }
+
+    // The foreign-Arch walk the three strata share (GRAMMAR §8 items 4, 13, 22): the first candidate some
+    // other Arch minted is reported and the walk stops, because a spec assembled from two instances is one
+    // mistake however many of its parts carry it. Each stratum supplies the noun its sentence opens with,
+    // the code the catalog files it under, and where each candidate would land — a member steers to its own
+    // arch.Member(...) call site, every other stratum to the consuming anchor's. Returns whether anything
+    // was reported, which is what lets a caller skip the per-item checks a foreign owner makes meaningless.
+    private static bool ReportFirstForeign(
+        IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates, Arch arch, Code code, string noun,
+        string id, List<SpecValidationError> errors)
+    {
+        foreach ((Arch owner, SpecSourceLocation? location) in candidates)
+        {
+            if (ReferenceEquals(owner, arch)) continue;
+
+            errors.Add(new SpecValidationError(code, id,
+                $"{noun} used by '{id}' was minted on a different Arch instance; it is not registered with this model.",
+                location));
+            return true;
+        }
+
+        return false;
+    }
+
     private static void CheckForeign(
         IEnumerable<Selection> selections, string id, Arch arch, SpecSourceLocation? location, List<SpecValidationError> errors)
     {
-        foreach (Selection selection in selections)
-            if (!ReferenceEquals(selection.Owner, arch))
-            {
-                errors.Add(new SpecValidationError(Code.ForeignSelection, id,
-                    $"A selection used by '{id}' was minted on a different Arch instance; it is not registered with this model.", location));
-                return;
-            }
+        IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
+            selections.Select(selection => (selection.Owner, Location: location));
+
+        ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", id, errors);
     }
 
     // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign. A project selection carries its own
     // Arch (it has no underlying type selection to borrow one from), so it needs its own walk — the type-side
-    // one reaches nothing on a project constraint, whose Subject is null. Reported once per rule, mirroring
-    // CheckForeign's report-once-and-return, and anchored at the consuming rule's spec-source location as
-    // every other foreign report is. The walk includes the Except payloads, which is the one way a project
-    // selection nests and therefore the one way a foreign one can hide inside a local subject.
+    // one reaches nothing on a project constraint, whose Subject is null. The walk includes the Except
+    // payloads, which is the one way a project selection nests and therefore the one way a foreign one can
+    // hide inside a local subject.
     private static void CheckForeignProjects(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
 
-        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(rule.Constraint))
-            if (!ReferenceEquals(selection.Owner, arch))
-            {
-                errors.Add(new SpecValidationError(Code.ForeignProjectSelection, rule.Id,
-                    $"A project selection used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model.",
-                    rule.Location));
-                return;
-            }
+        IEnumerable<ProjectSelection> selections = SelectionWalk.ConstraintProjectSelections(rule.Constraint);
+        IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
+            selections.Select(selection => (selection.Owner, rule.Location));
+
+        ReportFirstForeign(candidates, arch, Code.ForeignProjectSelection, "A project selection", rule.Id, errors);
     }
 
     // GRAMMAR §8 item 23: the blank check over a project subject's own operands — the .Named names and the
     // .Matching globs. Its own code rather than the shared BlankPattern because the two shapes fail in
     // opposite directions (a blank name matches nothing, a blank glob matches everything) and the catalog
-    // entry has to be able to say so. Same message shape as CheckPattern's, so a reader who has met one
-    // blank-operand error has met them all.
+    // entry has to be able to say so. The labels come off PatternKind all the same, so the noun a project
+    // operand is named by cannot drift from the noun the type-side walk names the same thing by.
     private static void CheckProjectPatterns(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
@@ -263,20 +288,22 @@ internal static class SpecValidator
             switch (adjective)
             {
                 case ProjectNamedAdjective named:
-                    foreach (string name in named.Names) CheckProjectPattern(name, "project name", rule, errors);
+                    foreach (string name in named.Names) CheckProjectPattern(name, PatternKind.ProjectName, rule, errors);
 
                     break;
                 case ProjectMatchingAdjective matching:
-                    foreach (string glob in matching.Globs) CheckProjectPattern(glob, "project name pattern", rule, errors);
+                    foreach (string glob in matching.Globs) CheckProjectPattern(glob, PatternKind.ProjectNamePattern, rule, errors);
 
                     break;
             }
     }
 
-    private static void CheckProjectPattern(string value, string label, RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckProjectPattern(
+        string value, PatternKind kind, RuleRegistration rule, List<SpecValidationError> errors)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            errors.Add(new SpecValidationError(Code.BlankProjectPattern, rule.Id, $"Blank {label} on '{rule.Id}'.", rule.Location));
+        if (!string.IsNullOrWhiteSpace(value)) return;
+
+        ReportBlank(Code.BlankProjectPattern, kind.Label, rule.Id, $"'{rule.Id}'", rule.Location, errors);
     }
 
     // GRAMMAR §8 item 24: MustOnlyTarget's own operands. A blank moniker matches nothing, so it narrows the
@@ -288,28 +315,22 @@ internal static class SpecValidator
 
         foreach (string framework in target.Frameworks)
             if (string.IsNullOrWhiteSpace(framework))
-                errors.Add(new SpecValidationError(Code.BlankTargetFramework, rule.Id,
-                    $"Blank target framework on '{rule.Id}'.", rule.Location));
+                ReportBlank(Code.BlankTargetFramework, "target framework", rule.Id, $"'{rule.Id}'", rule.Location, errors);
     }
 
     // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
-    // rule (mirroring CheckForeign's report-once-and-return); otherwise each member is checked for a
-    // blank name and then, when named, that its anchor declares it. A member error renders at the member's
-    // own arch.Member(...) call site when it has one, falling back to the consuming rule's anchor for a
-    // verb-minted member (which carries no location — GRAMMAR §8, items 11–13/18).
+    // rule and stops the pass; otherwise each member is checked for a blank name and then, when named,
+    // that its anchor declares it. A member error renders at the member's own arch.Member(...) call site
+    // when it has one, falling back to the consuming rule's anchor for a verb-minted member (which carries
+    // no location — GRAMMAR §8, items 11–13/18).
     private static void CheckMembers(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
         IReadOnlyList<Member> members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
         if (members.Count == 0) return;
 
-        foreach (Member member in members)
-            if (!ReferenceEquals(member.Owner, arch))
-            {
-                errors.Add(new SpecValidationError(Code.ForeignMember, rule.Id,
-                    $"A member used by '{rule.Id}' was minted on a different Arch instance; it is not registered with this model.",
-                    member.Location ?? rule.Location));
-                return;
-            }
+        IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
+            members.Select(member => (member.Owner, Location: member.Location ?? rule.Location));
+        if (ReportFirstForeign(candidates, arch, Code.ForeignMember, "A member", rule.Id, errors)) return;
 
         foreach (Member member in members) CheckMember(member, rule.Id, rule.Location, errors);
     }
@@ -809,13 +830,15 @@ internal static class SpecValidator
     }
 
     /// <summary>
-    ///     What a glob, affix, project name or string anchor is, for the pattern walk: the label the error
-    ///     names it by ("Blank interface name on 'rule/id'.") and whether it carries namespace structure,
-    ///     which is what decides between the blank check alone and the full dead-subtree-prefix check.
+    ///     What a glob, affix, project name or string anchor is: the label the error names it by ("Blank
+    ///     interface name on 'rule/id'.") and whether it carries namespace structure, which is what decides
+    ///     between the blank check alone and the full dead-subtree-prefix check.
     /// </summary>
     /// <remarks>
     ///     One instance per kind, so each label literal is written once and the two facts about a kind
-    ///     cannot travel apart.
+    ///     cannot travel apart. The pattern walk is the main reader, but the project stratum's own blank
+    ///     check reads labels from here too — its operands ride a separate walk under a separate code, and
+    ///     the noun in the sentence is the one thing that must not fork with them.
     /// </remarks>
     private sealed class PatternKind(string label, bool isNamespace)
     {
@@ -830,6 +853,7 @@ internal static class SpecValidator
         internal static readonly PatternKind InterfaceName = new("interface name", false);
         internal static readonly PatternKind BaseTypeName = new("base type name", false);
         internal static readonly PatternKind ProjectName = new("project name", false);
+        internal static readonly PatternKind ProjectNamePattern = new("project name pattern", false);
 
         /// <summary>The noun the BlankPattern / UnanchoredSubtreePattern messages name this kind by.</summary>
         internal string Label { get; } = label;

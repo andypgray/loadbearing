@@ -34,21 +34,9 @@ public sealed class CheckJsonOrderTests
     // A run whose workspace loaded incompletely, whose packages did not restore, that a solution filter
     // narrowed, whose solution declares a project in another language and a project that compiles twice,
     // and that a --rules glob narrowed further: every optional slot populated at once, which no real run
-    // needs to be for the order to matter and which no golden can be.
-    private static readonly string StampedDocument = JsonReportRenderer.Document(
-        report: WebOpensData,
-        solutionDirectory: Directory.GetCurrentDirectory(),
-        solutionName: "S.sln",
-        specAssembly: "Spec.dll",
-        diffBase: null,
-        workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
-        diagnostics: new WorkspaceDiagnostics(
-            [], [], ["App.Web/App.Web.csproj"], ["App.Reports/App.Reports.csproj"],
-            ["App.Data/App.Data.csproj"],
-            [new UnsupportedProject("App.Signals/App.Signals.fsproj", UnsupportedProjectKind.NotCsharp)],
-            [new MultiTargetedProject("App.Shared", ["net10.0", "netstandard2.0"], "net10.0")]),
-        rulesFilter: ["layer/*"],
-        grain: DocumentGrain.Full);
+    // needs to be for the order to matter and which no golden can be. Must stay declared below
+    // WebOpensData: static field initializers run in declaration order, and Render reads it.
+    private static readonly string StampedDocument = Render(DocumentGrain.Full);
 
     [Theory]
     [InlineData("summary")]
@@ -162,7 +150,7 @@ public sealed class CheckJsonOrderTests
         index.ShouldNotContain("\"workspaceDiagnosticCount\"");
     }
 
-    // The stamped document at one grain — same inputs as StampedDocument, which is this one at Full.
+    // The stamped document at one grain; StampedDocument is this at Full.
     private static string Render(DocumentGrain grain)
     {
         return JsonReportRenderer.Document(

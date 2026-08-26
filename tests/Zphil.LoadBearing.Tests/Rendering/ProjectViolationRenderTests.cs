@@ -2,10 +2,9 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -29,8 +28,6 @@ public sealed class ProjectViolationRenderTests
     private static readonly CodebaseModel Packaged = ProjectFacts.Solution(
         ProjectFacts.Project(
             "Zphil.Domain", packageReferences: [ProjectFacts.Package("Serilog", "Domain.csproj", 9)]));
-
-    private static readonly string SolutionDir = Directory.GetCurrentDirectory();
 
     [Fact]
     public void HumanBlock_PackagingViolation_NamesTheProjectAtItsDeclaringSite()
@@ -105,15 +102,17 @@ public sealed class ProjectViolationRenderTests
     [Fact]
     public void Sarif_PackagingViolation_MessageIsTheProjectName()
     {
-        MessagesOf(PackableReport())
-            .ShouldBe(["Zphil.Internal"]);
+        PackableReport()
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Internal");
     }
 
     [Fact]
     public void Sarif_PerPackageViolation_MessageNamesTheProjectAndThePackage()
     {
-        MessagesOf(PackagedReport())
-            .ShouldBe(["Zphil.Domain references package Serilog"]);
+        PackagedReport()
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Domain references package Serilog");
     }
 
     private static CheckReport PackableReport()
@@ -128,19 +127,5 @@ public sealed class ProjectViolationRenderTests
         return Checker.Run(Packaged, arch => arch.Rule("packaging/domain-pure")
             .Enforce(arch.Projects.Matching("*").MustReferenceNoPackages())
             .Because("The domain must not take a dependency the rest of the estate has to carry."));
-    }
-
-    private static IReadOnlyList<string> MessagesOf(CheckReport report)
-    {
-        string json = SarifReportRenderer.Serialize(report, SolutionDir, true, [], WorkspaceDiagnostics.None);
-        using JsonDocument document = JsonDocument.Parse(json);
-
-        return document.RootElement.GetProperty("runs")[0]
-            .GetProperty("results")
-            .EnumerateArray()
-            .Select(result => result.GetProperty("message")
-                .GetProperty("text")
-                .GetString()!)
-            .ToList();
     }
 }

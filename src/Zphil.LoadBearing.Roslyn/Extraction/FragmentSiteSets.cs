@@ -90,6 +90,33 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
+    ///     A project's declared packages materialized the way the model reads them: one entry per name,
+    ///     ordinal by name, projected through <paramref name="make" />. A name declared more than once keeps
+    ///     its ordinally-first site, so the list is stable whatever order the declarations arrived in.
+    /// </summary>
+    /// <remarks>
+    ///     It sits here for the same reason <see cref="OrderedRegistrations{TOut}" /> does, and folds rather
+    ///     than merely sorts because both ends of the pipeline meet the duplicates too: the evaluation reads
+    ///     one project's declarations, the merge reads one project's fragments back together, and a package
+    ///     declared once per framework is declared once. Each end names its own output type, which is the only
+    ///     part of the table that differs between them.
+    /// </remarks>
+    internal static List<TOut> OrderedPackages<TOut>(
+        IEnumerable<FragmentPackageReference> declarations, Func<string, FragmentSite, TOut> make)
+    {
+        var byName = new Dictionary<string, FragmentSite>(StringComparer.Ordinal);
+        foreach (FragmentPackageReference declaration in declarations)
+            if (!byName.TryGetValue(declaration.Name, out FragmentSite existing)
+                || declaration.Site.CompareTo(existing) < 0)
+                byName[declaration.Name] = declaration.Site;
+
+        return byName
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => make(entry.Key, entry.Value))
+            .ToList();
+    }
+
+    /// <summary>
     ///     A site collection as the model's <see cref="SourceLocation" /> list — the projection every axis
     ///     applies on the way out of extraction, order preserved exactly as the collection holds it.
     /// </summary>
@@ -99,9 +126,18 @@ internal static class FragmentSiteSets
 
         var locations = new SourceLocation[sites.Count];
         var index = 0;
-        foreach (FragmentSite site in sites) locations[index++] = new SourceLocation(site.File, site.Line);
+        foreach (FragmentSite site in sites) locations[index++] = Location(site);
 
         return locations;
+    }
+
+    /// <summary>
+    ///     One site as the model's <see cref="SourceLocation" /> — the single crossing between the two
+    ///     shapes, which every projection here goes through.
+    /// </summary>
+    internal static SourceLocation Location(FragmentSite site)
+    {
+        return new SourceLocation(site.File, site.Line);
     }
 
     /// <summary>
@@ -111,7 +147,7 @@ internal static class FragmentSiteSets
     /// </summary>
     internal static SourceLocation? Location(FragmentSite? site)
     {
-        return site is { } known ? new SourceLocation(known.File, known.Line) : null;
+        return site is { } known ? Location(known) : null;
     }
 
     /// <summary>

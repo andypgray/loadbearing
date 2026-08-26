@@ -5,8 +5,8 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Hosting;
-using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -29,10 +29,6 @@ public sealed class SarifReportRendererTests
                                          namespace App.Data { public class Db {} }
                                          """;
 
-    // The site path is a relative "Test.cs" from the MSBuild-free factory, so any solution directory works —
-    // the tests never assert on the resolved URI, only on level, state, suppressions, and fingerprint ordinals.
-    private static readonly string SolutionDir = Directory.GetCurrentDirectory();
-
     [Fact]
     public void Serialize_RedReference_EmitsErrorLevelNewBaselineStateNoSuppressions()
     {
@@ -43,9 +39,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        IReadOnlyList<JsonElement> results = Results(json);
+        IReadOnlyList<JsonElement> results = json.SarifResults();
         results.ShouldNotBeEmpty();
         foreach (JsonElement result in results)
         {
@@ -82,9 +78,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        IReadOnlyList<JsonElement> results = Results(json);
+        IReadOnlyList<JsonElement> results = json.SarifResults();
         results.Count.ShouldBeGreaterThan(1); // genuinely multi-site
         // All sites belong to the one Page -> Db violation, so the fingerprints share every slot but the ordinal.
         IReadOnlyList<string> fingerprints = results.Select(Fingerprint)
@@ -109,9 +105,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                 .Because("Catch specific exceptions, not the domain base."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        ShouldBeOneErrorSaying(json, "App.Handler catches Errors.DbError");
+        json.ShouldBeOneErrorSaying("App.Handler catches Errors.DbError");
     }
 
     [Fact]
@@ -128,9 +124,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
                 .Because("Keep internal types off the public API."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        ShouldBeOneErrorSaying(json, "App.Facade exposes Secrets.Data");
+        json.ShouldBeOneErrorSaying("App.Facade exposes Secrets.Data");
     }
 
     [Fact]
@@ -146,9 +142,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Sanctioned.*")))
                 .Because("Throw only the sanctioned exception types."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        ShouldBeOneErrorSaying(json, "App.Service throws System.InvalidOperationException");
+        json.ShouldBeOneErrorSaying("App.Service throws System.InvalidOperationException");
     }
 
     [Fact]
@@ -180,9 +176,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                 .Because("A broad catch names what it expects."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        JsonElement result = ShouldBeOneErrorSaying(json, "App.Handler catches Errors.DbError");
+        JsonElement result = json.ShouldBeOneErrorSaying("App.Handler catches Errors.DbError");
         StartLine(result)
             .ShouldBe(11);
 
@@ -191,7 +187,7 @@ public sealed class SarifReportRendererTests
         string sentence = report.Results.Single()
             .Rule.Sentence;
         sentence.ShouldContain("without a `when` filter");
-        Rules(json)
+        json.SarifRules()
             .Single()
             .GetProperty("shortDescription")
             .GetProperty("text")
@@ -212,9 +208,9 @@ public sealed class SarifReportRendererTests
                 .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(Exception)))
                 .Because("Throw a type a caller can dispatch on."));
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        ShouldBeOneErrorSaying(json, "App.Service throws System.Exception");
+        json.ShouldBeOneErrorSaying("App.Service throws System.Exception");
     }
 
     [Fact]
@@ -235,11 +231,11 @@ public sealed class SarifReportRendererTests
                 [], null, [])
         ]);
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        Results(json)
+        json.SarifResults()
             .ShouldBeEmpty();
-        Rules(json)
+        json.SarifRules()
             .Select(r => r.GetProperty("id")
                 .GetString())
             .ShouldBe(["naming/empty", "ref/error"]);
@@ -260,9 +256,9 @@ public sealed class SarifReportRendererTests
                 RuleStatus.Skipped, [], [], "no diff context", [])
         ]);
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
-        JsonElement rule = Rules(json)
+        JsonElement rule = json.SarifRules()
             .Single();
         rule.TryGetProperty("shortDescription", out _)
             .ShouldBeFalse();
@@ -280,7 +276,7 @@ public sealed class SarifReportRendererTests
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
         CheckReport report = Checker.Run(OneController, index, NoDataAccess);
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
         ShouldSuppressEveryNoteWith(json, "grandfathered in arch/baselines/data/x.json");
     }
@@ -296,7 +292,7 @@ public sealed class SarifReportRendererTests
             .WithBecause(because);
         CheckReport report = Checker.Run(OneController, Checker.Baselines("data/x", entry), NoDataAccess);
 
-        string json = Serialize(report);
+        string json = report.ToSarif();
 
         ShouldSuppressEveryNoteWith(json, because);
     }
@@ -317,32 +313,6 @@ public sealed class SarifReportRendererTests
     private static ArchRule Rule(string id, Posture posture)
     {
         return new ArchRule(id, posture, "because", null, "sentence", null, null, null);
-    }
-
-    // Every case here drives the per-site mapping over a healthy load: nothing rendered on the diagnostics
-    // stream and no incomplete-model evidence, so the invocation block is the one a clean run writes. The
-    // populated shape is the gate suites' subject, and the golden's.
-    private static string Serialize(CheckReport report)
-    {
-        return SarifReportRenderer.Serialize(report, SolutionDir, true, [], WorkspaceDiagnostics.None);
-    }
-
-    /// <summary>
-    ///     Asserts the render carries exactly one result, at <c>error</c> level, saying
-    ///     <paramref name="message" /> — and hands it back for any further per-site read.
-    /// </summary>
-    private static JsonElement ShouldBeOneErrorSaying(string json, string message)
-    {
-        JsonElement result = Results(json)
-            .ShouldHaveSingleItem();
-        result.GetProperty("level")
-            .GetString()
-            .ShouldBe("error");
-        result.GetProperty("message")
-            .GetProperty("text")
-            .GetString()
-            .ShouldBe(message);
-        return result;
     }
 
     /// <summary>
@@ -371,28 +341,10 @@ public sealed class SarifReportRendererTests
         }
     }
 
-    private static IReadOnlyList<JsonElement> Rules(string json)
-    {
-        return Run(json)
-            .GetProperty("tool")
-            .GetProperty("driver")
-            .GetProperty("rules")
-            .EnumerateArray()
-            .ToList();
-    }
-
-    private static IReadOnlyList<JsonElement> Results(string json)
-    {
-        return Run(json)
-            .GetProperty("results")
-            .EnumerateArray()
-            .ToList();
-    }
-
     // The grandfathered results — every note-level result carries a suppression by construction.
     private static IReadOnlyList<JsonElement> Notes(string json)
     {
-        return Results(json)
+        return json.SarifResults()
             .Where(r => r.GetProperty("level")
                 .GetString() == "note")
             .ToList();
@@ -413,11 +365,5 @@ public sealed class SarifReportRendererTests
             .GetProperty("region")
             .GetProperty("startLine")
             .GetInt32();
-    }
-
-    private static JsonElement Run(string json)
-    {
-        return JsonDocument.Parse(json)
-            .RootElement.GetProperty("runs")[0];
     }
 }

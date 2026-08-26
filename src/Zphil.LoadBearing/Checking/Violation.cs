@@ -7,30 +7,21 @@ namespace Zphil.LoadBearing.Checking;
 ///     One concrete way a rule is broken (GRAMMAR §4.3). <see cref="Kind" /> governs which of the
 ///     nullable slots are populated — <see cref="ViolationKind" /> documents the mapping per kind.
 /// </summary>
+/// <remarks>
+///     The constructor takes only what every violation has — its kind and its evidence — and each factory
+///     below names the slots its own kind populates, through an object initializer. That is why the slots
+///     carry a private setter rather than being get-only: <c>init</c> is unavailable on this target
+///     framework (no <c>IsExternalInit</c>), and every factory is a member of this class, so the setters
+///     reach exactly as far as they must and a violation is read-only to every consumer. A new slot
+///     therefore touches no existing factory, and no factory threads a run of nulls past slots of the
+///     same type where a transposition would compile.
+/// </remarks>
 public sealed class Violation
 {
-    private Violation(
-        ViolationKind kind,
-        TypeNode? source,
-        TypeNode? target,
-        TypeNode? subject,
-        MemberReference? member,
-        MemberNode? subjectMember,
-        ProjectNode? subjectProject,
-        PackageReference? package,
-        IReadOnlyList<SourceLocation> sites,
-        string? detail)
+    private Violation(ViolationKind kind, IReadOnlyList<SourceLocation> sites)
     {
         Kind = kind;
-        Source = source;
-        Target = target;
-        Subject = subject;
-        Member = member;
-        SubjectMember = subjectMember;
-        SubjectProject = subjectProject;
-        Package = package;
         Sites = sites;
-        Detail = detail;
     }
 
     /// <summary>The violation kind.</summary>
@@ -41,26 +32,26 @@ public sealed class Violation
     ///     constructing type (Construction kind), the injecting type (Injection kind), the catching type
     ///     (Catch kind), the throwing type (Throw kind), or the exposing type (Expose kind).
     /// </summary>
-    public TypeNode? Source { get; }
+    public TypeNode? Source { get; private set; }
 
     /// <summary>
     ///     The referenced type (Reference kind), the constructed type (Construction kind), the injected
     ///     parameter type (Injection kind), the caught exception type (Catch kind), the thrown exception
     ///     type (Throw kind), or the exposed type (Expose kind).
     /// </summary>
-    public TypeNode? Target { get; }
+    public TypeNode? Target { get; private set; }
 
     /// <summary>The offending subject type (Shape kind).</summary>
-    public TypeNode? Subject { get; }
+    public TypeNode? Subject { get; private set; }
 
     /// <summary>The banned member the source used (MemberUse kind); null otherwise.</summary>
-    public MemberReference? Member { get; }
+    public MemberReference? Member { get; private set; }
 
     /// <summary>The offending declared member (MemberShape kind); null otherwise.</summary>
-    public MemberNode? SubjectMember { get; }
+    public MemberNode? SubjectMember { get; private set; }
 
     /// <summary>The offending subject project (ProjectShape kind, GRAMMAR §4.10); null otherwise.</summary>
-    public ProjectNode? SubjectProject { get; }
+    public ProjectNode? SubjectProject { get; private set; }
 
     /// <summary>
     ///     The offending declared package reference — populated only by the per-package
@@ -68,13 +59,13 @@ public sealed class Violation
     ///     kind. Its presence is what parts "this project is wrong" from "this project declares this
     ///     package".
     /// </summary>
-    public PackageReference? Package { get; }
+    public PackageReference? Package { get; private set; }
 
     /// <summary>The reference or declaration sites carrying the violation; empty for EmptySubject/RuleError.</summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
     /// <summary>Free text for EmptySubject/RuleError; null otherwise.</summary>
-    public string? Detail { get; }
+    public string? Detail { get; private set; }
 
     /// <summary>
     ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
@@ -131,12 +122,10 @@ public sealed class Violation
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
-            // A project has no DocumentationCommentId, so it keys on its own name under a `project:` tag —
-            // the same shape a DocId wears, and SymbolIds.Display passes it through verbatim because
-            // `project` is not a one-letter tag. Both project factories key the same way, so the per-package
-            // violations of one project share one identity: the law is about the project, and a baseline
-            // entry blessing it must not have to be rewritten every time the package list moves.
-            ViolationKind.ProjectShape => BaselineEntry.ForSubject("project:" + SubjectProject!.Name),
+            // Both project factories key the same way, so the per-package violations of one project share
+            // one identity: the law is about the project, and a baseline entry blessing it must not have to
+            // be rewritten every time the package list moves.
+            ViolationKind.ProjectShape => BaselineEntry.ForSubject(SubjectProject!.SymbolId),
             _ => null
         };
     }
@@ -173,17 +162,17 @@ public sealed class Violation
 
     internal static Violation MemberUse(TypeNode source, MemberReference member, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.MemberUse, source, null, null, member, null, null, null, sites, null);
+        return new Violation(ViolationKind.MemberUse, sites) { Source = source, Member = member };
     }
 
     internal static Violation Shape(TypeNode subject, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.Shape, null, null, subject, null, null, null, null, sites, null);
+        return new Violation(ViolationKind.Shape, sites) { Subject = subject };
     }
 
     internal static Violation MemberShape(MemberNode subjectMember, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.MemberShape, null, null, null, null, subjectMember, null, null, sites, null);
+        return new Violation(ViolationKind.MemberShape, sites) { SubjectMember = subjectMember };
     }
 
     /// <summary>
@@ -193,7 +182,7 @@ public sealed class Violation
     /// </summary>
     internal static Violation ProjectShape(ProjectNode subject, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.ProjectShape, null, null, null, null, null, subject, null, sites, null);
+        return new Violation(ViolationKind.ProjectShape, sites) { SubjectProject = subject };
     }
 
     /// <summary>
@@ -204,27 +193,24 @@ public sealed class Violation
     /// </summary>
     internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
     {
-        return new Violation(
-            ViolationKind.ProjectShape, null, null, null, null, null, subject, package, [package.Site], null);
+        return new Violation(ViolationKind.ProjectShape, [package.Site]) { SubjectProject = subject, Package = package };
     }
 
     internal static Violation EmptySubject(string detail)
     {
-        return new Violation(
-            ViolationKind.EmptySubject, null, null, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
+        return new Violation(ViolationKind.EmptySubject, Array.Empty<SourceLocation>()) { Detail = detail };
     }
 
     internal static Violation RuleError(string detail)
     {
-        return new Violation(
-            ViolationKind.RuleError, null, null, null, null, null, null, null, Array.Empty<SourceLocation>(), detail);
+        return new Violation(ViolationKind.RuleError, Array.Empty<SourceLocation>()) { Detail = detail };
     }
 
-    // The one constructor call the six edge factories share: an edge violation is a (source, target) pair
-    // with its sites, and every other slot empty.
+    // The one mint the six edge factories share: an edge violation is a (source, target) pair with its
+    // sites, and every other slot empty.
     private static Violation Edge(
         ViolationKind kind, TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(kind, source, target, null, null, null, null, null, sites, null);
+        return new Violation(kind, sites) { Source = source, Target = target };
     }
 }
