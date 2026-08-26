@@ -386,6 +386,7 @@ internal static class SpecResolver
                     + "Zphil.LoadBearing.dll may have failed to resolve it:",
                     diagnostics.ActionableDiagnostics,
                     "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
+                    withSelectionNote: true,
                     quoteCap: MaxQuotedDiagnostics));
 
         return new UserErrorException(

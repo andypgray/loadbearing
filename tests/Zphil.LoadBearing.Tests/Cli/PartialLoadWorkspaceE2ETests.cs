@@ -215,6 +215,10 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         check.ShouldRefuseWith(SpecGateLine, MissingProject); // the evidence, inline
         check.ShouldTellBothCausesLoadFirst(SpecGateLine, SpecRestoreGateLine);
+        // ... says which MSBuild opened them, which is nearly always the next question — and nothing has
+        // written to this stream above the refusal, so the note reaches the reader here or nowhere ...
+        check.Err.ShouldContain("MSBuild for this run:");
+        // ... and says what to do about it.
         check.Err.ShouldContain("Restore and build the solution first");
         check.Err.ShouldContain("Restore the solution first (dotnet restore), then retry.");
         check.Err.ShouldNotContain("Pass --spec to name one");

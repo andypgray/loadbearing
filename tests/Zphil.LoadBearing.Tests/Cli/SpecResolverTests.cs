@@ -3,6 +3,7 @@ using Xunit;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
+using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
@@ -205,6 +206,27 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
+    public void ResolveConventionProject_ProjectsFailedToLoad_CarriesTheMsBuildSelectionInsideTheEvidence()
+    {
+        // Which MSBuild opened them is nearly always the next question about a project that failed to load,
+        // and this refusal is thrown before a runner exists to echo the note beside it — so on both its
+        // surfaces the reader meets the selection here or not at all. Pinned whole because the placement is
+        // the claim: the note belongs inside the indented run, under the projects and above the remedy.
+        var diagnostics = new WorkspaceDiagnostics([], [], [BrokenProject], [], [], [], []);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldBe(
+            "No spec project found: 1 project failed to load, so a project that references "
+            + "Zphil.LoadBearing.dll may be among them:\n"
+            + $"  {BrokenProject}\n"
+            + $"  {MsBuildBootstrap.SelectionNote()}\n"
+            + "Restore and build the solution first (dotnet restore, dotnet build), then retry.");
+    }
+
+    [Fact]
     public void ResolveConventionProject_PackagesDidNotResolve_BlamesTheRestoreAndNamesTheProject()
     {
         // The measured locked-mode shape, and the defect this pin exists to keep out of the field. A broken
@@ -233,6 +255,8 @@ public sealed class SpecResolverTests
         // One tree can be broken both ways at once, and the two ask for different repairs — so each block
         // names its own project rather than one list standing in for both. The load block comes first: a
         // project that never loaded is more fundamentally broken than one that loaded without its packages.
+        // The MSBuild selection closes each block for the same reason the evidence opens it: it is stated
+        // per block, beside the projects it is an answer about.
         const string unrestoredProject = "C:/repo/src/MyApp.Web/MyApp.Web.csproj";
         const string loadLede =
             "No spec project found: 1 project failed to load, so a project that references "
@@ -246,8 +270,9 @@ public sealed class SpecResolverTests
             SpecResolver.ResolveConventionProject(
                 [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
 
-        error.Message.ShouldContain(loadLede + "\n  " + BrokenProject);
-        error.Message.ShouldContain(restoreLede + "\n  " + unrestoredProject);
+        string selectionNote = MsBuildBootstrap.SelectionNote();
+        error.Message.ShouldContain(loadLede + "\n  " + BrokenProject + "\n  " + selectionNote);
+        error.Message.ShouldContain(restoreLede + "\n  " + unrestoredProject + "\n  " + selectionNote);
         error.Message.IndexOf(loadLede, StringComparison.Ordinal)
             .ShouldBeLessThan(error.Message.IndexOf(restoreLede, StringComparison.Ordinal), error.Message);
     }
@@ -272,6 +297,27 @@ public sealed class SpecResolverTests
         error.Message.ShouldContain("NU1004");
         error.Message.ShouldContain("Restore and build the solution first");
         error.Message.ShouldNotContain("Pass --spec");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_CarriesTheMsBuildSelectionInsideTheEvidence()
+    {
+        // The two gate arms' reason, on the arm that names diagnostics rather than projects: this refusal is
+        // thrown from the same place, before a runner exists to echo the note beside it, and a load that did
+        // not go cleanly is nearly always a question about which MSBuild opened the solution. Pinned whole
+        // because the placement is the claim: inside the indented run, under the diagnostics, above the remedy.
+        var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [], [], [], [], []);
+
+        var error = Should.Throw<UserErrorException>(() =>
+            SpecResolver.ResolveConventionProject(
+                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+
+        error.Message.ShouldBe(
+            "No spec project found: the workspace did not load cleanly, so a project that references "
+            + "Zphil.LoadBearing.dll may have failed to resolve it:\n"
+            + $"  {LockFileFailure}\n"
+            + $"  {MsBuildBootstrap.SelectionNote()}\n"
+            + "Restore and build the solution first (dotnet restore, dotnet build), then retry.");
     }
 
     [Fact]
@@ -325,6 +371,9 @@ public sealed class SpecResolverTests
         error.Message.ShouldContain("  failure three");
         error.Message.ShouldNotContain("failure four");
         error.Message.ShouldContain("... and 2 more.");
+        // The MSBuild selection closes the indented run below the elision line, not above it: what was left
+        // out is more evidence, and the selection is the one answer that covers all of it.
+        error.Message.ShouldContain("  ... and 2 more.\n  " + MsBuildBootstrap.SelectionNote());
     }
 
     [Fact]

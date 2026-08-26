@@ -201,7 +201,8 @@ internal static class IncompleteModelGate
     ///         It carries the blamed projects inline rather than pointing at warnings printed above, for
     ///         <see cref="GraphRefusal" />'s reason and a stronger one of its own: this refusal is thrown
     ///         before a runner exists to render any diagnostics beside it, so on <em>both</em> its surfaces
-    ///         there is nothing above to point at.
+    ///         there is nothing above to point at. The MSBuild selection note rides that block for the same
+    ///         reason — a reader who cannot reach the warnings cannot read the selection off them either.
     ///     </para>
     ///     <para>
     ///         The derive_spec prompt's troubleshooting list quotes both ledes (their counts glossed as
@@ -212,7 +213,7 @@ internal static class IncompleteModelGate
     {
         return Message(
             diagnostics,
-            false,
+            true,
             $"No spec project found: {Failed(diagnostics)} failed to load, so a project that references "
             + "Zphil.LoadBearing.dll may be among them:",
             "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
