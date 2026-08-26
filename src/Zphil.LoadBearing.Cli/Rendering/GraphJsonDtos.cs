@@ -22,21 +22,44 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </param>
 /// <param name="Grain">
 ///     <c>overview</c> when the namespace inventories were elided, <c>skeleton</c> when the
-///     external-reference rows went with them, or null (omitted) at full grain — so a document that says
-///     nothing about grain is the complete one, and a consumer can tell a coarser survey from a smaller
-///     codebase without diffing it.
+///     external-reference rows went with them, <c>index</c> when the survey is down to its project roster,
+///     or null (omitted) at full grain — so a document that says nothing about grain is the complete one,
+///     and a consumer can tell a coarser survey from a smaller codebase without diffing it.
 /// </param>
 /// <param name="ProjectsScope">
 ///     The project-name globs the survey was narrowed to, or null (omitted) when it covers the whole
 ///     solution. Present, it explains why <c>projectEdges</c> can name a project <c>projects</c> does not:
 ///     an edge survives scoping on either endpoint.
 /// </param>
-/// <param name="Projects">One row per project the survey read, ordered by name.</param>
+/// <param name="Projects">
+///     One row per project the survey read, ordered by name. Present at every rung — it is the roster that
+///     makes the floor a narrowing menu, and the argument <c>--projects</c> takes.
+/// </param>
 /// <param name="ProjectEdges">
-///     The observed cross-project reference edges, grouped by (source, target) project pair.
+///     The observed cross-project reference edges, grouped by (source, target) project pair, or null
+///     (omitted) at index grain — the one thing that grain elides beyond skeleton's, and the last array here
+///     that scales with the codebase. Null is "not rendered at this grain", never "none found";
+///     <see cref="ProjectEdgeCount" /> tells the two apart.
+/// </param>
+/// <param name="ProjectEdgeCount">
+///     How many observed edges the elision dropped, present only when <see cref="ProjectEdges" /> is elided.
+///     Rendered on <see cref="ExternalEdgeCount" />'s rule and for its reason: an index survey still says
+///     the projects reference each other, rather than reading like a solution of unrelated projects.
 /// </param>
 /// <param name="WorkspaceDiagnostics">
-///     The workspace-load diagnostics, or null (omitted) when there were none.
+///     The workspace-load diagnostics, or null (omitted) when there were none — and at index grain, where
+///     <see cref="WorkspaceDiagnosticCount" /> stands in. This is MSBuild's own words, one entry per project
+///     per framework per complaint, so it is the one array here with no ceiling at all: measured on a
+///     56-project bed whose NuGet audit feed was unreachable, it was 222,108 characters against a 4,703-character
+///     roster. Its actionable half is already keyed — <see cref="FailedProjects" /> and
+///     <see cref="RestoreFailedProjects" /> — which is what makes eliding the raw stream at the floor rung
+///     safe rather than merely smaller.
+/// </param>
+/// <param name="WorkspaceDiagnosticCount">
+///     How many diagnostics the elision dropped, present only when <see cref="WorkspaceDiagnostics" /> is
+///     elided at index grain and there were some — never a bare <c>0</c>, so a clean load's survey is
+///     untouched. Without it a survey that hit trouble and a survey that did not would read alike at the one
+///     grain a reader reaches when nothing else fits.
 /// </param>
 /// <param name="ModelIncomplete">
 ///     <see langword="true" /> when a project failed to load or a project's NuGet packages are not in the
@@ -114,7 +137,8 @@ internal sealed record GraphJson(
     string? Grain,
     IReadOnlyList<string>? ProjectsScope,
     IReadOnlyList<GraphProjectJson> Projects,
-    IReadOnlyList<GraphProjectEdgeJson> ProjectEdges,
+    IReadOnlyList<GraphProjectEdgeJson>? ProjectEdges,
+    int? ProjectEdgeCount,
     IReadOnlyList<GraphExternalEdgeJson>? ExternalEdges,
     int? ExternalEdgeCount,
     IReadOnlyList<GraphMultiplyDeclaredTypeJson>? MultiplyDeclaredTypes,
@@ -122,6 +146,7 @@ internal sealed record GraphJson(
     IReadOnlyList<GraphShadowedTypeJson>? ShadowedTypes,
     int? ShadowedTypeCount,
     IReadOnlyList<string>? WorkspaceDiagnostics,
+    int? WorkspaceDiagnosticCount,
     bool? ModelIncomplete,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
@@ -132,7 +157,9 @@ internal sealed record GraphJson(
 ///     One project: whether the solution declares it, which target frameworks it was extracted from and
 ///     which one its shared types' facts came from, its declared references, solution-declared type count,
 ///     how many of those a generator emitted, and its namespace inventory — the last of which is null
-///     (omitted) at overview grain, being the one thing that grain elides.
+///     (omitted) at overview grain, being the one thing that grain elides. At index grain the row is down to
+///     what names and sizes the project: the frameworks pair and <c>projectReferences</c> go, leaving
+///     <c>name</c>, <c>solutionMember</c>, <c>types</c> and <c>generated</c>.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -148,8 +175,19 @@ internal sealed record GraphJson(
 ///         yielded several, the array names them all and <c>factsFollow</c> names the one the types they
 ///         share took their facts from — absent in its own right when the frameworks share no type, because
 ///         nothing was then displaced and claiming a winner would be false about every type in the project.
-///         Riding the row is also what carries them down the grain ladder untouched: the pair scales with the
-///         solution's projects, which the coarsest survey still lists in full.
+///         Riding the row is also what carries them down the grain ladder to its last rung: the pair scales
+///         with the solution's projects, which every survey lists in full. They stop at index, where a row
+///         answers only "which projects are there, and how big" and every qualifier on that answer is one
+///         more multiple of the project count.
+///     </para>
+///     <para>
+///         <c>projectReferences</c> is the row's one array and the reason index is a rung at all: what a
+///         project declares scales with the solution's <em>edges</em> rather than its projects, so on a
+///         large solution these lists are most of the roster's bulk. Elided at index it goes bare, with no
+///         count — the same rule <c>namespaces</c> takes at overview: a row's own array carries its
+///         document's grain stamp with it, so it needs no per-row restatement, while a document-level array
+///         (<c>projectEdges</c>, <c>externalEdges</c>) elides to a count because nothing else on the
+///         document says how much was there.
 ///     </para>
 ///     <para>
 ///         <c>generated</c> is a qualifier on the number it qualifies, in both places that number
@@ -162,7 +200,7 @@ internal sealed record GraphProjectJson(
     bool? SolutionMember,
     IReadOnlyList<string>? TargetFrameworks,
     string? FactsFollow,
-    IReadOnlyList<string> ProjectReferences,
+    IReadOnlyList<string>? ProjectReferences,
     int Types,
     int? Generated,
     IReadOnlyList<GraphNamespaceJson>? Namespaces);

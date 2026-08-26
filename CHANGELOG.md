@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A fourth grain, `index`, below `skeleton` — the ladder's floor and the narrowing menu.**
+  `--index` on `check` and `graph`, `index` on `arch_check` and `arch_graph`. The survey keeps every
+  project's name, solution membership and type count; the report keeps every rule's ID, posture,
+  status, baseline, warnings and violation count. What it drops is everything that scales with the
+  codebase rather than with the solution or the spec, so a caller who lands here by degrading is
+  holding exactly the list `--projects` and `--rules` globs pick from — and `explain` expands any of
+  those rule IDs whole. Measured on a 56-project solution, the survey falls from 266,710 characters
+  at `skeleton` to 6,258; on another, the report falls from 100,364 to 5,186.
+- **`workspaceDiagnostics` elides at `index` too, to `workspaceDiagnosticCount`.** MSBuild's own
+  words about the load are one entry per project per framework per complaint, so they scale with
+  neither the spec nor the codebase but with whatever the load ran into — and they used to ride
+  every rung untouched. On a bed whose package-audit feed happened to be unreachable that array was
+  98% of the survey and 96% of the report *at every grain*, which no amount of coarsening elsewhere
+  could fix. Every trust stamp still survives the floor rung: the actionable half of that stream is
+  already keyed in `failedProjects` and `restoreFailedProjects`, and `modelIncomplete` still says
+  the verdict was reached against a partial model. Only the raw text goes, and only at the floor.
+
 ### Fixed
 
 - **A reference between two types a linked source file compiles into several projects no longer reds
@@ -32,6 +51,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   §4.1's no-implicit-self-allowance sentence has always said and the code did not. Before, an entry
   naming any declarer allowed it, so a spec that reads green today can red — the fix, not a
   regression, but it is the one place where this release can turn a passing rule red.
+- **A large solution no longer exhausts the grain ladder and gets a cut document.** On a 56-project
+  solution `arch_graph`'s coarsest survey was 66,593 characters against a 62,500-character client
+  budget, and on another `arch_check`'s was 67,909 — every rung overran, so the response came back
+  truncated: corrupt JSON under a footer naming a knob whose argument values were in the very
+  document it had just withheld. Both tools now degrade to `index` instead, which grows with the
+  project and rule counts rather than with the codebase — and, with the diagnostic stream eliding
+  there too, both of those solutions now answer whole where they were previously cut.
+- **Neither truncation footer offers to page the document out to a file any more, and the
+  `derive_spec` recipe no longer suggests it either.** Both said, in effect, *redirect the CLI to a
+  file and slice it there* — while the served server instructions say to narrow and never page. An
+  agent handed the cut survey quoted the footer back as its reason for leaving the tool surface
+  entirely and reading the whole document through the shell. Advice at the moment of failure
+  outweighs a line in a system prompt, so the two must not disagree; the footers keep the knob they
+  name, its CLI twin, and `arch_explain`.
 
 ## [0.6.1] - 2026-08-22
 

@@ -20,7 +20,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     <para>
 ///         The document is composed as a string rather than written straight out, so a caller with a
 ///         response budget can measure the report and, if it overruns, re-compose it one grain coarser from
-///         the same result model — one check, two renders, and never a document cut mid-array.
+///         the same result model — one check, one render per rung walked, and never a document cut
+///         mid-array.
 ///     </para>
 /// </remarks>
 internal static class JsonReportRenderer
@@ -49,6 +50,12 @@ internal static class JsonReportRenderer
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, relativizer);
 
+        // The floor rung elides MSBuild's own words, which is the one array here that scales with neither
+        // the spec nor even the codebase but with the load's troubles — one entry per project per framework
+        // per complaint, and on a bed whose package audit feed was unreachable it was 96% of this document
+        // at every grain. Its actionable half is already keyed above, so what goes is the raw text.
+        bool elideDiagnostics = grain >= DocumentGrain.Index && workspaceDiagnostics.Count > 0;
+
         // Every argument is named, which is what holds the six trust slots to the record's declaration
         // order for a reader; the key order is the DTO's to state.
         var document = new CheckJson(
@@ -72,26 +79,31 @@ internal static class JsonReportRenderer
                 report.ViolationCount,
                 report.WarningCount),
             Rules: report.Results.Select(r => ToRule(r, relativizer, grain)).ToList(),
-            WorkspaceDiagnostics: workspaceDiagnostics);
+            WorkspaceDiagnostics: elideDiagnostics ? null : workspaceDiagnostics,
+            WorkspaceDiagnosticCount: elideDiagnostics ? workspaceDiagnostics.Count : null);
 
         return JsonSerializer.Serialize(document, LoadBearingJson.Context.CheckJson);
     }
 
-    // Everything above the violations survives every rung: the id, the verdict, the prose, the baseline and
-    // the warnings. That is deliberate and is what keeps the coarsest report actionable — prose scales with
-    // the rule count, which is authored and small, while violations and their sites scale with the codebase,
-    // which is what actually overruns a channel. Dropping because/fix would leave an id and a number.
+    // Two rungs act on a rule, and they answer different questions. Skeleton keeps the prose, because that is
+    // what makes it a verdict a reader can act on without a second call: prose scales with the rule count,
+    // which is authored and small, while violations and their sites scale with the codebase, which is what
+    // actually overruns a channel. Index drops it, and is not competing with skeleton for that reader — it
+    // competes with a cut document, which is corrupt JSON. What survives is the id and the verdict, which is
+    // exactly the menu the next call needs: rules globs match these ids, and arch_explain takes one and
+    // returns that rule whole, prose and all.
     private static RuleJson ToRule(RuleResult result, PathFormat.Relativizer relativizer, DocumentGrain grain)
     {
         bool elideViolations = grain >= DocumentGrain.Skeleton;
+        bool elideProse = grain >= DocumentGrain.Index;
 
         return new RuleJson(
             result.Rule.Id,
             result.Rule.Posture,
             result.Status,
-            result.Rule.Sentence,
-            result.Rule.Because,
-            result.Rule.Fix,
+            elideProse ? null : result.Rule.Sentence,
+            elideProse ? null : result.Rule.Because,
+            elideProse ? null : result.Rule.Fix,
             result.SkipReason,
             ToBaseline(result),
             // Both or neither: the denominator alone says nothing worth a key, and the numerator alone is

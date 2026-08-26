@@ -263,12 +263,15 @@ public sealed class GraphCommandTests
     {
         // Arrange — the regression this ladder exists for. A budget below even the overview's size used to
         // stop after one step and hand the truncator an over-budget document to cut mid-array; measured on a
-        // 34-project solution, the full survey was ~147k characters and its overview still ~82k.
+        // 34-project solution, the full survey was ~147k characters and its overview still ~82k. The budget
+        // is the skeleton's own size rather than a round number, because a round number stops naming this
+        // rung the moment a coarser one is added below it.
         var degraded = new StringWriter();
         var skeleton = new StringWriter();
+        int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
 
         // Act
-        await Runner(degraded, FixedResponseBudget.Fitter(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(skeletonLength))
             .RunAsync(Request(), Ct);
         await Runner(skeleton)
             .RunAsync(Request(DocumentGrain.Skeleton), Ct);
@@ -289,9 +292,10 @@ public sealed class GraphCommandTests
         // transport's budget. This was the exact hole: the old guard skipped degrading whenever the caller
         // had asked for overview, which is what an MCP client does the moment a survey is large.
         var degraded = new StringWriter();
+        int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
 
         // Act
-        await Runner(degraded, FixedResponseBudget.Fitter(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(skeletonLength))
             .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert
@@ -379,10 +383,12 @@ public sealed class GraphCommandTests
     }
 
     [Fact]
-    public async Task Graph_BudgetBelowEvenTheSkeleton_TruncatesAndNamesTheSubjectKnob()
+    public async Task Graph_BudgetBelowEvenTheSkeleton_DegradesToIndexRatherThanTruncating()
     {
-        // Arrange — the ladder's floor, pinned so it stays a known limit rather than a surprise. Below the
-        // coarsest grain there is no rung left, so the backstop fires like it does for any other response.
+        // Arrange — the case the field found and this rung answers. A 56-project solution's skeleton was
+        // 66,593 characters against a 62,500 budget, so the ladder ran out and the survey came back cut;
+        // the agent that received it left the tool surface. One character below the skeleton is the same
+        // condition in miniature.
         int belowSkeleton = await LengthAt(DocumentGrain.Skeleton) - 1;
         var output = new StringWriter();
 
@@ -393,12 +399,150 @@ public sealed class GraphCommandTests
             .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, belowSkeleton);
 
+        // Assert — a whole survey at the floor rung, untouched by the truncator behind it.
+        afterTruncation.ShouldBe(document);
+        afterTruncation.ShouldNotContain("RESPONSE TRUNCATED");
+        using JsonDocument parsed = JsonDocument.Parse(afterTruncation);
+        parsed.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("index");
+    }
+
+    [Fact]
+    public async Task Graph_BudgetBelowEvenTheIndex_TruncatesAndNamesTheSubjectKnob()
+    {
+        // Arrange — the ladder's floor, pinned so it stays a known limit rather than a surprise. Below the
+        // coarsest grain there is no rung left, so the backstop fires like it does for any other response.
+        // What reaches here is a budget too small for a project roster, not a large solution.
+        int belowIndex = await LengthAt(DocumentGrain.Index) - 1;
+        var output = new StringWriter();
+
+        // Act
+        await Runner(output, FixedResponseBudget.Fitter(belowIndex))
+            .RunAsync(Request(), Ct);
+        string document = output.ToString()
+            .TrimEnd('\r', '\n');
+        string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Graph, belowIndex);
+
         // Assert — cut, and the hint names the one knob still worth reaching for. Naming a grain here would
         // send a reader back down a ladder the survey has already walked to the bottom of.
         afterTruncation.ShouldContain("RESPONSE TRUNCATED");
         afterTruncation.ShouldContain("Narrow the subject");
         afterTruncation.ShouldContain("projects:");
         afterTruncation.ShouldNotContain("overview:");
+    }
+
+    [Fact]
+    public async Task Graph_MyAppFixtureIndexJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync("graph", CliRunner.MyAppSolution, "--json", "--index");
+
+        // Assert — the roster: every project by name with its membership and type count, what each declares
+        // and targets gone, and the observed edges replaced by their count so the survey cannot be read as a
+        // solution of unrelated projects.
+        result.ShouldSucceed();
+        result.Out.ShouldMatchGolden("graph-index.json");
+    }
+
+    [Fact]
+    public async Task Graph_IndexGrain_NamesEveryProjectTheFullSurveyDoes()
+    {
+        // Arrange — the property that makes the floor rung the narrowing menu rather than merely the
+        // smallest answer. A caller who lands here by degrading has the argument --projects takes, which the
+        // truncation stamp it replaces could only name in the abstract: the roster it pointed at was in the
+        // document it had just withheld.
+        var index = new StringWriter();
+        var full = new StringWriter();
+
+        // Act
+        await Runner(index)
+            .RunAsync(Request(DocumentGrain.Index), Ct);
+        await Runner(full)
+            .RunAsync(Request(), Ct);
+
+        // Assert
+        using JsonDocument indexDocument = JsonDocument.Parse(index.ToString());
+        using JsonDocument fullDocument = JsonDocument.Parse(full.ToString());
+
+        ProjectNames(indexDocument)
+            .ShouldBe(ProjectNames(fullDocument));
+        indexDocument.RootElement.GetProperty("projectEdgeCount")
+            .GetInt32()
+            .ShouldBe(
+                fullDocument.RootElement.GetProperty("projectEdges")
+                    .GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Graph_IndexGrain_KeepsNoKeyTheSkeletonDropped()
+    {
+        // Arrange — the ladder's own contract, at the rung that was added last: every rung keeps a subset of
+        // what the one above it keeps, so a reader can compare two surveys by their stamp alone. A rung that
+        // reintroduced a key would break that without breaking anything else.
+        var index = new StringWriter();
+        var skeleton = new StringWriter();
+
+        // Act
+        await Runner(index)
+            .RunAsync(Request(DocumentGrain.Index), Ct);
+        await Runner(skeleton)
+            .RunAsync(Request(DocumentGrain.Skeleton), Ct);
+
+        // Assert — the document's own keys, and every project row's, are subsets of the skeleton's.
+        using JsonDocument indexDocument = JsonDocument.Parse(index.ToString());
+        using JsonDocument skeletonDocument = JsonDocument.Parse(skeleton.ToString());
+
+        // projectEdgeCount stands in for the array it replaced, exactly as externalEdgeCount does one rung
+        // up, so it is the one key the subset rule exempts.
+        Keys(indexDocument.RootElement)
+            .Except(["projectEdgeCount"])
+            .ShouldBeSubsetOf(Keys(skeletonDocument.RootElement));
+        ProjectRowKeys(indexDocument)
+            .ShouldBeSubsetOf(ProjectRowKeys(skeletonDocument));
+    }
+
+    [Fact]
+    public async Task Graph_ExplicitIndexOverTheBudget_DegradesNothingFurther()
+    {
+        // Arrange — the floor is the floor from both directions: a caller who names it and still overruns
+        // gets it anyway, rather than the ladder spinning or the runner inventing a coarser answer.
+        var output = new StringWriter();
+
+        // Act
+        await Runner(output, FixedResponseBudget.Fitter(1))
+            .RunAsync(Request(DocumentGrain.Index), Ct);
+
+        // Assert
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("index");
+    }
+
+    private static IReadOnlyList<string?> ProjectNames(JsonDocument document)
+    {
+        return document.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Select(project => project.GetProperty("name")
+                .GetString())
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ProjectRowKeys(JsonDocument document)
+    {
+        return document.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .SelectMany(Keys)
+            .Distinct()
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> Keys(JsonElement element)
+    {
+        return element.EnumerateObject()
+            .Select(property => property.Name)
+            .ToList();
     }
 
     // The runner directly, because the response budget has no CLI spelling: it belongs to a caller whose

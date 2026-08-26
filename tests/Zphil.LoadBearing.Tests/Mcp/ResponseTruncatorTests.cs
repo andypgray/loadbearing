@@ -16,14 +16,12 @@ public sealed class ResponseTruncatorTests
     private const string GraphHint =
         "Narrow the subject rather than read half a survey: the grain ladder is already exhausted, so "
         + "projects: \"<name globs>\" surveys part of the solution and is the knob left. On the CLI, "
-        + "loadbearing graph --projects <globs> --json, or redirect loadbearing graph --json to a file "
-        + "and slice it there.";
+        + "loadbearing graph --projects <globs> --json.";
 
     private const string CheckHint =
         "Narrow the subject rather than read half a report: the grain ladder is already exhausted, so "
         + "rules: \"<rule-id globs>\" checks part of the spec and is the knob left — and arch_explain "
-        + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json, or redirect "
-        + "loadbearing check --json to a file and slice it there.";
+        + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json.";
 
     [Fact]
     public void ComputeMaxChars_NullValue_ReturnsDefault()
@@ -146,6 +144,23 @@ public sealed class ResponseTruncatorTests
         result.ShouldContain("the grain ladder is already exhausted");
         result.ShouldNotContain("overview:");
         result.ShouldNotContain("skeleton:");
+        result.ShouldNotContain("index:");
+    }
+
+    [Theory]
+    [InlineData("arch_graph")]
+    [InlineData("arch_check")]
+    public void TruncateIfNeeded_ToolWithAGrainLadder_FooterNeverOffersToPageTheDocumentOut(string toolName)
+    {
+        // The trailer these hints used to carry — "or redirect loadbearing <verb> --json to a file and slice
+        // it there" — contradicted the served instruction not to page, and a field test caught an agent
+        // quoting it back as its reason for leaving the tool surface entirely. Text at the moment of failure
+        // beats text in a system prompt, so the product must not say both.
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
+
+        result.ShouldNotContain("redirect");
+        result.ShouldNotContain("to a file");
+        result.ShouldNotContain("slice it");
     }
 
     [Theory]

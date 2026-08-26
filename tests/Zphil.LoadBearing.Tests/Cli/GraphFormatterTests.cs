@@ -126,6 +126,46 @@ public sealed class GraphFormatterTests
     }
 
     [Fact]
+    public void Lines_IndexGrain_KeepEachProjectsNameMembershipAndSizeAndNothingElse()
+    {
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            MultiTargetedSummary(), "Acme.slnx", DocumentGrain.Index, []);
+
+        // Assert — the roster line at the floor rung, matching what the document's own row keeps. Both
+        // qualifiers go: what a project declares and what it targets each multiply by the project count, on
+        // the one rung whose whole job is to stay proportional to the roster.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Plain — 1 type",
+                "  Acme.Shared — 3 types",
+                "  Acme.Split — 2 types"
+            ]);
+    }
+
+    [Fact]
+    public void Lines_IndexGrain_ElidesTheObservedEdgesRatherThanReadingAsNone()
+    {
+        // Arrange — the survey's last codebase-scaled array. An elided section that read "(none)" would say
+        // this solution's projects never reference each other, which is the opposite of the truth and the
+        // exact failure the elision lines exist to prevent.
+        GraphSummary summary = new(
+            MultiTargetedSummary()
+                .Projects,
+            [new ProjectEdgeSummary("Acme.Plain", "Acme.Shared", 4)],
+            [],
+            [],
+            []);
+
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(summary, "Acme.slnx", DocumentGrain.Index, []);
+
+        // Assert
+        Section(lines, "Observed project references (distinct type pairs):")
+            .ShouldBe(["  (elided at index grain — rerun without --index for the observed project references)"]);
+    }
+
+    [Fact]
     public void Lines_SingleTargetedProjects_LeaveEveryLineExactlyAsItWas()
     {
         // The other half of the byte-identity claim: every project of an ordinary solution targets one

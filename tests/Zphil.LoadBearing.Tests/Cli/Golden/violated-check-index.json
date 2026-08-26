@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 3,
+  "solution": "MyApp.sln",
+  "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
+  "grain": "index",
+  "summary": {
+    "rulesChecked": 23,
+    "rulesPassed": 2,
+    "rulesFailed": 20,
+    "rulesSkipped": 1,
+    "violations": 36,
+    "warnings": 1
+  },
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "layering/billing-independent",
+      "posture": "enforce",
+      "status": "passed",
+      "violationCount": 0,
+      "warnings": []
+    },
+    {
+      "id": "data-access/no-inline-sql",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/data-access/no-inline-sql.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "time/inject-clock",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/time/inject-clock.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "naming/async-suffix",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/naming/async-suffix.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-via-registry",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/di/handlers-via-registry.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "di/no-captive-dependencies",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/di/no-captive-dependencies.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ghost",
+      "posture": "enforce",
+      "status": "passed",
+      "violationCount": 0,
+      "warnings": [
+        {
+          "kind": "inertTarget",
+          "message": "This rule is inert: its target selection matched no types."
+        }
+      ]
+    },
+    {
+      "id": "naming/nonexistent",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/containment",
+      "posture": "quarantine",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/violated-quarantine-baseline.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/tripwire",
+      "posture": "quarantine",
+      "status": "skipped",
+      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.",
+      "violationCount": 0,
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-general-catch",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/exceptions/no-general-catch.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "exceptions/domain-throws-domain",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "async/accept-cancellation",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 3,
+      "warnings": []
+    },
+    {
+      "id": "api/return-dtos",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/api/return-dtos.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-unfiltered-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-swallowed-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-bare-bcl-throw",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 4,
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 3,
+      "warnings": []
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    }
+  ],
+  "workspaceDiagnostics": []
+}

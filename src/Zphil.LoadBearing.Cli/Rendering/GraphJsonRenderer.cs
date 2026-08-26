@@ -11,8 +11,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     The document is composed as a string rather than written straight out, so a caller with a response
-///     budget can measure the full survey and, if it overruns, re-compose it at overview grain from the same
-///     summary — one extraction, two renders, and never a document cut mid-array.
+///     budget can measure the full survey and, if it overruns, re-compose it a rung coarser from the same
+///     summary — one extraction, one render per rung walked, and never a document cut mid-array.
 /// </remarks>
 internal static class GraphJsonRenderer
 {
@@ -33,6 +33,7 @@ internal static class GraphJsonRenderer
         IReadOnlyList<string> projectsScope)
     {
         bool skeleton = grain >= DocumentGrain.Skeleton;
+        bool index = grain >= DocumentGrain.Index;
 
         (IReadOnlyList<GraphMultiplyDeclaredTypeJson>? multiplyDeclaredRows, int? multiplyDeclaredCount) =
             CoverageRung(
@@ -50,7 +51,10 @@ internal static class GraphJsonRenderer
             DocumentGrains.Wire(grain),
             projectsScope.Count > 0 ? projectsScope : null,
             summary.Projects.Select(project => ToProject(project, grain)).ToList(),
-            summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
+            index
+                ? null
+                : summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
+            index ? summary.ProjectEdges.Count : null,
             skeleton
                 ? null
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
@@ -59,7 +63,8 @@ internal static class GraphJsonRenderer
             multiplyDeclaredCount,
             shadowedRows,
             shadowedCount,
-            workspaceDiagnostics.Count > 0 ? workspaceDiagnostics : null,
+            index || workspaceDiagnostics.Count == 0 ? null : workspaceDiagnostics,
+            index && workspaceDiagnostics.Count > 0 ? workspaceDiagnostics.Count : null,
             trust.ModelIncomplete,
             trust.FailedProjects,
             trust.UncheckedProjects,
@@ -85,18 +90,24 @@ internal static class GraphJsonRenderer
         return (rows, null);
     }
 
-    // The framework pair takes no grain argument, deliberately: it rides the project row like solutionMember
-    // and the project's own generated count, so it survives every rung the roster does. Omitted when empty,
-    // which is every single-framework project — the rule that keeps an ordinary solution's survey the
-    // document it was before the keys existed.
+    // The row's own ladder. The framework pair rides it like solutionMember and the project's generated
+    // count, so it survives every rung the roster does down to index, where the row is cut to what names and
+    // sizes a project; each is also omitted when empty, which is every single-framework project — the rule
+    // that keeps an ordinary solution's survey the document it was before the keys existed. The declared
+    // references are the row's one array, and the reason index exists: they scale with the solution's edges
+    // rather than its projects, so on a large solution they are most of the roster's bulk. They elide bare,
+    // as the namespaces do at overview — a row's array needs no count of its own when the document already
+    // stamps the grain that dropped it.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
+        bool index = grain >= DocumentGrain.Index;
+
         return new GraphProjectJson(
             project.Name,
             project.SolutionMember,
-            project.TargetFrameworks.Count > 0 ? project.TargetFrameworks : null,
-            project.FactsFollow,
-            project.ProjectReferences,
+            !index && project.TargetFrameworks.Count > 0 ? project.TargetFrameworks : null,
+            index ? null : project.FactsFollow,
+            index ? null : project.ProjectReferences,
             project.Types,
             project.Generated > 0 ? project.Generated : null,
             grain >= DocumentGrain.Overview

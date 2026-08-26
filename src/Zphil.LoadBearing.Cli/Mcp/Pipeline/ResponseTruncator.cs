@@ -15,10 +15,18 @@ namespace Zphil.LoadBearing.Cli.Mcp.Pipeline;
 ///     </para>
 ///     <para>
 ///         <c>arch_graph</c> and <c>arch_check</c> both degrade down a grain ladder against this same budget
-///         before reaching here, so on any solution whose skeleton fits neither arrives. That is a ladder
-///         with a last rung, not a guarantee: a document still over budget at its coarsest grain lands here
-///         and is cut like any other response. Reaching that point is the signal to narrow the
-///         <em>subject</em> — the knob each footer names — because no grain left will help.
+///         before reaching here, and that ladder's floor is the roster: every project name, every rule id,
+///         and nothing that scales with the codebase. So neither tool arrives here on any realistic
+///         solution — not because the floor is guaranteed to fit, which no rung can be against a budget a
+///         client sets, but because what is left there grows with the authored and structural dimension
+///         while a channel budget does not shrink with it.
+///     </para>
+///     <para>
+///         What still lands here is a budget too small for any answer at all (the suites set 10 tokens), and
+///         it is cut like any other response. The footer names the <em>subject</em> knob because grain is
+///         genuinely spent by then; it does not offer to page the document out through the CLI, which the
+///         served instructions forbid in as many words — a hint at the point of failure outweighs a sentence
+///         in a system prompt, so the two must not disagree.
 ///     </para>
 /// </remarks>
 internal static class ResponseTruncator
@@ -34,18 +42,21 @@ internal static class ResponseTruncator
     // Neither hint names a grain. Both tools coarsen their own grain against this same budget before a
     // response can reach here, so anything that still overruns has already been through the ladder and
     // overview: true would only name a rung it took. What is left in each case is the subject.
+    //
+    // Neither offers to redirect the CLI to a file either, though both once did. A field test caught an agent
+    // quoting that clause back as its reason for abandoning the tool surface and paging the whole document
+    // through the shell — the exact move the served instructions call out by name — so the trailer was the
+    // product contradicting itself, and text at the moment of failure is what a reader acts on.
     private static readonly FrozenDictionary<string, string> NarrowingHints = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [ArchToolNames.Graph] =
             "Narrow the subject rather than read half a survey: the grain ladder is already exhausted, so "
             + "projects: \"<name globs>\" surveys part of the solution and is the knob left. On the CLI, "
-            + "loadbearing graph --projects <globs> --json, or redirect loadbearing graph --json to a file "
-            + "and slice it there.",
+            + "loadbearing graph --projects <globs> --json.",
         [ArchToolNames.Check] =
             "Narrow the subject rather than read half a report: the grain ladder is already exhausted, so "
             + "rules: \"<rule-id globs>\" checks part of the spec and is the knob left — and arch_explain "
-            + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json, or redirect "
-            + "loadbearing check --json to a file and slice it there."
+            + "returns one rule whole. On the CLI, loadbearing check --rules <globs> --json."
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     /// <summary>

@@ -22,10 +22,9 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         what its CLI option produces — and the two budget rows cover the one behaviour with no CLI
 ///         spelling: over the client's declared response budget, <c>arch_graph</c> and <c>arch_check</c>
 ///         each re-render one rung coarser, and what comes back is byte-identical to what that grain's own
-///         flag writes. Each walks the ladder, not one step of it: a budget between the full and overview
-///         documents returns the <c>--overview</c> document, one between overview and skeleton returns the
-///         <c>--skeleton</c> document. That identity is the whole claim, because it is what makes a degraded
-///         answer a complete document rather than a cut one.
+///         flag writes. Each walks the whole ladder, not one step of it: a budget between any two adjacent
+///         rungs returns the coarser one's own document, down to the floor. That identity is the whole
+///         claim, because it is what makes a degraded answer a complete document rather than a cut one.
 ///     </para>
 /// </summary>
 /// <remarks>
@@ -64,7 +63,7 @@ public sealed class CliMcpParityTests
     // asserts on the resulting cap are what keep this honest if the multiple ever moves.
     private const double CharsPerToken = 2.5;
 
-    // The three cold graph documents this suite measures against — one per rung of the grain ladder — each
+    // The four cold graph documents this suite measures against — one per rung of the grain ladder — each
     // produced once. Several rows want more than one of them, and the solution behind them is never mutated
     // here — the diff-base row edits its own TempGitRepo copy — so the same document answers every row.
     // Memoizing the task does not warm anything: the run underneath is still CliRunner.InvokeColdAsync,
@@ -78,7 +77,10 @@ public sealed class CliMcpParityTests
     private static readonly Lazy<Task<CliResult>> ColdGraphSkeleton =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--skeleton"));
 
-    // The three cold check documents, memoized for the same reason and against the same spec every row here
+    private static readonly Lazy<Task<CliResult>> ColdGraphIndex =
+        new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--index"));
+
+    // The four cold check documents, memoized for the same reason and against the same spec every row here
     // binds to. Nothing mutates the solution behind them either — the diff-base row runs against its own
     // TempGitRepo copy — so the same full document answers the parity row and the budget row alike.
     private static readonly Lazy<Task<CliResult>> ColdCheckFull =
@@ -92,6 +94,10 @@ public sealed class CliMcpParityTests
     private static readonly Lazy<Task<CliResult>> ColdCheckSkeleton =
         new(() => CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--skeleton"));
+
+    private static readonly Lazy<Task<CliResult>> ColdCheckIndex =
+        new(() => CliRunner.InvokeColdAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--index"));
 
     [Fact]
     public async Task HarnessA_ViolatedSpec_CheckStatusExplain_MatchCli()
@@ -291,13 +297,34 @@ public sealed class CliMcpParityTests
         mcpCheckSkeleton.ShouldHaveTextContent()
             .NormalizedTrimmed()
             .ShouldBe(cliCheckSkeleton.Out.NormalizedTrimmed());
+
+        // The floor rung is a caller's flag on both surfaces, not a degrade-only state. It has to be: a rung
+        // the server can drop a caller onto but the caller cannot ask for is one no CLI reader can reproduce,
+        // and reproducing a degraded answer at its own grain is the property this whole file exists for.
+        //
+        // arch_graph index ≡ graph --index --json: the project roster, edges as a count.
+        CliResult cliGraphIndex = await ColdGraphIndex.Value;
+        CallToolResult mcpGraphIndex = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["index"] = true }, cancellationToken: Ct);
+        mcpGraphIndex.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliGraphIndex.Out.NormalizedTrimmed());
+
+        // arch_check index ≡ check --index --json: a verdict per rule ID, the prose gone.
+        CliResult cliCheckIndex = await ColdCheckIndex.Value;
+        CallToolResult mcpCheckIndex = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?> { ["index"] = true }, cancellationToken: Ct);
+        mcpCheckIndex.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(cliCheckIndex.Out.NormalizedTrimmed());
     }
 
     [Fact]
     public async Task HarnessG_GraphOverTheResponseBudget_ReturnsExactlyTheCliDocumentForTheGrainItLandsOn()
     {
         await ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
-            "arch_graph", ColdGraph, ColdGraphOverview, ColdGraphSkeleton, result => result.ShouldSucceed());
+            "arch_graph", [ColdGraph, ColdGraphOverview, ColdGraphSkeleton, ColdGraphIndex],
+            result => result.ShouldSucceed());
     }
 
     [Fact]
@@ -309,69 +336,62 @@ public sealed class CliMcpParityTests
         // agent from the tool surface entirely, which is the failure the ladder exists for.
         await ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
             "arch_check",
-            ColdCheckFull,
-            ColdCheckOverview,
-            ColdCheckSkeleton,
+            [ColdCheckFull, ColdCheckOverview, ColdCheckSkeleton, ColdCheckIndex],
             result => result.ShouldReportViolations());
     }
 
     /// <summary>
     ///     Walks <paramref name="tool" /> down the grain ladder a rung at a time and asserts that each answer
-    ///     is byte-identical to the CLI document for the grain it landed on: over a budget between
-    ///     <paramref name="full" /> and <paramref name="overview" /> the tool must return the whole overview
-    ///     document, and over one between <paramref name="overview" /> and <paramref name="skeleton" /> the
-    ///     whole skeleton — nothing cut, so the JSON still parses and the client reads a whole answer rather
-    ///     than half of one. <paramref name="verdict" /> is the exit contract every CLI leg must meet.
+    ///     is byte-identical to the CLI document for the grain it landed on: over a budget between two
+    ///     adjacent <paramref name="rungs" /> the tool must return the whole coarser document — nothing cut,
+    ///     so the JSON still parses and the client reads a whole answer rather than half of one.
+    ///     <paramref name="verdict" /> is the exit contract every CLI leg must meet.
     /// </summary>
     /// <remarks>
-    ///     Both budgets are derived from the CLI documents either side of the rung under test rather than
-    ///     guessed, so this proves the degrade instead of assuming a fixture size. The two calls share one
-    ///     harness on purpose: the tool re-reads the budget per call, so a tighter one takes effect without a
-    ///     second server, and neither call names a grain — the degrade is the server's own decision.
+    ///     Every budget is derived from the CLI documents either side of the rung under test rather than
+    ///     guessed, so this proves the degrade instead of assuming a fixture size — and a rung added below
+    ///     the last one is covered by appending it to <paramref name="rungs" />, never by re-picking a
+    ///     literal. All the calls share one harness on purpose: the tool re-reads the budget per call, so a
+    ///     tighter one takes effect without a second server, and no call names a grain — the degrade is the
+    ///     server's own decision.
     /// </remarks>
+    /// <param name="tool">The tool to call, finest rung first.</param>
+    /// <param name="rungs">The CLI documents, one per rung, ordered finest to coarsest.</param>
+    /// <param name="verdict">The exit contract each CLI leg must meet.</param>
     private static async Task ShouldAnswerEachRungWithThatGrainsCliDocumentAsync(
         string tool,
-        Lazy<Task<CliResult>> full,
-        Lazy<Task<CliResult>> overview,
-        Lazy<Task<CliResult>> skeleton,
+        IReadOnlyList<Lazy<Task<CliResult>>> rungs,
         Action<CliResult> verdict)
     {
         // Arrange
-        CliResult cliFull = await full.Value;
-        CliResult cliOverview = await overview.Value;
-        CliResult cliSkeleton = await skeleton.Value;
-        verdict(cliFull);
-        verdict(cliOverview);
-        verdict(cliSkeleton);
-
-        int tokens = ShouldHaveBudgetBetween(cliFull, cliOverview);
+        List<CliResult> documents = [];
+        foreach (Lazy<Task<CliResult>> rung in rungs)
+        {
+            CliResult document = await rung.Value;
+            verdict(document);
+            documents.Add(document);
+        }
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
-        harness.Environment.SetVariable(
-            LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
 
-        // Act — the plain call, with no grain argument.
-        CallToolResult mcpOverview = await harness.Client.CallToolAsync(tool, cancellationToken: Ct);
+        // Act & Assert — one pass per step down the ladder. The claim is ladder-wide, not overview-shaped:
+        // what comes back is whatever grain the response landed on, spelled exactly as that grain's own flag
+        // spells it.
+        for (var step = 1; step < documents.Count; step++)
+        {
+            int tokens = ShouldHaveBudgetBetween(documents[step - 1], documents[step]);
+            harness.Environment.SetVariable(
+                LoadBearingEnvVars.MaxMcpOutputTokens, tokens.ToString(CultureInfo.InvariantCulture));
 
-        // Assert — a complete document at coarser grain, byte-identical to what --overview writes.
-        string text = mcpOverview.ShouldHaveTextContent();
-        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        text.NormalizedTrimmed()
-            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
+            // The plain call, with no grain argument.
+            CallToolResult degraded = await harness.Client.CallToolAsync(tool, cancellationToken: Ct);
 
-        // The rung below, on the same harness: the claim is ladder-wide, not overview-shaped — what comes
-        // back is whatever grain the response landed on, spelled exactly as that grain's own flag spells it.
-        int skeletonTokens = ShouldHaveBudgetBetween(cliOverview, cliSkeleton);
-
-        harness.Environment.SetVariable(
-            LoadBearingEnvVars.MaxMcpOutputTokens, skeletonTokens.ToString(CultureInfo.InvariantCulture));
-        CallToolResult mcpSkeleton = await harness.Client.CallToolAsync(tool, cancellationToken: Ct);
-
-        string skeletonText = mcpSkeleton.ShouldHaveTextContent();
-        skeletonText.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        skeletonText.NormalizedTrimmed()
-            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+            string text = degraded.ShouldHaveTextContent();
+            text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
+            text.NormalizedTrimmed()
+                .ShouldBe(documents[step].Out.NormalizedTrimmed());
+        }
     }
 
     /// <summary>

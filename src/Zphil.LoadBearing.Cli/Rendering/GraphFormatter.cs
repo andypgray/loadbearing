@@ -29,12 +29,17 @@ internal static class GraphFormatter
     private const string SkeletonShadowedElisionLine =
         "  (elided at skeleton grain — rerun without --skeleton for the shadowed type names)";
 
+    private const string IndexProjectEdgeElisionLine =
+        "  (elided at index grain — rerun without --index for the observed project references)";
+
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them: the namespace inventory becomes one elision line at overview grain, the external references
-    ///     and the multiply-declared types become elision lines at skeleton grain, and no section ever
-    ///     disappears. A section with nothing to elide keeps its <c>(none)</c> instead, which is why a
-    ///     healthy solution's skeleton still says outright that no type is declared twice.
+    ///     and the multiply-declared types become elision lines at skeleton grain, the observed project
+    ///     references become one at index grain — where the roster lines also shed what each project
+    ///     declares and targets — and no section ever disappears. A section with nothing to elide keeps its
+    ///     <c>(none)</c> instead, which is why a healthy solution's skeleton still says outright that no type
+    ///     is declared twice.
     /// </summary>
     /// <param name="summary">The survey to format.</param>
     /// <param name="solutionName">The solution's file name, for the heading.</param>
@@ -54,7 +59,7 @@ internal static class GraphFormatter
         var lines = new List<string> { $"Codebase survey: {solutionName}", "" };
 
         lines.Add($"Projects ({summary.Projects.Count}):");
-        lines.AddRange(summary.Projects.Select(ProjectLine));
+        lines.AddRange(summary.Projects.Select(project => ProjectLine(project, grain)));
         lines.Add("");
 
         lines.Add("Projects the solution declares that this survey does not cover:");
@@ -62,7 +67,7 @@ internal static class GraphFormatter
         lines.Add("");
 
         lines.Add("Observed project references (distinct type pairs):");
-        lines.AddRange(ProjectEdgeLines(summary));
+        lines.AddRange(ProjectEdgeLines(summary, grain));
         lines.Add("");
 
         lines.Add("Types declared by more than one project:");
@@ -107,13 +112,20 @@ internal static class GraphFormatter
     // no easier to find. An unread membership says nothing at all, for the same reason it serializes absent.
     // The framework clause follows that same rule: one project file, one compilation is the unremarkable
     // case, so only the project that arrived as several says so.
-    private static string ProjectLine(ProjectSummary project)
+    private static string ProjectLine(ProjectSummary project, DocumentGrain grain)
     {
-        string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
         string membership = project.SolutionMember == false ? " (not a solution member)" : "";
         string generated = project.Generated > 0 ? $" ({project.Generated} generated)" : "";
-        return $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}{generated}; "
-               + $"{FrameworksClause(project)}references: {references}";
+        var line = $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}{generated}";
+
+        // At index grain the line stops here, matching what the document's own row keeps: a project's name,
+        // whether the solution declares it, and how big it is. What it declares and what it targets are
+        // both qualifiers on that, and both multiply by the project count on the one rung whose whole job is
+        // to stay proportional to the roster.
+        if (grain >= DocumentGrain.Index) return line;
+
+        string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
+        return $"{line}; {FrameworksClause(project)}references: {references}";
     }
 
     // "targets net10.0, netstandard2.0 (shared types from net10.0); " — the frameworks in extraction order,
@@ -147,8 +159,15 @@ internal static class GraphFormatter
         return $"{@namespace.Namespace} ({@namespace.Types}, {qualifier})";
     }
 
-    private static IEnumerable<string> ProjectEdgeLines(GraphSummary summary)
+    // The last section to elide, and the one that decides where the ladder stops: observed edges are the
+    // survey's remaining codebase-scaled array once the namespaces and external rows are gone. Unlike the two
+    // coverage statements below it, an empty edge list is not a finding worth keeping at every grain — a
+    // solution whose projects never reference each other still reads truthfully from the roster — so this
+    // section takes the ordinary rule and elides whether or not it has rows.
+    private static IEnumerable<string> ProjectEdgeLines(GraphSummary summary, DocumentGrain grain)
     {
+        if (grain >= DocumentGrain.Index) return [IndexProjectEdgeElisionLine];
+
         return summary.ProjectEdges.Count > 0
             ? summary.ProjectEdges.Select(e => $"  {e.Source} -> {e.Target}: {e.References}")
             : ["  (none)"];

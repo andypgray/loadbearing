@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Mcp.Pipeline;
 using Zphil.LoadBearing.Cli.Pipeline;
+using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Roslyn.Hosting;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 
@@ -10,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// <summary>
 ///     The two fitters and the budget behind them — the machinery that decides which rung of a runner's
 ///     coarsening ladder a caller actually gets, held here in isolation from any runner so the rungs can be
-///     plain strings of known length.
+///     plain strings of known length. The two ladder rows are the exception and the other half of the same
+///     question: which rungs a runner offers at all, and that the walk ends at the floor.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -100,6 +102,53 @@ public sealed class ResponseFitterTests
         // Assert — the whole ladder was walked, and what comes back is the smallest whole document there is.
         fitted.ShouldBe("12");
         composed.ShouldBe(["12345678", "1234", "12"]);
+    }
+
+    [Fact]
+    public void Ladder_FromFullGrain_OffersEveryRungDownToIndexAndStopsThere()
+    {
+        // Arrange — the rows above use plain strings because a fitter knows nothing about grain. This one
+        // pins the other half: which rungs a runner actually offers. The loop bound is the single place the
+        // ladder's last rung is named — every other comparison in the product is a >= against the rung whose
+        // elision it guards — so a rung added below the floor reaches production through this one line, and
+        // a bound left behind makes the new rung unreachable by degrading while every explicit-flag test
+        // still passes.
+        List<DocumentGrain> composed = [];
+
+        // Act
+        List<string> rungs = DocumentGrains.Ladder(
+                DocumentGrain.Full,
+                at =>
+                {
+                    composed.Add(at);
+                    return DocumentGrains.Wire(at) ?? "full";
+                })
+            .ToList();
+
+        // Assert
+        rungs.ShouldBe(["full", "overview", "skeleton", "index"]);
+        composed.ShouldBe([DocumentGrain.Full, DocumentGrain.Overview, DocumentGrain.Skeleton, DocumentGrain.Index]);
+    }
+
+    [Fact]
+    public void Ladder_FromTheFloorRung_YieldsThatRungAndNothingElse()
+    {
+        // Arrange — a caller who names the coarsest grain still gets an answer, and the ladder does not spin.
+        List<DocumentGrain> composed = [];
+
+        // Act
+        List<string> rungs = DocumentGrains.Ladder(
+                DocumentGrain.Index,
+                at =>
+                {
+                    composed.Add(at);
+                    return DocumentGrains.Wire(at) ?? "full";
+                })
+            .ToList();
+
+        // Assert
+        rungs.ShouldBe(["index"]);
+        composed.ShouldBe([DocumentGrain.Index]);
     }
 
     [Fact]

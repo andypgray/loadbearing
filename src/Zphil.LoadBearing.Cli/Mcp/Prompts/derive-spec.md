@@ -22,9 +22,9 @@ Work the steps in order. Do not skip the curation gate.
 - Everything here uses the read-only tools (`arch_graph`, `arch_check`, `arch_explain`,
   `arch_status`) or their identical CLI verbs (`loadbearing graph|check|explain|status`, add
   `--json` for the same documents). Prefer the tools: they are already bound to the solution,
-  the workspace stays warm between calls, and their narrowing parameters (`overview` and
-  `skeleton` for grain, `projects` for scope on the survey, `rules` on the check) keep a big
-  solution's answer a complete document rather than a truncated one. The CLI verbs are for when a document belongs in a
+  the workspace stays warm between calls, and their narrowing parameters (`overview`,
+  `skeleton` and `index` for grain, `projects` for scope on the survey, `rules` on the check)
+  keep a big solution's answer a complete document rather than a truncated one. The CLI verbs are for when a document belongs in a
   file. They take the solution path as their first argument — `loadbearing graph MyApp.sln
   --json` — or walk up from the working directory when omitted (`explain` differs: its rule
   ID comes first, the solution second — `loadbearing explain area/rule MyApp.sln`). The two
@@ -128,21 +128,27 @@ external row survives. At skeleton grain — `skeleton: true`, or the server's s
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
 and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
 `externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
-edges stay. `unsupportedProjects[]` survives every rung whole, having no count key at all. A
-project's own `generated` survives every rung too, riding its row, and the framework pair
-(`targetFrameworks`, `factsFollow`) rides the row the same way; only the per-namespace
-`generated` goes, with the inventory that carries it — so at any grain you can still see which
-projects are mostly generator output, and drop to full grain to see which namespaces. Read the
-stamp: a survey with no `grain` is the complete one. An absent coverage key with no count beside
-it means the solution has none; the count key is what tells elision from absence.
+edges stay. At index grain — `index: true`, the ladder's floor — it stamps `"grain": "index"`
+and keeps the roster alone: every project's `name`, `solutionMember` and `types`, with its
+`projectReferences` and framework pair gone and `projectEdges[]` reported as
+`projectEdgeCount`. That is the list `projects` globs match, so a survey that degrades this
+far hands you the argument for the next call. `unsupportedProjects[]` survives every rung
+whole, having no count key at all, and so does a project's own `generated`, riding its row;
+the framework pair (`targetFrameworks`, `factsFollow`) rides it the same way down to skeleton.
+Only the per-namespace `generated` goes with the inventory that carries it — so at any grain
+you can still see which projects are mostly generator output, and drop to full grain to see
+which namespaces. Read the stamp: a survey with no `grain` is the complete one. An absent
+coverage key with no count beside it means the solution has none; the count key is what tells
+elision from absence.
 
 Scope is the other axis. `projects` (name globs) narrows the survey and stamps
 `projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
 outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of its declarers is
 in scope. A `shadowedTypes[]` entry survives on either end too — its declaring project, or any
 project binding the assembly. `unsupportedProjects[]` does not scope either: it is a fact about
-the load rather than about the roster. On a solution too big to survey whole even at skeleton
-grain, scope is the knob left — grain has nowhere further to go.
+the load rather than about the roster. On a solution too big to survey whole even at index
+grain, scope is the knob left — grain has nowhere further to go, and the index document you
+are holding names every project you can scope to.
 
 From the survey, write down **hypotheses, not conclusions**:
 
@@ -408,8 +414,9 @@ pay a workspace load each time (a clean tree with a valid extraction cache skips
 big solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules:
 "data-access/*"`; the CLI twin is `--rules`), so the evidence pass can walk the draft area
 by area with every response a complete document, and `arch_explain` returns one rule whole.
-When you want the report entire, redirect the CLI to a file — `loadbearing check MyApp.sln
---json > check.json` — and slice it there.
+You never have to page a report out to read it entire: over your client's budget it comes
+back whole at a coarser grain rather than cut, down to `index` — every rule ID with its
+verdict and violation count, which is the menu those globs pick from.
 
 ## 5. Assign postures from the evidence
 

@@ -26,6 +26,14 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         elided levels were chosen by measurement — the bulk of each document is the array that scales with
 ///         the codebase rather than with the spec.
 ///     </para>
+///     <para>
+///         <see cref="Index" /> is where that reasoning ends: every rung above it still carries something
+///         that scales with the codebase, and it carries nothing that does. What survives it is the roster —
+///         every project name, every rule id — which scales with the authored and structural dimension
+///         alone, so no realistic solution reaches the truncator through it. That is what makes the floor
+///         rung the narrowing menu as well as the smallest answer: the arguments <c>--projects</c> and
+///         <c>--rules</c> take are exactly what it lists.
+///     </para>
 /// </remarks>
 internal enum DocumentGrain
 {
@@ -48,7 +56,16 @@ internal enum DocumentGrain
     ///     latter replaced by its count. In the report: every rule with its prose and verdict, its violations
     ///     replaced by their count.
     /// </summary>
-    Skeleton = 2
+    Skeleton = 2,
+
+    /// <summary>
+    ///     The roster only — the ladder's floor, and the narrowing menu. In the survey: every project by
+    ///     name, with its solution membership and type counts, its observed edges replaced by their count;
+    ///     declared references and frameworks go with the rest. In the report: every rule by id, with its
+    ///     posture, verdict, baseline, warnings and violation count; the prose goes. Both keep every trust
+    ///     stamp and every roll-up, because those bound the answer rather than fill it.
+    /// </summary>
+    Index = 3
 }
 
 /// <summary>
@@ -60,12 +77,13 @@ internal enum DocumentGrain
 internal static class DocumentGrains
 {
     /// <summary>
-    ///     The grain a caller's two flags name. The coarsest wins: they are a floor on detail rather than
-    ///     competing modes, so passing both asks for the coarser one instead of being an error worth
+    ///     The grain a caller's three flags name. The coarsest wins: they are a floor on detail rather than
+    ///     competing modes, so passing several asks for the coarsest one instead of being an error worth
     ///     refusing over.
     /// </summary>
-    public static DocumentGrain Coarsest(bool overview, bool skeleton)
+    public static DocumentGrain Coarsest(bool overview, bool skeleton, bool index)
     {
+        if (index) return DocumentGrain.Index;
         if (skeleton) return DocumentGrain.Skeleton;
 
         return overview ? DocumentGrain.Overview : DocumentGrain.Full;
@@ -78,13 +96,15 @@ internal static class DocumentGrains
     /// <remarks>
     ///     Lazy on purpose: each rung costs a full serialization of the document, so a fitter that stops at
     ///     the first pays for exactly one. The ladder cannot spin — every rung is strictly coarser than the
-    ///     one before it, and <see cref="DocumentGrain.Skeleton" /> is last.
+    ///     one before it, and <see cref="DocumentGrain.Index" /> is last. This bound is the only place the
+    ///     last rung is named: every other comparison in the product is a <c>&gt;=</c> against the rung whose
+    ///     elision it guards, so a new rung below reaches them all unedited.
     /// </remarks>
     /// <param name="floor">The grain the caller asked for: the finest rung offered, and always yielded.</param>
     /// <param name="compose">Composes the whole document at one grain.</param>
     public static IEnumerable<string> Ladder(DocumentGrain floor, Func<DocumentGrain, string> compose)
     {
-        for (DocumentGrain at = floor; at <= DocumentGrain.Skeleton; at++) yield return compose(at);
+        for (DocumentGrain at = floor; at <= DocumentGrain.Index; at++) yield return compose(at);
     }
 
     /// <summary>
@@ -98,6 +118,7 @@ internal static class DocumentGrains
         {
             DocumentGrain.Overview => "overview",
             DocumentGrain.Skeleton => "skeleton",
+            DocumentGrain.Index => "index",
             _ => null
         };
     }

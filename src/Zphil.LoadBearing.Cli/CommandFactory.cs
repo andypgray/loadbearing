@@ -81,6 +81,14 @@ internal static class CommandFactory
                 + "prose, status, baseline and warnings, its violations replaced by their count. Coarser "
                 + "than --overview, and still not narrower."
         };
+        Option<bool> index = new("--index")
+        {
+            Description =
+                "Summarize the --json report at index grain: a verdict per rule ID — posture, status, "
+                + "baseline, warnings and violation count — with the rule's prose and the workspace "
+                + "diagnostics elided (workspaceDiagnosticCount says how many) and every trust stamp kept. "
+                + "The coarsest grain, and the menu --rules globs pick from; still not narrower."
+        };
         Option<bool> noCache = NoCacheOption();
         Option<string?> binlog = BinlogOption();
 
@@ -98,6 +106,7 @@ internal static class CommandFactory
             rules,
             overview,
             skeleton,
+            index,
             noCache,
             binlog
         };
@@ -115,7 +124,8 @@ internal static class CommandFactory
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(sarif),
                 parseResult.GetValue(rules),
-                DocumentGrains.Coarsest(parseResult.GetValue(overview), parseResult.GetValue(skeleton))),
+                DocumentGrains.Coarsest(
+                    parseResult.GetValue(overview), parseResult.GetValue(skeleton), parseResult.GetValue(index))),
             (request, output, error, ct) =>
                 MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
 
@@ -375,6 +385,14 @@ internal static class CommandFactory
                 + "external references are both elided, the latter reported as a count. Coarser than "
                 + "--overview, and still not narrower."
         };
+        Option<bool> index = new("--index")
+        {
+            Description =
+                "Summarize at index grain: the project roster only — every project with its solution "
+                + "membership and type count, its declared references and target frameworks elided, and the "
+                + "observed edges and workspace diagnostics each reported as a count. The coarsest grain, "
+                + "and the menu --projects globs pick from; still not narrower."
+        };
         Option<string?> projects = new("--projects")
         {
             Description =
@@ -398,6 +416,7 @@ internal static class CommandFactory
             binlog,
             overview,
             skeleton,
+            index,
             projects
         };
 
@@ -410,7 +429,8 @@ internal static class CommandFactory
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
                 parseResult.GetValue(allowWorkspaceDiagnostics),
-                DocumentGrains.Coarsest(parseResult.GetValue(overview), parseResult.GetValue(skeleton)),
+                DocumentGrains.Coarsest(
+                    parseResult.GetValue(overview), parseResult.GetValue(skeleton), parseResult.GetValue(index)),
                 parseResult.GetValue(projects)),
             (request, output, error, ct) =>
                 MsBuildGate.RunGraphAsync(request, output, error, hostSource, environment, ct));

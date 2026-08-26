@@ -265,6 +265,20 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpecIndexJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--index");
+
+        // Assert — the ladder's floor: a verdict per rule ID, with the prose gone and everything a next call
+        // needs still here. It is not a smaller skeleton for the same reader — it is what a client whose
+        // channel cannot hold the skeleton gets instead of a document cut mid-array.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-index.json");
+    }
+
+    [Fact]
     public async Task Check_OverviewAndSkeletonTogether_TakesTheCoarserGrain()
     {
         // Arrange & Act — the two name a floor on detail rather than competing modes, so asking for both is
@@ -276,6 +290,20 @@ public sealed class CheckCommandE2ETests
         // Assert
         result.ShouldReportViolations();
         result.Out.ShouldMatchGolden("violated-check-skeleton.json");
+    }
+
+    [Fact]
+    public async Task Check_EveryGrainFlagTogether_TakesTheCoarsestOfThem()
+    {
+        // Arrange & Act — the coarsest-wins rule holds however many flags arrive, which is what keeps a
+        // third rung from turning the mapper into a precedence puzzle.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--overview",
+            "--skeleton", "--index");
+
+        // Assert
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-index.json");
     }
 
     [Fact]

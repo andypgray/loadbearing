@@ -148,8 +148,10 @@ public sealed class GlobalCallToolFilterTests
     public async Task CallTool_GraphOverBudgetAtEveryGrain_TruncatesWithTheNarrowingHint()
     {
         // Arrange — a 10-token budget (25-char cap) no survey can fit at any grain, so arch_graph walks the
-        // whole ladder down to skeleton and the truncator still fires. That is the backstop case, and the one
-        // that has to teach: with grain exhausted, the footer names the knob that is actually left.
+        // whole ladder down to its floor and the truncator still fires. That is the backstop case, and the
+        // one that has to teach: with grain exhausted, the footer names the knob that is actually left. It
+        // takes a budget this absurd to reach here now — the floor rung is a project roster, which grows
+        // with the solution rather than the codebase.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
         harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "10");

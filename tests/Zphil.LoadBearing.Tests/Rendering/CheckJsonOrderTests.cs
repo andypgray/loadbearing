@@ -107,6 +107,80 @@ public sealed class CheckJsonOrderTests
         ShouldSerializeBefore(StampedDocument, "rules", "workspaceDiagnostics");
     }
 
+    [Fact]
+    public void Document_IndexGrain_ElidesTheDiagnosticStreamToItsCountAndKeepsEveryTrustStamp()
+    {
+        // The slot's other consequence, and the one a field re-proof found the hard way: "no ceiling" is not
+        // a figure of speech. On a 9-project bed whose package-audit feed was unreachable this array was
+        // 86,518 characters beside a 2,709-character rule list — 96% of the document, at EVERY grain — so a
+        // ladder that elided everything else still could not fit a channel. It is the last thing the floor
+        // rung drops, and it can be dropped because its actionable half is keyed above it.
+        string index = Render(DocumentGrain.Index);
+
+        index.ShouldNotContain("\"workspaceDiagnostics\"");
+        index.ShouldContain("\"workspaceDiagnosticCount\": 1");
+        foreach (string stamp in
+                 new[]
+                 {
+                     "modelIncomplete", "failedProjects", "uncheckedProjects", "restoreFailedProjects",
+                     "unsupportedProjects", "multiTargetedProjects", "summary"
+                 })
+            index.ShouldContain($"\"{stamp}\"");
+    }
+
+    [Fact]
+    public void Document_EveryGrainAboveTheFloor_KeepsTheDiagnosticStreamWhole()
+    {
+        // The elision is the floor rung's alone. A reader who can hold a skeleton gets MSBuild's words in
+        // full, because at that grain they are affordable and they are the only place the load's own account
+        // of itself survives.
+        foreach (DocumentGrain grain in new[] { DocumentGrain.Full, DocumentGrain.Overview, DocumentGrain.Skeleton })
+        {
+            string document = Render(grain);
+
+            document.ShouldContain("\"workspaceDiagnostics\"");
+            document.ShouldNotContain("\"workspaceDiagnosticCount\"");
+        }
+    }
+
+    [Fact]
+    public void Document_IndexGrainWithACleanLoad_CarriesNeitherTheStreamNorABareZero()
+    {
+        // A count of nothing is a key that says nothing. The elision reports what it dropped, so with
+        // nothing to drop it reports nothing — the rule every other <key>Count on these documents takes.
+        string index = JsonReportRenderer.Document(
+            report: WebOpensData,
+            solutionDirectory: Directory.GetCurrentDirectory(),
+            solutionName: "S.sln",
+            specAssembly: "Spec.dll",
+            diffBase: null,
+            workspaceDiagnostics: [],
+            diagnostics: new WorkspaceDiagnostics([], [], [], [], [], [], []),
+            rulesFilter: [],
+            grain: DocumentGrain.Index);
+
+        index.ShouldNotContain("\"workspaceDiagnosticCount\"");
+    }
+
+    // The stamped document at one grain — same inputs as StampedDocument, which is this one at Full.
+    private static string Render(DocumentGrain grain)
+    {
+        return JsonReportRenderer.Document(
+            report: WebOpensData,
+            solutionDirectory: Directory.GetCurrentDirectory(),
+            solutionName: "S.sln",
+            specAssembly: "Spec.dll",
+            diffBase: null,
+            workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
+            diagnostics: new WorkspaceDiagnostics(
+                [], [], ["App.Web/App.Web.csproj"], ["App.Reports/App.Reports.csproj"],
+                ["App.Data/App.Data.csproj"],
+                [new UnsupportedProject("App.Signals/App.Signals.fsproj", UnsupportedProjectKind.NotCsharp)],
+                [new MultiTargetedProject("App.Shared", ["net10.0", "netstandard2.0"], "net10.0")]),
+            rulesFilter: ["layer/*"],
+            grain: grain);
+    }
+
     // The document from `rules` onward. Several key names appear both in the roll-up summary and inside a
     // rule, and ShouldHaveKeyAt reads the first occurrence — so an ordering claim about two keys of one rule
     // has to be made where only the rules are.

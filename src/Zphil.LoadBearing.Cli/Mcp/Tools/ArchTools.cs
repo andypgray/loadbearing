@@ -34,8 +34,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
         "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
         "only those. " +
-        "Narrow with overview or skeleton (coarser grain) or rules (fewer rules); an over-budget report " +
-        "coarsens its own grain, as far as skeleton, rather than being cut. " +
+        "Narrow with overview, skeleton or index (coarser grain) or rules (fewer rules); an over-budget " +
+        "report coarsens its own grain, as far as index, rather than being cut — and index lists every rule " +
+        "ID, which is what rules globs match. " +
         "subjectTypes/subjectGeneratedTypes appear together on a rule whose subject contained generator " +
         "output, pass or fail: how many types it swept and how many nobody wrote. Both absent means none " +
         "were. Narrowing the rule with .Authored() removes them. " +
@@ -94,8 +95,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
         "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
         "them rather than a survey missing them or missing their external edges. " +
-        "Narrow with overview or skeleton (coarser grain) or projects (fewer projects); an over-budget survey " +
-        "coarsens its own grain, as far as skeleton, rather than being cut. " +
+        "Narrow with overview, skeleton or index (coarser grain) or projects (fewer projects); an " +
+        "over-budget survey coarsens its own grain, as far as index, rather than being cut — and index lists " +
+        "every project name, which is what projects globs match. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never loaded — " +
         "a project absent from the survey may simply be out of view. unsupportedProjects is the third " +
         "coverage key and the one that bounds the survey's subject: the declared projects this product " +
@@ -126,6 +128,13 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "violationCount (always present) still says how many. Coarser than overview, still not a "
             + "narrower subject.")]
         bool skeleton = false,
+        [Description(
+            "Elide the rule prose too — sentence, because and fix — and the workspaceDiagnostics stream "
+            + "(workspaceDiagnosticCount says how many), keeping every rule's id, posture, status, "
+            + "baseline, warnings and violationCount, and every trust stamp. The coarsest grain, and the "
+            + "menu the rules parameter picks from; arch_explain returns any of these ids whole. Still not "
+            + "a narrower subject.")]
+        bool index = false,
         CancellationToken cancellationToken = default)
     {
         // Exit code and error writer deliberately discarded — everything they would carry is in the document.
@@ -143,7 +152,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // dump with no ceiling, so a legacy migration burndown scales it without limit.
         return await CaptureAsync(output => new CheckRunner(output, TextWriter.Null, source, fitter: fitter)
             .RunAsync(
-                binding.CheckRequest(diffBase, rules, DocumentGrains.Coarsest(overview, skeleton)),
+                binding.CheckRequest(diffBase, rules, DocumentGrains.Coarsest(overview, skeleton, index)),
                 cancellationToken));
     }
 
@@ -223,6 +232,13 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "narrower subject.")]
         bool skeleton = false,
         [Description(
+            "Elide each project's declared references and target frameworks too, the observed project edges "
+            + "with them (projectEdgeCount says how many), and the workspaceDiagnostics stream "
+            + "(workspaceDiagnosticCount likewise), keeping every project's name, solution membership and "
+            + "type count, and every trust stamp. The coarsest grain, and the menu the projects parameter "
+            + "picks from. Still not a narrower subject.")]
+        bool index = false,
+        [Description(
             "Project-name globs, semicolon-separated ('*' allowed). References in both directions are "
             + "kept, so an edge can name a project outside the scope. Matching no project is an error listing "
             + "the available names.")]
@@ -242,7 +258,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         return await CaptureAsync(output => new GraphRunner(output, TextWriter.Null, source, fitter: fitter)
             .RunAsync(
                 binding.GraphRequest(
-                    allowWorkspaceDiagnostics, DocumentGrains.Coarsest(overview, skeleton), projects),
+                    allowWorkspaceDiagnostics, DocumentGrains.Coarsest(overview, skeleton, index), projects),
                 cancellationToken));
     }
 

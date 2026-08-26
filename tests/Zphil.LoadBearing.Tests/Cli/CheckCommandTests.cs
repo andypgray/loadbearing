@@ -67,12 +67,15 @@ public sealed class CheckCommandTests
     {
         // Arrange — one step is not enough. Sites are the first bulk but not the only one: a spec with many
         // rules over a codebase with many violations overruns again at overview, and stopping there would
-        // hand the truncator exactly the document the ladder exists to avoid producing.
+        // hand the truncator exactly the document the ladder exists to avoid producing. The budget is the
+        // skeleton's own size rather than a round number, because a round number stops naming this rung the
+        // moment a coarser one is added below it.
         var degraded = new StringWriter();
         var skeleton = new StringWriter();
+        int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
 
         // Act
-        await Runner(degraded, FixedResponseBudget.Fitter(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(skeletonLength))
             .RunAsync(Request(), Ct);
         await Runner(skeleton)
             .RunAsync(Request(DocumentGrain.Skeleton), Ct);
@@ -92,9 +95,10 @@ public sealed class CheckCommandTests
         // Arrange — a caller naming a grain is declaring a floor on detail, not opting out of their own
         // transport's budget. Which is what an MCP client does the moment a report is large.
         var degraded = new StringWriter();
+        int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
 
         // Act
-        await Runner(degraded, FixedResponseBudget.Fitter(500))
+        await Runner(degraded, FixedResponseBudget.Fitter(skeletonLength))
             .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert
@@ -194,10 +198,12 @@ public sealed class CheckCommandTests
     }
 
     [Fact]
-    public async Task Check_BudgetBelowEvenTheSkeleton_TruncatesAndNamesTheSubjectKnob()
+    public async Task Check_BudgetBelowEvenTheSkeleton_DegradesToIndexRatherThanTruncating()
     {
-        // Arrange — the ladder's floor, pinned so it stays a known limit rather than a surprise. Below the
-        // coarsest grain there is no rung left, so the backstop fires like it does for any other response.
+        // Arrange — the case the field found and this rung answers. A Spectre.Console bed's report was 67,909
+        // characters against a 62,500 budget, so the ladder ran out and the report came back cut; the agent
+        // that received it ran whole-document CLI checks instead and never called the tool again. One
+        // character below the skeleton is the same condition in miniature.
         int belowSkeleton = await LengthAt(DocumentGrain.Skeleton) - 1;
         var output = new StringWriter();
 
@@ -208,12 +214,102 @@ public sealed class CheckCommandTests
             .TrimEnd('\r', '\n');
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowSkeleton);
 
+        // Assert — a whole report at the floor rung, untouched by the truncator behind it.
+        afterTruncation.ShouldBe(document);
+        afterTruncation.ShouldNotContain("RESPONSE TRUNCATED");
+        using JsonDocument parsed = JsonDocument.Parse(afterTruncation);
+        parsed.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("index");
+    }
+
+    [Fact]
+    public async Task Check_BudgetBelowEvenTheIndex_TruncatesAndNamesTheSubjectKnob()
+    {
+        // Arrange — the ladder's floor, pinned so it stays a known limit rather than a surprise. Below the
+        // coarsest grain there is no rung left, so the backstop fires like it does for any other response.
+        // What reaches here is a budget too small for a list of rule IDs, not a large spec.
+        int belowIndex = await LengthAt(DocumentGrain.Index) - 1;
+        var output = new StringWriter();
+
+        // Act
+        await Runner(output, FixedResponseBudget.Fitter(belowIndex))
+            .RunAsync(Request(), Ct);
+        string document = output.ToString()
+            .TrimEnd('\r', '\n');
+        string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowIndex);
+
         // Assert — cut, and the hint names the one knob still worth reaching for. Naming a grain here would
         // send a reader back down a ladder the report has already walked to the bottom of.
         afterTruncation.ShouldContain("RESPONSE TRUNCATED");
         afterTruncation.ShouldContain("Narrow the subject");
         afterTruncation.ShouldContain("rules:");
         afterTruncation.ShouldNotContain("overview:");
+    }
+
+    [Fact]
+    public async Task Check_IndexGrain_NamesEveryRuleWithItsVerdictAndDropsOnlyTheProse()
+    {
+        // Arrange — what the floor rung is for. Skeleton keeps the prose because that is what makes it a
+        // verdict a reader can act on; index is not competing with skeleton for that reader, it is competing
+        // with a cut document. What survives is the menu the next call needs: the ids rules globs match, and
+        // the ids arch_explain expands one at a time — prose and all.
+        var index = new StringWriter();
+        var skeleton = new StringWriter();
+
+        // Act
+        await Runner(index)
+            .RunAsync(Request(DocumentGrain.Index), Ct);
+        await Runner(skeleton)
+            .RunAsync(Request(DocumentGrain.Skeleton), Ct);
+
+        // Assert
+        using JsonDocument indexDocument = JsonDocument.Parse(index.ToString());
+        using JsonDocument skeletonDocument = JsonDocument.Parse(skeleton.ToString());
+
+        RuleIds(indexDocument)
+            .ShouldBe(RuleIds(skeletonDocument));
+        foreach (JsonElement rule in indexDocument.RootElement.GetProperty("rules")
+                     .EnumerateArray())
+        {
+            rule.GetProperty("status")
+                .GetString()
+                .ShouldNotBeNullOrEmpty();
+            rule.GetProperty("violationCount")
+                .GetInt32()
+                .ShouldBeGreaterThanOrEqualTo(0);
+            rule.TryGetProperty("sentence", out _)
+                .ShouldBeFalse();
+            rule.TryGetProperty("because", out _)
+                .ShouldBeFalse();
+            rule.TryGetProperty("fix", out _)
+                .ShouldBeFalse();
+        }
+
+        // And the counts never move with the grain, at this rung as at every other.
+        indexDocument.RootElement.GetProperty("summary")
+            .GetRawText()
+            .ShouldBe(
+                skeletonDocument.RootElement.GetProperty("summary")
+                    .GetRawText());
+    }
+
+    [Fact]
+    public async Task Check_ExplicitIndexOverTheBudget_DegradesNothingFurther()
+    {
+        // Arrange — the floor is the floor from both directions: a caller who names it and still overruns
+        // gets it anyway, rather than the ladder spinning or the runner inventing a coarser answer.
+        var output = new StringWriter();
+
+        // Act
+        await Runner(output, FixedResponseBudget.Fitter(1))
+            .RunAsync(Request(DocumentGrain.Index), Ct);
+
+        // Assert
+        using JsonDocument document = JsonDocument.Parse(output.ToString());
+        document.RootElement.GetProperty("grain")
+            .GetString()
+            .ShouldBe("index");
     }
 
     // The runner directly, because the response budget has no CLI spelling. No fitter is the CLI's own

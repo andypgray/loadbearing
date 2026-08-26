@@ -32,10 +32,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// <param name="SpecAssembly">The spec DLL's file name — which spec's rules answered.</param>
 /// <param name="Grain">
 ///     <c>overview</c> when each violation's sites were elided, <c>skeleton</c> when the violations went with
-///     them, or null (omitted) at full grain — so a document that says nothing about grain is the complete
-///     one, and a consumer can tell a coarser report from a cleaner solution without diffing it. A coarser
-///     report is never a narrower one: every rule the run selected is here at every rung, with its verdict
-///     and its prose, which is what makes an automatic degrade safe on a surface the caller cannot re-ask.
+///     them, <c>index</c> when the report is down to a verdict per rule id, or null (omitted) at full grain —
+///     so a document that says nothing about grain is the complete one, and a consumer can tell a coarser
+///     report from a cleaner solution without diffing it. A coarser report is never a narrower one: every
+///     rule the run selected is here at every rung, with its verdict, which is what makes an automatic
+///     degrade safe on a surface the caller cannot re-ask.
 /// </param>
 /// <param name="DiffBase">
 ///     The git ref the Quarantine tripwire compared against, or null (omitted) when the run took no diff.
@@ -107,7 +108,19 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </param>
 /// <param name="Rules">One entry per rule the run selected, present at every grain.</param>
 /// <param name="WorkspaceDiagnostics">
-///     MSBuild's own words about the load — evidence rather than verdict; empty on a clean load.
+///     MSBuild's own words about the load — evidence rather than verdict; empty on a clean load, and null
+///     (omitted) at index grain where <see cref="WorkspaceDiagnosticCount" /> stands in. One entry per
+///     project per framework per complaint, so it is the one array on this document with no ceiling that is
+///     not a function of the spec: measured on a 9-project bed it was 86,518 characters beside a
+///     2,709-character rule list. Eliding it at the floor rung costs a reader nothing they cannot get back —
+///     its actionable half is already keyed in <see cref="FailedProjects" /> and
+///     <see cref="RestoreFailedProjects" />, and <see cref="ModelIncomplete" /> still says the verdict was
+///     reached against a partial model.
+/// </param>
+/// <param name="WorkspaceDiagnosticCount">
+///     How many diagnostics the elision dropped, present only when <see cref="WorkspaceDiagnostics" /> is
+///     elided at index grain and there were some — never a bare <c>0</c>, so a clean load's report loses a
+///     key that said nothing rather than gaining one.
 /// </param>
 internal sealed record CheckJson(
     int SchemaVersion,
@@ -124,7 +137,8 @@ internal sealed record CheckJson(
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
     SummaryJson Summary,
     IReadOnlyList<RuleJson> Rules,
-    IReadOnlyList<string> WorkspaceDiagnostics);
+    IReadOnlyList<string>? WorkspaceDiagnostics,
+    int? WorkspaceDiagnosticCount);
 
 /// <summary>
 ///     One rule's result. <see cref="Baseline" /> is populated for ratcheted rules (Migrate and Quarantine
@@ -132,12 +146,22 @@ internal sealed record CheckJson(
 ///     camelCase wire spelling is <see cref="LoadBearingJson.Options" />'s to apply, so a renderer cannot
 ///     write a value no member names.
 /// </summary>
-/// <param name="Id">The post-desugar rule ID.</param>
+/// <param name="Id">
+///     The post-desugar rule ID, at every grain. It is what makes the floor rung a narrowing menu rather
+///     than only the smallest answer: these are the strings <c>rules</c> globs match, and
+///     <c>arch_explain</c> takes one of them and returns that rule whole.
+/// </param>
 /// <param name="Posture">The rule's declared posture.</param>
 /// <param name="Status">The evaluation status.</param>
-/// <param name="Sentence">The rule's rendered English sentence.</param>
-/// <param name="Because">The rule's rationale prose.</param>
-/// <param name="Fix">The rule's fix hint, or null (omitted) when the spec declares none.</param>
+/// <param name="Sentence">
+///     The rule's rendered English sentence, or null (omitted) at index grain — the one thing that grain
+///     elides beyond skeleton's, along with its two neighbours below.
+/// </param>
+/// <param name="Because">The rule's rationale prose, or null (omitted) at index grain.</param>
+/// <param name="Fix">
+///     The rule's fix hint, or null (omitted) when the spec declares none — and at index grain, where the
+///     other two go with it.
+/// </param>
 /// <param name="SkipReason">
 ///     Why the run reached no verdict for this rule, or null (omitted) when it was evaluated.
 /// </param>
@@ -151,9 +175,9 @@ internal sealed record CheckJson(
 ///     what makes a skeleton report a verdict.
 /// </param>
 /// <param name="Violations">
-///     This rule's violations — <see cref="ViolationCount" />'s expansion — or null (omitted) at skeleton
-///     grain, the one thing that grain elides beyond overview's. Null here is "not rendered at this grain",
-///     never "none found": a passing rule renders an empty array, and the count tells the two apart.
+///     This rule's violations — <see cref="ViolationCount" />'s expansion — or null (omitted) from skeleton
+///     grain down, the one thing that grain elides beyond overview's. Null here is "not rendered at this
+///     grain", never "none found": a passing rule renders an empty array, and the count tells the two apart.
 /// </param>
 /// <param name="SubjectTypes">
 ///     How many types the rule's subject materialized to, present only alongside
@@ -172,8 +196,8 @@ internal sealed record RuleJson(
     string Id,
     Posture Posture,
     RuleStatus Status,
-    string Sentence,
-    string Because,
+    string? Sentence,
+    string? Because,
     string? Fix,
     string? SkipReason,
     BaselineJson? Baseline,

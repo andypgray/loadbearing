@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "solution": "MyApp.sln",
+  "grain": "index",
+  "projects": [
+    {
+      "name": "MyApp.Domain",
+      "solutionMember": true,
+      "types": 8
+    },
+    {
+      "name": "MyApp.Legacy.Billing",
+      "solutionMember": true,
+      "types": 4
+    },
+    {
+      "name": "MyApp.Web",
+      "solutionMember": true,
+      "types": 19
+    }
+  ],
+  "projectEdgeCount": 2,
+  "externalEdgeCount": 7
+}
