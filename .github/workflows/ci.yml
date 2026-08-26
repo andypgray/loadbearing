@@ -180,7 +180,7 @@ jobs:
       # comparison needs `.claude/arch-hook.sh`, which is gitignored, so no runner has ever had it.
       # Each skip carries its own reason in the log; that is where to read what a given leg left out.
       - name: Test
-        run: dotnet test Zphil.LoadBearing.slnx --no-build --logger "console;verbosity=normal"
+        run: dotnet test Zphil.LoadBearing.slnx --no-build --output Detailed
 
   # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at
   # exactly `.mcp/server.json` — the path nuget.org scans to generate the VS Code MCP config. A
@@ -650,7 +650,7 @@ jobs:
       # ID — the run the landing page's xUnit beat links. The 3-OS matrix already runs these tests inside
       # the full suite; this leg exists to be readable, not to add coverage.
       - name: Self-spec as named xUnit tests (one test per rule)
-        run: dotnet test tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj --no-build --filter "FullyQualifiedName~AdapterSelfSpecTests" --logger "console;verbosity=normal"
+        run: dotnet test tests/Zphil.LoadBearing.Tests/Zphil.LoadBearing.Tests.csproj --no-build --filter "FullyQualifiedName~AdapterSelfSpecTests" --output Detailed
       # Render this repo's own spec and require a zero diff — the same provably-current property the
       # examples job holds, now over the root block, the diagram, and the whole class of per-directory
       # cards. The command is character-for-character the one ARCHITECTURE.md publishes as the way to
@@ -681,7 +681,7 @@ jobs:
           dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- explain layering/model-independent Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj
       - name: Upload SARIF to code scanning
         if: always() && (github.event_name != 'pull_request' || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'))
-        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: loadbearing.sarif
           category: loadbearing
@@ -738,7 +738,7 @@ jobs:
       # No --no-build here: the adapter test project is not a member of any slnx, so nothing
       # above builds it. dotnet test restores and builds it (and the Xunit adapter it references).
       - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
-        run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --logger "console;verbosity=normal"
+        run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --output Detailed
       # No scope flag on any of these four, which is the property being exercised: every example spec
       # project references the LoadBearing packages it is written against, so the workspace loads this
       # repository's projects on each render and only the survey fence's declared-members default keeps

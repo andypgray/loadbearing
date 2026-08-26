@@ -15,6 +15,8 @@ dotnet test Zphil.LoadBearing.slnx
 dotnet test Zphil.LoadBearing.slnx --filter "FullyQualifiedName~SpecValidationTests"
 ```
 
+The suite runs on Microsoft.Testing.Platform rather than VSTest, because `xunit.v3` 4.0.0 ships a version of that platform the .NET 10 SDK declines to drive through the VSTest target. `global.json` selects the runner, and the test project carries neither `Microsoft.NET.Test.Sdk` nor `xunit.runner.visualstudio`. Filter expressions are unchanged, since `xunit.v3` accepts the VSTest filter syntax. VSTest's other options are rejected rather than ignored: `--logger "console;verbosity=normal"` stops the run before a test is discovered, and `--output Detailed` prints the per-test line it used to. A failing run exits 2 where VSTest exited 1, and a filter that matches nothing exits 8 where VSTest reported success.
+
 ## Test culture: pinned tests are the spec
 
 The house stack is xUnit v3 + Shouldly. Beyond that, one convention carries this repo:

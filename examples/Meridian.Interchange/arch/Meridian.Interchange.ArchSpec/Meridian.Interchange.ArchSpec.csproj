@@ -18,8 +18,8 @@
              deliberately absent — the nine canonical rules moved to the DotNetGuidance pack, which brings
              Microsoft.Extensions.DependencyInjection[.Abstractions] with it. Naming them here as well
              would pin this project to its own version and turn the pack's newer one into a downgrade. -->
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
     </ItemGroup>
 
 </Project>

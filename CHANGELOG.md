@@ -49,6 +49,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already keyed in `failedProjects` and `restoreFailedProjects`, and `modelIncomplete` still says
   the verdict was reached against a partial model. Only the raw text goes, and only at the floor.
 
+### Changed
+
+- **`Zphil.LoadBearing.Xunit` now requires `xunit.v3` 4.0.0, which runs on Microsoft.Testing
+  Platform rather than VSTest.** The authoring pair the adapter references (`xunit.v3.assert`,
+  `xunit.v3.extensibility.core`) moves to 4.0.0, and that raises the floor for consumers: a test
+  project on `xunit.v3` 3.x hits a package-downgrade error rather than a subtle mismatch. Because
+  4.0.0 ships MTP 2.x, which the .NET 10 SDK declines to drive through the VSTest target at all,
+  what the version bump forces on a consumer is a change of runner: name it in `global.json`
+  (`{ "test": { "runner": "Microsoft.Testing.Platform" } }`) and drop `Microsoft.NET.Test.Sdk` and
+  `xunit.runner.visualstudio`, whose only purpose was the VSTest adapter. The adapter's own surface
+  is unchanged — same `ArchRuleTests<TSpec>`, same overrides, same failure text — and filter
+  expressions carry over, since `xunit.v3` accepts the VSTest filter syntax. Two behaviours that
+  scripts read do move: a failing run exits 2 where VSTest exited 1, and a filter matching nothing
+  exits 8 where VSTest reported success. The adapter README carries the consumer-side shape, and
+  the `Meridian.Quoting` example is the worked copy of it.
+- **Dependencies bumped:** `Basic.CompilerLog.Util` 0.9.53 → 0.9.56, the four `Microsoft.Build`
+  engine packages 18.8.2 → 18.9.6 (unifying with `Microsoft.NET.StringTools`, already there), and
+  `ModelContextProtocol` 2.1.0 → 2.2.0. The `github/codeql-action` pins move to v4.37.8 together,
+  as the grouped update they are.
+
 ### Fixed
 
 - **The unbound server's recovery now names a command the session reading it can run.** A server

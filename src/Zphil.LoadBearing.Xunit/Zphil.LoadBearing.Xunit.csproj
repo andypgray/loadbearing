@@ -12,7 +12,7 @@
              repo-root Directory.Build.props. The &lt;TSpec&gt; in the description is XML-escaped. -->
         <PackageId>Zphil.LoadBearing.Xunit</PackageId>
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <Description>The LoadBearing xUnit adapter: derive a test class from ArchRuleTests&lt;TSpec&gt; and every rule in the architecture spec becomes an individually named xUnit test, with failure text identical to the loadbearing CLI. Requires xunit.v3 3.2.2 or later and a .NET SDK on the test host (the checker loads the target solution through MSBuildWorkspace).</Description>
+        <Description>The LoadBearing xUnit adapter: derive a test class from ArchRuleTests&lt;TSpec&gt; and every rule in the architecture spec becomes an individually named xUnit test, with failure text identical to the loadbearing CLI. Requires xunit.v3 4.0.0 or later, which runs on Microsoft.Testing.Platform rather than VSTest, and a .NET SDK on the test host (the checker loads the target solution through MSBuildWorkspace).</Description>
         <PackageTags>architecture;architecture-as-code;xunit;testing;fitness-functions;dependency-rules;layering;csharp;dotnet</PackageTags>
     </PropertyGroup>
 
@@ -27,9 +27,11 @@
 
     <ItemGroup>
         <!-- The library-authoring pair (extensibility + assert), not the xunit.v3 metapackage — a test
-             library references these, its consumers keep the metapackage + a runner. -->
-        <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.2" />
-        <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+             library references these, its consumers keep the metapackage. Since 4.0.0 that is the whole
+             consumer side: the runner ships inside the metapackage as Microsoft.Testing.Platform, so
+             there is no separate runner package to name. -->
+        <PackageReference Include="xunit.v3.extensibility.core" Version="4.0.0" />
+        <PackageReference Include="xunit.v3.assert" Version="4.0.0" />
     </ItemGroup>
 
 </Project>

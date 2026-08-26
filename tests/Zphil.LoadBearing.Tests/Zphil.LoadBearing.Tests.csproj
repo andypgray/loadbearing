@@ -31,20 +31,25 @@
         <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../../analyzers.globalconfig" />
     </ItemGroup>
 
+    <!-- Microsoft.Testing.Platform, not VSTest. xunit.v3 4.0.0 ships MTP 2.x, which the .NET 10 SDK
+         declines to drive through the VSTest target, so the version bump forces a change of runner. The
+         VSTest-era packages that used to sit here have no path left to execute on and are gone rather than
+         dormant: Microsoft.NET.Test.Sdk, xunit.runner.visualstudio (the VSTest adapter, and nothing else),
+         and coverlet.collector, which is a VSTest data collector. Coverage moves to the extension below,
+         which still writes Cobertura, so only the request changes and everything downstream that reads the
+         XML is unaffected. global.json at the repo root names the runner. -->
     <ItemGroup>
-        <PackageReference Include="coverlet.collector" Version="10.0.1" />
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)
              bind against — promoted from transitive (via the MCP/Hosting stack) to explicit, so the versions
              the recognizer resolves are pinned here rather than floating on another package's closure. -->
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.10.0" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
         <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture
              model from compiled MyApp IL (Mono.Cecil), cross-checking LoadBearing's Roslyn-source model. -->
-        <PackageReference Include="TngTech.ArchUnitNET" Version="0.13.3" />
-        <PackageReference Include="xunit.v3" Version="3.2.2" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+        <PackageReference Include="TngTech.ArchUnitNET" Version="0.13.4" />
+        <PackageReference Include="xunit.v3" Version="4.0.0" />
     </ItemGroup>
 
     <ItemGroup>

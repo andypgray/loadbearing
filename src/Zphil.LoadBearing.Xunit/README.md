@@ -71,10 +71,17 @@ from one over the solution.
 
 ## Requirements
 
-- **xunit.v3 3.2.2 or later.** The adapter is built against the xunit.v3 authoring libraries;
+- **xunit.v3 4.0.0 or later.** The adapter is built against the xunit.v3 authoring libraries;
   a consumer on an older metapackage hits a package-downgrade error. Your test project keeps
-  its own `xunit.v3` metapackage and runner references; the adapter brings only the authoring
-  pair.
+  its own `xunit.v3` metapackage reference; the adapter brings only the authoring pair.
+- **Microsoft.Testing.Platform, not VSTest.** xunit.v3 4.0.0 ships that platform, and the .NET
+  SDK declines to drive it through the VSTest target, so a test project on this adapter names
+  the runner in `global.json` and carries no `Microsoft.NET.Test.Sdk` or
+  `xunit.runner.visualstudio`:
+
+  ```json
+  { "test": { "runner": "Microsoft.Testing.Platform" } }
+  ```
 - **A .NET SDK on the test host.** The checker loads the target solution through
   MSBuildWorkspace (via MSBuildLocator), so plain runtime-only environments cannot run these
   tests.

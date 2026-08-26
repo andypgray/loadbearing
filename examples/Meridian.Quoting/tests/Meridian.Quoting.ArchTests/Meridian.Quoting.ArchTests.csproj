@@ -41,10 +41,12 @@
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
 
+    <!-- Microsoft.Testing.Platform, not VSTest: xunit.v3 4.0.0 ships MTP 2.x, which the .NET 10 SDK
+         declines to drive through the VSTest target. Microsoft.NET.Test.Sdk and xunit.runner.visualstudio
+         were the VSTest half and are gone. What a quickstart reader copies is this ItemGroup, so it is the
+         shape a consumer of the adapter needs: the metapackage alone. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.0" />
-        <PackageReference Include="xunit.v3" Version="3.2.2" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+        <PackageReference Include="xunit.v3" Version="4.0.0" />
     </ItemGroup>
 
     <ItemGroup>
