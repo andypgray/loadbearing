@@ -99,6 +99,30 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_NamesTheDnxPrefixForASessionWithNoInstalledCommand()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — the recipe names `loadbearing` eleven times and is served to a session that may have no
+        // such command: the registry manifest's dnx launch runs the package without installing the tool.
+        // The eleven spellings stay right for every installed reader, so what the recipe owes the other
+        // population is the prefix, pinned to the running build for the same reason the scaffold's version
+        // is. Bare `dnx` would not resolve in the shell an agent drives — see ServerInstructionsTests.
+        string text = result.ShouldHaveTextContent();
+        text.ShouldContain($"`dotnet dnx Zphil.LoadBearing.Cli@{ServerVersion.SemVer} --yes --`");
+        text.ShouldNotContain(ArchPrompts.CliPackagePlaceholder);
+
+        // The substitution is a plain replace over the whole recipe, and the product's own repository URL
+        // carries the package's name too. This is what keeps it from being rewritten into a dead link.
+        text.ShouldContain("https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md");
+    }
+
+    [Fact]
     public async Task GetPrompt_DeriveSpec_ScaffoldOptsOutOfCentralPackageManagement()
     {
         // Arrange

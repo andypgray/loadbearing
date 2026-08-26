@@ -28,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The unbound server's recovery now names a command the session reading it can run.** A server
+  that cannot resolve a solution leads its reply with the CLI that answers from the same model, and
+  that reply is read overwhelmingly by sessions launched from the MCP registry manifest — the one
+  wiring that is unbound by construction, because the manifest has nowhere to put a solution. Those
+  sessions had no `loadbearing` command: `dnx` runs the package without installing the tool, so the
+  single remedy on offer was a command not found. Both spellings are named now, the installed one
+  first and `dotnet dnx Zphil.LoadBearing.Cli@<version> --yes --` for the session that lacks it,
+  pinned to the build answering so the promise of the same engine and the same verdicts holds.
+  `dotnet dnx` rather than bare `dnx`, because on Windows the short form is a `.cmd` and a POSIX
+  shell resolves a bare name to `.exe` alone. The discovery refusal quoted above the recovery
+  stopped naming a runner at all, since argument order is what its parenthetical is for, and the
+  `derive_spec` recipe now names the prefix once for the same population.
+
 - **A reference between two types a linked source file compiles into several projects no longer reds
   a ban aimed at another declarer.** 0.6.0 made `arch.Project` membership N-way, so a project noun
   reaches every declarer of a shared file; the cure landed on selection and not on what an edge

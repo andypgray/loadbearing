@@ -29,9 +29,12 @@ public static class SolutionDiscovery
     // Both refusals end here. The argument comes first because it is the better answer on both surfaces the
     // walk-up serves: at the CLI it is the normal spelling, and for an MCP client the args array in the
     // server registration is where the answer has to live — the environment variable would have to be set
-    // for whatever process launches the client.
+    // for whatever process launches the client. The runner is deliberately unnamed. This line is read from
+    // an unbound MCP session as often as from a shell, and the session that reads it most is the one a
+    // registry manifest launched, which has no `loadbearing` command to put in front of the verb. What the
+    // parenthetical is for is argument order, and that survives naming no runner at all.
     private static string FixLine =>
-        "Pass the solution as the argument (loadbearing <command> <solution>, or in your MCP client "
+        "Pass the solution as the argument (<command> <solution>, or in your MCP client "
         + $"config's args), or set {LoadBearingEnvVars.SolutionPath} to it.";
 
     /// <summary>

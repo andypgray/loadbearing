@@ -15,16 +15,37 @@ internal static class ServerInstructions
     ///     result, so the two channels a client reads cannot drift apart.
     /// </summary>
     /// <remarks>
-    ///     Deliberately silent about <c>args</c> and the environment variable, which the banner names in the
-    ///     paragraph after this one. Those bind the <em>next</em> session: an agent inside this one cannot
-    ///     edit the client config that launched it, and a remedy the reader cannot take reads as no remedy
-    ///     at all — which is what a wave of field-test sessions did with it, driving the CLI while five
-    ///     advertised tools sat unused.
+    ///     <para>
+    ///         Deliberately silent about <c>args</c> and the environment variable, which the banner names in
+    ///         the paragraph after this one. Those bind the <em>next</em> session: an agent inside this one
+    ///         cannot edit the client config that launched it, and a remedy the reader cannot take reads as
+    ///         no remedy at all — which is what a wave of field-test sessions did with it, driving the CLI
+    ///         while five advertised tools sat unused.
+    ///     </para>
+    ///     <para>
+    ///         Both spellings are named because this process cannot know which one resolves for whoever is
+    ///         reading. The unbound server is by construction the registry-manifest server: that manifest has
+    ///         nowhere to put a solution, and the <c>dnx</c> launch it prescribes runs the package
+    ///         <em>without installing the tool</em>, so <c>loadbearing</c> is absent from exactly the session
+    ///         this text was written for. The installed spelling still leads: it is right for every other
+    ///         unbound shape, and a reader who has it tests it in one move.
+    ///     </para>
+    ///     <para>
+    ///         Three things here are load-bearing and easy to undo by accident. <c>dotnet dnx</c>, never bare
+    ///         <c>dnx</c>: on Windows that command is <c>dnx.cmd</c>, and a POSIX shell resolves a bare name
+    ///         to <c>.exe</c> alone, so the short spelling is itself a command not found in the shell an agent
+    ///         drives. <c>--yes</c>, which is a real option though it appears in no <c>--help</c> — without it
+    ///         a cold machine can block on a trust prompt, and a blocked stdio session has no second channel
+    ///         to say so on. And <see cref="ServerVersion.SemVer" /> rather than a floating id, because
+    ///         "same engine, same verdicts" is a claim this sentence makes two clauses earlier; pinned, it
+    ///         also resolves from the cache the server is already running out of.
+    ///     </para>
     /// </remarks>
-    internal const string UnboundCallCoda =
+    internal static readonly string UnboundCallCoda =
         "The MCP tools stay unusable for this session; rebinding takes a client-config edit and a relaunch. "
         + "Use the CLI with the solution named instead — same engine, same verdicts: "
-        + "`loadbearing graph <solution>` surveys the codebase, `loadbearing check <solution>` runs the rules.";
+        + "`loadbearing graph <solution>` surveys the codebase, `loadbearing check <solution>` runs the rules. "
+        + $"A registry-manifest session has no such command: `dotnet dnx Zphil.LoadBearing.Cli@{ServerVersion.SemVer} --yes -- graph <solution>`.";
 
     internal static readonly string Text = EmbeddedResourceText.Load("server-instructions.md");
 

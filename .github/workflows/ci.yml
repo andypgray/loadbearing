@@ -520,7 +520,7 @@ jobs:
             bad='the refusal does not list both candidates, one indented line each'
           elif grep -Fq 'BillingOnly.slnf' stderr.txt; then
             bad='the refusal names the .slnf, which is a view of the solutions beside it rather than a rival candidate'
-          elif ! grep -Fq "Pass the solution as the argument (loadbearing <command> <solution>, or in your MCP client config's args), or set LOADBEARING_SOLUTION_PATH to it." stderr.txt; then
+          elif ! grep -Fq "Pass the solution as the argument (<command> <solution>, or in your MCP client config's args), or set LOADBEARING_SOLUTION_PATH to it." stderr.txt; then
             bad='the refusal does not carry the fix line naming the argument, the MCP client config and the environment variable'
           elif [ -s stdout.txt ]; then
             bad='the refusal wrote to stdout, which every --json consumer parses'

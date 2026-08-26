@@ -38,6 +38,13 @@ internal sealed class ArchPrompts
     /// </summary>
     internal const string ScaffoldVersionPlaceholder = "Version=\"...\"";
 
+    /// <summary>
+    ///     The package placeholder as the raw recipe spells it, in the <c>dnx</c> prefix a session with no
+    ///     installed <c>loadbearing</c> command has to put in front of every CLI verb. Serving pins it to
+    ///     the running build, so the recipe's CLI half names the same engine its tool half is.
+    /// </summary>
+    internal const string CliPackagePlaceholder = "Zphil.LoadBearing.Cli@...";
+
     // The served body, composed once: both halves are fixed for the process's life (an embedded resource
     // and the running build's own version), so a prompts/get is a field read rather than a resource
     // read plus a scan of the whole recipe.
@@ -53,6 +60,8 @@ internal sealed class ArchPrompts
     private static string ComposeDeriveSpecBody()
     {
         string template = EmbeddedResourceText.Load("derive-spec.md");
-        return template.Replace(ScaffoldVersionPlaceholder, $"Version=\"{ServerVersion.SemVer}\"");
+        return template
+            .Replace(ScaffoldVersionPlaceholder, $"Version=\"{ServerVersion.SemVer}\"")
+            .Replace(CliPackagePlaceholder, $"Zphil.LoadBearing.Cli@{ServerVersion.SemVer}");
     }
 }

@@ -29,7 +29,8 @@ Work the steps in order. Do not skip the curation gate.
   --json` — or walk up from the working directory when omitted (`explain` differs: its rule
   ID comes first, the solution second — `loadbearing explain area/rule MyApp.sln`). The two
   ratchet mutations that end the flow — `loadbearing baseline --init` and the commit — belong
-  to the human.
+  to the human. A session launched from the MCP registry manifest has no `loadbearing` command:
+  there, prefix every CLI verb in this recipe with `dotnet dnx Zphil.LoadBearing.Cli@... --yes --`.
 
 ## 0. Discover stated intent first
 

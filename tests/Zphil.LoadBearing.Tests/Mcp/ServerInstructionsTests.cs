@@ -33,8 +33,16 @@ public sealed class ServerInstructionsTests
     ///     unbound client buys a recovery it can act on with roughly 240 more characters of the file's tail,
     ///     which is the trade the file's ordering was designed to make payable. This is also the coda's only
     ///     budget — it is inside the banner, so bounding the banner bounds it.
+    ///     <para>
+    ///         Raised again from 650 when the coda took on the <c>dnx</c> spelling for the session that has
+    ///         no installed command. That spelling carries a pinned version, so the banner's length now moves
+    ///         with the version string: every readable wording of the clause landed within four characters of
+    ///         650, which would have made a version bump alone red this fact from a distance. The ceiling is
+    ///         set clear of that rather than against it, and what the extra buys is priced in the same
+    ///         currency as before — roughly fifty more characters of the file's most droppable tail.
+    ///     </para>
     /// </remarks>
-    private const int BannerBudget = 650;
+    private const int BannerBudget = 700;
 
     [Fact]
     public void Text_FitsUnderTheClientTruncationCliff()
@@ -111,6 +119,21 @@ public sealed class ServerInstructionsTests
         // belongs below the one they can, never inside it. Both of these are client-config edits.
         ServerInstructions.UnboundCallCoda.ShouldNotContain("`args`");
         ServerInstructions.UnboundCallCoda.ShouldNotContain("LOADBEARING_SOLUTION_PATH");
+    }
+
+    [Fact]
+    public void UnboundCallCoda_AlsoNamesTheRecoveryARegistryManifestSessionCanPerform()
+    {
+        // The population the coda was written for is the one that cannot run the command above it: the
+        // registry manifest has nowhere to put a solution, so its session is unbound by construction, and
+        // the dnx launch it prescribes runs the package without installing the tool.
+        ServerInstructions.UnboundCallCoda.ShouldContain(
+            $"dotnet dnx Zphil.LoadBearing.Cli@{ServerVersion.SemVer} --yes -- graph <solution>");
+
+        // Bare `dnx` is dnx.cmd on Windows and a POSIX shell resolves a bare name to .exe alone, so the
+        // short spelling is a command not found in the shell an agent drives. Anchored on the backtick that
+        // opens the command, because `dotnet dnx` contains the substring the naive form would match.
+        ServerInstructions.UnboundCallCoda.ShouldNotContain("`dnx ");
     }
 
     [Fact]

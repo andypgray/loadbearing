@@ -417,14 +417,17 @@ first; the checker never builds, and a stale build gives stale verdicts.
 everything after it to the tool:
 
 ```bash
-dnx Zphil.LoadBearing.Cli -- mcp MyApp.sln
+dotnet dnx Zphil.LoadBearing.Cli -- mcp MyApp.sln
 ```
 
-This is how MCP-registry clients run the server; note the `mcp` subcommand. A config generated
-from the registry manifest passes no solution argument, so a repository whose walk-up resolves
-nothing gets an unbound server and a session that works from the CLI. Bind such a repository at
-install time: put the solution in the config's `args` after `mcp`, or set
-`LOADBEARING_SOLUTION_PATH` in its `env`.
+This is how MCP-registry clients run the server; note the `mcp` subcommand. Spell it `dotnet dnx`
+rather than bare `dnx` in a shell: on Windows the short form is a `.cmd`, which a POSIX shell will
+not resolve. A config generated from the registry manifest passes no solution argument, so a
+repository whose walk-up resolves nothing gets an unbound server. That session still works from
+the CLI, but not through the installed command, because `dnx` runs the package without installing
+anything: the server's replies name `dotnet dnx Zphil.LoadBearing.Cli@<version> --yes --` in front
+of the verb, pinned to the build answering. Bind such a repository at install time instead: put the
+solution in the config's `args` after `mcp`, or set `LOADBEARING_SOLUTION_PATH` in its `env`.
 
 `dnx` ships with the .NET 10 SDK, but installing that SDK is not what makes the command exist:
 `dotnet` picks an SDK per directory, honouring the nearest `global.json` at or above the
