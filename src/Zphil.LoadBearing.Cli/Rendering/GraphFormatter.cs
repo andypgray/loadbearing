@@ -35,11 +35,11 @@ internal static class GraphFormatter
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them: the namespace inventory becomes one elision line at overview grain, the external references
-    ///     and the multiply-declared types become elision lines at skeleton grain, the observed project
-    ///     references become one at index grain — where the roster lines also shed what each project
-    ///     declares and targets — and no section ever disappears. A section with nothing to elide keeps its
-    ///     <c>(none)</c> instead, which is why a healthy solution's skeleton still says outright that no type
-    ///     is declared twice.
+    ///     and the multiply-declared types become elision lines at skeleton grain — where the roster lines
+    ///     also shed the packages each project declares — the observed project references become one at index
+    ///     grain, where the roster lines shed what each project declares, targets and ships, and no section
+    ///     ever disappears. A section with nothing to elide keeps its <c>(none)</c> instead, which is why a
+    ///     healthy solution's skeleton still says outright that no type is declared twice.
     /// </summary>
     /// <param name="summary">The survey to format.</param>
     /// <param name="solutionName">The solution's file name, for the heading.</param>
@@ -110,8 +110,9 @@ internal static class GraphFormatter
     // Only the passenger is annotated. Membership is the unremarkable case — every project of a healthy
     // solution has it — so marking it would put a badge on every line and leave the one line worth reading
     // no easier to find. An unread membership says nothing at all, for the same reason it serializes absent.
-    // The framework clause follows that same rule: one project file, one compilation is the unremarkable
-    // case, so only the project that arrived as several says so.
+    // What a project targets does not follow that rule and used to: it is not a remark about the project but
+    // an answer a reader came for, and the line beside it — what the project references — is stated on every
+    // project for exactly that reason.
     private static string ProjectLine(ProjectSummary project, DocumentGrain grain)
     {
         string membership = project.SolutionMember == false ? " (not a solution member)" : "";
@@ -125,13 +126,41 @@ internal static class GraphFormatter
         if (grain >= DocumentGrain.Index) return line;
 
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
-        return $"{line}; {FrameworksClause(project)}references: {references}";
+        return $"{line}; {FrameworksClause(project)}references: {references}"
+               + PackagesClause(project, grain) + PackagingClause(project);
+    }
+
+    // "; packages: A, B" — the build-side twin of the external references, and elided at the grain those go
+    // at, for their reason: a project's declared packages scale with what the solution depends on rather
+    // than with the solution. It reads "(none)" like the references beside it, because a project that
+    // declares no packages is the fact a rule about declared packages is written against.
+    private static string PackagesClause(ProjectSummary project, DocumentGrain grain)
+    {
+        if (grain >= DocumentGrain.Skeleton) return "";
+
+        string packages = project.PackageReferences.Count > 0
+            ? string.Join(", ", project.PackageReferences)
+            : "(none)";
+        return $"; packages: {packages}";
+    }
+
+    // Only the deliberate half of each fact is annotated, on the passenger's rule: the SDK makes every
+    // project packable and NuGet locks no restore, so a badge on those would land on nearly every line and
+    // leave the two lines worth reading no easier to find. The document's own row states both outright,
+    // because that is the surface a rule is drafted against rather than read on.
+    private static string PackagingClause(ProjectSummary project)
+    {
+        string packable = project.IsPackable == false ? "; does not pack" : "";
+        string locks = project.LocksPackages == true ? "; locks restore" : "";
+        return packable + locks;
     }
 
     // "targets net10.0, netstandard2.0 (shared types from net10.0); " — the frameworks in extraction order,
     // and the winner only where the frameworks actually share a type. A multi-targeted project whose
     // frameworks share nothing displaced no facts, so the parenthesis would be a claim about nothing; the
     // list alone still says the project compiles more than once, which is the fact a rule author needs.
+    // Empty only where nothing evaluated the project, which is where the survey has nothing to say rather
+    // than something unremarkable to leave out.
     private static string FrameworksClause(ProjectSummary project)
     {
         if (project.TargetFrameworks.Count == 0) return "";

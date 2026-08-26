@@ -199,9 +199,14 @@ public static class GraphSummarizer
 
         int generated = declaredTypes.Count(type => type.IsGenerated);
 
+        List<string> packageReferences = project.PackageReferences
+            .Select(package => package.Name)
+            .ToList();
+
         return new ProjectSummary(
             project.Name, project.ProjectReferences, declaredTypes.Count, generated, namespaces,
-            project.SolutionMember, project.TargetFrameworks, project.FactsFollow);
+            project.SolutionMember, project.TargetFrameworks, project.FactsFollow, packageReferences,
+            project.IsPackable, project.LocksPackages);
     }
 
     // The external-reference bucket: the first two dot-segments of the target's namespace (one segment →

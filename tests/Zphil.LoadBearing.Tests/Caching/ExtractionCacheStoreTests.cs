@@ -44,6 +44,11 @@ public sealed class ExtractionCacheStoreTests
     // writable — a get-only rule would pass vacuously over a codebase full of settable properties, and a
     // readonly rule would red every field it saw.
     [InlineData(24)]
+    // A v25 cache predates the evaluated artifact facts (schema bumped 25→26): its fragments carry no
+    // declared frameworks, package references, packability or lock policy, so on a hit every project would
+    // replay as one nothing was evaluated for — a rule about what a project targets or ships would find no
+    // subject at all and pass over a solution it has never read.
+    [InlineData(25)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange

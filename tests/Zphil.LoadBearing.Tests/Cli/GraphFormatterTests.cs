@@ -33,9 +33,9 @@ public sealed class GraphFormatterTests
         // unreadable solution file must not turn every project into a reported passenger.
         Roster(lines)
             .ShouldBe([
-                "  Acme.App — 1 type; references: Acme.Passenger",
-                "  Acme.Passenger (not a solution member) — 1 type; references: (none)",
-                "  Acme.Unread — 1 type; references: (none)"
+                "  Acme.App — 1 type; references: Acme.Passenger; packages: (none)",
+                "  Acme.Passenger (not a solution member) — 1 type; references: (none); packages: (none)",
+                "  Acme.Unread — 1 type; references: (none); packages: (none)"
             ]);
     }
 
@@ -86,7 +86,7 @@ public sealed class GraphFormatterTests
         // catch: it is the one namespace here that must never become a layer glob. A namespace with none
         // says nothing at all, so the qualifier's presence is itself the signal.
         Roster(lines)
-            .ShouldBe(["  Acme.Web — 5 types (3 generated); references: (none)"]);
+            .ShouldBe(["  Acme.Web — 5 types (3 generated); references: (none); packages: (none)"]);
         Section(lines, "Namespaces:")
             .ShouldBe(["  Acme.Web: Acme.Views (2, all generated), Acme.Web (2, 1 generated), Acme.Plain (1)"]);
     }
@@ -118,10 +118,46 @@ public sealed class GraphFormatterTests
         // nothing was displaced and there is no winner to name — the list alone still says it compiles twice.
         Roster(lines)
             .ShouldBe([
-                "  Acme.Plain — 1 type; references: (none)",
+                "  Acme.Plain — 1 type; references: (none); packages: (none)",
                 "  Acme.Shared — 3 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
-                + "references: (none)",
-                "  Acme.Split — 2 types; targets net10.0, netstandard2.0; references: (none)"
+                + "references: (none); packages: (none)",
+                "  Acme.Split — 2 types; targets net10.0, netstandard2.0; references: (none); packages: (none)"
+            ]);
+    }
+
+    [Fact]
+    public void Lines_PackagingFacts_AnnotateOnlyTheDeliberateHalfOfEach()
+    {
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(PackagingSummary(), "Acme.slnx", DocumentGrain.Full, []);
+
+        // Assert — the passenger's rule applied to two facts whose unremarkable values are the SDK's and
+        // NuGet's own: nearly every project is packable and nearly none locks, so the badge goes on the
+        // project that opted out and the project that opted in. The declared packages read like the
+        // references beside them, "(none)" included, because a project declaring none is what a rule about
+        // declared packages is written against.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Locked — 0 types; targets net10.0; references: (none); packages: Shouldly; locks restore",
+                "  Acme.Ordinary — 0 types; targets net10.0; references: (none); packages: (none)",
+                "  Acme.Tooling — 0 types; targets net10.0; references: (none); packages: (none); does not pack"
+            ]);
+    }
+
+    [Fact]
+    public void Lines_SkeletonGrain_DropsTheDeclaredPackagesAndKeepsTheRestOfTheLine()
+    {
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(PackagingSummary(), "Acme.slnx", DocumentGrain.Skeleton, []);
+
+        // Assert — the packages leave a rung before the project references, beside the external-reference
+        // rows they are the build-side twin of; what the project targets and ships stays, because those are
+        // one value each rather than a list.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Locked — 0 types; targets net10.0; references: (none); locks restore",
+                "  Acme.Ordinary — 0 types; targets net10.0; references: (none)",
+                "  Acme.Tooling — 0 types; targets net10.0; references: (none); does not pack"
             ]);
     }
 
@@ -233,6 +269,21 @@ public sealed class GraphFormatterTests
     }
 
     // App (declared) references Passenger (undeclared); Unread was extracted with no membership at all.
+    // Hand-built rather than extracted, because the facts under test come from an MSBuild evaluation and
+    // the fast path has no project file to evaluate. Three projects, one per shape the roster line has to
+    // tell apart: the opted-in lock policy, the ordinary SDK defaults, and the opted-out packability.
+    private static GraphSummary PackagingSummary()
+    {
+        List<ProjectSummary> projects =
+        [
+            new("Acme.Locked", [], 0, 0, [], true, ["net10.0"], null, ["Shouldly"], true, true),
+            new("Acme.Ordinary", [], 0, 0, [], true, ["net10.0"], null, [], true, false),
+            new("Acme.Tooling", [], 0, 0, [], true, ["net10.0"], null, [], false, false)
+        ];
+
+        return new GraphSummary(projects, [], [], [], []);
+    }
+
     private static GraphSummary MixedMembershipSummary()
     {
         CompilationInput passenger = CompilationFactory.Compile("Acme.Passenger", ("Passenger.cs", """

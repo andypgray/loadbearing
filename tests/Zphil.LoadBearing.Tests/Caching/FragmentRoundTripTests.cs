@@ -464,6 +464,131 @@ public sealed class FragmentRoundTripTests
             .ShouldBe([("Member", true), ("Passenger", false), ("Unread", null)]);
     }
 
+    [Fact]
+    public void RoundTrip_ArtifactFacts_SurviveOntoTheProjectNodesWithTheirSites()
+    {
+        // Arrange — one project's worth of every evaluated fact, with values no default could produce: two
+        // frameworks, two packages, an explicit packable-false and a lock policy declared in a file the
+        // project does not name. Each site is distinct, so a hit that dropped one would land somewhere
+        // visibly wrong rather than merely somewhere.
+        CodebaseFragment fragment = FragmentExtractor.Extract(CompilationFactory.Compile("Widget", ("Widget.cs", """
+                                                                                                                 namespace Widget;
+                                                                                                                 public class W {}
+                                                                                                                 """))) with
+        {
+            DeclaredTargetFrameworks = ["net10.0", "netstandard2.0"],
+            TargetFrameworksSite = new FragmentSite("/repo/src/Widget/Widget.csproj", 3),
+            PackageReferences =
+            [
+                new FragmentPackageReference("Newtonsoft.Json", new FragmentSite("/repo/src/Directory.Build.props", 11)),
+                new FragmentPackageReference("Shouldly", new FragmentSite("/repo/src/Widget/Widget.csproj", 9))
+            ],
+            IsPackable = false,
+            IsPackableSite = new FragmentSite("/repo/src/Widget/Widget.csproj", 5),
+            LocksPackages = true,
+            LocksPackagesSite = new FragmentSite("/repo/src/Directory.Build.props", 18)
+        };
+
+        // Act
+        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([fragment], ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert — the model the fragment is only a carrier for.
+        ProjectNode project = FragmentMerger.Merge(roundTripped)
+            .Projects.Single();
+        project.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
+        project.TargetFrameworksSite.ShouldNotBeNull()
+            .ToString()
+            .ShouldBe("/repo/src/Widget/Widget.csproj:3");
+        project.PackageReferences.Select(package => $"{package.Name} @ {package.Site}")
+            .ShouldBe([
+                "Newtonsoft.Json @ /repo/src/Directory.Build.props:11",
+                "Shouldly @ /repo/src/Widget/Widget.csproj:9"
+            ]);
+        project.IsPackable.ShouldBe(false);
+        project.IsPackableSite.ShouldNotBeNull()
+            .ToString()
+            .ShouldBe("/repo/src/Widget/Widget.csproj:5");
+        project.LocksPackages.ShouldBe(true);
+        project.LocksPackagesSite.ShouldNotBeNull()
+            .ToString()
+            .ShouldBe("/repo/src/Directory.Build.props:18");
+    }
+
+    [Fact]
+    public void RoundTrip_ArtifactFactsUnevaluated_ReplayAsAbsentRatherThanAsDefaults()
+    {
+        // Arrange — the hand-built input, which has no project file to evaluate. The cache is where "nobody
+        // asked" and "the answer is no" can be flattened into one value, and a hit replaying an unevaluated
+        // project as not-packable and not-locking would hand a rule a verdict nothing measured.
+        CodebaseFragment fragment = FragmentExtractor.Extract(CompilationFactory.Compile("Bare", ("Bare.cs", """
+                                                                                                             namespace Bare;
+                                                                                                             public class B {}
+                                                                                                             """)));
+
+        // Act
+        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([fragment], ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert
+        ProjectNode project = FragmentMerger.Merge(roundTripped)
+            .Projects.Single();
+        project.TargetFrameworks.ShouldBeEmpty();
+        project.TargetFrameworksSite.ShouldBeNull();
+        project.PackageReferences.ShouldBeEmpty();
+        project.IsPackable.ShouldBeNull();
+        project.IsPackableSite.ShouldBeNull();
+        project.LocksPackages.ShouldBeNull();
+        project.LocksPackagesSite.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Merge_ArtifactFactsAcrossOneProjectsFrameworks_FoldWhereNeitherCanInventACleanAnswer()
+    {
+        // Arrange — one project file, two frameworks, disagreeing on every fact a condition can move: one
+        // packs, one does not; one locks, one does not; each declares a package the other does not.
+        CodebaseFragment modern = FragmentExtractor.Extract(
+                CompilationFactory.Compile("Widget", ("Widget.cs", """
+                                                                   namespace Widget;
+                                                                   public class W {}
+                                                                   """))) with
+            {
+                TargetFramework = "net10.0",
+                DeclaredTargetFrameworks = ["net10.0", "netstandard2.0"],
+                PackageReferences = [new FragmentPackageReference("Modern", new FragmentSite("/repo/Widget.csproj", 9))],
+                IsPackable = true,
+                IsPackableSite = new FragmentSite("/repo/Widget.csproj", 5),
+                LocksPackages = true,
+                LocksPackagesSite = new FragmentSite("/repo/Widget.csproj", 6)
+            };
+        CodebaseFragment legacy = modern with
+        {
+            TargetFramework = "netstandard2.0",
+            PackageReferences = [new FragmentPackageReference("Legacy", new FragmentSite("/repo/Widget.csproj", 13))],
+            IsPackable = false,
+            IsPackableSite = new FragmentSite("/repo/Widget.csproj", 15),
+            LocksPackages = false,
+            LocksPackagesSite = new FragmentSite("/repo/Widget.csproj", 16)
+        };
+
+        // Act
+        ProjectNode project = FragmentMerger.Merge([modern, legacy])
+            .Projects.Single();
+
+        // Assert — packable because one framework ships a package, unlocked because one framework's restore
+        // writes no lock file, and both packages because either framework declaring one is the project
+        // declaring it. Each site is the framework that decided the verdict, which is the line a violation
+        // has to name.
+        project.IsPackable.ShouldBe(true);
+        project.IsPackableSite.ShouldNotBeNull()
+            .Line.ShouldBe(5);
+        project.LocksPackages.ShouldBe(false);
+        project.LocksPackagesSite.ShouldNotBeNull()
+            .Line.ShouldBe(16);
+        project.PackageReferences.Select(package => package.Name)
+            .ShouldBe(["Legacy", "Modern"]);
+    }
+
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()
     {
         CompilationInput lib = CompilationFactory.Compile("Lib",

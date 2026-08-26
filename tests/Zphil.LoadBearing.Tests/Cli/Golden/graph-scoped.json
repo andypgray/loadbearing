@@ -8,8 +8,16 @@
     {
       "name": "MyApp.Web",
       "solutionMember": true,
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "isPackable": true,
+      "locksPackages": false,
       "projectReferences": [
         "MyApp.Legacy.Billing"
+      ],
+      "packageReferences": [
+        "Microsoft.Extensions.DependencyInjection.Abstractions"
       ],
       "types": 19,
       "namespaces": [

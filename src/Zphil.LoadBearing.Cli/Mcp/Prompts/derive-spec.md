@@ -63,14 +63,22 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
   the solution file does not declare — a passenger, not part of the estate you are writing law
   for, so keep it out of your layer globs. An absent key means membership could not be read.
-  `targetFrameworks` lists every framework a multi-targeting project was extracted from,
-  ordinal-ordered by framework name — extraction's own order, never the csproj's — and
-  `factsFollow` names the framework whose compilation supplied the facts for the types more
-  than one framework declares; it is absent when the frameworks share no type (every type then
-  keeps its own framework's facts), and both are absent when the project compiled once. Read
-  both before writing a rule whose subject is that project: the rule is checked against
+  `targetFrameworks` lists every framework the project declares, ordinal-ordered by framework
+  name — extraction's own order, never the csproj's — normalized to the short moniker, so a
+  project predating the SDK reads `net48` beside everything else. `factsFollow` names the
+  framework whose compilation supplied the facts for the types more than one framework
+  declares; it is absent when the frameworks share no type (every type then keeps its own
+  framework's facts), and absent for every project that compiled once. Read both before writing
+  a rule whose subject is a multi-targeting project: the rule is checked against
   `factsFollow`'s compilation alone, and a `#if`-divergent branch on a losing framework is
   invisible to it.
+  `isPackable`, `locksPackages` and `packageReferences[]` are the artifact facts, and they are
+  evaluated rather than read off the project file — which is the only way they can be right.
+  The SDK makes a project packable without anybody writing it down, and a lock-file policy is
+  regularly declared once in a props file above the whole solution, so the project's own XML
+  says nothing about either. `packageReferences[]` is what the project declares, never the
+  transitive closure. An absent key means no answer: nothing evaluated the project, or — for
+  `isPackable` alone — the project is outside the SDK's pack machinery and has none.
   `generated` qualifies a type count — on the project, and on each namespace — with how many of
   those types a generator emitted; it is absent when none were. **A namespace whose `generated`
   equals its `types` is wholly generator output: never make it a layer glob and never anchor a
@@ -114,7 +122,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, projectReferences[], types, generated?, namespaces[]{ namespace, types, generated? } }
+projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, isPackable?, locksPackages?, projectReferences[], packageReferences[], types, generated?, namespaces[]{ namespace, types, generated? } }
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }
@@ -128,14 +136,16 @@ stamps `"grain": "overview"` and elides each project's `namespaces`; every proje
 external row survives. At skeleton grain — `skeleton: true`, or the server's second step when
 the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
 and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
-`externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; the projects and their
-edges stay. At index grain — `index: true`, the ladder's floor — it stamps `"grain": "index"`
-and keeps the roster alone: every project's `name`, `solutionMember` and `types`, with its
-`projectReferences` and framework pair gone and `projectEdges[]` reported as
-`projectEdgeCount`. That is the list `projects` globs match, so a survey that degrades this
-far hands you the argument for the next call. `unsupportedProjects[]` survives every rung
-whole, having no count key at all, and so does a project's own `generated`, riding its row;
-the framework pair (`targetFrameworks`, `factsFollow`) rides it the same way down to skeleton.
+`externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; each project's
+`packageReferences[]` goes with them, being the build-side twin of the external rows. The
+projects and their edges stay. At index grain — `index: true`, the ladder's floor — it stamps
+`"grain": "index"` and keeps the roster alone: every project's `name`, `solutionMember` and
+`types`, with its `projectReferences`, framework pair and packaging pair gone and
+`projectEdges[]` reported as `projectEdgeCount`. That is the list `projects` globs match, so a
+survey that degrades this far hands you the argument for the next call. `unsupportedProjects[]`
+survives every rung whole, having no count key at all, and so does a project's own `generated`,
+riding its row; the framework pair (`targetFrameworks`, `factsFollow`) and the packaging pair
+(`isPackable`, `locksPackages`) ride it the same way down to skeleton.
 Only the per-namespace `generated` goes with the inventory that carries it — so at any grain
 you can still see which projects are mostly generator output, and drop to full grain to see
 which namespaces. Read the stamp: a survey with no `grain` is the complete one. An absent

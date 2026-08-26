@@ -115,9 +115,9 @@ public sealed class GeneratedTypeSurveyE2ETests
         result.ShouldSucceed();
         string output = result.Out.NormalizedLines();
 
-        output.ShouldContain($"  {Web} — 4 types (2 generated); references: {Core}");
+        output.ShouldContain($"  {Web} — 4 types (2 generated); targets net10.0; references: {Core}; packages: (none)");
         output.ShouldContain($"{GeneratedNamespace} (2, all generated)");
-        output.ShouldContain($"  {Core} — 1 type; references: (none)");
+        output.ShouldContain($"  {Core} — 1 type; targets net10.0; references: (none); packages: (none)");
     }
 
     private static JsonElement Project(JsonDocument document, string name)

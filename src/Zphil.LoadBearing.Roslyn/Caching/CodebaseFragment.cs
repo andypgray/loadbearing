@@ -47,6 +47,17 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         <see cref="SolutionMember" /> does, and <see langword="null" /> is read as unknown throughout: an
 ///         unknown assembly never makes the merge conclude anything.
 ///     </para>
+///     <para>
+///         The trailing artifact facts are the fifth group, and the only ones that come from MSBuild rather
+///         than from the compilation: what the project declares it targets, the packages it declares, whether
+///         it packs, and whether its restore locks — each with the <c>file:line</c> that decided it, which is
+///         regularly in a props file above the project. They carry defaults for
+///         <see cref="SolutionMember" />'s reason and are read the same way: absent is unevaluated, never
+///         off. <see cref="DeclaredTargetFrameworks" /> is <see cref="TargetFramework" />'s counterpart
+///         rather than a longer spelling of it — this fragment is one framework's compilation, and that list
+///         is every framework the project file names, which stays the same across the fragments of one
+///         multi-targeted project.
+///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(
     string ProjectName,
@@ -63,4 +74,11 @@ internal sealed record CodebaseFragment(
     IReadOnlyList<FragmentExposureEdge> ExposureEdges,
     IReadOnlyList<FragmentServiceRegistration> ServiceRegistrations,
     bool? SolutionMember = null,
-    string? AssemblyName = null);
+    string? AssemblyName = null,
+    IReadOnlyList<string>? DeclaredTargetFrameworks = null,
+    FragmentSite? TargetFrameworksSite = null,
+    IReadOnlyList<FragmentPackageReference>? PackageReferences = null,
+    bool? IsPackable = null,
+    FragmentSite? IsPackableSite = null,
+    bool? LocksPackages = null,
+    FragmentSite? LocksPackagesSite = null);

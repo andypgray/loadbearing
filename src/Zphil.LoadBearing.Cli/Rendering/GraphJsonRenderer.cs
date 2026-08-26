@@ -90,14 +90,15 @@ internal static class GraphJsonRenderer
         return (rows, null);
     }
 
-    // The row's own ladder. The framework pair rides it like solutionMember and the project's generated
-    // count, so it survives every rung the roster does down to index, where the row is cut to what names and
-    // sizes a project; each is also omitted when empty, which is every single-framework project — the rule
-    // that keeps an ordinary solution's survey the document it was before the keys existed. The declared
-    // references are the row's one array, and the reason index exists: they scale with the solution's edges
-    // rather than its projects, so on a large solution they are most of the roster's bulk. They elide bare,
-    // as the namespaces do at overview — a row's array needs no count of its own when the document already
-    // stamps the grain that dropped it.
+    // The row's own ladder. What a project targets, whether it packs and whether it locks all ride it like
+    // solutionMember and the generated count, so they survive every rung the roster does down to index,
+    // where the row is cut to what names and sizes a project. Each is omitted where it has no answer, which
+    // for the frameworks means no evaluation happened at all. The declared project references are the reason
+    // index exists: they scale with the solution's edges rather than its projects, so on a large solution
+    // they are most of the roster's bulk. The declared packages leave a rung earlier, at skeleton, beside
+    // the external-reference rows they are the build-side twin of. Both elide bare, as the namespaces do at
+    // overview — a row's array needs no count of its own when the document already stamps the grain that
+    // dropped it.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
         bool index = grain >= DocumentGrain.Index;
@@ -107,7 +108,10 @@ internal static class GraphJsonRenderer
             project.SolutionMember,
             !index && project.TargetFrameworks.Count > 0 ? project.TargetFrameworks : null,
             index ? null : project.FactsFollow,
+            index ? null : project.IsPackable,
+            index ? null : project.LocksPackages,
             index ? null : project.ProjectReferences,
+            grain >= DocumentGrain.Skeleton ? null : project.PackageReferences,
             project.Types,
             project.Generated > 0 ? project.Generated : null,
             grain >= DocumentGrain.Overview

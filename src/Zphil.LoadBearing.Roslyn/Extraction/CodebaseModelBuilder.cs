@@ -14,9 +14,15 @@ namespace Zphil.LoadBearing.Roslyn.Extraction;
 /// </summary>
 internal static class CodebaseModelBuilder
 {
-    public static CodebaseModel Build(IReadOnlyList<CompilationInput> inputs)
+    /// <param name="inputs">The compilations to extract, in extraction order.</param>
+    /// <param name="artifactFacts">
+    ///     What MSBuild said about each input's project, at the same index. Null on the paths that hand
+    ///     compilations over directly, where there is no project file to evaluate.
+    /// </param>
+    public static CodebaseModel Build(
+        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts = null)
     {
-        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs);
+        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs, artifactFacts);
 
         return FragmentMerger.Merge(fragments);
     }

@@ -52,14 +52,22 @@ internal static class MultiTargetedProjects
     ///     each target one framework, which is most of them.
     /// </summary>
     /// <remarks>
-    ///     Wider than the merge notes by design: a note is raised only where two frameworks declared the same
-    ///     type, so a project whose frameworks share nothing has no note and is still checked against one of
-    ///     them.
+    ///     <para>
+    ///         Wider than the merge notes by design: a note is raised only where two frameworks declared the
+    ///         same type, so a project whose frameworks share nothing has no note and is still checked
+    ///         against one of them.
+    ///     </para>
+    ///     <para>
+    ///         Narrower than the framework list, which every project now carries: a single-framework project
+    ///         states what it targets like any other and has nothing to disclose about it, so the gate is a
+    ///         second framework or a collapse — the second arm because a load that discriminated
+    ///         compilations knows one happened even where nothing evaluated the project file.
+    ///     </para>
     /// </remarks>
     internal static IReadOnlyList<MultiTargetedProject> Of(CodebaseModel codebase)
     {
         return codebase.Projects
-            .Where(project => project.TargetFrameworks.Count > 0)
+            .Where(project => project.TargetFrameworks.Count > 1 || project.FactsFollow is not null)
             .Select(project => new MultiTargetedProject(
                 project.Name, project.TargetFrameworks, project.FactsFollow))
             .ToList();

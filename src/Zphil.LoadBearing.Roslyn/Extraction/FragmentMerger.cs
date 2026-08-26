@@ -788,6 +788,7 @@ internal static class FragmentMerger
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
             Dictionary<string, bool?> memberByProject = new(StringComparer.Ordinal);
+            Dictionary<string, ProjectArtifacts> artifactsByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in fragments)
             {
                 if (!refsByProject.TryGetValue(fragment.ProjectName, out SortedSet<string>? refs))
@@ -800,23 +801,49 @@ internal static class FragmentMerger
 
                 memberByProject[fragment.ProjectName] = UnionMembership(
                     memberByProject.GetValueOrDefault(fragment.ProjectName), fragment.SolutionMember);
+
+                if (!artifactsByProject.TryGetValue(fragment.ProjectName, out ProjectArtifacts? artifacts))
+                    artifactsByProject[fragment.ProjectName] = artifacts = new ProjectArtifacts();
+
+                artifacts.Absorb(fragment);
             }
 
             return refsByProject
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => new ProjectNode(
-                    kv.Key, kv.Value.ToList(), memberByProject[kv.Key], TargetFrameworksOf(kv.Key),
-                    _multiFrameworkWinners.GetValueOrDefault(kv.Key)))
+                .Select(kv => BuildProject(
+                    kv.Key, kv.Value, memberByProject[kv.Key], artifactsByProject[kv.Key]))
                 .ToList();
         }
 
-        // Stated only where there is more than one framework to state: a single-framework project — and
-        // every hand-built input, whose fragments carry no framework at all — has nothing a name does not
-        // already say.
-        private IReadOnlyList<string>? TargetFrameworksOf(string projectName)
+        private ProjectNode BuildProject(
+            string projectName, SortedSet<string> projectReferences, bool? solutionMember, ProjectArtifacts artifacts)
         {
-            SortedSet<string>? frameworks = _frameworksByProject.GetValueOrDefault(projectName);
-            return frameworks is { Count: > 1 } ? frameworks.ToList() : null;
+            return new ProjectNode(
+                projectName,
+                projectReferences.ToList(),
+                solutionMember,
+                TargetFrameworksOf(projectName, artifacts),
+                FragmentSiteSets.Location(artifacts.TargetFrameworksSite),
+                _multiFrameworkWinners.GetValueOrDefault(projectName),
+                artifacts.PackageReferences(),
+                artifacts.IsPackable,
+                FragmentSiteSets.Location(artifacts.IsPackableSite),
+                artifacts.LocksPackages,
+                FragmentSiteSets.Location(artifacts.LocksPackagesSite));
+        }
+
+        // What the project declares, whatever it compiled to — so a single-framework project states its one
+        // framework like any other, and a solution filter that extracted one of a project's two frameworks
+        // still reports both. The frameworks its fragments actually carried are the fallback rather than the
+        // answer: they exist only where a load discriminated the compilations, which is the multi-framework
+        // case, so a project nothing evaluated says what it can and a hand-built input says nothing.
+        private IReadOnlyList<string>? TargetFrameworksOf(string projectName, ProjectArtifacts artifacts)
+        {
+            IReadOnlyList<string> declared = artifacts.TargetFrameworks();
+            if (declared.Count > 0) return declared;
+
+            SortedSet<string>? carried = _frameworksByProject.GetValueOrDefault(projectName);
+            return carried is { Count: > 0 } ? carried.ToList() : null;
         }
 
         // A multi-targeted project arrives as one fragment per framework under the one name the load boundary
@@ -830,6 +857,87 @@ internal static class FragmentMerger
             if (right is null) return left;
 
             return left.Value || right.Value;
+        }
+
+        /// <summary>
+        ///     One project's artifact facts folded across its fragments — the evaluated half of a
+        ///     <see cref="ProjectNode" />, which a multi-targeted project states once per framework because a
+        ///     condition on <c>$(TargetFramework)</c> can make them differ.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         <b>Each fact folds in the direction that cannot invent a clean answer.</b> A package any
+        ///         framework declares is a package the project declares, so the references union. Packability
+        ///         unions for the same reason read the other way round: if one framework produces a package,
+        ///         the project ships one. The lock policy <em>intersects</em> — a framework whose restore
+        ///         writes no lock file leaves that restore unlocked however the others are configured — and
+        ///         that opposition between the two flags is the fact rather than an inconsistency, because
+        ///         one is a property of what gets built and the other of how it is resolved.
+        ///     </para>
+        ///     <para>
+        ///         <b>Unknown loses to either verdict</b>, exactly as <see cref="UnionMembership" /> has it: a
+        ///         fragment nothing evaluated has nothing to contradict one that was, so a project is unknown
+        ///         only when every one of its fragments was.
+        ///     </para>
+        ///     <para>
+        ///         <b>The site follows the fact that decides the verdict.</b> Where a fragment changes the
+        ///         fold it brings its own site with it, so the packable project's site is the framework that
+        ///         packs and the unlocked project's site is the framework that does not — which is the
+        ///         <c>file:line</c> a violation about either would have to name. Fragments arrive in a fixed
+        ///         order, so this is deterministic even where every fragment agrees.
+        ///     </para>
+        /// </remarks>
+        private sealed class ProjectArtifacts
+        {
+            private readonly SortedSet<string> _frameworks = new(StringComparer.Ordinal);
+            private readonly Dictionary<string, FragmentSite> _packages = new(StringComparer.Ordinal);
+
+            internal bool? IsPackable { get; private set; }
+
+            internal FragmentSite? IsPackableSite { get; private set; }
+
+            internal bool? LocksPackages { get; private set; }
+
+            internal FragmentSite? LocksPackagesSite { get; private set; }
+
+            internal FragmentSite? TargetFrameworksSite { get; private set; }
+
+            internal void Absorb(CodebaseFragment fragment)
+            {
+                foreach (string framework in fragment.DeclaredTargetFrameworks ?? []) _frameworks.Add(framework);
+                if (fragment.TargetFrameworksSite is { } frameworksSite && TargetFrameworksSite is null)
+                    TargetFrameworksSite = frameworksSite;
+
+                foreach (FragmentPackageReference package in fragment.PackageReferences ?? [])
+                    if (!_packages.TryGetValue(package.Name, out FragmentSite existing)
+                        || package.Site.CompareTo(existing) < 0)
+                        _packages[package.Name] = package.Site;
+
+                if (fragment.IsPackable is { } packable && IsPackable is not true)
+                {
+                    if (IsPackable is null || packable) IsPackableSite = fragment.IsPackableSite;
+                    IsPackable = IsPackable is null ? packable : IsPackable.Value || packable;
+                }
+
+                if (fragment.LocksPackages is { } locks && LocksPackages is not false)
+                {
+                    if (LocksPackages is null || !locks) LocksPackagesSite = fragment.LocksPackagesSite;
+                    LocksPackages = LocksPackages is null ? locks : LocksPackages.Value && locks;
+                }
+            }
+
+            internal IReadOnlyList<string> TargetFrameworks()
+            {
+                return _frameworks.ToList();
+            }
+
+            internal IReadOnlyList<PackageReference> PackageReferences()
+            {
+                return _packages
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => new PackageReference(entry.Key, new SourceLocation(entry.Value.File, entry.Value.Line)))
+                    .ToList();
+            }
         }
 
         /// <summary>

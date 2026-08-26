@@ -70,13 +70,19 @@ internal static class FragmentExtractor
     ///         <see cref="AggregateException" /> the error-rendering path has never had to know about.
     ///     </para>
     /// </remarks>
-    public static CodebaseFragment[] ExtractAll(IReadOnlyList<CompilationInput> inputs)
+    /// <param name="inputs">The compilations to extract, in extraction order.</param>
+    /// <param name="artifactFacts">
+    ///     What MSBuild said about each input's project, at the same index — null, or a null entry, wherever
+    ///     nothing evaluated it, which is every path that hands compilations over directly.
+    /// </param>
+    public static CodebaseFragment[] ExtractAll(
+        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts = null)
     {
         var fragments = new CodebaseFragment[inputs.Count];
 
         try
         {
-            Parallel.For(0, inputs.Count, i => fragments[i] = Extract(inputs[i]));
+            Parallel.For(0, inputs.Count, i => fragments[i] = WithArtifactFacts(Extract(inputs[i]), ArtifactFactsAt(artifactFacts, i)));
         }
         catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count > 0)
         {
@@ -84,6 +90,30 @@ internal static class FragmentExtractor
         }
 
         return fragments;
+    }
+
+    private static ProjectArtifactFacts? ArtifactFactsAt(IReadOnlyList<ProjectArtifactFacts?>? artifactFacts, int index)
+    {
+        return artifactFacts is not null && index < artifactFacts.Count ? artifactFacts[index] : null;
+    }
+
+    // Stamped onto the finished fragment rather than threaded through the extraction, because none of it
+    // comes from the compilation: an evaluated fact and a bound symbol are two different reads of the same
+    // project, and only one of them has anything to say about a hand-built input.
+    private static CodebaseFragment WithArtifactFacts(CodebaseFragment fragment, ProjectArtifactFacts? facts)
+    {
+        if (facts is null) return fragment;
+
+        return fragment with
+        {
+            DeclaredTargetFrameworks = facts.TargetFrameworks,
+            TargetFrameworksSite = facts.TargetFrameworksSite,
+            PackageReferences = facts.PackageReferences,
+            IsPackable = facts.IsPackable,
+            IsPackableSite = facts.IsPackableSite,
+            LocksPackages = facts.LocksPackages,
+            LocksPackagesSite = facts.LocksPackagesSite
+        };
     }
 
     private static IEnumerable<INamedTypeSymbol> DeclaredTypes(Compilation compilation)

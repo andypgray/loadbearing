@@ -154,12 +154,14 @@ internal sealed record GraphJson(
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects);
 
 /// <summary>
-///     One project: whether the solution declares it, which target frameworks it was extracted from and
-///     which one its shared types' facts came from, its declared references, solution-declared type count,
-///     how many of those a generator emitted, and its namespace inventory — the last of which is null
-///     (omitted) at overview grain, being the one thing that grain elides. At index grain the row is down to
-///     what names and sizes the project: the frameworks pair and <c>projectReferences</c> go, leaving
-///     <c>name</c>, <c>solutionMember</c>, <c>types</c> and <c>generated</c>.
+///     One project: whether the solution declares it, what it targets and which framework its shared types'
+///     facts came from, whether it packs and whether its restore locks, its declared project and package
+///     references, solution-declared type count, how many of those a generator emitted, and its namespace
+///     inventory — the last of which is null (omitted) at overview grain, being the one thing that grain
+///     elides. <c>packageReferences</c> goes at skeleton, beside the document's external-reference rows. At
+///     index grain the row is down to what names and sizes the project: the frameworks pair, the packaging
+///     pair and <c>projectReferences</c> go, leaving <c>name</c>, <c>solutionMember</c>, <c>types</c> and
+///     <c>generated</c>.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -169,25 +171,34 @@ internal sealed record GraphJson(
 ///         <c>ProjectReference</c> that the solution file does not declare.
 ///     </para>
 ///     <para>
-///         <c>targetFrameworks</c> and <c>factsFollow</c> ride the row for the reason <c>generated</c> does,
-///         and are absent for the same reason: a single-framework project has one compilation, so its name
-///         already says which one every fact came from and there is nothing to qualify. Where a project file
-///         yielded several, the array names them all and <c>factsFollow</c> names the one the types they
-///         share took their facts from — absent in its own right when the frameworks share no type, because
-///         nothing was then displaced and claiming a winner would be false about every type in the project.
-///         Riding the row is also what carries them down the grain ladder to its last rung: the pair scales
-///         with the solution's projects, which every survey lists in full. They stop at index, where a row
-///         answers only "which projects are there, and how big" and every qualifier on that answer is one
-///         more multiple of the project count.
+///         <c>targetFrameworks</c> names every framework the project declares, and is absent only where
+///         nothing evaluated the project file — a hand-built model, or a host with no MSBuild to evaluate
+///         with. <c>factsFollow</c> rides beside it and is absent far more often: it names the framework the
+///         types a multi-targeted project's compilations <em>share</em> took their facts from, so it is
+///         absent for every single-framework project, and absent in its own right for a multi-targeted one
+///         whose frameworks share no type — nothing was then displaced, and claiming a winner would be false
+///         about every type in the project.
 ///     </para>
 ///     <para>
-///         <c>projectReferences</c> is the row's one array and the reason index is a rung at all: what a
-///         project declares scales with the solution's <em>edges</em> rather than its projects, so on a
-///         large solution these lists are most of the roster's bulk. Elided at index it goes bare, with no
-///         count — the same rule <c>namespaces</c> takes at overview: a row's own array carries its
-///         document's grain stamp with it, so it needs no per-row restatement, while a document-level array
-///         (<c>projectEdges</c>, <c>externalEdges</c>) elides to a count because nothing else on the
-///         document says how much was there.
+///         <c>isPackable</c> and <c>locksPackages</c> are the artifact pair, and both are evaluated rather
+///         than read off the project file: the first is true by SDK default on projects that never say so,
+///         and the second is regularly set once in a props file above the whole solution. Absent means no
+///         answer — nothing evaluated the project, or, for <c>isPackable</c> alone, a project outside the
+///         SDK's pack machinery, which has none. Like <c>targetFrameworks</c> these scale with the
+///         solution's projects, so they ride the row down to index, where it answers only "which projects
+///         are there, and how big" and every qualifier on that answer is one more multiple of the project
+///         count.
+///     </para>
+///     <para>
+///         <c>projectReferences</c> is the reason index is a rung at all: what a project declares scales
+///         with the solution's <em>edges</em> rather than its projects, so on a large solution these lists
+///         are most of the roster's bulk. <c>packageReferences</c> is the row's other array and leaves a
+///         rung earlier, at skeleton, beside the document's <c>externalEdges</c> — the two are one fact seen
+///         twice, what a project depends on outside itself, one counted from the code and one declared in
+///         the build. Both elide bare, with no count, the same rule <c>namespaces</c> takes at overview: a
+///         row's own array carries its document's grain stamp with it, so it needs no per-row restatement,
+///         while a document-level array (<c>projectEdges</c>, <c>externalEdges</c>) elides to a count
+///         because nothing else on the document says how much was there.
 ///     </para>
 ///     <para>
 ///         <c>generated</c> is a qualifier on the number it qualifies, in both places that number
@@ -200,7 +211,10 @@ internal sealed record GraphProjectJson(
     bool? SolutionMember,
     IReadOnlyList<string>? TargetFrameworks,
     string? FactsFollow,
+    bool? IsPackable,
+    bool? LocksPackages,
     IReadOnlyList<string>? ProjectReferences,
+    IReadOnlyList<string>? PackageReferences,
     int Types,
     int? Generated,
     IReadOnlyList<GraphNamespaceJson>? Namespaces);

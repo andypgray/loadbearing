@@ -58,10 +58,10 @@ public static class CodebaseExtractor
         IReadOnlySet<string>? declaredMembers = null,
         CancellationToken ct = default)
     {
-        IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
+        ExtractionInputs collected = await CollectInputsAsync(
             solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct);
-        return CodebaseModelBuilder.Build(inputs);
+        return CodebaseModelBuilder.Build(collected.Inputs, collected.ArtifactFacts);
     }
 
     /// <summary>
@@ -85,10 +85,10 @@ public static class CodebaseExtractor
         IReadOnlySet<string>? declaredMembers = null,
         CancellationToken ct = default)
     {
-        IReadOnlyList<CompilationInput> inputs = await CollectInputsAsync(
+        ExtractionInputs collected = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct);
-        return FragmentExtractor.ExtractAll(inputs);
+        return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts);
     }
 
     // The shared project enumeration behind both entry points: C# projects passing the filter, ordered by
@@ -101,7 +101,7 @@ public static class CodebaseExtractor
     // <TargetFrameworks> declaration order — and the merge gives the FIRST input's facts to every type they
     // share. Ordering on the framework fixes which one that is, so reordering a csproj's framework list
     // cannot silently move a type's facts.
-    private static async Task<List<CompilationInput>> CollectInputsAsync(
+    private static async Task<ExtractionInputs> CollectInputsAsync(
         Solution solution,
         Func<Project, bool> include,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks,
@@ -116,6 +116,16 @@ public static class CodebaseExtractor
             .ToList();
 
         ct.ThrowIfCancellationRequested();
+
+        // The artifact facts come from MSBuild rather than from Roslyn, so this batch shares nothing with the
+        // binding below and runs beside it: evaluation is a serial walk of one ProjectCollection, and binding
+        // is the expensive half it would otherwise wait behind. One request per input, in input order, so the
+        // results read back by the same index as everything else here.
+        List<ProjectEvaluationRequest> evaluationRequests = projects
+            .Select(project => new ProjectEvaluationRequest(project.FilePath, TargetFrameworkOf(targetFrameworks, project)))
+            .ToList();
+        Task<IReadOnlyList<ProjectArtifactFacts?>> artifactFactsTask =
+            Task.Run(() => ProjectFactsEvaluator.EvaluateAll(evaluationRequests, ct), ct);
 
         // Binding is the expensive half and the projects are independent, so they bind together rather than
         // one after another. The ordered list above still decides input order — the results are read back by
@@ -136,7 +146,10 @@ public static class CodebaseExtractor
         // canonicalized path, and the projects of one solution share nearly all of their ancestors.
         var canonicalProjectFiles = new ProjectFileCanonicalizer();
 
+        IReadOnlyList<ProjectArtifactFacts?> evaluated = await artifactFactsTask;
+
         List<CompilationInput> inputs = [];
+        List<ProjectArtifactFacts?> artifactFacts = [];
         for (var i = 0; i < projects.Count; i++)
         {
             if (compilations[i] is not { } compilation) continue;
@@ -154,9 +167,10 @@ public static class CodebaseExtractor
                 SpecExclusion.SolutionMembershipOf(
                     declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath)),
                 generatedTrees[i]));
+            artifactFacts.Add(evaluated[i]);
         }
 
-        return inputs;
+        return new ExtractionInputs(inputs, artifactFacts);
     }
 
     // The trees one project's source generators produced, by reference — the identity the extractor tests

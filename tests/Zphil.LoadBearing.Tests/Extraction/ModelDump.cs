@@ -20,10 +20,7 @@ internal static class ModelDump
 
         builder.AppendLine("== PROJECTS ==");
         foreach (ProjectNode project in model.Projects)
-            builder.Append(project.Name)
-                .Append(" -> [")
-                .Append(string.Join(", ", project.ProjectReferences))
-                .AppendLine("]");
+            RenderProject(builder, project);
 
         builder.AppendLine("== TYPES ==");
         foreach (TypeNode type in model.Types)
@@ -136,6 +133,49 @@ internal static class ModelDump
             RenderMember(builder, type, member);
 
         return builder.ToString();
+    }
+
+    // Every fact a project node carries, including the two that went unrendered until the artifact facts
+    // arrived beside them: a dump comparison can only see a dropped field if the dump prints it, and
+    // solutionMember and factsFollow were both round-tripping unwatched. A site renders as its own file:line
+    // or <null>, so a fact that loses its declaration is a visible diff rather than a silent one.
+    private static void RenderProject(StringBuilder builder, ProjectNode project)
+    {
+        builder.Append(project.Name)
+            .Append(" -> [")
+            .Append(string.Join(", ", project.ProjectReferences))
+            .AppendLine("]");
+        builder.Append("  solutionMember=")
+            .Append(Tristate(project.SolutionMember))
+            .Append(" targets=[")
+            .Append(string.Join(", ", project.TargetFrameworks))
+            .Append("] @ ")
+            .Append(Site(project.TargetFrameworksSite))
+            .Append(" factsFollow=")
+            .Append(project.FactsFollow ?? "<null>")
+            .AppendLine();
+        builder.Append("  isPackable=")
+            .Append(Tristate(project.IsPackable))
+            .Append(" @ ")
+            .Append(Site(project.IsPackableSite))
+            .Append(" locksPackages=")
+            .Append(Tristate(project.LocksPackages))
+            .Append(" @ ")
+            .Append(Site(project.LocksPackagesSite))
+            .AppendLine();
+        builder.Append("  packages=[")
+            .Append(string.Join(", ", project.PackageReferences.Select(package => $"{package.Name} @ {package.Site}")))
+            .AppendLine("]");
+    }
+
+    private static string Tristate(bool? value)
+    {
+        return value?.ToString() ?? "<null>";
+    }
+
+    private static string Site(SourceLocation? location)
+    {
+        return location?.ToString() ?? "<null>";
     }
 
     private static void RenderMember(StringBuilder builder, TypeNode type, MemberNode member)

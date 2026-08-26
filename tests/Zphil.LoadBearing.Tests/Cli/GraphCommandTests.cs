@@ -39,9 +39,9 @@ public sealed class GraphCommandTests
         Codebase survey: MyApp.sln
 
         Projects (3):
-          MyApp.Domain — 8 types; references: MyApp.Web
-          MyApp.Legacy.Billing — 4 types; references: (none)
-          MyApp.Web — 19 types; references: MyApp.Legacy.Billing
+          MyApp.Domain — 8 types; targets net10.0; references: MyApp.Web; packages: (none)
+          MyApp.Legacy.Billing — 4 types; targets net10.0; references: (none); packages: (none)
+          MyApp.Web — 19 types; targets net10.0; references: MyApp.Legacy.Billing; packages: Microsoft.Extensions.DependencyInjection.Abstractions
 
         Projects the solution declares that this survey does not cover:
           (none)
@@ -81,7 +81,7 @@ public sealed class GraphCommandTests
         Codebase survey: MyApp.sln
 
         Projects (1):
-          MyApp.Web — 19 types; references: MyApp.Legacy.Billing
+          MyApp.Web — 19 types; targets net10.0; references: MyApp.Legacy.Billing; packages: Microsoft.Extensions.DependencyInjection.Abstractions
 
         Projects the solution declares that this survey does not cover:
           (none)

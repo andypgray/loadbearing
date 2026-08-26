@@ -174,15 +174,15 @@ public sealed class MultiTargetFrameworkTests
     }
 
     [Fact]
-    public async Task ExtractFromSolutionAsync_SingleTargetedProject_StatesNeitherFrameworkFact()
+    public async Task ExtractFromSolutionAsync_SingleTargetedProject_StatesItsOneFrameworkAndNoWinner()
     {
         CodebaseModel model = await MultiTfmCodebase.Value;
 
-        // The contrast project inside the same model: one compilation, so its name already says which one
-        // every fact came from and there is nothing to qualify. This is the shape every project of an
-        // ordinary solution has, and the reason its documents are the ones they were before the pair existed.
+        // The contrast project inside the same model, and the two facts part company on it: what a project
+        // targets is stated whatever it targets, because a rule about it has to be able to fail here too,
+        // while the winner is a disclosure about a collapse and this project had none to disclose.
         ProjectNode web = model.Projects.Single(project => project.Name == Web);
-        web.TargetFrameworks.ShouldBeEmpty();
+        web.TargetFrameworks.ShouldBe(["net10.0"]);
         web.FactsFollow.ShouldBeNull();
     }
 

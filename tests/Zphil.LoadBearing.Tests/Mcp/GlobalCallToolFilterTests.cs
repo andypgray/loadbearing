@@ -179,7 +179,7 @@ public sealed class GlobalCallToolFilterTests
         // at the same number it had just been measured against.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
-        harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "400"); // 1000-char cap
+        harness.Environment.SetVariable("MAX_MCP_OUTPUT_TOKENS", "600"); // 1500-char cap
 
         // Act
         CallToolResult result = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);

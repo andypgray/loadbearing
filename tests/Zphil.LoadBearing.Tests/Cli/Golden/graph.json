@@ -5,9 +5,15 @@
     {
       "name": "MyApp.Domain",
       "solutionMember": true,
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "isPackable": true,
+      "locksPackages": false,
       "projectReferences": [
         "MyApp.Web"
       ],
+      "packageReferences": [],
       "types": 8,
       "namespaces": [
         {
@@ -19,7 +25,13 @@
     {
       "name": "MyApp.Legacy.Billing",
       "solutionMember": true,
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "isPackable": true,
+      "locksPackages": false,
       "projectReferences": [],
+      "packageReferences": [],
       "types": 4,
       "namespaces": [
         {
@@ -31,8 +43,16 @@
     {
       "name": "MyApp.Web",
       "solutionMember": true,
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "isPackable": true,
+      "locksPackages": false,
       "projectReferences": [
         "MyApp.Legacy.Billing"
+      ],
+      "packageReferences": [
+        "Microsoft.Extensions.DependencyInjection.Abstractions"
       ],
       "types": 19,
       "namespaces": [

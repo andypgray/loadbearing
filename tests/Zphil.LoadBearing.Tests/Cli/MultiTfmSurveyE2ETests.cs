@@ -48,7 +48,7 @@ public sealed class MultiTfmSurveyE2ETests
     }
 
     [Fact]
-    public async Task Graph_SingleTargetedProject_OmitsBothKeysEntirely()
+    public async Task Graph_SingleTargetedProject_StatesItsFrameworkAndOmitsTheWinner()
     {
         // Arrange
         using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
@@ -56,15 +56,15 @@ public sealed class MultiTfmSurveyE2ETests
         // Act
         CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
 
-        // Assert — the omit-when-empty rule, which is what keeps every survey of an ordinary solution the
-        // document it was before these keys existed. Asserted on the contrast project inside the same
-        // document as the one above, so the two shapes cannot drift apart.
+        // Assert — the contrast project inside the same document as the one above, so the two shapes
+        // cannot drift apart. What a project targets is stated whatever it targets; the winner is a
+        // disclosure about a collapse, and this project had none.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement web = Project(document, Web);
 
-        web.TryGetProperty("targetFrameworks", out _)
-            .ShouldBeFalse();
+        Frameworks(web)
+            .ShouldBe(["net10.0"]);
         web.TryGetProperty("factsFollow", out _)
             .ShouldBeFalse();
     }
@@ -95,7 +95,7 @@ public sealed class MultiTfmSurveyE2ETests
     }
 
     [Fact]
-    public async Task Graph_HumanSurvey_QualifiesOnlyTheMultiTargetedProjectsLine()
+    public async Task Graph_HumanSurvey_NamesTheWinnerOnlyOnTheMultiTargetedProjectsLine()
     {
         // Arrange
         using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
@@ -103,15 +103,15 @@ public sealed class MultiTfmSurveyE2ETests
         // Act
         CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
 
-        // Assert — the same two facts a terminal reader gets, so nobody is sent to --json for them, and the
-        // single-framework line beside it unannotated: only the remarkable case is marked, which is what
-        // leaves the one line worth reading easy to find.
+        // Assert — the same two facts a terminal reader gets, so nobody is sent to --json for them. Both
+        // lines say what they target; only the line whose frameworks collapsed a type says whose facts won.
         result.ShouldSucceed();
         string output = result.Out.NormalizedLines();
 
         output.ShouldContain(
-            $"  {Core} — 2 types; targets net10.0, netstandard2.0 (shared types from net10.0); references: (none)");
-        output.ShouldContain($"  {Web} — 1 type; references: {Core}");
+            $"  {Core} — 2 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
+            + "references: (none); packages: (none)");
+        output.ShouldContain($"  {Web} — 1 type; targets net10.0; references: {Core}; packages: (none)");
     }
 
     private static IReadOnlyList<string?> Frameworks(JsonElement project)

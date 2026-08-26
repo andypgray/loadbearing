@@ -196,10 +196,10 @@ public static class MsBuildBootstrap
     }
 
     // The registration sequence both arms run: find the bin directory under the VS root, prove MSBuild.exe is
-    // in it, and only then point this process and the BuildHost subprocess at it. A missed probe registers
-    // nothing and hands both probed paths back, because that is the whole of what the two arms disagree
-    // about — an operator who named this root has to be told it was wrong, while a VS install we picked
-    // ourselves degrades to MSBuildLocator's defaults rather than failing a run over it.
+    // in it, and only then point the BuildHost subprocess at it and give this process an engine. A missed
+    // probe registers nothing and hands both probed paths back, because that is the whole of what the two
+    // arms disagree about — an operator who named this root has to be told it was wrong, while a VS install
+    // we picked ourselves degrades to MSBuildLocator's defaults rather than failing a run over it.
     private static (string MsBuildBin, string MsBuildExe, bool Registered) TryRegisterFromVsRoot(string vsRoot)
     {
         string msBuildBin = Path.Combine(vsRoot, MsBuildBinLayout);
@@ -207,9 +207,29 @@ public static class MsBuildBootstrap
         if (!File.Exists(msBuildExe)) return (msBuildBin, msBuildExe, false);
 
         ApplyDevConsoleEnv(vsRoot);
-        MSBuildLocator.RegisterMSBuildPath(msBuildBin);
+        RegisterEngineForThisProcess(msBuildBin);
 
         return (msBuildBin, msBuildExe, true);
+    }
+
+    // Which MSBuild the BuildHost opens projects with and which one runs inside this process are two
+    // choices, and only the first of them is about Visual Studio: ApplyDevConsoleEnv above has already
+    // handed the subprocess the VS instance that has to read a non-SDK project. In-process the engine has
+    // to be a .NET build of MSBuild or it will not run at all — Visual Studio ships a .NET Framework one,
+    // whose SDK resolver cannot be loaded here, and this process evaluates project files directly. So the
+    // .NET SDK's MSBuild is registered, which is what every non-Windows run already gets. A machine with no
+    // SDK at all falls back to the VS path: nothing here can then evaluate, and an unevaluated project
+    // records no artifact facts, which the model already knows how to be missing.
+    private static void RegisterEngineForThisProcess(string msBuildBin)
+    {
+        try
+        {
+            MSBuildLocator.RegisterDefaults();
+        }
+        catch (InvalidOperationException)
+        {
+            MSBuildLocator.RegisterMSBuildPath(msBuildBin);
+        }
     }
 
     /// <summary>

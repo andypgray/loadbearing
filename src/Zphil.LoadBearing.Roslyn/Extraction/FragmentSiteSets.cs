@@ -105,6 +105,16 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
+    ///     One site as the model's <see cref="SourceLocation" />, or <see langword="null" /> for a site that
+    ///     was never recorded — the singular twin of <see cref="Locations" />, for the facts that have one
+    ///     declaration rather than a set of mentions.
+    /// </summary>
+    internal static SourceLocation? Location(FragmentSite? site)
+    {
+        return site is { } known ? new SourceLocation(known.File, known.Line) : null;
+    }
+
+    /// <summary>
     ///     The distinct files a site collection touches, in first-occurrence order (the GRAMMAR §5.6
     ///     <c>FilePaths</c> contract).
     /// </summary>

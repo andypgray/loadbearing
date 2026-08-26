@@ -70,7 +70,10 @@ public sealed class ProjectSummary
         IReadOnlyList<NamespaceCount> namespaces,
         bool? solutionMember = null,
         IReadOnlyList<string>? targetFrameworks = null,
-        string? factsFollow = null)
+        string? factsFollow = null,
+        IReadOnlyList<string>? packageReferences = null,
+        bool? isPackable = null,
+        bool? locksPackages = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
@@ -80,6 +83,9 @@ public sealed class ProjectSummary
         SolutionMember = solutionMember;
         TargetFrameworks = targetFrameworks ?? [];
         FactsFollow = factsFollow;
+        PackageReferences = packageReferences ?? [];
+        IsPackable = isPackable;
+        LocksPackages = locksPackages;
     }
 
     /// <summary>The project (assembly) name.</summary>
@@ -112,9 +118,9 @@ public sealed class ProjectSummary
     public bool? SolutionMember { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.TargetFrameworks" /> verbatim: every framework this project was extracted
-    ///     from, ordinal-ordered, and empty for the single-framework project — which is every project of most
-    ///     solutions, so most surveys say nothing here at all.
+    ///     <see cref="ProjectNode.TargetFrameworks" /> verbatim: every framework this project declares,
+    ///     ordinal-ordered and normalized to the short moniker. Empty only where nothing was evaluated to
+    ///     answer with.
     /// </summary>
     public IReadOnlyList<string> TargetFrameworks { get; }
 
@@ -125,6 +131,26 @@ public sealed class ProjectSummary
     ///     several, with every other framework's conditional code outside the model.
     /// </summary>
     public string? FactsFollow { get; }
+
+    /// <summary>
+    ///     The names of the packages this project declares, ordinal-ordered — the declaration sites the
+    ///     model holds are dropped here, on the survey's grouped-counts posture, and arrive from
+    ///     <c>check</c> once a rule names them.
+    /// </summary>
+    public IReadOnlyList<string> PackageReferences { get; }
+
+    /// <summary>
+    ///     <see cref="ProjectNode.IsPackable" /> verbatim: whether the project produces a package, or
+    ///     <see langword="null" /> where there is no answer. The survey is where the four projects a
+    ///     solution actually ships are told apart from the many that merely compile.
+    /// </summary>
+    public bool? IsPackable { get; }
+
+    /// <summary>
+    ///     <see cref="ProjectNode.LocksPackages" /> verbatim: whether restoring this project writes a lock
+    ///     file, or <see langword="null" /> where nothing evaluated it.
+    /// </summary>
+    public bool? LocksPackages { get; }
 }
 
 /// <summary>A namespace and the number of a project's solution-declared types that reside in it.</summary>

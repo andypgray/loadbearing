@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Hosting;
+using Zphil.LoadBearing.Roslyn.Solutions;
 using Zphil.LoadBearing.Tests.Extraction;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -107,10 +108,14 @@ public sealed class CodebaseSourceMemoTests
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // The oracle every claim above is checked against: the extraction the cold path performs, with the
-    // exclusion applied at collection rather than at merge.
+    // exclusion applied at collection rather than at merge. It is handed the solution's declared membership
+    // for the same reason the memoized source reads it — the comparison is about where the exclusion is
+    // applied, and a fact the oracle was never given would read as a difference the memo introduced.
     private static Task<CodebaseModel> ColdAsync(SolutionHandle handle, string[] excludeProjectNames)
     {
-        return CodebaseExtractor.ExtractFromSolutionAsync(handle.Solution, excludeProjectNames, ct: Ct);
+        return CodebaseExtractor.ExtractFromSolutionAsync(
+            handle.Solution, excludeProjectNames,
+            declaredMembers: SpecExclusion.TryReadDeclaredMembers(handle.SolutionPath), ct: Ct);
     }
 
     // The cache root only matters where a fact turns the cache on; elsewhere the run is disabled and reads
