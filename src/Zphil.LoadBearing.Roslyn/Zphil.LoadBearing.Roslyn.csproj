@@ -47,7 +47,7 @@
          registration, which the CLI's replay path performs up front. No engine assemblies ship (see the
          ExcludeAssets="runtime" block below); the SDK's are resolved on the host after registration. -->
     <ItemGroup>
-        <PackageReference Include="Basic.CompilerLog.Util" Version="0.9.56" />
+        <PackageReference Include="Basic.CompilerLog.Util" Version="0.9.60" />
     </ItemGroup>
 
     <!-- complog references the Microsoft.CodeAnalysis meta-package at >= 4.8.0; left alone it resolves

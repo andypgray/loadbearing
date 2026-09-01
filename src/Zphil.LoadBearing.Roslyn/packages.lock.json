@@ -4,11 +4,11 @@
     "net10.0": {
       "Basic.CompilerLog.Util": {
         "type": "Direct",
-        "requested": "[0.9.56, )",
-        "resolved": "0.9.56",
-        "contentHash": "kh4Lnon/bRjKx//9lFqQicHnAUIBW7iWeDlsUw8nEC9NBSSE9jxXcdL0KIeLU6flxHU2g+/PYLVPpoptnIIblw==",
+        "requested": "[0.9.60, )",
+        "resolved": "0.9.60",
+        "contentHash": "LvxBJsWj8dOqjNE1n4E+h49ZaZebyveztnB9gd9Joc1UrSX3qRW2RweKekeU6Fo8LvwhyPbfg/nCZgtsyyHWHA==",
         "dependencies": {
-          "MSBuild.StructuredLogger": "2.3.213",
+          "MSBuild.StructuredLogger": "2.3.244",
           "MessagePack": "3.1.8",
           "Microsoft.Bcl.Memory": "10.0.11",
           "Microsoft.CodeAnalysis": "4.8.0",
@@ -284,8 +284,8 @@
       },
       "MSBuild.StructuredLogger": {
         "type": "Transitive",
-        "resolved": "2.3.213",
-        "contentHash": "YGzaGta+8rgy2vnC14ZCdXIhXCbYNMYHoYldguY4+siZpJPgRJbGwtsg4+RjxVdEe7u28KA8Urv/ObNaYLWP0Q==",
+        "resolved": "2.3.244",
+        "contentHash": "znirXStxMZaTMzSJKB6NCD4Wt4/kt+xwMKuNOyYcdcBr1Dut9qQ3NjhveLvYvs/5k+71MZYHmy3vWvLgeu9Kdg==",
         "dependencies": {
           "Microsoft.Build.Framework": "17.5.0",
           "Microsoft.Build.Utilities.Core": "17.5.0"
