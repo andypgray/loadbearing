@@ -51,7 +51,7 @@
              the recognizer resolves are pinned here rather than floating on another package's closure. -->
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
-        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.10.0" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.0" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
         <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture
              model from compiled MyApp IL (Mono.Cecil), cross-checking LoadBearing's Roslyn-source model. -->

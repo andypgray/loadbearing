@@ -19,6 +19,6 @@
          live in the Abstractions assembly. Restored UNLOCKED (no packages.lock.json under Fixtures/) — the
          lock-file policy lives only in the tests project, never here. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     </ItemGroup>
 </Project>
