@@ -6,6 +6,6 @@
 This directory holds the `Invoicing` layer. Its architecture rules:
 
 - `modules/invoicing/internals` — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*` must be referenced only by the Invoicing layer. Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
-- `modules/invoicing/outbound` — The Invoicing layer must reference only the Invoicing layer, types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
+- `modules/invoicing/outbound` — The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->

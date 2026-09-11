@@ -28,7 +28,7 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Fix("Depend on `IDispatchBoard` or another `Dispatch.Contracts` type instead of reaching into the module's internals.");
 
         arch.Rule("modules/dispatch/outbound")
-            .Enforce(dispatch.MustOnlyReference(dispatch, arch.Namespace("Meridian.Operations.Tracking.Contracts.*")))
+            .Enforce(dispatch.MustOnlyReference(arch.Namespace("Meridian.Operations.Tracking.Contracts.*")))
             .Because("The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.");
 
         arch.Rule("modules/tracking/internals")
@@ -38,7 +38,7 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Fix("Depend on `ITrackingLog` or another `Tracking.Contracts` type instead of the internal store or log.");
 
         arch.Rule("modules/tracking/outbound")
-            .Enforce(tracking.MustOnlyReference(tracking))
+            .Enforce(tracking.MustOnlyReferenceItself())
             .Because("Tracking is the leaf of the module graph: it owns the shipment milestone timeline that every other module reads and depends on no module in turn, so nothing it does can pull another module's state into that shared source of truth.");
 
         arch.Rule("modules/tracking/event-naming")
@@ -59,14 +59,12 @@ public sealed class OperationsArchSpec : IArchitectureSpec
         // un-grandfatherable red — two rules fighting over one reference.
         arch.Rule("modules/invoicing/outbound")
             .Enforce(invoicing.MustOnlyReference(
-                invoicing,
                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
                 demurrage))
             .Because("Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.");
 
         arch.Rule("modules/host/outbound")
             .Enforce(host.MustOnlyReference(
-                host,
                 arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
                 arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"),

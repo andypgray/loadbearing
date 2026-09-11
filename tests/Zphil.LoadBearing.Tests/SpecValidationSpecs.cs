@@ -935,3 +935,23 @@ internal sealed class BlankProjectMustSpec : IArchitectureSpec
             .Because("Reason.");
     }
 }
+
+internal sealed class BlankCounterpartTemplateSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.MustHaveExactlyOneCounterpart(among: arch.Types, named: " "))
+            .Because("Reason.");
+    }
+}
+
+internal sealed class PlaceholderFreeCounterpartTemplateSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.MustHaveExactlyOneCounterpart(among: arch.Types, named: "IService"))
+            .Because("Reason.");
+    }
+}

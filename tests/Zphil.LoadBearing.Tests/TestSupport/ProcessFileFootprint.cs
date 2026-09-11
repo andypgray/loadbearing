@@ -199,6 +199,28 @@ internal static class ProcessFileFootprint
             .ToList();
     }
 
+    /// <summary>
+    ///     Everything <paramref name="process" /> holds under <paramref name="root" /> that it acquired for
+    ///     itself: the full scan minus the handles it was handed and the images a profiler forced in.
+    /// </summary>
+    /// <remarks>
+    ///     The one composition of the scan with both given-rather-than-acquired exclusions, shared so the
+    ///     footprint assertion's poll loop and the negative control that proves the scan is not blind
+    ///     cannot drift over which exclusions ran. A new exclusion lands here and both have it.
+    /// </remarks>
+    internal static IReadOnlyList<RetainedPath> AcquiredPathsUnder(
+        Process process,
+        string root,
+        IReadOnlyCollection<RetainedPath>? inheritedHandles,
+        string? injectedProfilerDirectory)
+    {
+        IReadOnlyList<RetainedPath> retained = PathsUnder(process, root);
+        if (inheritedHandles is not null)
+            retained = ExceptInherited(retained, inheritedHandles);
+
+        return ExceptInjected(retained, injectedProfilerDirectory);
+    }
+
     private static IReadOnlyList<RetainedPath> Scan(Process process, string root, bool includeMappedViews)
     {
         if (!IsSupported)

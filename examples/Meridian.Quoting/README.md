@@ -18,7 +18,7 @@ Three rules from [arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs](arch/Meridi
 
 ```csharp
         arch.Rule("layering/application-boundaries")
-            .Enforce(application.MustOnlyReference(application, domain))
+            .Enforce(application.MustOnlyReference(domain))
             .Because("Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.")
             .Fix("Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.");
 
@@ -40,12 +40,12 @@ Three rules from [arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs](arch/Meridi
 The exact lines those three produce in [AGENTS.md](AGENTS.md):
 
 ```markdown
-- `layering/application-boundaries` — The Application layer must reference only the Application layer or the Domain layer (external packages are not constrained by this rule). Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.
+- `layering/application-boundaries` — The Application layer must reference only the Domain layer (external packages are not constrained by this rule). Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.
 - `handlers/transactional` — Types implementing `ICommandHandler<TCommand>` must be attributed with `[Transactional]`. Every command here mutates the store, and the command bus opens a unit of work only around a handler marked `[Transactional]`; an unmarked command handler would commit each write on its own and leave a half-written quote if it failed midway.
 - `time/injected-clock` — Types in `Meridian.Quoting.*`, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`. A quote's validity window is computed from the current instant; read straight from the wall clock it cannot be tested at a fixed moment, so time enters through IClock and SystemClock is the one adapter that reads the machine clock.
 ```
 
-Each rendered rule opens with a sentence generated from the fluent call, then carries its `Because` string verbatim. `loadbearing render` writes the whole block into `AGENTS.md`; CI re-runs `render` on every push and fails on any diff, so the block an agent reads is provably the spec the build enforces. `layering/application-boundaries` renders its own honesty caveat: `MustOnlyReference` bounds the Application layer against the other layers, and the parenthetical `(external packages are not constrained by this rule)` says so, because a use case still depends on framework types.
+Each rendered rule opens with a sentence generated from the fluent call, then carries its `Because` string verbatim. `loadbearing render` writes the whole block into `AGENTS.md`; CI re-runs `render` on every push and fails on any diff, so the block an agent reads is provably the spec the build enforces. `layering/application-boundaries` renders its own honesty caveat: `MustOnlyReference` bounds the Application layer against the other layers, and the parenthetical `(external packages are not constrained by this rule)` says so, because a use case still depends on framework types. The call names only `domain` and the sentence only the Domain layer, because a `MustOnly*` subject may always reach itself: an Application-to-Application reference needs no permission written down.
 
 ## Every rule as a named test
 
@@ -88,7 +88,7 @@ Layers here are namespace patterns (`Meridian.Quoting.Application.*`), not proje
 The agent-failure story is an agent that wires the concrete repository instead of the port. Drop one file into the Api project (which already references Infrastructure, so it compiles) declaring the Application namespace and newing up `InMemoryQuoteRepository`. The layer is the namespace, so the type lands in Application while the file sits in Api, and `check` goes red:
 
 ```text
-FAIL layering/application-boundaries — The Application layer must reference only the Application layer or the Domain layer (external packages are not constrained by this rule).
+FAIL layering/application-boundaries — The Application layer must reference only the Domain layer (external packages are not constrained by this rule).
   because: Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.
   fix: Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.
   src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:12 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryDatabase

@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "overview",
   "summary": {
-    "rulesChecked": 27,
+    "rulesChecked": 28,
     "rulesPassed": 2,
-    "rulesFailed": 24,
+    "rulesFailed": 25,
     "rulesSkipped": 1,
-    "violations": 43,
+    "violations": 44,
     "warnings": 1
   },
   "rules": [
@@ -423,6 +423,28 @@
         {
           "kind": "shape",
           "subject": "MyApp.Domain.OrderService",
+          "siteCount": 1
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/services-behind-contracts",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types named `*Service` must have exactly one counterpart named `I{Name}` among interfaces.",
+      "because": "A caller that can only name the concrete service cannot be handed a different one; the I{Name} contract is where a double or a second implementation goes.",
+      "fix": "Extract an I{Name} interface for the service and consume that.",
+      "baseline": {
+        "path": "arch/baselines/layering/services-behind-contracts.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.InvoiceService",
           "siteCount": 1
         }
       ],

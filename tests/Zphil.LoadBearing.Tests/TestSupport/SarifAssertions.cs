@@ -91,6 +91,19 @@ internal static class SarifAssertions
             .ToList();
     }
 
+    /// <summary>
+    ///     The run's tool-execution notifications, in render order — the invocation channel a partial
+    ///     survey warns on, this log format having neither an exit code nor prose to carry it.
+    /// </summary>
+    internal static IReadOnlyList<JsonElement> SarifNotifications(this string sarif)
+    {
+        return Run(sarif)
+            .GetProperty("invocations")[0]
+            .GetProperty("toolExecutionNotifications")
+            .EnumerateArray()
+            .ToList();
+    }
+
     // The single run a LoadBearing SARIF log always carries.
     private static JsonElement Run(string sarif)
     {

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A leaf of the reference graph has a verb of its own: `MustOnlyReferenceItself()`.**
+  `tracking.MustOnlyReferenceItself()` renders "The Tracking layer must reference only itself
+  (external packages are not constrained by this rule)", which is the shape a module graph's leaf
+  is left with once the allow-list default below gives it nothing to name. Nullary, because the
+  empty list is the law: the subject is the whole of what the rule permits. It draws no arrow —
+  there is no second place to point one at — so a diagram lists it under the fence, exactly where
+  its explicitly self-listing predecessor landed.
+
 - **The rendered root block now names the install route.** The managed `AGENTS.md` block carries a
   second meta-line directly after the provenance sentence: if the `loadbearing` command is missing
   (a configured MCP server dies without it), install the tool with
@@ -21,6 +29,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server's recovery coda: a committed render has no running engine behind it, so there is no
   same-engine promise for a version to back, and a pinned version in a committed file only rots.
   Re-rendering updates the root block; scoped cards are unchanged.
+
+- **A ratcheted correspondence law: `MustHaveExactlyOneCounterpart`.** "Every service has exactly
+  one `I{Name}` contract" was sayable only as prose; now
+  `arch.Types.WithSuffix("Service").MustHaveExactlyOneCounterpart(among:
+  arch.Types.OfKind(TypeKind.Interface), named: "I{Name}")` renders "must have exactly one
+  counterpart named `I{Name}` among interfaces" — the template backticked and unsubstituted, the
+  law stated as the pattern. Per subject, every `{Name}` is replaced by the type's simple name
+  (ordinal, arity-free, nested types by leaf name) and exactly one type in `among:` must carry
+  the result: a service with no contract is red, and so is one with two claimants. Both arms key
+  the subject alone, so the rule ratchets under `Migrate` from day one — counterparts are
+  evidence, and a grandfathered subject stays blessed when its arm flips — while the arms point
+  where the edit goes: an absence at the subject's declaration, an ambiguity at the counterparts
+  that collide. Validation refuses a blank template and one with no `{Name}` placeholder (a
+  constant derived name is a cardinality claim, not a correspondence — and the ordinal match is
+  what makes the `{name}` typo fail at spec build). One `among:` selection by design: authors
+  union candidate homes with `arch.AnyOf`, whose or-join states the reading. The violated
+  fixture carries the first committed per-subject baseline —
+  `layering/services-behind-contracts` blesses `OrderService` and reds `InvoiceService` at its
+  own `file:line`.
+
+### Changed
+
+- **`MustOnlyReference` and `MustOnlyBeReferencedBy` allow the rule's own subject.**
+  `application.MustOnlyReference(domain)` permits an Application-to-Application reference and
+  renders "must reference only the Domain layer". Saying that took
+  `MustOnlyReference(application, domain)` before, and a sentence that spent a clause telling the
+  reader a layer may talk to itself; every rule of this shape in the examples paid it. "Self" is
+  the **refined** subject, the membership the rule ranges over after `Except`, so
+  `arch.Types.WithSuffix("Controller").MustOnlyReference(domain)` stays a law rather than becoming
+  a tautology: a controller may reach the Domain layer or another controller, and nothing else.
+  The subject is read as one more allow entry, which is also what decides the co-declared case — a
+  project-headed subject allows an intra-copy edge at the project it names the type at and nowhere
+  else, the loosening mirror of 0.7.0's tightening on those same edges. The change can only turn a
+  red rule green, never the reverse. Naming the subject explicitly stays legal and renders as
+  written; a baseline entry covering an edge that is now allowed goes stale, and
+  `loadbearing status` reports it with the rest. GRAMMAR §4.1 states the rule.
+
+- **The Migrate paragraph no longer claims a majority.** The managed block's counter-prior bullet
+  opened with "Most existing code here follows the OLD pattern", a fixed claim the reading model
+  can measure and, late in a burndown, falsify; on this repository's own `mcp/env-through-seam`
+  most of the subject is migrated already. It now opens "Some existing code here still follows the
+  OLD pattern", true at any point of a migration. The rest of the paragraph — the debt sentence,
+  the target law, the rationale and the boy-scout policy — is unchanged, and the magnitude stays
+  where it is measured, in `loadbearing status`. Re-rendering updates the root block and any layer
+  card carrying a Migrate rule.
 
 ## [0.7.0] - 2026-08-26
 

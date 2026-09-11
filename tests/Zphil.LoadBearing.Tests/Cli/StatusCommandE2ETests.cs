@@ -22,7 +22,9 @@ public sealed class StatusCommandE2ETests
         result.Out.ShouldContain(
             "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
         result.Out.ShouldContain("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
-        result.Out.ShouldContain("Burndown: 1 grandfathered remaining, 0 fixed awaiting acceptance.");
+        result.Out.ShouldContain(
+            "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
+        result.Out.ShouldContain("Burndown: 2 grandfathered remaining, 0 fixed awaiting acceptance.");
     }
 
     [Fact]

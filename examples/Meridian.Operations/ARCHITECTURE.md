@@ -75,13 +75,13 @@ The graph is acyclic because none of those allow-lists points back, and the draw
 easiest to check. Follow the arrows and there is no way home.
 
 Four rules that are genuinely about the module graph appear under the fence rather than in it, and
-they are the interesting half of that list. `modules/tracking/outbound` says tracking may reference
-tracking and nothing else, which is how this language spells "tracking is the leaf". The three
-`internals` rules each say that a module's interior, once its `Contracts` surface is excepted, may be
-referenced only from inside that same module. In all four the subject and the one permitted target
-are the same place, so there is no second place to draw an arrow to, and a self-arrow would tell a
-reader nothing. They are named instead, which is what keeps the claim on this page total: every rule
-in this spec is either drawn or listed.
+they are the interesting half of that list. `modules/tracking/outbound` is
+`tracking.MustOnlyReferenceItself()`, which is how this language spells "tracking is the leaf": a
+rule's subject is always among its own permitted targets, so a leaf has nothing left to name. The
+three `internals` rules each say that a module's interior, once its `Contracts` surface is excepted,
+may be referenced only from inside that same module. In all four there is no second place to draw an
+arrow to, and a self-arrow would tell a reader nothing. They are named instead, which is what keeps
+the claim on this page total: every rule in this spec is either drawn or listed.
 
 The other two are `modules/tracking/event-naming`, which is about a type shape, and the quarantine
 tripwire, which has nothing to draw by design. `loadbearing explain <rule-id>` expands any of them.

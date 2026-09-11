@@ -183,7 +183,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         OpenWorld = false)]
     [Description(ExplainDescription)]
     public async Task<string> ExplainAsync(
-        [Description("A post-desugar rule ID, e.g. layering/domain-independent or legacy/billing/containment.")]
+        [Description(
+            "A post-desugar rule ID as one string, not an array — e.g. layering/domain-independent or "
+            + "legacy/billing/containment.")]
         string ruleId,
         CancellationToken cancellationToken = default)
     {

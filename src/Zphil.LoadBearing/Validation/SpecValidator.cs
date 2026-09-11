@@ -125,6 +125,7 @@ internal static class SpecValidator
         CheckForeignProjects(rule, arch, errors);
         CheckProjectPatterns(rule, errors);
         CheckTargetFrameworks(rule, errors);
+        CheckCounterpartTemplate(rule, errors);
         CheckMembers(rule, arch, errors);
         CheckMemberReturning(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
@@ -316,6 +317,25 @@ internal static class SpecValidator
         foreach (string framework in target.Frameworks)
             if (string.IsNullOrWhiteSpace(framework))
                 ReportBlank(Code.BlankTargetFramework, "target framework", rule.Id, $"'{rule.Id}'", rule.Location, errors);
+    }
+
+    // GRAMMAR §8 item 26: MustHaveExactlyOneCounterpart's name template. A template with no {Name} in it is
+    // a constant predicate — every subject derives the same fixed name, so the rule is a cardinality law
+    // wearing a correspondence law's clothes, and it reds or greens the whole subject set together. The
+    // match is ordinal, which is exactly what makes the '{name}' typo fail here rather than at check time.
+    // A blank template is item 25's, which fires first and says something more specific.
+    private static void CheckCounterpartTemplate(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MustHaveExactlyOneCounterpartConstraint counterpart) return;
+
+        string template = counterpart.Template;
+        if (string.IsNullOrWhiteSpace(template)) return;
+        if (template.IndexOf("{Name}", StringComparison.Ordinal) >= 0) return;
+
+        errors.Add(new SpecValidationError(Code.CounterpartTemplateWithoutPlaceholder, rule.Id,
+            $"The counterpart name template '{template}' on '{rule.Id}' contains no '{{Name}}' placeholder, so every "
+            + "subject derives the same fixed name — a cardinality claim, not a correspondence; use a template such "
+            + "as 'I{Name}' (substitution is case-sensitive).", rule.Location));
     }
 
     // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
@@ -683,6 +703,9 @@ internal static class SpecValidator
             case MustHavePrefixConstraint c:
                 yield return (c.Prefix, PatternKind.Prefix);
                 break;
+            case MustHaveExactlyOneCounterpartConstraint c:
+                yield return (c.Template, PatternKind.CounterpartTemplate);
+                break;
             case MemberMustHaveNameMatchingConstraint c:
                 yield return (c.Glob, PatternKind.MemberNamePattern);
                 break;
@@ -852,6 +875,7 @@ internal static class SpecValidator
         internal static readonly PatternKind AttributeName = new("attribute name", false);
         internal static readonly PatternKind InterfaceName = new("interface name", false);
         internal static readonly PatternKind BaseTypeName = new("base type name", false);
+        internal static readonly PatternKind CounterpartTemplate = new("counterpart name template", false);
         internal static readonly PatternKind ProjectName = new("project name", false);
         internal static readonly PatternKind ProjectNamePattern = new("project name pattern", false);
 

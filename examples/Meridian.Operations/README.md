@@ -15,7 +15,6 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/O
 
         arch.Rule("modules/invoicing/outbound")
             .Enforce(invoicing.MustOnlyReference(
-                invoicing,
                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
                 demurrage))
             .Because("Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.");
@@ -32,7 +31,7 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/O
 This directory holds the `Invoicing` layer. Its architecture rules:
 
 - `modules/invoicing/internals` — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*` must be referenced only by the Invoicing layer. Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
-- `modules/invoicing/outbound` — The Invoicing layer must reference only the Invoicing layer, types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
+- `modules/invoicing/outbound` — The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
 ```
@@ -56,14 +55,14 @@ The whole subsystem is one `Microsoft.NET.Sdk.Web` project. Each module is a nam
 
 The three law modules each publish a `Contracts` namespace and keep the rest to themselves; Demurrage's public surface is its calculator facade, and Host consumes surfaces without publishing one. The spec pins the dependency arrows one module at a time:
 
-- Tracking is the leaf: it owns the shipment milestone timeline the others read, and references no module in turn (`tracking.MustOnlyReference(tracking)`).
+- Tracking is the leaf: it owns the shipment milestone timeline the others read, and references no module in turn (`tracking.MustOnlyReferenceItself()`).
 - Dispatch reads `Tracking.Contracts` to gate a haulage leg on a Booked milestone, and reaches nothing else.
 - Invoicing reads `Tracking.Contracts` and the Demurrage layer to price a shipment.
 - Host is the composition root: it wires the three module `Contracts` surfaces and the demurrage calculator facade, and sees no module's internals.
 
-Those allow-lists are the module graph. v1 has no cycle-detection combinator: the graph is acyclic because each module's `MustOnlyReference` lists its outbound arrows by hand, and none of them point back. Draw an arrow the spec does not list, and `check` goes red.
+Those allow-lists are the module graph. v1 has no cycle-detection combinator: the graph is acyclic because each module's allow-list names its outbound arrows by hand, and none of them point back. Draw an arrow the spec does not list, and `check` goes red.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes; the codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule and the three `internals` rules name a single place at both ends, so they are listed under the fence instead of drawn as arrows to themselves.
+[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes; the codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule names no target at all, and the three `internals` rules name a single place at both ends, so all four are listed under the fence instead of drawn as arrows to themselves.
 
 ## One edit, two rules
 
@@ -74,7 +73,7 @@ FAIL modules/invoicing/internals — Types in the Invoicing layer, except types 
   because: Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
   fix: Depend on `IInvoiceRun` or another `Invoicing.Contracts` type instead of the internal assembler or reconciler.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
-FAIL modules/dispatch/outbound — The Dispatch layer must reference only the Dispatch layer or types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule).
+FAIL modules/dispatch/outbound — The Dispatch layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule).
   because: The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
 

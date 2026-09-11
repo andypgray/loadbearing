@@ -337,6 +337,24 @@
               }
             },
             {
+              "id": "layering/services-behind-contracts",
+              "shortDescription": {
+                "text": "Types named `*Service` must have exactly one counterpart named `I{Name}` among interfaces."
+              },
+              "fullDescription": {
+                "text": "A caller that can only name the concrete service cannot be handed a different one; the I{Name} contract is where a double or a second implementation goes."
+              },
+              "help": {
+                "text": "Extract an I{Name} interface for the service and consume that."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
               "id": "layering/no-ungoverned-types",
               "shortDescription": {
                 "text": "Types in `MyApp.*` must belong to the Domain layer or the Web layer."
@@ -1247,6 +1265,60 @@
             "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Domain.OrderService|MyApp.Domain/OrderService.cs|0"
           },
           "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-behind-contracts",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Web.InvoiceService|MyApp.Web/InvoiceService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-behind-contracts",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||T:MyApp.Domain.OrderService|MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/services-behind-contracts.json"
+            }
+          ]
         },
         {
           "ruleId": "layering/no-ungoverned-types",

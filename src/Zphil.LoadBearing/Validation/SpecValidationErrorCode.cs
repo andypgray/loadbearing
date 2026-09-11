@@ -140,5 +140,13 @@ public enum SpecValidationErrorCode
     ///     moniker matches nothing, so it silently narrows the allow-list rather than widening it — the
     ///     rule stays green until a project targets the framework the author meant to permit.
     /// </summary>
-    BlankTargetFramework
+    BlankTargetFramework,
+
+    /// <summary>
+    ///     A <c>MustHaveExactlyOneCounterpart</c> name template carrying no <c>{Name}</c> placeholder (§8
+    ///     item 26). Substitution is ordinal, so every subject then derives the same fixed name and the
+    ///     rule states a cardinality claim rather than a correspondence — and the <c>{name}</c> typo that
+    ///     causes it would otherwise be discovered only as a whole subject set going red at check time.
+    /// </summary>
+    CounterpartTemplateWithoutPlaceholder
 }

@@ -4,9 +4,8 @@
 
 This document is the **canonical specification of the fluent surface** — the "language" spec
 authors write. It pins what a spec sentence may say, what it reifies to, and what prose it
-renders. Derived from a survey of the prior art (ArchUnit, ArchUnitNET, NetArchTest,
-FluentValidation, EF Core ModelBuilder, .NET fluent-idiom survey) plus an adversarial review
-pass; the four dialect decisions in §1 are ratified.
+renders. The four dialect decisions in §1 are ratified; §9 records the deliberate divergences
+from the prior art.
 
 The pinned tests are the enforcement of this document: **the fluent surface may only change
 together with this document and its pinned tests.** When a pin must move, move it deliberately
@@ -79,7 +78,10 @@ trailer      :=  Because(prose) | Fix(prose)
 ```
 
 Modal-verb targets are selections for the dependency verbs (§3.3) and members for the
-member-access verb `MustNotUse` (§4.5). The member-modal verbs (§4.6) take no target — they
+member-access verb `MustNotUse` (§4.5). Selection-valued *operands* are a different position:
+`MustBelongTo`'s memberships and `MustHaveExactlyOneCounterpart`'s `among:` are selections
+resolved in subject position, naming where a subject may live or where its counterpart may
+stand — never the far end of an edge. The member-modal verbs (§4.6) take no target — they
 are shape/naming assertions over the projected member set, so `member-selection` is itself the
 whole subject side of a member-shape sentence. The one exception is the methods-only
 `.MustAcceptParameter(Type)` (§5.7), whose `Type` anchor renders on the verb side of the
@@ -230,29 +232,26 @@ Member targets are `arch.Member`-anchored — `typeof` + `nameof`, or the expres
 `arch.Member<T>(x => x.M)` / `arch.Member(() => X.M)` (§4.5) — so a
 banned member participates in compilation and refactoring like every other spec reference; the
 expression forms additionally let the compiler check the type↔member pairing that `typeof` +
-`nameof` leaves unverified. There is deliberately no string-FQN member overload: string-FQN
-*member* anchoring stays named growth (§11). Attribute anchors are where the string form has
-shipped (§5.2–§5.3, §5.7), and they set the anchoring policy any later string form inherits:
-`typeof` whenever the spec project can compile against the anchored type — a `typeof`
-participates in compilation and refactoring, and nothing checks a string — and the string only
-when it cannot.
+`nameof` leaves unverified. There is no string-FQN member overload (growth, §11). The
+anchoring policy every string form follows (§5.2): `typeof` whenever the spec project can
+compile against the anchored type — a `typeof` participates in compilation and refactoring,
+and nothing checks a string — and the string only when it cannot.
 
-The dependency verbs deliberately grow **no** generic twin (decided against): the
-pinned `(first, params more)` shape has no generic form (a variadic type-argument list is
-inexpressible), and mixing a bare type into a selection list is already served by wrapping it —
-`MustNotReference(web, arch.Type<SqlConnection>())`. The generic sugar lands only where a single
-type is the whole argument: `arch.Type<X>()` and the `Implementing` / `DerivedFrom` /
-`AttributedWith` hierarchy adjectives and their `Must*` twins (§5.2, §5.3).
+The dependency verbs carry **no** generic twin: the pinned `(first, params more)` shape has no
+generic form (a variadic type-argument list is inexpressible), and mixing a bare type into a
+selection list is served by wrapping it — `MustNotReference(web, arch.Type<SqlConnection>())`.
+The generic sugar exists only where a single type is the whole argument: `arch.Type<X>()` and
+the `Implementing` / `DerivedFrom` / `AttributedWith` hierarchy adjectives and their `Must*`
+twins (§5.2, §5.3).
 
-The member-access verb grows **no instance-form verb twin and no cross-form mixing** (decided
-against): a `MustNotUse<T>(x => x.M)` twin would drag the type argument onto the
-verb, and one call cannot name two declaring types — instance members stay
-`arch.Member<T>(x => x.M)`. A static value and a static void target are disjoint delegate shapes
-(`Func<object?>` vs `Action`) that no single overload spans, so one call mixes neither the two
-static forms nor a static with an instance — wrap the odd target with `arch.Member` and pass the
-uniform `Member` list, exactly as a mixed selection/type list wraps the type (above). The sugar
-lands only where the whole list is static and one form:
-`web.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)`.
+The member-access verb has **no instance-form verb twin and no cross-form mixing**: a
+`MustNotUse<T>(x => x.M)` twin would drag the type argument onto the verb, and one call cannot
+name two declaring types — instance members stay `arch.Member<T>(x => x.M)`. A static value
+and a static void target are disjoint delegate shapes (`Func<object?>` vs `Action`) that no
+single overload spans, so one call mixes neither the two static forms nor a static with an
+instance — wrap the odd target with `arch.Member` and pass the uniform `Member` list, exactly
+as a mixed selection/type list wraps the type (above). The sugar applies only where the whole
+list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)`.
 
 ## 4. Pinned semantics
 
@@ -307,11 +306,12 @@ lands only where the whole list is static and one form:
   the ones its project-headed selections spelled. Heads that are not projects therefore stay
   attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`, `arch.Layer`,
   `arch.Registered`, and `MustNotUse`'s string-keyed member anchors, so
-  `MustNotReference(typeof(T))` reds even on a project's own copy. `MustOnly*` stays strict
-  (no implicit self-allowance, below): an intra-copy edge is satisfied only by an allow entry
-  naming the compiling project, or by a non-project entry containing the type — including
-  where the edge runs between two shared types, which is allowed by an entry naming the
-  compiling project and by nothing else. `Except` subtracts by node identity:
+  `MustNotReference(typeof(T))` reds even on a project's own copy. `MustOnly*` allows its own
+  subject (below), and the subject is an allow entry like any other here: an intra-copy edge is
+  satisfied by an entry naming the compiling project, by a non-project entry containing the
+  type, or by the subject at the projects it names the node at. Where the edge runs between two
+  shared types that leaves an entry naming the compiling project, the subject included when it
+  names one, and nothing else. `Except` subtracts by node identity:
   `arch.Project("A").Except(arch.Project("B"))` removes a co-declared node from A's selection
   too. Read as "A's copy but not B's" it is a trap — it deletes every shared type from A,
   and the way to speak about one declarer's instances is to anchor the subject on that
@@ -345,11 +345,16 @@ lands only where the whole list is static and one form:
   provably true". `MustOnlyThrow` diverges deliberately: no type must *throw* a BCL
   exception, so the exemption's rationale never applies — the verb is strict and its
   fragment carries no caveat (§4.8).
-- **`MustOnly*` is strict — no implicit self-allowance.** A subject's reference to another
-  member of its own selection is a violation unless that selection is itself among the allowed
-  targets; authors list their own layer when they mean it. Internal precedent: the Quarantine
-  `{id}/containment` desugaring explicitly lists the quarantined selection in its own allowed set
-  (§7). (Self-edges never arise — extraction drops them.)
+- **`MustOnly*` allows the subject implicitly.** A subject's reference to another member of its
+  own selection is permitted. "Self" is the **refined** subject — the membership the rule ranges
+  over, after `Except` — evaluated as one more allow entry, so it narrows with the subject and
+  carries the at-project naming above.
+  `arch.Types.WithSuffix("Controller").MustOnlyReference(domain)` is therefore a law and not a
+  tautology: a Controller may reach the Domain layer or another Controller, and nothing else.
+  Listing the subject explicitly stays legal and renders as written, which is how the Quarantine
+  `{id}/containment` desugaring spells its allowed set (§7), its hermetic branch needing an
+  operand to name. The subject-only shape has a verb of its own, `MustOnlyReferenceItself()`
+  (§5.3). (Self-edges never arise — extraction drops them.)
 - `MustOnlyBeReferencedBy` needs no caveat: only solution types can be observed referencing.
 - Checker behavior: an empty *subject* selection **fails** the rule by default
   (ArchUnit and ArchUnitNET precedent, with a pinned message). For a **union** subject the
@@ -421,25 +426,22 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   red"). Multiple reference sites within one (source, target) pair ride together; this is
   documented behavior.
 - **Construction verb** (`MustNotConstruct`, §4.5/§5.3): `(ruleId, source symbol ID,
-  constructed symbol ID)` — the same edge-key shape as a dependency reference (the constructed
-  type keys the target slot), so a construction entry rides `BaselineEntry.ForEdge` with **zero
-  baseline-format change**. Overload-indifferent: every constructor overload of the constructed
+  constructed symbol ID)` — the same edge-key shape as a dependency reference, the constructed
+  type keying the target slot. Overload-indifferent: every constructor overload of the constructed
   type collapses to the one type-pair identity, and the `new` sites are evidence, not identity.
   A grandfathered `new Foo()` plus a *different* forbidden constructed target from the same
   source is NEW and red, exactly like the reference ratchet; multiple `new` sites within one
   (source, constructed) pair ride together.
 - **Injection verb** (`MustNotInject`, §4.7/§5.3): `(ruleId, source symbol ID, injected
-  symbol ID)` — the same edge-key shape again (the injected parameter type keys the target
-  slot), so an injection entry rides `BaselineEntry.ForEdge` with **zero baseline-format
-  change**. Constructor-overload- and parameter-name-indifferent: every constructor parameter
+  symbol ID)` — the same edge-key shape, the injected parameter type keying the target
+  slot. Constructor-overload- and parameter-name-indifferent: every constructor parameter
   typed on the injected type collapses to the one type-pair identity, and the parameter sites
   are evidence, not identity. A grandfathered captive injection plus a *different* forbidden
   injected target from the same source is NEW and red; multiple injecting parameters within
   one (source, injected) pair ride together.
 - **Catch verbs** (`MustNotCatch`, `MustNotCatchUnfiltered` and `MustNotSwallow`, §4.8/§5.3):
-  `(ruleId, source symbol ID, caught symbol ID)` — the same edge-key shape once more (the caught
-  exception type
-  keys the target slot), riding `BaselineEntry.ForEdge` with **zero baseline-format change**.
+  `(ruleId, source symbol ID, caught symbol ID)` — the same edge-key shape, the caught
+  exception type keying the target slot.
   Catch sites are evidence, not identity: multiple `catch` clauses within one (source, caught)
   pair ride together, and a grandfathered catch plus a *different* forbidden caught type from
   the same source is NEW and red. **All three catch verbs key that same edge.** The *unfiltered*
@@ -449,22 +451,27 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   identical edge under the others, and adding a `when` filter or a terminal `throw` to one clause
   of a grandfathered pair moves the evidence, not the baseline.
 - **Throw verbs** (`MustOnlyThrow` and `MustNotThrow`, §4.8/§5.3): `(ruleId, source symbol ID,
-  thrown symbol ID)` — the same shape (the thrown type keys the target slot), riding
-  `BaselineEntry.ForEdge` with **zero format change**. Throw sites are evidence, not
-  identity; a grandfathered thrown type plus a *different* thrown type the rule objects to,
-  from the same source, is NEW and red. The allow-list and the ban key edges identically, so
-  which polarity a spec chose is invisible to its baselines.
+  thrown symbol ID)` — the same shape, the thrown type keying the target slot. Throw sites
+  are evidence, not identity; a grandfathered thrown type plus a *different* thrown type the
+  rule objects to, from the same source, is NEW and red. The allow-list and the ban key edges
+  identically, so which polarity a spec chose is invisible to its baselines.
 - **Exposure verb** (`MustNotExpose`, §4.9/§5.3): `(ruleId, source symbol ID, exposed symbol
-  ID)` — the same edge-key shape once more (the exposed type keys the target slot), riding
-  `BaselineEntry.ForEdge` with **zero baseline-format change**. Signature positions are
-  evidence, not identity: every signature position of one exposed type within a source rides
-  together, and a grandfathered exposure plus a *different* forbidden exposed type from the
-  same source is NEW and red.
+  ID)` — the same edge-key shape, the exposed type keying the target slot. Signature
+  positions are evidence, not identity: every signature position of one exposed type within a
+  source rides together, and a grandfathered exposure plus a *different* forbidden exposed
+  type from the same source is NEW and red.
 - **Shape/naming/inheritance/attribute/membership verbs and escape hatches**:
   `(ruleId, subject symbol ID)`. A membership verb's operands (`MustBelongTo`'s memberships,
   §5.3) are part of the rule, never of the identity: widening or narrowing the membership list
   changes which subjects red, and every existing entry keeps keying the subject it
-  grandfathered.
+  grandfathered. The correspondence verb (`MustHaveExactlyOneCounterpart`, §5.3) rides the same
+  key with two red arms — a subject reds with zero counterparts and with several — and both arms
+  key the subject alone: counterparts are evidence, never identity, so a grandfathered subject
+  stays blessed on the day its arm flips, and widening `among:` or editing `named:` changes
+  which subjects red while every entry keeps its subject. Where the arms differ is where they
+  point — a missing counterpart sites at the subject's own declaration, an ambiguity at the
+  counterparts that collide — which is the catch bullet's "narrowing which sites a violation
+  prints never narrows what it keys" read in the other direction.
 - Symbol IDs are Roslyn `DocumentationCommentId` strings — stable across file moves and
   formatting.
 - A symbol ID names a name, not a node. Where a fully-qualified name means several types — see the
@@ -492,7 +499,7 @@ Per verb class — this is grammar-level semantics, not baseline file format:
 The first rules a long-lived .NET estate asks for are member-level bans — `DateTime.Now`,
 `.Result`/`.Wait()`, `ConfigurationManager.AppSettings`, `HttpContext.Current` — all invisible
 to type-level edges (`DateTime` the *type* cannot be banned). `arch.Member` + `MustNotUse`
-ship exactly that half: members as constraint **targets**. Member *subjects* stay §11 growth.
+express them: members as constraint **targets**. Member *subjects* are §4.6.
 
 - **A member-use edge** is `(source type, target member, file:line sites)`, recorded beside
   the type-level edge wherever the walk binds a member: property/field/event accesses
@@ -507,7 +514,7 @@ ship exactly that half: members as constraint **targets**. Member *subjects* sta
   third axis beside reference and use.
 - **A construction edge** is `(source type, constructed type,
   file:line sites)`, recorded beside the type-level edge at every object-creation expression —
-  explicit `new Foo()` **and** target-typed `new()` (the modern-codebase form, pinned early).
+  explicit `new Foo()` **and** target-typed `new()` (the modern-codebase form).
   Constructed generics normalize to their open definition (§4.1); self-construction is dropped like
   the type-edge self-reference. **Excluded, each with a pinned must-NOT-mint row**: attribute
   applications, `: base(…)`/`: this(…)` initializers, delegate creation (`new Action(M)` and its
@@ -531,8 +538,7 @@ ship exactly that half: members as constraint **targets**. Member *subjects* sta
   A ban on a concrete member does not catch calls through an interface-typed receiver, and an
   interface-member ban does not catch direct concrete calls — member bans are
   source-visibility bans, not runtime-dispatch bans.
-- **Anchoring** (`typeof` is not the only v1 form; receiver casts are identity-preserving
-  only, and extension parity extends to the static form):
+- **Anchoring**:
   `arch.Member(typeof(X), nameof(X.M))` and, as pure authoring sugar desugaring at mint to the
   identical leaf, the expression anchors `arch.Member<T>(x => x.M)` (instance; value member via
   `Func<T, object?>`, void method via `Action<T>`) and `arch.Member(() => X.M)` (static). The
@@ -569,24 +575,21 @@ ship exactly that half: members as constraint **targets**. Member *subjects* sta
   exists — so `MustNotUse` never warns, exactly like a bare `typeof` target (§4.1). An
   empty *subject* fails the rule (shared checker default).
 - Rendered glossary line, beside the reference entry and **only when the spec carries a
-  member-target rule** (a spec without one renders byte-identically to before this section
-  existed): *"use = a source-level member access."*
+  member-target rule**: *"use = a source-level member access."*
 
 ### 4.6 Member subjects (member selections)
 
-Where §4.5 ships members as constraint *targets* (`arch.Member` + `MustNotUse`), this section
-ships them as *subjects*: a projection turns a type selection into a **member selection** over
+Where §4.5 admits members as constraint *targets* (`arch.Member` + `MustNotUse`), this section
+admits them as *subjects*: a projection turns a type selection into a **member selection** over
 the declared members of the selected types, refinable with member adjectives and asserted on
 with member modal verbs. The flagship is `naming/async-suffix` — *"Methods of types in
-`MyApp.Web.*` returning `Task` must be named `*Async`."* The named structural decision:
-`MemberConstraint : Constraint` carries the `MemberSelection`, but its inherited `Subject` is
-the underlying **type** selection (`Subject => MemberSubject.Source`), so every existing walk
-that reaches through `Constraint.Subject` — foreign-`Arch` detection (§8 item 10) and Quarantine
-desugaring (§7) — keeps working unchanged on the type side.
+`MyApp.Web.*` returning `Task` must be named `*Async`."* A member constraint's subject, as
+every walk through `Constraint.Subject` sees it — foreign-`Arch` detection (§8 item 10) and
+Quarantine desugaring (§7) — is the underlying **type** selection.
 
 - **The inventory universe** is the **declared members of solution-declared types** — the same
   subject universe as type selections (§4.1), read one level down. Extraction inventories, per
-  declared type, its declared methods, properties, fields, and events. **Excluded** (ratified):
+  declared type, its declared methods, properties, fields, and events. **Excluded**:
   property/event accessors (they fold into the property/event, matching the §4.5 member-use
   normalization), constructors including static constructors, operators and conversions,
   finalizers, **explicit interface implementations of every kind** — method (`void IFoo.Bar()`),
@@ -601,7 +604,7 @@ desugaring (§7) — keeps working unchanged on the type side.
   dropped by the non-`Ordinary` `MethodKind` screen, the *property* and *event* impls by their
   non-empty `ExplicitInterfaceImplementations`. A member subject and `MustAcceptParameter` (§5.7)
   therefore never see an explicit implementation of any kind, and none mints an exposure edge
-  (§4.9 gates on public — moot now that they carry no inventory). **Enum and
+  (they carry no inventory, and §4.9 gates on public besides). **Enum and
   delegate types contribute no inventory** — an enum's fields are its values (an enum-value read
   stays a recorded field *use*, §4.5, untouched by this section) and a delegate's `Invoke`/
   `BeginInvoke` are runtime plumbing, not authored surface. **External (metadata) types carry no
@@ -612,11 +615,10 @@ desugaring (§7) — keeps working unchanged on the type side.
   solution-declared members."* (a selection that matches types none of whose members survive the
   kind filter is the ordinary way to hit it). Under a narrowed run it skips exactly as the type
   analog does (§4.1).
-- **Violation identity is `(ruleId, member DocumentationCommentId)`** via `BaselineEntry.ForSubject`
-  — the member's own `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and
-  a renamed or newly-added member is a NEW red. This reuses the shape-verb identity
-  substrate (§4.3, second bullet) with a member ID in the subject slot — **zero baseline
-  format/parser changes**.
+- **Violation identity is `(ruleId, member DocumentationCommentId)`** — the member's own
+  `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and a renamed or
+  newly-added member is a NEW red: the shape-verb identity (§4.3) with a member ID in the
+  subject slot.
 - **`.Returning(Type first, params Type[] more)`** matches a method's return type at the
   **definition level**, mirroring `Implementing` (§5.2): a **non-generic** anchor (`typeof(Task)`)
   matches exactly; an **open-generic** anchor (`typeof(Task<>)`) matches *any* construction
@@ -626,9 +628,9 @@ desugaring (§7) — keeps working unchanged on the type side.
   derived-from / assignability matching — the return type is compared to the anchor's definition
   FQN, nothing wider. `.Returning` is **methods-only**: it lives on the `.Methods` projection's
   `MethodSelection` and is uncompilable elsewhere (§3.2), so a return-type filter on a field or
-  property never type-checks. There is deliberately **no `.Returning<T>()` generic twin**
-  (decided against): the open-generic anchor is the main use and is inexpressible as
-  a type argument, and a closed-generic type argument would only reproduce the §8 item 14 refusal.
+  property never type-checks. There is **no `.Returning<T>()` generic twin**: the open-generic
+  anchor is the main use and is inexpressible as a type argument, and a closed-generic type
+  argument would only reproduce the §8 item 14 refusal.
 - **Parameter facts.** Extraction inventories, per declared *method*, its parameters in
   declaration order — each `(Name, TypeFullName)` with the type definition-normalized exactly
   like the return type (§5.6); properties, fields, and events carry an empty list (accessors,
@@ -643,7 +645,7 @@ desugaring (§7) — keeps working unchanged on the type side.
   type; `params CancellationToken[]` is the array type and does not match a
   `CancellationToken` anchor; `CancellationToken?` is `Nullable<>`'s definition and does not
   match either — the definition-level-exact honesty boundary `.Returning` and `MustNotCatch`
-  already carry, deliberately not widened; a type-parameter-typed parameter records its
+  carry; a type-parameter-typed parameter records its
   declared name (`T`) — the same rendering that pins `Echo<T>(T value)`'s return type — so it
   never matches a `typeof` anchor; a record's positional list surfaces as the generated
   property, never as parameter facts (the primary constructor is outside the inventory);
@@ -673,7 +675,7 @@ desugaring (§7) — keeps working unchanged on the type side.
   will assume otherwise: **declaration shape is not deep immutability** — a get-only property
   whose type is itself mutable still hands the caller something it can write through, the same
   static-declaration boundary §4.9 carries for exposure; **setter kind is recorded distinctly**,
-  so an init-only setter is a fact the model carries even where no verb reads it (§11 residue);
+  so an init-only setter is a fact the model carries even where no verb reads it (§11);
   and **`HasSetter` is accessibility-blind** — a `private set` is a setter, because the
   declaration has one.
 - **Declaration-semantics flags are pinned to C#, not IL.** `IsVirtual` is true for a member
@@ -688,9 +690,9 @@ desugaring (§7) — keeps working unchanged on the type side.
 - **The violation line** names the member as `{DeclaringType.FullName}.{Name}` (with `()`
   appended iff the member is a method — the shared member-display convention of §6/§4.5), located
   at the member's **declaration** `file:line`.
-- **No glossary change.** Member subjects never mint or read an edge, so they never trip the
-  `use`-glossary gate (§4.5) — a spec that adds only member-subject rules renders its managed
-  block byte-identically to before this section existed.
+- **No glossary line.** Member subjects never mint or read an edge, so they never trip the
+  `use`-glossary gate (§4.5): a spec whose member rules are all member-subject rules renders
+  no `use` clause.
 
 ### 4.7 Registration facts and injection edges (the DI axis)
 
@@ -778,10 +780,10 @@ the throw verbs `MustOnlyThrow` and `MustNotThrow` (§3.3, §5.3) consume them.
   constructed generic caught types normalize to their definition (§4.1); self-catches drop;
   lambda and local-function catches attribute to the enclosing type; top-level-statements
   catches attribute to `Program`.
-- **A catch edge additionally records its unfiltered sites** — a named, separate fact, not a
-  narrowing of the rules above. Beside its sites, each edge carries the **subset of them whose
-  `catch` clause spells no `when` filter**; the keying, the site list, and every minting rule
-  are exactly what they were. The recorded subset is the *unfiltered* one, and the polarity is
+- **A catch edge additionally records its unfiltered sites** — a separate fact beside the
+  edge, not a narrowing of the rules above: each edge carries the **subset of its sites whose
+  `catch` clause spells no `when` filter**, under the same keying and minting rules. The
+  recorded subset is the *unfiltered* one, and the polarity is
   load-bearing: sites dedupe by `(file, line)`, so a filtered and an unfiltered catch of one
   type on one physical line collapse to a single site, and a filter that a conditional
   compilation applies under one target framework but not another reaches the merge as one site
@@ -801,8 +803,8 @@ the throw verbs `MustOnlyThrow` and `MustNotThrow` (§3.3, §5.3) consume them.
   reason as the unfiltered subset — a rethrowing and a swallowing catch of one type on one
   physical line collapse to a single site, and a `#if`-divergent rethrow reaches the merge as
   one site reported both ways; recording the *swallowing* sites answers both the way a ban needs.
-  **The rethrow fact is syntactic**, and that is its honesty boundary, stated rather than
-  discovered: it reads the block's **last statement** and never analyses whether every path
+  **The rethrow fact is syntactic**, and that is its honesty boundary: it reads the block's
+  **last statement** and never analyses whether every path
   reaches it. `catch { if (…) return; throw; }` counts as throwing even though one path leaves
   having suppressed the failure, and `catch { if (…) throw; Cleanup(); }` counts as swallowing
   even though one path rethrows. The throw's operand is never judged either — a
@@ -1094,6 +1096,7 @@ from the model rather than misclassified in it, so no arm here can reach it.
 |---|---|
 | `.MustNotReference(target, ...)` | "must not reference {list}" |
 | `.MustOnlyReference(target, ...)` | "must reference only {list} (external packages are not constrained by this rule)" |
+| `.MustOnlyReferenceItself()` | "must reference only itself (external packages are not constrained by this rule)" — the leaf form: the refined subject is the whole allow-set, which every `MustOnlyReference` carries implicitly (§4.1) |
 | `.MustNotBeReferencedBy(source, ...)` | "must not be referenced by {list}" |
 | `.MustOnlyBeReferencedBy(source, ...)` | "must be referenced only by {list}" |
 | `.MustNotUse(member, ...)` | "must not use {list}" — member targets (§4.5) |
@@ -1108,6 +1111,7 @@ from the model rather than misclassified in it, so no arm here can reach it.
 | `.MustResideInNamespace(glob)` | "must reside in `{glob}`" |
 | `.MustResideInProject(name)` | "must reside in project `{name}`" — declared-by membership (§4.1): any declarer of a multiply-declared type satisfies it, so the verb agrees with `arch.Project`; single-name arity on `MustResideInNamespace`'s pattern (§10), several projects being `MustBelongTo` with project memberships |
 | `.MustBelongTo(membership, ...)` | "must belong to {list}" — the coverage verb (§10): memberships are selections naming where a type may live (layers, projects, namespaces), resolved in subject position and or-joined with the reference phrases (§6), so the any-of reading is stated by the sentence itself; a subject type no membership names is red. Deliberately no `Type` sugar — a bare `typeof` membership would degenerate into "must be that type" |
+| `.MustHaveExactlyOneCounterpart(among: selection, named: "I{Name}")` | "must have exactly one counterpart named `I{Name}` among {list}" — the correspondence verb (§4.3, §10): per subject, every `{Name}` in the template is replaced by the subject's simple name — ordinal and case-sensitive, arity-free, nested types by leaf name — and exactly one type in `among:` must carry the derived name; zero counterparts and several are both red, keying the subject either way. The template renders backticked and unsubstituted, as `MustHaveSuffix` renders `*Handler`: the sentence states the law, and the law is the pattern. Deliberately one `among:` selection — a params list would reopen ALL/ANY in a worse form, exactly-one-across-the-union versus exactly-one-per-operand, which no single sentence distinguishes — so authors union with `arch.AnyOf`, whose or-join states the reading; exactly-one is per subject, never a bijection. An `among:` matching nothing reds every subject — a false red, not a miss (§4.7) — and raises no warning |
 | `.MustBeRegistered()` | "must be registered" — nullary; membership is `arch.Registered()`'s at any lifetime (§4.7), the false-red polarity of the honesty boundary riding with it |
 | `.MustHaveSuffix("Handler")` | "must be named `*Handler`" |
 | `.MustHavePrefix("I")` | "must be named `I*`" |
@@ -1126,8 +1130,7 @@ from the model rather than misclassified in it, so no arm here can reach it.
 | `.Must(pred, description:)` | "must {description}" |
 
 Naming note: the constraint carries its noun where a bare preposition would be ambiguous —
-`MustResideInNamespace`, not `MustResideIn`, because `Project` (and later assembly) nouns
-exist.
+`MustResideInNamespace`, not `MustResideIn`, because the `Project` noun exists.
 
 Generic sugar: the three type-taking hierarchy verbs carry generic twins —
 `MustImplement<T>()` ≡ `MustImplement(typeof(T))`, `MustDeriveFrom<T>()`, and
@@ -1197,7 +1200,7 @@ name, each carrying its declaration site — declared references only, §4.10),
 `ProjectReferences` (referenced project names, ordinal-ordered), and the tri-state
 `IsPackable` and `LocksPackages` — `bool?`, `null` meaning the evaluation never happened
 rather than that the property is off. A predicate that treats unknown as false asserts
-something the model never measured; treat unknown as passing, exactly as the shipped verbs do
+something the model never measured; treat unknown as passing, exactly as the project verbs do
 (§4.10). This contract grows additively too.
 
 Descriptions are **required parameters** (uncompilable without) and must be non-blank (§8
@@ -1252,7 +1255,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 | `.WithNameMatching("*Handler*")` | "whose name matches `*Handler*`" |
 | `.Returning(typeof(Task))` | "returning `Task`" — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`". Methods-only. |
 | `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically |
-| `.ThatAreStatic()` | head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". The first member **shape** adjective (§11), so head prefixes now stack across two families and concatenate in authoring order |
+| `.ThatAreStatic()` | head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 
 **Member modal verbs** (turn a `MemberSelection` into a terminal `Constraint`):
@@ -1276,33 +1279,30 @@ form cannot reach, because a string anchor still names one definition rather tha
 | `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IMemberInfo, bool>` (§5.6) |
 
 The naming verbs reuse the type-side "must be named" / "must have a name matching" strings
-verbatim; `MustBePrivate` and `MustBeVirtual` are new member-only vocabulary. The whole member
-vocabulary shipped complete per the admission rule (§10): reification, pinned fragments, and
-the checker semantics (member inventory, the shape/naming evaluators, the ratchet) landed
-together.
+verbatim; `MustBePrivate` and `MustBeVirtual` are member-only vocabulary.
 
-The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) shipped on
-the same admission-rule terms, over the §4.6 attribute facts. The **verbs** reuse the
+The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) reads the
+§4.6 attribute facts. The **verbs** reuse the
 type-side fragments verbatim — verb position is unambiguous, so there is nothing to
-disambiguate. The **adjective** could not: an inline " attributed with" clause would render
+disambiguate. The **adjective** cannot: an inline " attributed with" clause would render
 the type-side adjective before a projection and the member adjective after one as **one
 byte-identical sentence** for two different subjects — every method of an attributed type,
 versus the attributed methods of any type — and both attachment sites are live in real
-specs. So the member adjective is a **head prefix**, the `.Authored()` move (§5.2, §6)
-replayed for the same reference-position ambiguity: its fragment premodifies the kind-plural
+specs. So the member adjective is a **head prefix**, on the same grounds as `.Authored()`
+(§5.2, §6) and for the same reference-position ambiguity: its fragment premodifies the kind-plural
 ("`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`"), and the two
 subjects can never render alike. Unlike the type side's single substituted prefix, stacked
 member head prefixes **concatenate** in authoring order ("`[ApiController]`-attributed
 `[Audit]`-attributed methods of types") — two attribute adjectives are an intersection, and
 a sentence that dropped one would describe a wider subject than the checker uses. The shape
 adjective `.ThatAreStatic()` head-prefixes for the same reason and stacks the same way, so
-the prefixes now concatenate across two families ("static `[Audit]`-attributed fields of
+prefixes concatenate across both families ("static `[Audit]`-attributed fields of
 types"). The generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no
 partial type inference, so the sugar ships as one overload per concrete member selection —
 `MemberSelection` for `.Members`/`.Events`, and `MethodSelection`, `PropertySelection` and
 `FieldSelection`, each keeping its own kind-only vocabulary reachable after it.
 
-`MustAcceptParameter` is the first methods-only modal verb — receiver-typed to
+`MustAcceptParameter` is methods-only — receiver-typed to
 `MethodSelection` exactly like `.Returning`, so a parameter constraint on a property, field,
 or event never type-checks. Its fragment is deliberately "a parameter of type `X`",
 article-safe for arbitrary type names ("a/an `X` parameter" garden-paths on `a Order` /
@@ -1310,16 +1310,15 @@ article-safe for arbitrary type names ("a/an `X` parameter" garden-paths on `a O
 constraint (§4.6): a subject method passes iff any declared parameter's `TypeFullName`
 matches the anchor's definition FQN.
 
-`MustBeGetOnly` and `MustBeReadonly` are the second and third kind-scoped receivers, minted on
-that model for the same reason: what each verb tests is a fact only one member kind has, so the
+`MustBeGetOnly` and `MustBeReadonly` are kind-scoped the same way, for the same reason: what
+each verb tests is a fact only one member kind has, so the
 receiver type is what keeps a setter question off a field and a `readonly` question off a
 property, with no validation rule to write and no runtime refusal to render. Both read the §4.6
 mutability facts and evaluate as member-shape constraints, and both are strict about the
 declaration rather than about the writes: a property passes iff it declares no setter accessor
 at all, and a field passes iff it is `readonly` or `const`. The receiver-typed generic sugar
-grows to four overloads with them (above), which is the price of a new projection type — a
-projection that ships a kind-only verb ships its sugar overload too, or the verb silently stops
-compiling after the sugar.
+is one overload per projection type (above): a projection that carries a kind-only verb
+carries its sugar overload too, or the verb silently stops compiling after the sugar.
 
 ### 5.8 Project vocabulary (project subjects, §4.10)
 
@@ -1348,9 +1347,6 @@ compiling after the sugar.
 | `.MustLockPackages()` | "must lock package restore" |
 | `.MustNotBePackable()` | "must not be packable" |
 | `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IProjectInfo, bool>` (§5.6) |
-
-The whole project vocabulary shipped complete per the admission rule (§10): reification,
-pinned fragments, the evaluated facts (§4.10), and the checker semantics landed together.
 
 ## 6. Sentence assembly
 
@@ -1434,8 +1430,7 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
 `arch.Scope(id).Quarantine(sel).BoundaryOnlyVia(F).Baseline(p)` reifies to ordinary rule nodes:
 
 - **`{id}/containment`** — internally `sel.Except(F).MustOnlyBeReferencedBy(sel ∪ F)`.
-  (The `sel ∪ F` payload is the same union node `arch.AnyOf` mints, §5.1 — the desugaring
-  predates the surface noun and is unchanged by it.) The
+  (The `sel ∪ F` payload is the same union node `arch.AnyOf` mints, §5.1.) The
   formula holds whether the facade types live inside or outside the quarantined selection.
   **`.Baseline(p)` grandfathers existing inbound references** with the same ratchet semantics
   as Migrate — day-one adoption on a real legacy codebase must not be a wall of red; only
@@ -1452,19 +1447,18 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
   baseline) so it can map changed files to quarantined types.
 - Scope children occupy the rule-ID namespace: duplicate detection runs over the
   **post-desugar** ID set, and a declared ID may not extend a scope ID — `{scope-id}/…` is
-  reserved. Reserved suffixes today: `containment`, `tripwire`.
+  reserved. Reserved suffixes: `containment`, `tripwire`.
 - Omitting `BoundaryOnlyVia` = hermetic quarantine (nothing outside may reference the scope).
   Because omission is legal, the verb deliberately stays plain `params` (not `(first, more)`)
   so that a zero-arg call reaches spec-build validation and gets the designed hint — "omit
-  the call for a hermetic quarantine" (§8 item 8) — instead of an opaque compiler error. It grows
-  **no** generic twin (decided against): a boundary is a variadic facade-plus-
-  implementation list, which has no type-argument form; a single facade type is
-  `BoundaryOnlyVia(typeof(IFacade))`.
+  the call for a hermetic quarantine" (§8 item 8) — instead of an opaque compiler error. It has
+  **no** generic twin: a boundary is a variadic facade-plus-implementation list, which has no
+  type-argument form; a single facade type is `BoundaryOnlyVia(typeof(IFacade))`.
 - A project-headed quarantined selection follows §4.1's several-projects rule: a type the
   project co-declares is in the quarantine — for containment, for the tripwire's changed-file
   mapping, and for scope-card placement alike.
 - Nested/overlapping quarantines compose as independent conjuncts; there is no scope precedence.
-- **Practical note** (also for the derive prompt): `BoundaryOnlyVia` usually needs
+- **Practical note**: `BoundaryOnlyVia` usually needs
   the facade *implementation* type(s) listed alongside the interface, or the composition
   root's DI registration of the concrete facade goes red on day one:
   `BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))`.
@@ -1503,7 +1497,7 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
     member sides alike, to layer globs (reported spec-wide, named by layer), and to the project
     name on the noun and the verb alike — `arch.Project("")` in any position and
     `MustResideInProject("")`, each as `Blank project name on '{id}'.` String anchors (§5.2) report
-    through this same family — no new code — in every position of both families, adjective and
+    through this same family in every position of both families, adjective and
     verbs alike, under a label naming which kind of anchor was left empty: "attribute name"
     (`Blank attribute name on '{id}'.`), "interface name", "base type name". Blankness is the
     whole of a string anchor's well-formedness: a dotless or suffix-less spelling is a legal
@@ -1538,10 +1532,9 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
     target-typed `new()`) steered to the `MustNotConstruct` verb (§5.3). Reported **before** item 12 for the same member: an
     expression anchor is resolved from a real member and generic-normalized at mint, so item 12
     (and the check-time closed-generic refusal, §4.5) can never fire on it — those stay live only
-    for the `typeof` form. The poison rides on the `Member` leaf itself: the diagnostic core is
-    stored while the `DeclaringType`/`Name`/`IsMethod` backing fields stay default and now throw if
-    read (fail closed — enforced, not merely documented), so it is collected in the same all-at-once
-    pass as every other error.
+    for the `typeof` form. The poison rides on the `Member` leaf itself: the diagnostic is stored
+    on the leaf, whose `DeclaringType`/`Name`/`IsMethod` throw if read (fail closed), so it is
+    collected in the same all-at-once pass as every other error.
 19. Undefined `Lifetime` value on an `arch.Registered` noun used by a rule — a cast like
     `(Lifetime)7` names no defined lifetime; the error names the undefined value and the
     defined ones ("`(Lifetime)7` is not a defined `Lifetime` — use `Lifetime.Singleton`,
@@ -1572,7 +1565,7 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
     on a positive (always red) and silent on a negative, the honesty cost of the hatch. Blankness
     (item 15) is checked on a string anchor everywhere, including the adjectives; category is
     checked nowhere on one. The **adjectives**
-    stay unchecked on both sides and across every hierarchy family, deliberately: a
+    are unchecked on both sides and across every hierarchy family: a
     wrong-category adjective empties the subject and the fail-on-empty default (§4.1, §4.6)
     reds it loudly, whereas the silent slip this item exists to catch is the always-passing
     `MustNot` verb. Reported in the same all-at-once pass with the rule's
@@ -1593,10 +1586,22 @@ pinned fragments, the evaluated facts (§4.10), and the checker semantics landed
     '{id}'.`). A blank moniker matches nothing, so it silently narrows the allow-list rather
     than widening it — the rule stays green until a project targets the framework the author
     meant to permit.
+25. Blank/whitespace counterpart name template on `MustHaveExactlyOneCounterpart` (`Blank
+    counterpart name template on '{id}'.`). Rides item 15's walk — one label, one case — so a
+    reader who has met one blank-operand error has met them all.
+26. Counterpart name template with no `{Name}` placeholder (`The counterpart name template
+    'IService' on '{id}' contains no '{Name}' placeholder, so every subject derives the same
+    fixed name — a cardinality claim, not a correspondence; use a template such as 'I{Name}'
+    (substitution is case-sensitive).`). On item 21's argument: a placeholder-free template is
+    a constant predicate — a cardinality law wearing a correspondence law's clothes — that reds
+    or greens the whole subject set together, and is almost never what the author meant.
+    Substitution replaces every occurrence and matches case-sensitively, which is what lets the
+    likeliest slip, `{name}`, fail at spec build instead of checking a constant name. A blank
+    template is item 25's alone, on item 18's reported-before pattern.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
-extended to descend through a `MemberConstraint`'s member subject and verb (§4.6) — and the
+which descends through a member constraint's subject and verb (§4.6) — and the
 project escape-hatch descriptions the same way: a project `Must` description, and project
 `Where` descriptions wherever the subject nests one, `Except` payloads included (§4.10).
 
@@ -1607,8 +1612,9 @@ item 10. **Per-operand emptiness is not a §8 error**: whether an operand matche
 fact about the codebase, not the spec, so it is check-time — one empty-subject violation naming
 the operand (§5.1, §9).
 
-Enforced at compile time instead (no catalog entry): zero-target dependency verbs,
-zero-member `MustNotUse`, and zero-glob layers (`(first, more)` signatures); missing
+Enforced at compile time instead (no catalog entry): zero-target dependency verbs — the one
+shape that legitimately names no target has a verb of its own, `MustOnlyReferenceItself()`
+(§5.3) — zero-member `MustNotUse`, and zero-glob layers (`(first, more)` signatures); missing
 escape-hatch descriptions (required parameters); trailers before postures (absent from stage
 types); adjectives or modal verbs on a `Member` (a leaf outside the selection hierarchy,
 §3.2); `.Returning` and `MustAcceptParameter` off any projection but `.Methods` (they live
@@ -1621,8 +1627,8 @@ warning CS8974) and so is caught at spec build (item 18), not by the compiler.
 Every error that names a rule, scope, or member additionally renders the offending anchor's
 spec-source `file:line` (file name only, captured by `[CallerFilePath]`/`[CallerLineNumber]`
 on the `Rule`/`Scope`/five `Member` factories) so each lands as a jump target — e.g.
-`ArchSpec.cs:17: …`; the catalog verdicts above are otherwise unchanged, and duplicate-layer
-and layer-glob errors stay location-free (a layer name is already a unique greppable string).
+`ArchSpec.cs:17: …`. Duplicate-layer and layer-glob errors are location-free (a layer name is
+already a unique greppable string).
 
 All-errors-at-once is a deliberate divergence from EF Core's fail-fast `ModelValidator`: an
 agent fixing a spec sees every problem in one pass.
@@ -1679,10 +1685,10 @@ agent fixing a spec sees every problem in one pass.
   composite: `MustNotCatchUnfilteredUnrethrown` enumerates the conditions instead of naming what
   they add up to, and reads as a fourth qualifier rather than a law. *Swallow* is the word the
   code review already uses for holding a failure and continuing, and it is a verb, so it takes
-  the `Must[Not]` + verb-phrase form directly. The glossary clause does **not** move with it: the
-  clause glosses the *fact* (*"catch = a source-level `catch` clause"*), not the verb, so a spec
-  that swaps any catch verb for another renders that clause byte-identically — the same
-  byte-identical-without-it discipline the axis gating already has, one level down.
+  the `Must[Not]` + verb-phrase form directly. The glossary clause glosses the *fact*
+  (*"catch = a source-level `catch` clause"*), not the verb, so a spec that swaps one catch
+  verb for another renders that clause byte-identically — the axis-gating discipline, one
+  level down.
   The throw verb is *throw*
   (the strict allow-list `MustOnlyThrow` and its ban twin `MustNotThrow`), glossary-pinned as
   *"throw = a source-level `throw` of the thrown expression's type (bare rethrows `throw;`
@@ -1693,8 +1699,7 @@ agent fixing a spec sees every problem in one pass.
   member-target rule; construct iff a ctor rule; inject iff an injection rule; catch iff a
   catch rule; throw iff a throw rule; expose iff an exposure rule) joined with "; "
   and closed by the drill-down tail, so each axis
-  gates independently and a spec without a given axis renders byte-identically to before that axis
-  existed (§4.1/§4.5's byte-identical-without-it discipline, generalized). A `Registered` noun
+  gates independently and a spec without a given axis renders no clause for it. A `Registered` noun
   anywhere in a rule — subject or operand — or the `MustBeRegistered` verb, whose membership is
   that noun's (§4.7), additionally gates its own glossary line on the same
   byte-identical-without-it terms: *"registered = named in a source-level container registration
@@ -1731,6 +1736,9 @@ agent fixing a spec sees every problem in one pass.
   serves them: what differs between the two is which extracted facts the matcher reads and
   whether the prose brackets the name, neither of which is a property of the anchor. A new
   anchor position ships the whole triple or it is not an anchor position.
+  The rule governs positions that name a *type*: `MustHaveExactlyOneCounterpart`'s `named:`
+  derives a name rather than naming one — `MustHaveSuffix`'s bare-string precedent — so no
+  triple is owed there.
   The generic twin is `TSelf`-generic where inference allows and
   **receiver-typed where it does not**: C# has no partial type inference, so a
   `TSelf`-generic member adjective twin would force both type arguments at every call site
@@ -1741,67 +1749,47 @@ agent fixing a spec sees every problem in one pass.
   The set is closed by the same triple discipline: a projection that mints a concrete selection
   type ships that type's sugar overload, or its kind-only verb stops compiling after the sugar.
 - Named arguments are the documentation convention for prose parameters (`from:`, `to:`,
-  `description:`).
+  `description:`) and for the correspondence verb's operands (`among:`, `named:`).
 - **Admission rule**: a new vocabulary member ships with model node + fragment(s) + pinned
   string test + checker semantics (or an explicit "reifies now, checks later" note) — or it
-  does not ship. The member-subject vocabulary (§4.6, §5.7) used that clause and shipped
-  complete: every projection, member adjective, and member verb landed with reification, a
-  pinned string, and checker semantics (member inventory, the shape/naming evaluators, the
-  ratchet) together. The mutability family (§4.6, §5.7) shipped on the same terms in one piece:
-  the four declaration facts, the two verbs, the `.ThatAreStatic()` adjective, pinned fragments
-  for all three, checker semantics for both verbs, and the ratchet — no half of it reifying
-  ahead of the half that reads it. The project stratum (§4.10, §5.8) shipped whole on the same
-  terms: the noun, three adjectives, four verbs, pinned fragments, the evaluated facts, and
-  checker semantics in one piece.
+  does not ship. A fact family ships whole: no half of it reifying ahead of the half that
+  reads it.
 
 ## 11. Growth paths (designed-for, not built)
 
-Member-level *targets* shipped first (`arch.Member` + `MustNotUse`, §4.5); then member
-*subjects* (the `.Members`/`.Methods`/`.Properties`/`.Fields`/`.Events` projections with
-member adjectives and shape/naming verbs, §4.6); then expression member anchors and generic
-type sugar (`arch.Member<T>(x => x.M)` / `arch.Member(() => X.M)` and `arch.Type<X>()` / the
-`Implementing`/`DerivedFrom`/`AttributedWith` twins, §4.5, §5.2–§5.3); then member attribute
-facts with the member attribute vocabulary (§4.6, §5.7). Still growth on the member axis: the
-`MustOnlyUse` / `MustNotBeUsedBy` verb twins; member-granular *source* attribution on the
-dependency verbs (today a violation names the using *type*, not the using member); string-FQN
-*member* anchoring — the last of the anchoring residue, now that both single-type anchor
-families carry a string form (§5.2): the escape hatch for a member that neither `typeof` +
-`nameof` nor an expression lambda can name (a member on a type the spec project cannot
-reference);
-indexer/operator bans (the syntax-walk boundary moves deliberately, §4.5); and the rest of the
-subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`, `.ThatAreAbstract()`, …)
-— the member constraint-side verbs and the `IMemberInfo` flags shipped first (§5.7, §5.6), and
-`.ThatAreStatic()` has since shipped as the first adjective among them, so what remains is the
-rest of that position rather than all of it; the type-side gap below is now the wider one. One entry shipped off
-this list whole, and a second narrowed twice: member-level attribute facts landed with the
-member-side `AttributedWith` / `MustNotBeAttributedWith` pair — carrying the positive
-`MustBeAttributedWith` the entry never promised, per the admission rule (§10) — and string-FQN
-anchoring shipped as §5.2's escape hatch in two passes, the *attribute* positions first and the
-*hierarchy* positions after, each carrying its family's whole triple (§10). Members really are
-the only residue now.
+Each entry is a new, explicitly named semantic, never a widening of one pinned above, and a
+consumer arriving with evidence is what admits it (§10).
+
+On the member axis (§4.5, §4.6): the `MustOnlyUse` / `MustNotBeUsedBy` verb twins;
+member-granular *source* attribution on the dependency verbs (a violation names the using
+*type*, not the using member); string-FQN *member* anchoring — the escape hatch for a member
+that neither `typeof` + `nameof` nor an expression lambda can name (a member on a type the spec
+project cannot reference); indexer/operator bans (the syntax-walk boundary moves deliberately,
+§4.5); and the remaining subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`,
+`.ThatAreAbstract()`, …) beside `.ThatAreStatic()` — the constraint-side verbs and the
+`IMemberInfo` flags exist (§5.7, §5.6).
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
 twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`
-negative twin; multi-`Type` arity (refused in v1 — one sentence cannot say whether ALL anchors
+negative twin; multi-`Type` arity (one sentence cannot say whether ALL anchors
 are required or ANY suffices, §10); richer `IParameterInfo` facts (ref kind, optionality,
 default values, `params`, ordinal position); hierarchy- or assignability-aware parameter
 matching (the exception-axis bar applies: an explicitly named new semantic, never a widening of
 definition-level-exact); accessibility-scoped member subjects (`.Methods.ThatArePublic()` — the
-canon's literal "public surface" scope; the escape hatch reaches `Accessibility` today); and
+canon's literal "public surface" scope; the escape hatch reaches `Accessibility`); and
 `graph` parameter data.
 
 On the mutability facts (§4.6): `MustBeInitOnly` — the fact is recorded (`HasInitOnlySetter`) and
 no verb reads it, so "a plain setter is banned, `init` is fine" is expressible through the escape
-hatch today and would need no extraction change to become a verb; a `MustBeMutable` opposite,
-which no consumer has asked for and which would be a strange thing for an architecture rule to
-demand; and `IsRequired`, deliberately not extracted because nothing reads it — §5.6 grows
-additively when something does. The property-side twin of a static-mutability law is **not**
-residue: `.Properties.ThatAreStatic().MustBeGetOnly()` composes today over the same facts, so a
-fields-only law leaving a codebase's static `{ get; private set; }` diagnostics properties outside
-its subject is an authoring choice, not a gap in the vocabulary.
+hatch and would need no extraction change to become a verb; a `MustBeMutable` opposite, which
+would be a strange thing for an architecture rule to demand; and `IsRequired`, not extracted
+because nothing reads it — §5.6 grows additively when something does. The property-side twin of
+a static-mutability law is **not** a gap: `.Properties.ThatAreStatic().MustBeGetOnly()` composes
+over the same facts, so a fields-only law that leaves static `{ get; private set; }` properties
+outside its subject is an authoring choice.
 
 On the injection axis (§4.7): the `MustOnlyInject` / `MustNotBeInjectedBy` twins; a
-lifetime-scoped `MustBeRegistered(Lifetime)` (the nullary verb ships any-lifetime, §5.3);
+lifetime-scoped `MustBeRegistered(Lifetime)` (the nullary verb is any-lifetime, §5.3);
 property- and method-injection edges (constructor parameters are the recorded form); recognition growth beyond
 the pinned call table — keyed services, `ServiceDescriptor`/`TryAddEnumerable`, assembly-scanning
 registrars — the table is the fence, everything outside it the documented honesty boundary;
@@ -1809,31 +1797,18 @@ lifetime facts on `ITypeInfo` (registration membership stays model-side, resolve
 and `graph` registration data.
 
 On the exception axis (§4.8): the `MustOnlyCatch` allow-list and the `MustNotBeCaughtBy` /
-`MustNotBeThrownBy` passive twins; hierarchy-aware operand matching
-(exact definition-level FQN is pinned, so a ban on `Exception` deliberately
-does not reach derived catches — a hierarchy-matching form would be a new, explicitly named
-semantic, not a widening of this one); and `graph` catch/throw data. Three entries shipped off
-this list on exactly the terms the hierarchy item states (a new, explicitly named semantic,
-never a widening): `MustNotThrow`; `when`-filter awareness — a filter still never
-suppresses the catch edge; what is new is the recorded fact beside it, the unfiltered sites
-`MustNotCatchUnfiltered` reads as its evidence (§4.8) — and, on the same template,
-**rethrow-aware refinement**, which was ratified *against* for v1 on the grounds that edges are
-facts and a sanctioned log-and-rethrow site is excepted or grandfathered deliberately. That
-rationale held until its cost was measured: in this repository's own spec, type-granular
-exemption of nine rethrow sites that suppressed nothing was holding nine already-compliant
-filtered sites out of the law with them. The edge is still a fact and its identity still does
-not move; what is new is a second recorded fact beside filter presence — the swallowing sites —
-and `MustNotSwallow`, the verb that reads it.
+`MustNotBeThrownBy` passive twins; hierarchy-aware operand matching (exact definition-level FQN
+is pinned, so a ban on `Exception` does not reach derived catches — a hierarchy-matching form
+would be a new, explicitly named semantic, not a widening of this one); and `graph` catch/throw
+data.
 
-Also declined in writing, and this one stays declined: **member-granular source attribution on
-catch edges**, and member subjects for the catch verbs. It would buy nothing measurable — after
-that burndown, the residual sanctioned handlers are small single-role boundary classes
-where the type effectively *is* the site, and there is nothing left for finer granularity to
-recover. The designed-for entry stays under the admission rule, and a consumer arriving with
-evidence reopens it, exactly as this rethrow entry was reopened. **Site-granular sanctioning as
-a spec surface is declined outright**: a per-site ledger inside a spec re-invents baseline
-mechanics under another name, and the candour argument that puts an exemption in the spec where
-it is read cuts equally against a ledger in disguise.
+Declined: **member-granular source attribution on catch edges**, and member subjects for the
+catch verbs. Sanctioned broad handlers are small single-role boundary classes where the type
+effectively *is* the site, so finer granularity recovers nothing; a consumer arriving with
+evidence reopens it. **Site-granular sanctioning as a spec surface is declined outright**: a
+per-site ledger inside a spec re-invents baseline mechanics under another name, and the candour
+argument that puts an exemption in the spec where it is read cuts equally against a ledger in
+disguise.
 
 On the exposure axis (§4.9): the `MustOnlyExpose` allow-list complement — the §4.1
 `MustOnly*` external exemption would apply to it naturally, but v1's canon for surface
@@ -1843,43 +1818,51 @@ v1 mints only from effectively-public members, because an internal type has no e
 contract); generic-constraint-clause positions (`where T : Order` mints nothing in v1 — a
 constraint clause names a type without placing it in a signature position); member-granular
 *source* attribution (the edge keys the exposing *type*, not the exposing member — the same
-residue the dependency verbs carry above); laundering awareness — a signature declared
+gap the member axis lists above); laundering awareness — a signature declared
 `object` exposes `System.Object` and nothing more (the §4.9 honesty boundary: the edge is a
 static-signature fact, and internal members are not surface), so a flow- or cast-aware form
 would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
 exposure data (exposure edges stay out of the graph).
 
-On the project stratum (§4.10): `.Under(pathGlob…)` — its first consumer, an
-examples-never-pack rule, lives outside this solution's universe; `MustNotReferencePackage` —
-this repository has no live package ban to consume it, and a rule invented to give it one
-would pin vocabulary no law needs; and `MustSetProperty` / `MustSetPackageAsset`, whose named
-next consumer is the `ExcludeAssets=runtime` law the `Microsoft.Build.*` references already
-live by. Also unbuilt, each waiting on a consumer: `AnyOf` over project selections, and card
-placement for artifact selections — a project rule renders into the root block only.
+On the project stratum (§4.10), each waiting on a consumer: `.Under(pathGlob…)`;
+`MustNotReferencePackage`; `MustSetProperty` / `MustSetPackageAsset` (the
+`ExcludeAssets=runtime` shape); `AnyOf` over project selections; and card placement for
+artifact selections — a project rule renders into the root block only.
 
 On the string anchors (§5.2): **constructed-generic** anchoring — a string naming a
 construction rather than a definition (`"MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>"`)
 renders, and matches nothing. Making it match that construction, the way a closed `typeof`
 anchor does, would be a new and explicitly named semantic on the exception axis's terms, never
-a widening of the definition-level-exact one pinned here: today's silence is what makes a
+a widening of the definition-level-exact one pinned here: that silence is what makes a
 string anchor's meaning independent of whether the spec author happened to spell type
 arguments. Also unbuilt: a string form for the *set*-valued anchor positions — the dependency
 verbs' `Type` sugar and `arch.Type(...)`, where a namespace pattern is already the no-load
 form (§5.6) and a string would only duplicate it.
 
+On correspondence (§5.3): the at-least-one twin `MustHaveCounterpart`, wanting a consumer whose
+law tolerates several
+counterparts; richer templates — a second placeholder (`{Namespace}`, `{Project}`), escaping for
+a literal `{Name}`, case-insensitive or glob-shaped matching — each wanting a real consumer
+before the template stops being a substitution and starts being a language; correspondence keyed
+by attribute arguments, the instance that fails at runtime when broken — every wire DTO carrying
+`[JsonSerializable(typeof(X))]` — which waits on attribute-argument facts, §4.6's attribute facts
+being name pairs only; set-to-set counting, where the law is about the two sets rather than each
+subject; and the
+arm distinction in the document — `Violation.Detail` reaches the JSON channel only, the human
+report reads it for the identity-less kinds alone and SARIF never does, so the site policy
+carries missing-versus-ambiguous until a design reaches all three channels.
+
 Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); an intersection
-or difference combinator (`arch.AnyOf` is union only — `Except` already covers difference);
-unions of *member* selections (the projections compose over a union subject already); a
-layered-architecture macro (deferred:
-it would mint N rules under one ID, muddying baselines — and its coverage half has since
-shipped as `MustBelongTo`, one rule under one ID, so what remains deferred is the ordering
-half, which stays explicit `MustNotReference` pairs); assembly-anchored layers (the
-constraint side is reachable now — `MustResideInProject`, or `MustBelongTo` over project
-memberships — while the layer *noun* anchored to a project remains unbuilt);
-subject-side shape adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the
-constraint-side verbs and the `ITypeInfo` flags shipped (§5.3, §5.6); only the adjective
-position remains; a `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a
-`MustBeOfKind` constraint twin.
+combinator (`arch.AnyOf` is union only; `Except` covers difference); unions of *member*
+selections (the projections compose over a union subject already); a layered-architecture
+macro for the ordering half (it would mint N rules under one ID, muddying baselines; the
+coverage half is `MustBelongTo`, and ordering stays explicit `MustNotReference` pairs);
+assembly-anchored layers (the constraint side exists — `MustResideInProject`, or `MustBelongTo`
+over project memberships — the layer *noun* anchored to a project does not); type-side shape
+adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the constraint-side verbs and the
+`ITypeInfo` flags exist (§5.3, §5.6); only the adjective position is missing; a
+`.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
+twin.
 
 ## 12. Canonical sample spec
 
@@ -1937,14 +1920,6 @@ public sealed class ArchSpec : IArchitectureSpec
     }
 }
 ```
-
-Refinements vs the founding-session sketch: `Layer` is itself a selection (no `.Types` hop);
-`Implementing` auto-detects open generics (no `ImplementingOpenInterface`); naming rules use
-closed vocabulary; escape hatches are `Where`/`Must`; Quarantine shows facade-implementation
-listing and the grandfathering baseline. The founding dogfood rule was one line —
-`arch.Project("Zphil.LoadBearing").MustNotReference(arch.Project("Zphil.LoadBearing.Roslyn"))` —
-since grown into the three-posture self-spec (`LoadBearingArchSpec`: three Enforce rules plus a
-Migrate and a Quarantine).
 
 ## 13. Composition: rule packs
 

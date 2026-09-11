@@ -596,7 +596,8 @@ string always names the **definition**, so it reads like the open-generic `typeo
 
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes
-selections or `typeof()`s, one-or-more) · `MustNotUse(arch.Member(...), ...)` — or, when every
+selections or `typeof()`s, one-or-more) · `MustOnlyReferenceItself()` (nullary — a leaf of the
+reference graph, whose whole allow-set is the subject) · `MustNotUse(arch.Member(...), ...)` — or, when every
 target is a **static** member, the lambdas bare: `MustNotUse(() => DateTime.Now,
 () => DateTime.UtcNow)` — (bans member accesses — `DateTime.Now`, `.Result`,
 `ConfigurationManager.AppSettings`; *use* = a
@@ -640,7 +641,14 @@ satisfied by any of its declarers, agreeing with `arch.Project`) ·
 `MustBelongTo(membership, …)` (the coverage verb: each membership is a selection naming where a
 type may live — layers, projects, namespaces — and a subject type no membership names is red;
 "any of several projects" is this verb with project memberships, and there is deliberately no
-`typeof` membership form — a single-type membership would collapse into "must be that type")
+`typeof` membership form — a single-type membership would collapse into "must be that type") ·
+`MustHaveExactlyOneCounterpart(among: selection, named: "I{Name}")` (the correspondence verb: per
+subject, every `{Name}` in the template is replaced by the subject's simple name — ordinal,
+arity-free, nested types by their leaf name — and exactly one type in `among:` must carry the
+derived name; zero counterparts and several are both red. E.g.
+`arch.Types.WithSuffix("Service").MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}")`
+demands exactly one `I{Name}` interface per service. One `among:` selection only — union candidate
+homes with `arch.AnyOf`; write `among:`/`named:` as named arguments at every call site)
 · `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `MustImplement` /
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
 `MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustNotImplement(type, …)` /
@@ -749,8 +757,10 @@ declared members of solution-declared types (accessors, constructors, operators,
 and compiler-generated members are excluded; external types carry no member inventory), and
 an empty member subject fails the rule exactly like an empty type subject. Type subjects
 range over solution-declared types; targets also reach external (BCL/NuGet) types. `MustOnlyReference` constrains solution-declared targets only (external
-packages are exempt, and the rendered sentence says so) and is strict — list a layer's own
-selection among its allowed targets if self-references are fine. `MustOnlyThrow` is stricter
+packages are exempt, and the rendered sentence says so) and allows the subject implicitly, after
+any `Except` it spells — list what a layer may reach BEYOND itself, and reach for
+`MustOnlyReferenceItself()` where that list is empty. `MustOnlyBeReferencedBy` reads its subject
+the same way. `MustOnlyThrow` is stricter
 still: external thrown types ARE constrained (no type must throw a BCL exception), so its
 sentence carries no exemption; `MustNotThrow` is its ban twin, and a spec may carry either or
 both. All five exception verbs match their operands exactly — banning `Exception` never flags a

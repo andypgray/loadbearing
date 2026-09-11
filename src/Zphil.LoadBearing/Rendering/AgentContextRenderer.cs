@@ -262,7 +262,7 @@ public static class AgentContextRenderer
 
     // The Migrate counter-prior section: one bullet per Migrate rule that names
     // the OLD pattern as grandfathered debt, states the target law, and renders the boy-scout policy —
-    // so an agent reading the majority (old) pattern does not infer it is house style.
+    // so an agent meeting the old pattern in the files around its task does not infer it is house style.
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
     {
         IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule, counts));
@@ -284,7 +284,7 @@ public static class AgentContextRenderer
     private static string MigrationBullet(ArchRule rule, Func<ArchRule, int?>? counts)
     {
         MigrateData migrate = rule.Migrate!;
-        string bullet = $"- {ProseFormat.Backtick(rule.Id)} — Most existing code here follows the OLD pattern: " +
+        string bullet = $"- {ProseFormat.Backtick(rule.Id)} — Some existing code here still follows the OLD pattern: " +
                         $"{migrate.From} That is grandfathered debt, not house style. New code must follow: " +
                         $"{migrate.ToSentence} {rule.Because} {PolicySentence(migrate.Policy)}";
 

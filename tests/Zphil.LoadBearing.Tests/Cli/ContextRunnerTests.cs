@@ -20,11 +20,7 @@ public sealed class ContextRunnerTests
         // The defect this closes: brackets resolve to a directory no card covers, so the verb used to answer
         // "no architecture scope covers …" and exit 0 — a well-formed proven negative to a question nobody
         // asked, on the exact call an agent is told to make before editing unfamiliar territory.
-        var output = new StringWriter();
-        var runner = new ContextRunner(output);
-        ContextRequest request = Request("""["src/Foo"]""");
-
-        var refusal = await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(request, Ct));
+        UserErrorException refusal = await ShouldRefuse("""["src/Foo"]""");
 
         refusal.Message.ShouldBe(
             "Cannot find architecture scope for '[\"src/Foo\"]'. That is a JSON array written as text; "
@@ -36,11 +32,7 @@ public sealed class ContextRunnerTests
     {
         // No echo: an array of several holds no single path this verb could have taken, and picking one of
         // them for the caller would be a guess dressed as advice.
-        var output = new StringWriter();
-        var runner = new ContextRunner(output);
-        ContextRequest request = Request("""["src/Foo","src/Bar"]""");
-
-        var refusal = await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(request, Ct));
+        UserErrorException refusal = await ShouldRefuse("""["src/Foo","src/Bar"]""");
 
         refusal.Message.ShouldBe(
             "Cannot find architecture scope for '[\"src/Foo\",\"src/Bar\"]'. That is a JSON array written as "
@@ -72,15 +64,19 @@ public sealed class ContextRunnerTests
         // The reader is never a repair, so a caller whose tree really does hold a bracketed directory name
         // gets their own text quoted back and one round trip to disambiguate — not a silent rewrite into a
         // path they did not ask about.
-        var output = new StringWriter();
-        var runner = new ContextRunner(output);
-        ContextRequest request = Request("[weird]");
-
-        var refusal = await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(request, Ct));
+        UserErrorException refusal = await ShouldRefuse("[weird]");
 
         refusal.Message.ShouldBe(
             "Cannot find architecture scope for '[weird]'. That is a JSON array written as text; "
             + "pass one path: 'weird'.");
+    }
+
+    // The writer rides inline because no case going through here reads it — the order pin above keeps its
+    // own, being the one test that asserts on the output channel.
+    private static async Task<UserErrorException> ShouldRefuse(string path)
+    {
+        var runner = new ContextRunner(new StringWriter());
+        return await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(Request(path), Ct));
     }
 
     // The solution and spec are never read — every case here throws before the load — so the shortest

@@ -24,8 +24,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         every rule the run selected — grain is never scope.
 ///     </para>
 ///     <para>
-///         The fixture's rungs are 27.2k / 20.8k / 13.5k / 5.9k characters — overview and skeleton a modest
-///         77% and 50% of full, because the MyApp solution has 43 violations over 46 sites. That ratio is an
+///         The fixture's rungs are 28.2k / 21.7k / 14.2k / 6.2k characters — overview and skeleton a modest
+///         77% and 50% of full, because the MyApp solution has 44 violations over 47 sites. That ratio is an
 ///         artefact of the fixture, not of the design: sites are the one array with no ceiling, so on the
 ///         legacy migration this exists for the compression is unbounded. What these rows pin is which rung
 ///         comes back and that it is whole — not how much it saved.
@@ -134,7 +134,7 @@ public sealed class CheckCommandTests
     {
         // Arrange — why skeleton is the last rung that still answers on its own. Prose scales with the rule
         // count, which is authored and small; violations and sites scale with the codebase, which is what
-        // overruns a channel. Dropping the prose takes this fixture's 13.5k to 5.9k — 22% of the full
+        // overruns a channel. Dropping the prose takes this fixture's 14.2k to 6.2k — 22% of the full
         // document, an id and a number per rule — which is a menu for the next call, not a verdict: index's
         // job, one rung further down, for the reader whose alternative was a cut report.
         var full = new StringWriter();

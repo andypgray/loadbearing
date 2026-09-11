@@ -24,7 +24,7 @@ public sealed class QuotingArchSpec : IArchitectureSpec
             .Fix("Move the dependency out of Domain: define an interface here and implement it in the outer layer that needs it.");
 
         arch.Rule("layering/application-boundaries")
-            .Enforce(application.MustOnlyReference(application, domain))
+            .Enforce(application.MustOnlyReference(domain))
             .Because("Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.")
             .Fix("Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.");
 

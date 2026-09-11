@@ -158,10 +158,8 @@ internal sealed class GraphRunner(
     {
         string written = string.Join(";", projectGlobs);
         var lead = $"No project matched '{written}'";
-        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(written);
 
-        return elements is null
-            ? Refusals.NotFoundMessage(lead, "Available projects", summary.Projects.Select(project => project.Name))
-            : Refusals.StringifiedArrayMessage(lead, Refusals.GlobListAdvice(elements));
+        return Refusals.StringifiedArrayRefusal(written, lead, Refusals.GlobListAdvice)
+               ?? Refusals.NotFoundMessage(lead, "Available projects", summary.Projects.Select(project => project.Name));
     }
 }

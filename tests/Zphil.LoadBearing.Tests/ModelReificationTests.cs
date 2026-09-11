@@ -656,6 +656,44 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void MustHaveExactlyOneCounterpartRule_ReifiesToWalkableCorrespondenceConstraint()
+    {
+        // The correspondence verb stores its one among selection on the shared operand list, exactly as the
+        // coverage verb stores its memberships — so the generic walks (foreign-Arch validation, the pattern
+        // walk, Quarantine desugaring) reach it with no arm of their own, and the template rides the node.
+        ArchRule rule = Checker.Model(arch => arch.Rule("naming/one-interface-per-service")
+                .Enforce(arch.Types.MustHaveExactlyOneCounterpart(
+                    among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"))
+                .Because("A service with no interface cannot be substituted in a test."))
+            .Rules.Single();
+
+        rule.ShouldReifyToWalkableDependencyConstraint<MustHaveExactlyOneCounterpartConstraint>(constraint => constraint.Among);
+    }
+
+    [Fact]
+    public void MustHaveExactlyOneCounterpart_AmongAndTemplate_RoundTripThroughTheOperandList()
+    {
+        // Deliberately ONE among selection rather than a params list: several would reopen the ALL/ANY
+        // question the coverage verb answers with an or-join, and a correspondence law has no reading under
+        // which two homes each hold exactly one counterpart. Authors union candidate homes with arch.AnyOf,
+        // which reifies as one operand — which is why Among is asserted against Operands rather than beside
+        // them. The template is stored verbatim: substitution happens at check time, never at mint.
+        var constraint = Checker.Model(arch => arch.Rule("naming/one-interface-per-service")
+                .Enforce(arch.Types.MustHaveExactlyOneCounterpart(
+                    among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"))
+                .Because("Reason."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustHaveExactlyOneCounterpartConstraint>();
+
+        constraint.Among.ShouldHaveSingleItem()
+            .Noun.ShouldBeOfType<NamespaceNoun>()
+            .Glob.ShouldBe("MyApp.Contracts.*");
+        constraint.Template.ShouldBe("I{Name}");
+        constraint.Operands.ShouldBe(constraint.Among);
+    }
+
+    [Fact]
     public void MustResideInProjectRule_ReifiesToWalkableProjectConstraint()
     {
         // A string-carrying shape verb: the project name rides on the node itself, so the rule names no

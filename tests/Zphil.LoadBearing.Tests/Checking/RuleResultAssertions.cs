@@ -191,8 +191,9 @@ internal static class RuleResultAssertions
 
     /// <summary>
     ///     Asserts the rule failed on exactly one shape violation, naming <paramref name="subject" /> and
-    ///     evidenced by <paramref name="sites" /> — the offending type's own declaration sites, each
-    ///     rendered <c>file:line</c> (GRAMMAR §4.4).
+    ///     evidenced by <paramref name="sites" /> — the sites the verb points at, each rendered
+    ///     <c>file:line</c> (GRAMMAR §4.4); for most shape verbs those are the offending type's own
+    ///     declarations, while the correspondence verb's ambiguous arm cites the colliding counterparts.
     /// </summary>
     /// <remarks>
     ///     A shape violation has no edge to cite, so its sites are the whole of what an agent can jump to,

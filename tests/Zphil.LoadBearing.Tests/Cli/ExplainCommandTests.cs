@@ -67,6 +67,7 @@ public sealed class ExplainCommandTests
                 "  layering/domain-independent\n" +
                 "  layering/no-ghost\n" +
                 "  layering/no-ungoverned-types\n" +
+                "  layering/services-behind-contracts\n" +
                 "  layering/services-in-web\n" +
                 "  legacy/billing/containment\n" +
                 "  legacy/billing/tripwire\n" +

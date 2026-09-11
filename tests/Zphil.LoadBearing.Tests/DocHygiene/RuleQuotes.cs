@@ -16,7 +16,7 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     <para>
 ///         <b>Containment, not equality.</b> A <c>Migrate</c> rule renders as
 ///         <c>
-///             Most existing code here
+///             Some existing code here still
 ///             follows the OLD pattern: … New code must follow: &lt;sentence&gt; …
 ///         </c>
 ///         , so the quoted sentence

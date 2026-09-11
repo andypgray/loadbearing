@@ -40,7 +40,7 @@ public sealed class RenderCommandE2ETests
         "- `naming/interfaces` — Interfaces in `MyApp.*` must be named `I*`. " +
         "House naming convention; agents grep by I-prefix.\n\n" +
         "### Migrations\n" +
-        "- `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: " +
+        "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
         "Controllers build DataTables inline (legacy Active Record style). " +
         "That is grandfathered debt, not house style. New code must follow: " +
         "Types in `MyApp.Web.*` named `*Controller` must not reference types in `System.Data.*`. " +

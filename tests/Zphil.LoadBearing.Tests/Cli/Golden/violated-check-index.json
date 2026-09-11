@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "index",
   "summary": {
-    "rulesChecked": 27,
+    "rulesChecked": 28,
     "rulesPassed": 2,
-    "rulesFailed": 24,
+    "rulesFailed": 25,
     "rulesSkipped": 1,
-    "violations": 43,
+    "violations": 44,
     "warnings": 1
   },
   "rules": [
@@ -188,6 +188,18 @@
       "id": "layering/services-in-web",
       "posture": "enforce",
       "status": "failed",
+      "violationCount": 1,
+      "warnings": []
+    },
+    {
+      "id": "layering/services-behind-contracts",
+      "posture": "migrate",
+      "status": "failed",
+      "baseline": {
+        "path": "arch/baselines/layering/services-behind-contracts.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
       "violationCount": 1,
       "warnings": []
     },

@@ -52,6 +52,9 @@ public sealed class CheckerSemanticsTests
     [Fact]
     public void MustOnly_EmptyAllowSet_IsLoudNotInert()
     {
+        // The allow-set an author wrote matches nothing, so the only targets left are the ones §4.1 grants:
+        // the subject itself, and external types. The Domain to Web edges are neither, which is what keeps
+        // an empty allow-set loud rather than turning it into a rule about nothing.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("only/x")
                     .Enforce(arch.Namespace("App.Domain.*").MustOnlyReference(arch.Namespace("App.Ghost.*")))

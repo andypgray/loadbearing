@@ -30,15 +30,19 @@ internal static class LawPlaceClassifier
     private const string OnlyVerb = "only";
 
     /// <summary>
-    ///     What the fence draws for a verb, or null when the verb draws nothing. The five drawable verbs
-    ///     are the four dependency-direction verbs and the exposure verb; every other verb constrains a
-    ///     shape, a name, or a member rather than a relation between two places, and an arrow would
-    ///     misrepresent it.
+    ///     What the fence draws for a verb, or null when the verb draws nothing. The drawable verbs are
+    ///     the four dependency-direction verbs, the leaf form of the outbound allow-list, and the exposure
+    ///     verb; every other verb constrains a shape, a name, or a member rather than a relation between
+    ///     two places, and an arrow would misrepresent it.
     /// </summary>
     /// <remarks>
     ///     One reading answers the whole drawing — the arrow's direction, the self-edge an allow-list makes
     ///     redundant, the word the label carries, and the legend rows those imply — so a verb can never be
-    ///     one thing to the arrow and another to the legend.
+    ///     one thing to the arrow and another to the legend. The leaf form is drawable and draws nothing:
+    ///     it names no operand, so it registers its subject's place and then falls to the compact list
+    ///     under the fence, which is where its explicitly-self-listing predecessor landed too. Declining it
+    ///     here instead would drop the place with it, and a leaf is a node of the graph whether or not an
+    ///     arrow leaves it.
     /// </remarks>
     internal static DrawableVerb? Classify(Constraint? constraint)
     {
@@ -47,6 +51,7 @@ internal static class LawPlaceClassifier
             MustNotReferenceConstraint => new DrawableVerb(inbound: false, only: false, verbWord: null),
             MustNotBeReferencedByConstraint => new DrawableVerb(inbound: true, only: false, verbWord: null),
             MustOnlyReferenceConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
+            MustOnlyReferenceItselfConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
             MustOnlyBeReferencedByConstraint => new DrawableVerb(inbound: true, only: true, verbWord: OnlyVerb),
             MustNotExposeConstraint => new DrawableVerb(inbound: false, only: false, verbWord: ExposeVerb),
             _ => null

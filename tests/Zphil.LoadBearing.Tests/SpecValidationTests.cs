@@ -71,6 +71,12 @@ public class SpecValidationTests
     [InlineData(typeof(BlankTargetFrameworkSpec), Code.BlankTargetFramework, "area/rule")]
     [InlineData(typeof(BlankProjectWhereSpec), Code.BlankProse, "area/rule")]
     [InlineData(typeof(BlankProjectMustSpec), Code.BlankProse, "area/rule")]
+    // The correspondence verb's name template (GRAMMAR §8 items 25–26). Blankness rides the shared
+    // BlankPattern walk under its own label, because a blank template is the same slip as a blank affix;
+    // a template that is merely missing its {Name} needs its own code, since it is well-formed text that
+    // states the wrong kind of law.
+    [InlineData(typeof(BlankCounterpartTemplateSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(PlaceholderFreeCounterpartTemplateSpec), Code.CounterpartTemplateWithoutPlaceholder, "area/rule")]
     public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, Code code, string ruleId)
     {
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
@@ -879,6 +885,37 @@ public class SpecValidationTests
         ex.ShouldHaveError(Code.BlankPattern, "project/verb")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:866: Blank project name on 'project/verb'.");
+    }
+
+    // ---- The correspondence verb's name template (GRAMMAR §8 items 25–26). Two failures, deliberately under
+    //      two codes: a blank template is an empty operand like any other, while a template with no {Name} in
+    //      it is well-formed text that states a cardinality law instead of a correspondence one. ----
+
+    [Fact]
+    public void BlankPattern_BlankCounterpartTemplate_IsReported()
+    {
+        // Blankness routes through the shared CheckPattern walk, so the sentence is the family's, and the
+        // label is the only thing that says which operand was left empty.
+        SpecValidationException ex = BuildExpectingFailure(new BlankCounterpartTemplateSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:943: Blank counterpart name template on 'area/rule'.");
+    }
+
+    [Fact]
+    public void CounterpartTemplateWithoutPlaceholder_ConstantName_IsReported()
+    {
+        // A template with no {Name} derives one fixed name for every subject, so the rule asks "does exactly
+        // one IService exist" rather than "does each subject have its own counterpart" — green or red for the
+        // whole subject set at once. The message names the template, says what the rule would actually mean,
+        // and shows the spelling — which is also how a '{name}' typo is found, the match being ordinal.
+        SpecValidationException ex = BuildExpectingFailure(new PlaceholderFreeCounterpartTemplateSpec());
+
+        ex.ShouldHaveError(Code.CounterpartTemplateWithoutPlaceholder, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:953: The counterpart name template 'IService' on 'area/rule' contains no "
+                      + "'{Name}' placeholder, so every subject derives the same fixed name — a cardinality claim, not a "
+                      + "correspondence; use a template such as 'I{Name}' (substitution is case-sensitive).");
     }
 
     [Fact]

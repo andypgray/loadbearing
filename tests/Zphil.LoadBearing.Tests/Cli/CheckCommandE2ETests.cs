@@ -498,14 +498,14 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_RulesSelectingOnePassingRule_StampsTheFilterAndExitsZero()
     {
-        // Act — one green rule picked out of a spec with twenty-four red ones.
+        // Act — one green rule picked out of a spec with twenty-five red ones.
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "layering/billing-independent");
 
         // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
         // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
         result.ShouldSucceed(
-            "Checking 1 of 27 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            "Checking 1 of 28 rules matching 'layering/billing-independent'; the verdict below covers only those, "
             + "so a clean result here is not a clean solution.");
         result.Out.ShouldNotContain("layering/domain-independent");
     }
@@ -519,7 +519,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
         result.ShouldReportViolations(
-            "Checking 5 of 27 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            "Checking 5 of 28 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
             + "result here is not a clean solution.",
             "FAIL exceptions/no-general-catch",
             "FAIL exceptions/no-bare-bcl-throw");
@@ -536,7 +536,7 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--rules", "exceptions/*");
 
         // Assert — the stamp never reaches stdout under --json; the document carries the same fact in
-        // rulesFilter, and the summary counts the five rules that ran rather than the twenty-seven that exist.
+        // rulesFilter, and the summary counts the five rules that ran rather than the twenty-eight that exist.
         result.ShouldReportViolations();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement root = document.RootElement;

@@ -200,6 +200,21 @@
       "warnings": 0
     },
     {
+      "id": "layering/services-behind-contracts",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/layering/services-behind-contracts.json",
+        "captured": true,
+        "remaining": 1,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
       "id": "layering/no-ungoverned-types",
       "posture": "enforce",
       "status": "failed",
@@ -257,11 +272,11 @@
     }
   ],
   "summary": {
-    "rulesChecked": 27,
+    "rulesChecked": 28,
     "rulesPassed": 2,
-    "rulesFailed": 24,
+    "rulesFailed": 25,
     "rulesSkipped": 1,
-    "grandfatheredRemaining": 1,
+    "grandfatheredRemaining": 2,
     "fixedAwaitingAcceptance": 0
   }
 }

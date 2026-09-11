@@ -128,12 +128,11 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
     // those, so nothing here narrows what a path may be.
     private static void RefuseAStringifiedArrayPath(string path)
     {
-        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(path);
-        if (elements is null) return;
-
         var lead = $"Cannot find architecture scope for '{path}'";
-        string advice = Refusals.SingleValueAdvice("pass one path", elements);
-        throw new UserErrorException(Refusals.StringifiedArrayMessage(lead, advice));
+        string? refusal = Refusals.StringifiedArrayRefusal(
+            path, lead, elements => Refusals.SingleValueAdvice("pass one path", elements));
+
+        if (refusal is not null) throw new UserErrorException(refusal);
     }
 
     private static string PointerLine(string path)

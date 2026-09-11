@@ -44,6 +44,11 @@ namespace Zphil.LoadBearing.Tests.Oracle;
 ///             comparison is at type granularity — LoadBearing's per-site locations have nothing to compare
 ///             against.
 ///         </item>
+///         <item>
+///             <b>Correspondence counting</b> (<c>MustHaveExactlyOneCounterpart</c>): ArchUnitNET asserts facts
+///             about a type itself and has no form that counts the other types a name template derives — there is
+///             nothing to build a row against, only a wrong one.
+///         </item>
 ///     </list>
 /// </remarks>
 public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchitecture oracle) : IClassFixture<OracleArchitecture>

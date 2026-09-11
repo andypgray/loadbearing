@@ -158,6 +158,24 @@ internal sealed class SelectionAdmission
         return new SelectionAdmission(members, Merge(parts, members));
     }
 
+    /// <summary>
+    ///     This allow-set with the rule's own subject folded in as one more entry — the implicit
+    ///     self-allowance the <c>MustOnly*</c> reference verbs carry (GRAMMAR §4.1).
+    /// </summary>
+    /// <remarks>
+    ///     The subject arrives already resolved in <see cref="SelectionPosition.Subject" /> position, and
+    ///     that is the whole of what "self" means: the refined membership the rule ranges over, so an
+    ///     <c>Except</c> the subject spells narrows what the verb allows exactly as it narrows what the
+    ///     verb governs. Folding that admission rather than re-resolving the subject selection in target
+    ///     position is also what keeps the entry's §4.1 naming: the subject allows a node at precisely the
+    ///     projects it names it at, so an intra-copy edge is allowed at the compiling project a
+    ///     project-headed subject anchors and nowhere else.
+    /// </remarks>
+    internal SelectionAdmission IncludingSelf(SelectionAdmission subject)
+    {
+        return Merged([this, subject]);
+    }
+
     // The operand fold's membership half: one operand is already its own admission, and the rest union.
     private static SelectionAdmission Merged(IReadOnlyList<SelectionAdmission> parts)
     {

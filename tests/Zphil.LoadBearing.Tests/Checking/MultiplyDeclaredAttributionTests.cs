@@ -82,7 +82,8 @@ internal static class MixedDeclarerCodebase
 ///     reference per declarer of its source, each reaching that declarer's own copy of the target where it
 ///     compiles one and the target's attributed declarer otherwise. The subject bounds which instances a
 ///     rule owns and the operand decides the far end at each. Heads that are not projects stay
-///     attribution-insensitive, and <c>MustOnly*</c> stays strict.
+///     attribution-insensitive, and a <c>MustOnly*</c> subject is an allow entry like any other: it allows
+///     a node at exactly the projects it names it at.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -283,8 +284,9 @@ public sealed class MultiplyDeclaredAttributionTests
     [Fact]
     public void MustOnlyReference_IntraCopyEdge_AllowEntryNamingTheCompilingProjectSatisfies()
     {
-        // Strictness under attribution: the allow entry names the project that compiled both ends, which is
-        // the project the edge belongs to, so the reference is allowed.
+        // Attribution at the allow-set's far end: the entry names the project that compiled both ends,
+        // which is the project the edge belongs to, so the reference is allowed. Nothing here rests on the
+        // implicit self-allowance, the subject being a namespace that does not contain Widget at all.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-tool")
                     .Enforce(arch.Namespace("Tool.*").MustOnlyReference(arch.Project("Tool")))
@@ -294,27 +296,41 @@ public sealed class MultiplyDeclaredAttributionTests
     }
 
     [Fact]
-    public void MustOnlyReference_IntraCopyEdge_AllowEntryNamingOnlyTheWinnerIsRed()
+    public void MustOnlyReference_IntraCopyEdge_AProjectHeadedSubjectAllowsTheCopyItAnchorsOn()
     {
         // The same allow-list moved to the winner, and a project-headed subject, so both instances the
-        // rule owns are Tool's. Neither is allowed by an entry naming Core: Command's reference reached
-        // Tool's copy of Widget, and Tool's copy of Widget reached Tool's copy of WidgetPart.
+        // rule owns are Tool's. The entry naming Core allows neither, Command's reference having reached
+        // Tool's copy of Widget and Tool's copy of Widget having reached Tool's copy of WidgetPart. The
+        // subject allows both: Project("Tool") names each of those nodes at Tool, which is the project
+        // every owned instance reached.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-core")
                     .Enforce(arch.Project("Tool").MustOnlyReference(arch.Project("Core")))
                     .Because("The tool builds on the core alone."))
             .Single()
-            .ShouldHaveFailedWithEdges(ViolationKind.Reference, [
-                "Shared.Widget -> Shared.WidgetPart",
-                "Tool.Command -> Shared.Widget"
-            ]);
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustOnlyReference_IntraCopyEdge_ASubjectThatDoesNotNameTheTargetAllowsNothingExtra()
+    {
+        // The boundary the row above no longer holds, over the very same edge: the subject is Tool's own
+        // namespace rather than Tool the project, so it contains Command and not Widget, and the implicit
+        // entry has nothing to say about the far end. Project("Stub") names Widget only at Stub, and the
+        // instance reached Tool.
+        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
+                arch.Rule("layering/tool-only-stub")
+                    .Enforce(arch.Namespace("Tool.*").MustOnlyReference(arch.Project("Stub")))
+                    .Because("The command surface reaches the stub's declarations alone."))
+            .Single()
+            .ShouldHaveFailedWithEdges(ViolationKind.Reference, ["Tool.Command -> Shared.Widget"]);
     }
 
     [Fact]
     public void MustOnlyReference_IntraCopyEdge_TypeofAllowEntryContainingTheTypeSatisfies()
     {
         // The other way an intra-copy edge is satisfied: an allow entry that is not a project at all simply
-        // contains the type, and containment is all the strict verb asks of it.
+        // contains the type, and containment is all this verb asks of it.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-widget")
                     .Enforce(arch.Namespace("Tool.*").MustOnlyReference(typeof(Widget)))
@@ -329,8 +345,9 @@ public sealed class MultiplyDeclaredAttributionTests
         // The containment verb, with the subject at the target end again. Command is in neither allowed
         // project, so counting its reference into Tool's own copy would red the rule; anchored on Core the
         // subject does not own that instance, while User's and Consumer's references are owned and allowed.
-        // The green rests on the subject being WINNER-anchored: the same allow-list under Project("Tool")
-        // owns Tool's instances instead and reds on both, which the row below this one pins.
+        // Core is listed beside Client redundantly under the implicit self-allowance, and stays as written
+        // because what this row is about is which instances a WINNER-anchored subject owns. Drop Client
+        // and the owned cross-project reference goes red, which the second row below pins.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/core-only-from-client")
                     .Enforce(arch.Project("Core")
@@ -341,22 +358,34 @@ public sealed class MultiplyDeclaredAttributionTests
     }
 
     [Fact]
-    public void MustOnlyBeReferencedBy_IntraCopyEdge_AllowEntryNamingOnlyAnotherDeclarerIsRed()
+    public void MustOnlyBeReferencedBy_IntraCopyEdge_AProjectHeadedSubjectAllowsItsOwnCopysSources()
     {
-        // The allow-list is stricter under the instance model, and this is the row that says so. Anchored
-        // on Tool the subject owns Tool's instance of both inbound edges, and Project("Core") allows
-        // neither: Tool.Command is in no allowed project, and Tool's copy of Widget is allowed only by an
-        // entry naming Tool. Through 0.6.1 the shared edge was allowed, because membership alone was
-        // asked of the source and Project("Core") does contain Shared.Widget.
+        // The inbound twin of the outbound row above. Anchored on Tool the subject owns Tool's instance of
+        // both inbound edges, and Project("Core") allows neither source: Tool.Command is in no allowed
+        // project, and Tool's copy of Widget is allowed only by an entry naming Tool. The subject is that
+        // entry, naming Command at Tool and Widget at Tool, which is the project both owned instances
+        // reached.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-from-core")
                     .Enforce(arch.Project("Tool").MustOnlyBeReferencedBy(arch.Project("Core")))
                     .Because("The tool's types are reached through the core."))
             .Single()
-            .ShouldHaveFailedWithEdges(ViolationKind.Reference, [
-                "Shared.Widget -> Shared.WidgetPart",
-                "Tool.Command -> Shared.Widget"
-            ]);
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustOnlyBeReferencedBy_OwnedCrossProjectSource_StaysRedWhenNoEntryNamesIt()
+    {
+        // The boundary for the inbound verb, in the same attribution context: anchored on Core the subject
+        // owns Consumer's reference into Core's copy, and Consumer is declared by Client alone, outside the
+        // subject and outside Project("Stub"). The two edges the subject owns at its own copy stay green on
+        // the implicit entry, so the one violation names the source that is genuinely elsewhere.
+        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
+                arch.Rule("layering/core-only-from-stub")
+                    .Enforce(arch.Project("Core").MustOnlyBeReferencedBy(arch.Project("Stub")))
+                    .Because("The core's declarations are reached through the stub."))
+            .Single()
+            .ShouldHaveFailedWithEdges(ViolationKind.Reference, ["Client.Consumer -> Shared.Widget"]);
     }
 
     [Fact]

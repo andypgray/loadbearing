@@ -24,6 +24,17 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustOnlyReferenceItself_StatesTheSameExternalPackagesCaveat()
+    {
+        // §4.1/§5.3: the leaf form's complement universe is the outbound verb's, so the caveat is too — a
+        // leaf of the solution's reference graph may still take a NuGet dependency. A layer subject rather
+        // than the bare Types noun every other row here uses, because "itself" refers to the selection and
+        // a singular noun is the only subject that reads back as the law means it.
+        SentenceRenderer.Sentence(Arch.Layer("Tracking", "MyApp.Tracking.*").MustOnlyReferenceItself())
+            .ShouldBe("The Tracking layer must reference only itself (external packages are not constrained by this rule).");
+    }
+
+    [Fact]
     public void MustOnlyBeReferencedBy_OmitsCaveat()
     {
         // §4.1: only solution types can be observed referencing, so no caveat is needed.
@@ -488,6 +499,17 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.MustBelongTo(
                 Arch.Layer("Domain", "MyApp.Domain.*"), Arch.Layer("Web", "MyApp.Web.*")))
             .ShouldBe("Types must belong to the Domain layer or the Web layer.");
+    }
+
+    [Fact]
+    public void MustHaveExactlyOneCounterpart_BackticksTemplateUnsubstituted()
+    {
+        // The correspondence verb (GRAMMAR §5.3, §10): the template renders backticked and unsubstituted,
+        // exactly as MustHaveSuffix renders `*Handler` — the sentence states the law, and the law is the
+        // pattern. The among selection renders in reference position, head-substituted to "interfaces".
+        SentenceRenderer.Sentence(Arch.Types.MustHaveExactlyOneCounterpart(
+                among: Arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
+            .ShouldBe("Types must have exactly one counterpart named `I{Name}` among interfaces.");
     }
 
     [Fact]

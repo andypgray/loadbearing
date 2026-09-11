@@ -14,7 +14,9 @@ namespace Zphil.LoadBearing;
 ///     (GRAMMAR §2). The dependency verbs carry both overloads (GRAMMAR §3.3): a
 ///     <see cref="Selection" /> list and a <see cref="Type" /> list (sugar that wraps each type as a
 ///     single-type selection). The <c>(first, params more)</c> shape makes a zero-target call
-///     uncompilable.
+///     uncompilable; the one shape that legitimately names no target gets a verb of its own instead
+///     (<see cref="MustOnlyReferenceItself" />), so the arity stays a compile error rather than a
+///     runtime one.
 /// </remarks>
 public static class SelectionConstraints
 {
@@ -40,6 +42,15 @@ public static class SelectionConstraints
     public static Constraint MustOnlyReference(this Selection subject, Type first, params Type[] more)
     {
         return new MustOnlyReferenceConstraint(subject, WrappedTypes(subject, first, more));
+    }
+
+    /// <summary>
+    ///     The subject may reference nothing outside itself — the leaf of the reference graph
+    ///     (external packages exempt, GRAMMAR §4.1).
+    /// </summary>
+    public static Constraint MustOnlyReferenceItself(this Selection subject)
+    {
+        return new MustOnlyReferenceItselfConstraint(Subject(subject));
     }
 
     /// <summary>The subject must not be referenced by any of the sources.</summary>
@@ -247,6 +258,24 @@ public static class SelectionConstraints
     public static Constraint MustBelongTo(this Selection subject, Selection first, params Selection[] more)
     {
         return new MustBelongToConstraint(subject, Selections(subject, first, more));
+    }
+
+    /// <summary>
+    ///     The subject must have exactly one counterpart whose name the template derives — the
+    ///     correspondence verb, red on a subject with zero counterparts and red again with several
+    ///     (GRAMMAR §5.3, §10). Every <c>{Name}</c> occurrence is replaced by the subject's simple name:
+    ///     substitution is ordinal and case-sensitive, and a template with no <c>{Name}</c> at all fails at
+    ///     spec build rather than checking a constant name. Matching is arity-free and nested types match
+    ///     on leaf names. Deliberately one <c>among:</c> selection — a params list would reopen the ALL/ANY
+    ///     question in a worse form — so authors union candidate homes with <c>arch.AnyOf</c>; and no
+    ///     <c>Type</c> sugar, because this position derives a name rather than naming a type (GRAMMAR §10).
+    ///     An <c>among:</c> selection matching nothing reds every subject — a false red, not a miss — and
+    ///     raises no warning (GRAMMAR §4.7).
+    /// </summary>
+    public static Constraint MustHaveExactlyOneCounterpart(this Selection subject, Selection among, string named)
+    {
+        return new MustHaveExactlyOneCounterpartConstraint(
+            Subject(subject), [NotNull(among, nameof(among))], NotNull(named, nameof(named)));
     }
 
     /// <summary>The subject must reside in a namespace glob.</summary>

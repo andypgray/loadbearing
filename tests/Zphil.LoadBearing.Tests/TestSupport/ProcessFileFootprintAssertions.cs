@@ -26,8 +26,8 @@ internal static class ProcessFileFootprintAssertions
     ///     case; only a genuine leak pays it. The failure names every offender with both spellings, because
     ///     when this reds the useful question is <em>which</em> build output is pinned.
     ///     <para>
-    ///         Both exclusions run inside the loop rather than over the caller's first scan, because the
-    ///         subject is re-scanned each poll and an unfiltered rescan would resurrect what was excused.
+    ///         The excused scan runs inside the loop rather than once over the caller's first look, because
+    ///         the subject is re-scanned each poll and an unfiltered rescan would resurrect what was excused.
     ///     </para>
     /// </remarks>
     internal static void ShouldEventuallyHoldNoPathsUnder(
@@ -42,11 +42,8 @@ internal static class ProcessFileFootprintAssertions
 
         while (true)
         {
-            IReadOnlyList<RetainedPath> retained = ProcessFileFootprint.PathsUnder(process, root);
-            if (inheritedHandles is not null)
-                retained = ProcessFileFootprint.ExceptInherited(retained, inheritedHandles);
-
-            retained = ProcessFileFootprint.ExceptInjected(retained, injectedProfilerDirectory);
+            IReadOnlyList<RetainedPath> retained = ProcessFileFootprint.AcquiredPathsUnder(
+                process, root, inheritedHandles, injectedProfilerDirectory);
 
             if (retained.Count == 0) return;
 

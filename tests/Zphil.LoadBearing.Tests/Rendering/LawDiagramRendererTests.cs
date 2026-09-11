@@ -120,8 +120,9 @@ public sealed class LawDiagramRendererTests
     [Fact]
     public void Block_AnOnlyVerbNamingNothingButItself_DrawsNoEdgeAndIsListed()
     {
-        // Arrange — a leaf of the reference graph, said the only way the language says it: the sole
-        // permitted target is the subject.
+        // Arrange — a leaf of the reference graph, spelled the long way: the sole permitted target is the
+        // subject, which §4.1 now allows anyway. The spelling stays legal, so the drawing still has to
+        // answer for it.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/leaf")
                 .Enforce(arch.Namespace("A.*").MustOnlyReference(arch.Namespace("A.*")))
@@ -131,6 +132,25 @@ public sealed class LawDiagramRendererTests
         string block = LawDiagramRenderer.Block(model, SpecName);
 
         // Assert — the self-arrow stays omitted, and the rule lands in the list rather than vanishing.
+        Edges(block)
+            .ShouldBeEmpty();
+        block.ShouldEndWith("Not drawn in full: `r/leaf`. Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
+    public void Block_TheLeafVerb_DrawsNoEdgeAndIsListed()
+    {
+        // Arrange — the same law in the spelling that has no operand to skip. The drawing must land in the
+        // same place, or the two ways of saying "leaf" would draw two different pictures.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaf")
+                .Enforce(arch.Namespace("A.*").MustOnlyReferenceItself())
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert
         Edges(block)
             .ShouldBeEmpty();
         block.ShouldEndWith("Not drawn in full: `r/leaf`. Expand any of them with `loadbearing explain <rule-id>`.");

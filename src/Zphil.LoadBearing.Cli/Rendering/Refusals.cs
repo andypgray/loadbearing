@@ -13,9 +13,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     One value never earns the roster: a JSON array a client serialized into the string parameter it was
 ///     binding. Every name the reader wants is already inside their own brackets, so answering with the whole
 ///     spec's is a menu to a question nobody asked — the defect is the shape, not the spelling.
-///     <see cref="StringifiedArrayElements" /> recognizes it and <see cref="StringifiedArrayMessage" /> names
-///     it instead. The refusals are shared by the CLI and the MCP tools by construction, so no wording here may
-///     name a flag or a tool parameter: it names the shape both surfaces pass.
+///     <see cref="StringifiedArrayRefusal" /> owns that decision, so a caller states only its lead, its
+///     advice, and the roster it falls back to. The refusals are shared by the CLI and the MCP tools by
+///     construction, so no wording here may name a flag or a tool parameter: it names the shape both
+///     surfaces pass.
 /// </remarks>
 internal static class Refusals
 {
@@ -82,6 +83,22 @@ internal static class Refusals
     internal static string StringifiedArrayMessage(string lead, string advice)
     {
         return $"{lead}. That is a JSON array written as text; {advice}.";
+    }
+
+    /// <summary>
+    ///     The whole shape-or-roster decision: the stringified-array refusal for <paramref name="value" />,
+    ///     or <c>null</c> when the value is not one and the caller's own roster refusal should answer.
+    /// </summary>
+    /// <remarks>
+    ///     <paramref name="advice" /> runs only when the value is an array, handed its elements — compose
+    ///     with <see cref="GlobListAdvice" /> or <see cref="SingleValueAdvice" /> and fall back through
+    ///     <c>??</c>, and neither branch ever builds the other's message.
+    /// </remarks>
+    internal static string? StringifiedArrayRefusal(
+        string value, string lead, Func<IReadOnlyList<string>, string> advice)
+    {
+        IReadOnlyList<string>? elements = StringifiedArrayElements(value);
+        return elements is null ? null : StringifiedArrayMessage(lead, advice(elements));
     }
 
     /// <summary>

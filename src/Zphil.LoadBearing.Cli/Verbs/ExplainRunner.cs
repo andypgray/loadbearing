@@ -77,10 +77,9 @@ internal sealed class ExplainRunner(
     private static string UnknownRuleMessage(string ruleId, ArchitectureModel model)
     {
         var lead = $"Unknown rule ID '{ruleId}'";
-        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(ruleId);
 
-        return elements is null
-            ? Refusals.RuleNotFound(lead, model)
-            : Refusals.StringifiedArrayMessage(lead, Refusals.SingleValueAdvice("pass one rule ID", elements));
+        return Refusals.StringifiedArrayRefusal(
+                   ruleId, lead, elements => Refusals.SingleValueAdvice("pass one rule ID", elements))
+               ?? Refusals.RuleNotFound(lead, model);
     }
 }

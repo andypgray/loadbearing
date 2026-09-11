@@ -104,6 +104,17 @@ public static class HumanReportRenderer
         var located = new List<(string Path, int Line, string Text)>();
         var unlocated = new List<string>();
 
+        // Where a one-line violation lands: its first carried site as a jump target, or the unlocated
+        // block when it carries none. The site always comes off the violation — every shape kind's
+        // evidence is minted where the verb decided it points, and the renderer only reads it.
+        void Place(SourceLocation? at, string text)
+        {
+            if (at is not null)
+                located.Add((relativizer.Relative(at.FilePath), at.Line, text));
+            else
+                unlocated.Add(text);
+        }
+
         foreach (Violation violation in result.Violations)
             switch (violation.Kind)
             {
@@ -116,20 +127,11 @@ public static class HumanReportRenderer
                         located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
                     break;
                 case ViolationKind.Shape:
-                    SourceLocation? first = violation.Subject!.DeclarationSites.FirstOrDefault();
-                    if (first is not null)
-                        located.Add((relativizer.Relative(first.FilePath), first.Line, violation.Subject.FullName));
-                    else
-                        unlocated.Add(violation.Subject.FullName);
+                    Place(violation.Sites.FirstOrDefault(), violation.Subject!.FullName);
                     break;
                 case ViolationKind.MemberShape:
                     MemberNode member = violation.SubjectMember!;
-                    SourceLocation? at = member.DeclarationSites.FirstOrDefault();
-                    string memberLine = MemberText(member.DeclaringTypeFullName, member.Name, member.Kind);
-                    if (at is not null)
-                        located.Add((relativizer.Relative(at.FilePath), at.Line, memberLine));
-                    else
-                        unlocated.Add(memberLine);
+                    Place(violation.Sites.FirstOrDefault(), MemberText(member.DeclaringTypeFullName, member.Name, member.Kind));
                     break;
                 case ViolationKind.ProjectShape:
                     // The Shape parallel over a project: its name, at whichever declaration carried the fact
@@ -140,11 +142,7 @@ public static class HumanReportRenderer
                     string projectText = violation.Package is { } package
                         ? $"{project.Name} references package {package.Name}"
                         : project.Name;
-                    SourceLocation? declared = violation.Sites.FirstOrDefault();
-                    if (declared is not null)
-                        located.Add((relativizer.Relative(declared.FilePath), declared.Line, projectText));
-                    else
-                        unlocated.Add(projectText);
+                    Place(violation.Sites.FirstOrDefault(), projectText);
                     break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");

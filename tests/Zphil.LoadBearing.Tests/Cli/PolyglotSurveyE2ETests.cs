@@ -287,15 +287,8 @@ public sealed class PolyglotSurveyE2ETests
         // posture its JSON twin pins: a project this product cannot read makes the universe smaller, never
         // wrong, so it warns beside the narrowing notice instead of gating like a failed load.
         result.ShouldSucceed();
-        using JsonDocument log = JsonDocument.Parse(File.ReadAllText(sarifPath));
-        JsonElement notification = log.RootElement.GetProperty("runs")
-            .EnumerateArray()
-            .ShouldHaveSingleItem()
-            .GetProperty("invocations")
-            .EnumerateArray()
-            .ShouldHaveSingleItem()
-            .GetProperty("toolExecutionNotifications")
-            .EnumerateArray()
+        JsonElement notification = File.ReadAllText(sarifPath)
+            .SarifNotifications()
             .ShouldHaveSingleItem();
 
         notification.GetProperty("message")

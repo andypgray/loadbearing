@@ -180,9 +180,6 @@ public sealed class GrandfatheredCountSyncTests
         (DeriveSpecPrompt,
             "with the grandfathered counts visible",
             "The 0 is the expected `rulesFailed` of the re-check, not a grandfathered count."),
-        ("GRAMMAR.md",
-            "The founding dogfood rule was one line",
-            "The one is a line of source in the founding spec, not a baseline entry."),
         (MeridianReadme,
             "Three describe debt with a target",
             "The counts are of rules by posture — three law, three ratcheting, one quarantine — not of "

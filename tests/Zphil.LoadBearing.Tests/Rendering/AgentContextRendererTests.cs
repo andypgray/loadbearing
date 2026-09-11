@@ -72,7 +72,7 @@ public class AgentContextRendererTests
             "- `style/type-name-length` — Types in `MyApp.*` must keep type names at or under 40 characters. " +
             "Long type names break the generated architecture tables.\n\n" +
             "### Migrations\n" +
-            "- `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: " +
+            "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
             "Controllers open SqlConnection directly (legacy Active Record style). " +
             "That is grandfathered debt, not house style. New code must follow: " +
             "Types in the Web layer named `*Controller` must not reference `SqlConnection`. " +
@@ -237,7 +237,7 @@ public class AgentContextRendererTests
 
         // The exact counter-prior bullet the root ### Migrations section renders for this rule.
         const string counterPriorBullet =
-            "- `data-access/no-inline-sql` — Most existing code here follows the OLD pattern: " +
+            "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
             "Controllers build DataTables inline (legacy Active Record style). " +
             "That is grandfathered debt, not house style. New code must follow: " +
             "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`. " +

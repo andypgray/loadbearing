@@ -48,12 +48,23 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         governed by <c>model/constraint-nodes</c>. <c>MustNotBeAttributedWith</c> idles because no
 ///         attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance this
 ///         ledger refuses. <c>MustHaveNameMatching</c> idles because the two naming laws here are a
-///         prefix and a suffix, which say it more exactly. <c>MustBeRegistered</c> idles because nothing
+///         prefix and a suffix, which say it more exactly. <c>MustOnlyReferenceItself</c> idles because
+///         Core is this solution's only reference-graph leaf and the temptation it actually faces is a
+///         package: the leaf verb exempts external targets, so it cannot say the one thing
+///         <c>layering/core-no-roslyn</c> exists to say, and a second rule beside that one would state
+///         the weaker half twice. Its consumer is a modular monolith whose leaf module must stay clear
+///         of its siblings. <c>MustBeRegistered</c> idles because nothing
 ///         here is registered by convention: the composition root wires a hand-written list of
 ///         infrastructure singletons, so a completeness rule over them could only restate that list at
 ///         itself — a tautology wearing a law's clothes. Its consumer is an estate where a naming
 ///         convention implies registration (every <c>*Handler</c>, say) and a type can carry the name
-///         while missing the wiring. The predicate escape hatch is the one entry
+///         while missing the wiring. <c>MustHaveExactlyOneCounterpart</c> idles because this suite
+///         organizes tests by behavior, not per type: 21 of the 110 public Core types have a
+///         <c>{Name}Tests</c> class, and a rule demanding one each would grandfather the other 89 as
+///         debt — recording a convention the tree deliberately does not follow as if it were merely
+///         unpaid. Its consumer is an estate where the per-type test home or the per-service interface
+///         is the convention, and a missing counterpart there is drift rather than design. The
+///         predicate escape hatch is the one entry
 ///         that came off this list: the three <c>api/*-front-door</c> rules use it because a curated set
 ///         of names is the thing the vocabulary genuinely cannot say — no prefix, suffix or pattern picks
 ///         out "the types an author spells". The unused sugar overloads and the unused
@@ -500,7 +511,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                  "with the family it belongs to, and say in review which one.");
 
         arch.Rule("packs/depends-on-core-only")
-            .Enforce(pack.MustOnlyReference(core, pack))
+            .Enforce(pack.MustOnlyReference(core))
             .Because("A spec project takes the rule pack as a reference of its own, and the whole of what " +
                      "the pack needs is the Arch it composes onto. A reference to the extraction host or " +
                      "the CLI would pull MSBuild and the rest of the tool into the closure of every spec " +

@@ -160,12 +160,8 @@ public sealed class McpChildServerRepoHandleTests
         ChildConversation conversation = await McpChildHarness.ConverseAsync(
             startInfo,
             [],
-            whileComplete: server =>
-            {
-                IReadOnlyList<RetainedPath> scanned = ProcessFileFootprint.PathsUnder(server, RepoRoot.Directory);
-                IReadOnlyList<RetainedPath> acquired = ProcessFileFootprint.ExceptInherited(scanned, inherited);
-                retained = ProcessFileFootprint.ExceptInjected(acquired, injected);
-            });
+            whileComplete: server => retained = ProcessFileFootprint.AcquiredPathsUnder(
+                server, RepoRoot.Directory, inherited, injected));
 
         conversation.Handshake.ShouldNotBeNull(
             $"the MCP server never answered `initialize` over real stdio.\nstderr:\n{conversation.Diagnostics}");

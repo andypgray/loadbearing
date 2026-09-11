@@ -155,6 +155,10 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenReference(admission, c.Sources, inbound: true);
             case MustOnlyReferenceConstraint c:
                 return OnlyReference(admission, c.Targets);
+            case MustOnlyReferenceItselfConstraint:
+                // The leaf verb is the default with nothing beside it: an empty operand list resolves to
+                // an empty admission, which the implicit self-allowance folds back to the subject alone.
+                return OnlyReference(admission, Array.Empty<Selection>());
             case MustOnlyBeReferencedByConstraint c:
                 return OnlyBeReferencedBy(admission, c.Sources);
             case MustNotUseConstraint c:
@@ -188,6 +192,8 @@ internal sealed class ConstraintEvaluator
                 SelectionAdmission membership =
                     SelectionAdmission.Operands(_selections, c.Memberships, SelectionPosition.Subject);
                 return Shape(subjects, membership.Contains);
+            case MustHaveExactlyOneCounterpartConstraint c:
+                return Counterparts(subjects, c);
             case MustBeRegisteredConstraint:
                 HashSet<TypeNode> registered = _selections.RegisteredMembers(SelectionPosition.Subject);
                 return Shape(subjects, registered.Contains);
@@ -502,15 +508,19 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets)
     {
-        SelectionAdmission allowed = ResolveOperands(allowedTargets);
+        SelectionAdmission allowed = ResolveOperands(allowedTargets).IncludingSelf(subject);
         var violations = new List<Violation>();
 
-        // Strict, no implicit self-allowance; external targets are exempt (the complement universe is
-        // solution-declared, GRAMMAR §4.1). MustOnly* never warns — an empty allow-set is loud by itself.
-        // Strictness survives §4.1 attribution by flipping the polarity CountsEdge asks with: an edge is
-        // a violation when SOME instance the subject owns lands outside the allow-set. So an intra-copy
-        // edge is allowed by an entry naming the compiling project, or by an entry that is not a project
-        // at all — never by an entry naming some other declarer of the same source file.
+        // The refined subject is allowed implicitly, as one more allow entry (GRAMMAR §4.1) — folded into
+        // the resolved admission here rather than into the Targets list, so Operands, the sentence and the
+        // diagram never see an entry no author wrote. External targets are exempt (the complement universe
+        // is solution-declared). MustOnly* never warns — an empty allow-set is loud by itself, and the
+        // leaf verb's empty operand list resolves to subject-only rather than to nothing.
+        // Attribution survives by flipping the polarity CountsEdge asks with: an edge is a violation when
+        // SOME instance the subject owns lands outside the allow-set. So an intra-copy edge is allowed by
+        // an entry naming the compiling project — the subject counts as one, at the projects it names the
+        // node at — or by an entry that is not a project at all, and never by an entry naming some other
+        // declarer of the same source file.
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesBySource.Lookup))
             if (!edge.Target.IsExternal
                 && SelectionAdmission.CountsEdge(
@@ -523,14 +533,16 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedSources)
     {
-        SelectionAdmission allowed = ResolveOperands(allowedSources);
+        SelectionAdmission allowed = ResolveOperands(allowedSources).IncludingSelf(subject);
         var violations = new List<Violation>();
 
-        // Any inbound reference from outside the allow-set is a violation (the containment verb, §7).
-        // Edge sources are always solution-declared, so no external caveat is needed. The subject sits at
-        // the edge's TARGET end, so it bounds ownership there while the allow-set decides the source —
-        // one test rather than two, because "some instance the subject owns comes from an unallowed
-        // project" is a claim about one declarer and cannot be split across independent filters (§4.1).
+        // Any inbound reference from outside the allow-set is a violation (the containment verb, §7), the
+        // refined subject being one of the allowed sources implicitly (GRAMMAR §4.1, as for the outbound
+        // verb). Edge sources are always solution-declared, so no external caveat is needed. The subject
+        // sits at the edge's TARGET end, so it bounds ownership there while the allow-set decides the
+        // source — one test rather than two, because "some instance the subject owns comes from an
+        // unallowed project" is a claim about one declarer and cannot be split across independent
+        // filters (§4.1).
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesByTarget.Lookup))
             if (SelectionAdmission.CountsEdge(
                     subject, allowed, edge.Source, edge.Target, subjectAtSource: false, wantHit: false))
@@ -596,12 +608,68 @@ internal sealed class ConstraintEvaluator
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
     {
+        return Shape(subjects, subject => holds(subject) ? null : subject.DeclarationSites);
+    }
+
+    // The one minter for every type-subject shape violation: the verdict answers with the sites a red
+    // points at, null for a pass. Most shape verbs point at the failing subject's own declaration (the
+    // predicate form above); a verb whose evidence lives elsewhere answers with those sites instead.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(
+        HashSet<TypeNode> subjects, Func<TypeNode, IReadOnlyList<SourceLocation>?> verdict)
+    {
         var violations = new List<Violation>();
         foreach (TypeNode subject in subjects)
-            if (!holds(subject))
-                violations.Add(Violation.Shape(subject, subject.DeclarationSites));
+            if (verdict(subject) is { } sites)
+                violations.Add(Violation.Shape(subject, sites));
 
         return (violations, NoWarnings);
+    }
+
+    // The correspondence verb (GRAMMAR §5.3): per subject the template derives a name, and exactly one type
+    // in the among selection must carry it. Two arms, each with its own evidence — a subject with NO
+    // counterpart is sited at its own declaration, an AMBIGUOUS one at the counterparts that collide — and
+    // one identity: the key is the subject's symbol ID either way, because counterparts are evidence and
+    // never identity, so a grandfathered subject stays grandfathered when the arm flips. The among selection
+    // resolves in SUBJECT position, like a membership: it names where a counterpart may live rather than
+    // the far end of an edge. An among selection matching nothing reds every subject and warns about none
+    // of it — the shape family raises no inert-target warning.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Counterparts(
+        HashSet<TypeNode> subjects, MustHaveExactlyOneCounterpartConstraint constraint)
+    {
+        SelectionAdmission among =
+            SelectionAdmission.Operands(_selections, constraint.Among, SelectionPosition.Subject);
+        ILookup<string, TypeNode> byName = among.Members.ToLookup(node => node.Name, StringComparer.Ordinal);
+        string template = constraint.Template;
+
+        return Shape(subjects, subject =>
+        {
+            // Materialized rather than held as the lookup's IEnumerable, because the ambiguous arm walks
+            // the same counterparts a second time to site them.
+            List<TypeNode> counterparts = byName[Derive(template, subject)].ToList();
+            if (counterparts.Count == 1) return null;
+
+            return counterparts.Count == 0 ? subject.DeclarationSites : CounterpartSites(counterparts);
+        });
+    }
+
+    // The name one subject's template derives: every {Name} occurrence replaced by the subject's simple
+    // name. netstandard2.0's two-string Replace is ordinal by definition — there is no StringComparison
+    // overload to spell it with — which is the same match the spec-build placeholder check runs, so a
+    // '{name}' typo fails at build rather than deriving a constant name here.
+    private static string Derive(string template, TypeNode subject)
+    {
+        return template.Replace("{Name}", subject.Name);
+    }
+
+    // The ambiguous arm's evidence: every colliding counterpart's declaration, ordered the way a report
+    // prints sites. Deliberately the counterparts rather than the subject — the edit that resolves an
+    // ambiguity happens at one of them, and the subject is already named by the violation itself.
+    private static IReadOnlyList<SourceLocation> CounterpartSites(IEnumerable<TypeNode> counterparts)
+    {
+        return counterparts.SelectMany(counterpart => counterpart.DeclarationSites)
+            .OrderBy(site => site.FilePath, StringComparer.Ordinal)
+            .ThenBy(site => site.Line)
+            .ToList();
     }
 
     // The negative hierarchy/attribute verbs (GRAMMAR §5.3, §5.7): a subject VIOLATES iff ANY anchor matches,

@@ -198,6 +198,23 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Because("Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep.")
             .Fix("Move the service into the MyApp.Web project.");
 
+        // Migrate (shape, correspondence): the second question on the *Service subject layering/services-in-web
+        // already reads — one subject, two questions, two identities. The first ForSubject baseline this spec
+        // commits (arch/baselines/layering/services-behind-contracts.json): OrderService is blessed and burns
+        // down in status; InvoiceService is the unblessed new-debt red at its own declaration. The four real
+        // interfaces (IHandler<T>, IOrderFeed, IOrderFormatter, IBillingFacade) are near misses that make both
+        // reds a claim about the derived I{Name}, not about having any interface at all. The ambiguous arm
+        // (two same-named counterparts) is pinned in the checker's own band over synthetic sources — staging it
+        // here needs a second same-named type, and this fixture gains rules but never types.
+        arch.Rule("layering/services-behind-contracts")
+            .Migrate(
+                "Some services are consumed as concrete classes, with no contract to substitute.",
+                arch.Types.WithSuffix("Service").MustHaveExactlyOneCounterpart(
+                    among: arch.Types.OfKind(TypeKind.Interface),
+                    named: "I{Name}"))
+            .Because("A caller that can only name the concrete service cannot be handed a different one; the I{Name} contract is where a double or a second implementation goes.")
+            .Fix("Extract an I{Name} interface for the service and consume that.");
+
         // Enforce (shape, membership): the ungoverned-remainder rule — every MyApp.* type must belong to
         // a declared layer. All four MyApp.Legacy.Billing types red: Billing is quarantined under
         // legacy/billing above, but a quarantine is not a layer — the two rules read the same namespace

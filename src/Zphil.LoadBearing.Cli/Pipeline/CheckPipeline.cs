@@ -68,10 +68,8 @@ internal static class CheckPipeline
     {
         string written = string.Join(";", ruleIdGlobs);
         var lead = $"No rule matched '{written}'";
-        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(written);
 
-        return elements is null
-            ? Refusals.RuleNotFound(lead, model)
-            : Refusals.StringifiedArrayMessage(lead, Refusals.GlobListAdvice(elements));
+        return Refusals.StringifiedArrayRefusal(written, lead, Refusals.GlobListAdvice)
+               ?? Refusals.RuleNotFound(lead, model);
     }
 }

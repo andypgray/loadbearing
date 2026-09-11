@@ -186,7 +186,7 @@ public sealed class RuleQuotesTests
         RuleQuote quote = new("d.md", 5, "pass", "data-access/no-inline-sql", "Types in `Web.*` must not reference `SqlConnection`.");
         IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = Bullets(
             "data-access/no-inline-sql",
-            "Most existing code here follows the OLD pattern: inline SQL. New code must follow: Types in `Web.*` must not reference `SqlConnection`. Data access behind a repository can be swapped.");
+            "Some existing code here still follows the OLD pattern: inline SQL. New code must follow: Types in `Web.*` must not reference `SqlConnection`. Data access behind a repository can be swapped.");
 
         // Act
         RuleQuotes.QuoteResult result = RuleQuotes.Classify(quote, bullets);

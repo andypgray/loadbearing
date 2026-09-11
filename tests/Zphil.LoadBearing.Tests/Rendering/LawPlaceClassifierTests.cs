@@ -16,6 +16,22 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 public sealed class LawPlaceClassifierTests
 {
     [Fact]
+    public void IsDrawableVerb_TheLeafForm_IsDrawableSoItsSubjectStaysAPlace()
+    {
+        // Arrange — the verb draws nothing, having no operand to point at, and is drawable all the same:
+        // declining it here would drop the subject's place with it, and a leaf is a node of the graph
+        // whether or not an arrow leaves it.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaf")
+                .Enforce(arch.Namespace("A.*").MustOnlyReferenceItself())
+                .Because("x"));
+
+        // Act + Assert
+        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
+            .ShouldBeTrue();
+    }
+
+    [Fact]
     public void IsDrawableVerb_TheFourDirectionVerbsAndExpose_AreDrawable()
     {
         // Arrange — one rule per drawable verb, in one model.

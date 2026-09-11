@@ -72,8 +72,8 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_ShapeSubjectWithoutDeclarationSites_RendersUnlocatedFullName()
     {
-        // A Shape subject with no DeclarationSites has no file:line, so the renderer emits its bare FullName as
-        // an unlocated line (HumanReportRenderer.cs:101-102) rather than a located `path:line — …` line.
+        // A Shape violation carrying no site has no file:line, so the renderer emits its bare FullName as
+        // an unlocated line (HumanReportRenderer.cs:129-130) rather than a located `path:line — …` line.
         TypeNode subject = Node("App.Orphan");
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, []);
@@ -224,11 +224,12 @@ public sealed class HumanReportRendererTests
     public void RuleBlock_MixedUnlocatedAndLocated_EmitsUnlocatedBeforeLocated()
     {
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered
-        // located lines, regardless of input order (HumanReportRenderer.cs:121-127).
-        TypeNode located = Node("App.Located", new SourceLocation("Located.cs", 7));
+        // located lines, regardless of input order (HumanReportRenderer.cs:155-163).
+        var site = new SourceLocation("Located.cs", 7);
+        TypeNode located = Node("App.Located", site);
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed,
-            [Violation.Shape(located, []), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, []);
+            [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, []);
 
         string block = result.HumanBlock();
 
