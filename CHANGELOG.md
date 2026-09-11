@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`.Returning` and `MustAcceptParameter` anchor by string, and `MustAcceptParameter<T>()`.**
+  `web.Methods.Returning("Microsoft.AspNetCore.Mvc.IActionResult").MustHaveSuffix("Async")` and
+  `.Methods.MustAcceptParameter("System.Threading.CancellationToken")` take the type definition's
+  fully-qualified name on the same terms as every other string anchor: it matches any construction
+  of that definition, needs no assembly load, and renders byte-identically to the `typeof` form,
+  so which form a spec chose is invisible to its sentences. The two member type positions were the
+  last anchor positions without the string arm, and the spec-load failure for a shared-framework
+  type ("every typeof() anchor position carries a string overload") now tells the truth for them
+  too. One call is all-`typeof` or all-string, never a mix, so a return-type list that reaches for
+  a framework type is spelled all-string, the open generic with its declared type-parameter names:
+  `.Returning("System.Threading.Tasks.Task<TResult>", "Microsoft.AspNetCore.Mvc.IActionResult")`.
+  The cost is the one every string anchor carries, and it lands differently on the two verbs: a
+  typo'd or constructed spelling names nothing, so as the sole `.Returning` anchor it empties the
+  subject and the rule reds, beside an anchor that still matches it is inert and the rule stays
+  green, and on `MustAcceptParameter` it is always red. Blank names are refused at spec build
+  under the "return type name" and "parameter type name" labels. `MustAcceptParameter<T>()` is
+  the generic sugar the attribute and hierarchy verbs already carry; `.Returning` keeps no `<T>`
+  twin, because its main use is the open generic. In passing, `.Returning`'s anchor list now
+  widens colliding simple names by their trailing namespace segments like every other anchor
+  list ("returning `A.Result` or `B.Result`"); no committed render moves.
+
 - **A family of layers may reference each other, but not in a circle:
   `MustNotHaveCircularReferences()`.** `arch.Each(model, checking, rendering)
   .MustNotHaveCircularReferences()` renders "Each of the Model, Checking and Rendering layers must
@@ -217,6 +238,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking: the third migration policy is `MigrationPolicy.NeverMigrate`.** It was
+  `NeverExpand`, which named the clause every policy renders ("never grow the debt") rather than
+  the thing it decides: leave grandfathered sites alone in passing, because a coordinated
+  migration is planned. The policies now answer the question `.WhileYoureThere` asks, as
+  imperatives beside each other: `MigrateIfSmall`, `AlwaysMigrate`, `NeverMigrate`. The rendered
+  sentence is unchanged, so no managed block moves; `explain` prints the new name on its
+  `policy:` line. No alias or shim: `explain` prints the member through `Enum.ToString`, which is
+  unspecified across two members sharing one value.
 - **Breaking: `PathComparison` is no longer public, and it has left `Zphil.LoadBearing.Rendering`.**
   The per-OS path-segment comparison helper was a rendering type in name only: the checker's diff
   context borrowed it, which closed a circle between the two readers of the model that the new

@@ -631,8 +631,8 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("mcp/env-through-seam")
             .Migrate(
-                "MCP infrastructure reads process env vars via System.Environment directly.",
-                arch.Types.InNamespace("Zphil.LoadBearing.Cli.Mcp.Infrastructure.*")
+                from: "MCP infrastructure reads process env vars via System.Environment directly.",
+                to: arch.Types.InNamespace("Zphil.LoadBearing.Cli.Mcp.Infrastructure.*")
                     .Except(arch.Types.Named("SystemEnvironment"))
                     .MustNotReference(typeof(Environment)))
             .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +

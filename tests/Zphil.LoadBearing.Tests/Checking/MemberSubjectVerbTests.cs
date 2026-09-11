@@ -308,6 +308,70 @@ public sealed class MemberSubjectVerbTests
             .ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
     }
 
+    [Fact]
+    public void Returning_StringArm_SelectsExactlyWhatTheTypeofArmSelects()
+    {
+        // Both arms in ONE model, asserted against EACH OTHER rather than against their own literals: a
+        // string anchor IS the definition FQN, while the typeof arm reaches that same form reflectively
+        // through TypeName.FullDisplay — two paths to one key, so only comparing the results catches them
+        // diverging. The open generic is the point: `Task<TResult>` is the anchor no type-argument form
+        // could ever spell.
+        CheckReport report = Checker.Run(AsyncModel, arch =>
+        {
+            arch.Rule("m/typed")
+                .Enforce(
+                    arch.Namespace("App.Async.*").Methods.Returning(typeof(Task), typeof(Task<>))
+                        .MustHaveSuffix("Async"))
+                .Because("b");
+            arch.Rule("m/string")
+                .Enforce(
+                    arch.Namespace("App.Async.*").Methods
+                        .Returning("System.Threading.Tasks.Task", "System.Threading.Tasks.Task<TResult>")
+                        .MustHaveSuffix("Async"))
+                .Because("b");
+        });
+
+        IReadOnlyList<string> typed = report.ForRule("m/typed")
+            .MemberShapeSubjects();
+        IReadOnlyList<string> stringed = report.ForRule("m/string")
+            .MemberShapeSubjects();
+
+        stringed.ShouldBe(typed);
+
+        // Non-vacuous: the union of both anchors, one of them matched through an open definition.
+        typed.ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
+    }
+
+    [Fact]
+    public void Returning_ConstructedStringSpelling_MatchesNothing_SoleAnchorRedsAsEmptySubject()
+    {
+        // Nothing is inferred from a string's shape (GRAMMAR §5.2), so the closed-generic refusal the typeof
+        // arm carries cannot port here: a constructed spelling builds, names no definition, and as the SOLE
+        // anchor empties the member subject — which the fail-on-empty gate reds in member terms rather than
+        // passing vacuously. Loud, and pinned because it is the honesty boundary of the hatch.
+        RuleResult result = Checker.Run(AsyncModel, arch => arch.Rule("member/x")
+                .Enforce(
+                    arch.Namespace("App.Async.*").Methods
+                        .Returning("System.Threading.Tasks.Task<System.Int32>")
+                        .MustHaveSuffix("Async"))
+                .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+    }
+
+    [Fact]
+    public void Returning_NonsenseAnchorBesideAMatchingOne_IsInertRatherThanLoud()
+    {
+        // The other half of that boundary: in a LIST beside an anchor that still matches, a name that names
+        // nothing is silently inert — the selection, and so the verdict, is exactly the good anchor's own
+        // (the single Save red typeof(Task) alone produces). Pinned, because the silence is the cost.
+        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
+                .Methods.Returning("System.Threading.Tasks.Task", "Nonsense")
+                .MustHaveSuffix("Async"))
+            .ShouldBe(["M:App.Async.HomeController.Save"]);
+    }
+
     // ── MustAcceptParameter (definition-level) ────────────────────────────────────────────────────────
 
     [Fact]
@@ -386,6 +450,80 @@ public sealed class MemberSubjectVerbTests
                 .WithPrefix("ParamsTokensOnly")
                 .MustAcceptParameter(typeof(CancellationToken)))
             .ShouldBe(["M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])"]);
+    }
+
+    [Fact]
+    public void MustAcceptParameter_StringArm_SelectsExactlyWhatTheTypeofArmSelects()
+    {
+        // Both arms in ONE model over the bare .Methods subject, compared against each other for the reason
+        // the .Returning row above states — and on both anchor shapes at once: a struct anchor, whose two
+        // arms coincide, and an open-generic one, where the typeof arm has to reach the definition name.
+        CheckReport report = Checker.Run(ParametersModel, arch =>
+        {
+            arch.Rule("token/typed")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(CancellationToken)))
+                .Because("b");
+            arch.Rule("token/string")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods
+                    .MustAcceptParameter("System.Threading.CancellationToken"))
+                .Because("b");
+            arch.Rule("progress/typed")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(IProgress<>)))
+                .Because("b");
+            arch.Rule("progress/string")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter("System.IProgress<T>"))
+                .Because("b");
+        });
+
+        IReadOnlyList<string> tokenTyped = report.ForRule("token/typed")
+            .MemberShapeSubjects();
+        IReadOnlyList<string> tokenStringed = report.ForRule("token/string")
+            .MemberShapeSubjects();
+        IReadOnlyList<string> progressTyped = report.ForRule("progress/typed")
+            .MemberShapeSubjects();
+        IReadOnlyList<string> progressStringed = report.ForRule("progress/string")
+            .MemberShapeSubjects();
+
+        tokenStringed.ShouldBe(tokenTyped);
+        progressStringed.ShouldBe(progressTyped);
+
+        // Non-vacuous, and the two anchors disagree about the fixture — so neither pin is the other's.
+        tokenTyped.ShouldBe([
+            "M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})",
+            "M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])",
+            "M:App.Parameters.Handlers.PollWithoutToken",
+            "M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})"
+        ]);
+        progressTyped.ShouldContain("M:App.Parameters.Handlers.PollWithoutToken");
+        progressTyped.ShouldNotContain("M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})");
+    }
+
+    [Fact]
+    public void MustAcceptParameter_GenericTwin_ReifiesAsTheTypeofForm()
+    {
+        // MustAcceptParameter<T>() ≡ MustAcceptParameter(typeof(T)), and T is deliberately unconstrained so
+        // that the flagship anchor — a struct — is spellable as a type argument at all.
+        CheckReport report = Checker.Run(ParametersModel, arch =>
+        {
+            arch.Rule("token/typed")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods.WithPrefix("PollWithoutToken")
+                    .MustAcceptParameter(typeof(CancellationToken)))
+                .Because("b");
+            arch.Rule("token/generic")
+                .Enforce(arch.Namespace("App.Parameters.*").Methods.WithPrefix("PollWithoutToken")
+                    .MustAcceptParameter<CancellationToken>())
+                .Because("b");
+        });
+
+        IReadOnlyList<string> typed = report.ForRule("token/typed")
+            .MemberShapeSubjects();
+        IReadOnlyList<string> generic = report.ForRule("token/generic")
+            .MemberShapeSubjects();
+
+        generic.ShouldBe(typed);
+
+        // The literal the bare-subject row above pins for the same anchor and the same tokenless method.
+        typed.ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
     }
 
     // ── the attribute axis: one adjective, both verbs (GRAMMAR §5.7) ──────────────────────────────────

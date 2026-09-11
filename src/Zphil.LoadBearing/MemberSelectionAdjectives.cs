@@ -103,7 +103,8 @@ public static class MemberSelectionAdjectives
     /// <summary>
     ///     Narrows to methods carrying attribute <typeparamref name="T" /> —
     ///     <c>≡ AttributedWith(typeof(T))</c>. The <see cref="MethodSelection" /> receiver is what keeps
-    ///     <see cref="MethodSelection.Returning" /> and <c>MustAcceptParameter</c> reachable after the sugar.
+    ///     <see cref="MethodSelection.Returning(Type,Type[])" /> and <c>MustAcceptParameter</c> reachable
+    ///     after the sugar.
     /// </summary>
     public static MethodSelection AttributedWith<T>(this MethodSelection selection)
         where T : Attribute

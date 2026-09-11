@@ -781,6 +781,28 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void Returning_StringAnchors_RenderByteIdenticallyToTheTypeofTwin()
+    {
+        // Both arms supply the same path segments, so the string form renders the typeof form byte for byte
+        // — the declared type-parameter name on the open generic included.
+        string typed = SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task), typeof(Task<>)));
+        string named = SentenceRenderer.MemberSubject(Arch.Types.Methods
+            .Returning("System.Threading.Tasks.Task", "System.Threading.Tasks.Task<TResult>"));
+
+        named.ShouldBe(typed);
+        typed.ShouldBe("Methods of types returning `Task` or `Task<TResult>`");
+    }
+
+    [Fact]
+    public void Returning_CollidingSimpleNames_WidenByTrailingSegments()
+    {
+        // The anchor list widens colliding simple names outward by the minimal distinguishing trailing
+        // segments (§6), exactly as every other anchor list does.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning("A.Result", "B.Result"))
+            .ShouldBe("Methods of types returning `A.Result` or `B.Result`");
+    }
+
+    [Fact]
     public void MemberWhere_CanonicalizesToSentenceFinal_RegardlessOfChainPosition()
     {
         // The member Where renders sentence-final after the inline adjective, whatever the chain order.

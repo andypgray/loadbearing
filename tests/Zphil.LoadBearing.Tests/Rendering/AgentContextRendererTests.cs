@@ -450,7 +450,7 @@ public class AgentContextRendererTests
         MigrationPolicy.AlwaysMigrate,
         "If your change touches a grandfathered site, migrate it as part of the change; never grow the debt.")]
     [InlineData(
-        MigrationPolicy.NeverExpand,
+        MigrationPolicy.NeverMigrate,
         "Do not migrate grandfathered sites in passing (a coordinated migration is planned); never grow the debt.")]
     public void MigrationsSection_PolicyVariants_RenderPinnedSentences(MigrationPolicy policy, string expectedSentence)
     {

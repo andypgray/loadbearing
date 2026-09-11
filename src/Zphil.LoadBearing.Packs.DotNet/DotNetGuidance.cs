@@ -270,7 +270,7 @@ public static class DotNetGuidance
         string? fix)
     {
         if (posture.Posture == Posture.Migrate)
-            rule.Migrate(posture.From!, constraint).Because(because).Fix(fix ?? defaultFix);
+            rule.Migrate(from: posture.From!, to: constraint).Because(because).Fix(fix ?? defaultFix);
         else
             rule.Enforce(constraint).Because(because).Fix(fix ?? defaultFix);
     }

@@ -663,9 +663,10 @@ a type the spec project can reference goes straight into `.Except(typeof(X), …
 `.Where(pred, description:)` · `.Authored()` (drops source-generated
 types — `[GeneratedCode]` on the type or its container; a project noun otherwise names them).
 
-The **string overload** on every hierarchy and attribute anchor position — the three adjectives
-above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttributedWith` verbs
-below — is the escape hatch for a type the spec project cannot compile against, and it renders
+The **string overload** on every hierarchy, attribute and member type anchor position — the three
+adjectives above, the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttributedWith`
+verbs below, and `.Returning` / `MustAcceptParameter` on a member subject — is the escape hatch
+for a type the spec project cannot compile against, and it renders
 byte-identically to the `typeof()` form. Reach for it whenever a reference on the spec project
 would be the only reason to add one, and *always* for a **.NET shared framework** type such as an
 MVC `ControllerBase`, which no build setting can stage into a spec's output (see the load-failure
@@ -740,29 +741,38 @@ homes with `arch.AnyOf`; write `among:`/`named:` as named arguments at every cal
 `MustDeriveFrom` / `MustBeAttributedWith` (each with a generic twin — `MustImplement<T>()`,
 `MustDeriveFrom<T>()`, `MustBeAttributedWith<T>()`) · `MustNotImplement(type, …)` /
 `MustNotDeriveFrom(type, …)` / `MustNotBeAttributedWith(type, …)` (the negative hierarchy/attribute
-bans — none-of over the anchors, so unlike the single-`Type` positives they take one-or-more anchors;
+bans — none-of over the anchors, so unlike the single-anchor positives they take one-or-more anchors;
 each with a generic twin — `MustNotImplement<T>()`, `MustNotDeriveFrom<T>()`,
 `MustNotBeAttributedWith<T>()`) · `MustBeSealed` / `MustBeStatic` /
 `MustBeAbstract` / `MustBePublic` / `MustBeInternal` · `.Must(pred, description:)`.
 
 The generic twins — `arch.Type<X>()`, `.Implementing<T>()` / `.DerivedFrom<T>()` /
-`.AttributedWith<T>()`, the `Must[Not]*<T>` hierarchy verbs (member-side pair included), the `arch.Member<X>(x => x.M)` /
+`.AttributedWith<T>()`, the `Must[Not]*<T>` hierarchy verbs (member-side pair included),
+`MustAcceptParameter<T>()`, the `arch.Member<X>(x => x.M)` /
 `arch.Member(() => X.M)` anchors, and the static `MustNotUse(() => X.M)` verb forms — are pure
 sugar for the `typeof`/`nameof` form and reify identically; a generic twin needs the same
 compile-time reference the `typeof` does, so where you cannot have one, use the string overload
 above rather than reaching for `<T>`. An **open** generic has no
 type-argument form, so it stays `typeof` (`Implementing(typeof(IHandler<>))`,
-`.Returning(typeof(Task<>))`). The dependency verbs take
+`.Returning(typeof(Task<>))`), and `.Returning` has no `<T>` twin at all, the open generic
+being its main use. The dependency verbs take
 `typeof` or a wrapping `arch.Type<X>()` (never a generic verb); `.Returning` and
-`MustAcceptParameter` take `typeof` only (`Returning(Type, params Type[])`,
-`MustAcceptParameter(Type)`), and a `Selection` such as `arch.Type<X>()` is not a `Type`.
+`MustAcceptParameter` take `typeof` or the type definition's fully-qualified name as a string
+(`Returning(Type, params Type[])` / `Returning(string, params string[])`,
+`MustAcceptParameter(Type)` / `MustAcceptParameter(string)`), one call all-`typeof` or all-string
+and never a mix — so a return-type list that reaches for a shared-framework type is spelled
+all-string, the open generic written with its declared type-parameter names exactly as a report
+prints it: `.Returning("System.Threading.Tasks.Task<TResult>", "Microsoft.AspNetCore.Mvc.IActionResult")`.
+A `Selection` such as `arch.Type<X>()` is not a `Type`.
 
 **Member subjects** — a projection turns any selection into a selection of its declared
 members, constrained directly: projections `.Members` / `.Methods` / `.Properties` / `.Fields`
 / `.Events` · member adjectives `.WithSuffix` / `.WithPrefix` / `.WithNameMatching` ·
-`.Returning(typeof(Task))` (methods-only, so it chains only off `.Methods`; matches the
-declared return type at the definition level — `typeof(Task<>)` matches every construction,
-and a closed generic like `typeof(Task<int>)` is refused) · `.AttributedWith(attributeType)`
+`.Returning(typeof(Task))` / `.Returning("Microsoft.AspNetCore.Mvc.IActionResult")` (methods-only,
+so it chains only off `.Methods`; matches the declared return type at the definition level —
+`typeof(Task<>)` matches every construction, and a closed generic like `typeof(Task<int>)` is
+refused; the string form is the same escape hatch as the type-side adjectives and renders
+byte-identically) · `.AttributedWith(attributeType)`
 (declared member attributes only, with the same `<T>` and string forms as the type-side
 adjective; renders as a prefix on the subject head — "`[Audit]`-attributed methods of …") ·
 `.ThatAreStatic()` (the static members alone; prefixes the head the same way — "static fields
@@ -771,7 +781,8 @@ member verbs `MustHaveSuffix` / `MustHavePrefix` / `MustHaveNameMatching` · `Mu
 `MustBeInternal` / `MustBePrivate` · `MustBeStatic` / `MustBeAbstract` / `MustBeVirtual` ·
 `MustBeAttributedWith` / `MustNotBeAttributedWith` (the type-side pair again, generic twins and
 string forms included) ·
-`MustAcceptParameter(typeof(CancellationToken))` (methods-only, so it chains only off
+`MustAcceptParameter(typeof(CancellationToken))` / `MustAcceptParameter<CancellationToken>()` /
+`MustAcceptParameter("System.Threading.CancellationToken")` (methods-only, so it chains only off
 `.Methods` like `.Returning`; one anchor, matched at the definition level — `typeof(IProgress<>)`
 matches every construction, and a closed generic is refused) ·
 `MustBeGetOnly()` (properties-only, so it chains only off `.Properties`; strict about the
@@ -803,7 +814,7 @@ always passes. The flagship:
 
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |
-NeverExpand)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(selections... | types...)`]
+NeverMigrate)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(selections... | types...)`]
 [`.Dragons(prose)` / `.DragonsDoc(path)`] [`.Baseline(path)`] · `arch.Scope(id).Caution(selection)`
 [`.Dragons(prose)` / `.DragonsDoc(path)`].
 

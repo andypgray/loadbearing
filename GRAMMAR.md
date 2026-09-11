@@ -97,7 +97,7 @@ stand only as a rule subject, directly or as the source of a member projection, 
 operand position (§8 item 27). The member-modal verbs (§4.6) take no target — they
 are shape/naming assertions over the projected member set, so `member-selection` is itself the
 whole subject side of a member-shape sentence. The one exception is the methods-only
-`.MustAcceptParameter(Type)` (§5.7), whose `Type` anchor renders on the verb side of the
+`.MustAcceptParameter` (§5.7), whose type anchor renders on the verb side of the
 sentence.
 
 ### 3.2 Stage machine
@@ -143,8 +143,10 @@ MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatc
                .AttributedWith / .ThatAreStatic / .Where) → the SAME concrete
                member-selection type; member modal verbs → Constraint (terminal)
 MethodSelection — a MemberSelection minted by .Methods that additionally offers
-               .Returning(Type first, params Type[] more) → MethodSelection (§4.6)
-               and .MustAcceptParameter(Type) → Constraint (terminal; §5.7)
+               .Returning(Type first, params Type[] more) /
+               .Returning(string first, params string[] more) → MethodSelection (§4.6)
+               and .MustAcceptParameter(Type) / (string) / <T>() → Constraint
+               (terminal; §5.7)
 PropertySelection — a MemberSelection minted by .Properties that additionally offers
                .MustBeGetOnly() → Constraint (terminal; §5.7)
 FieldSelection — a MemberSelection minted by .Fields that additionally offers
@@ -716,18 +718,31 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and a renamed or
   newly-added member is a NEW red: the shape-verb identity (§4.3) with a member ID in the
   subject slot.
-- **`.Returning(Type first, params Type[] more)`** matches a method's return type at the
-  **definition level**, mirroring `Implementing` (§5.2): a **non-generic** anchor (`typeof(Task)`)
-  matches exactly; an **open-generic** anchor (`typeof(Task<>)`) matches *any* construction
-  (`Task<int>`, `Task<Order>`, …) on the definition name. A **closed-generic** anchor
-  (`typeof(Task<int>)`) is refused at spec build (§8 item 14) with guidance to use the open
-  definition, and a check-time backstop guards the same class of mistake. There is no
-  derived-from / assignability matching — the return type is compared to the anchor's definition
-  FQN, nothing wider. `.Returning` is **methods-only**: it lives on the `.Methods` projection's
-  `MethodSelection` and is uncompilable elsewhere (§3.2), so a return-type filter on a field or
-  property never type-checks. There is **no `.Returning<T>()` generic twin**: the open-generic
-  anchor is the main use and is inexpressible as a type argument, and a closed-generic type
-  argument would only reproduce the §8 item 14 refusal.
+- **`.Returning(Type first, params Type[] more)` / `.Returning(string first, params string[] more)`**
+  matches a method's return type at the **definition level**, mirroring `Implementing` (§5.2): a
+  **non-generic** anchor (`typeof(Task)`) matches exactly; an **open-generic** anchor
+  (`typeof(Task<>)`) matches *any* construction (`Task<int>`, `Task<Order>`, …) on the definition
+  name. A **closed-generic** anchor (`typeof(Task<int>)`) is refused at spec build (§8 item 14)
+  with guidance to use the open definition, and a check-time backstop guards the same class of
+  mistake. The string form is §5.2's escape hatch on §5.2's terms: each name is the return type
+  definition's FQN as a report prints it, an open generic spelled with its declared
+  type-parameter names (`"System.Threading.Tasks.Task<TResult>"`), matching any construction
+  of that definition and rendering byte-identically to the `typeof` twin. The homogeneity rule
+  bites harder here than anywhere: a return-type list routinely pairs a BCL wrapper with a
+  framework type, and one call takes `typeof` anchors or strings, never a mix — so a list
+  reaching for a type the spec cannot reference is spelled all-string,
+  `"System.Threading.Tasks.Task<TResult>"` beside `"Microsoft.AspNetCore.Mvc.IActionResult"`.
+  Item 14 is a `typeof`-arm fact: a constructed string names no definition and never matches,
+  and only blankness is validated (§8 item 15, "return type name"). The honesty cost: a typo'd
+  or constructed string as the sole anchor empties the member subject and the rule reds on the
+  empty-subject gate; beside an anchor that still matches it is inert, and the rule stays green.
+  There is no derived-from / assignability matching — the return type is compared to the
+  anchor's definition FQN, nothing wider. `.Returning` is **methods-only**: it lives on the
+  `.Methods` projection's `MethodSelection` and is uncompilable elsewhere (§3.2), so a
+  return-type filter on a field or property never type-checks. There is **no `.Returning<T>()`
+  generic twin**: the open-generic anchor is the main use and is inexpressible as a type
+  argument, and a closed-generic type argument would only reproduce the §8 item 14 refusal —
+  the one anchor position the §10 triple discipline exempts from its `<T>` leg.
 - **Parameter facts.** Extraction inventories, per declared *method*, its parameters in
   declaration order — each `(Name, TypeFullName)` with the type definition-normalized exactly
   like the return type (§5.6); properties, fields, and events carry an empty list (accessors,
@@ -735,8 +750,13 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   `MustAcceptParameter` (§5.7) evaluates against these facts: a subject method passes iff any
   declared parameter's type matches the anchor's definition FQN — a non-generic anchor
   exactly, an open-generic anchor on any construction, the `.Returning` matching discipline
-  verbatim. Declaration semantics, pinned in the extraction matrix: a default-valued
-  parameter counts (`CancellationToken cancellationToken = default` — the most common
+  verbatim. The anchor is a `typeof`, a definition-FQN string on §5.2's terms
+  (`"System.Threading.CancellationToken"`, `"System.IProgress<T>"`; validated for blankness
+  alone, §8 item 15, "parameter type name"), or the `<T>` sugar
+  (`MustAcceptParameter<CancellationToken>()`, §10). A typo'd or constructed string here is
+  always red: the verb asks every subject method for a parameter no declaration can have, and
+  an empty subject reds on its own gate. Declaration semantics, pinned in the extraction
+  matrix: a default-valued parameter counts (`CancellationToken cancellationToken = default` — the most common
   compliant signature); the extension-method `this` parameter is included (the declared
   static method's list, never the reduced form); `ref`/`in`/`out` do not change the recorded
   type; `params CancellationToken[]` is the array type and does not match a
@@ -1158,10 +1178,13 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 **String anchors.** Every single-type anchor position carries a `string` overload beside the
 `typeof` form: the escape hatch for a type the spec project cannot compile against, so that
 naming someone else's attribute or contract does not force a package reference on the spec just
-to write the `typeof`. Two families carry them, on identical terms — **attribute** positions
+to write the `typeof`. Three families carry them, on identical terms — **attribute** positions
 (this adjective's `AttributedWith`, the `Must[Not]BeAttributedWith` verbs of §5.3, and their
-member-side twins in §5.7) and **hierarchy** positions (the `Implementing` and `DerivedFrom`
-adjectives above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` verbs of §5.3).
+member-side twins in §5.7), **hierarchy** positions (the `Implementing` and `DerivedFrom`
+adjectives above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` verbs of §5.3), and the
+**member type** positions of §5.7 (`.Returning`'s anchor list and `MustAcceptParameter`'s
+anchor), whose matchers read the §4.6 return-type and parameter facts by definition FQN and
+take the string verbatim.
 
 The string names the type **definition**'s FQN in extraction format — which is exactly what a
 report prints for it, `Attribute` suffix included for an attribute and declared type-parameter
@@ -1263,6 +1286,12 @@ from the model rather than misclassified in it, so no arm here can reach it.
 Naming note: the constraint carries its noun where a bare preposition would be ambiguous —
 `MustResideInNamespace`, not `MustResideIn`, because the `Project` noun exists.
 
+The reside pair is `MustBelongTo` with one membership: `MustResideInNamespace(g)` checks exactly
+as `MustBelongTo(arch.Namespace(g))` does, and `MustResideInProject(n)` exactly as
+`MustBelongTo(arch.Project(n))`. The pair earns its place by the tighter sentence one membership
+allows: "must reside in project `X`", where the general form says "must belong to types in
+project `X`".
+
 Generic sugar: the three type-taking hierarchy verbs carry generic twins —
 `MustImplement<T>()` ≡ `MustImplement(typeof(T))`, `MustDeriveFrom<T>()`, and
 `MustBeAttributedWith<T>()` (`where T : Attribute`) — desugaring to the identical constraint, on
@@ -1283,7 +1312,7 @@ no-reference string, and the generic sugar (§10).
 | `.Quarantine(selection)` | scope statement; desugars per §7 |
 | `.Caution(selection)` | scope statement; desugars per §7 to the tripwire alone; severity warning, never red |
 | `.Baseline(path)` | Migrate **and** Quarantine; ratcheted grandfather store |
-| `.WhileYoureThere(MigrationPolicy)` | `MigrateIfSmall` (default) \| `AlwaysMigrate` \| `NeverExpand` |
+| `.WhileYoureThere(MigrationPolicy)` | `MigrateIfSmall` (default) \| `AlwaysMigrate` \| `NeverMigrate` |
 | `.BoundaryOnlyVia(Selection first, params Selection[] more)` | the sanctioned surface; omit entirely for a hermetic quarantine |
 | `.BoundaryOnlyVia(params Type[])` | the same, as types — ≡ `arch.Type(t)` per operand (§3.3) |
 | `.Dragons(prose)` / `.DragonsDoc(path)` | load-bearing-weirdness prose / linked long-form doc |
@@ -1388,7 +1417,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 | `.WithSuffix("Async")` | "named `*Async`" — the same fragment as the type-side adjective (§5.2) |
 | `.WithPrefix("Get")` | "named `Get*`" |
 | `.WithNameMatching("*Handler*")` | "whose name matches `*Handler*`" |
-| `.Returning(typeof(Task))` | "returning `Task`" — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`". Methods-only. |
+| `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` | "returning `Task`" — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only. |
 | `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `Zphil.LoadBearing.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically |
 | `.ThatAreStatic()` | head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
@@ -1408,7 +1437,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 | `.MustBeVirtual()` | "must be virtual" — member-only vocabulary (no type-side twin, deliberate) |
 | `.MustBeAttributedWith(typeof(X))` | "must be attributed with `[{X}]`" — reuses the type-side fragment verbatim (§5.3); also anchors by string (§5.2) and carries a generic twin (§10) |
 | `.MustNotBeAttributedWith(type, ...)` | "must not be attributed with {list}" — none-of over the anchors, the type-side negative's `(first, more)` shape and widening; string form included |
-| `.MustAcceptParameter(typeof(CancellationToken))` | "must accept a parameter of type `CancellationToken`" — methods-only (it lives on `MethodSelection`, like `.Returning`, §3.2); single-`Type` arity; matching is definition-level (§4.6): a non-generic anchor matches exactly, an open-generic anchor matches any construction and renders declared type-parameter names ("… of type `IProgress<T>`"), a closed-generic anchor is refused at spec build (§8 item 20) |
+| `.MustAcceptParameter(typeof(CancellationToken))` | "must accept a parameter of type `CancellationToken`" — methods-only (it lives on `MethodSelection`, like `.Returning`, §3.2); single-anchor arity; matching is definition-level (§4.6): a non-generic anchor matches exactly, an open-generic anchor matches any construction and renders declared type-parameter names ("… of type `IProgress<T>`"), a closed-generic `typeof` anchor is refused at spec build (§8 item 20); also anchors by string (§5.2) and carries a generic twin (§10) |
 | `.MustBeGetOnly()` | "must be get-only" — properties-only (it lives on `PropertySelection`, like `.Returning` on `MethodSelection`, §3.2); nullary; **strict**: a property with an `init`-only setter reds, because get-only is a claim about the declaration and an init-only setter is a setter |
 | `.MustBeReadonly()` | "must be readonly" — fields-only; nullary; a `const` field **satisfies** it, const being readonly's superset, so the verb asks for the weakest thing that closes the hole |
 | `.Must(pred, description:)` | "must {description}" — `pred` is `Func<IMemberInfo, bool>` (§5.6) |
@@ -1692,7 +1721,9 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     construction and the open definition to use ("`System.Threading.Tasks.Task<System.Int32>` is a closed generic;
     `.Returning` matches definition-level — use `typeof(Task<>)`"). A non-generic anchor
     (`typeof(Task)`) and an open-generic anchor (`typeof(Task<>)`) are both accepted. The
-    checker carries a matching backstop (§4.6).
+    checker carries a matching backstop (§4.6). The string arm is outside this item: a
+    constructed spelling names no definition and matches nothing (§5.2), and nothing is
+    inferred from a string's shape.
 15. Blank/whitespace glob, name or affix — a namespace pattern, a type- or member-name pattern,
     an exact type name (`Named`, reported as `Blank type name on '{id}'.` — blank is the whole
     check, a name having no structure to validate), a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
@@ -1701,9 +1732,10 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     its `Except` payloads included (both reported spec-wide, named by layer), and to the project
     name on the noun and the verb alike — `arch.Project("")` in any position and
     `MustResideInProject("")`, each as `Blank project name on '{id}'.` String anchors (§5.2) report
-    through this same family in every position of both families, adjective and
+    through this same family in every position of all three families, adjective and
     verbs alike, under a label naming which kind of anchor was left empty: "attribute name"
-    (`Blank attribute name on '{id}'.`), "interface name", "base type name". Blankness is the
+    (`Blank attribute name on '{id}'.`), "interface name", "base type name", "return type name"
+    and "parameter type name". Blankness is the
     whole of a string anchor's well-formedness: a dotless or suffix-less spelling is a legal
     name that never matches (§5.2), and no other shape check exists.
 16. Dead namespace subtree pattern — a trailing `.*` whose literal prefix carries a `*` (e.g.
@@ -1750,7 +1782,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     use ("`System.IProgress<System.Int32>` is a closed generic; `MustAcceptParameter` matches
     definition-level — use `typeof(IProgress<>)`"). A non-generic anchor
     (`typeof(CancellationToken)`) and an open-generic anchor (`typeof(IProgress<>)`) are both
-    accepted. The checker carries a matching backstop (§4.6).
+    accepted. The checker carries a matching backstop (§4.6). The string arm is outside this
+    item, as for item 14.
 21. Category-invalid hierarchy anchor, both polarities (§5.2, §5.3): a `Must[Not]Implement`
     anchor must be an interface; a `Must[Not]DeriveFrom` anchor must not be an interface; a
     `Must[Not]BeAttributedWith` anchor must derive from `System.Attribute` (`typeof(Attribute)`
@@ -1897,7 +1930,12 @@ agent fixing a spec sees every problem in one pass.
   phrases (`InNamespace`, `WithSuffix`, `OfKind`). A bare past participle (`Authored`) names the
   set by the fact that admits membership, the adjective twin of the `Registered` noun, and reads
   attributively in front of the head (§6); the bare adjective `Packable` names the artifact set
-  the same way (§5.8). A verb-plus-object compound is not licensed:
+  the same way (§5.8). The glob adjective differs by stratum, and the difference carries
+  information: `WithNameMatching` on types and members, where a name sits beside a namespace, a
+  kind or a signature and the adjective says which of them the glob reads (the
+  `WithSuffix`/`WithPrefix` family); `Matching` on projects, whose name is the whole identity, so
+  a property word would say nothing. `Named` is the exact form on both the type and project
+  strata (§5.2, §5.8). A verb-plus-object compound is not licensed:
   `ExceptGenerated` would both duplicate `Except` and stop reading as a modifier of the noun.
 - **Constraints**: `Must[Not]` + verb phrase; polarity lexical; the noun rides along where a
   bare preposition would be ambiguous (`MustResideInNamespace`). The member-access verb is
@@ -1947,18 +1985,25 @@ agent fixing a spec sees every problem in one pass.
   `AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or
   framework defaults are not seen."*
 - **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`, `Caution`). **Options**: nouns
-  (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule).
+  (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule). Its policies
+  each answer the question the option asks, as imperatives (`MigrateIfSmall`, `AlwaysMigrate`,
+  `NeverMigrate`); a policy is never named for what every policy shares.
   **Trailers**: conjunctions (`Because`) / nouns (`Fix`, `Purpose`).
 - `(first, params more)` signatures wherever an empty list would be meaningless.
-  `MustAcceptParameter` is deliberately single-`Type`: over several parameter anchors one
-  sentence cannot say whether ALL are required or ANY suffices, so a second required
-  parameter type is a second rule. The same ambiguity keeps the positive hierarchy verbs
-  single-`Type`, but it does not bite a negation, so their `MustNot*` twins take
-  `(Type first, params Type[] more)` — "must not implement `A` or `B`" is unambiguous none-of.
-  Nor does it bite a membership: `MustBelongTo` takes `(Selection first, params Selection[]
-  more)` because its or-join states the reading in the sentence itself — "must belong to the
-  Domain layer or the Web layer" is unambiguous any-of, belonging to one sufficing — which is
-  what licenses a list on a positive verb here. `MustResideInProject` stays single-name on
+  Where a verb requires a fact rather than bounding it (a `MustOnly*` list is a bound, and the
+  word "only" fixes its reading), a list is licensed only where the fact admits one value per
+  subject. The ambiguity sits at the call site, not in the sentence: a C# argument list has no
+  join word, so where a subject can hold several of the thing named (the parameters a method
+  declares, the interfaces a type implements) an author writes `(typeof(A), typeof(B))` meaning
+  both as readily as either, and the rendered "`A` or `B`" would then state a law the author
+  did not mean. So `MustAcceptParameter` and the positive hierarchy verbs are single-anchor,
+  and a second required anchor is a second rule. A negation has no such reading: "must not
+  implement `A` or `B`" is none-of under either join, so the `MustNot*` twins take
+  `(Type first, params Type[] more)`. A membership has none either: `MustBelongTo` asks where a
+  subject may live, a question with one answer per subject, so its list can only be read as
+  alternatives, and it takes `(Selection first, params Selection[] more)` with the or-joined
+  sentence stating the reading the call site already had. `MustResideInProject` stays
+  single-name on
   `MustResideInNamespace`'s pattern (several projects is `MustBelongTo` with project
   memberships), and `MustBeRegistered` is nullary: its membership is the codebase's
   registration facts (§4.7), not an authored operand. `MustBeGetOnly` and `MustBeReadonly` are
@@ -1979,10 +2024,18 @@ agent fixing a spec sees every problem in one pass.
 - **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
   generic sugar — all reifying to one internal anchor, so form choice is invisible to the
-  model and the sentence. It holds for both families, attribute and hierarchy, and one union
-  serves them: what differs between the two is which extracted facts the matcher reads and
-  whether the prose brackets the name, neither of which is a property of the anchor. A new
-  anchor position ships the whole triple or it is not an anchor position.
+  model and the sentence. The legs are not owed equally. The `string` leg is the obligation:
+  it is the only leg with semantic reach, the one spelling for a type the spec cannot
+  reference, and a position without it is not an anchor position. The `<T>` leg is sugar,
+  owed where a type argument can spell the position's main use
+  (`MustAcceptParameter<CancellationToken>()`) and declined where it cannot: `.Returning`'s
+  main use is the open generic, which no type argument spells, so it carries no `<T>` twin
+  (§4.6) — the exception this rule names rather than a violation of it. The discipline holds
+  for all three families, attribute, hierarchy and member type, and one union serves them:
+  what differs between them is which extracted facts the matcher reads and whether the prose
+  brackets the name, neither of which is a property of the anchor. A new anchor position ships
+  the `Type` and `string` legs, and the `<T>` leg unless its main use has no type-argument
+  form — or it is not an anchor position.
   The rule governs positions that name a *type*: `MustHaveExactlyOneCounterpart`'s `named:`
   derives a name rather than naming one — `MustHaveSuffix`'s bare-string precedent — so no
   triple is owed there, and `Named` selects by simple name on the same precedent.
@@ -2018,8 +2071,8 @@ project cannot reference); indexer/operator bans (the syntax-walk boundary moves
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
 twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`
-negative twin; multi-`Type` arity (one sentence cannot say whether ALL anchors
-are required or ANY suffices, §10); richer `IParameterInfo` facts (ref kind, optionality,
+negative twin; multi-`Type` arity (an argument list has no join word, so a list of anchors
+reads as both as readily as either, §10); richer `IParameterInfo` facts (ref kind, optionality,
 default values, `params`, ordinal position); hierarchy- or assignability-aware parameter
 matching (the exception-axis bar applies: an explicitly named new semantic, never a widening of
 definition-level-exact); accessibility-scoped member subjects (`.Methods.ThatArePublic()` — the

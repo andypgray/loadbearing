@@ -1133,6 +1133,40 @@ public class SpecValidationTests
         Should.NotThrow(() => ArchModelBuilder.Build(new NonsenseStringHierarchyAnchorSpec()));
     }
 
+    // ---- The member type anchors (GRAMMAR §5.7, §8 items 14–15 and 20). Blankness is the whole of what a
+    //      string anchor is validated for here too, under labels that name which position was left empty. The
+    //      closed-generic refusals items 14 and 20 carry are typeof-arm facts — nothing is inferred from a
+    //      string's shape — so a constructed spelling builds and matches nothing. ----
+
+    [Fact]
+    public void BlankPattern_BlankReturnTypeName_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankReturnTypeNameSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1286: Blank return type name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankParameterTypeName_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new BlankParameterTypeNameSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1296: Blank parameter type name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void ValidStringMemberTypeAnchors_ConstructedSpellingIsNotRefused()
+    {
+        // The spellings items 14 and 20 refuse in typeof form both build as strings: those checks read a
+        // reflected type and a string carries none. Each names no definition, so it matches nothing — loud
+        // when it is .Returning's sole anchor, silent beside one that matches. The hatch's stated cost.
+        Should.NotThrow(() => ArchModelBuilder.Build(new NonsenseStringMemberTypeAnchorSpec()));
+    }
+
     // ---- Project names (GRAMMAR §8 item 15). A project name carries no glob structure, so blank is the whole
     //      of its well-formedness and it reports through the shared Code.BlankPattern family under its own
     //      label. One SelectionPatterns arm covers the noun wherever it stands — subject, operand, Except

@@ -1278,3 +1278,36 @@ internal sealed class CircularReferencesOnProjectFamilySpec : IArchitectureSpec
             .Because("Projects cannot have circular references, so over a family of projects the law would hold by construction.");
     }
 }
+
+internal sealed class BlankReturnTypeNameSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.Returning("   ").MustBeStatic())
+            .Because("Reason.");
+    }
+}
+
+internal sealed class BlankParameterTypeNameSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.MustAcceptParameter(""))
+            .Because("Reason.");
+    }
+}
+
+internal sealed class NonsenseStringMemberTypeAnchorSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("member/returning")
+            .Enforce(arch.Types.Methods.Returning("System.Threading.Tasks.Task<System.Int32>").MustBeStatic())
+            .Because("Reason.");
+        arch.Rule("member/parameter")
+            .Enforce(arch.Types.Methods.MustAcceptParameter("System.IProgress<System.Int32>"))
+            .Because("Reason.");
+    }
+}

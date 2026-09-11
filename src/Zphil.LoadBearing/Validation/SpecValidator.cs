@@ -544,13 +544,16 @@ internal static class SpecValidator
     // (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)). A non-generic
     // or open-generic anchor is accepted; only a MemberConstraint carries a ReturningAdjective at all. The
     // anchor is the consuming rule's statement, so it renders at the rule's location.
+    // A string anchor carries no reflected type, so TypedAnchors filters it out and nothing here judges it:
+    // blankness (item 15) is the whole of what a string anchor is validated for, and a constructed spelling
+    // is a legal name that simply matches nothing.
     private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is not MemberConstraint memberConstraint) return;
 
         foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
             if (adjective is ReturningAdjective returning)
-                foreach (Type type in returning.Types)
+                foreach (Type type in TypedAnchors(returning.Anchors))
                     if (Generics.IsConstructed(type))
                         errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
                             $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
@@ -560,16 +563,18 @@ internal static class SpecValidator
     // GRAMMAR §8 item 20: a MustAcceptParameter anchor is definition-level, so a closed-generic anchor
     // (typeof(IProgress<int>)) is refused with guidance to the open definition (typeof(IProgress<>)) — the
     // sibling of the item-14 .Returning refusal, with the verb named in the steer. A non-generic or
-    // open-generic anchor is accepted; only MemberMustAcceptParameterConstraint carries the ParameterType. The
-    // anchor is the consuming rule's statement, so it renders at the rule's location.
+    // open-generic anchor is accepted; only MemberMustAcceptParameterConstraint carries the anchor. The
+    // anchor is the consuming rule's statement, so it renders at the rule's location. A string anchor is
+    // filtered out here on the item-14 terms above.
     private static void CheckMemberAcceptParameter(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is not MemberMustAcceptParameterConstraint accept) return;
 
-        if (Generics.IsConstructed(accept.ParameterType))
-            errors.Add(new SpecValidationError(Code.MemberAcceptParameterClosedGeneric, rule.Id,
-                $"'{SafeFullDisplay(accept.ParameterType)}' is a closed generic; MustAcceptParameter matches definition-level — " +
-                $"use typeof({TypeofForm(Generics.Definition(accept.ParameterType))}) (used by '{rule.Id}').", rule.Location));
+        foreach (Type type in TypedAnchors([accept.Anchor]))
+            if (Generics.IsConstructed(type))
+                errors.Add(new SpecValidationError(Code.MemberAcceptParameterClosedGeneric, rule.Id,
+                    $"'{SafeFullDisplay(type)}' is a closed generic; MustAcceptParameter matches definition-level — " +
+                    $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
     }
 
     // GRAMMAR §8 item 21, both polarities — Code.HierarchyAnchorWrongCategory carries the category rule per
@@ -940,6 +945,12 @@ internal static class SpecValidator
             case MemberMustNotBeAttributedWithConstraint c:
                 foreach ((string, PatternKind) pattern in AnchorNamePatterns(c.Anchors, PatternKind.AttributeName)) yield return pattern;
                 break;
+
+            // The parameter verb's string anchor, under its own label — blankness is the whole of its
+            // validation, the closed-generic refusal (item 20) being a typeof-arm fact.
+            case MemberMustAcceptParameterConstraint c:
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns([c.Anchor], PatternKind.ParameterTypeName)) yield return pattern;
+                break;
         }
 
         // The subject selection tree (for a member constraint this is the underlying type selection,
@@ -1044,6 +1055,12 @@ internal static class SpecValidator
                 // does not reach an adjective on either axis — see CheckHierarchyAnchors.
                 yield return (attributeName, PatternKind.AttributeName);
                 break;
+            case ReturningAdjective a:
+                // The return-type adjective's string anchors, on the same terms under their own label. The
+                // list form goes through the shared projection, so every anchor is reached.
+                foreach ((string, PatternKind) pattern in AnchorNamePatterns(a.Anchors, PatternKind.ReturnTypeName)) yield return pattern;
+
+                break;
         }
     }
 
@@ -1071,6 +1088,8 @@ internal static class SpecValidator
         internal static readonly PatternKind AttributeName = new("attribute name", false);
         internal static readonly PatternKind InterfaceName = new("interface name", false);
         internal static readonly PatternKind BaseTypeName = new("base type name", false);
+        internal static readonly PatternKind ReturnTypeName = new("return type name", false);
+        internal static readonly PatternKind ParameterTypeName = new("parameter type name", false);
         internal static readonly PatternKind CounterpartTemplate = new("counterpart name template", false);
         internal static readonly PatternKind ProjectName = new("project name", false);
         internal static readonly PatternKind ProjectNamePattern = new("project name pattern", false);

@@ -367,7 +367,7 @@ public static class AgentContextRenderer
         {
             MigrationPolicy.AlwaysMigrate =>
                 "If your change touches a grandfathered site, migrate it as part of the change; never grow the debt.",
-            MigrationPolicy.NeverExpand =>
+            MigrationPolicy.NeverMigrate =>
                 "Do not migrate grandfathered sites in passing (a coordinated migration is planned); never grow the debt.",
             _ => "If you are already editing a grandfathered site and the migration is small, migrate it; " +
                  "otherwise do not grow the debt."

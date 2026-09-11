@@ -1049,12 +1049,13 @@ internal sealed class ConstraintEvaluator
                 // The anchor resolves through the SHARED definition-FQN path (SelectionEvaluator.DefinitionFullName,
                 // the same helper .Returning's anchors resolve through) — so a method passes iff one declared
                 // parameter's definition-level TypeFullName equals the anchor's (a non-generic anchor exactly, an
-                // open-generic anchor on any construction, GRAMMAR §4.6). Resolving eagerly here is the
-                // check-time closed-generic BACKSTOP: a constructed anchor throws RuleEvaluationException
+                // open-generic anchor on any construction, GRAMMAR §4.6), and a string anchor passes through
+                // verbatim because it already IS that form. Resolving eagerly here is the check-time
+                // closed-generic BACKSTOP for the typeof arm: a constructed anchor throws RuleEvaluationException
                 // (→ RuleError) before any member is tested. (.Returning's backstop fires a step earlier, inside
                 // subject resolution — a divergence observable only for a validation-bypassed empty subject.)
                 string parameterAnchor = SelectionEvaluator.DefinitionFullName(
-                    c.ParameterType, "member parameter matching is definition-level. Anchor on the open definition instead.");
+                    c.Anchor, "member parameter matching is definition-level. Anchor on the open definition instead.");
                 return MemberShape(members, m => AcceptsParameter(m, parameterAnchor));
             case MemberMustConstraint c:
                 return MemberShape(members, m => SelectionEvaluator.InvokePredicate(c.Predicate, m, "Must"));

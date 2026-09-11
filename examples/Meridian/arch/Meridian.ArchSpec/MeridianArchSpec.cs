@@ -39,16 +39,16 @@ public sealed class MeridianArchSpec : IArchitectureSpec
 
         arch.Rule("data-access/no-inline-sql")
             .Migrate(
-                "Controllers open SqlConnection and run inline SQL directly.",
-                arch.Namespace("Meridian.Web.Controllers.*")
+                from: "Controllers open SqlConnection and run inline SQL directly.",
+                to: arch.Namespace("Meridian.Web.Controllers.*")
                     .MustNotReference(typeof(SqlConnection), typeof(SqlCommand)))
             .Because("Data access behind a repository can be tested and swapped; SQL in the request path cannot.")
             .Fix("Move the SQL into a repository; see BookingRepository.");
 
         arch.Rule("time/inject-clock")
             .Migrate(
-                "Code reads the ambient clock directly.",
-                web.Except(arch.Types.Named("SystemClock"))
+                from: "Code reads the ambient clock directly.",
+                to: web.Except(arch.Types.Named("SystemClock"))
                     .MustNotUse(
                         () => DateTime.Now,
                         () => DateTime.UtcNow))

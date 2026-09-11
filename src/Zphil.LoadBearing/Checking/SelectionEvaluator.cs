@@ -351,6 +351,18 @@ internal sealed class SelectionEvaluator
         return TypeName.FullDisplay(type);
     }
 
+    /// <summary>
+    ///     The anchor face of <see cref="DefinitionFullName(Type,string)" /> — the one helper both member
+    ///     verbs resolve an anchor through (GRAMMAR §5.2, §4.6). A string anchor already <em>is</em> the
+    ///     definition FQN, so it passes through verbatim and needs no reflection at all, which is the
+    ///     escape hatch's whole point; a <c>typeof</c> anchor resolves reflectively and keeps the
+    ///     closed-generic refusal.
+    /// </summary>
+    internal static string DefinitionFullName(TypeAnchor anchor, string closedGenericGuidance)
+    {
+        return anchor.DefinitionFullName ?? DefinitionFullName(anchor.Type!, closedGenericGuidance);
+    }
+
     private IEnumerable<TypeNode> ApplyAdjective(IEnumerable<TypeNode> current, SelectionAdjective adjective)
     {
         switch (adjective)

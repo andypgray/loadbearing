@@ -6,7 +6,10 @@ namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
 ///     The member-adjective vocabulary's guards and self-type contract
-///     (<see cref="MemberSelectionAdjectives" />). Each public narrowing extension routes its
+///     (<see cref="MemberSelectionAdjectives" />), plus the two methods-only positions beside it —
+///     <see cref="MethodSelection.Returning(Type,Type[])" /> and
+///     <see cref="MethodSelectionConstraints.MustAcceptParameter(MethodSelection,Type)" />. Each public
+///     narrowing routes its
 ///     string/predicate argument through <c>Guard.NotNull</c>, so a null argument is a programmer error
 ///     that throws <see cref="ArgumentNullException" /> at the call site — naming the offending parameter
 ///     — rather than minting a selection that resolves emptily later. Every receiver here is a concrete
@@ -59,6 +62,37 @@ public sealed class MemberSelectionAdjectivesTests
     {
         Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.AttributedWith((string)null!))
             .ParamName.ShouldBe("attributeFullName");
+    }
+
+    [Fact]
+    public void Returning_NullType_ThrowsArgumentNullException()
+    {
+        // The cast picks the arm, as on AttributedWith. Both arms guard through the shared operand-list
+        // builder, so the reported parameter is the list head's name rather than either overload's own.
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.Returning((Type)null!))
+            .ParamName.ShouldBe("first");
+    }
+
+    [Fact]
+    public void Returning_NullTypeName_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.Returning((string)null!))
+            .ParamName.ShouldBe("first");
+    }
+
+    [Fact]
+    public void MustAcceptParameter_NullParameterType_ThrowsArgumentNullException()
+    {
+        // The methods-only verb guards its single anchor directly, so each arm names its own parameter.
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.MustAcceptParameter((Type)null!))
+            .ParamName.ShouldBe("parameterType");
+    }
+
+    [Fact]
+    public void MustAcceptParameter_NullParameterTypeFullName_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() => Arch.Types.Methods.MustAcceptParameter((string)null!))
+            .ParamName.ShouldBe("parameterTypeFullName");
     }
 
     [Fact]

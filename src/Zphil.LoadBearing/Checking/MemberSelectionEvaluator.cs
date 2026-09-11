@@ -16,7 +16,8 @@ namespace Zphil.LoadBearing.Checking;
 ///     externals carry none). Name adjectives match ordinally (globs via
 ///     <see cref="TypeNamePattern" />); <c>Returning</c>
 ///     compares a method's <see cref="IMemberInfo.ReturnTypeFullName" /> against the anchors' definition
-///     FQNs (<see cref="SelectionEvaluator.DefinitionFullName" /> — a closed-generic anchor throws the
+///     FQNs (<see cref="SelectionEvaluator.DefinitionFullName(TypeAnchor,string)" /> — a closed-generic
+///     <c>typeof</c> anchor throws the
 ///     check-time backstop, GRAMMAR §4.6); the member <c>Where</c> runs through the guarded predicate
 ///     invoke. The result is ordered by <c>(DeclaringType.FullName, SymbolId)</c> so violations are
 ///     deterministic.
@@ -65,9 +66,11 @@ internal static class MemberSelectionEvaluator
                 var pattern = new TypeNamePattern(matching.Glob);
                 return current.Where(member => pattern.Matches(member.Name));
             case ReturningAdjective returning:
-                // Anchor keys resolve eagerly (before the lazy Where), so a closed-generic anchor throws the
-                // backstop here — during resolution — exactly like a closed-generic type noun (§4.1).
-                HashSet<string> anchors = ReturningAnchors(returning.Types);
+                // Anchor keys resolve eagerly (before the lazy Where), so a closed-generic typeof anchor throws
+                // the backstop here — during resolution — exactly like a closed-generic type noun (§4.1). A
+                // string anchor is already the definition FQN and passes through verbatim, so it reaches no
+                // reflection and needs no backstop.
+                HashSet<string> anchors = ReturningAnchors(returning.Anchors);
                 return current.Where(member => member.ReturnTypeFullName is { } returnType && anchors.Contains(returnType));
             case MemberAttributedWithAdjective attributed:
                 // The matcher is built once, eagerly (before the lazy Where), so an unrepresentable typeof
@@ -120,15 +123,18 @@ internal static class MemberSelectionEvaluator
 
     // The definition-level FQNs a .Returning anchor set matches against, byte-identical to the extraction's
     // ReturnTypeFullName form (GRAMMAR §4.6): a non-generic anchor is exact, an open-generic anchor matches
-    // any construction (its declared-type-parameter definition name). DefinitionFullName refuses a closed
-    // generic here — the check-time backstop for the spec-build refusal (GRAMMAR §8 item 14).
-    private static HashSet<string> ReturningAnchors(IReadOnlyList<Type> types)
+    // any construction (its declared-type-parameter definition name), and a string anchor is that same form
+    // written out, so it passes through verbatim. DefinitionFullName refuses a closed generic on the typeof
+    // arm here — the check-time backstop for the spec-build refusal (GRAMMAR §8 item 14), which is a
+    // typeof-arm fact: nothing is inferred from a string's shape, so a constructed spelling is a legal name
+    // that simply matches nothing.
+    private static HashSet<string> ReturningAnchors(IReadOnlyList<TypeAnchor> anchors)
     {
-        var anchors = new HashSet<string>(StringComparer.Ordinal);
-        foreach (Type type in types)
-            anchors.Add(SelectionEvaluator.DefinitionFullName(
-                type, "member return-type matching is definition-level. Anchor on the open definition instead."));
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (TypeAnchor anchor in anchors)
+            names.Add(SelectionEvaluator.DefinitionFullName(
+                anchor, "member return-type matching is definition-level. Anchor on the open definition instead."));
 
-        return anchors;
+        return names;
     }
 }

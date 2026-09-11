@@ -16,6 +16,6 @@ public enum MigrationPolicy
     /// <summary>Always migrate a baselined site you touch.</summary>
     AlwaysMigrate,
 
-    /// <summary>Never grow the debt, but do not require migrating what you touch.</summary>
-    NeverExpand
+    /// <summary>Do not migrate a baselined site in passing; a coordinated migration is planned.</summary>
+    NeverMigrate
 }

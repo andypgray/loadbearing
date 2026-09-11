@@ -365,6 +365,26 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_MustAcceptParameter_StringArm_RendersTheTypeofFragment()
+    {
+        // The anchor triple's string arm (GRAMMAR §5.2, §10) names the DEFINITION, so it renders what the
+        // typeof arm renders — on the open generic too, where the name already carries the declared
+        // type-parameter name the reflected form derives.
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter("System.Threading.CancellationToken"))
+            .ShouldBe("Methods of types must accept a parameter of type `CancellationToken`.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter("System.IProgress<T>"))
+            .ShouldBe("Methods of types must accept a parameter of type `IProgress<T>`.");
+    }
+
+    [Fact]
+    public void Member_MustAcceptParameter_GenericArm_RendersTheTypeofFragment()
+    {
+        // The triple's type-argument arm — unconstrained, so the flagship struct anchor is spellable.
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustAcceptParameter<CancellationToken>())
+            .ShouldBe("Methods of types must accept a parameter of type `CancellationToken`.");
+    }
+
+    [Fact]
     public void Member_MustBeGetOnly_RendersFragment()
     {
         // Properties-only by receiver type (GRAMMAR §5.7) — the fragment is the hyphenated adjective, not a
