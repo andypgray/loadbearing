@@ -188,6 +188,22 @@ public class GenericSugarTests
                 .MustBeSealed()));
     }
 
+    [Fact]
+    public void Except_TypeSugar_ReifiesIdenticallyToWrappedSelections()
+    {
+        // .Except(typeof(A)) ≡ .Except(arch.Type(a)); several types are the union arch.AnyOf would mint, so
+        // the multi-type form is the AnyOf spelling written for the caller.
+        Checker.Sentence(arch => arch.Types.Except(typeof(SugarType))
+                .MustBeSealed())
+            .ShouldBe(Checker.Sentence(arch => arch.Types.Except(arch.Type(typeof(SugarType)))
+                .MustBeSealed()));
+        Checker.Sentence(arch => arch.Types.Except(typeof(SugarType), typeof(SugarBase))
+                .MustBeSealed())
+            .ShouldBe(Checker.Sentence(arch => arch.Types
+                .Except(arch.AnyOf(typeof(SugarType), typeof(SugarBase)))
+                .MustBeSealed()));
+    }
+
     // Local reification markers — the sugar-equality tests only need a non-generic interface, base class,
     // and attribute; the checker never runs here.
     private interface ISugarPort;

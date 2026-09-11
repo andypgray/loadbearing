@@ -166,6 +166,16 @@ internal static class ProseFormat
     /// </summary>
     internal static string JoinReferences(IReadOnlyList<string> references)
     {
+        return JoinReferences(references, closeBeforeOr: false);
+    }
+
+    /// <summary>
+    ///     The same join with the final joiner closing an <c>Except</c> parenthetical the penultimate item
+    ///     left open — <c>`A`, `B`, or `C`</c> — the one place a list item can end open and still be
+    ///     followed by text (GRAMMAR §6). Items before it are already followed by a comma.
+    /// </summary>
+    internal static string JoinReferences(IReadOnlyList<string> references, bool closeBeforeOr)
+    {
         switch (references.Count)
         {
             case 0:
@@ -174,7 +184,8 @@ internal static class ProseFormat
                 return references[0];
             default:
                 string head = string.Join(", ", references.Take(references.Count - 1));
-                return head + " or " + references[references.Count - 1];
+                string joiner = closeBeforeOr ? ", or " : " or ";
+                return head + joiner + references[references.Count - 1];
         }
     }
 

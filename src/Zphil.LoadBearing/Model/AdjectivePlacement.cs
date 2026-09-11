@@ -20,6 +20,11 @@ internal enum AdjectivePlacement
     /// </summary>
     HeadPrefix,
 
-    /// <summary>Canonicalized to sentence-final regardless of chain position (<c>Except</c>/<c>Where</c>).</summary>
+    /// <summary>
+    ///     Canonicalized to sentence-final regardless of chain position (<c>Except</c>/<c>Where</c>). An
+    ///     <c>Except</c> here is a parenthetical: its fragment opens with a comma, and the composer closes it
+    ///     with one at whatever junction follows — the verb, a member subject's own clauses, the next item of
+    ///     a list — while a sentence-final period closes it by itself (GRAMMAR §6).
+    /// </summary>
     SubjectFinal
 }

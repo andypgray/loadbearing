@@ -95,12 +95,12 @@ FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   src/Meridian.Web/Controllers/BookingsController.cs:88 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
   src/Meridian.Web/Controllers/BookingsController.cs:90 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
-pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
+pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
 pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
-pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 pass clearance/engine/tripwire
 
@@ -141,12 +141,12 @@ pass layering/domain-independent — The Domain layer must not reference the Web
 pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
-pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
+pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
 pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
-pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 pass clearance/engine/tripwire
 

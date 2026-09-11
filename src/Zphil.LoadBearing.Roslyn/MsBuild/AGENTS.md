@@ -7,7 +7,7 @@ This directory holds the quarantined `roslyn/msbuild-bootstrap` scope. Here be d
 
 Dragons: We pick a VS 16/17 via vswhere and hand it to the out-of-process BuildHost through VSINSTALLDIR/VSCMD_VER=99.0. That preference is caution about a moving target, not a live workaround: the TypeInitializationException (XMakeElements) on legacy-namespace projects came from an early VS 18 preview and does not reproduce on VS 18.6. Where no 16/17 is installed, the highest available is taken and MsBuildBootstrap.LastSelection says so — the CLI prints it beside any workspace-load diagnostic, and LOADBEARING_VS_INSTALL_PATH overrides the choice. Do NOT switch to MSBuildLocator.QueryVisualStudioInstances — on .NET it returns no VS Setup instances.
 
-- `roslyn/msbuild-bootstrap/containment` — Types in `Zphil.LoadBearing.Roslyn.MsBuild.*`, except `MsBuildBootstrap` must be referenced only by types in `Zphil.LoadBearing.Roslyn.MsBuild.*` or `MsBuildBootstrap`. Fragile host bootstrap; contain it behind MsBuildBootstrap.
+- `roslyn/msbuild-bootstrap/containment` — Types in `Zphil.LoadBearing.Roslyn.MsBuild.*`, except `MsBuildBootstrap`, must be referenced only by types in `Zphil.LoadBearing.Roslyn.MsBuild.*` or `MsBuildBootstrap`. Fragile host bootstrap; contain it behind MsBuildBootstrap.
 - Sanctioned surface: `MsBuildBootstrap`.
 - Expand: `loadbearing explain roslyn/msbuild-bootstrap/containment`.
 <!-- loadbearing:end -->

@@ -955,3 +955,11 @@ internal sealed class PlaceholderFreeCounterpartTemplateSpec : IArchitectureSpec
             .Because("Reason.");
     }
 }
+
+internal sealed class BlankTypeNamedAdjectiveSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.Named("A", " ").MustHavePrefix("I")).Because("Reason.");
+    }
+}

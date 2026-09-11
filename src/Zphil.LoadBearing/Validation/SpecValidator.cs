@@ -805,6 +805,10 @@ internal static class SpecValidator
                 case WithNameMatchingAdjective a:
                     yield return (a.Glob, PatternKind.NamePattern);
                     break;
+                case NamedAdjective a:
+                    foreach (string name in a.Names) yield return (name, PatternKind.ExactTypeName);
+
+                    break;
                 case WithSuffixAdjective a:
                     yield return (a.Suffix, PatternKind.Suffix);
                     break;
@@ -867,6 +871,7 @@ internal static class SpecValidator
     {
         internal static readonly PatternKind NamespacePattern = new("namespace pattern", true);
         internal static readonly PatternKind NamePattern = new("name pattern", false);
+        internal static readonly PatternKind ExactTypeName = new("type name", false);
         internal static readonly PatternKind Suffix = new("suffix", false);
         internal static readonly PatternKind Prefix = new("prefix", false);
         internal static readonly PatternKind MemberNamePattern = new("member name pattern", false);

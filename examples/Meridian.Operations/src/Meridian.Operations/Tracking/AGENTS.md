@@ -5,7 +5,7 @@
 
 This directory holds the `Tracking` layer. Its architecture rules:
 
-- `modules/tracking/internals` — Types in the Tracking layer, except types in `Meridian.Operations.Tracking.Contracts.*` must be referenced only by the Tracking layer. Downstream modules read tracking only through its Contracts surface, so the milestone store and the log stay swappable; a reference into them from outside would lock an internal into a contract the source-of-truth module can no longer revise.
+- `modules/tracking/internals` — Types in the Tracking layer, except types in `Meridian.Operations.Tracking.Contracts.*`, must be referenced only by the Tracking layer. Downstream modules read tracking only through its Contracts surface, so the milestone store and the log stay swappable; a reference into them from outside would lock an internal into a contract the source-of-truth module can no longer revise.
 - `modules/tracking/outbound` — The Tracking layer must reference only itself (external packages are not constrained by this rule). Tracking is the leaf of the module graph: it owns the shipment milestone timeline that every other module reads and depends on no module in turn, so nothing it does can pull another module's state into that shared source of truth.
 - `modules/tracking/event-naming` — Types in the Tracking layer named `*Event` must be declared as records. The `*Event` values are what tracking projects across the module boundary and, later, onto a bus; declaring them as records makes them immutable and compared by value, so an event cannot be mutated after it is published or matched by reference identity.
 - Expand any rule above with `loadbearing explain <rule-id>`.

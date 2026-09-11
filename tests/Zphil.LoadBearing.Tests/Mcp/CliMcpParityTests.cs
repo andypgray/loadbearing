@@ -44,7 +44,7 @@ public sealed class CliMcpParityTests
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
-        "`BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
+        "`BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
         "`BillingFacade`. Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
         "- Expand: `loadbearing explain legacy/billing/containment`.";

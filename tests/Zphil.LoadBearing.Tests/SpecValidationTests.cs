@@ -43,6 +43,7 @@ public class SpecValidationTests
     [InlineData(typeof(BlankTypeNameMatchingVerbSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(BlankTypeNameMatchingAdjectiveSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(BlankTypePrefixAdjectiveSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankTypeNamedAdjectiveSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(BlankMemberNameMatchingAdjectiveSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(BlankMemberPrefixAdjectiveSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(BlankMemberNameMatchingVerbSpec), Code.BlankPattern, "area/rule")]
@@ -291,6 +292,17 @@ public class SpecValidationTests
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:259: Blank suffix on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankTypeName_IsReported()
+    {
+        // The exact-name adjective carries a list, so the walk yields one pattern per name and the blank one
+        // reports under its own label. Blankness is the whole check: a name carries no structure to check.
+        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNamedAdjectiveSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:963: Blank type name on 'area/rule'.");
     }
 
     [Fact]

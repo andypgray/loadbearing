@@ -104,6 +104,166 @@ public class SentenceAssemblyTests
         chainedAfter.ShouldBe(chainedBefore);
     }
 
+    // ---- The Except parenthetical and its closing comma (GRAMMAR §6). The fragment only OPENS the
+    //      parenthetical; whatever junction follows the phrase is what closes it, and a sentence-final
+    //      period or a bracketed tail closes it with no comma at all ----
+
+    [Fact]
+    public void Except_TheVerbClosesTheParenthetical()
+    {
+        // The junction: the verb straight after the subject.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .MustBeSealed())
+            .ShouldBe("Types in `MyApp.*`, except `SqlConnection`, must be sealed.");
+    }
+
+    [Fact]
+    public void Except_InTargetPosition_ThePeriodClosesIt()
+    {
+        // The junction: the end of the sentence, where the period closes the clause on its own.
+        SentenceRenderer.Sentence(Arch.Types.MustNotReference(Arch.Types.InNamespace("MyApp.Legacy.*")
+                .Except(Arch.Type(typeof(SqlConnection)))))
+            .ShouldBe("Types must not reference types in `MyApp.Legacy.*`, except `SqlConnection`.");
+    }
+
+    [Fact]
+    public void Except_OnThePenultimateTarget_TheListClosesItBeforeOr()
+    {
+        // The junction: the final " or " of a target list, the one list position that can follow an open
+        // clause — every earlier item is already followed by a comma.
+        SentenceRenderer.Sentence(Arch.Types.MustNotReference(
+                Arch.Types.InNamespace("MyApp.Legacy.*").Except(Arch.Type(typeof(SqlConnection))),
+                Arch.Type(typeof(SqlCommand))))
+            .ShouldBe("Types must not reference types in `MyApp.Legacy.*`, except `SqlConnection`, or `SqlCommand`.");
+    }
+
+    [Fact]
+    public void Except_OnAMemberSubjectsSource_ClosesBeforeTheMemberClauses()
+    {
+        // The junction: the member subject's own clauses, which render after the source reference.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Methods.Returning(typeof(Task))
+                .MustHaveSuffix("Async"))
+            .ShouldBe("Methods of types in `MyApp.*`, except `SqlConnection`, returning `Task` must be named `*Async`.");
+    }
+
+    [Fact]
+    public void Except_OnAMemberSubjectsSourceWithNoMemberClauses_TheVerbClosesIt()
+    {
+        // The junction: the verb again — with no member clause between them, the reference ends the subject.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Methods.MustBePublic())
+            .ShouldBe("Methods of types in `MyApp.*`, except `SqlConnection`, must be public.");
+    }
+
+    [Fact]
+    public void Except_OnTheLastOperandOfAnOrJoinedUnion_TheVerbClosesIt()
+    {
+        // The junction: the verb, reached through a union that does not collapse — the phrase ends with its
+        // last operand, so the operand's open clause is the union's own.
+        SentenceRenderer.Sentence(Arch.AnyOf(
+                    Arch.Project("A"),
+                    Arch.Namespace("B.*").Except(Arch.Type(typeof(SqlConnection))))
+                .MustBeSealed())
+            .ShouldBe("Types in project `A` or types in `B.*`, except `SqlConnection`, must be sealed.");
+    }
+
+    [Fact]
+    public void Except_OnThePenultimateOperandOfAnOrJoinedUnion_ClosesBeforeOr()
+    {
+        // The junction: the union's own final " or ", the operand-list twin of the target list above.
+        SentenceRenderer.Sentence(Arch.AnyOf(
+                    Arch.Namespace("B.*").Except(Arch.Type(typeof(SqlConnection))),
+                    Arch.Project("A"))
+                .MustBeSealed())
+            .ShouldBe("Types in `B.*`, except `SqlConnection`, or types in project `A` must be sealed.");
+    }
+
+    [Fact]
+    public void Except_BeforeAVerbPhraseTail_ClosesBeforeTheTail()
+    {
+        // The junction: a verb-phrase tail after the target list.
+        SentenceRenderer.Sentence(Arch.Types.MustNotCatchUnfiltered(Arch.Types.InNamespace("MyApp.Errors.*")
+                .Except(Arch.Type(typeof(TimeoutException)))))
+            .ShouldBe(
+                "Types must not catch types in `MyApp.Errors.*`, except `TimeoutException`, "
+                + "without a `when` filter.");
+    }
+
+    [Fact]
+    public void Except_BeforeABracketedTail_NeedsNoComma()
+    {
+        // The junction that needs nothing: a bracketed parenthetical closes the clause on its own.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .MustOnlyReference(Arch.Types.InNamespace("MyApp.Domain.*")
+                    .Except(Arch.Type(typeof(SqlConnection)))))
+            .ShouldBe(
+                "Types in `MyApp.*` must reference only types in `MyApp.Domain.*`, except `SqlConnection` "
+                + "(external packages are not constrained by this rule).");
+    }
+
+    // ---- Except over several operands (GRAMMAR §5.1, §5.2): the union arch.AnyOf would mint ----
+
+    [Fact]
+    public void Except_SeveralSelections_ExcludesTheirUnion()
+    {
+        // The payload is the union, so it renders through the namespace-noun collapse.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Namespace("MyApp.Legacy.*"), Arch.Namespace("MyApp.Generated.*"))
+                .MustBeSealed())
+            .ShouldBe(
+                "Types in `MyApp.*`, except types in `MyApp.Legacy.*` or `MyApp.Generated.*`, must be sealed.");
+    }
+
+    [Fact]
+    public void Except_SeveralTypes_ExcludesTheirUnion()
+    {
+        // The typeof sugar wraps each type as a bare type noun, which collapses to the backticked or-list.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(typeof(SqlConnection), typeof(SqlCommand))
+                .MustBeSealed())
+            .ShouldBe("Types in `MyApp.*`, except `SqlConnection` or `SqlCommand`, must be sealed.");
+    }
+
+    // ---- The Named adjective (GRAMMAR §5.2): the exact-name form beside WithNameMatching ----
+
+    [Fact]
+    public void Named_OneName_RendersAnInlineNamedClause()
+    {
+        SentenceRenderer.Subject(Arch.Types.Named("Program"))
+            .ShouldBe("Types named `Program`");
+    }
+
+    [Fact]
+    public void Named_SeveralNames_OrJoinTheNames()
+    {
+        SentenceRenderer.Subject(Arch.Types.Named("A", "B", "C"))
+            .ShouldBe("Types named `A`, `B` or `C`");
+    }
+
+    [Fact]
+    public void Named_InExceptPosition_ReadsAsTheSetItExcludes()
+    {
+        // Why the clause is inline rather than a bare backticked name: in reference position it must still
+        // say "types named `X`", the set, not the one type an arch.Type noun would name.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Types.Named("SystemClock"))
+                .MustBeSealed())
+            .ShouldBe("Types in `MyApp.*`, except types named `SystemClock`, must be sealed.");
+    }
+
+    [Fact]
+    public void Named_InTargetPosition_ReadsAsAListItem()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustNotConstruct(
+                Arch.Type(typeof(SqlConnection)),
+                Arch.Types.Named("SessionStore", "ModelCache")))
+            .ShouldBe("Types must not construct `SqlConnection` or types named `SessionStore` or `ModelCache`.");
+    }
+
     [Fact]
     public void Authored_RendersTheHeadPremodifier()
     {
@@ -636,7 +796,7 @@ public class SentenceAssemblyTests
             .Except(exclusion)
             .MustNotInject(Arch.Registered(Lifetime.Scoped));
         SentenceRenderer.Sentence(constraint)
-            .ShouldBe("Singleton-registered types, except `SqlConnection` must not inject scoped-registered types.");
+            .ShouldBe("Singleton-registered types, except `SqlConnection`, must not inject scoped-registered types.");
     }
 
     // ---- Surface union: arch.AnyOf (GRAMMAR §5.1, §6). A homogeneous union hoists one head and locative
@@ -1121,15 +1281,15 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void ProjectExcept_CanonicalizesSentenceFinalWithNoClosingComma()
+    public void ProjectExcept_CanonicalizesSentenceFinalAndTheVerbClosesIt()
     {
-        // The payload renders in reference position — the same phrase, uncapitalized — and there is no
-        // closing comma, exactly as the type-side Except.
+        // The payload renders in reference position — the same phrase, uncapitalized — and the verb junction
+        // closes the parenthetical with a comma, exactly as on the type side.
         SentenceRenderer.Sentence(Arch.Projects.Matching("Zphil.*")
                 .Except(Arch.Projects.Named("Zphil.LoadBearing.Cli"))
                 .MustNotBePackable())
             .ShouldBe(
-                "Projects matching `Zphil.*`, except project `Zphil.LoadBearing.Cli` must not be packable.");
+                "Projects matching `Zphil.*`, except project `Zphil.LoadBearing.Cli`, must not be packable.");
     }
 
     [Fact]

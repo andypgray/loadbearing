@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Model;
 using static Zphil.LoadBearing.Internal.Guard;
 
@@ -37,10 +38,28 @@ public static class SelectionAdjectives
         return Append(selection, new WithPrefixAdjective(NotNull(prefix, nameof(prefix))));
     }
 
-    /// <summary>Narrows to types whose name matches a glob: " whose name matches `*Repo*`".</summary>
+    /// <summary>
+    ///     Narrows to types whose name matches a glob: " whose name matches `*Repo*`". <see cref="Named" />
+    ///     is the exact form beside it.
+    /// </summary>
     public static Selection WithNameMatching(this Selection selection, string glob)
     {
         return Append(selection, new WithNameMatchingAdjective(NotNull(glob, nameof(glob))));
+    }
+
+    /// <summary>
+    ///     Narrows to the types named exactly: " named `Program`", or " named `A` or `B`" for several.
+    ///     Ordinal and case-sensitive over the simple name — the name a report prints without namespace,
+    ///     generic arity or containing type — so <c>Named("Line")</c> reaches a nested <c>Order.Line</c> and
+    ///     <c>Named("Order.Line")</c> names nothing. A name reaches every type that carries it, in every
+    ///     namespace and project. <see cref="WithNameMatching" /> is the glob form beside this one; the
+    ///     <c>(first, more)</c> shape makes a zero-name call uncompilable.
+    /// </summary>
+    public static Selection Named(this Selection selection, string first, params string[] more)
+    {
+        NotNull(more, nameof(more));
+        IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
+        return Append(selection, new NamedAdjective(names));
     }
 
     /// <summary>Narrows to types implementing an interface (open generic = any construction).</summary>
@@ -135,10 +154,33 @@ public static class SelectionAdjectives
         return selection.AttributedWith(typeof(T));
     }
 
-    /// <summary>Excludes another selection; canonicalized to sentence-final (GRAMMAR §6).</summary>
-    public static Selection Except(this Selection selection, Selection exclusion)
+    /// <summary>
+    ///     Excludes one or more selections — several are the union <c>arch.AnyOf</c> would mint, so
+    ///     <c>.Except(a, b)</c> ≡ <c>.Except(arch.AnyOf(a, b))</c>. The clause renders sentence-final as a
+    ///     parenthetical, ", except {ref}", that the sentence closes with a comma wherever text follows it
+    ///     (GRAMMAR §5.2, §6).
+    /// </summary>
+    public static Selection Except(this Selection selection, Selection first, params Selection[] more)
     {
-        return Append(selection, new ExceptAdjective(NotNull(exclusion, nameof(exclusion))));
+        NotNull(selection, nameof(selection));
+        NotNull(more, nameof(more));
+        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, exclusion => exclusion);
+        Selection payload = ExceptPayload(selection.Owner, parts);
+        return Append(selection, new ExceptAdjective(payload));
+    }
+
+    /// <summary>
+    ///     Excludes one or more types — <c>≡ Except(arch.Type(a), arch.Type(b), …)</c>, the same sugar the
+    ///     dependency verbs carry (GRAMMAR §3.3): identical model, identical prose.
+    /// </summary>
+    public static Selection Except(this Selection selection, Type first, params Type[] more)
+    {
+        NotNull(selection, nameof(selection));
+        NotNull(more, nameof(more));
+        Arch owner = selection.Owner;
+        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => owner.Type(type));
+        Selection payload = ExceptPayload(owner, parts);
+        return Append(selection, new ExceptAdjective(payload));
     }
 
     /// <summary>
@@ -160,6 +202,14 @@ public static class SelectionAdjectives
     public static Selection Authored(this Selection selection)
     {
         return Append(selection, new AuthoredAdjective());
+    }
+
+    // The excluded set for one or more operands: a single operand passes through as the payload unchanged —
+    // byte for byte the model a one-operand Except has always built — and several mint the union arch.AnyOf
+    // would (GRAMMAR §5.1), so prose and evaluation both reach them by paths that already exist.
+    private static Selection ExceptPayload(Arch owner, IReadOnlyList<Selection> parts)
+    {
+        return parts.Count == 1 ? parts[0] : UnionSelection.Create(owner, parts);
     }
 
     private static Selection Append(Selection selection, SelectionAdjective adjective)

@@ -48,7 +48,7 @@ public sealed class RenderCommandE2ETests
         "If you are already editing a grandfathered site and the migration is small, migrate it; " +
         "otherwise do not grow the debt.\n\n" +
         "### Quarantined scopes\n" +
-        "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
+        "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, " +
         "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`. " +
         "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
@@ -61,7 +61,7 @@ public sealed class RenderCommandE2ETests
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
-        "`BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
+        "`BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
         "`BillingFacade`. Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
         "- Expand: `loadbearing explain legacy/billing/containment`.";
@@ -88,7 +88,7 @@ public sealed class RenderCommandE2ETests
         "- `layering/billing-not-web` — The Billing layer must not reference types in `MyApp.Web.*`. " +
         "Billing must not reach up into the web layer.\n\n" +
         "### Quarantined scopes\n" +
-        "- `legacy/billing` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade` " +
+        "- `legacy/billing` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, " +
         "must be referenced only by the Billing layer, `IBillingFacade` or `BillingFacade`. " +
         "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
@@ -114,7 +114,7 @@ public sealed class RenderCommandE2ETests
         "This directory holds the quarantined `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
-        "- `legacy/billing/containment` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade` " +
+        "- `legacy/billing/containment` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, " +
         "must be referenced only by the Billing layer, `IBillingFacade` or `BillingFacade`. " +
         "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +

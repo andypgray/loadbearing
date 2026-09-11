@@ -286,7 +286,7 @@ FAIL naming/async-suffix — Methods of the Domain or Web layers returning `Task
   src/Meridian.Web/Data/QuoteRepository.cs:30 — Meridian.Web.Data.QuoteRepository.Get()
   src/Meridian.Web/Data/RateCardRepository.cs:8 — Meridian.Web.Data.RateCardRepository.GetForLane()
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
-FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   because: Candidate: a self-contained clearance module already sits behind a gateway facade.
   fix: use `IClearanceGateway`
   src/Meridian.Web/Controllers/CustomsController.cs:52 — Meridian.Web.Controllers.CustomsController references Meridian.Clearance.ContainerNumberValidator
@@ -323,7 +323,7 @@ The three zero-violation rules become law. The inline-SQL rule has twelve violat
 
 The two pack rules land on opposite sides of that line, from the same source, on the same run. In the [Interchange example](../Meridian.Interchange/) the identical `naming/async-suffix` is `Enforce`, because that codebase already keeps it. Nothing about the rule changed; the evidence did. This is why a pack hands you the rule and its reason and leaves the posture alone: only your check knows what your code does.
 
-The refinement is where the evidence earns its keep. The draft flagged `SystemClock.cs:7` alongside the seven controller reads. But `SystemClock` implements `IClock`: it is the one sanctioned seam that must read the wall clock, so nothing else has to. The blunt draft rule surfaced the seam; the curated rule keeps it by adding `.Except(arch.Types.WithNameMatching("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, not code evidence: an empty subject or a glob that matched nothing would speak the same way, telling you to fix the rule rather than measure the code.
+The refinement is where the evidence earns its keep. The draft flagged `SystemClock.cs:7` alongside the seven controller reads. But `SystemClock` implements `IClock`: it is the one sanctioned seam that must read the wall clock, so nothing else has to. The blunt draft rule surfaced the seam; the curated rule keeps it by adding `.Except(arch.Types.Named("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, not code evidence: an empty subject or a glob that matched nothing would speak the same way, telling you to fix the rule rather than measure the code.
 
 ## Step 6: curate, then baseline
 
@@ -361,10 +361,10 @@ $ loadbearing check examples/Meridian/Meridian.slnx
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
 pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
-pass time/inject-clock — Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`.
+pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
 pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
-pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
 skip clearance/engine/tripwire
   skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.
 

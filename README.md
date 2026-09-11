@@ -113,7 +113,7 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
             .Migrate(
                 "MCP infrastructure reads process env vars via System.Environment directly.",
                 arch.Types.InNamespace("Zphil.LoadBearing.Cli.Mcp.Infrastructure.*")
-                    .Except(arch.Types.WithNameMatching("SystemEnvironment"))
+                    .Except(arch.Types.Named("SystemEnvironment"))
                     .MustNotReference(typeof(Environment)))
             .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +
                      "process state.")
@@ -171,7 +171,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, w
   "id": "mcp/env-through-seam",
   "posture": "migrate",
   "status": "passed",
-  "sentence": "Types in `Zphil.LoadBearing.Cli.Mcp.Infrastructure.*`, except types whose name matches `SystemEnvironment` must not reference `Environment`.",
+  "sentence": "Types in `Zphil.LoadBearing.Cli.Mcp.Infrastructure.*`, except types named `SystemEnvironment`, must not reference `Environment`.",
   "because": "A single IEnvironment seam keeps the MCP pipeline testable without mutating real process state.",
   "fix": "Inject IEnvironment (see SystemEnvironment); read via GetVariable.",
   "baseline": {

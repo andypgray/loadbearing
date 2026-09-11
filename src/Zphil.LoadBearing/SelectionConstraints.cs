@@ -585,7 +585,7 @@ public static class SelectionConstraints
     // sugar overload is exactly the selection overload with arch.Type(...) written for the caller.
     private static Selection Wrap(Selection subject, Type type)
     {
-        return new RefinedSelection(subject.Owner, new TypeNoun(type), Array.Empty<SelectionAdjective>());
+        return subject.Owner.Type(type);
     }
 
     private static Selection Subject(Selection subject)

@@ -63,7 +63,7 @@ public sealed class ExplainFormatterTests
         Dump("legacy/billing/containment")
             .ShouldBe(
                 "legacy/billing/containment (quarantine/containment)\n" +
-                "  sentence: Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
+                "  sentence: Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, " +
                 "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.\n" +
                 "  because: Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
                 "  fix: use `IBillingFacade`\n" +

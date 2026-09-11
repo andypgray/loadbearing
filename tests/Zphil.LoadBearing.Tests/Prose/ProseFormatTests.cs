@@ -5,9 +5,10 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Tests.Prose;
 
 /// <summary>
-///     The GRAMMAR §6 reference-list join, pinned directly on <see cref="ProseFormat.JoinReferences" />:
-///     the empty (<c>Prose/ProseFormat.cs:76</c>), two, and three-plus forms — the last proving the
-///     no-Oxford-comma rule.
+///     The GRAMMAR §6 reference-list join, pinned directly on
+///     <see cref="ProseFormat.JoinReferences(IReadOnlyList{string})" />: the empty (the join's zero-item
+///     arm), two, and three-plus forms — the last proving the no-Oxford-comma rule. The closing-comma
+///     overload beside it is pinned through the sentences that use it, in <c>SentenceAssemblyTests</c>.
 /// </summary>
 public sealed class ProseFormatTests
 {

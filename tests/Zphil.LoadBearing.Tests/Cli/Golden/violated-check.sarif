@@ -99,7 +99,7 @@
             {
               "id": "di/handlers-via-registry",
               "shortDescription": {
-                "text": "Types, except `HandlerRegistry` must not construct types implementing `IHandler<T>`."
+                "text": "Types, except `HandlerRegistry`, must not construct types implementing `IHandler<T>`."
               },
               "fullDescription": {
                 "text": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery."
@@ -165,7 +165,7 @@
             {
               "id": "legacy/billing/containment",
               "shortDescription": {
-                "text": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`."
+                "text": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`."
               },
               "fullDescription": {
                 "text": "Replacement scheduled; not worth stabilizing."
@@ -483,7 +483,7 @@
             {
               "id": "packaging/nothing-published",
               "shortDescription": {
-                "text": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing` must not be packable."
+                "text": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing`, must not be packable."
               },
               "fullDescription": {
                 "text": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed."

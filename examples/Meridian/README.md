@@ -54,11 +54,11 @@ The same `naming/async-suffix` is `Enforce` in the [Interchange example](../Meri
 
 ### Migrations
 - `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: Controllers open SqlConnection and run inline SQL directly. That is grandfathered debt, not house style. New code must follow: Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`. Data access behind a repository can be tested and swapped; SQL in the request path cannot. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
-- `time/inject-clock` — Some existing code here still follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types whose name matches `SystemClock` must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
+- `time/inject-clock` — Some existing code here still follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 - `naming/async-suffix` — Some existing code here still follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`. Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
 ### Quarantined scopes
-- `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
+- `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
 ```
 
 ## Three ways an agent goes wrong here
@@ -87,7 +87,7 @@ The message carries the rule ID, the reason, the fix, and the exact `file:line`.
 `ContainerNumberValidator` is public, so an agent tidying the code can call it directly and delete an "unnecessary" hop through `IClearanceGateway`. The quarantined scope's containment rule stops that: the only sanctioned way into `Meridian.Clearance` is the gateway. Reach past it and the reference is red, with the fix naming the surface to use:
 
 ```text
-FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway` must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   because: The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.
   fix: use `IClearanceGateway`
   src/Meridian.Web/Controllers/BookingsController.cs:75 — Meridian.Web.Controllers.BookingsController references Meridian.Clearance.ContainerNumberValidator

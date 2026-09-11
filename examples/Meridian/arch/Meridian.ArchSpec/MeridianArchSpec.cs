@@ -45,7 +45,7 @@ public sealed class MeridianArchSpec : IArchitectureSpec
         arch.Rule("time/inject-clock")
             .Migrate(
                 "Code reads the ambient clock directly.",
-                web.Except(arch.Types.WithNameMatching("SystemClock"))
+                web.Except(arch.Types.Named("SystemClock"))
                     .MustNotUse(
                         () => DateTime.Now,
                         () => DateTime.UtcNow))

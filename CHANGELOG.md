@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The exemption idiom has a noun: `arch.Types.Named(name, …)`.**
+  `host.Except(arch.Types.Named("McpServerCommand"))` renders "Types in the Host layer, except
+  types named `McpServerCommand`, must not use …": the exact, ordinal simple name, or-joined for
+  several ("types named `A` or `B`"). The only spelling before was a wildcard-free glob,
+  `WithNameMatching("McpServerCommand")`, which matched the same set and rendered "types whose
+  name matches `McpServerCommand`" — a pattern in the sentence where the author meant a name. It
+  was the most common exemption shape in the corpus: nine sites across this repository's own spec
+  and two of the examples, every one now `Named`, and this repository's
+  `exceptions/no-swallowed-broad-catches` now lists its seven sanctioned handlers in the sentence
+  instead of behind a `Where` description. The fragment says *named* rather than rendering the
+  bare backticked name a `typeof` does, because a simple name reaches every type carrying it in
+  every namespace and project, and the sentence states the set the checker uses.
+  `WithNameMatching` stays the glob form beside it, and a blank name fails spec build.
+
+- **`Except` takes a list, and `typeof`.** `.Except(a, b)` is `.Except(arch.AnyOf(a, b))` (one
+  union, rendered ", except types in `A.*` or `B.*`"), and `.Except(typeof(Constraint))` is
+  `.Except(arch.Type<Constraint>())` with the `typeof` written for you: the `(first, params more)`
+  pair and the `Type` sugar every dependency verb already carries, now on the one set position
+  that lacked them. One operand is the payload it always was, byte for byte.
+
 - **A leaf of the reference graph has a verb of its own: `MustOnlyReferenceItself()`.**
   `tracking.MustOnlyReferenceItself()` renders "The Tracking layer must reference only itself
   (external packages are not constrained by this rule)", which is the shape a module graph's leaf
@@ -50,6 +70,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own `file:line`.
 
 ### Changed
+
+- **The Except clause closes.** "Types in the Host layer, except types named `SpecLoadContext`,
+  must not use `AssemblyLoadContext.LoadFromAssemblyPath()`" — the comma after the exception is
+  new. The clause is a parenthetical, and it opened with a comma and never closed, so "except [X
+  must not use Y]" parsed as a clause and the exception read as the subject of the law. The
+  sentence composer now closes it wherever text follows: before the verb, before a member
+  subject's own clauses ("Methods of types in `MyApp.*`, except `SqlConnection`, returning `Task`
+  must be named `*Async`"), before the final joiner of a list whose previous item ends open ("must
+  not reference types in `MyApp.Legacy.*`, except `SqlConnection`, or `SqlCommand`") and before a
+  verb phrase's tail; a sentence-final period, or a bracketed tail, closes it as before. Every
+  `check` line, `--json` sentence, SARIF message and `explain` line reads the same way.
+  Re-rendering updates every block whose subject carries an `Except`.
 
 - **The ratchet now measures sites.** A baseline entry records how many sites it grandfathers,
   and a grandfathered pair that gains a site is red — every site of the pair listed, with a

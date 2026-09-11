@@ -7,7 +7,8 @@ namespace Zphil.LoadBearing.Prose;
 ///     Assembles the deterministic law sentence from a <see cref="Constraint" /> (GRAMMAR §6). The
 ///     nouns and adjectives own their local fragments; this orchestrates the cross-node concerns:
 ///     the collective-vs-types voice switch, sentence-final canonicalization of <c>Except</c>/
-///     <c>Where</c>, colliding-simple-name qualification in target lists (the shared
+///     <c>Where</c>, closing the <c>Except</c> parenthetical with a comma at whatever junction follows
+///     it, colliding-simple-name qualification in target lists (the shared
 ///     <see cref="ProseFormat.ResolveTypeDisplays" /> primitive), and capitalization.
 /// </summary>
 internal static class SentenceRenderer
@@ -19,13 +20,17 @@ internal static class SentenceRenderer
         // subject ("Methods of types in `MyApp.Web.*` …"), a project constraint over its project subject
         // ("Packable projects …"), and every other constraint over its type subject. This dispatch is also
         // what makes the bare Subject read below safe — it is null exactly for the project arm above it.
-        string subject = constraint switch
+        // The phrase and its openness come out of the same arm, so the two cannot disagree about which
+        // stratum was read.
+        (string subject, bool endsOpen) = constraint switch
         {
-            MemberConstraint member => MemberSubject(member.MemberSubject),
-            ProjectConstraint project => ProjectSubject(project.ProjectSubject),
-            _ => Subject(constraint.Subject!)
+            MemberConstraint member => (MemberSubject(member.MemberSubject), EndsOpen(member.MemberSubject)),
+            ProjectConstraint project => (ProjectSubject(project.ProjectSubject), EndsOpen(project.ProjectSubject)),
+            _ => (Subject(constraint.Subject!), EndsOpen(constraint.Subject!))
         };
-        return subject + " " + constraint.VerbPhrase + ".";
+
+        // The verb is the junction after the subject, so the verb is what closes a subject-final Except.
+        return subject + (endsOpen ? ", " : " ") + constraint.VerbPhrase + ".";
     }
 
     /// <summary>The capitalized subject phrase for a selection (GRAMMAR §6).</summary>
@@ -90,7 +95,18 @@ internal static class SentenceRenderer
                 ? ProseFormat.Backtick(display[type])
                 : Reference(target));
 
-        return ProseFormat.JoinReferences(parts);
+        return ProseFormat.JoinReferences(parts, ClosesBeforeOr(targets));
+    }
+
+    /// <summary>
+    ///     The same target list followed by a verb-phrase tail, with the last target's open <c>Except</c>
+    ///     parenthetical closed before it: "…, except `TimeoutException`, without a `when` filter"
+    ///     (GRAMMAR §6). A tail that is a bracketed parenthetical closes the clause on its own and
+    ///     concatenates instead.
+    /// </summary>
+    internal static string TargetList(IReadOnlyList<Selection> targets, string tail)
+    {
+        return TargetList(targets) + CloseBefore(EndsOpen(targets[targets.Count - 1]), tail);
     }
 
     /// <summary>
@@ -164,7 +180,7 @@ internal static class SentenceRenderer
 
         IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
         return nouns is null
-            ? ProseFormat.JoinReferences(union.Parts.Select(Reference).ToList())
+            ? ProseFormat.JoinReferences(union.Parts.Select(Reference).ToList(), ClosesBeforeOr(union.Parts))
             : nouns[0].CollapsedReference(nouns);
     }
 
@@ -188,8 +204,11 @@ internal static class SentenceRenderer
             return (headPrefix ?? string.Empty) + (head ?? nouns[0].SubjectHead)
                                                 + nouns[0].CollapsedLocative(nouns) + inline + subjectFinal;
 
+        // The union's own clauses follow the last operand's phrase, so they close an Except it left open.
         List<string> parts = union.Parts.Select(part => Phrase(part, head, headPrefix)).ToList();
-        return ProseFormat.JoinReferences(parts) + inline + subjectFinal;
+        Selection lastPart = union.Parts[union.Parts.Count - 1];
+        string clauses = CloseBefore(EndsOpen(lastPart), inline + subjectFinal);
+        return ProseFormat.JoinReferences(parts, ClosesBeforeOr(union.Parts)) + clauses;
     }
 
     // Where each adjective lands (GRAMMAR §5.2, §4.10), accumulated in authoring order: Head and HeadPrefix
@@ -245,6 +264,61 @@ internal static class SentenceRenderer
         return nouns[0].CollapsedLocative(nouns) is null ? null : nouns;
     }
 
+    // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): its last sentence-final adjective
+    // is an Except — a Where after one closes nothing, and is not open either — or, with no clause of its
+    // own, it is an or-joined union whose last operand ends open. A collapsed union, a bare noun and an
+    // inline-terminated phrase are closed. The composer reads this at every junction where text follows,
+    // because the fragment cannot know what follows it.
+    private static bool EndsOpen(Selection selection)
+    {
+        SelectionAdjective? lastClause = selection.Adjectives
+            .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        if (lastClause is not null) return lastClause is ExceptAdjective;
+
+        bool endsWithInlineClause = selection.Adjectives
+            .Any(adjective => adjective.Placement == AdjectivePlacement.Inline);
+        if (endsWithInlineClause) return false;
+
+        if (selection is not UnionSelection union || CollapsibleNouns(union) is not null) return false;
+
+        return EndsOpen(union.Parts[union.Parts.Count - 1]);
+    }
+
+    // The project stratum's twin. Except and Where are the only sentence-final project adjectives, and the
+    // project phrase has no union or bare-noun arm to fall through to.
+    private static bool EndsOpen(ProjectSelection selection)
+    {
+        ProjectAdjective? lastClause = selection.Adjectives
+            .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        return lastClause is ProjectExceptAdjective;
+    }
+
+    // A member subject renders its own inline and sentence-final clauses AFTER the reference, so those
+    // clauses close an Except the source left open. Only head prefixes leave the reference at the end.
+    private static bool EndsOpen(MemberSelection selection)
+    {
+        return EndsOpen(selection.Source)
+               && selection.Adjectives.All(adjective => adjective.Placement == AdjectivePlacement.HeadPrefix);
+    }
+
+    // Comma-closes a following fragment when the phrase before it ended open. Every following fragment opens
+    // with a space, so this yields ", returning `Task`", ", whose name …", ", without a `when` filter". An
+    // empty following is closed by whatever comes after it — the sentence-final period, the verb — and an
+    // Except following an Except already carries the comma.
+    private static string CloseBefore(bool endsOpen, string following)
+    {
+        if (!endsOpen || following.Length == 0 || following[0] == ',') return following;
+
+        return "," + following;
+    }
+
+    // The or-joiner's closing decision for a list: only the PENULTIMATE item can end open and still be
+    // followed by text, because every item before it is already followed by a comma (GRAMMAR §6).
+    private static bool ClosesBeforeOr(IReadOnlyList<Selection> parts)
+    {
+        return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
+    }
+
     // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives + "{kind-plural} of
     // {selection-reference}" + inline member adjectives in authoring order + the sentence-final member
     // Where. The kind-plural is the projection head; the reference is the underlying type selection in
@@ -276,7 +350,7 @@ internal static class SentenceRenderer
                     break;
             }
 
-        return headPrefix + head + " of " + reference + inline + subjectFinal;
+        return headPrefix + head + " of " + reference + CloseBefore(EndsOpen(selection.Source), inline + subjectFinal);
     }
 
     // Project-subject assembly (GRAMMAR §4.10, §6): the bare plural "projects" as the head, then the shared

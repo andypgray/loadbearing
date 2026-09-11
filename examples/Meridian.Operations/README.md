@@ -30,7 +30,7 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/O
 
 This directory holds the `Invoicing` layer. Its architecture rules:
 
-- `modules/invoicing/internals` — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*` must be referenced only by the Invoicing layer. Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
+- `modules/invoicing/internals` — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by the Invoicing layer. Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
 - `modules/invoicing/outbound` — The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
@@ -69,7 +69,7 @@ Those allow-lists are the module graph. v1 has no cycle-detection combinator: th
 An agent working in Dispatch wants a quick invoice preview and constructs Invoicing's internal `InvoiceAssembler` directly. It compiles: `internal` is assembly-wide in a monolith, so nothing at the language level stops one module from reaching into another's internals. `dotnet build` is green. `check` is not, and it fails twice on the one reference:
 
 ```text
-FAIL modules/invoicing/internals — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*` must be referenced only by the Invoicing layer.
+FAIL modules/invoicing/internals — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by the Invoicing layer.
   because: Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
   fix: Depend on `IInvoiceRun` or another `Invoicing.Contracts` type instead of the internal assembler or reconciler.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
@@ -96,7 +96,7 @@ This directory holds the quarantined `demurrage/engine` scope. Here be dragons �
 
 Dragons: Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.
 
-- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator` must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.
+- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator`, must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.
 - Sanctioned surface: `IDemurrageCalculator`, `DemurrageCalculator`.
 - Expand: `loadbearing explain demurrage/engine/containment`.
 <!-- loadbearing:end -->

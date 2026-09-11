@@ -85,54 +85,6 @@ namespace Zphil.LoadBearing.ArchSpec;
 public sealed class LoadBearingArchSpec : IArchitectureSpec
 {
     /// <summary>
-    ///     The types whose broad catches deliberately hold any failure and continue, exempted from
-    ///     <c>exceptions/no-swallowed-broad-catches</c>. One kind of handler belongs here and nothing else:
-    ///     a boundary whose job is to absorb whatever arrives and carry on down a sanctioned degraded path.
-    ///     <list type="bullet">
-    ///         <item>
-    ///             <c>CommandEntryPoint</c> — the process boundary: every CLI failure becomes an exit code
-    ///             and a message rather than a stack trace.
-    ///         </item>
-    ///         <item>
-    ///             <c>ArchChecker</c> — the per-rule boundary: a fault evaluating one rule becomes that
-    ///             rule's errored result, so the others still report.
-    ///         </item>
-    ///         <item>
-    ///             <c>ArchRuleTests</c> — the discovery boundary: a spec that fails to build becomes one
-    ///             failing test row rather than a silently empty theory.
-    ///         </item>
-    ///         <item>
-    ///             <c>IdleTimeoutWatchdog</c> — a background loop: a poll fault logs and disables the
-    ///             watchdog rather than taking the server down.
-    ///         </item>
-    ///         <item>
-    ///             <c>ParentProcessWatcher</c> — a probe plus a background loop: both fail toward the safe
-    ///             direction for a leak guard.
-    ///         </item>
-    ///         <item>
-    ///             <c>ServerShutdown</c> — the drain: a faulting disposer must not stop the remaining
-    ///             disposers, or the process exits holding a lock.
-    ///         </item>
-    ///         <item>
-    ///             <c>VsWhereLocator</c> — a quarantined probe: any vswhere failure degrades to an empty
-    ///             instance list and the <c>MSBuildLocator.RegisterDefaults()</c> fallback.
-    ///         </item>
-    ///     </list>
-    ///     The exemption is by type name, so it covers a type's future catches as well as today's — the
-    ///     granularity a baseline entry would have, kept in the spec where it is read.
-    /// </summary>
-    private static readonly HashSet<string> SanctionedBroadCatchers =
-    [
-        "ArchChecker",
-        "ArchRuleTests",
-        "CommandEntryPoint",
-        "IdleTimeoutWatchdog",
-        "ParentProcessWatcher",
-        "ServerShutdown",
-        "VsWhereLocator"
-    ];
-
-    /// <summary>
     ///     The static fields whose mutability is load-bearing, exempted from <c>state/no-static-mutable</c>.
     ///     Keyed <c>{DeclaringType}.{Name}</c> rather than by type name, because unlike a broad catch a
     ///     second mutable static in the same class is exactly what this law should still catch. Three
@@ -296,7 +248,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                     arch.Project("Zphil.LoadBearing.Xunit"),
                     arch.Project("Zphil.LoadBearing.Packs.DotNet"))
                 .Authored()
-                .Except(arch.Types.WithNameMatching("Program"))
+                .Except(arch.Types.Named("Program"))
                 .MustBelongTo(core, extraction, host, adapter, pack))
             .Because("A type outside every declared layer is governed by nothing: no rule sweeps it, no card " +
                      "covers it, and check stays green while it accretes. The subject names the five projects " +
@@ -332,7 +284,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                  "inside an IServiceScopeFactory scope instead of injecting it into the singleton.");
 
         DotNetGuidance.NoServiceLocator(arch, host,
-            arch.AnyOf(arch.Types.WithNameMatching("McpServerCommand"), arch.Types.WithNameMatching("GlobalCallToolFilter")),
+            arch.Types.Named("McpServerCommand", "GlobalCallToolFilter"),
             PackPosture.Enforce,
             "Take the dependency in the constructor; McpServerCommand's composition root and GlobalCallToolFilter's request context are the only sanctioned resolve sites.");
 
@@ -378,7 +330,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("mcp/no-blocking-waits")
             .Enforce(arch.AnyOf(host, extraction)
-                .Except(arch.Types.WithNameMatching("ServerShutdown"))
+                .Except(arch.Types.Named("ServerShutdown"))
                 .MustNotUse(
                     arch.Member<Task>(t => t.Wait()),
                     arch.Member<Task<object>>(t => t.Result),
@@ -396,7 +348,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("mcp/no-path-assembly-loads")
             .Enforce(host
-                .Except(arch.Types.WithNameMatching("SpecLoadContext"))
+                .Except(arch.Types.Named("SpecLoadContext"))
                 .MustNotUse(arch.Member(typeof(AssemblyLoadContext), nameof(AssemblyLoadContext.LoadFromAssemblyPath))))
             .Because("A host that loads an assembly from its path pins that file for as long as the host " +
                      "lives, and this host lives for a whole session: the model roots the spec's Types, so " +
@@ -424,12 +376,10 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
 
         arch.Rule("mcp/warm-state-constructed-once")
             .Enforce(host
-                .Except(arch.Types.WithNameMatching("McpServerCommand"))
+                .Except(arch.Types.Named("McpServerCommand"))
                 .MustNotConstruct(
                     arch.Type<WorkspaceSession>(),
-                    arch.Types.WithNameMatching("SessionFragmentStore"),
-                    arch.Types.WithNameMatching("SpecModelCache"),
-                    arch.Types.WithNameMatching("SpecResolutionCache")))
+                    arch.Types.Named("SessionFragmentStore", "SpecModelCache", "SpecResolutionCache")))
             .Because("The warm server holds exactly one of each piece of session state for its lifetime — " +
                      "the workspace session, the fragment store, and the two spec caches that hang off the " +
                      "same load. A second construction forks the reconcile state and the caches silently " +
@@ -458,13 +408,34 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Route new failure modes through FileNotFoundException (missing solution) or " +
                  "InvalidOperationException (bad configuration).");
 
+        // The seven broad handlers exempted below are the handlers that hold any failure and continue:
+        // each is a boundary whose job is to absorb whatever arrives and carry on down a sanctioned
+        // degraded path. The exemption is by type name, so it covers a type's future catches as well as
+        // today's — the granularity a baseline entry would have, kept in the spec where it is read.
+        //   ArchChecker          — the per-rule boundary: a fault evaluating one rule becomes that rule's
+        //                          errored result, so the others still report.
+        //   ArchRuleTests        — the discovery boundary: a spec that fails to build becomes one failing
+        //                          test row rather than a silently empty theory.
+        //   CommandEntryPoint    — the process boundary: every CLI failure becomes an exit code and a
+        //                          message rather than a stack trace.
+        //   IdleTimeoutWatchdog  — a background loop: a poll fault logs and disables the watchdog rather
+        //                          than taking the server down.
+        //   ParentProcessWatcher — a probe plus a background loop: both fail toward the safe direction for
+        //                          a leak guard.
+        //   ServerShutdown       — the drain: a faulting disposer must not stop the remaining disposers,
+        //                          or the process exits holding a lock.
+        //   VsWhereLocator       — a quarantined probe: any vswhere failure degrades to an empty instance
+        //                          list and the MSBuildLocator.RegisterDefaults() fallback.
         arch.Rule("exceptions/no-swallowed-broad-catches")
             .Enforce(arch.AnyOf(core, extraction, host, adapter, pack)
-                .Where(t => !SanctionedBroadCatchers.Contains(t.Name),
-                    description: "whose name is not one of the sanctioned broad handlers (the process, rule " +
-                                 "and test boundaries, the background loops, and the quarantined probes — " +
-                                 "the handlers that hold any failure and continue on a sanctioned degraded " +
-                                 "path)")
+                .Except(arch.Types.Named(
+                    "ArchChecker",
+                    "ArchRuleTests",
+                    "CommandEntryPoint",
+                    "IdleTimeoutWatchdog",
+                    "ParentProcessWatcher",
+                    "ServerShutdown",
+                    "VsWhereLocator"))
                 .MustNotSwallow(typeof(Exception)))
             .Because("A broad catch that holds the failure and continues holds the ones nobody thought " +
                      "about — a cancellation, an out-of-memory, the bug introduced two lines up — and hands " +
@@ -529,7 +500,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Give the interface the `I` prefix.");
 
         arch.Rule("model/constraint-nodes")
-            .Enforce(core.WithSuffix("Constraint").Except(arch.Type<Constraint>())
+            .Enforce(core.WithSuffix("Constraint").Except(typeof(Constraint))
                 .MustResideInNamespace("Zphil.LoadBearing.Model.*"))
             .Because("A `*Constraint` is a node of the reified model — what a spec compiles to and what both " +
                      "render targets read back. The checker's dispatch and the sentence renderer each switch " +
@@ -650,7 +621,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Migrate(
                 "MCP infrastructure reads process env vars via System.Environment directly.",
                 arch.Types.InNamespace("Zphil.LoadBearing.Cli.Mcp.Infrastructure.*")
-                    .Except(arch.Types.WithNameMatching("SystemEnvironment"))
+                    .Except(arch.Types.Named("SystemEnvironment"))
                     .MustNotReference(typeof(Environment)))
             .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +
                      "process state.")

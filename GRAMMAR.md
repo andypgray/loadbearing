@@ -416,6 +416,15 @@ with no `*` is an exact name match; a lone `*` matches every name. Name globs ha
 dot-segment structure and no subtree operator, so §8 item 16 never applies to them — only
 the blank check (item 15) does.
 
+**`Named` is the exact form** (§5.2): a name, not a pattern. It is matched ordinal and
+case-sensitive against the whole simple name (a `*` in it is a literal), so the glob semantics
+above are untouched and a wildcard-free glob still means what it meant; `Named` is the spelling
+that says the intent. The simple name is the one a report prints without its namespace, generic
+arity or containing type: `Named("Line")` reaches a nested `Order.Line`, `Named("Order.Line")`
+names nothing, and `Named("Repository")` reaches `Repository<T>`. A name reaches every type that
+carries it, in every namespace and project, which is why the fragment says "types named `X`"
+rather than rendering the bare backticked name a single `arch.Type` does (§5.2, §6).
+
 ### 4.3 Violation identity (what a baseline entry keys)
 
 Per verb class — this is grammar-level semantics, not baseline file format:
@@ -974,7 +983,7 @@ declares as package references, whether it locks restore and whether it packs.
 | `arch.Namespace("MyApp.Legacy.Billing.*")` | "types in `MyApp.Legacy.Billing.*`" |
 | `arch.Project("MyApp.Web")` | "types in project `MyApp.Web`" |
 | `arch.Type(typeof(SqlConnection))` / `arch.Type<SqlConnection>()` | "`SqlConnection`" — simple name; FQN retained in the model |
-| `arch.Registered(Lifetime.Singleton)` / `arch.Registered()` | "singleton-registered types" (per lifetime: "scoped-registered types", "transient-registered types") / "registered types" — types named in a source-visible container registration (§4.7). The fragment is the noun's **head** and survives adjectives ("Singleton-registered types must not inject scoped-registered types, except `X`." — never a false bare "Types, …"); the §5.2 `OfKind` head-substitution mechanic, pinned by an adjective-bearing-subject test. |
+| `arch.Registered(Lifetime.Singleton)` / `arch.Registered()` | "singleton-registered types" (per lifetime: "scoped-registered types", "transient-registered types") / "registered types" — types named in a source-visible container registration (§4.7). The fragment is the noun's **head** and survives adjectives ("Singleton-registered types, except `X`, must not inject scoped-registered types." — never a false bare "Types, …"); the §5.2 `OfKind` head-substitution mechanic, pinned by an adjective-bearing-subject test. |
 | `arch.AnyOf(a, b, …)` / `arch.AnyOf(typeof(X), typeof(Y), …)` | the union of its operands: "types in projects `A` or `B`" when they collapse, "types in project `A` or types in `B.*`" when they do not (§6). A union has no single noun — it is the one noun-position node that renders through its own assembly arm. |
 | `arch.Member(typeof(DateTime), nameof(DateTime.Now))` / `arch.Member(() => DateTime.Now)` | "`DateTime.Now`" — member leaf, target-only (§4.5); parens iff method: "`Task.Wait()`" (`arch.Member<Task>(t => t.Wait())`) |
 
@@ -1010,10 +1019,11 @@ declares as package references, whether it locks restore and whether it packs.
 | `.WithSuffix("Controller")` | "named `*Controller`" |
 | `.WithPrefix("Legacy")` | "named `Legacy*`" |
 | `.WithNameMatching("*Repo*")` | "whose name matches `*Repo*`" |
+| `.Named("Program")` | "named `Program`" — the exact simple name, ordinal (§4.2); "named `A` or `B`" for several. The wildcard-free member of the `WithSuffix`/`WithPrefix` family, whose fragments already say *named* |
 | `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` | "implementing `IHandler<T>`" — the string form renders byte-identically (string anchors, below) |
 | `.DerivedFrom(typeof(ControllerBase))` / `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` | "derived from `ControllerBase`" |
 | `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below) |
-| `.Except(selection)` | ", except {ref}" — canonicalized to sentence-final (§6) |
+| `.Except(selection, …)` / `.Except(typeof(X), …)` | ", except {ref}" — a parenthetical canonicalized to sentence-final and closed by the composer (§6). Several operands are the union `AnyOf` mints (§5.1): `.Except(a, b)` ≡ `.Except(arch.AnyOf(a, b))`, ", except types in `A.*` or `B.*`". The `typeof` form is the dependency verbs' sugar (§3.3): `.Except(typeof(X))` ≡ `.Except(arch.Type<X>())` |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 | `.Authored()` | head premodifier: "authored types", "authored interfaces" (§6) |
 
@@ -1248,9 +1258,10 @@ rather than crashes: an assembly that is not staged beside the spec DLL, and a t
 type or implemented interface lives in a Framework-only assembly (`System.Web.IHttpHandler`,
 say). Neither is reachable by `typeof()` however the spec project is built. The anchor for
 anything on that side of the line is a namespace pattern, `arch.Namespace("System.Data.*")`,
-which needs no assembly load. A name pattern is not a substitute: a `Selection` matches only
-types inside the checked codebase, so `arch.Types.WithNameMatching("SqlConnection")` goes inert
-against an external type (§8, the inert-rule warning). The string anchors (§5.2) are the same
+which needs no assembly load. A name pattern is not a substitute, and neither is an exact name:
+a `Selection` matches only types inside the checked codebase, so
+`arch.Types.WithNameMatching("SqlConnection")` and `arch.Types.Named("SqlConnection")` alike go
+inert against an external type (§8, the inert-rule warning). The string anchors (§5.2) are the same
 no-load form in attribute and hierarchy position: each names a type **definition** the spec
 project never loads — `[McpServerTool]` on a codebase's methods is matchable without the spec
 referencing the SDK that declares the attribute, and so is `IHandler<T>` on its types, which no
@@ -1358,7 +1369,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 | `.Named("Zphil.LoadBearing")` | the head itself: "project `Zphil.LoadBearing`" for one name, "projects `A` or `B`" for several |
 | `.Matching("Zphil.*")` | head becomes "projects matching `Zphil.*`" ("matching `A` or `B`" over several globs) |
 | `.Packable()` | head prefix: "packable" — premodifies the head ("packable projects", "packable project `A`"), the set named by the evaluated fact that admits membership (§4.10) |
-| `.Except(...)` | "except project `X`" ("except projects `A` or `B`") — composes as everywhere else |
+| `.Except(...)` | ", except project `X`" (", except projects `A` or `B`") — the same parenthetical as the type-side clause, closed by the composer (§6). Single-operand by design: `.Named(a, b)` already says "either of these", and the stratum has no `AnyOf` to desugar a list to (§10) |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6), over `IProjectInfo` (§5.6) |
 
 **Project modal verbs** (turn a `ProjectSelection` into a terminal `Constraint`):
@@ -1384,6 +1395,20 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 - **Canonicalization**: `Except` and `Where` clauses render sentence-final regardless of
   chain position. Safe because selection algebra commutes — (T∖X)∩S = (T∩S)∖X — and it
   prevents garden-path sentences ("types, except `Foo`, named `*Service`").
+- **The Except clause is a parenthetical, and the composer closes it.** Its fragment opens with
+  a comma (", except `Foo`") and never closes itself: one phrase serves subject and reference
+  position alike, so only the junction that follows knows whether text follows. Wherever running
+  text does, a comma closes the clause — before the verb (*"Types in the Host layer, except
+  `McpServerCommand`, must not use …"*), before a member subject's own clauses (*"Methods of
+  types in `MyApp.*`, except `SqlConnection`, returning `Task` must be named `*Async`."*),
+  before the final joiner of a list whose penultimate item ends open (*"must not reference types
+  in `MyApp.Legacy.*`, except `SqlConnection`, or `SqlCommand`"*), before a union's own clauses
+  when its last operand ends open, and before a verb phrase's tail (*"…, except
+  `TimeoutException`, without a `when` filter"*). A sentence-final period closes it by itself
+  (*"must not reference types in `Y`, except `Z`."*), and so does a bracketed tail (*"…, except
+  `SqlConnection` (external packages are not constrained by this rule)"*). A `Where` after an
+  `Except` closes nothing and is not open either — the description reads as attached to the
+  exception, a recorded residue (§11).
 - **Head premodification**: `.Authored()` prefixes the current head rather than replacing it or
   trailing the phrase — "authored types in `MyApp.*`", and "authored interfaces in `MyApp.*`" where
   `OfKind` has substituted the head. Chain position does not matter, and the prefix distributes
@@ -1515,7 +1540,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     (`typeof(Task)`) and an open-generic anchor (`typeof(Task<>)`) are both accepted. The
     checker carries a matching backstop (§4.6).
 15. Blank/whitespace glob, name or affix — a namespace pattern, a type- or member-name pattern,
-    a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
+    an exact type name (`Named`, reported as `Blank type name on '{id}'.` — blank is the whole
+    check, a name having no structure to validate), a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
     glob throws at check time; both are almost always an authoring slip. Applies on the type and
     member sides alike, to layer globs (reported spec-wide, named by layer), and to the project
     name on the noun and the verb alike — `arch.Project("")` in any position and
@@ -1681,7 +1707,7 @@ agent fixing a spec sees every problem in one pass.
   membership.
 - **Projections**: bare plurals naming the member kind (`Members`, `Methods`, `Properties`,
   `Fields`, `Events`) — they read as "{plural} of {selection}" (§4.6, §5.7).
-- **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`) or prepositional
+- **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`, `Named`) or prepositional
   phrases (`InNamespace`, `WithSuffix`, `OfKind`). A bare past participle (`Authored`) names the
   set by the fact that admits membership, the adjective twin of the `Registered` noun, and reads
   attributively in front of the head (§6); the bare adjective `Packable` names the artifact set
@@ -1751,7 +1777,10 @@ agent fixing a spec sees every problem in one pass.
   and `MustReferenceNoPackages()` is the deliberate inversion of this bullet's rule: the empty
   list is the law it states, so the emptiness takes its own verb rather than an empty argument
   list, while `MustOnlyTarget` keeps `(first, more)` — an empty allow-list would be meaningless
-  there.
+  there. `Except` carries the pair on the type stratum (several exclusions are the union `AnyOf`
+  mints, and the `Type` sugar rides beside it exactly as on the dependency verbs, §3.3) and
+  stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
+  say "either of these" and no `AnyOf` exists to desugar a list to.
 - **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
   generic sugar — all reifying to one internal anchor, so form choice is invisible to the
@@ -1761,7 +1790,7 @@ agent fixing a spec sees every problem in one pass.
   anchor position ships the whole triple or it is not an anchor position.
   The rule governs positions that name a *type*: `MustHaveExactlyOneCounterpart`'s `named:`
   derives a name rather than naming one — `MustHaveSuffix`'s bare-string precedent — so no
-  triple is owed there.
+  triple is owed there, and `Named` selects by simple name on the same precedent.
   The generic twin is `TSelf`-generic where inference allows and
   **receiver-typed where it does not**: C# has no partial type inference, so a
   `TSelf`-generic member adjective twin would force both type arguments at every call site
@@ -1860,7 +1889,11 @@ a widening of the definition-level-exact one pinned here: that silence is what m
 string anchor's meaning independent of whether the spec author happened to spell type
 arguments. Also unbuilt: a string form for the *set*-valued anchor positions — the dependency
 verbs' `Type` sugar and `arch.Type(...)`, where a namespace pattern is already the no-load
-form (§5.6) and a string would only duplicate it.
+form (§5.6) and a string would only duplicate it. `arch.Type(string fullName)` is the one
+exception worth naming: the string arm of the Type noun's own triple (§10) would render the bare
+backticked name honestly (one definition, FQN in the model) and add namespace precision for a
+simple name that collides, which `Named` (§5.2) reaches every instance of. It costs FQN spelling
+at every site, and no exemption in the corpus collides today, so it waits on that collision.
 
 On correspondence (§5.3): the at-least-one twin `MustHaveCounterpart`, wanting a consumer whose
 law tolerates several
@@ -1885,7 +1918,8 @@ over project memberships — the layer *noun* anchored to a project does not); t
 adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the constraint-side verbs and the
 `ITypeInfo` flags exist (§5.3, §5.6); only the adjective position is missing; a
 `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
-twin.
+twin; canonicalizing `Except` last among the sentence-final adjectives, so a `Where` written after
+one stops reading as attached to the exception (§6).
 
 ## 12. Canonical sample spec
 

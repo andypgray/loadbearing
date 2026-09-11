@@ -1,3 +1,4 @@
+using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
@@ -8,7 +9,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The shape/naming/escape verbs (GRAMMAR §5.3) and the adjective + noun vocabulary that feeds
 ///     them (§5.1–§5.2): every adjective (InNamespace, OfKind, WithSuffix, WithPrefix,
-///     WithNameMatching, Except, Where) and the Project noun get at least one pass/fail pin here.
+///     WithNameMatching, Named, Except, Where) and the Project noun get at least one pass/fail pin here.
 /// </summary>
 public sealed class ShapeVerbTests
 {
@@ -24,6 +25,25 @@ public sealed class ShapeVerbTests
                                   }
                                   """;
 
+    // The exact-name universe: one simple name carried by two namespaces, a nested type, and a generic —
+    // the whole of what .Named's matching rule has to answer for.
+    private const string SimpleNames = """
+                                       namespace App.A
+                                       {
+                                           public class Widget {}
+                                           public class Order
+                                           {
+                                               public class Line {}
+                                           }
+                                           public class Repository<T> {}
+                                       }
+
+                                       namespace App.B
+                                       {
+                                           public class Widget {}
+                                       }
+                                       """;
+
     private const string Shape = """
                                  namespace App.Shape
                                  {
@@ -35,6 +55,8 @@ public sealed class ShapeVerbTests
                                      public class PublicThing {}
                                  }
                                  """;
+
+    private static readonly CodebaseModel SimpleNameModel = CompilationFactory.Extract(SimpleNames);
 
     [Fact]
     public void OfKind_And_MustHavePrefix_FlagInterfaceWithoutIPrefix()
@@ -120,6 +142,55 @@ public sealed class ShapeVerbTests
             .Single();
 
         result.ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
+    }
+
+    [Fact]
+    public void Except_SeveralPayloads_SubtractsEachOfThem()
+    {
+        // Several operands are one union payload, so every operand's types come out of the subject.
+        IReadOnlyList<string> remaining = Checker.Selects(
+            CompilationFactory.Extract(Naming),
+            arch => arch.Types.InNamespace("App.Naming.*")
+                .Except(arch.Types.Named("X"), arch.Types.Named("Bar")));
+
+        remaining.ShouldBe(
+            ["App.Naming.IFoo", "App.Naming.OrderController", "App.Naming.OrderHandler", "App.Naming.UserRepository"],
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Named_OneName_SelectsEveryTypeCarryingThatSimpleName()
+    {
+        // A simple name is not a location: it reaches every type carrying it, in every namespace.
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("Widget"))
+            .ShouldBe(["App.A.Widget", "App.B.Widget"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Named_SeveralNames_SelectsEachOfThem()
+    {
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("Order", "Widget"))
+            .ShouldBe(["App.A.Order", "App.A.Widget", "App.B.Widget"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Named_IsCaseSensitive_SelectsNothingForTheWrongCase()
+    {
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("widget"))
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Named_MatchesTheSimpleNameOnly()
+    {
+        // The simple name is the one a report prints without namespace, containing type or generic arity: a
+        // nested type answers to its leaf, its dotted spelling names nothing, and a generic drops the arity.
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("Line"))
+            .ShouldBe(["App.A.Order.Line"]);
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("Order.Line"))
+            .ShouldBeEmpty();
+        Checker.Selects(SimpleNameModel, arch => arch.Types.Named("Repository"))
+            .ShouldBe(["App.A.Repository<T>"]);
     }
 
     [Fact]

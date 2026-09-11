@@ -60,7 +60,7 @@ public sealed class ClassicProjectCheckTests
         // The green rule, so the run is a verdict rather than a blanket failure.
         result.Out.ShouldContain(
             "pass billing/no-direct-calculator — Types in `Classic.*`, except types whose name matches "
-            + "`BillingGateway` must not reference types whose name matches `BillingCalculator`.",
+            + "`BillingGateway`, must not reference types whose name matches `BillingCalculator`.",
             customMessage: context);
         result.Out.ShouldContain(
             "Checked 3 rules: 1 passed, 2 failed, 0 skipped (4 violations, 0 warnings).", customMessage: context);

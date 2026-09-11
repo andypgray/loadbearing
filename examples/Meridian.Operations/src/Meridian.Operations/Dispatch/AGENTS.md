@@ -5,7 +5,7 @@
 
 This directory holds the `Dispatch` layer. Its architecture rules:
 
-- `modules/dispatch/internals` — Types in the Dispatch layer, except types in `Meridian.Operations.Dispatch.Contracts.*` must be referenced only by the Dispatch layer. Every other module integrates with dispatch through its Contracts surface, so the board, the roster, and the haulage-leg types behind it stay swappable; a reference into them from outside turns a private implementation detail into a contract dispatch can no longer change without breaking a caller.
+- `modules/dispatch/internals` — Types in the Dispatch layer, except types in `Meridian.Operations.Dispatch.Contracts.*`, must be referenced only by the Dispatch layer. Every other module integrates with dispatch through its Contracts surface, so the board, the roster, and the haulage-leg types behind it stay swappable; a reference into them from outside turns a private implementation detail into a contract dispatch can no longer change without breaking a caller.
 - `modules/dispatch/outbound` — The Dispatch layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule). The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->

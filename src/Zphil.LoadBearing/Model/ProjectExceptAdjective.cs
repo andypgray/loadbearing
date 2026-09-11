@@ -7,6 +7,10 @@ namespace Zphil.LoadBearing.Model;
 ///     <c>.Except(projects)</c> → ", except {reference}", canonicalized to sentence-final (GRAMMAR §4.10,
 ///     §6). The payload is another project selection and renders in reference position via the renderer.
 /// </summary>
+/// <remarks>
+///     Opens a parenthetical the composer closes at the junction that follows — see
+///     <see cref="ExceptAdjective" />.
+/// </remarks>
 internal sealed class ProjectExceptAdjective(ProjectSelection payload) : ProjectAdjective
 {
     /// <summary>The excluded project selection.</summary>

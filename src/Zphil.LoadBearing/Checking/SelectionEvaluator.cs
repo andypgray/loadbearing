@@ -293,6 +293,11 @@ internal sealed class SelectionEvaluator
             case WithNameMatchingAdjective matching:
                 var namePattern = new TypeNamePattern(matching.Glob);
                 return current.Where(t => namePattern.Matches(t.Name));
+            case NamedAdjective named:
+                // The same simple-name universe the glob form matches: no generic arity backtick, and a
+                // nested type by its leaf — so a name reaches every type carrying it, in every namespace.
+                var names = new HashSet<string>(named.Names, StringComparer.Ordinal);
+                return current.Where(t => names.Contains(t.Name));
             case ImplementingAdjective implementing:
                 Func<TypeNode, bool> interfaceMatch = InterfaceMatcher(implementing.Anchor);
                 return current.Where(interfaceMatch);

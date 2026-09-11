@@ -59,7 +59,7 @@ They reify to the same kind of rule. Nothing downstream can tell you which came 
 `loadbearing render` writes those into the managed block in [AGENTS.md](AGENTS.md), citation and all. CI re-renders on every push and fails on any diff, so the context an agent reads is provably the spec the build enforces:
 
 ```markdown
-- `http/reuse-httpclient` — Types, except types in `Meridian.Interchange.Host.*` must not construct `HttpClient`. A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines
+- `http/reuse-httpclient` — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`. A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines
 - `di/hosted-services-scope-their-work` — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`. A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope — resolve per work item from an IServiceScopeFactory scope — https://learn.microsoft.com/dotnet/core/extensions/scoped-service
 ```
 
@@ -76,7 +76,7 @@ using var probe = new HttpClient();
 `dotnet build` is green: the compiler has no quarrel with `new HttpClient()`. `check` is not:
 
 ```text
-FAIL http/reuse-httpclient — Types, except types in `Meridian.Interchange.Host.*` must not construct `HttpClient`.
+FAIL http/reuse-httpclient — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`.
   because: A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines
   fix: Take a typed or named client from IHttpClientFactory; see how CarrierClient receives its HttpClient.
   src/Meridian.Interchange/Partners/CarrierClient.cs:15 — Meridian.Interchange.Partners.CarrierClient constructs System.Net.Http.HttpClient
@@ -156,7 +156,7 @@ catch (Exception)
 `dotnet build` is green: a blanket `catch (Exception)` is valid C#. `check` is not:
 
 ```text
-FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except types derived from `BackgroundService` must not catch `Exception`.
+FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except types derived from `BackgroundService`, must not catch `Exception`.
   because: Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle — https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types
   fix: Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.
   src/Meridian.Interchange/Processing/OutboxProcessor.cs:32 — Meridian.Interchange.Processing.OutboxProcessor catches System.Exception
@@ -257,7 +257,7 @@ Revert the contract to carry the entity, the coupling the guideline warns about:
 `dotnet build` is green: an entity on a contract is valid C#. `check` is not:
 
 ```text
-FAIL contracts/no-entity-exposure — Types in `Meridian.Interchange.*`, except types in `Meridian.Interchange.Outbox.*` must not expose `OutboxMessage`.
+FAIL contracts/no-entity-exposure — Types in `Meridian.Interchange.*`, except types in `Meridian.Interchange.Outbox.*`, must not expose `OutboxMessage`.
   because: Exposing a persisted entity on a public signature couples partner-facing code to the storage model, so a change to how a message is persisted reshapes the partner contract; hand partners a DTO made for the wire instead — https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads
   fix: Map the message to a PartnerEnvelope at the OutboxProcessor boundary and expose that; keep OutboxMessage inside the Outbox module.
   src/Meridian.Interchange/Partners/IPartnerClient.cs:15 — Meridian.Interchange.Partners.IPartnerClient exposes Meridian.Interchange.Outbox.OutboxMessage

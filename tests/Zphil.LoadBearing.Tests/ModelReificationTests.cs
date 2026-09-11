@@ -807,6 +807,64 @@ public class ModelReificationTests
         union.Adjectives.ShouldBeEmpty();
     }
 
+    // ---- Except over one or more operands (GRAMMAR §5.1, §5.2) ----
+
+    [Fact]
+    public void Except_OneOperand_IsThePayloadItself()
+    {
+        // One operand passes through unchanged rather than becoming a one-part union, so the single-operand
+        // spelling reifies to exactly the model it always did.
+        var arch = new Arch();
+        Selection exclusion = arch.Type(typeof(SqlConnection));
+        var except = arch.Types.Except(exclusion)
+            .Adjectives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ExceptAdjective>();
+
+        except.Payload.ShouldBeSameAs(exclusion);
+    }
+
+    [Fact]
+    public void Except_SeveralOperands_MintTheUnionAnyOfWould()
+    {
+        // Several operands are the union arch.AnyOf mints — the operands as parts, no adjectives of its own
+        // — so nothing downstream needs a second multi-payload shape to understand.
+        var arch = new Arch();
+        var except = arch.Types.Except(arch.Project("A"), arch.Project("B"))
+            .Adjectives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ExceptAdjective>();
+        var union = except.Payload.ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Count.ShouldBe(2);
+        union.Adjectives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Except_TypeSugar_WrapsEachTypeAsABareTypeNoun()
+    {
+        var arch = new Arch();
+        var except = arch.Types.Except(typeof(SqlConnection), typeof(SqlCommand))
+            .Adjectives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ExceptAdjective>();
+        var union = except.Payload.ShouldBeOfType<UnionSelection>();
+
+        union.Parts.Select(part => part.Noun.ShouldBeOfType<TypeNoun>()
+                .Type)
+            .ShouldBe([typeof(SqlConnection), typeof(SqlCommand)]);
+        union.Parts.ShouldAllBe(part => part.Adjectives.Count == 0);
+    }
+
+    [Fact]
+    public void Named_AppendsOneNamedAdjectiveCarryingTheNamesInOrder()
+    {
+        // Authoring order is the render order, so the model keeps the list as written.
+        var arch = new Arch();
+        var named = arch.Types.Named("A", "B", "C")
+            .Adjectives.ShouldHaveSingleItem()
+            .ShouldBeOfType<NamedAdjective>();
+
+        named.Names.ShouldBe(["A", "B", "C"]);
+    }
+
     /// <summary>
     ///     Asserts a verb's bare-<c>Type</c> sugar overload reifies to exactly what the <c>arch.Type(…)</c>
     ///     spelling does (GRAMMAR §3.3). The sugar wraps each bare type as a single-type selection, so both

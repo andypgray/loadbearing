@@ -58,7 +58,7 @@ public sealed class QuotingArchSpec : IArchitectureSpec
 
         arch.Rule("time/injected-clock")
             .Enforce(arch.Types.InNamespace("Meridian.Quoting.*")
-                         .Except(arch.Types.WithNameMatching("SystemClock"))
+                         .Except(arch.Types.Named("SystemClock"))
                          .MustNotUse(
                              () => DateTime.Now,
                              () => DateTime.UtcNow))

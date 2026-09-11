@@ -282,25 +282,22 @@ public sealed class SelfSpecTests
     ///     The sanctioned-broad-catcher pin: the discipline that holds an advisory channel empty by test,
     ///     applied to an exemption list. <c>exceptions/no-swallowed-broad-catches</c> carves seven type names
     ///     out of its own subject, and an exemption list is exactly the kind of thing that grows by one name at
-    ///     a time until it means nothing. Pinning it to the exact seven makes every addition a deliberate act:
-    ///     the list can only grow by moving this assertion in the same commit, where a reviewer sees the name
-    ///     and the reason together.
+    ///     a time until it means nothing. The names live in the rule's own <c>Except</c> operand, so the
+    ///     rendered law is the list; pinning that sentence to the exact seven makes every addition a
+    ///     deliberate act: the list can only grow by moving this assertion in the same commit, where a
+    ///     reviewer sees the name and the reason (the comment on the rule) together.
     /// </summary>
     [Fact]
     public void SanctionedBroadCatchers_AreExactlyTheSevenHoldAndContinueBoundaries()
     {
-        ShouldCarrySanctionedSet("SanctionedBroadCatchers")
+        SelfModel.Rule("exceptions/no-swallowed-broad-catches")
+            .Sentence
             .ShouldBe(
-                [
-                    "ArchChecker",
-                    "ArchRuleTests",
-                    "CommandEntryPoint",
-                    "IdleTimeoutWatchdog",
-                    "ParentProcessWatcher",
-                    "ServerShutdown",
-                    "VsWhereLocator"
-                ], customMessage: "a name added here leaves the broad-catch law; add it with its reason in the set's " +
-                                  "xmldoc, or rewrite the handler to filter or rethrow.");
+                "Types in the Core, Extraction, Host, Adapter or Pack layers, except types named `ArchChecker`, " +
+                "`ArchRuleTests`, `CommandEntryPoint`, `IdleTimeoutWatchdog`, `ParentProcessWatcher`, " +
+                "`ServerShutdown` or `VsWhereLocator`, must not swallow `Exception`.",
+                customMessage: "a name added here leaves the broad-catch law; add it with its reason in the comment " +
+                               "on the rule, or rewrite the handler to filter or rethrow.");
     }
 
     /// <summary>
@@ -331,7 +328,8 @@ public sealed class SelfSpecTests
 
     /// <summary>
     ///     The contents of one of the self-spec's private exemption sets, ordinally sorted — the reader the
-    ///     two pins above share, so the reflection and the guard beside it are written once.
+    ///     static-mutability pin above uses (the broad-catcher list moved into its rule's sentence), kept
+    ///     as the one place the reflection and the guard beside it are written.
     /// </summary>
     /// <remarks>
     ///     Asserting, hence the name: the set is <c>private static</c> and reached by reflection, so a

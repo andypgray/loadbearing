@@ -66,7 +66,7 @@ public class AgentContextRendererTests
             "House naming convention; agents grep by I-prefix.\n" +
             "- `naming/handlers` — Types implementing `IHandler<T>` must be named `*Handler`. " +
             "Handler discovery is convention-based (see HandlerRegistry).\n" +
-            "- `di/handlers-via-registry` — Types, except `HandlerRegistry` must not construct " +
+            "- `di/handlers-via-registry` — Types, except `HandlerRegistry`, must not construct " +
             "types implementing `IHandler<T>`. " +
             "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.\n" +
             "- `style/type-name-length` — Types in `MyApp.*` must keep type names at or under 40 characters. " +
@@ -80,7 +80,7 @@ public class AgentContextRendererTests
             "If you are already editing a grandfathered site and the migration is small, migrate it; " +
             "otherwise do not grow the debt.\n\n" +
             "### Quarantined scopes\n" +
-            "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` " +
+            "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, " +
             "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`. " +
             "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
             "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
@@ -148,7 +148,7 @@ public class AgentContextRendererTests
             "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
             "Nightly reconciliation depends on this. Do not normalize.\n\n" +
             "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
-            "`BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
+            "`BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
             "`BillingFacade`. Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
             "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
             "- Expand: `loadbearing explain legacy/billing/containment`.";

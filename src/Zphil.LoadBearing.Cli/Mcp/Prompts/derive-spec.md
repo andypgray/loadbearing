@@ -577,10 +577,13 @@ anchor those with the `typeof`/`nameof` form.)
 
 **Adjectives** (chain onto any selection) — `.InNamespace(glob)` · `.OfKind(TypeKind.Class |
 Interface | Struct | Enum | Delegate)` · `.WithSuffix(s)` / `.WithPrefix(s)` /
-`.WithNameMatching(glob)` · `.Implementing(type)` / `.Implementing<T>()` / `.Implementing("Fully.Qualified.Name")` ·
+`.WithNameMatching(glob)` / `.Named(name, …)` (the exact simple name, ordinal — the exemption
+form: `.Except(arch.Types.Named("SystemClock"))` renders ", except types named `SystemClock`,";
+a type the spec project can reference goes straight into `.Except(typeof(X), …)`) · `.Implementing(type)` / `.Implementing<T>()` / `.Implementing("Fully.Qualified.Name")` ·
 `.DerivedFrom(type)` / `.DerivedFrom<T>()` / `.DerivedFrom("Fully.Qualified.Name")` ·
 `.AttributedWith(attributeType)` / `.AttributedWith<T>()` / `.AttributedWith("Fully.Qualified.NameAttribute")` ·
-`.Except(selection)` · `.Where(pred, description:)` · `.Authored()` (drops source-generated
+`.Except(selection, …)` / `.Except(typeof(X), …)` (several exclusions are one `AnyOf` union) ·
+`.Where(pred, description:)` · `.Authored()` (drops source-generated
 types — `[GeneratedCode]` on the type or its container; a project noun otherwise names them).
 
 The **string overload** on every hierarchy and attribute anchor position — the three adjectives
@@ -713,7 +716,7 @@ the property a rule is about is very often set in a `Directory.Build.props` abov
 violation points at whichever declaration actually won, and a fact nothing evaluated is unknown and
 always passes. The flagship:
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
-*"Projects matching `MyApp.*`, except project `MyApp.Cli` must not be packable."*
+*"Projects matching `MyApp.*`, except project `MyApp.Cli`, must not be packable."*
 
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |

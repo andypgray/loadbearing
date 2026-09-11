@@ -80,7 +80,7 @@
       "id": "di/handlers-via-registry",
       "posture": "migrate",
       "status": "failed",
-      "sentence": "Types, except `HandlerRegistry` must not construct types implementing `IHandler<T>`.",
+      "sentence": "Types, except `HandlerRegistry`, must not construct types implementing `IHandler<T>`.",
       "because": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.",
       "fix": "Resolve the handler through HandlerRegistry instead of constructing it.",
       "baseline": {
@@ -133,7 +133,7 @@
       "id": "legacy/billing/containment",
       "posture": "quarantine",
       "status": "failed",
-      "sentence": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade` must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.",
+      "sentence": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.",
       "because": "Replacement scheduled; not worth stabilizing.",
       "fix": "use `IBillingFacade`",
       "baseline": {
@@ -333,7 +333,7 @@
       "id": "packaging/nothing-published",
       "posture": "enforce",
       "status": "failed",
-      "sentence": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing` must not be packable.",
+      "sentence": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing`, must not be packable.",
       "because": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed.",
       "fix": "Set `IsPackable` to false in the project file.",
       "violationCount": 2,

@@ -7,7 +7,7 @@ This directory holds the quarantined `demurrage/engine` scope. Here be dragons �
 
 Dragons: Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.
 
-- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator` must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.
+- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator`, must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.
 - Sanctioned surface: `IDemurrageCalculator`, `DemurrageCalculator`.
 - Expand: `loadbearing explain demurrage/engine/containment`.
 <!-- loadbearing:end -->
