@@ -19,5 +19,7 @@ internal sealed class ExceptAdjective(Selection payload) : SelectionAdjective
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.SubjectFinal;
 
+    internal override bool OpensParenthetical => true;
+
     internal override string Fragment => ", except " + SentenceRenderer.Reference(Payload);
 }

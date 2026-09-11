@@ -3,7 +3,7 @@
 
 ## Layer `Domain`
 
-This directory holds the `Domain` layer. Its architecture rules:
+This directory holds the `Domain` layer. Domain holds the quote and rate-card model. Its architecture rules:
 
 - `layering/domain-independent` — The Domain layer must not reference the Application layer, the Infrastructure layer or the Api layer. The Domain holds the quote and rate model the rest of the subsystem is built on; it stays free of the layers that depend on it so it can be reasoned about and tested on its own.
 - Expand any rule above with `loadbearing explain <rule-id>`.

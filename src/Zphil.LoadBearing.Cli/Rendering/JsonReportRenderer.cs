@@ -125,16 +125,14 @@ internal static class JsonReportRenderer
     // before the measure existed.
     private static BaselineJson? ToBaseline(RuleResult result)
     {
-        if (result.Rule.BaselinePath is not { } path) return null;
-
-        int shrunk = result.ShrunkBaselineEntries;
-        int uncounted = result.UncountedBaselineEntries;
-        return new BaselineJson(
-            path,
-            result.Grandfathered.Count,
-            result.StaleBaselineEntries,
-            shrunk > 0 ? shrunk : null,
-            uncounted > 0 ? uncounted : null);
+        return result.Rule.BaselinePath is { } path
+            ? new BaselineJson(
+                path,
+                result.Grandfathered.Count,
+                result.StaleBaselineEntries,
+                LoadBearingJson.OmitZero(result.ShrunkBaselineEntries),
+                LoadBearingJson.OmitZero(result.UncountedBaselineEntries))
+            : null;
     }
 
     // A memberUse violation carries Source (the using type, as Reference does) and the banned member's raw

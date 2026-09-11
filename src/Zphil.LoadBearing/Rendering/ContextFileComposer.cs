@@ -8,8 +8,8 @@ namespace Zphil.LoadBearing.Rendering;
 /// <summary>
 ///     Composes every agent-context file one render writes, from the model plus (optionally) the
 ///     codebase: the root block in the solution directory, each anchored layer's local-rules card, and
-///     each quarantined scope's card, grouped by target directory so a directory receiving several
-///     cards gets one merged managed block (layer cards before quarantine cards).
+///     each scope's card, grouped by target directory so a directory receiving several
+///     cards gets one merged managed block (layer cards before scope cards).
 /// </summary>
 /// <remarks>
 ///     This is the single composition path — <c>render</c> splices what it returns and the card-drift
@@ -22,7 +22,7 @@ public static class ContextFileComposer
     public const string FileName = "AGENTS.md";
 
     /// <summary>Composes the context files for <paramref name="model" />.</summary>
-    /// <param name="model">The reified spec whose layers, rules and quarantined scopes are rendered.</param>
+    /// <param name="model">The reified spec whose layers, rules and scopes are rendered.</param>
     /// <param name="codebase">
     ///     The extracted codebase the scoped cards are placed against, or null to compose the root block alone.
     /// </param>
@@ -51,29 +51,30 @@ public static class ContextFileComposer
     }
 
     /// <summary>
-    ///     Whether this model places anything scoped at all — a quarantined scope, or a layer carrying
-    ///     anchored rules.
+    ///     Whether this model places anything scoped at all — a scope of either posture, or a layer
+    ///     carrying anchored rules.
     /// </summary>
     /// <remarks>
     ///     The cost gate to consult before extracting: extraction is the expensive half, and with nothing
     ///     scoped to place there is nothing for it to place. Pure over the model, so it is answered before
-    ///     a codebase exists.
+    ///     a codebase exists. The scope test reads the payload rather than the posture, so a posture added
+    ///     to <see cref="Posture" /> later cannot silently lose its card here.
     /// </remarks>
     public static bool HasAnythingToPlace(ArchitectureModel model)
     {
         Guard.NotNull(model, nameof(model));
 
-        return model.Rules.Any(rule => rule.Posture == Posture.Quarantine)
+        return model.Rules.Any(rule => rule.Scope is not null)
                || LayerContextResolver.HasAnchoredLayers(model);
     }
 
     /// <summary>
     ///     Every scoped card this model places against <paramref name="codebase" />, rendered and paired
-    ///     with its directory: layer local-rules cards in declaration order ahead of quarantine cards in
+    ///     with its directory: layer local-rules cards in declaration order ahead of scope cards in
     ///     model order, and an unplaceable card carried as a null directory with its skip reason rather
     ///     than dropped.
     /// </summary>
-    /// <param name="model">The reified spec whose layers and quarantined scopes place the cards.</param>
+    /// <param name="model">The reified spec whose layers and scopes place the cards.</param>
     /// <param name="codebase">The extracted codebase the placements are resolved against.</param>
     /// <remarks>
     ///     This is the composition decision itself, so <see cref="Compose" /> and any other consumer of
@@ -94,19 +95,23 @@ public static class ContextFileComposer
         foreach (LayerPlacement placement in LayerContextResolver.Resolve(model, evaluator))
             cards.Add(new ContextCard(
                 placement.DirectoryPath,
-                AgentContextRenderer.LayerCard(placement.LayerName, placement.Rules),
+                AgentContextRenderer.LayerCard(placement.LayerName, placement.Purpose, placement.Rules),
                 placement.SkipReason));
 
+        // Which card a scope gets is the posture's decision and only the posture's: the resolver already
+        // picked the one card-bearing rule per scope, so this dispatch never has to ask which child it holds.
         foreach (ScopePlacement placement in ScopedContextResolver.Resolve(model, evaluator))
             cards.Add(new ContextCard(
                 placement.DirectoryPath,
-                AgentContextRenderer.ScopeCard(placement.ContainmentRule),
+                placement.Rule.Posture == Posture.Caution
+                    ? AgentContextRenderer.CautionCard(placement.Rule)
+                    : AgentContextRenderer.ScopeCard(placement.Rule),
                 placement.SkipReason));
 
         return cards;
     }
 
-    // Layer cards (declaration order) ahead of quarantine cards (model order), so a directory hosting
+    // Layer cards (declaration order) ahead of scope cards (model order), so a directory hosting
     // both receives its layer unit first and Group merges them in that order.
     private static void AddScopedUnits(
         ArchitectureModel model, CodebaseModel codebase, List<ContentUnit> units, List<string> warnings)

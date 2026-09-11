@@ -7,10 +7,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
 ///     The single <see cref="JsonSerializerOptions" /> every CLI JSON renderer (check, status, graph,
-///     sarif) shares: camelCase property names, camelCase enum values, indented, null-omitting, and the
-///     relaxed encoder so backticks and em-dashes in rule sentences ride literally — this is CLI output
+///     sarif, hook) shares: camelCase property names, camelCase enum values, indented, null-omitting, and
+///     the relaxed encoder so backticks and em-dashes in rule sentences ride literally — this is CLI output
 ///     for hooks, not HTML, so they are emitted verbatim rather than as <c>\u</c> escapes. One instance so
-///     the four documents cannot drift in escaping or casing; the JSON goldens prove the resulting
+///     the five documents cannot drift in escaping or casing; the JSON goldens prove the resulting
 ///     byte-identity.
 /// </summary>
 internal static class LoadBearingJson
@@ -45,13 +45,24 @@ internal static class LoadBearingJson
     ///     after <see cref="Options" /> because static initializers run in declaration order.
     /// </summary>
     public static readonly LoadBearingJsonContext Context = new(Options);
+
+    /// <summary>
+    ///     A count for an additive wire slot: itself when there is something to report, and null — omitted,
+    ///     under <see cref="Options" />' null handling — at zero. Zero and absent say the same thing, and a
+    ///     key that appears only when it means something keeps a clean document clean.
+    /// </summary>
+    public static int? OmitZero(int count)
+    {
+        return count > 0 ? count : null;
+    }
 }
 
-// Source-generated metadata for the four document roots. The generator emits an ordinary property read per
+// Source-generated metadata for the five document roots. The generator emits an ordinary property read per
 // member, which is what lets the DTOs stay free of implicit-use annotations: nothing about them is
 // reflection-only any more. Serialization stays byte-identical — the goldens are the proof.
 [JsonSerializable(typeof(CheckJson))]
 [JsonSerializable(typeof(StatusJson))]
 [JsonSerializable(typeof(GraphJson))]
 [JsonSerializable(typeof(SarifLog))]
+[JsonSerializable(typeof(HookJson))]
 internal sealed partial class LoadBearingJsonContext : JsonSerializerContext;

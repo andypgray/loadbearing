@@ -4,8 +4,10 @@ using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.Extraction;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
@@ -20,7 +22,9 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     justification is the baseline entry's <c>because</c> when present, else the generic
 ///     <c>grandfathered in {path}</c> fallback — the latter exercising the checker's baseline-attribution
 ///     recovery; and a grown pair emits <c>error</c> / <c>baselineState: updated</c> with no suppression at
-///     all. The full-report byte shape is pinned separately by the <c>violated-check.sarif</c> golden.
+///     all. A check warning is the one result that is not a violation: <c>warning</c> level at the file it
+///     names, on a rule whose descriptor declares that level too. The full-report byte shape is pinned
+///     separately by the <c>violated-check.sarif</c> golden.
 /// </summary>
 public sealed class SarifReportRendererTests
 {
@@ -29,6 +33,16 @@ public sealed class SarifReportRendererTests
                                          namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
                                          namespace App.Data { public class Db {} }
                                          """;
+
+    // Alpha sits inside the quarantined scope and User outside it, referencing nothing — so the containment
+    // twin stays green and the only finding in the log is the tripwire's.
+    private static readonly CodebaseModel QuarantinedCodebase = CompilationFactory.Extract(
+        "App",
+        ("App.Legacy/Alpha.cs", "namespace App.Legacy { public class Alpha {} }"),
+        ("App.Client/User.cs", "namespace App.Client { public class User {} }"));
+
+    // The diff that arms the tripwire: one changed file, inside the scope.
+    private static readonly DiffContext TouchedAlpha = new("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
 
     // The same forbidden edge reached from two distinct lines: two sites under one identity, which is the
     // shape a recorded site count is compared against.
@@ -284,6 +298,147 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
+    public void Serialize_TripwireDescriptor_DeclaresWarningLevelWhileItsContainmentTwinStaysError()
+    {
+        // A tripwire warns and can never fail, so its descriptor has to say `warning`: at `error` it advertises
+        // to a scanning service an alert it has no way to raise, and any touch it does report would be filed at
+        // the severity of a broken law. Its containment twin, desugared from the same scope statement, is a red
+        // law and stays where it was — which is why the level is read off the rule's own payload rather than
+        // off the posture the two share.
+        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, QuarantinedScope);
+
+        string json = report.ToSarif();
+
+        json.SarifRules()
+            .ToDictionary(
+                rule => rule.GetProperty("id")
+                    .GetString()!,
+                rule => rule.GetProperty("defaultConfiguration")
+                    .GetProperty("level")
+                    .GetString())
+            .ShouldBe(new Dictionary<string, string?>
+            {
+                ["legacy/quarantined/containment"] = "error",
+                ["legacy/quarantined/tripwire"] = "warning"
+            });
+    }
+
+    [Fact]
+    public void Serialize_TripwireWarning_EmitsAWarningResultAtTheChangedFileWithNoRegion()
+    {
+        // The finding a tripwire produces is a warning, and before this it produced no SARIF result at all: the
+        // walk covered violations and grandfathered entries only, so the one rule in the vocabulary that
+        // reports by warning reported nothing at all through this channel. The location is the changed file and
+        // nothing narrower — the finding is that the file was touched, and a start line would anchor the alert
+        // wherever the renderer chose rather than where anything happened.
+        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, QuarantinedScope);
+
+        string json = report.ToSarif();
+
+        JsonElement result = json.SarifResults()
+            .ShouldHaveSingleItem();
+        result.GetProperty("ruleId")
+            .GetString()
+            .ShouldBe("legacy/quarantined/tripwire");
+        result.GetProperty("level")
+            .GetString()
+            .ShouldBe("warning");
+        result.GetProperty("message")
+            .GetProperty("text")
+            .GetString()
+            .ShouldNotBeNull()
+            .ShouldContain("App.Legacy/Alpha.cs");
+        JsonElement location = result.GetProperty("locations")
+            .EnumerateArray()
+            .ToList()
+            .ShouldHaveSingleItem()
+            .GetProperty("physicalLocation");
+        location.GetProperty("artifactLocation")
+            .GetProperty("uri")
+            .GetString()
+            .ShouldBe("App.Legacy/Alpha.cs");
+        location.TryGetProperty("region", out _)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Serialize_CautionDescriptor_DeclaresWarningLevelAndCarriesItsOwnPosture()
+    {
+        // Neither half of this took renderer code: the level is keyed on the tripwire role rather than the
+        // posture, and the posture rides the model's own enum through the shared lower-casing. What the pin
+        // is for is that both were already right on the day the posture landed, and stay right.
+        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, CautionedScope);
+
+        JsonElement rule = report.ToSarif()
+            .SarifRules()
+            .ShouldHaveSingleItem();
+
+        rule.GetProperty("id")
+            .GetString()
+            .ShouldBe("legacy/cautioned/tripwire");
+        rule.GetProperty("defaultConfiguration")
+            .GetProperty("level")
+            .GetString()
+            .ShouldBe("warning");
+        rule.GetProperty("properties")
+            .GetProperty("posture")
+            .GetString()
+            .ShouldBe("caution");
+    }
+
+    [Fact]
+    public void Serialize_CautionWarning_EmitsAWarningResultAtTheChangedFile()
+    {
+        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, CautionedScope);
+
+        JsonElement result = report.ToSarif()
+            .SarifResults()
+            .ShouldHaveSingleItem();
+
+        result.GetProperty("ruleId")
+            .GetString()
+            .ShouldBe("legacy/cautioned/tripwire");
+        result.GetProperty("level")
+            .GetString()
+            .ShouldBe("warning");
+        result.GetProperty("locations")
+            .EnumerateArray()
+            .ToList()
+            .ShouldHaveSingleItem()
+            .GetProperty("physicalLocation")
+            .GetProperty("artifactLocation")
+            .GetProperty("uri")
+            .GetString()
+            .ShouldBe("App.Legacy/Alpha.cs");
+    }
+
+    [Fact]
+    public void Serialize_InertTargetWarning_EmitsAWarningResultWithNoLocation()
+    {
+        // The other warning kind, and the one that proves the location is read off the warning rather than
+        // assumed: an inert target is a fact about the rule's own operand — a pattern that matched no type —
+        // so there is no file to point at and the result carries an empty locations array rather than a
+        // fabricated one.
+        CheckReport report = Checker.Run(
+            "namespace App { public class Page {} }",
+            arch => arch.Rule("layer/no-ghosts")
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotReference(arch.Namespace("Ghost.*")))
+                .Because("Nothing may reach the ghost layer."));
+
+        string json = report.ToSarif();
+
+        JsonElement result = json.SarifResults()
+            .ShouldHaveSingleItem();
+        result.GetProperty("level")
+            .GetString()
+            .ShouldBe("warning");
+        result.GetProperty("locations")
+            .EnumerateArray()
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Serialize_GrandfatheredWithoutAttribution_SuppressesWithGenericBaselinePathJustification()
     {
         // A grandfathered Migrate violation whose baseline entry has no `because`: the suppression falls back to
@@ -353,8 +508,28 @@ public sealed class SarifReportRendererTests
             .Because("Repository pattern for testability.");
     }
 
-    // A metadata-only ArchRule (no constraint/migrate/quarantine payload) for hand-built reports — the renderer's
-    // rule catalog reads only Id, Sentence, Because, Fix, and Posture.
+    // The scope QuarantinedCodebase is checked against: one statement desugaring into the containment law and
+    // the tripwire, which is what makes the two halves comparable in one log.
+    private static void QuarantinedScope(Arch arch)
+    {
+        arch.Scope("legacy/quarantined")
+            .Quarantine(arch.Namespace("App.Legacy.*"))
+            .Dragons("Alpha is load-bearing.")
+            .Because("Replacement scheduled; not worth stabilizing.");
+    }
+
+    // The same region under the posture with no containment law: one statement, one rule, and no red half
+    // for the log to carry.
+    private static void CautionedScope(Arch arch)
+    {
+        arch.Scope("legacy/cautioned")
+            .Caution(arch.Namespace("App.Legacy.*"))
+            .Dragons("Alpha is load-bearing.")
+            .Because("Every caller depends on the exact behaviour.");
+    }
+
+    // A metadata-only ArchRule (no constraint/migrate/scope payload) for hand-built reports — the renderer's
+    // rule catalog reads only Id, Sentence, Because, Fix, Posture, and whether it is a tripwire.
     private static ArchRule Rule(string id, Posture posture)
     {
         return new ArchRule(id, posture, "because", null, "sentence", null, null, null);

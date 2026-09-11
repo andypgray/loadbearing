@@ -49,10 +49,16 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
         return place;
     }
 
-    /// <summary>Registers a sanctioned-surface type as a child of its scope's place.</summary>
-    internal LawPlace Facade(Type type, LawPlace scope)
+    /// <summary>
+    ///     Registers one sanctioned-surface operand as a child of its scope's place, or returns null when
+    ///     the operand is not place-shaped. A region named in facade position keeps its own place and gains
+    ///     the facade standing, so a namespace two rules name is still one node.
+    /// </summary>
+    internal LawPlace? Facade(Selection? selection, LawPlace scope)
     {
-        LawPlace place = Register(LawPlaceClassifier.FromFacade(type))!;
+        LawPlace? place = Register(LawPlaceClassifier.FacadePlace(selection, layers));
+        if (place is null) return null;
+
         place.IsFacade = true;
         place.Parent ??= scope;
         return place;

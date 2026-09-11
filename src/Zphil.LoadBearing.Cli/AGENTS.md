@@ -3,7 +3,7 @@
 
 ## Layer `Host`
 
-This directory holds the `Host` layer. Its architecture rules:
+This directory holds the `Host` layer. Host is the `loadbearing` command: the CLI verbs, the MCP server, and the spec loading and pipeline behind both. Its architecture rules:
 
 - `cli/no-stdout` — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
 - `di/no-service-locator` — Types in the Host layer, except types named `McpServerCommand` or `GlobalCallToolFilter`, must not use `IServiceProvider.GetService()`, `ServiceProviderServiceExtensions.GetService()` or `ServiceProviderServiceExtensions.GetRequiredService()`. Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines

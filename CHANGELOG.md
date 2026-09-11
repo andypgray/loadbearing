@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A scope posture without containment: `.Caution(selection)`.**
+  `arch.Scope("domain/retry-budget").Caution(arch.Types.Named("RetryPolicy")).Dragons("…").Because("…")`
+  puts a dragons card on code that new callers are welcome to reach. Until now a card existed only
+  where a containment law did: `IScopeBuilder` had one verb, so "read this before you touch it" could
+  not be said truthfully about code that is legitimately referenced from everywhere — a hermetic
+  `Quarantine` with a `Baseline` grandfathered every caller as debt and failed the next one, and a
+  boundary of `arch.Types` rendered a law true by being empty. A caution desugars to `{id}/tripwire`
+  alone, under a fourth posture, `Caution`, the first with no red state: with `check --diff-base <ref>`
+  a change set touching the scope draws a warning in the caution's own voice ("read the dragons before
+  editing: loadbearing explain {id}/tripwire"), the human report prints `dragons:` beneath a fired
+  tripwire of either posture, and no reference into the scope is ever a violation. `render` and
+  `arch_context` place the card on the scope's directory, after a layer card where one exists;
+  `explain` opens `{id}/tripwire (caution/tripwire)`; `status` prints the diff-aware skip line and no
+  ratchet; `check --json` carries the warning as `cautionedScopeTouched`; SARIF declares the tripwire
+  at warning level with `posture: caution`; the drawing lists it under "Not drawn in full" tagged
+  `(Caution)`. The root block does not change: a caution is not a rule over real code and adds no
+  line to the board. `ICautionedScope` offers `Dragons`, `DragonsDoc` and `Because` and nothing else;
+  the spec-build checks widen by wording, so a scope with no posture or with both names both verbs,
+  and a caution missing both `Dragons` and `DragonsDoc` fails the build as a quarantine does. On the
+  xUnit adapter, which has no diff context, a caution's tripwire is a permanent skip. This
+  repository's own spec cautions its `Model` namespace, where the fragments every renderer assembles
+  are declared, and the card merges into the directory's layer card.
+
+- **A layer can say what it is for: `.Purpose(prose)` on the layer definition.**
+  `arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.")`
+  renders the module-map row as "**Domain** — `MyApp.Domain.*`. Domain holds the order and
+  customer model." and, where a rule anchors on the layer, opens its directory card with "This
+  directory holds the `Domain` layer. Domain holds the order and customer model. Its
+  architecture rules:". Until now the row was a name and its globs, the card went from the
+  directory straight to the rules, and the sentence saying what a layer is for had nowhere to
+  go but the opening clause of a rule's `Because`, where it stayed true after the rule was
+  deleted, or a hand-written README paragraph beside a block that could not carry it. This
+  repository's own eight layers and the three layered examples now carry one each. The purpose
+  is authored prose on the same terms as `Because`: one line, validated at spec build (blank,
+  multi-line, or a second call fails the build, spec-wide and named by layer), rendered
+  verbatim, and checked by nothing. A layer without one renders exactly what it rendered
+  before, and a purpose alone places no card: a card is local law and still needs an anchored
+  rule. `LayerDefinition` gains a `Purpose` property, and `AgentContextRenderer.LayerCard`
+  takes the purpose as a second parameter.
+
+- **A quarantine's sanctioned surface can be named without loading it.**
+  `BoundaryOnlyVia` now takes selections beside types, so
+  `.BoundaryOnlyVia(arch.Types.Named("CodeFormatHelper"))` states a boundary the spec assembly
+  cannot compile against — an `internal` facade, or one in a project the spec does not reference
+  — and a namespace or layer states one that is a whole region. It was the last set-valued
+  position with no no-load spelling, and the cost of that showed up as law that says the wrong
+  thing: a `typeof` anchor the spec host could not load left an adopter grandfathering their
+  sanctioned entry point as debt, so the rendered rule called the sanctioned surface debt to burn
+  down while the dragons prose beside it said the opposite. Because the formula is indifferent to
+  whether the surface lies inside the scope or outside it, the same spelling states a sanctioned
+  *consumer*. `BoundaryOnlyVia(typeof(IFacade))` is unchanged and now reads as the sugar it
+  always was — identical model, identical sentence, identical `explain` — and the scope card and
+  `explain` render one pre-computed surface, so the two can no longer word it differently. The
+  drawing is the one place that narrows: a region facade is a doubled box inside the scope's box
+  as a type is, while a name is not a place, so its containment rule joins the compact list under
+  the fence instead of drawing a box.
+
 - **The exemption idiom has a noun: `arch.Types.Named(name, …)`.**
   `host.Except(arch.Types.Named("McpServerCommand"))` renders "Types in the Host layer, except
   types named `McpServerCommand`, must not use …": the exact, ordinal simple name, or-joined for
@@ -26,8 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Except` takes a list, and `typeof`.** `.Except(a, b)` is `.Except(arch.AnyOf(a, b))` (one
   union, rendered ", except types in `A.*` or `B.*`"), and `.Except(typeof(Constraint))` is
   `.Except(arch.Type<Constraint>())` with the `typeof` written for you: the `(first, params more)`
-  pair and the `Type` sugar every dependency verb already carries, now on the one set position
-  that lacked them. One operand is the payload it always was, byte for byte.
+  pair and the `Type` sugar every dependency verb already carries, now on the one adjective
+  position that lacked them. One operand is the payload it always was, byte for byte.
 
 - **A leaf of the reference graph has a verb of its own: `MustOnlyReferenceItself()`.**
   `tracking.MustOnlyReferenceItself()` renders "The Tracking layer must reference only itself
@@ -69,7 +126,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `layering/services-behind-contracts` blesses `OrderService` and reds `InvoiceService` at its
   own `file:line`.
 
+- **`check --hook-json`: a tripwire warning reaches the agent.** A Quarantine tripwire is the one
+  rule that reports by warning, and a warning never moves the exit code — so for as long as the
+  hook recipe simply exited 0 on a clean check, every tripwire warning it was handed was
+  discarded. `--hook-json` renders the run for a Claude Code `PostToolUse` hook instead: a clean
+  check that warned writes its report as
+  `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`, which is the
+  one exit-0 output the client turns into a transcript system message; a clean check with nothing
+  to say writes nothing at all; a red rule prints the report it always printed, byte for byte, so
+  the wrapper still has something to block with. The escaping lives here rather than in the
+  wrappers because a multi-line report inside a JSON string is the whole job and POSIX `sh` has no
+  JSON. All four committed wrappers (`hooks/`, `examples/Meridian/hooks/`) pass the flag and
+  pass stdout through; the exit-code contract — 0 proceed, 1 → 2 block, anything else → 1 — is
+  unchanged. `--json` and `--hook-json` both own stdout, so passing both is refused. The Meridian
+  storyboard gains a fifth beat walking the loop with the tripwire armed: an agent fixing a real
+  bug inside the quarantined clearance engine, the warning it draws, and the dragons it is sent to
+  read.
+
 ### Changed
+
+- **Breaking: the scope payload is named for what it now is.** `QuarantineData` is `ScopeData`,
+  `QuarantineRole` is `ScopeRole`, `ArchRule.Quarantine` is `ArchRule.Scope`, and
+  `ScopePlacement.ContainmentRule` is `ScopePlacement.Rule`. With a second scope posture,
+  `rule.Quarantine is { Role: Tripwire }` was the wrong word at every reader of the payload, and the
+  property is public on the hosting surface. No alias or shim. Machine-readable `posture` values gain
+  `"caution"` (check and status JSON, SARIF rule properties) and check JSON's warning `kind` gains
+  `cautionedScopeTouched`; both are additive, so no schema version moves. The quarantine message,
+  skip reason, rule ids and clause names are unchanged.
+
+- **A check warning is a SARIF result, and a tripwire declares itself a warning.** The SARIF
+  renderer walked violations and grandfathered entries only, and gave every rule
+  `defaultConfiguration.level = "error"` — so a tripwire uploaded to code scanning as an
+  error-level rule that could never report, and the touches it did find reached the service
+  through no channel at all. A warning now renders as a `warning`-level result on its rule, at the
+  file it names (whole-file: the finding is that the file changed, so there is no region) or with
+  no location where it names none, and a tripwire's descriptor declares `warning` beside it.
+  Violations and grandfathered results are untouched.
+
+- **The hook and CI recipes say to arm the tripwire.** `hooks/README.md` gains a CI section and the
+  derive recipe a sentence: pass `--diff-base <the pull request's base ref>` in CI, or every
+  quarantined scope's tripwire is skipped rather than clean and the scope fenced because it is
+  dangerous to edit is the one thing the pipeline never mentions.
 
 - **The Except clause closes.** "Types in the Host layer, except types named `SpecLoadContext`,
   must not use `AssemblyLoadContext.LoadFromAssemblyPath()`" — the comma after the exception is

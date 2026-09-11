@@ -19,12 +19,5 @@ internal sealed class NamedAdjective(IReadOnlyList<string> names) : SelectionAdj
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
-    internal override string Fragment
-    {
-        get
-        {
-            List<string> backticked = Names.Select(ProseFormat.Backtick).ToList();
-            return " named " + ProseFormat.JoinReferences(backticked);
-        }
-    }
+    internal override string Fragment => " named " + ProseFormat.BacktickedList(Names);
 }

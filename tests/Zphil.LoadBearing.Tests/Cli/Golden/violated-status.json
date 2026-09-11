@@ -278,13 +278,20 @@
       "status": "failed",
       "violations": 2,
       "warnings": 0
+    },
+    {
+      "id": "domain/retry-budget/tripwire",
+      "posture": "caution",
+      "status": "skipped",
+      "violations": 0,
+      "warnings": 0
     }
   ],
   "summary": {
-    "rulesChecked": 28,
+    "rulesChecked": 29,
     "rulesPassed": 2,
     "rulesFailed": 25,
-    "rulesSkipped": 1,
+    "rulesSkipped": 2,
     "grandfatheredRemaining": 2,
     "grandfatheredSites": 3,
     "fixedAwaitingAcceptance": 0

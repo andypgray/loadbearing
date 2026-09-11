@@ -33,10 +33,10 @@ public sealed class AdapterTests
     [Fact]
     public void RuleRows_UsesRuleIdsAsDisplayNames()
     {
-        // The dogfood spec exercises all three postures, so discovery must surface each post-desugar rule
+        // The dogfood spec exercises all four postures, so discovery must surface each post-desugar rule
         // ID as its own display name — including the Quarantine scope's containment + tripwire children,
-        // and the two rules the spec takes from the DotNetGuidance pack (a pack-declared rule is an
-        // ordinary rule by the time the adapter sees it).
+        // the Caution scope's tripwire alone, and the two rules the spec takes from the DotNetGuidance
+        // pack (a pack-declared rule is an ordinary rule by the time the adapter sees it).
         IReadOnlyList<ITheoryDataRow> rows = ArchRuleTests<LoadBearingArchSpec>.RuleRows()
             .ToList();
 
@@ -77,7 +77,8 @@ public sealed class AdapterTests
                 "packaging/only-the-four-ship",
                 "mcp/env-through-seam",
                 "roslyn/msbuild-bootstrap/containment",
-                "roslyn/msbuild-bootstrap/tripwire"
+                "roslyn/msbuild-bootstrap/tripwire",
+                "model/prose-fragments/tripwire"
             ], true);
     }
 
@@ -116,6 +117,19 @@ public sealed class AdapterTests
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
         skip.Message.ShouldEndWith(ArchChecker.TripwireSkipReason);
+    }
+
+    [Fact]
+    public async Task CautionTripwire_WithoutDiff_Skips()
+    {
+        // A caution's only rule is its tripwire, and a test run has no diff to hand it, so the case is a
+        // permanent skip here: present in the explorer, naming the scope, never firing. That is the
+        // adapter's nature and not a defect — the verdict a caution wants is `check --diff-base`'s, which
+        // is a pull-request concern.
+        Exception? exception = await CaughtAsync(() => new InlineCautionedArchTests().Rule_Holds("domain/retry-budget/tripwire"));
+
+        var skip = exception.ShouldBeOfType<SkipException>();
+        skip.Message.ShouldEndWith(ArchChecker.CautionTripwireSkipReason);
     }
 
     [Fact]
@@ -316,6 +330,25 @@ public sealed class AdapterTests
     }
 
     private sealed class InlineQuarantinedArchTests : ArchRuleTests<MyAppQuarantinedInlineSpec>
+    {
+        protected override string SolutionPath => CliRunner.MyAppSolution;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    // A cautioned scope over MyApp.Domain — its one and only child is the tripwire, so on this adapter the
+    // whole scope is a skip.
+    private sealed class MyAppCautionedInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Scope("domain/retry-budget")
+                .Caution(arch.Namespace("MyApp.Domain.*"))
+                .Dragons("The back-off table is tuned against production, not first principles. Keep the timings.")
+                .Because("Every caller depends on the exact timings.");
+        }
+    }
+
+    private sealed class InlineCautionedArchTests : ArchRuleTests<MyAppCautionedInlineSpec>
     {
         protected override string SolutionPath => CliRunner.MyAppSolution;
         protected override string? ExcludeProjectName => null;

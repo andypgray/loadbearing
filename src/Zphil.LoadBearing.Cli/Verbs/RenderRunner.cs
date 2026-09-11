@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 
 /// <summary>
 ///     The <c>render</c> pipeline: load the model → extract the codebase, but only when the model has
-///     quarantined scopes or layers carrying anchored rules → hand both to
+///     scopes or layers carrying anchored rules → hand both to
 ///     <see cref="ContextFileComposer" />, which composes every target file's managed block (the root
 ///     block in the solution directory, each layer's local-rules card and each scope's card in its own
 ///     directory, merged where they coincide). The composer is shared with the card-drift gate, so this
@@ -78,9 +78,9 @@ internal sealed class RenderRunner(
         string specName = Path.GetFileNameWithoutExtension(source.Resolution.DllPath);
         string solutionDirectory = source.SolutionDirectory;
 
-        // Extraction only earns its cost when there is something scoped to place — a quarantined scope, or a
-        // layer carrying anchored rules; with nothing scoped the composer gets no codebase and returns the
-        // root block alone.
+        // Extraction only earns its cost when there is something scoped to place — a scope of either
+        // posture, or a layer carrying anchored rules; with nothing scoped the composer gets no codebase
+        // and returns the root block alone.
         CodebaseModel? codebase = ContextFileComposer.HasAnythingToPlace(source.Model)
             ? await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct)
             : null;

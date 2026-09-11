@@ -18,8 +18,11 @@ public sealed class MeridianArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        Layer domain = arch.Layer("Domain", "Meridian.Domain.*");
-        Layer web = arch.Layer("Web", "Meridian.Web.*");
+        Layer domain = arch.Layer("Domain", "Meridian.Domain.*")
+            .Purpose("Domain holds the booking and rate model and the ports the web tier depends on.");
+        Layer web = arch.Layer("Web", "Meridian.Web.*")
+            .Purpose("Web is the HTTP surface of the monolith: the controllers, their request and response models, " +
+                     "and the data access behind them.");
 
         arch.Rule("layering/domain-independent")
             .Enforce(domain.MustNotReference(web))

@@ -66,11 +66,11 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
 
     private const string ContextDescription =
         "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
-        "or a layer's local rules — or a pointer line when none apply. If projects fail to load or to restore, the " +
-        "answer opens with a caveat naming them: cards from unloaded projects cannot be placed, and a rule about " +
-        "a package the restore never fetched was never measured, so treat a no-coverage answer as unproven " +
-        "there. A .slnf solution filter gets the same caveat for the declared projects it left " +
-        "unchecked: treat a no-coverage answer as unproven under them as well.";
+        "a cautioned scope's dragons, or a layer's local rules — or a pointer line when none apply. If projects " +
+        "fail to load or to restore, the answer opens with a caveat naming them: cards from unloaded projects " +
+        "cannot be placed, and a rule about a package the restore never fetched was never measured, so treat a " +
+        "no-coverage answer as unproven there. A .slnf solution filter gets the same caveat for the declared " +
+        "projects it left unchecked: treat a no-coverage answer as unproven under them as well.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
@@ -116,7 +116,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         OpenWorld = false)]
     [Description(CheckDescription)]
     public async Task<string> CheckAsync(
-        [Description("Git ref; files changed since it that fall in a quarantined scope raise a tripwire warning.")]
+        [Description(
+            "Git ref; files changed since it that fall in a quarantined or cautioned scope raise a tripwire warning.")]
         string? diffBase = null,
         [Description(
             "Rule-ID globs as one string, not an array, semicolon-separated ('*' spans '/'). Only matching "

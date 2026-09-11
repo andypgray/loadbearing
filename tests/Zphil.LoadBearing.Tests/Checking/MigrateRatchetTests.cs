@@ -63,6 +63,9 @@ public sealed class MigrateRatchetTests
     // A stand-in for the reason a filtered run composes; its wording is pinned where it is minted.
     private const string NarrowingSkipReason = "'BillingOnly.slnf' narrowed this run: 2 projects were not checked.";
 
+    // The one forbidden edge every controller fixture carries, as the baseline keys it.
+    private static readonly BaselineEntry OldControllerToDb = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db");
+
     // The same source's rule: Web controllers must not reference the data layer.
     private static void NoDataAccess(Arch arch)
     {
@@ -76,7 +79,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateViolationInBaseline_PassesWithGrandfathered()
     {
-        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess)
             .Single();
@@ -115,7 +118,7 @@ public sealed class MigrateRatchetTests
                               }
                               namespace App.Data { public class Db {} public class Cache {} }
                               """;
-        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
         RuleResult result = Checker.Run(source, index, NoDataAccess)
             .Single();
@@ -130,7 +133,7 @@ public sealed class MigrateRatchetTests
         // A construction violation ratchets exactly like a reference: its identity is the (source, constructed)
         // type pair (GRAMMAR §4.3), so the same ForEdge entry grandfathers OldController `new`ing Db with zero
         // baseline-format change. (OneController's Load() does `new App.Data.Db()`.)
-        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("data/x")
@@ -172,8 +175,7 @@ public sealed class MigrateRatchetTests
         // type whose surrounding code already does it.
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
-                .WithSiteCount(1));
+            OldControllerToDb.WithSiteCount(1));
 
         RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
             .Single();
@@ -192,8 +194,7 @@ public sealed class MigrateRatchetTests
     {
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
-                .WithSiteCount(2));
+            OldControllerToDb.WithSiteCount(2));
 
         RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
             .Single();
@@ -201,8 +202,8 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
-        result.ShrunkBaselineEntries.ShouldBe(0);
-        result.UncountedBaselineEntries.ShouldBe(0);
+        result.ShouldHaveShrunk(0);
+        result.ShouldHaveUncounted(0);
     }
 
     [Fact]
@@ -212,8 +213,7 @@ public sealed class MigrateRatchetTests
         // 'baseline --accept-reductions' has something to lower the recorded count to.
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
-                .WithSiteCount(3));
+            OldControllerToDb.WithSiteCount(3));
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess)
             .Single();
@@ -221,8 +221,8 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
-        result.ShrunkBaselineEntries.ShouldBe(1);
-        result.StaleBaselineEntries.ShouldBe(0);
+        result.ShouldHaveShrunk(1);
+        result.ShouldHaveStale(0);
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public sealed class MigrateRatchetTests
         // measure existed. That is what keeps a partially upgraded or foreign baseline section valid — and
         // it is reported, because it is the state a write can clear.
         BaselineIndex index = Checker.Baselines(
-            "data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+            "data/x", OldControllerToDb);
 
         RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
             .Single();
@@ -240,7 +240,7 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
-        result.UncountedBaselineEntries.ShouldBe(1);
+        result.ShouldHaveUncounted(1);
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
-        result.UncountedBaselineEntries.ShouldBe(0);
+        result.ShouldHaveUncounted(0);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public sealed class MigrateRatchetTests
         // delete the entry recording the very debt that just got worse.
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+            OldControllerToDb
                 .WithSiteCount(1)
                 .WithBecause("INC-1234"));
 
@@ -280,7 +280,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.ShouldHaveFailed();
-        result.StaleBaselineEntries.ShouldBe(0);
+        result.ShouldHaveStale(0);
         Violation grown = result.Violations.ShouldHaveSingleItem();
         BaselineEntry stored = result.GrownEntries[grown];
         stored.SiteCount.ShouldBe(1);
@@ -326,7 +326,7 @@ public sealed class MigrateRatchetTests
         // Old is grandfathered and present; the Ghost entry matches no current violation → stale.
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
+            OldControllerToDb,
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
 
         RuleResult result = Checker.Run(OneController, index, NoDataAccess)
@@ -334,7 +334,7 @@ public sealed class MigrateRatchetTests
 
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
-        result.StaleBaselineEntries.ShouldBe(1);
+        result.ShouldHaveStale(1);
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.BaselineCaptured.ShouldBeTrue();
         result.Grandfathered.ShouldBeEmpty();
-        result.StaleBaselineEntries.ShouldBe(0);
+        result.ShouldHaveStale(0);
     }
 
     [Fact]
@@ -394,7 +394,7 @@ public sealed class MigrateRatchetTests
         // BaselineCaptured stays truthful: the section is real, it simply went unmeasured.
         BaselineIndex index = Checker.Baselines(
             "data/x",
-            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"),
+            OldControllerToDb,
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
         var narrowing = new NarrowedUniverse(NarrowingSkipReason);
 
@@ -409,7 +409,7 @@ public sealed class MigrateRatchetTests
 
         result.ShouldHaveSkipped(NarrowingSkipReason);
         result.ShouldHaveGrandfathered(0);
-        result.StaleBaselineEntries.ShouldBe(0);
+        result.ShouldHaveStale(0);
         result.BaselineCaptured.ShouldBeTrue();
     }
 
@@ -457,7 +457,7 @@ public sealed class MigrateRatchetTests
     public void Check_EnforceRule_IgnoresBaselineIndex()
     {
         // Even an index that carries the exact edge does not grandfather an Enforce rule.
-        BaselineIndex index = Checker.Baselines("layer/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("layer/x", OldControllerToDb);
 
         RuleResult result = Checker.Run(OneController, index, arch =>
                 arch.Rule("layer/x")

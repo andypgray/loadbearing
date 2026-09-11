@@ -8,8 +8,8 @@ using Zphil.LoadBearing.Roslyn.Hosting;
 namespace Zphil.LoadBearing.Cli.Diff;
 
 /// <summary>
-///     Resolves the files changed since a git ref into a <see cref="DiffContext" /> for the Quarantine
-///     tripwire (GRAMMAR §7).
+///     Resolves the files changed since a git ref into a <see cref="DiffContext" /> for the scope
+///     tripwires (GRAMMAR §7).
 /// </summary>
 /// <remarks>
 ///     <para>

@@ -346,7 +346,7 @@ public sealed class CheckCommandTests
     {
         string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!;
         return new CheckRequest(
-            CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, true, null, workingDirectory, false, null,
+            CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, true, false, null, workingDirectory, false, null,
             false, null, null, grain);
     }
 }

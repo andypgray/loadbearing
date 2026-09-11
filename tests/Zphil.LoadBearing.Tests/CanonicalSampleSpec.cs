@@ -16,7 +16,7 @@ public sealed class ArchSpec : IArchitectureSpec
 {
     public void Define(Arch arch)
     {
-        Layer domain = arch.Layer("Domain", "MyApp.Domain.*");
+        Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
         Layer web    = arch.Layer("Web",    "MyApp.Web.*");
 
         arch.Rule("layering/domain-independent")
@@ -45,6 +45,12 @@ public sealed class ArchSpec : IArchitectureSpec
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
                      "Nightly reconciliation depends on this. Do not normalize.")
             .Because("Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.");
+
+        arch.Scope("domain/pricing")
+            .Caution(arch.Types.Named("PricingEngine"))
+            .Dragons("Discount rules are evaluated in declaration order and the first match wins; " +
+                     "the catalogue states exceptions before defaults. Do not sort or de-duplicate the list.")
+            .Because("Every checkout path calls PricingEngine directly; a facade would cost more than it guards.");
 
         arch.Rule("naming/handlers")
             .Enforce(arch.Types.Implementing(typeof(IHandler<>)).MustHaveSuffix("Handler"))

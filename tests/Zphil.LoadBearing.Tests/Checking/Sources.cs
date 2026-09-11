@@ -56,6 +56,24 @@ internal static class Sources
                                       """;
 
     /// <summary>
+    ///     A quarantined legacy scope whose sanctioned surface is named without loading it: a region
+    ///     (<c>App.Legacy.Contracts.*</c>) and a consumer that lives outside the scope entirely
+    ///     (<c>Sanctioned</c>). <c>Gateway</c> reaches the interior as a facade must; <c>Sanctioned</c> and
+    ///     <c>Other</c> reach it identically from outside and differ only in their names; <c>Caller</c>
+    ///     reaches the facade region.
+    /// </summary>
+    public const string ContainmentRegion = """
+                                            namespace App.Legacy { public class Internal {} }
+                                            namespace App.Legacy.Contracts { public class Gateway { public App.Legacy.Internal Inner; } }
+                                            namespace App.Client
+                                            {
+                                                public class Sanctioned { public App.Legacy.Internal Direct; }
+                                                public class Other { public App.Legacy.Internal Direct; }
+                                                public class Caller { public App.Legacy.Contracts.Gateway Via; }
+                                            }
+                                            """;
+
+    /// <summary>
     ///     The hierarchy fixture: the reflectable <c>Targets</c> types (mirrored from
     ///     <see cref="Targets" />) plus subjects exercising every hierarchy verb — one implementer,
     ///     one deriver, one attributed type, two <c>IHandler</c> constructions, and their negatives.
@@ -201,6 +219,9 @@ internal static class Sources
 
     /// <summary>The one extracted model of <see cref="Containment" />.</summary>
     public static readonly CodebaseModel ContainmentModel = CompilationFactory.Extract(Containment);
+
+    /// <summary>The one extracted model of <see cref="ContainmentRegion" />.</summary>
+    public static readonly CodebaseModel ContainmentRegionModel = CompilationFactory.Extract(ContainmentRegion);
 
     /// <summary>The one extracted model of <see cref="Hierarchy" />.</summary>
     public static readonly CodebaseModel HierarchyModel = CompilationFactory.Extract(Hierarchy);

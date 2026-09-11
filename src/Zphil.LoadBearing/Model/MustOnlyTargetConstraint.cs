@@ -16,5 +16,5 @@ internal sealed class MustOnlyTargetConstraint(ProjectSelection subject, IReadOn
     internal IReadOnlyList<string> Frameworks { get; } = frameworks;
 
     internal override string VerbPhrase =>
-        "must target only " + ProseFormat.JoinReferences(Frameworks.Select(ProseFormat.Backtick).ToList());
+        "must target only " + ProseFormat.BacktickedList(Frameworks);
 }

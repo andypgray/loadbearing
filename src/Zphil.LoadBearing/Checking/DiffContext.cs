@@ -4,7 +4,7 @@ using Zphil.LoadBearing.Rendering;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     The set of files changed relative to a git ref — the substrate the Quarantine tripwire checks
+///     The set of files changed relative to a git ref — the substrate a scope tripwire checks
 ///     against (GRAMMAR §7).
 /// </summary>
 /// <remarks>

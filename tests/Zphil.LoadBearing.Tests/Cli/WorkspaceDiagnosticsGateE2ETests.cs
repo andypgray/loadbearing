@@ -632,7 +632,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         var source = new DiagnosticInjectingSolutionSource(
             diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects);
         var request = new CheckRequest(
-            solution, spec, json, null, SolutionPaths.SolutionDirectoryOf(solution), true, null,
+            solution, spec, json, false, null, SolutionPaths.SolutionDirectoryOf(solution), true, null,
             allowWorkspaceDiagnostics, sarif, null, DocumentGrain.Full);
 
         return await CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));

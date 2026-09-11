@@ -3,7 +3,7 @@
 
 ## Layer `Core`
 
-This directory holds the `Core` layer. Its architecture rules:
+This directory holds the `Core` layer. Core is the package a spec is written against: the fluent language, the model a spec compiles to, and the readers of that model that need no compiler. Its architecture rules:
 
 - `layering/core-no-roslyn` — The Core layer must not reference the Extraction layer, types in `Microsoft.CodeAnalysis.*` or types in `Microsoft.Build.*`. Core is the netstandard2.0 reified model both render targets consume; Roslyn extraction is host machinery, and a Microsoft.CodeAnalysis or Microsoft.Build package reference would leak compiler types into Core just as the project reference would.
 - `model/constraint-nodes` — Types in the Core layer named `*Constraint`, except `Constraint`, must reside in `Zphil.LoadBearing.Model.*`. A `*Constraint` is a node of the reified model — what a spec compiles to and what both render targets read back. The checker's dispatch and the sentence renderer each switch over the whole set, so a constraint node declared somewhere else is one they would silently not handle. `Constraint` itself is the public base a spec author names, so it stays in the root namespace with the rest of the authoring surface.

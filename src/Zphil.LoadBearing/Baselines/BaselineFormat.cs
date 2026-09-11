@@ -40,6 +40,17 @@ public static class BaselineFormat
     }
 
     /// <summary>
+    ///     Whether an edge entry in a file of <paramref name="schemaVersion" /> may carry a <c>siteCount</c>
+    ///     — every version but <see cref="LegacySchemaVersion" />, whose grammar predates the measure. The
+    ///     one answer both the digest and a reader's property walk take, so the two cannot disagree about
+    ///     which keys a version admits.
+    /// </summary>
+    public static bool CarriesSiteCount(int schemaVersion)
+    {
+        return schemaVersion != LegacySchemaVersion;
+    }
+
+    /// <summary>
     ///     Composes the canonical file bytes-as-string for the given rule sections: sorts rules and
     ///     entries, computes and embeds a fresh <c>digest</c>, and emits the line-oriented JSON. The
     ///     input's own order and duplicates do not matter. Always <see cref="SchemaVersion" />, so a
@@ -139,9 +150,9 @@ public static class BaselineFormat
 
     private static string DigestInput(IReadOnlyList<SortedRule> sorted, int schemaVersion)
     {
-        bool legacy = schemaVersion == LegacySchemaVersion;
+        bool counted = CarriesSiteCount(schemaVersion);
         var builder = new StringBuilder();
-        builder.Append(legacy ? LegacyDigestPreamble : DigestPreamble).Append('\n');
+        builder.Append(counted ? DigestPreamble : LegacyDigestPreamble).Append('\n');
         foreach (SortedRule rule in sorted)
         {
             builder.Append("rule ").Append(rule.Id).Append('\n');
@@ -151,7 +162,7 @@ public static class BaselineFormat
                     builder.Append("subject ").Append(subject).Append('\n');
                 else
                     builder.Append("edge ").Append(entry.Source).Append(" -> ").Append(entry.Target).Append('\n');
-                if (!legacy && entry.SiteCount is { } siteCount)
+                if (counted && entry.SiteCount is { } siteCount)
                     builder.Append("siteCount ").Append(Digits(siteCount)).Append('\n');
                 if (entry.Because is { } because)
                     builder.Append("because ").Append(because).Append('\n');

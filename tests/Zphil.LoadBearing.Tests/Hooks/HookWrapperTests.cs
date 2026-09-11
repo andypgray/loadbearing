@@ -9,12 +9,13 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 
 /// <summary>
 ///     Runs the committed hook wrappers as real child processes and holds them to the contract they
-///     publish: the exit-code mapping a Claude Code hook depends on (clean → 0, a red rule → 2 with the
-///     report on stderr, LoadBearing's own error → 1 under a <c>loadbearing config error:</c> prefix), the
+///     publish: the exit-code mapping a Claude Code hook depends on (clean → 0 with whatever the check
+///     wrote passed through on stdout, a red rule → 2 with the report on stderr, LoadBearing's own error →
+///     1 under a <c>loadbearing config error:</c> prefix), the
 ///     PostToolUse payload filter that keeps a docs edit from paying for a check, and the working-tree
 ///     guard that spends a check only on the tree the edit actually landed in. A stub <c>loadbearing</c>
-///     first on <c>PATH</c> supplies the exit code and records that it ran, so the mapping is measured
-///     without a workspace load.
+///     first on <c>PATH</c> supplies the exit code and the output, and records that it ran, so the mapping
+///     is measured without a workspace load.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -30,7 +31,7 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///     </para>
 ///     <para>
 ///         The <c>sh</c> arm is the gate proper — every CI OS has a POSIX shell, Git Bash supplying it on
-///         Windows. The <c>pwsh</c> arm runs the same eleven cases where PowerShell 7 is installed and
+///         Windows. The <c>pwsh</c> arm runs the same twelve cases where PowerShell 7 is installed and
 ///         skips with a named reason where it is not — the shape that keeps the arm portable across
 ///         machines that have PowerShell 7 and machines that do not.
 ///     </para>
@@ -79,11 +80,32 @@ public sealed class HookWrapperTests
     [Theory]
     [InlineData(Sh)]
     [InlineData(Pwsh)]
-    public void CleanCheck_ProceedsWithExitZeroAndNoStderr(string interpreter)
+    public void CleanCheck_ProceedsWithExitZeroAndTheCheckOutputOnStdout(string interpreter)
     {
         HookRun run = Fire(interpreter, payload: "", stubExit: 0);
 
         run.Result.ExitCode.ShouldBe(0);
+        // On exit 0 the tool writes the PostToolUse hook document (--hook-json) and the wrapper is a
+        // passthrough of it: Claude Code parses an exit-0 hook's stdout, so what the check wrote has to
+        // arrive there verbatim, unprefixed and not diverted to stderr. The stub stands in for the tool,
+        // so what this row measures is the passthrough rather than the document.
+        run.Result.StandardOutput.NormalizedLines()
+            .ShouldContain(CannedReport);
+        run.Result.StandardError.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void CleanCheckThatWroteNothing_StaysSilent(string interpreter)
+    {
+        // The other half of that row, and the half that keeps the channel worth having: a clean check with
+        // no warnings writes nothing at all, and the wrapper must not turn nothing into a blank line. A hook
+        // that speaks on every edit is a hook people turn off.
+        HookRun run = Fire(interpreter, payload: "", stubExit: 0, quiet: true);
+
+        run.Result.ExitCode.ShouldBe(0);
+        run.Result.StandardOutput.ShouldBeEmpty();
         run.Result.StandardError.ShouldBeEmpty();
     }
 
@@ -328,9 +350,9 @@ public sealed class HookWrapperTests
     ///     Runs <c>hooks/arch-hook.{sh,ps1}</c> under <paramref name="interpreter" /> against a fresh
     ///     sandbox — the shape the rows that need no repository underneath them want.
     /// </summary>
-    private static HookRun Fire(string interpreter, string payload, int stubExit)
+    private static HookRun Fire(string interpreter, string payload, int stubExit, bool quiet = false)
     {
-        return Fire(interpreter, Arrange(), payload, stubExit);
+        return Fire(interpreter, Arrange(), payload, stubExit, quiet: quiet);
     }
 
     /// <summary>
@@ -346,7 +368,8 @@ public sealed class HookWrapperTests
     ///     directory of their own. <paramref name="withProjectDirectory" /> decides whether
     ///     <c>CLAUDE_PROJECT_DIR</c> is set at all: false is the hand-run outside Claude Code, and the
     ///     variable is removed rather than left unset, because the child inherits this process's
-    ///     environment.
+    ///     environment. <paramref name="quiet" /> silences the stub, which is how a clean check with no
+    ///     warnings — the tool's own silence under <c>--hook-json</c> — is put in front of a wrapper.
     /// </remarks>
     private static HookRun Fire(
         string interpreter,
@@ -354,7 +377,8 @@ public sealed class HookWrapperTests
         string payload,
         int stubExit,
         string? workingDirectory = null,
-        bool withProjectDirectory = true)
+        bool withProjectDirectory = true,
+        bool quiet = false)
     {
         string interpreterPath = ShellInterpreter.Require(interpreter);
         string launchDirectory = workingDirectory ?? sandbox.Root;
@@ -379,6 +403,7 @@ public sealed class HookWrapperTests
 
         startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(sandbox.StubDirectory);
         startInfo.Environment["STUB_EXIT"] = stubExit.ToString(CultureInfo.InvariantCulture);
+        if (quiet) startInfo.Environment["STUB_QUIET"] = "1";
         if (withProjectDirectory)
             startInfo.Environment["CLAUDE_PROJECT_DIR"] = ShellInterpreter.Posix(sandbox.ProjectDirectory);
         else
@@ -462,8 +487,14 @@ public sealed class HookWrapperTests
 
     /// <summary>
     ///     Writes the stub <c>loadbearing</c> the wrappers resolve off <c>PATH</c>: it records that it ran,
-    ///     prints the canned two-line report, and exits <c>STUB_EXIT</c>.
+    ///     prints the canned two-line report unless <c>STUB_QUIET</c> is set, and exits <c>STUB_EXIT</c>.
     /// </summary>
+    /// <remarks>
+    ///     The quiet knob is the real tool's exit-0-with-nothing-to-say: a clean check with no warnings
+    ///     writes nothing under <c>--hook-json</c>, and the wrapper has to pass that nothing through as
+    ///     nothing. Without a stub that can be silent, the row could only be written by asserting on the
+    ///     absence of a string the stub had printed anyway.
+    /// </remarks>
     private static void WriteStub(string stubDirectory)
     {
         ShellInterpreter.WriteExecutableStub(
@@ -471,14 +502,19 @@ public sealed class HookWrapperTests
             "loadbearing",
             "#!/bin/sh\n"
             + $"printf 'ran\\n' > {Sentinel}\n"
-            + "printf 'FAIL arch/stub-rule -- canned violation report\\n'\n"
-            + "printf '  Probe.cs:10 -- second report line, so the multi-line path is covered\\n'\n"
+            + "if [ -z \"${STUB_QUIET:-}\" ]; then\n"
+            + "  printf 'FAIL arch/stub-rule -- canned violation report\\n'\n"
+            + "  printf '  Probe.cs:10 -- second report line, so the multi-line path is covered\\n'\n"
+            + "fi\n"
             + "exit \"${STUB_EXIT:-0}\"\n",
-            // echo( is the batch form that echoes leading whitespace verbatim, which the report's second line needs.
+            // echo( is the batch form that echoes leading whitespace verbatim, which the report's second line
+            // needs; goto is the batch form of a multi-statement conditional.
             "@echo off\r\n"
             + $"echo ran>{Sentinel}\r\n"
+            + "if not \"%STUB_QUIET%\"==\"\" goto :quiet\r\n"
             + "echo(FAIL arch/stub-rule -- canned violation report\r\n"
             + "echo(  Probe.cs:10 -- second report line, so the multi-line path is covered\r\n"
+            + ":quiet\r\n"
             + "exit /b %STUB_EXIT%\r\n");
     }
 

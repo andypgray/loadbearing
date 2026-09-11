@@ -9,7 +9,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // document is byte-identical. The ratchet's two measure counts are additive the same way, on both the
 // per-rule block and the summary. The two site totals beside them are not: a burndown unit that appears
 // only sometimes is worse than one more integer, so they are written whatever they read, and the schema
-// stays at 2 because a consumer that never asked for them is unaffected by two more keys.
+// stays at 2 because a consumer that never asked for them is unaffected by two more keys. A new posture is
+// additive in the same sense — `caution` is one more value of an enum the schema already carries, not a new
+// shape — so the schema stays at 2 for that too.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="SchemaVersion">The burndown document's schema version — 2.</param>

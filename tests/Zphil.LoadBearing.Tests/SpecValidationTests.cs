@@ -29,6 +29,10 @@ public class SpecValidationTests
     [InlineData(typeof(MultiLineBecauseSpec), Code.MultiLineProse, "area/rule")]
     [InlineData(typeof(MalformedIdSpec), Code.MalformedId, "Bad_Id")]
     [InlineData(typeof(ForeignSelectionSpec), Code.ForeignSelection, "area/rule")]
+    // A scope's sanctioned surface rides the same walks its quarantined interior does, so the boundary's
+    // foreign-Arch and blank-pattern reports need no arm of their own — they are the scope's, by its ID.
+    [InlineData(typeof(ForeignBoundarySpec), Code.ForeignSelection, "legacy/billing")]
+    [InlineData(typeof(BlankBoundaryPatternSpec), Code.BlankPattern, "legacy/billing")]
     // The extended prose walk reaches a member Where description and a member Must description
     // (GRAMMAR §8 item 5, §4.6).
     [InlineData(typeof(BlankMemberWhereSpec), Code.BlankProse, "area/rule")]
@@ -140,12 +144,71 @@ public class SpecValidationTests
 
         ex.ShouldHaveError(Code.RepeatedPosture, "legacy/billing")
             .Message
-            .ShouldBe("SpecValidationSpecs.cs:123: Scope 'legacy/billing' has more than one posture; call .Quarantine(...) exactly once.");
+            .ShouldBe("SpecValidationSpecs.cs:123: Scope 'legacy/billing' has more than one posture; call .Quarantine(...) or .Caution(...) exactly once.");
+    }
+
+    [Fact]
+    public void RepeatedPosture_CautionTwiceViaStoredScopeBuilder_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new DoubleCautionScopeSpec());
+
+        ex.ShouldHaveError(Code.RepeatedPosture, "shared/utilities")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1025: Scope 'shared/utilities' has more than one posture; call .Quarantine(...) or .Caution(...) exactly once.");
+    }
+
+    [Fact]
+    public void RepeatedPosture_QuarantineThenCautionViaStoredScopeBuilder_IsReported()
+    {
+        // Two different verbs, not two of one: the count is what the check reads, so mixing them is the
+        // same overwrite and reports the same way.
+        SpecValidationException ex = BuildExpectingFailure(new MixedPostureScopeSpec());
+
+        ex.ShouldHaveError(Code.RepeatedPosture, "shared/utilities")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1037: Scope 'shared/utilities' has more than one posture; call .Quarantine(...) or .Caution(...) exactly once.");
+    }
+
+    [Fact]
+    public void DanglingScope_NoPostureVerb_IsReportedNamingBothVerbs()
+    {
+        // The dangling report reads the posture field rather than the selection, because a caution sets
+        // both and "no posture" is the thing the author has to fix.
+        SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
+
+        ex.ShouldHaveError(Code.DanglingAnchor, "other/scope")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:509: Scope 'other/scope' has no posture; call .Quarantine(...) or .Caution(...).");
+    }
+
+    [Fact]
+    public void MissingDragons_OnACaution_NamesTheCautionedScope()
+    {
+        // The message names the posture the scope was declared under, because the author's next move is to
+        // find that verb in the spec and add the clause beneath it.
+        SpecValidationException ex = BuildExpectingFailure(new MissingDragonsCautionSpec());
+
+        ex.ShouldHaveError(Code.MissingDragons, "shared/utilities")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1047: Cautioned scope 'shared/utilities' is missing .Dragons(...) or .DragonsDoc(...).");
+    }
+
+    [Fact]
+    public void ValidCaution_BuildsClean()
+    {
+        // The negative half of the catalog for the new posture: a caution carrying its two required clauses
+        // is not merely unreported, it builds.
+        ArchModelBuilder.Build(new ValidCautionSpec())
+            .Rules.Select(rule => rule.Id)
+            .ShouldBe(["shared/utilities/tripwire"]);
     }
 
     [Fact]
     public void EmptyBoundary_BoundaryOnlyViaWithNoTypes_IsReported()
     {
+        // That EmptyBoundarySpec compiles at all is half the pin: BoundaryOnlyVia() binds uniquely to the
+        // Type overload because the Selection form takes (first, params more). Flatten that form to plain
+        // params and the call is ambiguous under CS0121, taking this hint out of reach (GRAMMAR §7).
         SpecValidationException ex = BuildExpectingFailure(new EmptyBoundarySpec());
 
         ex.ShouldHaveError(Code.EmptyBoundary, "legacy/billing")
@@ -327,6 +390,41 @@ public class SpecValidationTests
             .RuleId.ShouldBeNull();
         ex.ShouldHaveError(Code.BlankPattern)
             .Message.ShouldBe("Blank namespace pattern on layer 'Bad'.");
+    }
+
+    [Fact]
+    public void BlankProse_BlankLayerPurpose_IsReportedSpecWide()
+    {
+        // A layer purpose is prose like any other (§8 item 5), reported on the layer-glob terms above:
+        // spec-wide, null rule ID, named by layer, and with no file:line prefix because there is no anchor.
+        SpecValidationException ex = BuildExpectingFailure(new BlankLayerPurposeSpec());
+
+        ex.ShouldHaveError(Code.BlankProse)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.BlankProse)
+            .Message.ShouldBe("Blank purpose on layer 'Core'.");
+    }
+
+    [Fact]
+    public void MultiLineProse_MultiLineLayerPurpose_IsReportedSpecWide()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new MultiLineLayerPurposeSpec());
+
+        ex.ShouldHaveError(Code.MultiLineProse)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.MultiLineProse)
+            .Message.ShouldBe("Multi-line purpose on layer 'Core'; prose fields are single-line.");
+    }
+
+    [Fact]
+    public void RepeatedTrailer_RepeatedLayerPurpose_IsReportedSpecWide()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new RepeatedLayerPurposeSpec());
+
+        ex.ShouldHaveError(Code.RepeatedTrailer)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.RepeatedTrailer)
+            .Message.ShouldBe("Repeated trailer 'Purpose' on layer 'Core'.");
     }
 
     [Fact]

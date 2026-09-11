@@ -21,6 +21,11 @@ public sealed class LawDiagramRendererTests
 {
     private const string SpecName = "Shop.ArchSpec";
 
+    // The legend row a drawn scope box earns, spelled once so the row that must be present in the
+    // quarantine pins and absent from the caution pin is literally the same string.
+    private const string QuarantineLegendRow =
+        "Quarantine box = a contained scope; the doubled boxes are its sanctioned surface";
+
     [Fact]
     public void Block_ASpecExercisingEveryConstruct_PinsTheWholeDrawing()
     {
@@ -213,6 +218,59 @@ public sealed class LawDiagramRendererTests
     }
 
     [Fact]
+    public void Block_ARegionFacade_IsADoubledBoxInsideTheScope()
+    {
+        // Arrange — the sanctioned surface is a namespace, which is a place the drawing already knows how
+        // to stand for; facade standing is what it gains, not a shape of its own.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/pricing")
+                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
+                .BoundaryOnlyVia(arch.Namespace("Shop.Legacy.Pricing.Contracts.*"))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — drawn in full, so the containment rule is absent from the list under the fence.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "subgraph s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
+                "s_Shop_Legacy_Pricing_Contracts[[\"Shop.Legacy.Pricing.Contracts.*\"]]",
+                "end",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_quarantine[\"Quarantine box = a contained scope; the doubled boxes are its sanctioned surface\"]",
+                "end"
+            ]);
+        block.ShouldNotContain("legacy/pricing/containment");
+    }
+
+    [Fact]
+    public void Block_ANamedFacade_DrawsNoBoxAndSendsItsRuleUnderTheFence()
+    {
+        // Arrange — a name is not a region, so there is no honest node for it. The law is unchanged; the
+        // drawing narrows, which is the cost the no-load spelling buys its law at.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/pricing")
+                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
+                .BoundaryOnlyVia(arch.Types.Named("PricingFacade"))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — the scope's own box still stands; only the sanctioned surface goes undrawn, and the
+        // totality rule reports the containment rule beside the tripwire that never draws.
+        MermaidBlock.Diagram(block)
+            .ShouldContain("s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]");
+        block.ShouldEndWith(
+            "Not drawn in full: `legacy/pricing/containment` (Quarantine), `legacy/pricing/tripwire` (Quarantine). " +
+            "Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
     public void Block_AHermeticScope_IsARectangleCarryingTheSameLabel()
     {
         // Arrange — no sanctioned surface at all, so there is nothing to draw inside the box.
@@ -239,6 +297,29 @@ public sealed class LawDiagramRendererTests
         // is named rather than silently dropped.
         block.ShouldEndWith(
             "Not drawn in full: `legacy/pricing/tripwire` (Quarantine). " +
+            "Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
+    public void Block_ACautionedScope_DrawsNoBoxAndIsListedUnderItsOwnPosture()
+    {
+        // Arrange — the same region under the posture with no containment law.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/pricing")
+                .Caution(arch.Namespace("Shop.Legacy.Pricing.*"))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — no boundary means no box to draw and no legend row to explain one; the caution's single
+        // rule falls past the quarantine arm into the compact list, tagged with its own posture. No code in
+        // the renderer knows the posture exists, which is the point of the pin.
+        block.ShouldNotContain("Quarantine: legacy/pricing");
+        block.ShouldNotContain(QuarantineLegendRow);
+        block.ShouldEndWith(
+            "Not drawn in full: `legacy/pricing/tripwire` (Caution). " +
             "Expand any of them with `loadbearing explain <rule-id>`.");
     }
 

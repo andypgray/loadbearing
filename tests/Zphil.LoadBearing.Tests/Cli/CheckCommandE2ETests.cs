@@ -104,6 +104,25 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_CautionSkipsWithItsOwnReasonAndAddsNothingElse()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // The twin of the row above for the posture with no red state: the caution's only rule is its
+        // tripwire, so the skip is the whole of what a caution contributes to a run with no --diff-base.
+        // The reason is worded for the posture rather than shared with the quarantine's, because the two
+        // scopes ask different things of the reader who goes looking for it.
+        result.Out.ShouldContain("skip domain/retry-budget/tripwire");
+        result.Out.ShouldContain(
+            "skipped: Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this cautioned scope.");
+        // No containment, no boundary, no baseline hint: a caution has no law to fail and nothing to
+        // grandfather, so the report gains one skip line and no red anywhere.
+        result.Out.ShouldNotContain("domain/retry-budget/containment");
+        result.Out.ShouldNotContain("FAIL domain/retry-budget");
+        result.Out.ShouldContain("Checked 29 rules: 2 passed, 25 failed, 2 skipped (44 violations, 1 warnings).");
+    }
+
+    [Fact]
     public async Task Check_ViolatedSpec_ReportsCatchRuleWithCatchesLineAndInitHint()
     {
         CliResult result = await ViolatedHuman.Value;
@@ -505,7 +524,7 @@ public sealed class CheckCommandE2ETests
         // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
         // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
         result.ShouldSucceed(
-            "Checking 1 of 28 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            "Checking 1 of 29 rules matching 'layering/billing-independent'; the verdict below covers only those, "
             + "so a clean result here is not a clean solution.");
         result.Out.ShouldNotContain("layering/domain-independent");
     }
@@ -519,7 +538,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
         result.ShouldReportViolations(
-            "Checking 5 of 28 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            "Checking 5 of 29 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
             + "result here is not a clean solution.",
             "FAIL exceptions/no-general-catch",
             "FAIL exceptions/no-bare-bcl-throw");
@@ -536,7 +555,7 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--rules", "exceptions/*");
 
         // Assert — the stamp never reaches stdout under --json; the document carries the same fact in
-        // rulesFilter, and the summary counts the five rules that ran rather than the twenty-eight that exist.
+        // rulesFilter, and the summary counts the five rules that ran rather than the twenty-nine that exist.
         result.ShouldReportViolations();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement root = document.RootElement;

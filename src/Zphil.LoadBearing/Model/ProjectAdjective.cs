@@ -20,4 +20,11 @@ internal abstract class ProjectAdjective
     ///     <see cref="AdjectivePlacement.Head" /> this is the whole phrase that replaces the head.
     /// </summary>
     internal abstract string Fragment { get; }
+
+    /// <summary>
+    ///     Whether the fragment opens a parenthetical it does not close — a project <c>Except</c> clause —
+    ///     so the composer closes it with a comma at whatever junction follows (GRAMMAR §6). Meaningful only
+    ///     for a <see cref="AdjectivePlacement.SubjectFinal" /> placement, the one that can end a phrase.
+    /// </summary>
+    internal virtual bool OpensParenthetical => false;
 }

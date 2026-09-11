@@ -15,11 +15,19 @@ public sealed class OperationsArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        Layer dispatch = arch.Layer("Dispatch", "Meridian.Operations.Dispatch.*");
-        Layer tracking = arch.Layer("Tracking", "Meridian.Operations.Tracking.*");
-        Layer invoicing = arch.Layer("Invoicing", "Meridian.Operations.Invoicing.*");
-        Layer demurrage = arch.Layer("Demurrage", "Meridian.Operations.Demurrage.*");
-        Layer host = arch.Layer("Host", "Meridian.Operations.Host.*");
+        Layer dispatch = arch.Layer("Dispatch", "Meridian.Operations.Dispatch.*")
+            .Purpose("Dispatch assigns haulage legs to drivers: the dispatch board and the driver roster behind its " +
+                     "Contracts surface.");
+        Layer tracking = arch.Layer("Tracking", "Meridian.Operations.Tracking.*")
+            .Purpose("Tracking owns the shipment milestone timeline that every other module reads.");
+        Layer invoicing = arch.Layer("Invoicing", "Meridian.Operations.Invoicing.*")
+            .Purpose("Invoicing assembles a shipment's invoice from its milestones and its demurrage charge.");
+        Layer demurrage = arch.Layer("Demurrage", "Meridian.Operations.Demurrage.*")
+            .Purpose("Demurrage computes the charge for a container held past its free time, behind its calculator " +
+                     "facade.");
+        Layer host = arch.Layer("Host", "Meridian.Operations.Host.*")
+            .Purpose("Host is the composition root: it wires the modules through their Contracts surfaces and " +
+                     "serves the HTTP endpoints.");
 
         arch.Rule("modules/dispatch/internals")
             .Enforce(dispatch.Except(arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"))

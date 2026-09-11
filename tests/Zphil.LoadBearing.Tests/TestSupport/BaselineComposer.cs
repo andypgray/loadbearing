@@ -17,7 +17,7 @@ internal static class BaselineComposer
     /// <summary>The composed file for <paramref name="sections" />, one rule section each, in order.</summary>
     internal static string Compose(params (string RuleId, BaselineEntry[] Entries)[] sections)
     {
-        return BaselineFormat.ComposeFile(Input(sections));
+        return BaselineFormat.ComposeFile(Rules(sections));
     }
 
     /// <summary>The composed file for one rule's <paramref name="entries" /> — the single-section case.</summary>
@@ -34,7 +34,7 @@ internal static class BaselineComposer
     /// </summary>
     internal static string ComposeLegacy(params (string RuleId, BaselineEntry[] Entries)[] sections)
     {
-        IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> input = Input(sections);
+        IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> input = Rules(sections);
         return BaselineFormat.ComposeFile(input)
             .Replace(
                 $"\"schemaVersion\": {BaselineFormat.SchemaVersion}",
@@ -50,8 +50,13 @@ internal static class BaselineComposer
         return ComposeLegacy((ruleId, entries));
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> Input(
-        (string RuleId, BaselineEntry[] Entries)[] sections)
+    /// <summary>
+    ///     The composer's input for <paramref name="sections" /> — one ordinal-keyed rule section each, in
+    ///     order: the shape <see cref="BaselineFormat.ComposeFile" /> and the digest verbs take, for the rows
+    ///     that call the format directly rather than through <see cref="Compose(ValueTuple{string, BaselineEntry[]}[])" />.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> Rules(
+        params (string RuleId, BaselineEntry[] Entries)[] sections)
     {
         var rules = new Dictionary<string, IReadOnlyCollection<BaselineEntry>>(StringComparer.Ordinal);
         foreach ((string ruleId, BaselineEntry[] entries) in sections) rules[ruleId] = entries;

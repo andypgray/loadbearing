@@ -3,7 +3,7 @@
 
 ## Layer `Pack`
 
-This directory holds the `Pack` layer. Its architecture rules:
+This directory holds the `Pack` layer. Pack is the shared rule pack: canonical .NET rules as an ordinary class library that a spec takes one method at a time. Its architecture rules:
 
 - `packs/depends-on-core-only` — The Pack layer must reference only the Core layer (external packages are not constrained by this rule). A spec project takes the rule pack as a reference of its own, and the whole of what the pack needs is the Arch it composes onto. A reference to the extraction host or the CLI would pull MSBuild and the rest of the tool into the closure of every spec project that takes the pack — and nothing in the project graph stops it, because the pack is a leaf and no reference out of it would be circular.
 - Expand any rule above with `loadbearing explain <rule-id>`.

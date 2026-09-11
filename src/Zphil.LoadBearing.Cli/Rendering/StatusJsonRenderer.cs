@@ -50,8 +50,8 @@ internal static class StatusJsonRenderer
                 report.GrandfatheredCount,
                 report.GrandfatheredSiteCount,
                 report.StaleBaselineEntryCount,
-                Measure(report.ShrunkBaselineEntryCount),
-                Measure(report.UncountedBaselineEntryCount)));
+                LoadBearingJson.OmitZero(report.ShrunkBaselineEntryCount),
+                LoadBearingJson.OmitZero(report.UncountedBaselineEntryCount)));
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.StatusJson));
     }
@@ -76,23 +76,15 @@ internal static class StatusJsonRenderer
         if (result.Rule.BaselinePath is not { } path) return null;
 
         bool? promotable = result.Rule.Posture == Posture.Migrate ? result.Promotable : null;
-        int remainingSites = result.Grandfathered.Sum(violation => violation.Sites.Count);
         return new RatchetStatusJson(
             path,
             result.BaselineCaptured,
             result.Grandfathered.Count,
-            remainingSites,
+            result.GrandfatheredSiteCount,
             result.Violations.Count,
             result.StaleBaselineEntries,
-            Measure(result.ShrunkBaselineEntries),
-            Measure(result.UncountedBaselineEntries),
+            LoadBearingJson.OmitZero(result.ShrunkBaselineEntries),
+            LoadBearingJson.OmitZero(result.UncountedBaselineEntries),
             promotable);
-    }
-
-    // A measure count on the wire only where there is one to report: zero and absent say the same thing, and
-    // a key that appears only when it means something keeps a clean document clean.
-    private static int? Measure(int count)
-    {
-        return count > 0 ? count : null;
     }
 }

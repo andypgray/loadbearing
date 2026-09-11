@@ -153,12 +153,10 @@ internal sealed class ConstraintEvaluator
                 return ForbiddenReference(admission, c.Targets, inbound: false);
             case MustNotBeReferencedByConstraint c:
                 return ForbiddenReference(admission, c.Sources, inbound: true);
-            case MustOnlyReferenceConstraint c:
-                return OnlyReference(admission, c.Targets);
-            case MustOnlyReferenceItselfConstraint:
-                // The leaf verb is the default with nothing beside it: an empty operand list resolves to
-                // an empty admission, which the implicit self-allowance folds back to the subject alone.
-                return OnlyReference(admission, Array.Empty<Selection>());
+            case MustOnlyReferenceConstraint or MustOnlyReferenceItselfConstraint:
+                // The leaf verb rides the allow-list's own arm with the empty operand list it was built to
+                // carry: an empty admission, which the implicit self-allowance folds back to the subject alone.
+                return OnlyReference(admission, constraint.Operands);
             case MustOnlyBeReferencedByConstraint c:
                 return OnlyBeReferencedBy(admission, c.Sources);
             case MustNotUseConstraint c:

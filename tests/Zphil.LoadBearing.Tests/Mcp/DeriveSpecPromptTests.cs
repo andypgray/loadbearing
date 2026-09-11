@@ -58,6 +58,17 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("by the human"); // the ratchet steps are human-owned...
         text.ShouldContain("baseline --init"); // ...specifically this one
         text.ShouldContain("implementation type"); // BoundaryOnlyVia must list the facade impl
+        // The no-load boundary: a facade the spec cannot compile against is still law, and the prompt
+        // must reach for that before telling an adopter to open the product project up.
+        text.ShouldContain("arch.Types.Named(\"IBillingFacade\", \"BillingFacade\")");
+        text.ShouldContain("rather than grandfathering it");
+        // The layer recipe shows the purpose trailer and says where its sentence comes from: the
+        // stated-intent prose the adopter was already sent to read in step 0.
+        text.ShouldContain(".Purpose(\"Domain holds the order and customer model.\")");
+        text.ShouldContain("one sentence on what the layer is for");
+        // The scope recipe teaches the second scope posture and the rule that picks between the two.
+        text.ShouldContain(".Caution(");
+        text.ShouldContain("new callers welcome");
         text.ShouldContain("arch_graph"); // the survey tool
         text.ShouldContain("arch_check"); // the evidence tool
     }

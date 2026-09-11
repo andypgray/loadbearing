@@ -4,10 +4,10 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "index",
   "summary": {
-    "rulesChecked": 28,
+    "rulesChecked": 29,
     "rulesPassed": 2,
     "rulesFailed": 25,
-    "rulesSkipped": 1,
+    "rulesSkipped": 2,
     "violations": 44,
     "warnings": 1
   },
@@ -257,6 +257,14 @@
       "posture": "enforce",
       "status": "failed",
       "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "domain/retry-budget/tripwire",
+      "posture": "caution",
+      "status": "skipped",
+      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this cautioned scope.",
+      "violationCount": 0,
       "warnings": []
     }
   ],

@@ -83,19 +83,29 @@ internal static class SentenceRenderer
     /// </summary>
     internal static string TargetList(IReadOnlyList<Selection> targets)
     {
+        return ProseFormat.JoinReferences(ReferenceFragments(targets), ClosesBeforeOr(targets));
+    }
+
+    /// <summary>
+    ///     One reference fragment per selection, collision-widened as a set: the fragments a list joins,
+    ///     before any joining. A boundary's sanctioned surface renders through this so the list a scope
+    ///     card prints and the list its sentence names are the same computation (GRAMMAR §6, §7).
+    /// </summary>
+    internal static IReadOnlyList<string> ReferenceFragments(IReadOnlyList<Selection> selections)
+    {
         var types = new List<Type>();
-        foreach (Selection target in targets)
-            if (TryBareType(target, out Type type))
+        foreach (Selection selection in selections)
+            if (TryBareType(selection, out Type type))
                 types.Add(type);
 
         Dictionary<Type, string> display = ProseFormat.ResolveTypeDisplays(types);
-        var parts = new List<string>(targets.Count);
-        foreach (Selection target in targets)
-            parts.Add(TryBareType(target, out Type type)
+        var parts = new List<string>(selections.Count);
+        foreach (Selection selection in selections)
+            parts.Add(TryBareType(selection, out Type type)
                 ? ProseFormat.Backtick(display[type])
-                : Reference(target));
+                : Reference(selection));
 
-        return ProseFormat.JoinReferences(parts, ClosesBeforeOr(targets));
+        return parts;
     }
 
     /// <summary>
@@ -131,11 +141,16 @@ internal static class SentenceRenderer
         return ProseFormat.JoinReferences(parts);
     }
 
-    /// <summary>The layer definition fragment for the module map: <c>**Domain** — `MyApp.Domain.*`</c>.</summary>
-    internal static string LayerDefinition(LayerNoun noun)
+    /// <summary>
+    ///     The layer definition fragment for the module map: <c>**Domain** — `MyApp.Domain.*`</c>, and with a
+    ///     purpose <c>**Domain** — `MyApp.Domain.*`. {purpose}</c> — prefix-preserving, the purpose verbatim.
+    /// </summary>
+    internal static string LayerDefinition(LayerNoun noun, string? purpose)
     {
         string globs = string.Join(", ", noun.Globs.Select(ProseFormat.Backtick));
-        return $"**{noun.Name}** — {globs}";
+        var fragment = $"**{noun.Name}** — {globs}";
+        if (purpose is not null) fragment += $". {purpose}";
+        return fragment;
     }
 
     private static string Phrase(Selection selection)
@@ -265,15 +280,15 @@ internal static class SentenceRenderer
     }
 
     // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): its last sentence-final adjective
-    // is an Except — a Where after one closes nothing, and is not open either — or, with no clause of its
-    // own, it is an or-joined union whose last operand ends open. A collapsed union, a bare noun and an
-    // inline-terminated phrase are closed. The composer reads this at every junction where text follows,
-    // because the fragment cannot know what follows it.
+    // says it opens one — a Where after an Except closes nothing, and is not open either — or, with no
+    // clause of its own, it is an or-joined union whose last operand ends open. A collapsed union, a bare
+    // noun and an inline-terminated phrase are closed. The composer reads this at every junction where
+    // text follows, because the fragment cannot know what follows it.
     private static bool EndsOpen(Selection selection)
     {
         SelectionAdjective? lastClause = selection.Adjectives
             .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
-        if (lastClause is not null) return lastClause is ExceptAdjective;
+        if (lastClause is not null) return lastClause.OpensParenthetical;
 
         bool endsWithInlineClause = selection.Adjectives
             .Any(adjective => adjective.Placement == AdjectivePlacement.Inline);
@@ -290,7 +305,7 @@ internal static class SentenceRenderer
     {
         ProjectAdjective? lastClause = selection.Adjectives
             .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
-        return lastClause is ProjectExceptAdjective;
+        return lastClause is { OpensParenthetical: true };
     }
 
     // A member subject renders its own inline and sentence-final clauses AFTER the reference, so those

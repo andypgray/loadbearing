@@ -3,7 +3,6 @@ using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Verbs;
-using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
@@ -194,12 +193,9 @@ public sealed class BaselineRunnerCountTests : IDisposable
         CheckReport report = Check(TwoSiteSource);
         string path = WriteBaseline(BaselineComposer.ComposeLegacy(RuleId, Pair.WithBecause("INC-1")));
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        output.ToString()
-            .ShouldContain("data-access/ledger-behind-repository: recorded the site count on 1 entry.");
+        echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 1 entry.");
         Read(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
@@ -215,12 +211,9 @@ public sealed class BaselineRunnerCountTests : IDisposable
         CheckReport report = Check(TwoPairSource);
         string path = WriteBaseline(BaselineComposer.ComposeLegacy(RuleId, ExportPair, Pair));
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        output.ToString()
-            .ShouldContain("data-access/ledger-behind-repository: recorded the site count on 2 entries.");
+        echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 2 entries.");
         Read(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
@@ -236,12 +229,9 @@ public sealed class BaselineRunnerCountTests : IDisposable
         CheckReport report = Check(TwoSiteSource);
         string path = WriteBaseline(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(3)));
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        output.ToString()
-            .ShouldContain("data-access/ledger-behind-repository: lowered the site count on 1 entry.");
+        echo.ShouldContain("data-access/ledger-behind-repository: lowered the site count on 1 entry.");
         Read(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
@@ -254,11 +244,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
         CheckReport report = Check(ThreeSiteSource);
         string path = WriteBaseline(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        var echo = output.ToString();
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
         echo.ShouldContain(
             "data-access/ledger-behind-repository: refused site growth on 1 entry — a grandfathered pair grows only via 'loadbearing baseline --add', one attributed entry at a time.");
@@ -275,11 +262,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string path = WriteBaseline(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
         byte[] before = File.ReadAllBytes(path);
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        var echo = output.ToString();
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
         echo.ShouldNotContain("site count");
         echo.ShouldNotContain("refused");
@@ -295,14 +279,11 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // each. Synthetic nodes, because the shape is about identity rather than about any real codebase.
         RuleResult result = SharedIdentityResult(observed: [2, 3]);
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(InitRequest(), [result], _temp.Path);
+        string echo = Init([result]);
 
         // One line, not two — and the allowance covers the larger of the two, because anything less would
         // red the very state the capture was taken from.
-        output.ToString()
-            .ShouldContain("data-access/ledger-behind-repository: captured 1 grandfathered violation.");
+        echo.ShouldContain("data-access/ledger-behind-repository: captured 1 grandfathered violation.");
         Read(_temp.PathOf(BaselineFile))
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(3)));
     }
@@ -316,11 +297,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string path = WriteBaseline(BaselineComposer.ComposeLegacy(RuleId, Pair));
         byte[] before = File.ReadAllBytes(path);
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(InitRequest(), report.Results, _temp.Path);
+        string echo = Init(report.Results);
 
-        var echo = output.ToString();
         echo.ShouldContain("data-access/ledger-behind-repository: already captured (1 entries) — unchanged.");
         echo.ShouldContain($"unchanged {BaselineFile}");
         File.ReadAllBytes(path)
@@ -337,11 +315,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // file would sit in the tree under a "wrote" line contradicting it.
         CheckReport report = Check(TwoSiteSource);
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(AcceptRequest(), report.Results, _temp.Path);
+        string echo = AcceptReductions(report.Results);
 
-        var echo = output.ToString();
         echo.ShouldContain(
             "data-access/ledger-behind-repository: no baseline section — run 'loadbearing baseline --init' first.");
         echo.ShouldNotContain("wrote");
@@ -356,11 +331,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // created around that absence.
         CheckReport report = Check(NoWebSource);
 
-        var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(InitRequest(), report.Results, _temp.Path);
+        string echo = Init(report.Results);
 
-        var echo = output.ToString();
         echo.ShouldContain(
             "data-access/ledger-behind-repository: cannot capture — the rule has an empty subject or an evaluation error; skipped.");
         echo.ShouldNotContain("wrote");
@@ -391,26 +363,12 @@ public sealed class BaselineRunnerCountTests : IDisposable
     {
         List<Violation> violations = observed
             .Select((sites, index) => Violation.Reference(
-                Node(ControllerId, "App.Web.ReportController", $"Web{index}"),
-                Node(LedgerId, "App.Data.Ledger", $"Data{index}"),
-                Sites(sites)))
+                SyntheticNodes.Type("App.Web.ReportController", ControllerId, $"Web{index}"),
+                SyntheticNodes.Type("App.Data.Ledger", LedgerId, $"Data{index}"),
+                SyntheticNodes.Sites("ReportController.cs", sites)))
             .ToList();
 
         return new RuleResult(Model().Rule(RuleId), RuleStatus.Failed, violations);
-    }
-
-    private static TypeNode Node(string symbolId, string fullName, string project)
-    {
-        return new TypeNode(
-            fullName, symbolId, fullName, "App", TypeKind.Class,
-            Accessibility.Public, false, false, false, false, false, project, false);
-    }
-
-    private static IReadOnlyList<SourceLocation> Sites(int count)
-    {
-        return Enumerable.Range(1, count)
-            .Select(line => new SourceLocation("ReportController.cs", line))
-            .ToList();
     }
 
     private BaselineRunner Runner(TextWriter output)
@@ -420,26 +378,26 @@ public sealed class BaselineRunnerCountTests : IDisposable
 
     private BaselineRequest AddRequest(string because)
     {
-        return Request(init: false, acceptReductions: false, add: true, because);
+        return BaselineRequests.Add(RuleId, because, "App.Web.ReportController", "App.Data.Ledger", _temp.Path);
     }
 
-    private BaselineRequest InitRequest()
+    // --init and --accept-reductions through the one seam they share, handing back what the runner said.
+    private string Init(IEnumerable<RuleResult> results)
     {
-        return Request(init: true, acceptReductions: false, add: false, because: null);
+        return Apply(BaselineRequests.Init(_temp.Path), results);
     }
 
-    private BaselineRequest AcceptRequest()
+    private string AcceptReductions(IEnumerable<RuleResult> results)
     {
-        return Request(init: false, acceptReductions: true, add: false, because: null);
+        return Apply(BaselineRequests.AcceptReductions(_temp.Path), results);
     }
 
-    // The --add companions ride along under every mode, because the request record carries one shape and
-    // ValidateMode (which these seams sit below) is what parts the three.
-    private BaselineRequest Request(bool init, bool acceptReductions, bool add, string? because)
+    private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)
     {
-        return new BaselineRequest(
-            null, null, init, acceptReductions, add, RuleId, because,
-            "App.Web.ReportController", "App.Data.Ledger", null, _temp.Path, false, false);
+        var output = new StringWriter();
+        Runner(output)
+            .ApplyFiles(request, results, _temp.Path);
+        return output.ToString();
     }
 
     private string WriteBaseline(string content)

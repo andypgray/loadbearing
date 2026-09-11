@@ -26,14 +26,14 @@ reference = a source-level type reference; use = a source-level member access; c
 registered = named in a source-level container registration (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or framework defaults are not seen.
 
 ### Layers
-- **Core** — `Zphil.LoadBearing`, `Zphil.LoadBearing.Baselines.*`, `Zphil.LoadBearing.Building.*`, `Zphil.LoadBearing.Checking.*`, `Zphil.LoadBearing.Codebase.*`, `Zphil.LoadBearing.Discovery.*`, `Zphil.LoadBearing.Fluent.*`, `Zphil.LoadBearing.Hosting.*`, `Zphil.LoadBearing.Internal.*`, `Zphil.LoadBearing.Model.*`, `Zphil.LoadBearing.Prose.*`, `Zphil.LoadBearing.Rendering.*`, `Zphil.LoadBearing.Validation.*`
-- **Model** — `Zphil.LoadBearing.Model.*`
-- **Checking** — `Zphil.LoadBearing.Checking.*`
-- **Rendering** — `Zphil.LoadBearing.Rendering.*`
-- **Extraction** — `Zphil.LoadBearing.Roslyn.*`
-- **Host** — `Zphil.LoadBearing.Cli.*`
-- **Adapter** — `Zphil.LoadBearing.Xunit.*`
-- **Pack** — `Zphil.LoadBearing.Packs.*`
+- **Core** — `Zphil.LoadBearing`, `Zphil.LoadBearing.Baselines.*`, `Zphil.LoadBearing.Building.*`, `Zphil.LoadBearing.Checking.*`, `Zphil.LoadBearing.Codebase.*`, `Zphil.LoadBearing.Discovery.*`, `Zphil.LoadBearing.Fluent.*`, `Zphil.LoadBearing.Hosting.*`, `Zphil.LoadBearing.Internal.*`, `Zphil.LoadBearing.Model.*`, `Zphil.LoadBearing.Prose.*`, `Zphil.LoadBearing.Rendering.*`, `Zphil.LoadBearing.Validation.*`. Core is the package a spec is written against: the fluent language, the model a spec compiles to, and the readers of that model that need no compiler.
+- **Model** — `Zphil.LoadBearing.Model.*`. Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and the renderers both read.
+- **Checking** — `Zphil.LoadBearing.Checking.*`. Checking evaluates each rule of the model against an extracted codebase: a verdict per rule, its violations, and what the baselines grandfather.
+- **Rendering** — `Zphil.LoadBearing.Rendering.*`. Rendering turns the model and a check's results into what people and agents read: the managed block and cards, the diagrams, and the reports.
+- **Extraction** — `Zphil.LoadBearing.Roslyn.*`. Extraction is the Roslyn host: it loads a solution through MSBuild and reads out the codebase model the checker evaluates against.
+- **Host** — `Zphil.LoadBearing.Cli.*`. Host is the `loadbearing` command: the CLI verbs, the MCP server, and the spec loading and pipeline behind both.
+- **Adapter** — `Zphil.LoadBearing.Xunit.*`. Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own test project.
+- **Pack** — `Zphil.LoadBearing.Packs.*`. Pack is the shared rule pack: canonical .NET rules as an ordinary class library that a spec takes one method at a time.
 
 ### Rules
 - `layering/core-no-roslyn` — The Core layer must not reference the Extraction layer, types in `Microsoft.CodeAnalysis.*` or types in `Microsoft.Build.*`. Core is the netstandard2.0 reified model both render targets consume; Roslyn extraction is host machinery, and a Microsoft.CodeAnalysis or Microsoft.Build package reference would leak compiler types into Core just as the project reference would.

@@ -164,9 +164,7 @@ public static class SelectionAdjectives
     {
         NotNull(selection, nameof(selection));
         NotNull(more, nameof(more));
-        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, exclusion => exclusion);
-        Selection payload = ExceptPayload(selection.Owner, parts);
-        return Append(selection, new ExceptAdjective(payload));
+        return AppendExcept(selection, OperandList.OneOrMore(first, more, exclusion => exclusion));
     }
 
     /// <summary>
@@ -178,9 +176,7 @@ public static class SelectionAdjectives
         NotNull(selection, nameof(selection));
         NotNull(more, nameof(more));
         Arch owner = selection.Owner;
-        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => owner.Type(type));
-        Selection payload = ExceptPayload(owner, parts);
-        return Append(selection, new ExceptAdjective(payload));
+        return AppendExcept(selection, OperandList.OneOrMore(first, more, type => owner.Type(type)));
     }
 
     /// <summary>
@@ -207,9 +203,10 @@ public static class SelectionAdjectives
     // The excluded set for one or more operands: a single operand passes through as the payload unchanged —
     // byte for byte the model a one-operand Except has always built — and several mint the union arch.AnyOf
     // would (GRAMMAR §5.1), so prose and evaluation both reach them by paths that already exist.
-    private static Selection ExceptPayload(Arch owner, IReadOnlyList<Selection> parts)
+    private static Selection AppendExcept(Selection selection, IReadOnlyList<Selection> exclusions)
     {
-        return parts.Count == 1 ? parts[0] : UnionSelection.Create(owner, parts);
+        Selection payload = exclusions.Count == 1 ? exclusions[0] : UnionSelection.Create(selection.Owner, exclusions);
+        return Append(selection, new ExceptAdjective(payload));
     }
 
     private static Selection Append(Selection selection, SelectionAdjective adjective)

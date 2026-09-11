@@ -16,7 +16,7 @@ internal sealed class NamespaceNoun(string glob) : SelectionNoun
 
     internal override string CollapsedLocative(IReadOnlyList<SelectionNoun> group)
     {
-        List<string> globs = group.Select(noun => ProseFormat.Backtick(((NamespaceNoun)noun).Glob)).ToList();
-        return $" in {ProseFormat.JoinReferences(globs)}";
+        List<string> globs = group.Select(noun => ((NamespaceNoun)noun).Glob).ToList();
+        return $" in {ProseFormat.BacktickedList(globs)}";
     }
 }

@@ -39,5 +39,5 @@ flowchart LR
     end
 ```
 
-Not drawn in full: `naming/interfaces`, `legacy/billing/tripwire` (Quarantine). Expand any of them with `loadbearing explain <rule-id>`.
+Not drawn in full: `naming/interfaces`, `legacy/billing/tripwire` (Quarantine), `domain/retry-budget/tripwire` (Caution). Expand any of them with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->

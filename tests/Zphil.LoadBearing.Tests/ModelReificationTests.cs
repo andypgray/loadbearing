@@ -10,9 +10,9 @@ namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
 ///     The reified read model (acceptance): rule order over the post-desugar
-///     set, per-rule posture, Migrate reification and defaults (GRAMMAR §4.4), and Quarantine
-///     desugaring into containment + tripwire with boundary, baseline, dragons, and auto-Fix
-///     (GRAMMAR §7).
+///     set, per-rule posture, Migrate reification and defaults (GRAMMAR §4.4), Quarantine
+///     desugaring into containment + tripwire with boundary, baseline, dragons, and auto-Fix, and
+///     Caution desugaring into the tripwire alone (GRAMMAR §7).
 /// </summary>
 public class ModelReificationTests
 {
@@ -27,6 +27,14 @@ public class ModelReificationTests
             .BoundaryOnlyVia(typeof(IBillingFacade))
             .DragonsDoc("arch/billing-dragons.md")
             .Because("Replacement scheduled; see the linked doc."));
+
+    // A cautioned scope carrying both dragons forms, so its one child's payload can be pinned whole.
+    private static readonly IArchitectureSpec CautionScopeSpec = new InlineSpec(arch =>
+        arch.Scope("shared/utilities")
+            .Caution(arch.Namespace("MyApp.Shared.*"))
+            .Dragons(DragonsProse)
+            .DragonsDoc("arch/utilities-dragons.md")
+            .Because("The helpers are public API for the whole solution."));
 
     // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
     private static readonly IArchitectureSpec CtorRuleSpec = new InlineSpec(arch =>
@@ -45,9 +53,27 @@ public class ModelReificationTests
             .Rule(id);
     }
 
-    [Fact]
-    public void Build_CanonicalSample_ReifiesEightRulesInPinnedOrder()
+    // The containment child of a one-scope spec whose sanctioned surface the caller spells.
+    private static ArchRule BoundedContainment(Func<Arch, IQuarantinedScope, IQuarantinedScope> boundary)
     {
+        var spec = new InlineSpec(arch =>
+        {
+            IQuarantinedScope scope = arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"));
+
+            boundary(arch, scope)
+                .Dragons(DragonsProse)
+                .Because("Replacement scheduled.");
+        });
+
+        return ArchModelBuilder.Build(spec)
+            .Rule("legacy/billing/containment");
+    }
+
+    [Fact]
+    public void Build_CanonicalSample_ReifiesNineRulesInPinnedOrder()
+    {
+        // Nine post-desugar rules from eight statements: the quarantine mints two children, the caution one.
         BuildCanonical()
             .Rules.Select(rule => rule.Id)
             .ShouldBe(
@@ -57,6 +83,7 @@ public class ModelReificationTests
                 "data-access/no-inline-sql",
                 "legacy/billing/containment",
                 "legacy/billing/tripwire",
+                "domain/pricing/tripwire",
                 "naming/handlers",
                 "di/handlers-via-registry",
                 "style/type-name-length"
@@ -69,6 +96,7 @@ public class ModelReificationTests
     [InlineData("data-access/no-inline-sql", Posture.Migrate)]
     [InlineData("legacy/billing/containment", Posture.Quarantine)]
     [InlineData("legacy/billing/tripwire", Posture.Quarantine)]
+    [InlineData("domain/pricing/tripwire", Posture.Caution)]
     [InlineData("naming/handlers", Posture.Enforce)]
     [InlineData("di/handlers-via-registry", Posture.Enforce)]
     [InlineData("style/type-name-length", Posture.Enforce)]
@@ -87,7 +115,7 @@ public class ModelReificationTests
         rule.Fix.ShouldBe("Define an abstraction in Domain and implement it in Web.");
         rule.Constraint.ShouldNotBeNull();
         rule.Migrate.ShouldBeNull();
-        rule.Quarantine.ShouldBeNull();
+        rule.Scope.ShouldBeNull();
     }
 
     [Fact]
@@ -137,9 +165,9 @@ public class ModelReificationTests
     {
         ArchRule containment = Rule("legacy/billing/containment");
 
-        QuarantineData quarantine = containment.Quarantine.ShouldNotBeNull();
-        quarantine.Role.ShouldBe(QuarantineRole.Containment);
-        quarantine.Boundary.ShouldBe([typeof(IBillingFacade), typeof(BillingFacade)]);
+        ScopeData quarantine = containment.Scope.ShouldNotBeNull();
+        quarantine.Role.ShouldBe(ScopeRole.Containment);
+        quarantine.Surface.ShouldBe(["`IBillingFacade`", "`BillingFacade`"]);
         quarantine.BaselinePath.ShouldBe("arch/baseline.json");
         quarantine.Dragons.ShouldBe(DragonsProse);
         quarantine.ScopeId.ShouldBe("legacy/billing");
@@ -147,7 +175,7 @@ public class ModelReificationTests
         // Auto-derived fix from the first BoundaryOnlyVia type (GRAMMAR §5.5).
         containment.Fix.ShouldBe("use `IBillingFacade`");
         // The raw quarantined selection rides on the containment child so the renderer can place it.
-        quarantine.Quarantined.ShouldNotBeNull();
+        quarantine.Scoped.ShouldNotBeNull();
     }
 
     [Fact]
@@ -155,17 +183,110 @@ public class ModelReificationTests
     {
         ArchRule tripwire = Rule("legacy/billing/tripwire");
 
-        QuarantineData quarantine = tripwire.Quarantine.ShouldNotBeNull();
-        quarantine.Role.ShouldBe(QuarantineRole.Tripwire);
+        ScopeData quarantine = tripwire.Scope.ShouldNotBeNull();
+        quarantine.Role.ShouldBe(ScopeRole.Tripwire);
         quarantine.Dragons.ShouldBe(DragonsProse);
         quarantine.ScopeId.ShouldBe("legacy/billing");
         // Boundary and baseline are containment concerns; the tripwire has no closed-vocabulary law yet.
-        quarantine.Boundary.ShouldBeEmpty();
+        quarantine.Surface.ShouldBeEmpty();
         quarantine.BaselinePath.ShouldBeNull();
         // The quarantined selection rides on the tripwire too so its diff-touch can map changed files.
-        quarantine.Quarantined.ShouldNotBeNull();
+        quarantine.Scoped.ShouldNotBeNull();
         tripwire.Constraint.ShouldBeNull();
         tripwire.Sentence.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void QuarantineScope_StillDesugarsIntoContainmentThenTripwire()
+    {
+        // The zero-move guard for the desugarer's fork: a quarantine mints the same two children in the
+        // same order it always did, whatever the other posture mints.
+        ArchModelBuilder.Build(DragonsDocScopeSpec)
+            .Rules.Select(rule => rule.Id)
+            .ShouldBe(["legacy/billing/containment", "legacy/billing/tripwire"]);
+    }
+
+    [Fact]
+    public void CautionScope_DesugarsIntoTheTripwireAlone()
+    {
+        // One rule, not two with an inert half: a caution declares no containment law, so there is nothing
+        // for a second child to hold.
+        ArchModelBuilder.Build(CautionScopeSpec)
+            .Rules.Select(rule => rule.Id)
+            .ShouldBe(["shared/utilities/tripwire"]);
+    }
+
+    [Fact]
+    public void CautionScope_TripwireCarriesTheScopePayloadAndNoLaw()
+    {
+        ArchRule tripwire = ArchModelBuilder.Build(CautionScopeSpec)
+            .Rule("shared/utilities/tripwire");
+
+        tripwire.Posture.ShouldBe(Posture.Caution);
+        tripwire.Because.ShouldBe("The helpers are public API for the whole solution.");
+        tripwire.Constraint.ShouldBeNull();
+        tripwire.Sentence.ShouldBe(string.Empty);
+        tripwire.Fix.ShouldBeNull();
+        tripwire.BaselinePath.ShouldBeNull();
+
+        ScopeData caution = tripwire.Scope.ShouldNotBeNull();
+        caution.Role.ShouldBe(ScopeRole.Tripwire);
+        caution.ScopeId.ShouldBe("shared/utilities");
+        caution.Dragons.ShouldBe(DragonsProse);
+        caution.DragonsDoc.ShouldBe("arch/utilities-dragons.md");
+        // Boundary and baseline are containment concerns, and a caution has no containment at all.
+        caution.Surface.ShouldBeEmpty();
+        caution.BaselinePath.ShouldBeNull();
+        // The scoped selection rides on the tripwire so the renderer can place the card and the diff-touch
+        // can map changed files — the same two jobs it does on a quarantine's tripwire.
+        caution.Scoped.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void QuarantineScope_NamespaceBoundary_SanctionsARegionAndNamesItInTheFix()
+    {
+        ArchRule containment = BoundedContainment((arch, scope) =>
+            scope.BoundaryOnlyVia(arch.Namespace("MyApp.Legacy.Billing.Contracts.*")));
+
+        containment.Scope.ShouldNotBeNull()
+            .Surface.ShouldBe(["types in `MyApp.Legacy.Billing.Contracts.*`"]);
+        containment.Fix.ShouldBe("use types in `MyApp.Legacy.Billing.Contracts.*`");
+    }
+
+    [Fact]
+    public void QuarantineScope_NamedBoundary_SanctionsASurfaceTheSpecNeverLoads()
+    {
+        // The no-load spelling (GRAMMAR §7): no typeof, so no reference to the product assembly and no
+        // [InternalsVisibleTo] for an internal facade.
+        ArchRule containment = BoundedContainment((arch, scope) => scope.BoundaryOnlyVia(arch.Types.Named("BillingFacade")));
+
+        containment.Scope.ShouldNotBeNull()
+            .Surface.ShouldBe(["types named `BillingFacade`"]);
+        containment.Fix.ShouldBe("use types named `BillingFacade`");
+    }
+
+    [Fact]
+    public void QuarantineScope_TypeBoundary_IsSugarForTheSameSelectionModel()
+    {
+        ArchRule sugar = BoundedContainment((_, scope) => scope.BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade)));
+        ArchRule spelled = BoundedContainment((arch, scope) =>
+            scope.BoundaryOnlyVia(arch.Type<IBillingFacade>(), arch.Type<BillingFacade>()));
+
+        // Identical model, identical prose — the whole of what "sugar" claims (GRAMMAR §3.3).
+        sugar.Sentence.ShouldBe(spelled.Sentence);
+        sugar.Fix.ShouldBe(spelled.Fix);
+        sugar.Scope.ShouldNotBeNull()
+            .Surface.ShouldBe(spelled.Scope.ShouldNotBeNull().Surface);
+    }
+
+    [Fact]
+    public void QuarantineScope_MixedBoundary_WrapsTheTypeBesideTheSelection()
+    {
+        ArchRule containment = BoundedContainment((arch, scope) =>
+            scope.BoundaryOnlyVia(arch.Types.Named("BillingFacade"), arch.Type<IBillingFacade>()));
+
+        containment.Scope.ShouldNotBeNull()
+            .Surface.ShouldBe(["types named `BillingFacade`", "`IBillingFacade`"]);
     }
 
     [Fact]
@@ -183,12 +304,12 @@ public class ModelReificationTests
     {
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rule("legacy/billing/containment")
-            .Quarantine.ShouldNotBeNull();
+        ScopeData containment = model.Rule("legacy/billing/containment")
+            .Scope.ShouldNotBeNull();
         containment.DragonsDoc.ShouldBe("arch/billing-dragons.md");
         containment.Dragons.ShouldBeNull();
         model.Rule("legacy/billing/tripwire")
-            .Quarantine.ShouldNotBeNull()
+            .Scope.ShouldNotBeNull()
             .DragonsDoc.ShouldBe("arch/billing-dragons.md");
     }
 
@@ -198,13 +319,13 @@ public class ModelReificationTests
         // DragonsDocScopeSpec omits .Baseline, so the containment child falls back to the default.
         ArchitectureModel model = ArchModelBuilder.Build(DragonsDocScopeSpec);
 
-        QuarantineData containment = model.Rule("legacy/billing/containment")
-            .Quarantine.ShouldNotBeNull();
+        ScopeData containment = model.Rule("legacy/billing/containment")
+            .Scope.ShouldNotBeNull();
         // .Baseline omitted ⇒ conventional default derived from the containment rule ID (GRAMMAR §4.4/§7).
         containment.BaselinePath.ShouldBe("arch/baselines/legacy/billing/containment.json");
         // The tripwire's baseline stays null — grandfathering is a containment concern.
         model.Rule("legacy/billing/tripwire")
-            .Quarantine.ShouldNotBeNull()
+            .Scope.ShouldNotBeNull()
             .BaselinePath.ShouldBeNull();
     }
 

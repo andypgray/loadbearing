@@ -7,6 +7,10 @@
 # the rule ID, reason, fix, and file:line and self-corrects); LoadBearing's own error -> 1
 # (a non-blocking config problem, not an architecture violation the agent is told to "fix").
 #
+# Exit 0 is not silence: --hook-json makes a clean check write its report as PostToolUse additional
+# context when a tripwire warned, and this wrapper passes that through on stdout, where Claude Code
+# turns it into a transcript message. A clean check with nothing to say writes nothing.
+#
 # Lift this into your own repo: copy it to .claude/arch-hook.sh and change the three values below.
 
 # The PostToolUse payload on stdin names the edited file. Read it once, because stdin does not
@@ -73,10 +77,10 @@ SOLUTION="${SOLUTION:-examples/Meridian/Meridian.slnx}"
 SPEC="${SPEC:-examples/Meridian/arch/Meridian.ArchSpec/bin/Debug/net10.0/Meridian.ArchSpec.dll}"
 DIFF_BASE="${DIFF_BASE:-HEAD}"
 
-out=$(loadbearing check "$SOLUTION" --spec "$SPEC" --diff-base "$DIFF_BASE" 2>&1)
+out=$(loadbearing check "$SOLUTION" --spec "$SPEC" --diff-base "$DIFF_BASE" --hook-json 2>&1)
 code=$?
 case "$code" in
-  0) exit 0 ;;
+  0) [ -n "$out" ] && printf '%s\n' "$out"; exit 0 ;; # tripwire warnings reach the agent as context
   1) printf '%s\n' "$out" >&2; exit 2 ;;             # violations -> block
   *) printf 'loadbearing config error:\n%s\n' "$out" >&2; exit 1 ;;
 esac

@@ -16,7 +16,7 @@ public sealed class CheckReport
         ViolationCount = results.Sum(r => r.Violations.Count);
         WarningCount = results.Sum(r => r.Warnings.Count);
         GrandfatheredCount = results.Sum(r => r.Grandfathered.Count);
-        GrandfatheredSiteCount = results.Sum(r => r.Grandfathered.Sum(v => v.Sites.Count));
+        GrandfatheredSiteCount = results.Sum(r => r.GrandfatheredSiteCount);
         StaleBaselineEntryCount = results.Sum(r => r.StaleBaselineEntries);
         ShrunkBaselineEntryCount = results.Sum(r => r.ShrunkBaselineEntries);
         UncountedBaselineEntryCount = results.Sum(r => r.UncountedBaselineEntries);
@@ -35,7 +35,7 @@ public sealed class CheckReport
     public int RulesFailed { get; }
 
     /// <summary>
-    ///     Rules the run reached no verdict for — a Quarantine tripwire with no <c>--diff-base</c> diff
+    ///     Rules the run reached no verdict for — a scope tripwire with no <c>--diff-base</c> diff
     ///     context (GRAMMAR §7), or a rule whose subject a solution filter left out of the checked universe.
     /// </summary>
     public int RulesSkipped { get; }

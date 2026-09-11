@@ -18,5 +18,7 @@ internal sealed class ProjectExceptAdjective(ProjectSelection payload) : Project
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.SubjectFinal;
 
+    internal override bool OpensParenthetical => true;
+
     internal override string Fragment => ", except " + SentenceRenderer.ProjectReference(Payload);
 }

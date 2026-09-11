@@ -3,7 +3,7 @@
 
 ## Layer `Domain`
 
-This directory holds the `Domain` layer. Its architecture rules:
+This directory holds the `Domain` layer. Domain holds the booking and rate model and the ports the web tier depends on. Its architecture rules:
 
 - `layering/domain-independent` — The Domain layer must not reference the Web layer. Domain holds the booking and rate model the rest of the system depends on; it must not reach up into the web tier.
 - Expand any rule above with `loadbearing explain <rule-id>`.

@@ -14,9 +14,9 @@ namespace Zphil.LoadBearing.Checking;
 ///     Enforce rules are evaluated; ratcheted rules — Migrate and Quarantine containment — are
 ///     evaluated the same way and then <em>partitioned</em> against a <see cref="BaselineIndex" />
 ///     (in-baseline = grandfathered/pass, not-in-baseline = red, including new code in the old
-///     pattern, and in-baseline-but-carrying-more-sites-than-the-entry-records red too); a Quarantine
-///     tripwire runs the diff-aware touch check (GRAMMAR §7), warning per
-///     changed file inside the scope and passing, or skipping when no <see cref="DiffContext" /> was
+///     pattern, and in-baseline-but-carrying-more-sites-than-the-entry-records red too); a scope
+///     tripwire — a quarantine's or a caution's — runs the diff-aware touch check (GRAMMAR §7), warning
+///     per changed file inside the scope and passing, or skipping when no <see cref="DiffContext" /> was
 ///     supplied. Any evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather
 ///     than aborting the run (all-errors philosophy). The run's universe is accounted for here too: the
 ///     evaluator reports what it evaluated and says nothing about the run it ran in, so a rule that
@@ -28,6 +28,10 @@ public static class ArchChecker
     /// <summary>Pinned skip reason for a Quarantine tripwire when no <c>--diff-base</c> diff context is present.</summary>
     internal const string TripwireSkipReason =
         "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this quarantined scope.";
+
+    /// <summary>Pinned skip reason for a Caution tripwire when no <c>--diff-base</c> diff context is present.</summary>
+    internal const string CautionTripwireSkipReason =
+        "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this cautioned scope.";
 
     // Stateless, so one instance serves every rule of every run.
     private static readonly IComparer<Violation> ReportOrder = new ReportOrderComparer();
@@ -56,14 +60,14 @@ public static class ArchChecker
     ///     containment) are partitioned against <paramref name="baselines" />: a violation whose
     ///     identity (GRAMMAR §4.3) is in the rule's captured section is grandfathered (it passes), unless
     ///     it carries more sites than that entry records, which is growth and red;
-    ///     anything else is red. A Quarantine tripwire warns for each changed file in
-    ///     <paramref name="diff" /> that declares a type in the quarantined scope, or skips when
+    ///     anything else is red. A scope tripwire warns for each changed file in
+    ///     <paramref name="diff" /> that declares a type in the scope, or skips when
     ///     <paramref name="diff" /> is null.
     /// </summary>
     /// <param name="model">The finalized model whose rules to evaluate.</param>
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
     /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <param name="diff">The changed-file context a scope tripwire warns from, or null to skip it.</param>
     /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
     public static CheckReport Check(
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
@@ -83,7 +87,7 @@ public static class ArchChecker
     /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
     /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <param name="diff">The changed-file context a scope tripwire warns from, or null to skip it.</param>
     /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
@@ -107,7 +111,7 @@ public static class ArchChecker
     /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
     /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <param name="diff">The changed-file context a Quarantine tripwire warns from, or null to skip it.</param>
+    /// <param name="diff">The changed-file context a scope tripwire warns from, or null to skip it.</param>
     /// <param name="narrowing">
     ///     The solution filter that answered this run over part of the solution, or null when the run's
     ///     universe is the whole of it.
@@ -140,7 +144,7 @@ public static class ArchChecker
     ///     A pattern matches the whole rule ID as a single ordinal token, where <c>*</c> spans any run of
     ///     characters including the <c>/</c> separator. There is no implicit subtree: <c>legacy/billing</c>
     ///     selects a rule with exactly that ID and none of its children, while <c>legacy/billing/*</c>
-    ///     selects the children a Quarantine scope desugars into (GRAMMAR §7). An empty glob list selects
+    ///     selects the children a scope desugars into (GRAMMAR §7). An empty glob list selects
     ///     every rule, so an unfiltered call costs nothing.
     /// </remarks>
     /// <param name="model">The finalized model to select from.</param>
@@ -162,12 +166,14 @@ public static class ArchChecker
         ArchRule rule, ConstraintEvaluator evaluator, SelectionEvaluator selections, BaselineIndex baselines,
         DiffContext? diff, NarrowedUniverse? narrowing)
     {
-        // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never
-        // reach the evaluator); it is a diff-aware warning check, not a red-producing rule (GRAMMAR §7).
-        if (rule.Quarantine is { Role: QuarantineRole.Tripwire }) return Tripwire(rule, selections, diff);
-
         try
         {
+            // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never
+            // reach the evaluator); it is a diff-aware warning check, not a red-producing rule (GRAMMAR §7).
+            // Inside the try because the class promises every evaluation fault becomes a RuleError rather
+            // than aborting the run, and evaluating the scoped selection is an evaluation like any other.
+            if (rule.Scope is { Role: ScopeRole.Tripwire }) return Tripwire(rule, selections, diff);
+
             (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
                 evaluator.Evaluate(rule.Constraint!);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
@@ -285,18 +291,21 @@ public static class ArchChecker
             captured, grandfatheredEntries, coverage, grown);
     }
 
-    // The Quarantine tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per
-    // changed file that declares a type in the quarantined selection and always passes (warnings never gate).
-    // An empty quarantined selection yields zero warnings and passes silently — containment's EmptySubject is
-    // the loud misconfiguration channel.
+    // The scope tripwire (GRAMMAR §7): with no diff context it skips; otherwise it warns once per changed
+    // file that declares a type in the scoped selection and always passes (warnings never gate). An empty
+    // scoped selection yields zero warnings and passes silently — for a quarantine, containment's
+    // EmptySubject is the loud misconfiguration channel; a caution has no such channel, and accepts the
+    // silence as the price of having no red state at all.
     private static RuleResult Tripwire(ArchRule rule, SelectionEvaluator selections, DiffContext? diff)
     {
-        if (diff is null) return Skipped(rule, TripwireSkipReason);
+        bool caution = rule.Posture == Posture.Caution;
+        if (diff is null) return Skipped(rule, caution ? CautionTripwireSkipReason : TripwireSkipReason);
 
-        string scopeId = rule.Quarantine!.ScopeId;
-        HashSet<TypeNode> quarantined = selections.Evaluate(rule.Quarantine.Quarantined!, SelectionPosition.Subject);
+        string scopeId = rule.Scope!.ScopeId;
+        CheckWarningKind kind = caution ? CheckWarningKind.CautionedScopeTouched : CheckWarningKind.QuarantinedScopeTouched;
+        HashSet<TypeNode> scoped = selections.Evaluate(rule.Scope.Scoped!, SelectionPosition.Subject);
 
-        List<CheckWarning> touched = quarantined
+        List<CheckWarning> touched = scoped
             .Where(type => !type.IsExternal)
             .SelectMany(type => type.DeclarationSites)
             .Select(site => site.FilePath)
@@ -304,16 +313,22 @@ public static class ArchChecker
             .Where(diff.Contains)
             .Select(diff.SolutionRelative)
             .OrderBy(path => path, StringComparer.Ordinal)
-            .Select(path => new CheckWarning(CheckWarningKind.QuarantinedScopeTouched, TripwireMessage(path, scopeId)))
+            .Select(path => new CheckWarning(kind, TripwireMessage(path, scopeId, caution), path))
             .ToList();
 
         return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched);
     }
 
-    private static string TripwireMessage(string relativePath, string scopeId)
+    // The two postures word the same finding differently because they ask different things of the reader: a
+    // quarantine asks whether the task requires being here at all, a caution only that the dragons be read
+    // before editing. Both name the tripwire as the way to read them.
+    private static string TripwireMessage(string relativePath, string scopeId, bool caution)
     {
-        return $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
-               $"require editing dragon territory? Dragons: loadbearing explain {scopeId}/tripwire.";
+        return caution
+            ? $"Changed file '{relativePath}' is inside cautioned scope '{scopeId}' — read the dragons before " +
+              $"editing: loadbearing explain {scopeId}/tripwire."
+            : $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
+              $"require editing dragon territory? Dragons: loadbearing explain {scopeId}/tripwire.";
     }
 
     // A rule the narrowed run never had in view: its subject selection matched nothing, and nothing is

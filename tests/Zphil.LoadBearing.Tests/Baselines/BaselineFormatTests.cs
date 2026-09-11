@@ -18,16 +18,10 @@ namespace Zphil.LoadBearing.Tests.Baselines;
 /// </summary>
 public sealed class BaselineFormatTests
 {
-    private static Dictionary<string, IReadOnlyCollection<BaselineEntry>> Rules(
-        params (string Id, BaselineEntry[] Entries)[] rules)
-    {
-        return rules.ToDictionary(r => r.Id, r => (IReadOnlyCollection<BaselineEntry>)r.Entries, StringComparer.Ordinal);
-    }
-
     [Fact]
     public void ComposeFile_SingleEdgeEntry_MatchesPinnedCanonicalText()
     {
-        string composed = BaselineFormat.ComposeFile(Rules((
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules((
             "data-access/no-inline-sql",
             [BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")])));
 
@@ -48,7 +42,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComposeFile_UnsortedInput_SortsRulesAndEntriesOrdinal()
     {
-        string composed = BaselineFormat.ComposeFile(Rules(
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(
             ("z/rule", [BaselineEntry.ForSubject("T:N.Beta"), BaselineEntry.ForSubject("T:N.Alpha")]),
             ("a/rule", [BaselineEntry.ForEdge("T:N.Src2", "T:N.Tgt"), BaselineEntry.ForEdge("T:N.Src1", "T:N.Tgt")])));
 
@@ -65,7 +59,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComposeFile_EmptyEntries_RendersEmptyArrayOnOneLine()
     {
-        string composed = BaselineFormat.ComposeFile(Rules(("data-access/no-inline-sql", [])));
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("data-access/no-inline-sql", [])));
 
         composed.ShouldContain("      \"entries\": []\n");
     }
@@ -73,7 +67,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComposeFile_Always_LfNoBomTrailingNewline()
     {
-        string composed = BaselineFormat.ComposeFile(Rules((
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules((
             "r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
         byte[] bytes = Encoding.UTF8.GetBytes(composed);
 
@@ -91,7 +85,7 @@ public sealed class BaselineFormatTests
         // points to keep the source free of invisible control chars: quote, backslash, TAB (0x09, a
         // named escape) and U+0001 (0x01, which falls through to the \u00XX form).
         string subject = "a\"b\\c" + (char)0x09 + "d" + (char)0x01 + "e";
-        string composed = BaselineFormat.ComposeFile(Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
 
         composed.ShouldContain("{ \"subject\": \"a\\\"b\\\\c\\td\\u0001e\" }");
     }
@@ -103,7 +97,7 @@ public sealed class BaselineFormatTests
         // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.cs:236-250); U+001F (<0x20) falls
         // through to \uXXXX. Built from explicit code points to keep the source free of invisible control chars.
         string subject = "a" + (char)0x08 + (char)0x0C + (char)0x0A + (char)0x0D + (char)0x09 + (char)0x1F + "z";
-        string composed = BaselineFormat.ComposeFile(Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
 
         composed.ShouldContain("\"a\\b\\f\\n\\r\\t\\u001fz\"");
 
@@ -121,7 +115,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void DigestInput_EdgeAndSubjectEntries_MatchesPinnedGrammar()
     {
-        string input = BaselineFormat.DigestInput(Rules((
+        string input = BaselineFormat.DigestInput(BaselineComposer.Rules((
             "r/x", [BaselineEntry.ForEdge("T:A", "T:B"), BaselineEntry.ForSubject("T:C")])));
 
         input.ShouldBe(
@@ -138,7 +132,7 @@ public sealed class BaselineFormatTests
         // immediately after the entry it measures and before that entry's attribution. Entries still
         // arrive in canonical order, which is why the subject — sorting ordinal before the edge's source
         // — leads here whatever order the input named them in.
-        string input = BaselineFormat.DigestInput(Rules((
+        string input = BaselineFormat.DigestInput(BaselineComposer.Rules((
             "data-access/no-inline-sql", [
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
                     .WithSiteCount(2)
@@ -162,7 +156,7 @@ public sealed class BaselineFormatTests
         // that carries one. That is what lets a file written before the measure existed still verify
         // against the digest it stored, which is the whole of the transparent legacy read.
         string input = BaselineFormat.DigestInput(
-            Rules((
+            BaselineComposer.Rules((
                 "r/x", [
                     BaselineEntry.ForEdge("T:A", "T:B")
                         .WithSiteCount(2)
@@ -182,7 +176,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComputeDigest_KnownInput_MatchesIndependentSha256()
     {
-        Dictionary<string, IReadOnlyCollection<BaselineEntry>> rules = Rules(
+        IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules = BaselineComposer.Rules(
             ("b/two", [BaselineEntry.ForSubject("T:N.Two")]),
             ("a/one", [BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")]));
 
@@ -197,7 +191,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComposeFile_AttributedEdgeAndSubject_RenderBecauseLastOnOneLine()
     {
-        string composed = BaselineFormat.ComposeFile(Rules(("r/x",
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r/x",
         [
             BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
                 .WithBecause("INC-1234"),
@@ -215,7 +209,7 @@ public sealed class BaselineFormatTests
         // Both shapes on one line, in the one order the format allows: the measure closes the identity
         // slots, the attribution closes the entry. An uncounted entry omits the key rather than writing a
         // null, so a burndown diff of a partially upgraded file still moves one line per entry.
-        string composed = BaselineFormat.ComposeFile(Rules(("r/x",
+        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r/x",
         [
             BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
                 .WithSiteCount(2),
@@ -234,7 +228,7 @@ public sealed class BaselineFormatTests
     [Fact]
     public void DigestInput_AttributedEntries_EmitBecauseLineAfterOwnLine()
     {
-        string input = BaselineFormat.DigestInput(Rules((
+        string input = BaselineFormat.DigestInput(BaselineComposer.Rules((
             "r/x", [
                 BaselineEntry.ForEdge("T:A", "T:B")
                     .WithBecause("INC-1234"),
@@ -252,13 +246,13 @@ public sealed class BaselineFormatTests
     [Fact]
     public void ComputeDigest_AttributedVsUnattributed_Differ()
     {
-        string plain = BaselineFormat.ComputeDigest(Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
-        string attributed = BaselineFormat.ComputeDigest(Rules((
+        string plain = BaselineFormat.ComputeDigest(BaselineComposer.Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
+        string attributed = BaselineFormat.ComputeDigest(BaselineComposer.Rules((
             "r/x", [
                 BaselineEntry.ForEdge("T:A", "T:B")
                     .WithBecause("INC-1234")
             ])));
-        string otherText = BaselineFormat.ComputeDigest(Rules((
+        string otherText = BaselineFormat.ComputeDigest(BaselineComposer.Rules((
             "r/x", [
                 BaselineEntry.ForEdge("T:A", "T:B")
                     .WithBecause("INC-9999")
@@ -273,13 +267,13 @@ public sealed class BaselineFormatTests
     {
         // The measure is folded into the digest, which is what makes a hand-raised count tamper rather
         // than a silently widened allowance — the one property that stops the ratchet being edited open.
-        string uncounted = BaselineFormat.ComputeDigest(Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
-        string two = BaselineFormat.ComputeDigest(Rules((
+        string uncounted = BaselineFormat.ComputeDigest(BaselineComposer.Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
+        string two = BaselineFormat.ComputeDigest(BaselineComposer.Rules((
             "r/x", [
                 BaselineEntry.ForEdge("T:A", "T:B")
                     .WithSiteCount(2)
             ])));
-        string three = BaselineFormat.ComputeDigest(Rules((
+        string three = BaselineFormat.ComputeDigest(BaselineComposer.Rules((
             "r/x", [
                 BaselineEntry.ForEdge("T:A", "T:B")
                     .WithSiteCount(3)
@@ -295,8 +289,8 @@ public sealed class BaselineFormatTests
         // The preamble carries the version, so one entry set hashes to two values. That is what forces the
         // schemaVersion bump: with the count in the digest but the version unchanged, a tool that predates
         // the measure would read a new file as *tampered* rather than as one it does not understand.
-        Dictionary<string, IReadOnlyCollection<BaselineEntry>> rules =
-            Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")]));
+        IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules =
+            BaselineComposer.Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")]));
 
         BaselineFormat.ComputeDigest(rules, BaselineFormat.SchemaVersion)
             .ShouldNotBe(BaselineFormat.ComputeDigest(rules, BaselineFormat.LegacySchemaVersion));
@@ -309,7 +303,7 @@ public sealed class BaselineFormatTests
         // them honest. Compared after CRLF normalization (core.autocrlf may check them out as CRLF).
         // Each controller declares the DataTable twice, as a return type and as a construction, on two
         // lines — so every edge entry here grandfathers two sites, and the count is part of the bytes.
-        string violated = BaselineFormat.ComposeFile(Rules((
+        string violated = BaselineFormat.ComposeFile(BaselineComposer.Rules((
             "data-access/no-inline-sql",
             [
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
@@ -319,7 +313,7 @@ public sealed class BaselineFormatTests
             .NormalizedLines()
             .ShouldBe(violated);
 
-        string clean = BaselineFormat.ComposeFile(Rules((
+        string clean = BaselineFormat.ComposeFile(BaselineComposer.Rules((
             "data-access/no-inline-sql",
             [
                 BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable")

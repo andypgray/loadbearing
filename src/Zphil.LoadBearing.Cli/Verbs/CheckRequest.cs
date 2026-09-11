@@ -7,7 +7,16 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 /// <param name="Solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>
 /// <param name="Spec">The <c>--spec</c> value (a built DLL or a solution-member csproj), or null for convention.</param>
 /// <param name="Json">Whether to emit the machine-readable JSON document instead of human output.</param>
-/// <param name="DiffBase">The <c>--diff-base</c> git ref for the Quarantine tripwire, or null to skip it.</param>
+/// <param name="HookJson">
+///     Whether to render for a Claude Code <c>PostToolUse</c> hook. A clean run carrying at least one
+///     warning writes the hook document (<see cref="Rendering.HookReportRenderer" />) and nothing else, so
+///     the wrapper passes stdout straight through and the warning reaches the agent as transcript context;
+///     a clean run with no warnings writes nothing at all; every other outcome writes what it always wrote,
+///     which is what the wrapper blocks with. Nothing else may share that stdout, so the run's whole human
+///     side — stamps, report and diagnostics alike — is composed into one buffer and then placed, rather
+///     than streamed across two channels. Refused beside <see cref="Json" />: two documents, one stdout.
+/// </param>
+/// <param name="DiffBase">The <c>--diff-base</c> git ref for the scope tripwires, or null to skip them.</param>
 /// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
 /// <param name="NoCache">Whether to bypass the persisted extraction cache entirely (no read, no write).</param>
 /// <param name="Binlog">
@@ -43,6 +52,7 @@ internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
     bool Json,
+    bool HookJson,
     string? DiffBase,
     string WorkingDirectory,
     bool NoCache,

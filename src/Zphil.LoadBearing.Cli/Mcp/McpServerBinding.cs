@@ -36,6 +36,13 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     private const bool AsJsonDocument = true;
 
     /// <summary>
+    ///     Never the hook document: that one shapes a command hook's stdout around an exit code, and a tool
+    ///     call has neither. A client that wants the warnings reads them from the document's own
+    ///     <c>warnings</c> arrays.
+    /// </summary>
+    private const bool NoHookDocument = false;
+
+    /// <summary>
     ///     A tool call never reads or writes <c>cache.json</c>: the warm session and the persisted cache keep
     ///     independent lifetimes, so they can never race on the file.
     /// </summary>
@@ -57,14 +64,14 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     ///     The <c>arch_check</c> run. The rule globs go in raw, so the same parse and the same
     ///     unmatched-filter refusal serve both surfaces.
     /// </summary>
-    /// <param name="diffBase">The git ref the Quarantine tripwire compares against, or null to skip it.</param>
+    /// <param name="diffBase">The git ref a scope tripwire compares against, or null to skip it.</param>
     /// <param name="rules">Rule-ID globs narrowing what runs, or null for every rule.</param>
     /// <param name="grain">The floor on detail — coarser, never narrower.</param>
     internal CheckRequest CheckRequest(string? diffBase, string? rules, DocumentGrain grain)
     {
         return new CheckRequest(
-            Solution, Spec, AsJsonDocument, diffBase, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
-            ReportPartialModels, NoSarifFile, rules, grain);
+            Solution, Spec, AsJsonDocument, NoHookDocument, diffBase, WorkingDirectory, BypassPersistedCache,
+            NoBinlogReplay, ReportPartialModels, NoSarifFile, rules, grain);
     }
 
     /// <summary>The <c>arch_status</c> run: the whole burndown, which carries no narrowing knob.</summary>

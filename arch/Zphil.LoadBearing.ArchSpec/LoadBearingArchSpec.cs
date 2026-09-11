@@ -10,7 +10,7 @@ namespace Zphil.LoadBearing.ArchSpec;
 
 /// <summary>
 ///     LoadBearing's own architecture spec — the dogfood render source, governing this repo's real code
-///     so the product governs itself honestly. It exercises all three postures across eight declared
+///     so the product governs itself honestly. It exercises all four postures across eight declared
 ///     layers, and every rule below is a genuine boundary: nothing in the build system states these laws,
 ///     and almost nothing prevents breaking them — the release pipeline's four-package count and
 ///     locked-mode restore graze two of the packaging rules, each checking a downstream outcome rather
@@ -20,8 +20,10 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///     <para>
 ///         Layers: five are assembly-shaped (Core, Extraction, Host, Adapter, Pack), and three more —
 ///         Model, Checking, Rendering — cut Core into the pieces <c>layering/model-independent</c> needs
-///         to name. Checking and Rendering carry no anchored rule on purpose: a declared layer with
-///         nothing to say renders a module-map row and no card, an honest negative. The union-subject
+///         to name. Every layer says what it is for, and a self-spec test holds that complete. Checking
+///         and Rendering carry no anchored rule on purpose: a declared layer with no law of its own still
+///         renders a module-map row — its name, its globs and its purpose — and no card, an honest
+///         negative. The union-subject
 ///         rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>,
 ///         <c>model/reified-nodes-immutable</c>, <c>state/no-static-mutable</c> and the exception laws)
 ///         place no card either — a union has no single home directory.
@@ -153,7 +155,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         "ProjectSelectionAdjectives",
         "ProjectSelectionConstraints",
         "PropertySelectionConstraints",
-        "QuarantineRole",
+        "ScopeRole",
         "Selection",
         "SelectionAdjectives",
         "SelectionConstraints",
@@ -200,26 +202,42 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         // That makes the list brittle by construction, which is why SelfSpecTests pins it against the
         // project: a new Core namespace that nobody adds here would silently escape core's rules.
         Layer core = arch.Layer("Core",
-            "Zphil.LoadBearing",
-            "Zphil.LoadBearing.Baselines.*",
-            "Zphil.LoadBearing.Building.*",
-            "Zphil.LoadBearing.Checking.*",
-            "Zphil.LoadBearing.Codebase.*",
-            "Zphil.LoadBearing.Discovery.*",
-            "Zphil.LoadBearing.Fluent.*",
-            "Zphil.LoadBearing.Hosting.*",
-            "Zphil.LoadBearing.Internal.*",
-            "Zphil.LoadBearing.Model.*",
-            "Zphil.LoadBearing.Prose.*",
-            "Zphil.LoadBearing.Rendering.*",
-            "Zphil.LoadBearing.Validation.*");
-        Layer model = arch.Layer("Model", "Zphil.LoadBearing.Model.*");
-        Layer checking = arch.Layer("Checking", "Zphil.LoadBearing.Checking.*");
-        Layer rendering = arch.Layer("Rendering", "Zphil.LoadBearing.Rendering.*");
-        Layer extraction = arch.Layer("Extraction", "Zphil.LoadBearing.Roslyn.*");
-        Layer host = arch.Layer("Host", "Zphil.LoadBearing.Cli.*");
-        Layer adapter = arch.Layer("Adapter", "Zphil.LoadBearing.Xunit.*");
-        Layer pack = arch.Layer("Pack", "Zphil.LoadBearing.Packs.*");
+                "Zphil.LoadBearing",
+                "Zphil.LoadBearing.Baselines.*",
+                "Zphil.LoadBearing.Building.*",
+                "Zphil.LoadBearing.Checking.*",
+                "Zphil.LoadBearing.Codebase.*",
+                "Zphil.LoadBearing.Discovery.*",
+                "Zphil.LoadBearing.Fluent.*",
+                "Zphil.LoadBearing.Hosting.*",
+                "Zphil.LoadBearing.Internal.*",
+                "Zphil.LoadBearing.Model.*",
+                "Zphil.LoadBearing.Prose.*",
+                "Zphil.LoadBearing.Rendering.*",
+                "Zphil.LoadBearing.Validation.*")
+            .Purpose("Core is the package a spec is written against: the fluent language, the model a spec " +
+                     "compiles to, and the readers of that model that need no compiler.");
+        Layer model = arch.Layer("Model", "Zphil.LoadBearing.Model.*")
+            .Purpose("Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and " +
+                     "the renderers both read.");
+        Layer checking = arch.Layer("Checking", "Zphil.LoadBearing.Checking.*")
+            .Purpose("Checking evaluates each rule of the model against an extracted codebase: a verdict per rule, " +
+                     "its violations, and what the baselines grandfather.");
+        Layer rendering = arch.Layer("Rendering", "Zphil.LoadBearing.Rendering.*")
+            .Purpose("Rendering turns the model and a check's results into what people and agents read: the " +
+                     "managed block and cards, the diagrams, and the reports.");
+        Layer extraction = arch.Layer("Extraction", "Zphil.LoadBearing.Roslyn.*")
+            .Purpose("Extraction is the Roslyn host: it loads a solution through MSBuild and reads out the codebase " +
+                     "model the checker evaluates against.");
+        Layer host = arch.Layer("Host", "Zphil.LoadBearing.Cli.*")
+            .Purpose("Host is the `loadbearing` command: the CLI verbs, the MCP server, and the spec loading and " +
+                     "pipeline behind both.");
+        Layer adapter = arch.Layer("Adapter", "Zphil.LoadBearing.Xunit.*")
+            .Purpose("Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own " +
+                     "test project.");
+        Layer pack = arch.Layer("Pack", "Zphil.LoadBearing.Packs.*")
+            .Purpose("Pack is the shared rule pack: canonical .NET rules as an ordinary class library that a spec " +
+                     "takes one method at a time.");
 
         arch.Rule("layering/core-no-roslyn")
             .Enforce(core.MustNotReference(
@@ -639,5 +657,19 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "LOADBEARING_VS_INSTALL_PATH overrides the choice. Do NOT switch to " +
                      "MSBuildLocator.QueryVisualStudioInstances — on .NET it returns no VS Setup instances.")
             .Because("Fragile host bootstrap; contain it behind MsBuildBootstrap.");
+
+        // A caution, not a quarantine: every reader in Core reaches into Model, so there is no boundary to
+        // state and nothing new to keep out. The weirdness is the sentence grammar itself, and the card is
+        // what puts it in front of an agent before the edit that would tidy it away.
+        arch.Scope("model/prose-fragments")
+            .Caution(model)
+            .Dragons("Every node here declares the prose fragment the renderers assemble into its sentence, and " +
+                     "the fragments are position-blind: one phrase serves subject and reference position, so a " +
+                     "fragment never closes its own parenthetical — the closing comma belongs to the junction " +
+                     "(SentenceRenderer.EndsOpen and CloseBefore). A strict verb renders its strictness by the " +
+                     "absence of the external-packages caveat; do not add one. A changed fragment moves its pin " +
+                     "in the same commit.")
+            .Because("Every reader in Core reaches into Model and every renderer assembles its fragments, so " +
+                     "nothing here can be fenced; the hazard is an edit that reads as tidying.");
     }
 }

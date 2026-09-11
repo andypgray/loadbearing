@@ -2,9 +2,9 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
-using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -12,7 +12,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     Pins every <c>status</c> line shape (<see cref="StatusFormatter" />) over synthetic
 ///     <see cref="RuleResult" />s — no workspace: Enforce pass/FAIL with counts, the four Migrate states
 ///     (captured-failing, promotable, interim-awaiting-acceptance, and uncaptured), the Quarantine
-///     containment ratchet lines (which never promote) and the tripwire's diff-aware skip, the
+///     containment ratchet lines (which never promote) and both postures' tripwire diff-aware skip, the
 ///     narrowing skip that overrides posture dispatch entirely, the three measure terms and their
 ///     self-extinguishing behaviour, plus the burndown summary and the nudge it carries once per run.
 /// </summary>
@@ -32,6 +32,10 @@ public sealed class StatusFormatterTests
             .Because("b");
         arch.Scope("legacy/billing")
             .Quarantine(arch.Namespace("App.Legacy.*"))
+            .Dragons("d")
+            .Because("b");
+        arch.Scope("shared/utilities")
+            .Caution(arch.Namespace("App.Shared.*"))
             .Dragons("d")
             .Because("b");
     });
@@ -95,6 +99,16 @@ public sealed class StatusFormatterTests
     {
         Line(Result(Model.Rule("legacy/billing/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
             .ShouldBe("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
+    }
+
+    [Fact]
+    public void CautionTripwire_ReadsDiffAwareSkip()
+    {
+        // The same line the quarantine's tripwire prints, and it has to be: what a reader is being told is
+        // that the run had no diff to check, which is the same fact under either posture. Without the arm
+        // the dispatch falls through to the Enforce line and a rule the run never ran reads "pass".
+        Line(Result(Model.Rule("shared/utilities/tripwire"), RuleStatus.Skipped, skipReason: "whatever"))
+            .ShouldBe("skip shared/utilities/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
     }
 
     [Fact]
@@ -263,23 +277,8 @@ public sealed class StatusFormatterTests
     private static IReadOnlyList<Violation> SitedDummies(int count, int sites)
     {
         return Enumerable.Range(0, count)
-            .Select(index => Violation.Shape(Node($"App.Subject{index}"), Sites(index, sites)))
+            .Select(index => Violation.Shape(
+                SyntheticNodes.Type($"App.Subject{index}"), SyntheticNodes.Sites($"Subject{index}.cs", sites)))
             .ToList();
-    }
-
-    private static IReadOnlyList<SourceLocation> Sites(int index, int sites)
-    {
-        return Enumerable.Range(1, sites)
-            .Select(line => new SourceLocation($"Subject{index}.cs", line))
-            .ToList();
-    }
-
-    // A shallow TypeNode standing in for a Shape subject: the formatter counts sites and reads nothing else
-    // off it, so the remaining scalar facts are inert placeholders.
-    private static TypeNode Node(string fullName)
-    {
-        return new TypeNode(
-            fullName, "T:" + fullName, fullName, string.Empty, TypeKind.Class, Accessibility.Public,
-            false, false, false, false, false, "TestProject", false);
     }
 }

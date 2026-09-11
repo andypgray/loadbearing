@@ -19,5 +19,5 @@ internal sealed class ReturningAdjective(IReadOnlyList<Type> types) : MemberAdje
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
     internal override string Fragment =>
-        " returning " + ProseFormat.JoinReferences(Types.Select(type => ProseFormat.Backtick(TypeName.Simple(type))).ToList());
+        " returning " + ProseFormat.BacktickedList(Types.Select(type => TypeName.Simple(type)).ToList());
 }

@@ -7,7 +7,8 @@ an architecture spec is written against. It is the one package a spec project re
 render targets: deterministic enforcement (CLI/CI/agent hooks) and generated AI-agent context
 (a managed `AGENTS.md` block, scoped rules, MCP tools). Every rule carries a posture: `Enforce`
 for the law, `Migrate` for ratcheted debt with a grandfathered baseline, `Quarantine` for
-"here be dragons" code that must be contained rather than touched.
+"here be dragons" code that must be contained rather than touched, and `Caution` for dragons
+that stay open to new callers: the same card and tripwire, no containment.
 
 ## Writing a spec
 

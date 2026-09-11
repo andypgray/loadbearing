@@ -10,14 +10,15 @@ namespace Zphil.LoadBearing.MyAppLayerSpec;
 ///     quarantined-scope card (layer key before quarantine key). That Billing directory is the
 ///     both-cards-in-one-directory acceptance surface; the quarantined layer's desugared containment is
 ///     layer-anchored yet Quarantine-posture, so it renders only as the quarantine card and is never
-///     double-emitted as a layer bullet.
+///     double-emitted as a layer bullet. Web carries a purpose and Billing does not, so the Web card's lede
+///     carries the sentence and the Billing card's does not.
 /// </summary>
 public sealed class MyAppLayerSpec : IArchitectureSpec
 {
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer web = arch.Layer("Web", "MyApp.Web.*").Purpose("The HTTP surface: controllers and the views they serve.");
         Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
 
         arch.Rule("layering/web-not-billing")

@@ -10,7 +10,7 @@ public enum RuleStatus
     Failed,
 
     /// <summary>
-    ///     The run reached no verdict for this rule — a Quarantine tripwire with no diff context
+    ///     The run reached no verdict for this rule — a scope tripwire with no diff context
     ///     (GRAMMAR §7), or a rule whose subject a solution filter left out of the checked universe.
     /// </summary>
     Skipped

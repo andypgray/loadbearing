@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Hosting;
 ///     Finalizes one or more specs into a walkable <see cref="ArchitectureModel" />: mint a fresh
 ///     <see cref="Arch" />, run each spec's <see cref="IArchitectureSpec.Define" />, run the whole
 ///     validation catalog (throwing an aggregate <see cref="SpecValidationException" /> on any
-///     error), then desugar Quarantine scopes and project the read model (GRAMMAR §7, §8).
+///     error), then desugar scopes and project the read model (GRAMMAR §7, §8).
 /// </summary>
 public static class ArchModelBuilder
 {
@@ -45,7 +45,7 @@ public static class ArchModelBuilder
                     rules.Add(ProjectRule(rule));
                     break;
                 case ScopeRegistration scope:
-                    rules.AddRange(QuarantineDesugarer.Desugar(scope));
+                    rules.AddRange(ScopeDesugarer.Desugar(scope));
                     break;
             }
 
@@ -57,14 +57,14 @@ public static class ArchModelBuilder
     {
         Constraint constraint = rule.Constraint!;
         string sentence = SentenceRenderer.Sentence(constraint);
-        string because = rule.Becauses.Count > 0 ? rule.Becauses[0] : string.Empty;
-        string? fix = rule.Fixes.Count > 0 ? rule.Fixes[0] : null;
+        string because = rule.Becauses.FirstOrDefault() ?? string.Empty;
+        string? fix = rule.Fixes.FirstOrDefault();
 
         if (rule.Posture == Posture.Migrate)
         {
             // .Baseline(path) omitted ⇒ the conventional default derived from the rule ID (GRAMMAR §4.4),
             // so MigrateData.BaselinePath is never null post-build.
-            string baseline = rule.Baselines.Count > 0 ? rule.Baselines[0] : BaselineConventions.DefaultPath(rule.Id);
+            string baseline = rule.Baselines.FirstOrDefault() ?? BaselineConventions.DefaultPath(rule.Id);
             MigrationPolicy policy = rule.Policies.Count > 0 ? rule.Policies[0] : MigrationPolicy.MigrateIfSmall;
             var migrate = new MigrateData(rule.MigrateFrom ?? string.Empty, sentence, baseline, policy);
             return new ArchRule(rule.Id, Posture.Migrate, because, fix, sentence, constraint, migrate, null);
@@ -73,8 +73,10 @@ public static class ArchModelBuilder
         return new ArchRule(rule.Id, Posture.Enforce, because, fix, sentence, constraint, null, null);
     }
 
-    private static LayerDefinition ProjectLayer(LayerNoun noun)
+    private static LayerDefinition ProjectLayer(LayerRegistration registration)
     {
-        return new LayerDefinition(noun.Name, noun.Globs, SentenceRenderer.LayerDefinition(noun));
+        LayerNoun noun = registration.Noun;
+        string? purpose = registration.Purposes.FirstOrDefault();
+        return new LayerDefinition(noun.Name, noun.Globs, SentenceRenderer.LayerDefinition(noun, purpose), purpose);
     }
 }

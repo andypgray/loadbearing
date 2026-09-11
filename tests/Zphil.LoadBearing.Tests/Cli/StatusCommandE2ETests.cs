@@ -25,8 +25,15 @@ public sealed class StatusCommandE2ETests
         result.Out.ShouldContain(
             "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
         result.Out.ShouldContain("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
+        // A caution's tripwire is the same diff-aware skip, byte for byte: the burndown reads a rule's
+        // ratchet, and neither tripwire has one, so the posture that produced the row never shows here.
+        result.Out.ShouldContain("skip domain/retry-budget/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
+        // The row names the role, never the posture: what the reader is told is that no verdict was reached,
+        // not which of the two scope postures declined to reach one.
+        result.Out.ShouldNotContain("domain/retry-budget/tripwire (caution)");
         result.Out.ShouldContain(
             "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
+        result.Out.ShouldContain("Checked 29 rules: 2 passed, 25 failed, 2 skipped.");
         result.Out.ShouldContain("Burndown: 2 grandfathered remaining (3 sites), 0 fixed awaiting acceptance.");
     }
 

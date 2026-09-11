@@ -51,7 +51,7 @@ internal static class ArchCheckSequence
     ///     baselines are in hand.
     /// </param>
     /// <param name="resolveDiff">
-    ///     Produces the changed-file context a Quarantine tripwire warns from, or <see langword="null" /> when
+    ///     Produces the changed-file context a scope tripwire warns from, or <see langword="null" /> when
     ///     the run has no diff base and its tripwires skip.
     /// </param>
     /// <param name="ct">Cancellation token, flowed into both delegates.</param>

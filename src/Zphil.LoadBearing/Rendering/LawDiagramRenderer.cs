@@ -195,13 +195,13 @@ public static class LawDiagramRenderer
     {
         // The tripwire is a diff-aware touch check rather than a law: no constraint, no sentence, nothing
         // to draw. It is still a rule of its own, so it is listed rather than silently dropped.
-        if (rule.Quarantine is not { Role: QuarantineRole.Containment } quarantine)
+        if (rule.Scope is not { Role: ScopeRole.Containment } quarantine)
         {
             unplaced.Add(rule);
             return;
         }
 
-        LawPlace? scope = places.Scope(quarantine.Quarantined, quarantine.ScopeId);
+        LawPlace? scope = places.Scope(quarantine.Scoped, quarantine.ScopeId);
         if (scope is null)
         {
             unplaced.Add(rule);
@@ -209,8 +209,15 @@ public static class LawDiagramRenderer
         }
 
         // Boundary order is the spec's order — the first facade is the one the Fix names — and an empty
-        // boundary is a hermetic scope, which stays a childless box carrying the same label.
-        foreach (Type facade in quarantine.Boundary) places.Facade(facade, scope);
+        // boundary is a hermetic scope, which stays a childless box carrying the same label. An operand the
+        // drawing cannot place draws no box, and the rule joins the list under the fence rather than
+        // showing a sanctioned surface that is missing part of itself.
+        var whole = true;
+        foreach (Selection facade in quarantine.Boundary)
+            if (places.Facade(facade, scope) is null)
+                whole = false;
+
+        if (!whole) unplaced.Add(rule);
     }
 
     // The edge's middle token, complete with its pipe label — the drawing's own knowledge and nothing

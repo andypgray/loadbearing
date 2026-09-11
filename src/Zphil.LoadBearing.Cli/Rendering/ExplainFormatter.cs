@@ -4,7 +4,8 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
 ///     Formats one rule as the <c>explain</c> field dump: a <c>&lt;id&gt; (&lt;posture&gt;)</c>
-///     header — the posture carries the Quarantine role, e.g. <c>(quarantine/containment)</c> — then each
+///     header — a scope posture carries the role, e.g. <c>(quarantine/containment)</c> or
+///     <c>(caution/tripwire)</c> — then each
 ///     present field once under check's lowercase-label style (<c>sentence:</c> / <c>because:</c> /
 ///     <c>fix:</c>) plus the posture payload. This is a data dump, not the voice templates:
 ///     <c>dragons:</c> and <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path
@@ -27,12 +28,14 @@ internal static class ExplainFormatter
                 lines.Add($"  policy: {migrate.Policy}");
                 lines.Add($"  baseline: {migrate.BaselinePath}"); // never null post-build (GRAMMAR §4.4)
                 break;
-            case Posture.Quarantine when rule.Quarantine is { } quarantine:
-                lines.Add($"  scope: {quarantine.ScopeId}");
-                if (quarantine.Boundary.Count > 0) lines.Add($"  boundary: {BoundaryList(quarantine.Boundary)}");
-                if (quarantine.BaselinePath is { } quarantineBaseline) lines.Add($"  baseline: {quarantineBaseline}");
-                if (quarantine.Dragons is { } dragons) lines.Add($"  dragons: {dragons}");
-                if (quarantine.DragonsDoc is { } dragonsDoc) lines.Add($"  dragons-doc: {dragonsDoc}");
+            // One arm for both scope postures: every line here already self-gates on presence, so a caution
+            // — no boundary, no baseline — prints the scope and its dragons and nothing else.
+            case Posture.Quarantine or Posture.Caution when rule.Scope is { } scope:
+                lines.Add($"  scope: {scope.ScopeId}");
+                if (scope.Surface.Count > 0) lines.Add($"  boundary: {BoundaryList(scope.Surface)}");
+                if (scope.BaselinePath is { } scopeBaseline) lines.Add($"  baseline: {scopeBaseline}");
+                if (scope.Dragons is { } dragons) lines.Add($"  dragons: {dragons}");
+                if (scope.DragonsDoc is { } dragonsDoc) lines.Add($"  dragons-doc: {dragonsDoc}");
                 break;
         }
 
@@ -43,16 +46,18 @@ internal static class ExplainFormatter
     {
         string posture = rule.Posture switch
         {
-            Posture.Quarantine when rule.Quarantine is { } quarantine => $"quarantine/{quarantine.Role.ToString().ToLowerInvariant()}",
+            Posture.Quarantine or Posture.Caution when rule.Scope is { } scope =>
+                $"{rule.Posture.ToString().ToLowerInvariant()}/{scope.Role.ToString().ToLowerInvariant()}",
             _ => rule.Posture.ToString().ToLowerInvariant()
         };
         return $"{rule.Id} ({posture})";
     }
 
-    // Simple type names, backticked and comma-joined. Uses Type.Name (the CLI cannot reach Core's
-    // internal prose helpers); boundary facades are non-generic, so this matches the scope card's list.
-    private static string BoundaryList(IReadOnlyList<Type> boundary)
+    // The already-rendered surface fragments, comma-joined. Reading the same pre-rendered list the
+    // scope card reads is what makes the two agree structurally rather than by coincidence — the CLI
+    // cannot reach Core's prose helpers to re-derive them.
+    private static string BoundaryList(IReadOnlyList<string> surface)
     {
-        return string.Join(", ", boundary.Select(type => $"`{type.Name}`"));
+        return string.Join(", ", surface);
     }
 }

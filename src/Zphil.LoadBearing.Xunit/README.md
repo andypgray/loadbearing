@@ -25,8 +25,8 @@ directory to the first ancestor holding the named file and returns its absolute 
 your repo; relative values resolve against the test process's working directory, not the output
 directory `FindSolutionUp` starts from. The test explorer lists one case per rule ID; the
 workspace load, extraction, and check run once per spec type, and every rule case reads its
-verdict from that shared run. A `Quarantine` tripwire rule reports as skipped (a test run has no
-diff context); everything else passes or fails like any other test.
+verdict from that shared run. A scope's tripwire rule, `Quarantine` or `Caution`, reports as
+skipped (a test run has no diff context); everything else passes or fails like any other test.
 
 When the spec project is a member of the checked solution it is excluded from the checked
 universe automatically (mirroring the CLI), along with any project only it pulls in: a library

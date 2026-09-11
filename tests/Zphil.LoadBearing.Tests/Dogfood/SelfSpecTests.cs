@@ -248,6 +248,21 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
+    ///     Every declared layer says what it is for. The language leaves <c>Purpose</c> optional; this
+    ///     repository does not, because a row that names a place and not a purpose is the gap the trailer
+    ///     exists to close. Held by test so a ninth layer cannot arrive without its sentence.
+    /// </summary>
+    [Fact]
+    public void EveryLayer_CarriesAPurpose()
+    {
+        SelfModel.Layers
+            .Where(layer => layer.Purpose is null)
+            .Select(layer => layer.Name)
+            .ShouldBeEmpty(
+                "every self-spec layer states what it is for — give these a .Purpose(...) in LoadBearingArchSpec.");
+    }
+
+    /// <summary>
     ///     The verb ledger's completeness pin, and the one gate here that needs neither a workspace nor
     ///     the codebase. The self-spec's xmldoc claims to exercise the verb families this codebase can
     ///     honestly exercise, and to name every remaining one with a reason — a claim that was false when

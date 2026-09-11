@@ -303,5 +303,21 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
                 .MustNotBePackable())
             .Because("The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed.")
             .Fix("Set `IsPackable` to false in the project file.");
+
+        // Caution (scope): the fourth posture, and the only one with no red state at all — no containment
+        // law, no baseline, nothing to grandfather. Its single tripwire is diff-aware, so on this run (no
+        // --diff-base) it is the report's second SKIPPED rule, carrying the caution's own skip reason and
+        // never touching the exit code. That absence is the point: a rule entry, a skip line, a diff-aware
+        // status row and a warning-level SARIF descriptor are the whole of what a caution contributes to a
+        // report, and every one of them is exercised here. RetryPolicy is the subject because it is where
+        // this fixture's load-bearing weirdness actually lives: its broad catch is green under
+        // exceptions/no-unfiltered-catch above only because of the `when` filter, so a tidy-up that removed
+        // the filter would red that rule — exactly the edit a caution exists to warn about.
+        arch.Scope("domain/retry-budget")
+            .Caution(arch.Types.Named("RetryPolicy"))
+            .Dragons("RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps it green " +
+                     "under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. Keep the " +
+                     "filter; add cases beside it, never inside it.")
+            .Because("The retry budget is the one place the domain sanctions a broad catch, and every caller relies on the filter.");
     }
 }

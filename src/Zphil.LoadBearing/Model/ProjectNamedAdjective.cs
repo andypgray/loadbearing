@@ -23,9 +23,8 @@ internal sealed class ProjectNamedAdjective(IReadOnlyList<string> names) : Proje
     {
         get
         {
-            List<string> backticked = Names.Select(ProseFormat.Backtick).ToList();
-            string head = backticked.Count == 1 ? "project " : "projects ";
-            return head + ProseFormat.JoinReferences(backticked);
+            string head = Names.Count == 1 ? "project " : "projects ";
+            return head + ProseFormat.BacktickedList(Names);
         }
     }
 }

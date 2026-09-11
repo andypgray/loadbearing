@@ -12,11 +12,11 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 /// <summary>
 ///     The <c>check</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) →
 ///     select the rules to run (<see cref="CheckRequest.Rules" />, everything by default) → run the shared
-///     <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render (human
-///     or JSON) → exit code (0 clean / 1 red violations; grandfathered Migrate violations do not fail
-///     the run). A narrowed run is a smaller report of the same shape and the same exit contract, so its
-///     verdict answers a smaller question — which is what the stamp and the document's <c>rulesFilter</c>
-///     say out loud.
+///     <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render (human, JSON,
+///     or the hook document) → exit code (0 clean / 1 red violations; grandfathered Migrate violations do
+///     not fail the run). A narrowed run is a smaller report of the same shape and the same exit contract,
+///     so its verdict answers a smaller question — which is what the stamp and the document's
+///     <c>rulesFilter</c> say out loud.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -43,11 +43,41 @@ internal sealed class CheckRunner(
     IEnvironment? environment = null,
     IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
+    /// <summary>
+    ///     Runs the check and writes it, on the channels <paramref name="request" /> asks for. Ordinary
+    ///     runs stream to the real writers; <see cref="CheckRequest.HookJson" /> composes into one buffer
+    ///     first, because what a hook may write to stdout depends on a verdict that does not exist until
+    ///     after the stamps and the diagnostics have been written.
+    /// </summary>
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
+    {
+        if (request is { Json: true, HookJson: true })
+            throw new UserErrorException(
+                "--json and --hook-json both own stdout; pass one. --json writes the check document for a "
+                + "client that parses it, --hook-json the PostToolUse document for a Claude Code hook.");
+
+        if (!request.HookJson) return (await ExecuteAsync(request, output, error, ct)).Code;
+
+        // The platform's own line terminator, deliberately: everything but the clean-with-warnings case is
+        // flushed verbatim, and a buffer that normalized would make hook mode change the bytes of a report it
+        // has no business touching.
+        var composed = new StringWriter();
+        (int code, int warnings) = await ExecuteAsync(request, composed, composed, ct);
+        WriteHookOutput(composed.ToString(), code, warnings);
+
+        return code;
+    }
+
+    // The check proper, over whichever pair of channels the caller handed it: the report and the human
+    // stamps to `stdout`, the workspace diagnostics and the incomplete-model refusal to `stderr`. The
+    // warning count rides back beside the exit code because hook mode needs both to decide what to write,
+    // and the report itself is gone by the time it decides.
+    private async Task<(int Code, int Warnings)> ExecuteAsync(
+        CheckRequest request, TextWriter stdout, TextWriter stderr, CancellationToken ct)
     {
         // This run's human channel. --json owns stdout, where the document is the only thing written, so
         // under it every stamp and notice below goes nowhere.
-        TextWriter human = request.Json ? TextWriter.Null : output;
+        TextWriter human = request.Json ? TextWriter.Null : stdout;
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
@@ -83,16 +113,34 @@ internal sealed class CheckRunner(
         bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
 
         Render(
-            request, human, report, source.SolutionDirectory, source.SolutionName,
+            request, stdout, stderr, human, report, source.SolutionDirectory, source.SolutionName,
             Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, diagnostics, !gated, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
         if (IncompleteModelNotices.Refused(
-                error, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.CheckMessage))
-            return 2;
+                stderr, diagnostics, request.AllowWorkspaceDiagnostics, IncompleteModelGate.CheckMessage))
+            return (2, report.WarningCount);
 
-        return report.HasViolations ? 1 : 0;
+        return (report.HasViolations ? 1 : 0, report.WarningCount);
+    }
+
+    // Hook mode's whole observable. A clean run (exit 0) with something to say hands the composed report to
+    // the agent as PostToolUse additional context, which is the one exit-0 channel Claude Code turns into a
+    // transcript message; a clean run with nothing to say writes nothing, because a hook that speaks on every
+    // edit is a hook people turn off. Every other exit code writes the report verbatim — that is what the
+    // wrapper puts on stderr to block with, and it is why the composed text is not the JSON's only home.
+    private void WriteHookOutput(string composed, int exitCode, int warnings)
+    {
+        if (exitCode != 0)
+        {
+            output.Write(composed);
+            return;
+        }
+
+        if (warnings == 0) return;
+
+        output.WriteLine(HookReportRenderer.Document(composed.TrimEnd('\r', '\n')));
     }
 
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an
@@ -111,20 +159,21 @@ internal sealed class CheckRunner(
     }
 
     private void Render(
-        CheckRequest request, TextWriter human, CheckReport report, string solutionDirectory, string solutionName,
+        CheckRequest request, TextWriter stdout, TextWriter stderr, TextWriter human, CheckReport report,
+        string solutionDirectory, string solutionName,
         string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         bool executionSuccessful, IReadOnlyList<string> ruleGlobs)
     {
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
-        WorkspaceDiagnosticsRenderer.Render(error, renderedDiagnostics, request.Json);
+        WorkspaceDiagnosticsRenderer.Render(stderr, renderedDiagnostics, request.Json);
 
         if (request.Json)
             WriteJson(
-                request, report, solutionDirectory, solutionName, specAssembly, renderedDiagnostics, diagnostics,
-                ruleGlobs);
+                request, stdout, report, solutionDirectory, solutionName, specAssembly, renderedDiagnostics,
+                diagnostics, ruleGlobs);
         else
-            HumanReportRenderer.Render(output, report, solutionDirectory);
+            HumanReportRenderer.Render(stdout, report, solutionDirectory);
 
         // The optional third render target: a SARIF file alongside stdout. The wrote line is human-mode only
         // (it would break --json stdout purity); the SARIF itself carries the same result model either way.
@@ -143,13 +192,13 @@ internal sealed class CheckRunner(
     // Degrading coarsens the grain and never touches the selection: every rule the run evaluated is still
     // here with its verdict, and the summary counts still cover exactly what ran.
     private void WriteJson(
-        CheckRequest request, CheckReport report, string solutionDirectory, string solutionName,
+        CheckRequest request, TextWriter stdout, CheckReport report, string solutionDirectory, string solutionName,
         string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         IReadOnlyList<string> ruleGlobs)
     {
         IEnumerable<string> ladder = DocumentGrains.Ladder(request.Grain, Compose);
         string document = Fitter.Fit(ladder);
-        output.WriteLine(document);
+        stdout.WriteLine(document);
         return;
 
         string Compose(DocumentGrain at)

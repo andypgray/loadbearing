@@ -12,9 +12,10 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// <summary>
 ///     The one composition path <c>render</c> and the card-drift gate share: model (plus optionally the
 ///     codebase) in, one managed-block body per target file out. Covers what the two callers cannot reach
-///     between them — the cost gate's codebase-free shape, the merge of co-located cards into one file,
-///     and the skip arms, which are the case where a declared layer or scope silently produces no card at
-///     all. No MSBuild — paths are synthesized through <see cref="CompilationFactory" />.
+///     between them — the cost gate's codebase-free shape and its whole truth table, the merge of
+///     co-located cards into one file, and the skip arms, which are the case where a declared layer or
+///     scope silently produces no card at all. No MSBuild — paths are synthesized through
+///     <see cref="CompilationFactory" />.
 /// </summary>
 public class ContextFileComposerTests
 {
@@ -24,6 +25,16 @@ public class ContextFileComposerTests
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-not-billing")
             .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
+            .Because("Web reaches billing only through the facade.");
+    });
+
+    // A Web layer that says what it is for and that no rule anchors on: the rule ranges over the same types
+    // through a NamespaceNoun subject, so the layer earns a module-map row and no card.
+    private static readonly IArchitectureSpec DescribedUnanchoredLayerSpec = new InlineSpec(arch =>
+    {
+        arch.Layer("Web", "MyApp.Web.*").Purpose("The HTTP surface: controllers and the views they serve.");
+        arch.Rule("layering/web-not-billing")
+            .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
             .Because("Web reaches billing only through the facade.");
     });
 
@@ -55,6 +66,27 @@ public class ContextFileComposerTests
             .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .Dragons("Banker's rounding is line-item level.")
             .Because("Replacement scheduled.");
+    });
+
+    // The caution twin of AbsentScopeSpec: a posture the cost gate must recognize as something to place.
+    private static readonly IArchitectureSpec AbsentCautionSpec = new InlineSpec(arch =>
+        arch.Scope("legacy/billing")
+            .Caution(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Dragons("Banker's rounding is line-item level.")
+            .Because("Every caller depends on the exact rounding."));
+
+    // A layer and a cautioned scope over the same namespace, so both cards resolve to one directory.
+    private static readonly IArchitectureSpec CoLocatedCautionSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/billing-not-web")
+            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
+            .Because("Billing is downstream of the web layer.");
+
+        arch.Scope("legacy/billing")
+            .Caution(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .Dragons("Banker's rounding is line-item level.")
+            .Because("Every caller depends on the exact rounding.");
     });
 
     private const string SpecName = "MyApp.ArchSpec";
@@ -148,5 +180,76 @@ public class ContextFileComposerTests
 
         composition.Warnings.ShouldBe(["scope 'legacy/billing' matched no types; no scoped context emitted"]);
         composition.Files.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void HasAnythingToPlace_AnchoredLayer_True()
+    {
+        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(WebLayerSpec))
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void HasAnythingToPlace_QuarantinedScope_True()
+    {
+        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(AbsentScopeSpec))
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void HasAnythingToPlace_CautionedScope_True()
+    {
+        // The gate reads the scope payload rather than the posture, so a caution earns the extraction cost
+        // exactly as a quarantine does — and it must, since its card is the only thing it renders.
+        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(AbsentCautionSpec))
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Compose_LayerAndCautionInOneDirectory_MergeIntoOneFileLayerCardFirst()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
+            ("src/MyApp.Legacy.Billing/BillingCalculator.cs",
+                "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+        ContextComposition composition = ContextFileComposer.Compose(
+            ArchModelBuilder.Build(CoLocatedCautionSpec), codebase, "/sln", SpecName);
+
+        // The layer-cards-first ordering is a property of the composer, not of which scope posture it met.
+        composition.Files.Count.ShouldBe(2);
+        string body = composition.Files[1].Body;
+        body.ShouldContain("## Layer `Billing`");
+        body.ShouldContain("## Cautioned scope `legacy/billing`");
+        body.IndexOf("## Layer `Billing`", StringComparison.Ordinal)
+            .ShouldBeLessThan(body.IndexOf("## Cautioned scope `legacy/billing`", StringComparison.Ordinal));
+
+        // And exactly one provenance line for the merged file, not one per card.
+        TextNormalization.Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
+            .ShouldBe(1);
+    }
+
+    [Fact]
+    public void HasAnythingToPlace_DescribedLayerNoRuleAnchorsOn_False()
+    {
+        // A purpose describes a layer; it never places a card. The gate answers on anchoring alone, so a
+        // spec whose only layer is described but unanchored still skips extraction entirely.
+        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(DescribedUnanchoredLayerSpec))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Compose_DescribedLayerNoRuleAnchorsOn_RendersTheRowAndPlacesNoCard()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
+
+        // Even with the codebase paid for, the purpose buys the layer a module-map row and nothing more.
+        ContextComposition composition = ContextFileComposer.Compose(
+            ArchModelBuilder.Build(DescribedUnanchoredLayerSpec), codebase, "/sln", SpecName);
+
+        composition.Warnings.ShouldBeEmpty();
+        ContextFile file = composition.Files.ShouldHaveSingleItem();
+        file.Body.ShouldContain("- **Web** — `MyApp.Web.*`. The HTTP surface: controllers and the views they serve.");
+        file.Body.ShouldNotContain("## Layer `Web`");
     }
 }

@@ -256,7 +256,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
+            new CheckRequest(solution, spec, true, false, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
             Ct);
 
         return new CacheRun(

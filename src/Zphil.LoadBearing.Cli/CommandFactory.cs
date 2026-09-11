@@ -48,10 +48,17 @@ internal static class CommandFactory
         {
             Description = "Emit the machine-readable JSON document instead of human-readable output."
         };
+        Option<bool> hookJson = new("--hook-json")
+        {
+            Description =
+                "Render for a Claude Code PostToolUse hook: a clean run carrying warnings writes the report "
+                + "as hookSpecificOutput.additionalContext and nothing else, so the hook's stdout reaches the "
+                + "agent; a clean run with no warnings writes nothing; violations print as usual. Not with --json."
+        };
         Option<string?> diffBase = new("--diff-base")
         {
             Description =
-                "A git ref; files changed since it are checked against quarantined scopes (Quarantine tripwire) — warnings only, never failures."
+                "A git ref; files changed since it are checked against quarantined and cautioned scopes (the scope tripwire) — warnings only, never failures."
         };
         Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Check against the partial model even when some projects fail to load or to restore, instead of "
@@ -100,6 +107,7 @@ internal static class CommandFactory
             solution,
             spec,
             json,
+            hookJson,
             diffBase,
             allowWorkspaceDiagnostics,
             sarif,
@@ -117,6 +125,7 @@ internal static class CommandFactory
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
                 parseResult.GetValue(json),
+                parseResult.GetValue(hookJson),
                 parseResult.GetValue(diffBase),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),

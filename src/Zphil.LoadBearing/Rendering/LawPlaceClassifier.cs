@@ -50,8 +50,7 @@ internal static class LawPlaceClassifier
         {
             MustNotReferenceConstraint => new DrawableVerb(inbound: false, only: false, verbWord: null),
             MustNotBeReferencedByConstraint => new DrawableVerb(inbound: true, only: false, verbWord: null),
-            MustOnlyReferenceConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
-            MustOnlyReferenceItselfConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
+            MustOnlyReferenceConstraint or MustOnlyReferenceItselfConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
             MustOnlyBeReferencedByConstraint => new DrawableVerb(inbound: true, only: true, verbWord: OnlyVerb),
             MustNotExposeConstraint => new DrawableVerb(inbound: false, only: false, verbWord: ExposeVerb),
             _ => null
@@ -71,7 +70,7 @@ internal static class LawPlaceClassifier
     /// </summary>
     internal static LawPlace? SubjectPlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
-        return PlaceOf(selection, layers, false);
+        return PlaceOf(selection, layers, PlacePosition.Subject);
     }
 
     /// <summary>
@@ -81,7 +80,7 @@ internal static class LawPlaceClassifier
     /// </summary>
     internal static LawPlace? OperandPlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
-        return PlaceOf(selection, layers, true);
+        return PlaceOf(selection, layers, PlacePosition.Operand);
     }
 
     /// <summary>A place standing for one namespace glob, carrying a declared layer's name when one owns that glob.</summary>
@@ -97,15 +96,35 @@ internal static class LawPlaceClassifier
             : new LawPlace(glob, owner.Name, owner.Name, owner.Globs, true);
     }
 
+    /// <summary>
+    ///     The place one sanctioned-surface operand stands on, or null when it is not place-shaped. A
+    ///     boundary the drawing cannot place is not a boundary the law loses: its containment rule joins
+    ///     the compact list under the fence, which is the drawing's totality rule.
+    /// </summary>
+    internal static LawPlace? FacadePlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
+    {
+        return PlaceOf(selection, layers, PlacePosition.Facade);
+    }
+
     /// <summary>A place standing for one sanctioned-surface type inside a quarantined scope.</summary>
-    internal static LawPlace FromFacade(Type type)
+    private static LawPlace FromFacade(Type type)
     {
         // The facade's box sits inside the scope's box, which already names the scope, so the simple name
         // is unambiguous where a free-floating type node's would not be.
         return new LawPlace(TypeKey(type), TypeName.Simple(type), TypeName.Simple(type), [], false) { IsFacade = true };
     }
 
-    private static LawPlace? PlaceOf(Selection? selection, IReadOnlyList<LayerDefinition> layers, bool typeIsAPlace)
+    // Which position of a rule the selection was read in — the one fact that changes what a single type
+    // stands for: nothing as a subject, a free-standing node as an operand, and a box inside the scope's
+    // box as a sanctioned surface. A region is the same place whichever position names it.
+    private enum PlacePosition
+    {
+        Subject,
+        Operand,
+        Facade
+    }
+
+    private static LawPlace? PlaceOf(Selection? selection, IReadOnlyList<LayerDefinition> layers, PlacePosition position)
     {
         // A union carries no noun head at all, and reading one throws; the guard comes before every
         // other question about the selection.
@@ -119,7 +138,9 @@ internal static class LawPlaceClassifier
                 return FromGlob(@namespace.Glob, layers);
             case ProjectNoun project:
                 return new LawPlace("project:" + project.Name, project.Name, project.Name, [], false);
-            case TypeNoun type when typeIsAPlace:
+            case TypeNoun type when position == PlacePosition.Facade:
+                return FromFacade(type.Type);
+            case TypeNoun type when position == PlacePosition.Operand:
                 return FromType(type.Type);
             case TypesNoun:
                 return FromTypes(selection, layers);

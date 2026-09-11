@@ -963,3 +963,100 @@ internal sealed class BlankTypeNamedAdjectiveSpec : IArchitectureSpec
         arch.Rule("area/rule").Enforce(arch.Types.Named("A", " ").MustHavePrefix("I")).Because("Reason.");
     }
 }
+
+internal sealed class ForeignBoundarySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // The sanctioned surface is spec-authored selection like any other, so a boundary minted on a
+        // different Arch is the same error the subject position reports.
+        var other = new Arch();
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .BoundaryOnlyVia(other.Types.Named("BillingFacade"))
+            .Dragons("Dragons.")
+            .Because("Quarantined.");
+    }
+}
+
+internal sealed class BlankBoundaryPatternSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Scope("legacy/billing")
+            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+            .BoundaryOnlyVia(arch.Namespace(" "))
+            .Dragons("Dragons.")
+            .Because("Quarantined.");
+    }
+}
+
+internal sealed class BlankLayerPurposeSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Layer("Core", "MyApp.Core.*").Purpose(" ");
+    }
+}
+
+internal sealed class MultiLineLayerPurposeSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Layer("Core", "MyApp.Core.*").Purpose("line one\nline two");
+    }
+}
+
+internal sealed class RepeatedLayerPurposeSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // The two-statement form: the trailer is called on the stored Layer, not chained.
+        Layer core = arch.Layer("Core", "MyApp.Core.*").Purpose("First.");
+        core.Purpose("Second.");
+    }
+}
+
+internal sealed class DoubleCautionScopeSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // A stored IScopeBuilder re-called with .Caution silently overwrites the scoped selection (§8 item 17).
+        IScopeBuilder scope = arch.Scope("shared/utilities");
+        scope.Caution(arch.Namespace("MyApp.Shared.*"));
+        scope.Caution(arch.Namespace("MyApp.Shared.Other.*")).Dragons("Dragons.").Because("Cautioned.");
+    }
+}
+
+internal sealed class MixedPostureScopeSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // Two different posture verbs overwrite each other exactly as two of the same one do: it is the
+        // count that item 17 reports, not which verbs were called.
+        IScopeBuilder scope = arch.Scope("shared/utilities");
+        scope.Quarantine(arch.Namespace("MyApp.Shared.*"));
+        scope.Caution(arch.Namespace("MyApp.Shared.*")).Dragons("Dragons.").Because("Cautioned.");
+    }
+}
+
+internal sealed class MissingDragonsCautionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Scope("shared/utilities")
+            .Caution(arch.Namespace("MyApp.Shared.*"))
+            .Because("Cautioned.");
+    }
+}
+
+internal sealed class ValidCautionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Scope("shared/utilities")
+            .Caution(arch.Namespace("MyApp.Shared.*"))
+            .Dragons("Every helper here is called from everywhere; the argument order is load-bearing.")
+            .Because("The utilities are public API for the whole solution.");
+    }
+}

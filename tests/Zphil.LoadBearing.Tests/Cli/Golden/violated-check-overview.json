@@ -4,10 +4,10 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "overview",
   "summary": {
-    "rulesChecked": 28,
+    "rulesChecked": 29,
     "rulesPassed": 2,
     "rulesFailed": 25,
-    "rulesSkipped": 1,
+    "rulesSkipped": 2,
     "violations": 44,
     "warnings": 1
   },
@@ -630,6 +630,17 @@
           "siteCount": 1
         }
       ],
+      "warnings": []
+    },
+    {
+      "id": "domain/retry-budget/tripwire",
+      "posture": "caution",
+      "status": "skipped",
+      "sentence": "",
+      "because": "The retry budget is the one place the domain sanctions a broad catch, and every caller relies on the filter.",
+      "skipReason": "Tripwire: no diff context — run 'loadbearing check --diff-base <ref>' to check changed files against this cautioned scope.",
+      "violationCount": 0,
+      "violations": [],
       "warnings": []
     }
   ],

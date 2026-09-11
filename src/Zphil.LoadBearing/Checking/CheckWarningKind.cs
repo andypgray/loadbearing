@@ -14,5 +14,14 @@ public enum CheckWarningKind
     ///     A changed file (from <c>check --diff-base</c>) declares a type in a quarantined scope — the Quarantine
     ///     tripwire (GRAMMAR §7). The rule still passes; warnings never affect the exit code.
     /// </summary>
-    QuarantinedScopeTouched
+    QuarantinedScopeTouched,
+
+    /// <summary>
+    ///     A changed file (from <c>check --diff-base</c>) declares a type in a cautioned scope — the Caution
+    ///     tripwire (GRAMMAR §7). Its own kind rather than the quarantine's, because the two say different
+    ///     things: a quarantine asks whether the task requires editing dragon territory at all, a caution
+    ///     only asks that the dragons be read first. The rule still passes; warnings never affect the exit
+    ///     code, and a caution has no other rule that could.
+    /// </summary>
+    CautionedScopeTouched
 }

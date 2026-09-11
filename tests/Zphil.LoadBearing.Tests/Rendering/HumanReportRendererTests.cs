@@ -7,14 +7,16 @@ using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
 ///     The human failure-text renderer's violation arms (<see cref="HumanReportRenderer" />, the shared
 ///     CLI + xUnit-adapter surface): the unlocated <c>error:</c> (RuleError) and empty-subject lines, the
-///     site-less Shape fallback, the unlocated-before-located ordering, the ratchet's grown trailer, and the
-///     <c>Render</c> summary tail. Pinned strings are the spec.
+///     site-less Shape fallback, the unlocated-before-located ordering, the ratchet's grown trailer, the
+///     dragons lines beneath a fired scope tripwire, and the <c>Render</c> summary tail. Pinned strings are
+///     the spec.
 /// </summary>
 public sealed class HumanReportRendererTests
 {
@@ -75,7 +77,7 @@ public sealed class HumanReportRendererTests
     {
         // A Shape violation carrying no site has no file:line, so the renderer emits its bare FullName as
         // an unlocated line (HumanReportRenderer.cs:151-152) rather than a located `path:line — …` line.
-        TypeNode subject = Node("App.Orphan");
+        TypeNode subject = SyntheticNodes.Type("App.Orphan");
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, []);
 
@@ -91,7 +93,8 @@ public sealed class HumanReportRendererTests
         // ViolationLines has no default arm, so a missing Construction case would render nothing and a red
         // report would read green. Pin the located line text: `Source constructs Target` at the `new` site.
         var construction = Violation.Construction(
-            Node("App.Factory"), Node("Widgets.Widget"), [new SourceLocation("Factory.cs", 12)]);
+            SyntheticNodes.Type("App.Factory"), SyntheticNodes.Type("Widgets.Widget"),
+            [new SourceLocation("Factory.cs", 12)]);
         var result = new RuleResult(
             EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, []);
 
@@ -109,7 +112,8 @@ public sealed class HumanReportRendererTests
         // ViolationLines has no default arm, so a missing Catch case would render nothing and a red report would
         // read green. Pin the located line text: `Source catches Target` at the `catch` site (GRAMMAR §4.8).
         Violation catchViolation = Violation.Catch(
-            Node("App.Handler"), Node("Errors.DbError"), [new SourceLocation("Handler.cs", 9)]);
+            SyntheticNodes.Type("App.Handler"), SyntheticNodes.Type("Errors.DbError"),
+            [new SourceLocation("Handler.cs", 9)]);
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, []);
 
@@ -127,7 +131,8 @@ public sealed class HumanReportRendererTests
         // ViolationLines has no default arm, so a missing Expose case would render nothing and a red report would
         // read green. Pin the located line text: `Source exposes Target` at the exposing member's site (GRAMMAR §4.9).
         Violation exposeViolation = Violation.Expose(
-            Node("App.Facade"), Node("Secrets.Secret"), [new SourceLocation("Facade.cs", 5)]);
+            SyntheticNodes.Type("App.Facade"), SyntheticNodes.Type("Secrets.Secret"),
+            [new SourceLocation("Facade.cs", 5)]);
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, []);
 
@@ -145,7 +150,8 @@ public sealed class HumanReportRendererTests
         // Likewise the Throw arm: a missing case would silently render nothing. Pin `Source throws Target` at the
         // `throw` site (GRAMMAR §4.8).
         Violation throwViolation = Violation.Throw(
-            Node("App.Service"), Node("Errors.InfraError"), [new SourceLocation("Service.cs", 14)]);
+            SyntheticNodes.Type("App.Service"), SyntheticNodes.Type("Errors.InfraError"),
+            [new SourceLocation("Service.cs", 14)]);
         var result = new RuleResult(
             EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, []);
 
@@ -227,7 +233,7 @@ public sealed class HumanReportRendererTests
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered
         // located lines, regardless of input order (HumanReportRenderer.cs:177-185).
         var site = new SourceLocation("Located.cs", 7);
-        TypeNode located = Node("App.Located", site);
+        TypeNode located = SyntheticNodes.Type("App.Located", site);
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed,
             [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, []);
@@ -296,6 +302,88 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_FiredQuarantineTripwire_PrintsTheDragonsOnceBeneathTheWarnings()
+    {
+        ArchRule tripwire = Tripwire(arch =>
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Dragons("Banker's rounding happens at line-item level.")
+                .Because("Replacement scheduled."));
+
+        // Two changed files, one set of dragons: they are a fact about the scope, not about which file was
+        // touched, so the reader meets them once however many warnings fired.
+        string block = Touched(tripwire, CheckWarningKind.QuarantinedScopeTouched, "Calc.cs", "Rounding.cs")
+            .HumanBlock();
+
+        block.ShouldEndWith("\n  dragons: Banker's rounding happens at line-item level.");
+        TextNormalization.Occurrences(block, "  dragons: ")
+            .ShouldBe(1);
+        block.ShouldNotContain("dragons-doc:");
+    }
+
+    [Fact]
+    public void RuleBlock_FiredCautionTripwire_PrintsTheDragonsBeneathTheWarning()
+    {
+        ArchRule tripwire = Tripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .Dragons("Argument order is load-bearing.")
+                .Because("Every caller passes them positionally."));
+
+        Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+            .HumanBlock()
+            .ShouldEndWith("\n  dragons: Argument order is load-bearing.");
+    }
+
+    [Fact]
+    public void RuleBlock_SilentTripwire_PrintsNoDragonsLine()
+    {
+        ArchRule tripwire = Tripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .Dragons("Argument order is load-bearing.")
+                .Because("Every caller passes them positionally."));
+
+        // Nothing in the change set touched the scope. The dragons are still true, but stating them under a
+        // rule that did not fire puts them on every clean run of every check.
+        var quiet = new RuleResult(tripwire, RuleStatus.Passed, []);
+
+        quiet.HumanBlock()
+            .ShouldNotContain("dragons");
+    }
+
+    [Fact]
+    public void RuleBlock_FiredTripwireWithBothDragonsForms_PrintsBothLinesInOrder()
+    {
+        ArchRule tripwire = Tripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .Dragons("Argument order is load-bearing.")
+                .DragonsDoc("arch/utilities-dragons.md")
+                .Because("Every caller passes them positionally."));
+
+        Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+            .HumanBlock()
+            .ShouldEndWith("\n  dragons: Argument order is load-bearing.\n  dragons-doc: arch/utilities-dragons.md");
+    }
+
+    [Fact]
+    public void RuleBlock_FiredTripwireWithDragonsDocOnly_PrintsTheDocLineAlone()
+    {
+        ArchRule tripwire = Tripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .DragonsDoc("arch/utilities-dragons.md")
+                .Because("Every caller passes them positionally."));
+
+        string block = Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+            .HumanBlock();
+
+        block.ShouldEndWith("\n  dragons-doc: arch/utilities-dragons.md");
+        block.ShouldNotContain("  dragons: ");
+    }
+
+    [Fact]
     public void Render_MultiRuleReport_WritesSummaryTail()
     {
         var report = new CheckReport(
@@ -318,6 +406,25 @@ public sealed class HumanReportRendererTests
         return new ArchRule(id, Posture.Enforce, "b", null, "s", null, null, null);
     }
 
+    // A scope's tripwire, built through the spec so it carries the real scope payload the dragons lines
+    // read; the caller declares the scope so each row spells the posture and the dragons forms it is about.
+    private static ArchRule Tripwire(Action<Arch> declareScope)
+    {
+        return Checker.Model(declareScope)
+            .Rules.Single(rule => rule.Scope is { Role: ScopeRole.Tripwire });
+    }
+
+    // A tripwire that fired: one warning per changed file, which is what the checker produces and what lets
+    // a row ask whether two of them still print one set of dragons.
+    private static RuleResult Touched(ArchRule tripwire, CheckWarningKind kind, params string[] files)
+    {
+        List<CheckWarning> warnings = files
+            .Select(file => new CheckWarning(kind, $"Changed file '{file}' is inside the scope.", file))
+            .ToList();
+
+        return new RuleResult(tripwire, RuleStatus.Passed, [], warnings);
+    }
+
     // A ratcheted rule, built through the spec so it carries a real BaselinePath — the one thing that makes
     // the renderer's ratchet lines reachable at all.
     private static ArchRule MigrateRule(string id)
@@ -326,14 +433,5 @@ public sealed class HumanReportRendererTests
                 .Migrate("old", arch.Namespace("App.*").MustHaveSuffix("X"))
                 .Because("b"))
             .Rules.Single();
-    }
-
-    // A shallow TypeNode standing in for a Shape subject: the renderer reads only its FullName and
-    // DeclarationSites, so the remaining scalar facts are inert placeholders.
-    private static TypeNode Node(string fullName, params SourceLocation[] sites)
-    {
-        return new TypeNode(
-            fullName, "T:" + fullName, fullName, string.Empty, TypeKind.Class, Accessibility.Public,
-            false, false, false, false, false, "TestProject", false) { DeclarationSites = sites };
     }
 }

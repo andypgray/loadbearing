@@ -8,10 +8,10 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The <c>explain</c> field dump, pinned over the canonical sample's rule shapes in-process:
-///     the <c>&lt;id&gt; (&lt;posture&gt;)</c> header (with the Quarantine role), each present field once,
-///     the posture payloads (Migrate <c>from</c>/<c>policy</c>/<c>baseline</c>; Quarantine scope/boundary/
-///     baseline/dragons), and the tripwire's sentence-less, boundary-less form. <c>Fix</c> renders here
-///     even though it stays out of the always-on block.
+///     the <c>&lt;id&gt; (&lt;posture&gt;)</c> header (with a scope posture's role), each present field once,
+///     the posture payloads (Migrate <c>from</c>/<c>policy</c>/<c>baseline</c>; a scope's scope/boundary/
+///     baseline/dragons), and the tripwire's sentence-less, boundary-less form under both scope postures.
+///     <c>Fix</c> renders here even though it stays out of the always-on block.
 /// </summary>
 public sealed class ExplainFormatterTests
 {
@@ -84,6 +84,43 @@ public sealed class ExplainFormatterTests
                 "  scope: legacy/billing\n" +
                 "  dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
                 "Nightly reconciliation depends on this. Do not normalize.");
+    }
+
+    [Fact]
+    public void CautionTripwire_DumpsPostureRoleScopeAndDragons_NoBoundaryOrBaseline()
+    {
+        // The whole dump as one string rather than as a header pin plus three absences: the body arm is
+        // shared with Quarantine and every line in it self-gates on presence, so what needs proving is that
+        // a caution's four lines are all of them.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .Dragons("Argument order is load-bearing: every caller passes them positionally.")
+                .Because("The helpers are public API for the whole solution."));
+
+        string.Join("\n", ExplainFormatter.Lines(model.Rule("shared/utilities/tripwire")))
+            .ShouldBe(
+                "shared/utilities/tripwire (caution/tripwire)\n" +
+                "  because: The helpers are public API for the whole solution.\n" +
+                "  scope: shared/utilities\n" +
+                "  dragons: Argument order is load-bearing: every caller passes them positionally.");
+    }
+
+    [Fact]
+    public void QuarantineWithASelectionBoundary_PrintsTheSurfaceAsProseNotTypeNames()
+    {
+        // The boundary line reads the pre-rendered surface, so a no-load operand arrives already worded
+        // and a CLI that cannot reach Core's prose helpers never has to word one itself.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .BoundaryOnlyVia(arch.Types.Named("BillingFacade"), arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))
+                .Dragons("Rounding is load-bearing.")
+                .Because("Replacement scheduled."));
+        string dump = string.Join("\n", ExplainFormatter.Lines(model.Rule("legacy/billing/containment")));
+
+        dump.ShouldContain("  boundary: types named `BillingFacade`, types in `MyApp.Legacy.Billing.Contracts.*`");
+        dump.ShouldContain("  fix: use types named `BillingFacade`");
     }
 
     [Fact]

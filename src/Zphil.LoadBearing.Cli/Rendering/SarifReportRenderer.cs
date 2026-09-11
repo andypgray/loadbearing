@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -23,8 +24,11 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     generic <c>grandfathered in {path}</c> fallback), and a grown pair — one carrying more sites than its
 ///     entry records — as <c>error</c> / <c>baselineState: updated</c>, unsuppressed, because the entry that
 ///     suppressed it no longer covers what is there. EmptySubject and RuleError violations are
-///     site-less and so contribute no results (they still gate via the CLI exit code). Every path is
-///     solution-relative against the <c>SRCROOT</c> URI base — no absolute path is ever emitted.
+///     site-less and so contribute no results (they still gate via the CLI exit code). A check warning is
+///     the one result that is not a violation: <c>warning</c> level at the file it names, on a rule whose
+///     descriptor declares that level too, so a scope tripwire stops advertising an error it can never
+///     raise. Every path is solution-relative against the <c>SRCROOT</c> URI base — no absolute path is
+///     ever emitted.
 ///     Serialization is the shared <see cref="LoadBearingJson.Options" />, so the SARIF golden and the JSON
 ///     golden cannot drift in escaping or casing. Pinned by the golden <c>Cli/Golden/violated-check.sarif</c>.
 /// </remarks>
@@ -106,8 +110,8 @@ internal static class SarifReportRenderer
     }
 
     // Every rule, in model order — passed and skipped rules included (metadata carries the whole spec, not
-    // just what failed). shortDescription is the law Sentence, omitted when empty (a Quarantine tripwire);
-    // fullDescription is the Because; help is the Fix, omitted when absent.
+    // just what failed). shortDescription is the law Sentence, omitted when empty (a scope tripwire, of
+    // either posture); fullDescription is the Because; help is the Fix, omitted when absent.
     private static IReadOnlyList<SarifReportingDescriptor> BuildRules(CheckReport report)
     {
         return report.Results
@@ -117,9 +121,20 @@ internal static class SarifReportRenderer
                 rule.Sentence.Length > 0 ? new SarifMessage(rule.Sentence) : null,
                 new SarifMessage(rule.Because),
                 rule.Fix is { } fix ? new SarifMessage(fix) : null,
-                new SarifReportingConfiguration(ErrorLevel),
+                new SarifReportingConfiguration(DefaultLevel(rule)),
                 new SarifRuleProperties(rule.Posture)))
             .ToList();
+    }
+
+    // The severity a rule reports at when it reports, which for the scope tripwires is not error: a tripwire
+    // warns and can never fail, so an error-level descriptor advertises an alert it has
+    // no way to raise — and a scanning service that reads defaultConfiguration to set an alert's severity
+    // would file the touch as an error. Keyed on the rule's own payload rather than its posture, because a
+    // quarantine's other half is the containment law and that one is red — and keying on the role rather
+    // than the posture is also what already had a caution's one rule right the day the posture landed.
+    private static string DefaultLevel(ArchRule rule)
+    {
+        return rule.Scope is { Role: ScopeRole.Tripwire } ? WarningLevel : ErrorLevel;
     }
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
@@ -241,10 +256,13 @@ internal static class SarifReportRenderer
     }
 
     // Results in the locked order: rules in model order → per rule, red Violations then Grandfathered (both
-    // already ordered by ArchChecker.Order) → each violation's Sites in stored order (one result per site).
+    // already ordered by ArchChecker.Order) then Warnings → each violation's Sites in stored order (one
+    // result per site).
     // A grown pair is red with the rest, and its state is `updated` rather than `new`: code scanning already
     // has an alert for this pair from the run that baselined it, and `new` would ask for a second one.
     // Unsuppressed, because the whole finding is that the suppression the entry granted no longer covers it.
+    // Warnings come last per rule, where the human report puts them, and they are the one result kind that is
+    // not a violation at all — see WarningResult.
     private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, PathFormat.Relativizer relativizer)
     {
         var results = new List<SarifResult>();
@@ -266,9 +284,32 @@ internal static class SarifReportRenderer
                 IReadOnlyList<SarifSuppression> suppressions = [new("external", justification)];
                 results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", suppressions, relativizer));
             }
+
+            foreach (CheckWarning warning in result.Warnings) results.Add(WarningResult(result.Rule.Id, warning));
         }
 
         return results;
+    }
+
+    // A check warning as a result: warning level, the message verbatim, and the file the warning names as its
+    // location — the tripwire names the changed file, an inert target is about the rule's own operand and so
+    // gets no location at all. No region with it: the finding is that the file was touched, and a start line
+    // would put the alert on whichever line the renderer picked rather than where anything happened. The
+    // fingerprint keys on that file so one touch stays one alert across runs; the source/target/subject slots
+    // a violation fills are empty, because a warning has no edge. `new` is the only honest baseline state — a
+    // warning is a fact about this diff, and no baseline has ever held one.
+    private static SarifResult WarningResult(string ruleId, CheckWarning warning)
+    {
+        IReadOnlyList<SarifLocation> locations = warning.File is { } file
+            ? [new SarifLocation(new SarifPhysicalLocation(new SarifArtifactLocation(file, SrcRootBaseId), null))]
+            : [];
+        var fingerprints = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [FingerprintKey] = $"v1||||{warning.File ?? string.Empty}|0"
+        };
+
+        return new SarifResult(
+            ruleId, WarningLevel, new SarifMessage(warning.Message), locations, fingerprints, "new", null);
     }
 
     // One result per site. The partial fingerprint keys the alert as (ruleId, v1|source|target|subject|rel|ord)

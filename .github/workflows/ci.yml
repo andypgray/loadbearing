@@ -661,7 +661,8 @@ jobs:
       # on every run. Warnings never move the exit code, so this cannot redden CI on its own;
       # containment, which needs no diff, already could. On a push to main origin/main is HEAD
       # and the diff is empty; on a pull request it is the base tip, so the warning covers
-      # exactly the proposed change.
+      # exactly the proposed change. The warning reaches code scanning too: it uploads as a
+      # warning-level result on the tripwire rule, whose descriptor declares that level.
       - name: Check self and emit SARIF
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --diff-base origin/main --sarif loadbearing.sarif
       # The same self-spec through the xUnit adapter, as its own step so the log reads one line per rule

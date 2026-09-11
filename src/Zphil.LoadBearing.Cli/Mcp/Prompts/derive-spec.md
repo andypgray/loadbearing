@@ -2,7 +2,8 @@
 
 Your goal is a **compiling LoadBearing spec that states this codebase's architecture honestly,
 as it is today**: the target rules new code must follow (`Enforce`), the known debt being
-worked off (`Migrate`), and the untouchable dragons (`Quarantine`). A legacy codebase's
+worked off (`Migrate`), the dragons nothing new may reference (`Quarantine`), and the dragons
+that stay open to callers (`Caution`). A legacy codebase's
 architecture is partly descriptive, not prescriptive — a spec that only states the ideal is
 useless on day one, and a spec that launders the mess into law is worse. The postures exist so
 you never have to choose between the two.
@@ -212,10 +213,14 @@ awkward, you do not need it: namespace-pattern targets (`arch.Namespace("System.
 need no compile-time reference at all, and matching is by full name.
 
 `typeof()` targets must also be **accessible** to the spec assembly: anchoring an `internal`
-type fails the spec build with CS0122. For dependency-verb targets, switch to a namespace
-pattern; where the type itself is the point — a `BoundaryOnlyVia` facade, an `Implementing`
-anchor — have the product project grant `[InternalsVisibleTo("MyApp.ArchSpec")]` (or the
-csproj `<InternalsVisibleTo Include="MyApp.ArchSpec" />`) and rebuild.
+type fails the spec build with CS0122. Every set-valued position has a spelling that needs no
+load, so reach for one before reaching for accessibility: dependency-verb targets take namespace
+patterns, a `BoundaryOnlyVia` facade takes `arch.Types.Named("BillingFacade")`, and
+`Implementing` / `DerivedFrom` / `AttributedWith` each take the fully-qualified name as a string,
+matching byte-identically to their `typeof` twin. Where the type must genuinely be reflected —
+an `arch.Member(typeof(X), nameof(X.M))` anchor — have the product project grant
+`[InternalsVisibleTo("MyApp.ArchSpec")]` (or the csproj
+`<InternalsVisibleTo Include="MyApp.ArchSpec" />`) and rebuild.
 
 ```csharp
 using Zphil.LoadBearing;
@@ -339,9 +344,14 @@ evidence in step 4; postures come in step 5. **Author the already-true direction
 layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest
 law you will ever get. A derive that only writes rules about problems under-produces law.
 
+Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the step 0
+prose that already says it (the ADR, the wiki page, the `AGENTS.md` paragraph). It renders into the
+layer's module-map row and its card, so the sentence that rotted in a document now sits beside the
+globs it describes and re-renders with them.
+
 ```csharp
-Layer domain = arch.Layer("Domain", "MyApp.Domain.*");
-Layer web    = arch.Layer("Web",    "MyApp.Web.*");
+Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
+Layer web    = arch.Layer("Web",    "MyApp.Web.*").Purpose("Web is the HTTP surface: controllers and the views they serve.");
 
 arch.Rule("layering/domain-independent")
     .Enforce(domain.MustNotReference(web))
@@ -389,9 +399,11 @@ arch.Rule("data-access/no-inline-sql")
   identically, but render's per-directory local-rules card is keyed on the layer-anchored
   subject — the glob-spelled twin emits no card in that layer's directory, so agents editing
   there never see the rule locally.
-- Dragon-zone candidates are the one exception to "all as Enforce": a boundary has no Enforce
-  form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape).
-  The scope's containment violations arrive in step 4 alongside every other rule's evidence.
+- Dragon-zone candidates are the one exception to "all as Enforce": a scope has no Enforce
+  form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape
+  of both scope postures). The scope's containment violations arrive in step 4 alongside every
+  other rule's evidence, and they are what decides in step 5 whether the scope stays a
+  `Quarantine` or becomes a `Caution`.
 
 Build the spec. Spec-build validation reports **every** error at once (missing `Because`,
 malformed IDs, dangling rules, blank prose) — fix them in one pass.
@@ -454,8 +466,8 @@ For each surviving rule, the violation count decides the honest posture:
   `MigrateIfSmall` (override with `.WhileYoureThere(...)`), and the baseline path defaults to
   `arch/baselines/<rule-id>.json` — omit `.Baseline(...)` unless the team wants it elsewhere.
 
-- **A region with no target state → `Quarantine`.** No one will fix it; the enforceable thing is
-  the boundary:
+- **A region with no target state, which nothing new may reference → `Quarantine`.** No one will
+  fix it; the enforceable thing is the boundary:
 
   ```csharp
   arch.Scope("legacy/billing")
@@ -469,6 +481,16 @@ For each surviving rule, the violation count decides the honest posture:
   **List the facade implementation type(s) in `BoundaryOnlyVia` alongside the interface** —
   the composition root's DI registration references the concrete type, and forgetting it puts
   that registration red on day one. Omit `BoundaryOnlyVia` entirely for a hermetic quarantine.
+
+  **The boundary takes selections, not only types**, so a facade the spec cannot compile against
+  is still law: `.BoundaryOnlyVia(arch.Types.Named("IBillingFacade", "BillingFacade"))` for an
+  `internal` facade or one in a project the spec does not reference,
+  `.BoundaryOnlyVia(arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))` where the surface is a
+  region. The formula does not care whether the surface is inside the scope or outside it, so a
+  legacy region's one sanctioned *caller* is spelled the same way. Write that caller into the
+  boundary rather than grandfathering it, or the rendered law will call your sanctioned entry
+  point debt to burn down while the dragons prose says the opposite.
+
   `Dragons` must carry three things: what the code does, **which weirdness is load-bearing**
   (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch,
   it's bad" is not dragons prose — agents still have to call into this code.
@@ -477,6 +499,26 @@ For each surviving rule, the violation count decides the honest posture:
   new reference into the scope not via the facade; existing inbound references get
   grandfathered in step 7) and `{id}/tripwire` (a diff-aware warning; it reports as *skipped*
   in `check` runs without `--diff-base` — expected, not a bug).
+
+- **Load-bearing weirdness that new callers are welcome to → `Caution`.** The decision rule between
+  the two scope postures is whether anything new may reference the code: nothing new may reference
+  it → `Quarantine`; new callers welcome → `Caution`. A shared utility, a God class, a native-interop
+  layer that is ordinary public API: containing it would grandfather every legitimate caller as debt
+  and red the next one, and the card is still worth having.
+
+  ```csharp
+  arch.Scope("interop/native-signatures")
+      .Caution(arch.Namespace("MyApp.Native.*"))
+      .Dragons("Every DllImport here mirrors the C header byte for byte, and a wrong width is silent " +
+               "memory corruption rather than a compile error. Add signatures beside the existing ones " +
+               "and keep every marshalling attribute; call through the wrappers, never the imports.")
+      .Because("The native layer is public API for the whole solution; the compiler checks none of it.");
+  ```
+
+  `Dragons` carries the same three things a quarantine's does. A Caution desugars to one checkable
+  rule, `{id}/tripwire`: nothing is ever red, a change set touching the scope draws a warning under
+  `--diff-base` (and reports as *skipped* without it), and `render` puts the dragons on the scope's
+  directory as a card. A caution that later gains a facade becomes a `Quarantine` under the same ID.
 
 - **Nothing the team will stand behind → drop the rule.** An unratified rule in the spec is
   exactly the stale-doc problem this tool exists to kill.
@@ -539,13 +581,18 @@ watches shrink.
 
 Have the human run `loadbearing render MyApp.sln`: it writes the managed block into the root `AGENTS.md`
 (everything outside the markers is preserved byte-for-byte) and drops a second managed
-`AGENTS.md` into each quarantined scope's directory (the dragons card) and into each layer's
+`AGENTS.md` into each scope's directory (the dragons card) and into each layer's
 directory when rules are anchored on that layer (the local-rules card). Then commit —
 spec project, `arch/baselines/**`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
 acknowledged debt, and the generated context in a single change. On a multi-configuration `.sln`
 the largest hunk in that diff is often the solution file itself: the configuration-table expansion
 from step 2, which is mechanical, expected, and not to be trimmed by hand.
+
+Where the human wires `check` into CI, say that the pipeline's invocation wants
+`--diff-base <the pull request's base ref>`: without one every scope's tripwire is skipped rather
+than clean, so the code fenced or flagged because it is dangerous to edit is the one thing CI never
+mentions. The checkout has to be deep enough for that ref to resolve.
 
 Report the outcome: rules by posture, debt counts per Migrate rule, any rule left
 deliberately red with its violation count, dragons documented, and anything you dropped at
@@ -558,7 +605,7 @@ curation (with why) so it is on the record.
 A spec is one class implementing `IArchitectureSpec` with one method `Define(Arch arch)`, and
 three statement forms: definitions, rules, scopes.
 
-**Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` ·
+**Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` (a definition; its optional `.Purpose(prose)` trailer is one sentence on what the layer is for, rendered into the layer's module-map row and its card) ·
 `arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
 `arch.Type<X>()`) · `arch.AnyOf(a, b, ...)` (the union of any selections — the way to say "these
 four projects" in one subject; `arch.AnyOf(typeof(X), typeof(Y), ...)` is the multi-type sugar.
@@ -720,8 +767,9 @@ always passes. The flagship:
 
 **Postures** — `arch.Rule(id).Enforce(constraint)` · `arch.Rule(id).Migrate(from:, to:)`
 [`.Baseline(path)`] [`.WhileYoureThere(MigrationPolicy.MigrateIfSmall | AlwaysMigrate |
-NeverExpand)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(types...)`]
-[`.Dragons(prose)` / `.DragonsDoc(path)`] [`.Baseline(path)`].
+NeverExpand)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(selections... | types...)`]
+[`.Dragons(prose)` / `.DragonsDoc(path)`] [`.Baseline(path)`] · `arch.Scope(id).Caution(selection)`
+[`.Dragons(prose)` / `.DragonsDoc(path)`].
 
 **Trailers** — `.Because(prose)` required everywhere; `.Fix(prose)` optional (for containment
 it is auto-derived from the facade list).
@@ -783,8 +831,8 @@ subject fails the rule; an inert target warns; both are authoring signals, not c
 
 - `arch_explain <rule-id>` (CLI: `loadbearing explain`) — any rule's because / fix / posture
   payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
-- `arch_context <path>` — the architecture scope cards covering a directory (a quarantined
-  scope's dragons, a layer's local rules).
+- `arch_context <path>` — the architecture scope cards covering a directory (a quarantined or
+  cautioned scope's dragons, a layer's local rules).
 - `loadbearing status` — the burndown after baselining.
 - [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) — the canonical
   fluent-language spec: the complete vocabulary with its rendered prose fragments and pinned

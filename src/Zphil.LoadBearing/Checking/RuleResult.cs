@@ -37,6 +37,7 @@ public sealed class RuleResult
         Warnings = warnings ?? Array.Empty<CheckWarning>();
         SkipReason = skipReason;
         Grandfathered = grandfathered ?? Array.Empty<Violation>();
+        GrandfatheredSiteCount = Grandfathered.Sum(violation => violation.Sites.Count);
         StaleBaselineEntries = ratchet.Stale;
         ShrunkBaselineEntries = ratchet.Shrunk;
         UncountedBaselineEntries = ratchet.Uncounted;
@@ -70,6 +71,14 @@ public sealed class RuleResult
     ///     <see cref="Violations" />. Empty for every non-Migrate rule.
     /// </summary>
     public IReadOnlyList<Violation> Grandfathered { get; }
+
+    /// <summary>
+    ///     How many <em>sites</em> the grandfathered violations carry between them — the burndown at the
+    ///     grain the ratchet measures, which is at least <see cref="Grandfathered" />'s count and is
+    ///     computable whether or not any entry has recorded a site count yet. Summed once here, so every
+    ///     renderer and the report's roll-up read one figure and cannot disagree about the same run.
+    /// </summary>
+    public int GrandfatheredSiteCount { get; }
 
     /// <summary>
     ///     The count of baseline entries no current violation matched — debt that was fixed and is now

@@ -9,9 +9,21 @@ namespace Zphil.LoadBearing.Fluent;
 public interface IQuarantinedScope
 {
     /// <summary>
-    ///     The sanctioned surface — the only types that may reference into the quarantined scope. Omit
-    ///     the call entirely for a hermetic quarantine; a zero-argument call is a validation error with
-    ///     a hint (§8 item 8), hence plain <c>params</c> rather than the <c>(first, more)</c> shape.
+    ///     The sanctioned surface — the only selections that may reference into the quarantined scope.
+    ///     Several are the union <c>arch.AnyOf</c> would mint, and the formula holds whether they lie
+    ///     inside or outside the quarantined selection (GRAMMAR §7). This is the no-load spelling: a
+    ///     facade the spec assembly cannot compile against is named by
+    ///     <c>arch.Types.Named("BillingFacade")</c> rather than by <c>typeof</c>.
+    /// </summary>
+    IQuarantinedScope BoundaryOnlyVia(Selection first, params Selection[] more);
+
+    /// <summary>
+    ///     The sanctioned surface as types — <c>≡ BoundaryOnlyVia(arch.Type(a), arch.Type(b), …)</c>, the
+    ///     same sugar the dependency verbs carry (GRAMMAR §3.3): identical model, identical prose. Omit the
+    ///     call entirely for a hermetic quarantine; a zero-argument call is a validation error with a hint
+    ///     (§8 item 8), which is why this overload alone keeps plain <c>params</c> — the <c>Selection</c>
+    ///     form's <c>(first, more)</c> shape is what leaves <c>BoundaryOnlyVia()</c> binding here uniquely
+    ///     instead of ambiguously.
     /// </summary>
     IQuarantinedScope BoundaryOnlyVia(params Type[] boundary);
 

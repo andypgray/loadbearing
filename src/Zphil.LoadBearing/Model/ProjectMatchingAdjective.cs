@@ -20,5 +20,5 @@ internal sealed class ProjectMatchingAdjective(IReadOnlyList<string> globs) : Pr
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
     internal override string Fragment =>
-        " matching " + ProseFormat.JoinReferences(Globs.Select(ProseFormat.Backtick).ToList());
+        " matching " + ProseFormat.BacktickedList(Globs);
 }

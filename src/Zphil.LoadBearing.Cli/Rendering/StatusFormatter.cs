@@ -14,8 +14,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     fixed-awaiting-acceptance, plus the three measure terms where they apply: the site total behind the
 ///     remaining pairs, and how many matched entries came in under their recorded count or record none at
 ///     all. Each of those three extinguishes itself, so a rule whose pairs are one site apiece and whose
-///     counts all hold reads exactly as it did before the measure existed. A Quarantine tripwire reads
-///     <c>skip</c> (diff-aware). Only Migrate surfaces
+///     counts all hold reads exactly as it did before the measure existed. A scope tripwire reads
+///     <c>skip</c> (diff-aware), whichever posture minted it — a caution has no other line, so without
+///     this its rule would fall to the Enforce arm and read <c>pass</c> for a rule the run never ran.
+///     Only Migrate surfaces
 ///     the promotion suggestion when the baseline has burned to zero — Quarantine→Migrate is a human decision.
 ///     A rule a solution filter left no subject for reads <c>skip</c> with its reason, whatever its posture:
 ///     the burndown its posture would otherwise print is a claim about a check this run never made.
@@ -42,21 +44,30 @@ internal static class StatusFormatter
         {
             Posture.Migrate => RatchetLine(result, "migrate"),
             Posture.Quarantine => QuarantineLine(result),
+            Posture.Caution => TripwireLine(result),
             _ => EnforceLine(result)
         };
     }
 
     private static bool IsTripwire(RuleResult result)
     {
-        return result.Rule.Quarantine is { Role: QuarantineRole.Tripwire };
+        return result.Rule.Scope is { Role: ScopeRole.Tripwire };
     }
 
     private static string QuarantineLine(RuleResult result)
     {
         // Containment ratchets like Migrate (but never suggests promotion); the tripwire is diff-aware skip.
-        return result.Rule.Quarantine!.Role == QuarantineRole.Containment
+        return result.Rule.Scope!.Role == ScopeRole.Containment
             ? RatchetLine(result, "quarantine")
-            : $"skip {result.Rule.Id} (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'";
+            : TripwireLine(result);
+    }
+
+    // The one tripwire line both scope postures print. A caution's only rule is its tripwire, so the
+    // posture arm reaches this directly; a quarantine reaches it past the containment fork. Sharing the
+    // string is what keeps the diff-aware skip reading identically wherever the scope came from.
+    private static string TripwireLine(RuleResult result)
+    {
+        return $"skip {result.Rule.Id} (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'";
     }
 
     private static string EnforceLine(RuleResult result)
@@ -90,20 +101,21 @@ internal static class StatusFormatter
         if (!result.BaselineCaptured)
             return $"no baseline captured; run 'loadbearing baseline --init' ({newCount} current {Plurals.Noun(newCount, "violation")})";
 
-        // Both measures need a matched entry to be counted at all, so a rule with nothing remaining has
-        // neither — which is why the two zero-remaining arms below say nothing about them. They trail the
-        // stale term rather than joining the head of the list: like it, each names a state a write clears.
-        int sites = result.Grandfathered.Sum(violation => violation.Sites.Count);
+        // Both measures need a matched entry to be counted at all, so a rule with nothing remaining and
+        // nothing new has neither — which is why this arm says nothing about them.
+        if (newCount == 0 && remaining == 0)
+        {
+            if (stale == 0)
+                return result.Promotable ? "0 remaining; promotable to Enforce (baseline is empty)" : "0 grandfathered remaining";
+
+            return $"0 remaining, {stale} fixed awaiting acceptance; run 'loadbearing baseline --accept-reductions'";
+        }
+
+        // The measures trail the stale term rather than joining the head of the list: like it, each names a
+        // state a write clears.
         string measures = Clause(result.ShrunkBaselineEntries, "shrunk")
                           + Clause(result.UncountedBaselineEntries, "uncounted");
-        if (newCount > 0)
-            return $"{remaining} grandfathered remaining{Sites(remaining, sites)}, {newCount} new, "
-                   + $"{stale} fixed awaiting acceptance{measures}";
-        if (remaining == 0 && stale == 0)
-            return result.Promotable ? "0 remaining; promotable to Enforce (baseline is empty)" : "0 grandfathered remaining";
-        if (remaining == 0)
-            return $"0 remaining, {stale} fixed awaiting acceptance; run 'loadbearing baseline --accept-reductions'";
-        return $"{remaining} grandfathered remaining{Sites(remaining, sites)}, 0 new, "
+        return $"{remaining} grandfathered remaining{Sites(remaining, result.GrandfatheredSiteCount)}, {newCount} new, "
                + $"{stale} fixed awaiting acceptance{measures}";
     }
 

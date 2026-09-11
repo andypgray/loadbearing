@@ -11,8 +11,8 @@ namespace Zphil.LoadBearing.Rendering;
 /// <remarks>
 ///     Pure and codebase-independent: the root block is a function of
 ///     <c>(model, specName)</c> (plus an optional grandfathered-count provider), a scope card a function
-///     of one containment rule. Output is LF-internal always (never <c>Environment.NewLine</c>); the
-///     splicer applies the target file's line ending.
+///     of one rule — a quarantine's containment or a caution's tripwire. Output is LF-internal always
+///     (never <c>Environment.NewLine</c>); the splicer applies the target file's line ending.
 /// </remarks>
 public static class AgentContextRenderer
 {
@@ -138,7 +138,7 @@ public static class AgentContextRenderer
         List<ArchRule> migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate).ToList();
         if (migrateRules.Count > 0) sections.Add(MigrationsSection(migrateRules, grandfatheredCounts));
 
-        List<ArchRule> containmentRules = model.Rules.Where(rule => rule.Quarantine is { Role: QuarantineRole.Containment }).ToList();
+        List<ArchRule> containmentRules = model.Rules.Where(rule => rule.Scope is { Role: ScopeRole.Containment }).ToList();
         if (containmentRules.Count > 0) sections.Add(QuarantinedScopesSection(containmentRules));
 
         return string.Join("\n\n", sections);
@@ -186,7 +186,7 @@ public static class AgentContextRenderer
     public static string ScopeCard(ArchRule containmentRule)
     {
         Guard.NotNull(containmentRule, nameof(containmentRule));
-        if (containmentRule.Quarantine is not { Role: QuarantineRole.Containment } quarantine)
+        if (containmentRule.Scope is not { Role: ScopeRole.Containment } quarantine)
             throw new ArgumentException("ScopeCard requires a Quarantine containment rule.", nameof(containmentRule));
 
         string scopeId = quarantine.ScopeId;
@@ -195,7 +195,7 @@ public static class AgentContextRenderer
         {
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
-        if (quarantine.Boundary.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(quarantine.Boundary)}.");
+        if (quarantine.Surface.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(quarantine.Surface)}.");
         // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
         // not a rebased markdown link.
         if (quarantine.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
@@ -214,16 +214,63 @@ public static class AgentContextRenderer
     }
 
     /// <summary>
+    ///     A cautioned scope's context card (without the provenance line, which the splice pipeline adds
+    ///     once per file): the scope heading, a lede naming what the scope covers, the load-bearing-
+    ///     weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a linked <c>Dragons doc</c>
+    ///     bullet — one of the two is spec-guaranteed), the tripwire and its rationale, and the
+    ///     <c>explain</c> pointer.
+    /// </summary>
+    /// <remarks>
+    ///     The twin of <see cref="ScopeCard" /> for the posture with no containment law, so it names no
+    ///     boundary and never tells the reader to keep out — a caution's whole point is that new callers
+    ///     are welcome and the weirdness is what wants reading first. The lede states the scoped selection
+    ///     because there is no containment sentence to state it: a quarantine card's law bullet names the
+    ///     subject, and a caution has no law.
+    /// </remarks>
+    public static string CautionCard(ArchRule tripwireRule)
+    {
+        Guard.NotNull(tripwireRule, nameof(tripwireRule));
+        if (tripwireRule.Posture != Posture.Caution
+            || tripwireRule.Scope is not { Role: ScopeRole.Tripwire, Scoped: { } scoped } caution)
+            throw new ArgumentException("CautionCard requires a Caution tripwire rule.", nameof(tripwireRule));
+
+        string scopeId = caution.ScopeId;
+
+        var bullets = new List<string>
+        {
+            $"- {ProseFormat.Backtick(tripwireRule.Id)} — a change set touching this scope is flagged by " +
+            $"{ProseFormat.Backtick("check --diff-base <ref>")}. {tripwireRule.Because}"
+        };
+        // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
+        // not a rebased markdown link.
+        if (caution.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
+        bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {tripwireRule.Id}")}.");
+
+        var sections = new List<string>
+        {
+            $"## Cautioned scope {ProseFormat.Backtick(scopeId)}",
+            $"This directory holds the cautioned {ProseFormat.Backtick(scopeId)} scope: " +
+            $"{SentenceRenderer.Reference(scoped)}. Here be dragons — the weirdness below is load-bearing; " +
+            "read it before you edit, and do not tidy it away."
+        };
+        if (caution.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
+        sections.Add(string.Join("\n", bullets));
+
+        return string.Join("\n\n", sections);
+    }
+
+    /// <summary>
     ///     A layer's "local rules" context card, placed in the layer's directory (without
     ///     the provenance line, which the splice pipeline adds once per file): the layer heading, a
-    ///     one-line lede, then one bullet per anchored rule, closed by a generic drill-down pointer.
+    ///     one-line lede — the directory sentence, then the layer's purpose when it has one, then the rules
+    ///     cue — then one bullet per anchored rule, closed by a generic drill-down pointer.
     /// </summary>
     /// <remarks>
     ///     The bullets use the very same Rules/Migrations composer the root block uses, so a rule reads
     ///     identically in both places. No Fix lines (progressive disclosure; <c>explain</c> serves the
     ///     fix). This is the scoped, per-directory rule digest an agent editing the layer reads.
     /// </remarks>
-    public static string LayerCard(string layerName, IReadOnlyList<ArchRule> rules)
+    public static string LayerCard(string layerName, string? purpose, IReadOnlyList<ArchRule> rules)
     {
         Guard.NotNullOrWhiteSpace(layerName, nameof(layerName));
         Guard.NotNull(rules, nameof(rules));
@@ -231,10 +278,14 @@ public static class AgentContextRenderer
         List<string> bullets = rules.Select(rule => RuleBullet(rule)).ToList();
         bullets.Add($"- Expand any rule above with {ProseFormat.Backtick("loadbearing explain <rule-id>")}.");
 
+        var lede = $"This directory holds the {ProseFormat.Backtick(layerName)} layer.";
+        if (purpose is not null) lede += $" {purpose}";
+        lede += " Its architecture rules:";
+
         var sections = new List<string>
         {
             $"## Layer {ProseFormat.Backtick(layerName)}",
-            $"This directory holds the {ProseFormat.Backtick(layerName)} layer. Its architecture rules:",
+            lede,
             string.Join("\n", bullets)
         };
 
@@ -305,9 +356,9 @@ public static class AgentContextRenderer
 
     private static string QuarantinedScopeBullet(ArchRule rule)
     {
-        QuarantineData quarantine = rule.Quarantine!;
+        ScopeData quarantine = rule.Scope!;
         var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence} {rule.Because}";
-        if (quarantine.Boundary.Count > 0) bullet += $" Sanctioned surface: {SurfaceList(quarantine.Boundary)}.";
+        if (quarantine.Surface.Count > 0) bullet += $" Sanctioned surface: {SurfaceList(quarantine.Surface)}.";
         return bullet;
     }
 
@@ -324,8 +375,10 @@ public static class AgentContextRenderer
         };
     }
 
-    private static string SurfaceList(IReadOnlyList<Type> boundary)
+    // Comma-joined rather than or-joined: this is an inventory of the sanctioned surface, not a
+    // sentence naming an alternative, and the fragments arrive already rendered and widened.
+    private static string SurfaceList(IReadOnlyList<string> surface)
     {
-        return string.Join(", ", boundary.Select(type => ProseFormat.Backtick(TypeName.Simple(type))));
+        return string.Join(", ", surface);
     }
 }

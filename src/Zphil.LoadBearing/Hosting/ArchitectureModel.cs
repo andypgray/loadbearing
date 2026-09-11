@@ -14,8 +14,9 @@ public sealed class ArchitectureModel
     }
 
     /// <summary>
-    ///     Every rule, in authoring order, with each scope's generated children (containment then
-    ///     tripwire) sitting at the scope's position (GRAMMAR §7).
+    ///     Every rule, in authoring order, with each scope's generated children — a quarantine's
+    ///     containment then tripwire, a caution's tripwire alone — sitting at the scope's position
+    ///     (GRAMMAR §7).
     /// </summary>
     public IReadOnlyList<ArchRule> Rules { get; }
 

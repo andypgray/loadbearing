@@ -19,8 +19,8 @@ as part of the change (house test culture).
    description:)` in constraint position; the mandatory-description semantics are locked.
 3. **`Because` is required** (spec-build error when missing); `Fix` is optional.
 4. **Posture granularity: dual surface, single model** —
-   `Rule().Enforce/Migrate(...)` and `Scope().Quarantine(...)` on the surface; Quarantine desugars to
-   ordinary posture-bearing rule nodes (§7); checker/renderer/baseline walk ONE rule model.
+   `Rule().Enforce/Migrate(...)` and `Scope().Quarantine/Caution(...)` on the surface; a scope desugars
+   to ordinary posture-bearing rule nodes (§7); checker/renderer/baseline walk ONE rule model.
 
 ## 2. Design principles
 
@@ -44,7 +44,12 @@ as part of the change (house test culture).
    once (§8) so an agent fixing a spec sees all problems in one pass.
 7. **Honesty is pinned.** Where a verb's semantics have a boundary (the `MustOnly*` reference
    universe, §4.1), the rendered fragment states the boundary. Escape hatches without
-   descriptions do not compile.
+   descriptions do not compile. The rendered block carries two kinds of prose, and the claim is
+   exact for one of them: a generated sentence (the law, a module-map row's name and globs, a
+   sanctioned surface) is *true of the code* whenever the checker is green; authored prose
+   (`Because`, `Fix`, a Migrate's `from:`, `Dragons`, a layer's `Purpose`) is *current with the
+   spec*, rendered verbatim beside the sentence or definition it glosses, re-rendered with it,
+   and checked by nothing.
 
 ## 3. The grammar
 
@@ -54,7 +59,7 @@ A spec is a class implementing `IArchitectureSpec` with one method, `Define(Arch
 Inside it there are exactly three statement forms:
 
 ```
-definition :=  var x = arch.Layer(name, glob, globs...) | arch.Namespace(glob)
+definition :=  var x = arch.Layer(name, glob, globs...)[.Purpose(prose)] | arch.Namespace(glob)
              | arch.Project(name) | arch.Type(typeof(X)) | arch.Type<X>()
              | arch.Registered(lifetime) | arch.Registered()
              | arch.AnyOf(selection, selections...) | arch.AnyOf(typeof(X), types...)
@@ -62,6 +67,7 @@ definition :=  var x = arch.Layer(name, glob, globs...) | arch.Namespace(glob)
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
 rule       :=  arch.Rule(id) . posture-verb . trailer*
 scope      :=  arch.Scope(id) . Quarantine(selection) . quarantine-clause* . trailer*
+             | arch.Scope(id) . Caution(selection) . caution-clause* . trailer*
 
 posture-verb :=  Enforce(constraint)
               |  Migrate(from: prose, to: constraint) [.Baseline(path)] [.WhileYoureThere(policy)]
@@ -73,7 +79,9 @@ projection   :=  Members | Methods | Properties | Fields | Events
 member       :=  arch.Member(typeof(X), nameof(X.M))        — a leaf value, NOT a selection (§4.5)
              |   arch.Member<T>(x => x.M)                   — a typed instance-member anchor (§4.5)
              |   arch.Member(() => X.M)                     — a static-member anchor (§4.5)
-quarantine-clause :=  BoundaryOnlyVia(types...) | Dragons(prose) | DragonsDoc(path) | Baseline(path)
+quarantine-clause :=  BoundaryOnlyVia(selections...) | BoundaryOnlyVia(types...)
+             |   Dragons(prose) | DragonsDoc(path) | Baseline(path)
+caution-clause :=  Dragons(prose) | DragonsDoc(path)
 trailer      :=  Because(prose) | Fix(prose)
 ```
 
@@ -91,7 +99,7 @@ sentence.
 
 ```
 Arch
- ├─ .Layer(name, string glob, params string[] more) → Layer (: Selection)
+ ├─ .Layer(name, string glob, params string[] more) → Layer (: Selection; .Purpose(prose) → Layer)
  ├─ .Namespace(glob)  → Selection
  ├─ .Project(name)    → Selection
  ├─ .Type(Type)       → Selection      (single type; there is deliberately no
@@ -140,16 +148,22 @@ ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Excep
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
 IEnforceRule — .Because / .Fix
 IMigrateRule — .Because / .Fix / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
-IScopeBuilder — ONLY .Quarantine(Selection) → IQuarantinedScope
-IQuarantinedScope — .BoundaryOnlyVia(params Type[]) / .Dragons(prose) / .DragonsDoc(path)
-               / .Baseline(path) / .Because
+IScopeBuilder — ONLY .Quarantine(Selection) → IQuarantinedScope | .Caution(Selection) → ICautionedScope
+IQuarantinedScope — .BoundaryOnlyVia(Selection first, params Selection[]) / .BoundaryOnlyVia(params Type[])
+               / .Dragons(prose) / .DragonsDoc(path) / .Baseline(path) / .Because
+ICautionedScope — .Dragons(prose) / .DragonsDoc(path) / .Because
 ```
 
 Structural consequences, all deliberate:
 
 - A rule cannot exist without an ID (it is the anchor argument) or without a posture (the
   only methods on `IRuleBuilder` are posture verbs). Rule anatomy is enforced by the grammar.
-- Trailers exist only on posture stage types — `arch.Rule(id).Because(...)` does not compile.
+  A scope likewise: `IScopeBuilder` carries only its two posture verbs, and `ICautionedScope`
+  carries no `BoundaryOnlyVia`, `Baseline` or `Fix` — a caution has no boundary and nothing to
+  grandfather, so those clauses are uncompilable on it by construction, not validated away.
+- Trailers exist only on posture stage types and on the layer definition —
+  `arch.Rule(id).Because(...)` still does not compile. `.Purpose(prose)` is the one trailer a
+  definition carries; it returns the same `Layer`, so a described layer is the selection it was.
 - Register-on-anchor: a dangling `arch.Rule("x");` is caught by validation (§8 item 2), not
   silently dropped.
 - **`Selection` and `Constraint` are closed class hierarchies** — abstract classes with
@@ -979,7 +993,7 @@ declares as package references, whether it locks restore and whether it packs.
 | Combinator | Fragment (reference position) |
 |---|---|
 | `arch.Types` | "types" |
-| `arch.Layer("Domain", "MyApp.Domain.*")` | "the Domain layer" — definition fragment: "**Domain** — `MyApp.Domain.*`" |
+| `arch.Layer("Domain", "MyApp.Domain.*")` | "the Domain layer" — definition fragment: "**Domain** — `MyApp.Domain.*`", and with a `.Purpose(prose)` "**Domain** — `MyApp.Domain.*`. {purpose}": prefix-preserving, the purpose verbatim (§5.5). The reference fragment never carries the purpose. |
 | `arch.Namespace("MyApp.Legacy.Billing.*")` | "types in `MyApp.Legacy.Billing.*`" |
 | `arch.Project("MyApp.Web")` | "types in project `MyApp.Web`" |
 | `arch.Type(typeof(SqlConnection))` / `arch.Type<SqlConnection>()` | "`SqlConnection`" — simple name; FQN retained in the model |
@@ -1183,17 +1197,20 @@ no-reference string, and the generic sugar (§10).
 | `.Enforce(constraint)` | the law; violation = red |
 | `.Migrate(from: prose, to: constraint)` | `from` is descriptive prose (the OLD pattern); `to` is the checkable target constraint |
 | `.Quarantine(selection)` | scope statement; desugars per §7 |
+| `.Caution(selection)` | scope statement; desugars per §7 to the tripwire alone; severity warning, never red |
 | `.Baseline(path)` | Migrate **and** Quarantine; ratcheted grandfather store |
 | `.WhileYoureThere(MigrationPolicy)` | `MigrateIfSmall` (default) \| `AlwaysMigrate` \| `NeverExpand` |
-| `.BoundaryOnlyVia(params Type[])` | the sanctioned surface; omit entirely for a hermetic quarantine |
+| `.BoundaryOnlyVia(Selection first, params Selection[] more)` | the sanctioned surface; omit entirely for a hermetic quarantine |
+| `.BoundaryOnlyVia(params Type[])` | the same, as types — ≡ `arch.Type(t)` per operand (§3.3) |
 | `.Dragons(prose)` / `.DragonsDoc(path)` | load-bearing-weirdness prose / linked long-form doc |
 
 ### 5.5 Trailers
 
 | Member | Notes |
 |---|---|
-| `.Because(prose)` | **required** on every rule and quarantined scope (§8 item 3) |
-| `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IQuarantinedScope` carries no `.Fix` |
+| `.Because(prose)` | **required** on every rule and scope (§8 item 3) |
+| `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IQuarantinedScope` carries no `.Fix`, and neither does `ICautionedScope`: a caution's "what to do instead" is the sanctioned-interaction clause its dragons prose already carries |
+| `.Purpose(prose)` | optional; `Layer` only: the one trailer on a definition (§3.2). Renders verbatim after the definition fragment in the module-map row (§5.1) and after the first sentence of the layer card's lede ("This directory holds the `Host` layer. {purpose} Its architecture rules:"); never places a card of its own — a layer earns a card only through an anchored Enforce/Migrate rule. Blank or multi-line is §8 item 5 and a second call item 6, both spec-wide and named by layer. |
 
 ### 5.6 Escape hatches
 
@@ -1470,10 +1487,11 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   wrong set.
 - Posture voices consume these same fragments: Enforce renders as law; Migrate renders the
   counter-prior paragraph (slots: from-prose, to-sentence, policy, baseline burndown); Quarantine
-  renders dragons + sanctioned surface. Full paragraph templates are pinned by the renderer's
-  tests; the grammar carries every slot they need.
+  renders dragons + sanctioned surface; Caution renders dragons alone, on the directory card and
+  nowhere in the root block. Full paragraph templates are pinned by the renderer's tests; the
+  grammar carries every slot they need.
 
-## 7. Quarantine desugaring (the single rule model, constructively)
+## 7. Scope desugaring (the single rule model, constructively)
 
 `arch.Scope(id).Quarantine(sel).BoundaryOnlyVia(F).Baseline(p)` reifies to ordinary rule nodes:
 
@@ -1493,36 +1511,69 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   rule itself passes and warnings never affect the exit code. Without diff context the rule is
   skipped, with a pointer at `--diff-base`. It carries the quarantined selection (not the boundary or a
   baseline) so it can map changed files to quarantined types.
+- **`arch.Scope(id).Caution(sel)` mints the tripwire alone.** A caution reifies to one node,
+  `{id}/tripwire`, under the fourth posture, `Caution` — the same node a quarantine's second child
+  is, mapping changed files over `sel` the same way, with no containment law beside it: new
+  references into the scope are welcome, and nothing about the scope ever reds. The posture is the
+  severity (§9), and a caution's is warning, so it is the one posture with no red state. Its
+  tripwire warns in its own voice — "read the dragons before editing", pointing at
+  `explain {id}/tripwire` — where a quarantine's asks whether the task requires editing dragon
+  territory at all, and the human report prints the dragons beneath a fired tripwire of either
+  posture. A caution that later gains a facade becomes a quarantine under the same ID:
+  `Caution(sel)` to `Quarantine(sel).BoundaryOnlyVia(F)` keeps the `{id}/tripwire` handle, the
+  `explain` pointer and the card's directory key. Reserved suffixes are the same two for every
+  scope, whichever posture it carries.
 - Scope children occupy the rule-ID namespace: duplicate detection runs over the
   **post-desugar** ID set, and a declared ID may not extend a scope ID — `{scope-id}/…` is
   reserved. Reserved suffixes: `containment`, `tripwire`.
+- The boundary is **selections**, with the `Type` sugar every set-valued position carries
+  (§3.3): `BoundaryOnlyVia(typeof(IFacade))` ≡ `BoundaryOnlyVia(arch.Type(typeof(IFacade)))`,
+  identical model and identical prose, and a mixed list wraps the type. Anchor by `typeof` when
+  the spec can compile against the facade (§5.2); name it otherwise —
+  `BoundaryOnlyVia(arch.Types.Named("BillingFacade"))` reaches an `internal` facade, or one in a
+  project the spec does not reference, with no `[InternalsVisibleTo]` and no load. Since the
+  formula is indifferent to whether the surface lies inside or outside `sel`, a *consumer* is
+  spelled the same way: the one caller a legacy scope sanctions becomes law rather than
+  grandfathered debt.
 - Omitting `BoundaryOnlyVia` = hermetic quarantine (nothing outside may reference the scope).
-  Because omission is legal, the verb deliberately stays plain `params` (not `(first, more)`)
-  so that a zero-arg call reaches spec-build validation and gets the designed hint — "omit
-  the call for a hermetic quarantine" (§8 item 8) — instead of an opaque compiler error. It has
-  **no** generic twin: a boundary is a variadic facade-plus-implementation list, which has no
-  type-argument form; a single facade type is `BoundaryOnlyVia(typeof(IFacade))`.
+  Because omission is legal, the **`Type` overload** deliberately stays plain `params` (not
+  `(first, more)`) so that a zero-arg call reaches spec-build validation and gets the designed
+  hint — "omit the call for a hermetic quarantine" (§8 item 8) — instead of an opaque compiler
+  error. That is also why only one of the two carries plain `params`: two would make
+  `BoundaryOnlyVia()` ambiguous and put the hint out of reach, so the `Selection` form takes
+  `(first, more)` and is uncompilable at zero arguments by construction. Neither has a generic
+  twin: a boundary is a variadic list, which has no type-argument form.
 - A project-headed quarantined selection follows §4.1's several-projects rule: a type the
   project co-declares is in the quarantine — for containment, for the tripwire's changed-file
   mapping, and for scope-card placement alike.
-- Nested/overlapping quarantines compose as independent conjuncts; there is no scope precedence.
-- **Practical note**: `BoundaryOnlyVia` usually needs
-  the facade *implementation* type(s) listed alongside the interface, or the composition
-  root's DI registration of the concrete facade goes red on day one:
-  `BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))`.
+- Nested or overlapping scopes compose as independent conjuncts, whichever posture each carries;
+  there is no scope precedence, and a caution overlapping a quarantine is legal, redundant and
+  unvalidated.
+- **Practical note**: a `typeof` boundary usually needs the facade *implementation* type(s)
+  listed alongside the interface, or the composition root's DI registration of the concrete
+  facade goes red on day one: `BoundaryOnlyVia(typeof(IBillingFacade), typeof(BillingFacade))`.
+  A named boundary lists the pair the same way, and needs no `[InternalsVisibleTo]` to reach the
+  `internal sealed class` the implementation usually is:
+  `BoundaryOnlyVia(arch.Types.Named("IBillingFacade", "BillingFacade"))`.
 
 ## 8. Spec-build validation catalog (all errors reported at once)
 
 1. Duplicate ID over the **post-desugar** set (rules + scopes + generated children), across
    all spec classes; a declared ID may not extend a scope ID.
-2. Dangling anchor — `Rule()`/`Scope()` without a posture verb.
-3. Missing `Because` on any rule or quarantined scope.
-4. Missing both `Dragons` and `DragonsDoc` on a quarantined scope.
+2. Dangling anchor — `Rule()`/`Scope()` without a posture verb (`.Enforce`/`.Migrate` on a rule,
+   `.Quarantine`/`.Caution` on a scope); the message names both of the anchor's verbs.
+3. Missing `Because` on any rule or scope, whichever posture the scope carries.
+4. Missing both `Dragons` and `DragonsDoc` on a scope, quarantined or cautioned; the message names
+   the posture.
 5. Blank/whitespace prose anywhere; prose fields are single-line (no `\r`/`\n`, no leading
-   markdown-structural characters — long-form prose links out via `DragonsDoc`).
-6. Repeated trailer/option (`Because` twice, two `Baseline`s, …).
+   markdown-structural characters — long-form prose links out via `DragonsDoc`). A layer's
+   `Purpose` is prose like any other and is reported on the layer's spec-wide terms, named by
+   layer and with no location: `Blank purpose on layer 'Core'.`
+6. Repeated trailer/option (`Because` twice, two `Baseline`s, a layer's `Purpose` twice, …); the
+   `Purpose` case is spec-wide and named by layer, like item 5.
 7. Malformed ID — must match `^[a-z0-9-]+(/[a-z0-9-]+)*$` (convention: `area/rule-name`).
-8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic quarantine).
+8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic quarantine) — reachable
+   through the `Type` overload alone; the `Selection` form takes `(first, more)`.
 9. Duplicate layer name.
 10. Selection minted on a different `Arch` instance ("selection not registered with this
     model").
@@ -1561,13 +1612,13 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     never applies to them — only the blank check (item 15) does. `NamespacePattern.Validate` owns
     the verdict, so the matcher and its build-time gate cannot drift.
 17. Repeated posture — a rule given more than one posture verb (`.Enforce`/`.Migrate`), or a scope
-    given `.Quarantine` more than once. The stage machine (§3.2) makes the *fluent* double-call
+    given a posture verb (`.Quarantine`/`.Caution`) more than once, or both. The stage machine (§3.2) makes the *fluent* double-call
     uncompilable: the posture verbs live only on `IRuleBuilder`/`IScopeBuilder`, and the first call
     hands back a stage type without them. But those builders are mutable, so a **stored** builder
     reference (`var b = arch.Rule(id); b.Enforce(...); b.Migrate(...);`) can call a posture verb
     twice, and the second silently overwrites the first — the model keeps only the last posture.
     This item catches that stored-reference re-call: the count rides on the registration
-    (`RuleRegistration.PostureCount` / `ScopeRegistration.QuarantineCount`) and a count > 1 is the error.
+    (`RuleRegistration.PostureCount` / `ScopeRegistration.PostureCount`) and a count > 1 is the error.
 18. Unresolvable member-anchor expression (§4.5) — an `arch.Member<T>(x => ...)` /
     `arch.Member(() => ...)` lambda the resolver cannot reduce to a declared `(type, name)`. One
     code (`MemberExpressionUnresolvable`) carrying eight messages, each steering to the cure: a
@@ -1755,9 +1806,9 @@ agent fixing a spec sees every problem in one pass.
   (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
   `AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or
   framework defaults are not seen."*
-- **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`). **Options**: nouns
+- **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`, `Caution`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule).
-  **Trailers**: conjunctions (`Because`) / nouns (`Fix`).
+  **Trailers**: conjunctions (`Because`) / nouns (`Fix`, `Purpose`).
 - `(first, params more)` signatures wherever an empty list would be meaningless.
   `MustAcceptParameter` is deliberately single-`Type`: over several parameter anchors one
   sentence cannot say whether ALL are required or ANY suffices, so a second required
@@ -1930,7 +1981,7 @@ public sealed class ArchSpec : IArchitectureSpec
 {
     public void Define(Arch arch)
     {
-        Layer domain = arch.Layer("Domain", "MyApp.Domain.*");
+        Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
         Layer web    = arch.Layer("Web",    "MyApp.Web.*");
 
         arch.Rule("layering/domain-independent")
@@ -1959,6 +2010,12 @@ public sealed class ArchSpec : IArchitectureSpec
             .Dragons("Banker's rounding happens at line-item level, NOT invoice level. " +
                      "Nightly reconciliation depends on this. Do not normalize.")
             .Because("Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.");
+
+        arch.Scope("domain/pricing")
+            .Caution(arch.Types.Named("PricingEngine"))
+            .Dragons("Discount rules are evaluated in declaration order and the first match wins; " +
+                     "the catalogue states exceptions before defaults. Do not sort or de-duplicate the list.")
+            .Because("Every checkout path calls PricingEngine directly; a facade would cost more than it guards.");
 
         arch.Rule("naming/handlers")
             .Enforce(arch.Types.Implementing(typeof(IHandler<>)).MustHaveSuffix("Handler"))

@@ -18,7 +18,7 @@ namespace Zphil.LoadBearing;
 /// </remarks>
 public sealed class Arch
 {
-    private readonly List<LayerNoun> _layers = [];
+    private readonly List<LayerRegistration> _layers = [];
     private readonly List<Registration> _registrations = [];
 
     internal Arch()
@@ -46,8 +46,8 @@ public sealed class Arch
     /// <summary>The registered rule and scope anchors, in authoring order.</summary>
     internal IReadOnlyList<Registration> Registrations => _registrations;
 
-    /// <summary>The declared layers, in authoring order.</summary>
-    internal IReadOnlyList<LayerNoun> Layers => _layers;
+    /// <summary>The declared layers with their purposes, in authoring order.</summary>
+    internal IReadOnlyList<LayerRegistration> Layers => _layers;
 
     /// <summary>
     ///     Defines a named layer from one or more namespace globs. The <c>(name, glob, more)</c>
@@ -58,8 +58,21 @@ public sealed class Arch
         var globs = new List<string>(1 + more.Length) { glob };
         globs.AddRange(more);
         var noun = new LayerNoun(name, globs);
-        _layers.Add(noun);
+        _layers.Add(new LayerRegistration(noun));
         return new Layer(this, noun);
+    }
+
+    /// <summary>Appends a <c>Purpose</c> to the registration of the layer minted with <paramref name="noun" />.</summary>
+    /// <remarks>
+    ///     The lookup always succeeds: <see cref="Zphil.LoadBearing.Layer" />'s constructor is internal,
+    ///     <see cref="Layer(string,string,string[])" /> is the only mint, and every
+    ///     <see cref="Zphil.LoadBearing.Layer" /> built later over a layer subject reuses the same
+    ///     <see cref="LayerNoun" /> instance — so there is no null branch and no defensive throw.
+    /// </remarks>
+    internal void AddLayerPurpose(LayerNoun noun, string prose)
+    {
+        LayerRegistration registration = _layers.First(candidate => ReferenceEquals(candidate.Noun, noun));
+        registration.Purposes.Add(prose);
     }
 
     /// <summary>Types in a namespace glob (dot-segment aware, GRAMMAR §4.2).</summary>
@@ -202,7 +215,7 @@ public sealed class Arch
         return new RuleBuilder(registration);
     }
 
-    /// <summary>Registers a scope anchor immediately and returns its quarantine-stage builder.</summary>
+    /// <summary>Registers a scope anchor immediately and returns its posture-stage builder.</summary>
     public IScopeBuilder Scope(string id,
         [CallerFilePath] string? filePath = null, [CallerLineNumber] int lineNumber = 0)
     {

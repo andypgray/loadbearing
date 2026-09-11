@@ -24,8 +24,12 @@ namespace Zphil.LoadBearing.Xunit;
 /// <remarks>
 ///     <para>
 ///         A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
-///         a Quarantine tripwire (no diff context in a test run) is reported as skipped, and everything else
-///         passes. A workspace that fails to load completely fails one named test —
+///         a scope tripwire (no diff context in a test run) is reported as skipped, and everything else
+///         passes. A Caution scope is therefore a permanent skip on this adapter — its tripwire is the only
+///         rule it has, and nothing here can supply a diff — so the case is present and never fires. That is
+///         accepted as the adapter's nature rather than papered over: the case still names the scope in the
+///         test explorer, and the verdict a caution wants belongs to <c>check --diff-base</c>, which is a
+///         pull-request concern and not a test-run one. A workspace that fails to load completely fails one named test —
 ///         <see cref="Workspace_LoadedCompletely" />, carrying the load diagnostics — and every rule case skips
 ///         rather than pass against a partial model. Override <see cref="AllowWorkspaceDiagnostics" /> to opt
 ///         into checking the partial model as it loaded. A solution filter is the opposite case — a smaller
@@ -138,8 +142,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     One rule's verdict from the shared check run: a Quarantine tripwire (no diff context) is skipped, a
-    ///     violated rule fails with the CLI human block, everything else passes.
+    ///     One rule's verdict from the shared check run: a scope tripwire (no diff context) is skipped —
+    ///     permanently, for a Caution, whose tripwire is its only rule — a violated rule fails with the CLI
+    ///     human block, and everything else passes.
     /// </summary>
     [Theory]
     [MemberData(nameof(RuleRows))]

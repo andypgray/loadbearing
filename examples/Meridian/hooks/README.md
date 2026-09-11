@@ -3,7 +3,10 @@
 This directory exists for [storyboard.md](storyboard.md): a coding agent working a routine
 task writes the pattern Meridian is retiring, and the architecture rule reaches it at the
 moment of creation. The storyboard walks that loop beat by beat with real captured output,
-from the task brief to the red check to the self-correction that lands instead.
+from the task brief to the red check to the self-correction that lands instead. A fifth beat
+walks the other outcome, the one an exit code cannot carry: an edit the rules allow, into the
+quarantined clearance engine, where the tripwire warns rather than blocks and the warning
+reaches the agent as hook context.
 
 Around it sit the pieces that make the loop run: two wrapper scripts, one PowerShell and
 one POSIX, that map a red check to the exit code a Claude Code hook treats as blocking, and

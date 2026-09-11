@@ -186,7 +186,7 @@
                 "text": "Replacement scheduled; not worth stabilizing."
               },
               "defaultConfiguration": {
-                "level": "error"
+                "level": "warning"
               },
               "properties": {
                 "posture": "quarantine"
@@ -496,6 +496,18 @@
               },
               "properties": {
                 "posture": "enforce"
+              }
+            },
+            {
+              "id": "domain/retry-budget/tripwire",
+              "fullDescription": {
+                "text": "The retry budget is the one place the domain sanctions a broad catch, and every caller relies on the filter."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "posture": "caution"
               }
             }
           ]
@@ -879,6 +891,18 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFormatter||MyApp.Web/ReportScheduler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ghost",
+          "level": "warning",
+          "message": {
+            "text": "This rule is inert: its target selection matched no types."
+          },
+          "locations": [],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|||||0"
           },
           "baselineState": "new"
         },

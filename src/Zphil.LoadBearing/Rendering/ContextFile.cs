@@ -5,7 +5,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     managed-block body that belongs in it.
 /// </summary>
 /// <remarks>
-///     The body is already merged — a directory hosting both a layer card and a quarantine card yields
+///     The body is already merged — a directory hosting both a layer card and a scope card yields
 ///     one file with both cards in it — so a consumer only has to splice it or compare it against what
 ///     is committed.
 /// </remarks>

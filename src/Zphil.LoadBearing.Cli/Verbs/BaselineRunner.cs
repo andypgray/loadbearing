@@ -327,8 +327,9 @@ internal sealed class BaselineRunner(
             return false;
         }
 
-        var observed = new Dictionary<BaselineEntry, BaselineEntry>();
-        foreach (BaselineEntry entry in current) observed[entry] = entry;
+        // Keyed by identity, so a captured entry's current twin — the one carrying what this run observed —
+        // is one lookup away. CurrentEntries folded duplicate identities, so the keys are unique.
+        Dictionary<BaselineEntry, BaselineEntry> observed = current.ToDictionary(entry => entry);
         var existingSet = new HashSet<BaselineEntry>(captured);
 
         var kept = new List<BaselineEntry>();

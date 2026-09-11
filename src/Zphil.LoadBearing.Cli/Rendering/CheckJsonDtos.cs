@@ -4,8 +4,12 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 // The wire shape of `check --json` (schemaVersion 3 — Quarantine containment evaluates and ratchets, and a
-// Quarantine tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
+// scope tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
 // Clustered in one file: these records are one cohesive DTO, not product types.
+// A new posture and a new warning kind are additive within the version: `caution` and
+// `cautionedScopeTouched` are values of enums the schema already carries, so a consumer that meets neither
+// reads the same document it always read, and one that meets them meets a widened enum rather than a new
+// shape. The schema stays at 3.
 // The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
 // §4.5), `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) and `subjectProject`/`package` pair (an offending project and, for the per-package violations, the

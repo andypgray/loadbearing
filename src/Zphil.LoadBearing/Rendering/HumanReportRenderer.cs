@@ -73,6 +73,21 @@ public static class HumanReportRenderer
         if (result.Rule.BaselinePath is not null) RenderRatchetLines(output, result);
 
         foreach (CheckWarning warning in result.Warnings) output.WriteLine($"  warning: {warning.Message}");
+
+        RenderDragonsLines(output, result);
+    }
+
+    // The dragons themselves, under a tripwire that actually fired. The warning above says a changed file is
+    // in dragon territory and points at `explain` for the prose; that is one round trip too many when the
+    // reader is an agent mid-edit, and the prose is already on the rule. Once per rule, never per warning —
+    // the dragons are a fact about the scope, not about which file was touched — and absent entirely when
+    // nothing fired, so a silent tripwire still renders as one line.
+    private static void RenderDragonsLines(TextWriter output, RuleResult result)
+    {
+        if (result.Rule.Scope is not { Role: ScopeRole.Tripwire } scope || result.Warnings.Count == 0) return;
+
+        if (scope.Dragons is { } dragons) output.WriteLine($"  dragons: {dragons}");
+        if (scope.DragonsDoc is { } dragonsDoc) output.WriteLine($"  dragons-doc: {dragonsDoc}");
     }
 
     // What the rule's subject actually swept, stated only when some of it is generator output — so a rule
@@ -110,7 +125,7 @@ public static class HumanReportRenderer
     // that lossiness is what buys the measure its immunity to line churn.
     private static void RenderGrownLine(TextWriter output, RuleResult result)
     {
-        int grown = result.GrownEntries.Count;
+        int grown = result.GrownBaselineEntries;
         if (grown == 0) return;
 
         int baselined = result.GrownEntries.Values.Sum(entry => entry.SiteCount ?? 0);

@@ -118,6 +118,36 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the ratchet found exactly <paramref name="count" /> stale entries — captured entries no
+    ///     current violation matched, fixed debt awaiting acceptance (GRAMMAR §4.3).
+    /// </summary>
+    internal static RuleResult ShouldHaveStale(this RuleResult result, int count)
+    {
+        result.StaleBaselineEntries.ShouldBe(count, Describe(result));
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts the ratchet found exactly <paramref name="count" /> shrunk entries — matched edge entries
+    ///     observed under the site count they record (GRAMMAR §4.3).
+    /// </summary>
+    internal static RuleResult ShouldHaveShrunk(this RuleResult result, int count)
+    {
+        result.ShrunkBaselineEntries.ShouldBe(count, Describe(result));
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts the ratchet found exactly <paramref name="count" /> uncounted entries — matched edge
+    ///     entries recording no site count, grandfathered at pair grain (GRAMMAR §4.3).
+    /// </summary>
+    internal static RuleResult ShouldHaveUncounted(this RuleResult result, int count)
+    {
+        result.UncountedBaselineEntries.ShouldBe(count, Describe(result));
+        return result;
+    }
+
+    /// <summary>
     ///     Asserts the rule failed. Says nothing about which violations did it — for the rows whose subject is
     ///     the violation list itself, which then read it in its own right.
     /// </summary>

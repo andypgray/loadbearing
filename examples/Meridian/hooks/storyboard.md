@@ -2,7 +2,9 @@
 
 A coding agent, working a routine task, writes the pattern Meridian is retiring, and the
 architecture rule reaches it at the moment of creation, so the agent self-corrects before the
-change ever lands. This page walks that loop beat by beat.
+change ever lands. This page walks that loop beat by beat, then walks the other half of it: an
+edit the rules allow, into code the spec has marked as dangerous, where the hook informs rather
+than blocks.
 
 Every fenced block below is real captured output from the wrapper in this directory, run against
 Meridian. Nothing here is mocked, and [Reproduce it](#reproduce-it) walks the same loop by hand
@@ -25,7 +27,8 @@ is the exit code:
 a clean check returns 0 and the edit proceeds; a red rule returns 2, which is how a Claude Code
 hook blocks, carrying the violation report on stderr so the agent reads it and fixes the code;
 LoadBearing's own errors return 1, a config problem the user sees rather than an architecture
-violation the agent is told to fix.
+violation the agent is told to fix. Returning 0 is not the same as saying nothing: where the check
+warned, the wrapper hands the report back as hook context, which is Beat 5.
 
 ## Beat 1: the task
 
@@ -156,6 +159,59 @@ Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 0 warnings).
 The endpoint is done, the retired pattern never reached the tree, and the correction was the tool's
 own fix line, not a reviewer catching it later.
 
+## Beat 5: a different task, and the warning that does not block
+
+> Ops report that container numbers from one partner are rejected as invalid. ISO 6346 allows `J`
+> and `Z` in the category position as well as `U`; `ContainerNumberValidator` accepts only `U`.
+
+That is a real bug, the fix is one line, and it lives inside `Meridian.Clearance`, the scope the
+spec quarantines. The agent widens the check:
+
+```csharp
+if (containerNumber[3] is not ('U' or 'J' or 'Z')) return false;
+```
+
+Nothing here breaks a law. Containment governs who may *reference* the scope from outside, and this
+edit is inside it, so the check is clean and the wrapper exits 0. What the check does say is that
+the edit landed in dragon territory:
+
+```text
+pass layering/domain-independent — The Domain layer must not reference the Web layer.
+pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
+pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
+  grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
+pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
+  grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
+pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+  grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
+pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
+pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
+  grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
+warn clearance/engine/tripwire
+  warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' is inside quarantined scope 'clearance/engine' — does the task actually require editing dragon territory? Dragons: loadbearing explain clearance/engine/tripwire.
+
+Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warnings).
+```
+
+Getting that paragraph in front of the agent is the whole of the tripwire. A warning never moves the
+exit code, and a hook that exits 0 has no stderr channel to the agent, so the wrapper passes
+`--hook-json` and hands this report back as `hookSpecificOutput.additionalContext`, the one exit-0
+output Claude Code turns into a transcript message. The agent reads it, follows the line it ends
+with, and gets the dragons:
+
+```text
+clearance/engine/tripwire (quarantine/tripwire)
+  because: The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.
+  scope: clearance/engine
+  dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
+```
+
+The category fix ships. What does not happen is the next edit: an agent one file away from a
+letter-value table with three gaps in it, told that the gaps are load-bearing before it decides they
+are a typo. That is the difference between the two postures on one codebase: Beat 3's ratchet
+blocks new code in a retired pattern, and the tripwire lets a legitimate edit through while making
+sure nobody makes it uninformed.
+
 ## Reproduce it
 
 From a checkout, build the CLI and the example once, then walk the loop by hand. This repository is
@@ -183,3 +239,18 @@ wrapper the way the hook does, install the [global tool](../README.md#run-it-you
 `loadbearing` resolves, then run `sh hooks/arch-hook.sh` (or `arch-hook.ps1`): it runs that same
 check, prints the report and exits 2 on a red rule, and prints nothing and exits 0 once you switch
 to the Beat 4 version. Revert `BookingsController` when you are done so the example tree stays clean.
+
+Beat 5 is the same loop with the tripwire armed. Widen the category check in
+`ContainerNumberValidator` as the beat does, rebuild, and check:
+
+```bash
+dotnet build examples/Meridian/src/Meridian.Clearance/Meridian.Clearance.csproj
+loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD              # exit 0: the Beat 5 board
+loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD --hook-json  # the same board, as hook context
+```
+
+The second command is what the wrapper actually runs, and its output is the JSON object the hook
+passes through: one `hookSpecificOutput`, carrying that board escaped into `additionalContext`. Add
+`--rules 'clearance/*'` to read it without the eight-rule board inside the string. Run either
+against the reverted tree and the first prints a clean board while the second prints nothing at all:
+a clean check with no warnings says nothing to the agent.

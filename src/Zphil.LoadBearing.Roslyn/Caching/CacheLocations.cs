@@ -17,7 +17,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///     <para>
 ///         The path identity reuses <see cref="PathCanonicalizer" /> (symlink-resolved, fully-qualified) so
 ///         the same solution opened through a symlinked root still maps to one cache directory, matching the
-///         canonicalization the Quarantine tripwire and spec resolution already use. On a case-insensitive file
+///         canonicalization the scope tripwires and spec resolution already use. On a case-insensitive file
 ///         system the canonical path is lowercased before hashing so case-variant spellings unify too.
 ///     </para>
 /// </remarks>

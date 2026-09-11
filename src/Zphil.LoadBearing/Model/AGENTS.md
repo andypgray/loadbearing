@@ -3,8 +3,17 @@
 
 ## Layer `Model`
 
-This directory holds the `Model` layer. Its architecture rules:
+This directory holds the `Model` layer. Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and the renderers both read. Its architecture rules:
 
 - `layering/model-independent` — The Model layer must not reference the Checking layer or the Rendering layer. The Model is the one reified thing this product is built around: a spec compiles to it, and checking and rendering are two independent readers of it. A reference the other way would make the model know about a consumer, and the next render target could no longer be added without touching it.
 - Expand any rule above with `loadbearing explain <rule-id>`.
+
+## Cautioned scope `model/prose-fragments`
+
+This directory holds the cautioned `model/prose-fragments` scope: the Model layer. Here be dragons — the weirdness below is load-bearing; read it before you edit, and do not tidy it away.
+
+Dragons: Every node here declares the prose fragment the renderers assemble into its sentence, and the fragments are position-blind: one phrase serves subject and reference position, so a fragment never closes its own parenthetical — the closing comma belongs to the junction (SentenceRenderer.EndsOpen and CloseBefore). A strict verb renders its strictness by the absence of the external-packages caveat; do not add one. A changed fragment moves its pin in the same commit.
+
+- `model/prose-fragments/tripwire` — a change set touching this scope is flagged by `check --diff-base <ref>`. Every reader in Core reaches into Model and every renderer assembles its fragments, so nothing here can be fenced; the hazard is an edit that reads as tidying.
+- Expand: `loadbearing explain model/prose-fragments/tripwire`.
 <!-- loadbearing:end -->

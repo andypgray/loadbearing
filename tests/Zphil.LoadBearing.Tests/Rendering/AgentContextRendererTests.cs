@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     sample (module map + the four Enforce laws + Migrations + the Quarantined scopes section, and the
 ///     §4.1 glossary line once), the no-layer single-rule root block (the dogfood shape), and the
 ///     canonical <c>legacy/billing</c> scope card (containment law + rationale + dragons prose +
-///     sanctioned surface), plus the DragonsDoc-only card variant. Output is LF-only.
+///     sanctioned surface), plus the DragonsDoc-only card variant, and the caution card — its lede, its
+///     tripwire bullet, and the two subject voices the lede reads the scope in. Output is LF-only.
 /// </summary>
 public class AgentContextRendererTests
 {
@@ -44,6 +45,14 @@ public class AgentContextRendererTests
         return ArchModelBuilder.Build(new ArchSpec());
     }
 
+    // The one rule a cautioned scope reifies to, whatever its ID: a caution mints a single child, so the
+    // model has nothing else to pick from and the rows below need not restate the scope ID twice.
+    private static ArchRule CautionTripwire(Action<Arch> define)
+    {
+        return Checker.Model(define)
+            .Rules.Single();
+    }
+
     [Fact]
     public void RootBlock_CanonicalSample_MatchesGolden()
     {
@@ -57,7 +66,7 @@ public class AgentContextRendererTests
             "reference = a source-level type reference; construct = a source-level object creation " +
             "(`new`, including target-typed `new()`). Expand any rule ID with `loadbearing explain <rule-id>`.\n\n" +
             "### Layers\n" +
-            "- **Domain** — `MyApp.Domain.*`\n" +
+            "- **Domain** — `MyApp.Domain.*`. Domain holds the order and customer model.\n" +
             "- **Web** — `MyApp.Web.*`\n\n" +
             "### Rules\n" +
             "- `layering/domain-independent` — The Domain layer must not reference the Web layer. " +
@@ -158,6 +167,27 @@ public class AgentContextRendererTests
     }
 
     [Fact]
+    public void ScopeCard_SelectionBoundary_WordsTheSurfaceTheWayTheSentenceRefersToIt()
+    {
+        // One computation behind both: the surface bullet and the sentence's own list are the same
+        // reference fragments, so a no-load operand cannot read one way in the law and another in the card.
+        ArchRule containment = Checker.Model(arch =>
+                arch.Scope("legacy/billing")
+                    .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                    .BoundaryOnlyVia(arch.Types.Named("BillingFacade"), arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))
+                    .Dragons("Rounding is load-bearing.")
+                    .Because("Replacement scheduled."))
+            .Rule("legacy/billing/containment");
+
+        string card = AgentContextRenderer.ScopeCard(containment);
+
+        card.ShouldContain("- Sanctioned surface: types named `BillingFacade`, types in `MyApp.Legacy.Billing.Contracts.*`.");
+        card.ShouldContain(
+            "must be referenced only by types in `MyApp.Legacy.Billing.*`, types named `BillingFacade` or " +
+            "types in `MyApp.Legacy.Billing.Contracts.*`.");
+    }
+
+    [Fact]
     public void ScopeCard_DragonsDocOnly_RendersBacktickedPathBullet()
     {
         // A hermetic quarantined scope documented via a linked doc rather than inline dragons prose.
@@ -181,12 +211,101 @@ public class AgentContextRendererTests
     [Fact]
     public void ScopeCard_NonContainmentRule_Throws()
     {
-        // ScopeCard requires a Quarantine containment rule; any other rule (here an Enforce rule with no Quarantine
-        // payload) is rejected before rendering (AgentContextRenderer.cs:92-93).
+        // ScopeCard requires a Quarantine containment rule; any other rule (here an Enforce rule with no scope
+        // payload) is rejected by AgentContextRenderer.ScopeCard's own guard, before any rendering.
         var enforceRule = new ArchRule("naming/x", Posture.Enforce, "b", null, "s", null, null, null);
 
         Should.Throw<ArgumentException>(() => AgentContextRenderer.ScopeCard(enforceRule))
             .Message.ShouldContain("ScopeCard requires a Quarantine containment rule.");
+    }
+
+    [Fact]
+    public void CautionCard_CautionedScope_MatchesGolden()
+    {
+        ArchRule tripwire = CautionTripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .Dragons("Argument order is load-bearing: every caller passes them positionally.")
+                .Because("The helpers are public API for the whole solution."));
+
+        const string expected =
+            "## Cautioned scope `shared/utilities`\n\n" +
+            "This directory holds the cautioned `shared/utilities` scope: types in `MyApp.Shared.*`. " +
+            "Here be dragons — the weirdness below is load-bearing; read it before you edit, and do not " +
+            "tidy it away.\n\n" +
+            "Dragons: Argument order is load-bearing: every caller passes them positionally.\n\n" +
+            "- `shared/utilities/tripwire` — a change set touching this scope is flagged by " +
+            "`check --diff-base <ref>`. The helpers are public API for the whole solution.\n" +
+            "- Expand: `loadbearing explain shared/utilities/tripwire`.";
+
+        AgentContextRenderer.CautionCard(tripwire)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void CautionCard_DragonsDocOnly_RendersBacktickedPathBulletAndNoDragonsParagraph()
+    {
+        ArchRule tripwire = CautionTripwire(arch =>
+            arch.Scope("shared/utilities")
+                .Caution(arch.Namespace("MyApp.Shared.*"))
+                .DragonsDoc("arch/utilities-dragons.md")
+                .Because("The helpers are public API for the whole solution."));
+
+        string card = AgentContextRenderer.CautionCard(tripwire);
+
+        // Backticked solution-relative path (the spec stays the index), not a rebased markdown link.
+        card.ShouldContain("- Dragons doc: `arch/utilities-dragons.md`.");
+        card.ShouldNotContain("Dragons: "); // no inline dragons paragraph when only a linked doc is supplied
+        // The doc bullet precedes the Expand bullet, as it does on a quarantine's card.
+        card.IndexOf("Dragons doc:", StringComparison.Ordinal)
+            .ShouldBeLessThan(card.IndexOf("Expand:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CautionCard_NamedSubject_StatesTheScopeAsTheSentenceWouldReferToIt()
+    {
+        // The lede carries the scoped selection because a caution has no law sentence to carry it, and it
+        // reads it through the very fragment every other reference position uses.
+        ArchRule tripwire = CautionTripwire(arch =>
+            arch.Scope("resilience/retry")
+                .Caution(arch.Types.Named("RetryPolicy"))
+                .Dragons("The back-off table is tuned against production, not first principles.")
+                .Because("Every caller depends on the exact timings."));
+
+        AgentContextRenderer.CautionCard(tripwire)
+            .ShouldContain("This directory holds the cautioned `resilience/retry` scope: types named `RetryPolicy`.");
+    }
+
+    [Fact]
+    public void CautionCard_BareLayerSubject_ReadsInTheCollectiveVoice()
+    {
+        // A bare layer handle keeps the collective voice ("the Model layer") rather than falling to the
+        // types voice, exactly as it does in any other reference position.
+        ArchRule tripwire = CautionTripwire(arch =>
+            arch.Scope("model/legacy")
+                .Caution(arch.Layer("Model", "MyApp.Model.*"))
+                .Dragons("The entities are generated; the partial halves are hand-written.")
+                .Because("Regeneration overwrites anything moved out of the partial half."));
+
+        AgentContextRenderer.CautionCard(tripwire)
+            .ShouldContain("This directory holds the cautioned `model/legacy` scope: the Model layer.");
+    }
+
+    [Fact]
+    public void CautionCard_NonCautionRule_Throws()
+    {
+        // Both of a quarantine's children are rejected — the tripwire because its posture is wrong even
+        // though its role is right, the containment because neither is.
+        ArchitectureModel quarantine = Checker.Model(arch =>
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Dragons("Rounding is load-bearing.")
+                .Because("Replacement scheduled."));
+
+        Should.Throw<ArgumentException>(() => AgentContextRenderer.CautionCard(quarantine.Rule("legacy/billing/tripwire")))
+            .Message.ShouldContain("CautionCard requires a Caution tripwire rule.");
+        Should.Throw<ArgumentException>(() => AgentContextRenderer.CautionCard(quarantine.Rule("legacy/billing/containment")))
+            .Message.ShouldContain("CautionCard requires a Caution tripwire rule.");
     }
 
     [Fact]
@@ -215,7 +334,44 @@ public class AgentContextRendererTests
             "Nothing legacy may depend on dispatch.\n" +
             "- Expand any rule above with `loadbearing explain <rule-id>`.";
 
-        AgentContextRenderer.LayerCard("Dispatch", rules)
+        AgentContextRenderer.LayerCard("Dispatch", null, rules)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void RootBlock_DescribedLayer_RendersThePurposeAfterTheModuleMapRow()
+    {
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Layer("Dispatch", "Acme.Dispatch.*").Purpose("Plans haulage legs and assigns them to drivers."));
+
+        AgentContextRenderer.RootBlock(model, "Spec")
+            .ShouldContain("- **Dispatch** — `Acme.Dispatch.*`. Plans haulage legs and assigns them to drivers.");
+    }
+
+    [Fact]
+    public void LayerCard_DescribedLayer_MatchesGoldenWithThePurposeInTheLede()
+    {
+        // The same card as the golden above, on a layer that says what it is for: the purpose lands between
+        // the directory sentence and the rules cue, and nothing else about the card moves.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer dispatch = arch.Layer("Dispatch", "Acme.Dispatch.*").Purpose("Plans haulage legs and assigns them to drivers.");
+            arch.Rule("modules/dispatch/internals")
+                .Enforce(dispatch.MustNotReference(arch.Namespace("Acme.Web.*")))
+                .Because("Dispatch is a leaf module.");
+        });
+        List<ArchRule> rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
+            .ToList();
+
+        const string expected =
+            "## Layer `Dispatch`\n\n" +
+            "This directory holds the `Dispatch` layer. Plans haulage legs and assigns them to drivers. " +
+            "Its architecture rules:\n\n" +
+            "- `modules/dispatch/internals` — The Dispatch layer must not reference types in `Acme.Web.*`. " +
+            "Dispatch is a leaf module.\n" +
+            "- Expand any rule above with `loadbearing explain <rule-id>`.";
+
+        AgentContextRenderer.LayerCard("Dispatch", model.Layers.Single().Purpose, rules)
             .ShouldBe(expected);
     }
 
@@ -248,7 +404,7 @@ public class AgentContextRendererTests
         AgentContextRenderer.RootBlock(model, "Spec")
             .ShouldContain(counterPriorBullet);
         // The shared composer renders the Migrate rule byte-identically in the layer card (no Fix, no count).
-        AgentContextRenderer.LayerCard("Web", migrateRules)
+        AgentContextRenderer.LayerCard("Web", null, migrateRules)
             .ShouldContain(counterPriorBullet);
     }
 
@@ -267,7 +423,7 @@ public class AgentContextRendererTests
         List<ArchRule> rules = model.Rules.Where(rule => rule.Posture == Posture.Enforce)
             .ToList();
 
-        string card = AgentContextRenderer.LayerCard("Web", rules);
+        string card = AgentContextRenderer.LayerCard("Web", null, rules);
 
         card.ShouldContain("- `layering/web-not-billing` —"); // the rule renders...
         card.ShouldNotContain("Inject IBillingFacade"); // ...but its Fix never does (progressive disclosure).

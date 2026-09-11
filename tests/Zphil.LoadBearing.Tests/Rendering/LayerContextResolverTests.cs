@@ -13,20 +13,19 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     Migrate rule is anchored on it (subject noun head is that layer), and the card lands in the
 ///     deepest common ancestor directory of the whole layer's types. A refined subject (adjective /
 ///     <c>Except</c>) keeps its noun head, so it still anchors; a namespace-subject rule over the same
-///     types does not; a Quarantine-posture rule never anchors (its story is the quarantine card). A layer
+///     types does not; a scope-posture rule never anchors, whichever verb declared the scope (its story is
+///     the scope card). A layer
 ///     matching no types resolves to a null directory with a skip reason. No MSBuild — paths are
 ///     synthesized through <see cref="CompilationFactory" />.
 /// </summary>
 public class LayerContextResolverTests
 {
-    // A Web layer with one bare-subject Enforce rule anchored on it.
-    private static readonly IArchitectureSpec WebLayerSpec = new InlineSpec(arch =>
-    {
-        Layer web = arch.Layer("Web", "MyApp.Web.*");
-        arch.Rule("layering/web-not-billing")
-            .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
-            .Because("Web reaches billing only through the facade.");
-    });
+    // A Web layer with one bare-subject Enforce rule anchored on it — saying what it is for when given a
+    // purpose, which is the sentence the card lede carries.
+    private static readonly IArchitectureSpec WebLayerSpec = WebLayer();
+
+    private static readonly IArchitectureSpec DescribedWebLayerSpec =
+        WebLayer("The HTTP surface: controllers and the views they serve.");
 
     // A Web layer whose only rule has a web.Except(...) subject — a refinement that preserves the noun head.
     private static readonly IArchitectureSpec ExceptRefinedSpec = new InlineSpec(arch =>
@@ -78,6 +77,29 @@ public class LayerContextResolverTests
             .Because("Replacement scheduled; not worth stabilizing.");
     });
 
+    // A cautioned Billing layer with no other rule. Its one child is a tripwire, which carries no constraint
+    // at all — so it anchors nothing whether or not the posture filter were to let it through.
+    private static readonly IArchitectureSpec CautionedLayerSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Scope("legacy/billing")
+            .Caution(billing)
+            .Dragons("Banker's rounding is load-bearing.")
+            .Because("Every caller depends on the exact rounding.");
+    });
+
+    private static IArchitectureSpec WebLayer(string? purpose = null)
+    {
+        return new InlineSpec(arch =>
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            if (purpose is not null) web.Purpose(purpose);
+            arch.Rule("layering/web-not-billing")
+                .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
+                .Because("Web reaches billing only through the facade.");
+        });
+    }
+
     [Fact]
     public void Resolve_LayerWithAnchoredRule_PicksDeepestCommonDirectory()
     {
@@ -93,6 +115,20 @@ public class LayerContextResolverTests
             .ShouldBe(["layering/web-not-billing"]);
         placement.DirectoryPath.ShouldBe("src/MyApp.Web");
         placement.SkipReason.ShouldBeNull();
+        placement.Purpose.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Resolve_DescribedLayer_CarriesItsPurposeOntoThePlacement()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
+
+        // The purpose rides from the layer definition onto the placement, which is the only route it has
+        // into the card lede — the renderer is handed it, never the model.
+        LayerPlacement placement = LayerContextResolver.Resolve(ArchModelBuilder.Build(DescribedWebLayerSpec), codebase)[0];
+
+        placement.Purpose.ShouldBe("The HTTP surface: controllers and the views they serve.");
     }
 
     [Fact]
@@ -131,6 +167,18 @@ public class LayerContextResolverTests
         // Enforce/Migrate rule — Quarantine posture is excluded, so the layer earns no card and does not
         // double-emit beside its quarantine card.
         LayerContextResolver.Resolve(ArchModelBuilder.Build(QuarantinedLayerSpec), codebase)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_CautionPostureRuleOnLayer_Excluded()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
+            ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+        // The caution card already covers this directory; a layer card beside it would say the same thing
+        // twice in the same file.
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(CautionedLayerSpec), codebase)
             .ShouldBeEmpty();
     }
 

@@ -3,7 +3,7 @@
 
 ## Layer `Extraction`
 
-This directory holds the `Extraction` layer. Its architecture rules:
+This directory holds the `Extraction` layer. Extraction is the Roslyn host: it loads a solution through MSBuild and reads out the codebase model the checker evaluates against. Its architecture rules:
 
 - `roslyn/no-engine-types-on-seam` — The Extraction layer must not expose types in `Microsoft.Build.*`. MSBuild engine assemblies bind at runtime through the Locator (the csproj's ExcludeAssets=runtime split); an engine type on a public signature would force consumers to compile against MSBuild and break that split.
 - Expand any rule above with `loadbearing explain <rule-id>`.

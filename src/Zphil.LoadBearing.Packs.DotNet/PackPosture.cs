@@ -7,8 +7,8 @@ namespace Zphil.LoadBearing.Packs.DotNet;
 ///     without prose" uncompilable, rather than a throw out of <c>Define</c>.
 /// </summary>
 /// <remarks>
-///     There is deliberately no <c>Quarantine</c> factory: a quarantine is a scope over a region of
-///     the codebase, not a rule a pack can hand out.
+///     There is deliberately no <c>Quarantine</c> or <c>Caution</c> factory: a scope is a region, not a
+///     rule a pack hands out.
 /// </remarks>
 public sealed class PackPosture
 {

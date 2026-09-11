@@ -300,17 +300,18 @@ The grammar comes from surveying that prior art, and [GRAMMAR.md](https://github
 
 `Because` is mandatory. A rule without one is an invalid spec: `check` refuses to run it and reports every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Every reason ships to your agents in the rendered context, and in the [Interchange example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange) each of the twelve rules' `Because` cites the learn.microsoft.com page it enforces. Nine of those twelve come from a shared rule pack, which is an ordinary class library of static methods: the pack owns the citation, the spec picks the posture. That pack ships in this repository as a working example rather than as a package to install, because a pack is a pattern you own rather than a registry you depend on.
 
-## The three postures
+## The four postures
 
-Every rule carries one.
+Every rule carries one of the first two, and every scope one of the last two.
 
 | Posture | What it is | What fails |
 |---|---|---|
 | `Enforce` | the law | every violation, even ones predating the rule |
 | `Migrate` | a ratchet over a counted baseline | new violations; baselined sites stay quiet |
 | `Quarantine` | containment for a scope | a new reference into the scope |
+| `Caution` | dragons for code new callers are welcome to | nothing; a change set touching it draws a warning |
 
-`Enforce` failing violations that predate it is what `Migrate` exists for: `loadbearing baseline` records a rule's current violations, new ones fail from the next commit, and the baseline only shrinks. At zero, the tool suggests promoting the rule to `Enforce`. A `Quarantine` scope also carries a diff-aware tripwire: with `check --diff-base <ref>`, a change set that touches the scope itself draws a warning.
+`Enforce` failing violations that predate it is what `Migrate` exists for: `loadbearing baseline` records a rule's current violations, new ones fail from the next commit, and the baseline only shrinks. At zero, the tool suggests promoting the rule to `Enforce`. Every scope carries a diff-aware tripwire: with `check --diff-base <ref>`, a change set that touches the scope draws a warning. For a `Caution` scope that tripwire is the whole posture: the dragons prose lands on the scope's directory as a card, `explain` and `arch_context` serve it, and no reference into the scope is ever a violation.
 
 ## Starting on a codebase that already exists
 
@@ -346,7 +347,7 @@ The last two both need Windows, because that is where the Framework build host a
 Six worked examples in [`examples/`](https://github.com/andypgray/loadbearing/tree/main/examples) share one fictional freight-forwarding company. Four are solutions: CI builds each one, holds `check` green against the committed tree, and re-renders every managed block under `examples/` to prove a zero diff. The other two walk a flow with captured output. Three are whole codebases:
 
 - [Enforce-only clean architecture](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Quoting): the greenfield quoting subsystem. Nine rules hold a four-layer clean architecture, and every rule runs as a named xUnit test.
-- [All three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a mid-migration monolith where six of eight controllers still run inline SQL. The law, three ratchets and their burndown, one quarantined scope.
+- [Three postures on one codebase](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian): a mid-migration monolith where six of eight controllers still run inline SQL. The law, three ratchets and their burndown, one quarantined scope.
 - [Module isolation as law](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Operations): a modular monolith. Every module directory carries its own rendered rule card, and one module is quarantined behind its facade.
 
 Three go deeper on one surface each:
@@ -446,7 +447,7 @@ dotnet test Zphil.LoadBearing.slnx
 
 ## Status
 
-Pre-alpha, under construction. What this page shows is what exists: the reified model, the fluent builder, Roslyn extraction, the CLI verbs, the SARIF writer, the xUnit adapter, the MCP server, and the render pipeline, with all three postures evaluating. The spec excerpts above are quoted from this repository's own committed spec, the tool output is captured from runs against this solution, and CI uploads that `check --sarif` run to code scanning. The fluent surface can still move; [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) is its spec.
+Pre-alpha, under construction. What this page shows is what exists: the reified model, the fluent builder, Roslyn extraction, the CLI verbs, the SARIF writer, the xUnit adapter, the MCP server, and the render pipeline, with all four postures evaluating. The spec excerpts above are quoted from this repository's own committed spec, the tool output is captured from runs against this solution, and CI uploads that `check --sarif` run to code scanning. The fluent surface can still move; [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) is its spec.
 
 ## License
 

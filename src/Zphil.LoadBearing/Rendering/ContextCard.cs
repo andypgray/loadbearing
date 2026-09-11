@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     One scoped agent-context card and where it goes: a rendered layer or quarantine card, plus either
+///     One scoped agent-context card and where it goes: a rendered layer or scope card, plus either
 ///     the <see cref="DirectoryPath" /> whose <c>AGENTS.md</c> receives it or — when the card's selection
 ///     matched no solution types — a null path with the <see cref="SkipReason" /> that says so.
 /// </summary>

@@ -82,9 +82,8 @@ public sealed class BaselineRunnerAddTests : IDisposable
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
-        var request = new BaselineRequest(
-            null, null, false, false, true, RuleId, "INC-1234",
-            "MyApp.Web.HomeController", "System.DateTime.Now", null, _temp.Path, false, false);
+        BaselineRequest request = BaselineRequests.Add(
+            RuleId, "INC-1234", "MyApp.Web.HomeController", "System.DateTime.Now", _temp.Path);
 
         // Act — the MemberUse violation reaches the added-entry echo with a null Target slot.
         int exit = runner.AddEntry(request, report, _temp.Path);
@@ -124,9 +123,8 @@ public sealed class BaselineRunnerAddTests : IDisposable
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
-        var request = new BaselineRequest(
-            null, null, false, false, true, CtorRuleId, "INC-9",
-            "MyApp.Web.OrderController", "MyApp.Data.Db", null, _temp.Path, false, false);
+        BaselineRequest request = BaselineRequests.Add(
+            CtorRuleId, "INC-9", "MyApp.Web.OrderController", "MyApp.Data.Db", _temp.Path);
 
         // Act — the Construction violation reaches the added-entry echo; the constructed type rides the Target slot.
         int exit = runner.AddEntry(request, report, _temp.Path);
@@ -172,9 +170,8 @@ public sealed class BaselineRunnerAddTests : IDisposable
 
         var output = new StringWriter();
         var runner = new BaselineRunner(output, TextWriter.Null);
-        var request = new BaselineRequest(
-            null, null, false, false, true, UnfilteredCatchRuleId, "INC-77",
-            "App.LegacyHandler", "Errors.DbError", null, _temp.Path, false, false);
+        BaselineRequest request = BaselineRequests.Add(
+            UnfilteredCatchRuleId, "INC-77", "App.LegacyHandler", "Errors.DbError", _temp.Path);
 
         // Act — the valve resolves the unfiltered-catch violation by its (source, caught) type pair.
         int exit = runner.AddEntry(request, report, _temp.Path);

@@ -3,6 +3,7 @@ using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Baselines;
 
@@ -52,7 +53,8 @@ public sealed class BaselineEntryTests
         // the very shape a reference uses — so grandfathering construction needs zero new baseline format: the
         // identity is value-equal to, hash-equal to, and set-dedupes with a hand-built ForEdge and its twin.
         BaselineEntry identity = Violation
-            .Construction(Node("N.Factory"), Node("N.Widget"), Array.Empty<SourceLocation>())
+            .Construction(
+                SyntheticNodes.Type("N.Factory"), SyntheticNodes.Type("N.Widget"), Array.Empty<SourceLocation>())
             .BaselineIdentity()!;
 
         identity.ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget"));
@@ -74,7 +76,7 @@ public sealed class BaselineEntryTests
         // baseline format: the identity is value-equal to, hash-equal to, and set-dedupes with a hand-built
         // ForEdge and its attributed twin.
         BaselineEntry identity = Violation
-            .Injection(Node("N.Svc"), Node("N.Dep"), Array.Empty<SourceLocation>())
+            .Injection(SyntheticNodes.Type("N.Svc"), SyntheticNodes.Type("N.Dep"), Array.Empty<SourceLocation>())
             .BaselineIdentity()!;
 
         identity.ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep"));
@@ -274,13 +276,5 @@ public sealed class BaselineEntryTests
             .Message.ShouldContain("non-blank single line");
         Should.Throw<ArgumentException>(() => entry.WithBecause("a\nb"))
             .Message.ShouldContain("non-blank single line");
-    }
-
-    // A shallow TypeNode whose SymbolId is `T:` + FullName — the construction identity reads only those.
-    private static TypeNode Node(string fullName)
-    {
-        return new TypeNode(
-            fullName, $"T:{fullName}", fullName, "N", TypeKind.Class, Accessibility.Public,
-            false, false, false, false, false, "Proj", false);
     }
 }

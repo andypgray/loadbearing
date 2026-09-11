@@ -13,10 +13,14 @@ public sealed class QuotingArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        Layer domain = arch.Layer("Domain", "Meridian.Quoting.Domain.*");
-        Layer application = arch.Layer("Application", "Meridian.Quoting.Application.*");
-        Layer infrastructure = arch.Layer("Infrastructure", "Meridian.Quoting.Infrastructure.*");
-        Layer api = arch.Layer("Api", "Meridian.Quoting.Api.*");
+        Layer domain = arch.Layer("Domain", "Meridian.Quoting.Domain.*")
+            .Purpose("Domain holds the quote and rate-card model.");
+        Layer application = arch.Layer("Application", "Meridian.Quoting.Application.*")
+            .Purpose("Application holds the use cases and the ports they depend on.");
+        Layer infrastructure = arch.Layer("Infrastructure", "Meridian.Quoting.Infrastructure.*")
+            .Purpose("Infrastructure implements the ports: in-memory persistence and the system clock.");
+        Layer api = arch.Layer("Api", "Meridian.Quoting.Api.*")
+            .Purpose("Api is the composition root and the HTTP surface.");
 
         arch.Rule("layering/domain-independent")
             .Enforce(domain.MustNotReference(application, infrastructure, api))

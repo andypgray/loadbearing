@@ -15,11 +15,13 @@ LoadBearing and Claude Code number exit codes differently, and translating betwe
 
 | `loadbearing check` exits | Meaning | The wrapper exits |
 |---|---|---|
-| `0` | clean (tripwire warnings do not change this) | `0`, and the agent proceeds |
+| `0` | clean; tripwire warnings reach the agent as context | `0`, and the agent proceeds |
 | `1` | a rule is red | `2`, which blocks, with the report on stderr |
 | `2` | LoadBearing's own error | `1`, a config problem rather than a violation |
 
 Claude Code blocks on exit 2 and feeds that process's stderr back to the agent, so the wrapper hands over the whole violation report: rule ID, reason, fix, and every offending `file:line`. Any other non-zero exit reaches the user as a non-blocking error, which is where an unresolvable spec or a bad git ref belongs. An agent told to "fix" a misconfiguration will try.
+
+A clean run is where a scope's tripwire has its say. A warning never moves the exit code, and an exit-0 hook's plain stdout reaches only the debug log, so a wrapper that just exited 0 threw every tripwire warning away. `--hook-json` closes that: a clean check that warned writes its report as `hookSpecificOutput.additionalContext`, which Claude Code turns into a transcript message the agent reads, and the wrapper passes that object through untouched. A clean check with nothing to say still writes nothing. The escaping lives in the tool because a multi-line report inside a JSON string is the whole job, and `sh` has no JSON.
 
 Each wrapper also reads the `PostToolUse` payload on stdin and returns early when the edited file is not code, so a docs edit pays nothing. With no payload, as in a hand-run, it checks.
 
@@ -97,12 +99,22 @@ There is no PowerShell sibling here, unlike the wrapper pair. The launcher's las
 
 ## Lifting it into your own repository
 
-Install the tool, copy one wrapper into your repo's `.claude/`, and change the three values at the top of it: your solution, your spec (a csproj or a built spec DLL), and the ref you diff against. `HEAD` suits a working session; CI wants the base branch. The launcher is not part of that move: an installed tool's binaries live outside your tree, so nothing there contends with your build, and the server registers as `loadbearing` directly.
+Install the tool, copy one wrapper into your repo's `.claude/`, and change the three values at the top of it: your solution, your spec (a csproj or a built spec DLL), and the ref you diff against. `HEAD` suits a working session. The launcher is not part of that move: an installed tool's binaries live outside your tree, so nothing there contends with your build, and the server registers as `loadbearing` directly.
 
 ```bash
 dotnet tool install -g Zphil.LoadBearing.Cli
 ```
 
-Then paste the snippet, pointing its `command` at the wrapper you copied.
+Then paste the snippet, pointing its `command` at the wrapper you copied. The snippet needs no change for the warnings above: the channel is the wrapper's own stdout, and the entry already routes it.
 
 [The Meridian storyboard](../examples/Meridian/hooks/storyboard.md) walks the whole loop on an example codebase, beat by beat with captured output, and ships the same two wrappers filled in with that example's paths.
+
+## In CI
+
+Run the same `check` in the pipeline, and pass `--diff-base <the pull request's base ref>` there too:
+
+```bash
+loadbearing check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --diff-base origin/main --sarif loadbearing.sarif
+```
+
+Without a ref every quarantine tripwire is skipped, not clean, so the scope you fenced because it is dangerous to edit is the one thing CI never mentions. The checkout has to be deep enough for `origin/main` to resolve. `--sarif` takes the run to code scanning, where a red rule is an error-level alert and a tripwire touch is a warning-level one.

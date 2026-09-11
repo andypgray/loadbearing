@@ -3,7 +3,7 @@ using Zphil.LoadBearing.Hosting;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Where a layer's "local rules" context card lands: the layer name, the anchored
+///     Where a layer's "local rules" context card lands: the layer name, its optional purpose, the anchored
 ///     Enforce/Migrate rules whose subject noun head is that layer (in model order — the
 ///     <see cref="AgentContextRenderer.LayerCard" /> source), and either the resolved
 ///     <see cref="DirectoryPath" /> — the deepest common ancestor of the layer's types' declaration
@@ -11,9 +11,11 @@ namespace Zphil.LoadBearing.Rendering;
 /// </summary>
 public sealed class LayerPlacement
 {
-    internal LayerPlacement(string layerName, IReadOnlyList<ArchRule> rules, string? directoryPath, string? skipReason)
+    internal LayerPlacement(
+        string layerName, string? purpose, IReadOnlyList<ArchRule> rules, string? directoryPath, string? skipReason)
     {
         LayerName = layerName;
+        Purpose = purpose;
         Rules = rules;
         DirectoryPath = directoryPath;
         SkipReason = skipReason;
@@ -21,6 +23,9 @@ public sealed class LayerPlacement
 
     /// <summary>The declaring layer's name (e.g. <c>Web</c>).</summary>
     public string LayerName { get; }
+
+    /// <summary>The layer's authored purpose, carried from its definition into the card lede, or null.</summary>
+    public string? Purpose { get; }
 
     /// <summary>The anchored Enforce/Migrate rules rendered into the layer card, in model order.</summary>
     public IReadOnlyList<ArchRule> Rules { get; }

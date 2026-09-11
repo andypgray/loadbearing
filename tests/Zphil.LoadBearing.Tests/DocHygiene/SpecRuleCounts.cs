@@ -30,10 +30,13 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///         that already exists.
 ///     </para>
 ///     <para>
-///         <b>Not the same number as <c>check</c>'s.</b> A check report says 31 because the quarantined
-///         scope desugars into its containment and tripwire children, which are rules the spec never
-///         spells. The board says 30 and the spec file holds 30 statements, so 30 is the count a claim
-///         about what an author wrote should state. A doc quoting a <c>Checked N rules</c> summary is
+///         <b>Not the same number as <c>check</c>'s, nor as the spec file's.</b> A check report says more
+///         than the board because a quarantined scope desugars into its containment and tripwire children
+///         and a cautioned scope into a tripwire alone — rules the spec never spells — and the spec file
+///         holds one statement more than the board because a caution is a statement that is not a rule
+///         over real code: nothing about it can fail, so it has no bullet on the board and no place in a
+///         count of rules. The board's count is the count a claim about what an author wrote should
+///         state. A doc quoting a <c>Checked N rules</c> summary is
 ///         holding a different fact against a different source, and <see cref="ProseQuotedOutputTests" />
 ///         is where that one lives.
 ///     </para>

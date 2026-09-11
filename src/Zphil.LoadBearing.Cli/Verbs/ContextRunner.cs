@@ -13,7 +13,7 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     nothing is scoped to place, emit the pointer line and stop (no extraction — the cost gate
 ///     <see cref="RenderRunner" /> consults too) → otherwise extract, ask
 ///     <see cref="ContextFileComposer.Placements" /> for the cards <c>render</c> would splice, and write the
-///     ones whose resolved directory contains the query path (layer card(s) before quarantine card(s)). No
+///     ones whose resolved directory contains the query path (layer card(s) before scope card(s)). No
 ///     card covers the path ⇒ the same pinned pointer line.
 /// </summary>
 /// <remarks>
@@ -69,8 +69,8 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         // no --json to suppress it for; the stamp writes itself only when the run was narrowed.
         NarrowingNotices.Stamp(output, source, NarrowedUniverseNotice.ContextStamp);
 
-        // Nothing scoped to place — no quarantined scope and no anchored layer — ⇒ skip the extraction cost
-        // and point at the root block.
+        // Nothing scoped to place — no scope of either posture and no anchored layer — ⇒ skip the
+        // extraction cost and point at the root block.
         if (!ContextFileComposer.HasAnythingToPlace(source.Model))
         {
             await output.WriteLineAsync(PointerLine(request.Path));
@@ -82,7 +82,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         string queryFullPath = ResolveQueryPath(request.Path, source.SolutionDirectory);
 
         // The composer's own placements, filtered to the ones covering the query path: layer local-rules
-        // card(s) ahead of quarantined-scope card(s), the same cards in the same order render splices. An
+        // card(s) ahead of scope card(s), the same cards in the same order render splices. An
         // unplaceable card carries a null directory and so covers nothing, which is the drop it always was.
         List<string> cards = ContextFileComposer.Placements(source.Model, codebase)
             .Where(card => card.DirectoryPath is not null && PathFormat.Contains(card.DirectoryPath, queryFullPath))
@@ -99,7 +99,7 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
         return 0;
     }
 
-    // Each matching card — layer cards before quarantine cards — blank line between cards.
+    // Each matching card — layer cards before scope cards — blank line between cards.
     private void WriteCards(IReadOnlyList<string> cards)
     {
         var first = true;

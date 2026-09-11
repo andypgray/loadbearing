@@ -41,13 +41,35 @@ public sealed class ExplainCommandTests
     }
 
     [Fact]
+    public async Task Explain_CautionTripwire_DumpsScopeAndDragonsWithNoBoundaryOrBaseline()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "domain/retry-budget/tripwire", "--spec", CliRunner.ViolatedSpecDll);
+
+        // The whole dump rather than a header pin plus absences: a caution has no containment sentence, no
+        // sanctioned surface and nothing to grandfather, so what needs proving end-to-end is that these four
+        // lines are all of them — the posture's field set is what the reader learns here.
+        result.ShouldSucceed();
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(
+                ("domain/retry-budget/tripwire (caution/tripwire)\n" +
+                 "  because: The retry budget is the one place the domain sanctions a broad catch, and every " +
+                 "caller relies on the filter.\n" +
+                 "  scope: domain/retry-budget\n" +
+                 "  dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps " +
+                 "it green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad " +
+                 "handler. Keep the filter; add cases beside it, never inside it.").NormalizedTrimmed());
+    }
+
+    [Fact]
     public async Task Explain_UnknownRuleId_ExitsTwoWithSortedListing()
     {
         CliResult result = await CliRunner.InvokeAsync(
             "explain", "no/such/rule", "--spec", CliRunner.ViolatedSpecDll);
 
         result.ShouldRefuseWith();
-        // The post-desugar ID set includes the quarantined scope's containment + tripwire children (GRAMMAR §7).
+        // The post-desugar ID set includes both scope postures' children (GRAMMAR §7): the quarantine's
+        // containment + tripwire pair, and the caution's tripwire on its own.
         result.Err.NormalizedTrimmed()
             .ShouldContain(
                 "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
@@ -57,6 +79,7 @@ public sealed class ExplainCommandTests
                 "  di/handlers-registered\n" +
                 "  di/handlers-via-registry\n" +
                 "  di/no-captive-dependencies\n" +
+                "  domain/retry-budget/tripwire\n" +
                 "  domain/values-immutable\n" +
                 "  exceptions/domain-throws-domain\n" +
                 "  exceptions/no-bare-bcl-throw\n" +

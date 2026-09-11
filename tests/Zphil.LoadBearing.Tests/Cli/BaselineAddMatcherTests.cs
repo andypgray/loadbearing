@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -63,8 +64,8 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveEdge_SourceAndTargetMatchDifferentViolations_NoMatchListsBothCandidates()
     {
-        Violation ab = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());
-        Violation cd = Violation.Reference(Node("N.C", "T:N.C"), Node("N.D", "T:N.D"), Array.Empty<SourceLocation>());
+        Violation ab = Violation.Reference(SyntheticNodes.Type("N.A"), SyntheticNodes.Type("N.B"), Array.Empty<SourceLocation>());
+        Violation cd = Violation.Reference(SyntheticNodes.Type("N.C"), SyntheticNodes.Type("N.D"), Array.Empty<SourceLocation>());
         Violation[] violations = [ab, cd];
 
         UserErrorException error = ShouldRefuseListing(
@@ -77,7 +78,7 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveSubject_ByFullNameAndSymbolId_ReturnsMatchingViolation()
     {
-        Violation shape = Violation.Shape(Node("N.S", "T:N.S"), Array.Empty<SourceLocation>());
+        Violation shape = Violation.Shape(SyntheticNodes.Type("N.S"), Array.Empty<SourceLocation>());
         Violation[] violations = [shape];
 
         Violation byName = BaselineAddMatcher.ResolveSubject("r", violations, "N.S");
@@ -136,7 +137,7 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveSubject_NoMatch_ListsCandidatesOrReportsNoViolations()
     {
-        Violation shape = Violation.Shape(Node("N.S", "T:N.S"), Array.Empty<SourceLocation>());
+        Violation shape = Violation.Shape(SyntheticNodes.Type("N.S"), Array.Empty<SourceLocation>());
 
         ShouldRefuseListing(() => BaselineAddMatcher.ResolveSubject("r", [shape], "N.Other"), "N.S");
 
@@ -147,8 +148,8 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveSubject_TwoIdentitiesShareFullName_AmbiguousListsBothSymbolIds()
     {
-        Violation dup1 = Violation.Shape(Node("N.Dup", "T:N.Dup`1"), Array.Empty<SourceLocation>());
-        Violation dup2 = Violation.Shape(Node("N.Dup", "T:N.Dup`2"), Array.Empty<SourceLocation>());
+        Violation dup1 = Violation.Shape(SyntheticNodes.Type("N.Dup", "T:N.Dup`1"), Array.Empty<SourceLocation>());
+        Violation dup2 = Violation.Shape(SyntheticNodes.Type("N.Dup", "T:N.Dup`2"), Array.Empty<SourceLocation>());
         Violation[] violations = [dup1, dup2];
 
         var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveSubject("r", violations, "N.Dup"));
@@ -162,8 +163,8 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveEdge_TwoIdentitiesShareFullNames_AmbiguousListsSymbolIdPairs()
     {
-        Violation edge1 = Violation.Reference(Node("N.A", "T:N.A`1"), Node("N.B", "T:N.B`1"), Array.Empty<SourceLocation>());
-        Violation edge2 = Violation.Reference(Node("N.A", "T:N.A`2"), Node("N.B", "T:N.B`2"), Array.Empty<SourceLocation>());
+        Violation edge1 = Violation.Reference(SyntheticNodes.Type("N.A", "T:N.A`1"), SyntheticNodes.Type("N.B", "T:N.B`1"), Array.Empty<SourceLocation>());
+        Violation edge2 = Violation.Reference(SyntheticNodes.Type("N.A", "T:N.A`2"), SyntheticNodes.Type("N.B", "T:N.B`2"), Array.Empty<SourceLocation>());
         Violation[] violations = [edge1, edge2];
 
         var error = Should.Throw<UserErrorException>(() => BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "N.B"));
@@ -177,8 +178,8 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveEdge_TwoViolationsShareOneIdentity_ResolvesToFirstNotAmbiguous()
     {
-        Violation first = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());
-        Violation second = Violation.Reference(Node("N.A", "T:N.A"), Node("N.B", "T:N.B"), Array.Empty<SourceLocation>());
+        Violation first = Violation.Reference(SyntheticNodes.Type("N.A"), SyntheticNodes.Type("N.B"), Array.Empty<SourceLocation>());
+        Violation second = Violation.Reference(SyntheticNodes.Type("N.A"), SyntheticNodes.Type("N.B"), Array.Empty<SourceLocation>());
         Violation[] violations = [first, second];
 
         Violation resolved = BaselineAddMatcher.ResolveEdge("r", violations, "N.A", "N.B");
@@ -190,7 +191,7 @@ public sealed class BaselineAddMatcherTests
     public void ResolveEdge_MemberByFullNameAndSymbolId_ReturnsMatchingViolation()
     {
         Violation use = Violation.MemberUse(
-            Node("App.Home", "T:App.Home"),
+            SyntheticNodes.Type("App.Home"),
             Member("System.DateTime", "Now", "P:System.DateTime.Now", MemberKind.Property),
             Array.Empty<SourceLocation>());
         Violation[] violations = [use];
@@ -208,10 +209,10 @@ public sealed class BaselineAddMatcherTests
         // A full-name --target naming an overloaded method matches every overload → the ambiguity lists
         // the distinct member ids to retry with (GRAMMAR §4.5).
         Violation intOverload = Violation.MemberUse(
-            Node("App.Cli", "T:App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.Int32)", MemberKind.Method),
+            SyntheticNodes.Type("App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.Int32)", MemberKind.Method),
             Array.Empty<SourceLocation>());
         Violation stringOverload = Violation.MemberUse(
-            Node("App.Cli", "T:App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.String)", MemberKind.Method),
+            SyntheticNodes.Type("App.Cli"), Member("N.Svc", "M", "M:N.Svc.M(System.String)", MemberKind.Method),
             Array.Empty<SourceLocation>());
         Violation[] violations = [intOverload, stringOverload];
 
@@ -227,7 +228,7 @@ public sealed class BaselineAddMatcherTests
     public void ResolveEdge_MemberNoMatch_ListsSourceArrowMemberFullNameForm()
     {
         Violation use = Violation.MemberUse(
-            Node("App.Home", "T:App.Home"),
+            SyntheticNodes.Type("App.Home"),
             Member("System.DateTime", "Now", "P:System.DateTime.Now", MemberKind.Property),
             Array.Empty<SourceLocation>());
 
@@ -304,8 +305,8 @@ public sealed class BaselineAddMatcherTests
     /// </summary>
     private static Violation Edge(ViolationKind kind, string source, string target)
     {
-        TypeNode from = Node(source, $"T:{source}");
-        TypeNode to = Node(target, $"T:{target}");
+        TypeNode from = SyntheticNodes.Type(source);
+        TypeNode to = SyntheticNodes.Type(target);
         IReadOnlyList<SourceLocation> sites = Array.Empty<SourceLocation>();
 
         return kind switch
@@ -320,13 +321,6 @@ public sealed class BaselineAddMatcherTests
         };
     }
 
-    private static TypeNode Node(string fullName, string symbolId)
-    {
-        return new TypeNode(
-            fullName, symbolId, fullName, "N", TypeKind.Class,
-            Accessibility.Public, false, false, false, false, false, "Proj", false);
-    }
-
     private static ProjectNode Project(string name)
     {
         return new ProjectNode(name, projectReferences: []);
@@ -339,13 +333,13 @@ public sealed class BaselineAddMatcherTests
 
     private static MemberReference Member(string containingFullName, string name, string symbolId, MemberKind kind)
     {
-        return new MemberReference(Node(containingFullName, $"T:{containingFullName}"), name, symbolId, kind);
+        return new MemberReference(SyntheticNodes.Type(containingFullName), name, symbolId, kind);
     }
 
     private static MemberNode MemberSubject(string declaringFullName, string name, string symbolId, MemberKind kind)
     {
         return new MemberNode(
-            Node(declaringFullName, $"T:{declaringFullName}"), symbolId, name, kind,
+            SyntheticNodes.Type(declaringFullName), symbolId, name, kind,
             Accessibility.Public, false, false, false, false, null, null,
             Array.Empty<SourceLocation>(), Array.Empty<string>());
     }

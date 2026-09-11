@@ -9,7 +9,7 @@ namespace Zphil.LoadBearing.Roslyn;
 ///         <c>git rev-parse --show-toplevel</c> returns a canonical (symlink-resolved) path, but
 ///         <see cref="System.IO.Path.GetFullPath(string)" /> — and MSBuildWorkspace's document paths — keep
 ///         whatever spelling the solution was opened with. On a symlinked root (macOS's <c>/var</c> →
-///         <c>/private/var</c>, a symlinked home, a Windows junction) the two disagree, and the Quarantine
+///         <c>/private/var</c>, a symlinked home, a Windows junction) the two disagree, and a scope
 ///         tripwire's prefix match silently misses. Canonicalizing once at the discovery seam makes the
 ///         git-derived and workspace-derived paths agree.
 ///     </para>

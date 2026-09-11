@@ -2,10 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
-// The wire shape of `check --sarif`: SARIF 2.1.0 (OASIS), the subset LoadBearing emits — one run, a
-// driver carrying a reporting descriptor per rule, and one result per violation site. Pinned by the golden
-// `Cli/Golden/violated-check.sarif`. Clustered in one file: these records are one cohesive DTO, not product
-// types. Serialized with the shared LoadBearingJson.Options (camelCase names, indented, nulls omitted);
+// The wire shape of `check --sarif`: SARIF 2.1.0 (OASIS), the subset LoadBearing emits — one run, a driver
+// carrying a reporting descriptor per rule, one result per violation site, and one per check warning. Pinned
+// by the golden `Cli/Golden/violated-check.sarif`. Clustered in one file: these records are one cohesive
+// DTO, not product types.
+// Serialized with the shared LoadBearingJson.Options (camelCase names, indented, nulls omitted);
 // dictionary keys ride verbatim (no DictionaryKeyPolicy), so the SRCROOT base-id and the fingerprint key
 // emit exactly as written. The one property camelCase would corrupt — `$schema`, which it would strip the
 // `$` from — carries an explicit name attribute; every other name is its positional property camelCased.
@@ -48,11 +49,15 @@ internal sealed record SarifReportingConfiguration(string Level);
 
 /// <summary>
 ///     A rule's LoadBearing-specific property bag — currently just its posture, the model's own enum cased
-///     for the wire by <see cref="LoadBearingJson.Options" /> exactly as <c>check --json</c> cases it.
+///     for the wire by <see cref="LoadBearingJson.Options" /> exactly as <c>check --json</c> cases it. A
+///     posture added to the enum therefore reaches the wire with no edit here: <c>caution</c> did.
 /// </summary>
 internal sealed record SarifRuleProperties(Posture Posture);
 
-/// <summary>One result — a single violation site. <see cref="Suppressions" /> is null (omitted) on red.</summary>
+/// <summary>
+///     One result — a single violation site, or a check warning. <see cref="Suppressions" /> is null
+///     (omitted) on red and on a warning; <see cref="Locations" /> is empty for a warning that names no file.
+/// </summary>
 internal sealed record SarifResult(
     string RuleId,
     string Level,
@@ -68,8 +73,12 @@ internal sealed record SarifMessage(string Text);
 /// <summary>One result location.</summary>
 internal sealed record SarifLocation(SarifPhysicalLocation PhysicalLocation);
 
-/// <summary>A physical location: the artifact and the region within it.</summary>
-internal sealed record SarifPhysicalLocation(SarifArtifactLocation ArtifactLocation, SarifRegion Region);
+/// <summary>
+///     A physical location: the artifact and the region within it. The region is null (omitted) for a
+///     whole-file result — a tripwire warning is about the file having changed, and there is no line to
+///     point at.
+/// </summary>
+internal sealed record SarifPhysicalLocation(SarifArtifactLocation ArtifactLocation, SarifRegion? Region);
 
 /// <summary>An artifact reference — a solution-relative URI resolved against the <see cref="UriBaseId" /> base.</summary>
 internal sealed record SarifArtifactLocation(string Uri, string UriBaseId);

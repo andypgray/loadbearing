@@ -8,18 +8,22 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     Places each declared layer's "local rules" context card — the second, additive
-///     emission key beside quarantined scopes. A layer earns a card iff at least one Enforce or Migrate
+///     emission key beside scopes. A layer earns a card iff at least one Enforce or Migrate
 ///     rule is <em>anchored</em> on it: the rule's subject <see cref="Selection" /> has that layer's
 ///     <see cref="Model.LayerNoun" /> as its noun head (adjectives and <c>Except</c> refinements keep
 ///     the noun head, so a refined subject still anchors).
 /// </summary>
 /// <remarks>
-///     Quarantine-posture rules are excluded — a quarantined layer's desugared containment subject is
+///     Scope-posture rules are excluded — a quarantined layer's desugared containment subject is
 ///     layer-anchored, but its story belongs to the quarantine card, and the two keys must not
-///     double-emit. The card lands in the deepest common ancestor directory of the layer's matched types,
+///     double-emit. A caution over a layer is excluded twice over: its posture is not in the filter, and
+///     its tripwire carries no constraint to read a subject from, so it anchors nothing whatever the
+///     filter says. The card lands in the deepest common ancestor directory of the layer's matched types,
 ///     shared with <see cref="ScopedContextResolver" /> through <see cref="DirectoryPlacement" />. Like
 ///     scoped placement, this is the one concern that needs the codebase, so it stays beside the internal
-///     <see cref="SelectionEvaluator" /> and returns a public result.
+///     <see cref="SelectionEvaluator" /> and returns a public result. The layer's purpose rides on the
+///     placement from its <see cref="LayerDefinition" />; a purpose alone earns no placement, because
+///     anchoring is what a card is for.
 /// </remarks>
 public static class LayerContextResolver
 {
@@ -47,9 +51,9 @@ public static class LayerContextResolver
             string? directory = DirectoryPlacement.ResolveDirectory(evaluator, BareLayer(anchored[0]));
 
             placements.Add(directory is null
-                ? new LayerPlacement(layer.Name, anchored, null,
+                ? new LayerPlacement(layer.Name, layer.Purpose, anchored, null,
                     $"layer '{layer.Name}' matched no types; no scoped context emitted")
-                : new LayerPlacement(layer.Name, anchored, directory, null));
+                : new LayerPlacement(layer.Name, layer.Purpose, anchored, directory, null));
         }
 
         return placements;
@@ -66,8 +70,8 @@ public static class LayerContextResolver
         return model.Layers.Any(layer => AnchoredRules(model, layer).Any());
     }
 
-    // The Enforce/Migrate rules whose subject noun head is this layer, in model order. Quarantine rules
-    // are excluded by the posture filter — a quarantined layer's containment story is the quarantine card's.
+    // The Enforce/Migrate rules whose subject noun head is this layer, in model order. Scope rules are
+    // excluded by the posture filter — a scoped layer's story is the scope card's.
     private static IEnumerable<ArchRule> AnchoredRules(ArchitectureModel model, LayerDefinition layer)
     {
         return model.Rules.Where(rule =>

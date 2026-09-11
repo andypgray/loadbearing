@@ -15,7 +15,7 @@ internal sealed class ProjectNoun(string name) : SelectionNoun
 
     internal override string CollapsedLocative(IReadOnlyList<SelectionNoun> group)
     {
-        List<string> names = group.Select(noun => ProseFormat.Backtick(((ProjectNoun)noun).Name)).ToList();
-        return $" in projects {ProseFormat.JoinReferences(names)}";
+        List<string> names = group.Select(noun => ((ProjectNoun)noun).Name).ToList();
+        return $" in projects {ProseFormat.BacktickedList(names)}";
     }
 }

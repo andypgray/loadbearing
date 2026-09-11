@@ -49,11 +49,28 @@ public sealed class CliMcpParityTests
         "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
         "- Expand: `loadbearing explain legacy/billing/containment`.";
 
+    // The AgentContextRenderer.CautionCard body arch_context returns for the cautioned domain/retry-budget
+    // scope — the RenderCommandE2ETests.DomainCautionBody card without its provenance line (moves with that
+    // pin). The other scope posture over the same spec, so one harness covers both.
+    private const string ExpectedCautionCard =
+        "## Cautioned scope `domain/retry-budget`\n\n" +
+        "This directory holds the cautioned `domain/retry-budget` scope: types named `RetryPolicy`. " +
+        "Here be dragons — the weirdness below is load-bearing; read it before you edit, and do not " +
+        "tidy it away.\n\n" +
+        "Dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps it green " +
+        "under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. Keep the " +
+        "filter; add cases beside it, never inside it.\n\n" +
+        "- `domain/retry-budget/tripwire` — a change set touching this scope is flagged by " +
+        "`check --diff-base <ref>`. The retry budget is the one place the domain sanctions a broad catch, " +
+        "and every caller relies on the filter.\n" +
+        "- Expand: `loadbearing explain domain/retry-budget/tripwire`.";
+
     // The AgentContextRenderer.LayerCard body arch_context returns for the Web layer of MyAppLayerSpec —
     // no provenance line (that is a render file-splice concern), mirroring the quarantined-scope card above.
     private const string ExpectedWebLayerCard =
         "## Layer `Web`\n\n" +
-        "This directory holds the `Web` layer. Its architecture rules:\n\n" +
+        "This directory holds the `Web` layer. The HTTP surface: controllers and the views they serve. " +
+        "Its architecture rules:\n\n" +
         "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
         "The web layer must reach billing only through the sanctioned facade.\n" +
         "- Expand any rule above with `loadbearing explain <rule-id>`.";
@@ -180,6 +197,15 @@ public sealed class CliMcpParityTests
         inScope.ShouldHaveTextContent()
             .NormalizedTrimmed()
             .ShouldBe(ExpectedScopeCard);
+
+        // A path inside the cautioned scope → that scope's card body. Same tool, same spec, the other scope
+        // posture: what an agent reads before editing dragon territory does not depend on whether the
+        // dragons are fenced off or merely load-bearing.
+        CallToolResult inCaution = await harness.Client.CallToolAsync(
+            "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/RetryPolicy.cs" }, cancellationToken: Ct);
+        inCaution.ShouldHaveTextContent()
+            .NormalizedTrimmed()
+            .ShouldBe(ExpectedCautionCard);
 
         // A path no scope covers → the pinned pointer line (echoing the query path). The RenderSpec's
         // Domain/Web layers carry no anchored rules, so no layer card competes here.

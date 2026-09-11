@@ -31,7 +31,7 @@ internal static class BaselineStore
     ///     containment (any rule with a <see cref="ArchRule.BaselinePath" />): resolves each rule's
     ///     baseline path against <paramref name="solutionDirectory" />, parses each distinct file once
     ///     (verifying its digest — tamper fails fast), and captures the matching section. A missing file
-    ///     or missing section leaves the rule uncaptured. A Quarantine tripwire (no baseline path) is skipped.
+    ///     or missing section leaves the rule uncaptured. A scope tripwire (no baseline path) is skipped.
     /// </summary>
     public static BaselineIndex LoadForModel(ArchitectureModel model, string solutionDirectory)
     {
@@ -159,20 +159,20 @@ internal static class BaselineStore
         if (entry.ValueKind != JsonValueKind.Object) throw Malformed(path, $"rule '{ruleId}' has a non-object entry.");
 
         // One pass over the properties answers the whole six-way shape question — {subject}, {source,
-        // target}, and either of those plus a because, plus the two an edge's siteCount adds — and this runs
-        // per entry, per baseline file, on every check and status: materializing the names and set-comparing
-        // them six times was work proportional to a team's whole debt ledger for a fixed question about
-        // five words.
-        var hasSubject = false;
-        var hasSource = false;
-        var hasTarget = false;
-        var hasBecause = false;
-        var hasSiteCount = false;
+        // target}, and either of those plus a because, plus the two an edge's siteCount adds — and keeps
+        // each value it meets, so nothing below walks the object a second time. This runs per entry, per
+        // baseline file, on every check and status: materializing the names and set-comparing them six
+        // times was work proportional to a team's whole debt ledger for a fixed question about five words.
+        JsonElement? subject = null;
+        JsonElement? source = null;
+        JsonElement? target = null;
+        JsonElement? because = null;
+        JsonElement? siteCount = null;
         var hasStranger = false;
         var propertyCount = 0;
         // A legacy file has no measure, so 'siteCount' there is a stranger rather than an optional key:
         // a v1 file carrying one was hand-edited, and its digest was computed without it.
-        bool measured = schemaVersion != BaselineFormat.LegacySchemaVersion;
+        bool measured = BaselineFormat.CarriesSiteCount(schemaVersion);
 
         foreach (JsonProperty property in entry.EnumerateObject())
         {
@@ -180,19 +180,19 @@ internal static class BaselineStore
             switch (property.Name)
             {
                 case "subject":
-                    hasSubject = true;
+                    subject = property.Value;
                     break;
                 case "source":
-                    hasSource = true;
+                    source = property.Value;
                     break;
                 case "target":
-                    hasTarget = true;
+                    target = property.Value;
                     break;
                 case "because":
-                    hasBecause = true;
+                    because = property.Value;
                     break;
                 case "siteCount" when measured:
-                    hasSiteCount = true;
+                    siteCount = property.Value;
                     break;
                 default:
                     hasStranger = true;
@@ -202,31 +202,34 @@ internal static class BaselineStore
 
         // Counting the distinct names back against the properties read is what rejects a repeated key: a
         // second 'subject' is a hand edit whose second value would silently never be read.
-        int distinctNames = (hasSubject ? 1 : 0) + (hasSource ? 1 : 0) + (hasTarget ? 1 : 0)
-                            + (hasBecause ? 1 : 0) + (hasSiteCount ? 1 : 0);
+        int distinctNames = Present(subject) + Present(source) + Present(target) + Present(because) + Present(siteCount);
         bool exactlyNamed = !hasStranger && propertyCount == distinctNames;
 
-        bool isSubject = exactlyNamed && hasSubject && !hasSource && !hasTarget;
-        bool isEdge = exactlyNamed && hasSource && hasTarget && !hasSubject;
+        bool isSubject = exactlyNamed && subject is not null && source is null && target is null;
+        bool isEdge = exactlyNamed && source is not null && target is not null && subject is null;
         if (!isSubject && !isEdge)
             throw Malformed(path, $"rule '{ruleId}' has an entry that is neither {{source, target}} nor {{subject}}.");
 
-        if (isSubject && hasSiteCount)
+        if (isSubject && siteCount is not null)
             throw Malformed(path, $"rule '{ruleId}' has a 'siteCount' on a subject entry — only edge entries carry one.");
 
         BaselineEntry parsed = isSubject
-            ? BaselineEntry.ForSubject(RequireNonEmptyString(path, ruleId, "subject", entry.GetProperty("subject")))
+            ? BaselineEntry.ForSubject(RequireNonEmptyString(path, ruleId, "subject", subject!.Value))
             : BaselineEntry.ForEdge(
-                RequireNonEmptyString(path, ruleId, "source", entry.GetProperty("source")),
-                RequireNonEmptyString(path, ruleId, "target", entry.GetProperty("target")));
+                RequireNonEmptyString(path, ruleId, "source", source!.Value),
+                RequireNonEmptyString(path, ruleId, "target", target!.Value));
 
-        if (hasSiteCount)
-            parsed = parsed.WithSiteCount(ReadSiteCount(path, ruleId, entry.GetProperty("siteCount")));
+        if (siteCount is { } count)
+            parsed = parsed.WithSiteCount(ReadSiteCount(path, ruleId, count));
 
-        if (!entry.TryGetProperty("because", out JsonElement because)) return parsed;
+        return because is { } attribution
+            ? parsed.WithBecause(ReadBecause(path, ruleId, attribution))
+            : parsed;
+    }
 
-        string attribution = ReadBecause(path, ruleId, because);
-        return parsed.WithBecause(attribution);
+    private static int Present(JsonElement? property)
+    {
+        return property is null ? 0 : 1;
     }
 
     private static int ReadSiteCount(string path, string ruleId, JsonElement value)

@@ -9,7 +9,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     selection's card.
 /// </summary>
 /// <remarks>
-///     Both <see cref="ScopedContextResolver" /> (quarantined scopes) and
+///     Both <see cref="ScopedContextResolver" /> (scopes of either posture) and
 ///     <see cref="LayerContextResolver" /> (layer local-rules cards) place through this one helper, so the
 ///     two emission keys land a co-located card in exactly the same directory. Sharing only the arithmetic
 ///     would leave the more valuable half — <em>which</em> paths get collapsed — free to diverge, with the

@@ -126,7 +126,7 @@ internal static class ProseFormat
     {
         List<IReadOnlyList<string>> paths = anchors.Select(anchor => anchor.PathSegments).ToList();
         IReadOnlyList<string> displays = ResolvePathDisplays(paths);
-        return JoinReferences(displays.Select(Backtick).ToList());
+        return BacktickedList(displays);
     }
 
     /// <summary>
@@ -157,7 +157,18 @@ internal static class ProseFormat
         // display (distinct simple names) is not widened — an accepted v1 corner.
         List<IReadOnlyList<string>> paths = anchors.Select(anchor => anchor.PathSegments).ToList();
         IReadOnlyList<string> displays = ResolvePathDisplays(paths);
-        return JoinReferences(displays.Select(display => Backtick(BracketAttribute(display))).ToList());
+        return BacktickedList(displays.Select(BracketAttribute).ToList());
+    }
+
+    /// <summary>
+    ///     Backticks each value and joins the result as an or-list
+    ///     (<see cref="JoinReferences(IReadOnlyList{string})" />): <c>`A`</c>; <c>`A` or `B`</c>;
+    ///     <c>`A`, `B` or `C`</c> — the one spelling of "these names, as code" every list of globs, names,
+    ///     monikers and displays renders through.
+    /// </summary>
+    internal static string BacktickedList(IReadOnlyList<string> values)
+    {
+        return JoinReferences(values.Select(Backtick).ToList());
     }
 
     /// <summary>

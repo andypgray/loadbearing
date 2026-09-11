@@ -3,7 +3,7 @@
 
 ## Layer `Host`
 
-This directory holds the `Host` layer. Its architecture rules:
+This directory holds the `Host` layer. Host is the composition root: it wires the modules through their Contracts surfaces and serves the HTTP endpoints. Its architecture rules:
 
 - `modules/host/outbound` — The Host layer must reference only types in `Meridian.Operations.Dispatch.Contracts.*`, types in `Meridian.Operations.Tracking.Contracts.*`, types in `Meridian.Operations.Invoicing.Contracts.*`, `IDemurrageCalculator` or `DemurrageCalculator` (external packages are not constrained by this rule). The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.
 - Expand any rule above with `loadbearing explain <rule-id>`.

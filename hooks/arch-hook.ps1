@@ -11,6 +11,10 @@
 # non-blocking config problem the user sees rather than an architecture violation the agent
 # is told to "fix".
 #
+# Exit 0 is not silence: --hook-json makes a clean check write its report as PostToolUse additional
+# context when a tripwire warned, and this wrapper passes that through on stdout, where Claude Code
+# turns it into a transcript message. A clean check with nothing to say writes nothing.
+#
 # Lift this into your own repo: copy it to .claude/arch-hook.ps1 and change the three values
 # below to your solution, your spec project, and the ref you diff against.
 
@@ -64,13 +68,13 @@ $Solution = if ($env:SOLUTION)  { $env:SOLUTION }  else { 'Zphil.LoadBearing.sln
 $Spec     = if ($env:SPEC)      { $env:SPEC }      else { 'arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj' }
 $DiffBase = if ($env:DIFF_BASE) { $env:DIFF_BASE } else { 'HEAD' }
 
-$out = loadbearing check $Solution --spec $Spec --diff-base $DiffBase 2>&1
+$out = loadbearing check $Solution --spec $Spec --diff-base $DiffBase --hook-json 2>&1
 $code = $LASTEXITCODE
 # Multi-line output lands in $out as an array; written raw, stderr would carry the array's
 # type name instead of the report. Join first.
 $report = $out -join "`n"
 switch ($code) {
-    0 { exit 0 }                                      # clean (tripwire warnings, if any, are informational)
+    0 { if ($report) { [Console]::Out.WriteLine($report) }; exit 0 } # warnings reach the agent as context
     1 { [Console]::Error.WriteLine($report); exit 2 } # violations -> block, feed the report back to the agent
     default { [Console]::Error.WriteLine("loadbearing config error:`n$report"); exit 1 }
 }

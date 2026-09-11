@@ -263,7 +263,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
     {
         var source = new DiagnosticInjectingSolutionSource(diagnostics, failedProjects);
         var request = new CheckRequest(
-            workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, null,
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, false, null,
             SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, null,
             allowWorkspaceDiagnostics, null, null, DocumentGrain.Full);
 
